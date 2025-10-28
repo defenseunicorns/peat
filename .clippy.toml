@@ -1,0 +1,7 @@
+# Clippy configuration for CAP protocol
+
+# Deny by default
+msrv = "1.70"
+
+# Allow certain lints that are too noisy
+avoid-breaking-exported-api = false

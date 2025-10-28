@@ -1,0 +1,38 @@
+[workspace]
+resolver = "2"
+members = [
+    "cap-protocol",
+    "cap-sim"
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Kit Plummer <kit@revolveteam.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourusername/cap"
+
+[workspace.dependencies]
+# CRDT synchronization
+dittolive-ditto = "4"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Utilities
+uuid = { version = "1", features = ["v4", "serde"] }
+thiserror = "1"
+anyhow = "1"
+async-trait = "0.1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Testing
+proptest = "1"
+criterion = { version = "0.5", features = ["html_reports"] }

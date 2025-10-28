@@ -1,0 +1,27 @@
+# Rust
+/target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Ditto
+.ditto/
+*.ditto
+
+# Testing
+coverage/
+
+# Logs
+*.log
+
+# Build artifacts
+dist/
+build/
