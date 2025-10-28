@@ -30,6 +30,9 @@
 //!
 //! Run with: cargo run --example ditto_spike --features ditto-spike
 
+// Allow deprecated API usage in this example for demonstration purposes
+#![allow(deprecated)]
+
 use dittolive_ditto::prelude::*;
 use dittolive_ditto::AppId;
 use std::sync::Arc;
@@ -130,35 +133,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn create_ditto_instance(
-    app_id_str: &str,
-    shared_key: &str,
-    persistence_dir: &str,
-) -> Result<Ditto, Box<dyn std::error::Error>> {
-    // Create persistent storage root
-    let root = Arc::new(PersistentRoot::new(persistence_dir)?);
-
-    let ditto = Ditto::builder()
-        .with_root(root)
-        .with_identity(|ditto_root| {
-            // Get AppId from environment variable
-            let app_id = AppId::from_env("DITTO_APP_ID")?;
-
-            // Create SharedKey identity
-            // Signature: SharedKey::new(ditto_root, app_id, key_der_b64)
-            identity::SharedKey::new(ditto_root, app_id, shared_key)
-        })?
-        .build()?;
-
-    // Enable LAN transport for peer discovery
-    // By default, all transports are disabled
-    ditto.update_transport_config(|config| {
-        config.peer_to_peer.lan.enabled = true;
-    });
-
-    Ok(ditto)
-}
-
 /// Creates a Ditto instance with TCP transport for localhost peer discovery testing.
 ///
 /// # Initialization Order (CRITICAL)
@@ -182,7 +156,7 @@ fn create_ditto_instance(
 /// While LAN/mDNS transport works well on macOS, TCP provides explicit control
 /// over the server/client topology and works consistently across all platforms.
 fn create_ditto_with_tcp(
-    app_id_str: &str,
+    _app_id_str: &str,
     shared_key: &str,
     persistence_dir: &str,
     listen_port: Option<u16>,
