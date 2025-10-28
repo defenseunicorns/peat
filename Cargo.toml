@@ -9,8 +9,8 @@ members = [
 version = "0.1.0"
 edition = "2021"
 authors = ["Kit Plummer <kit@revolveteam.com>"]
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourusername/cap"
+license = "MIT"
+repository = "https://github.com/kitplummer/cap"
 
 [workspace.dependencies]
 # CRDT synchronization
@@ -28,6 +28,8 @@ uuid = { version = "1", features = ["v4", "serde"] }
 thiserror = "1"
 anyhow = "1"
 async-trait = "0.1"
+dotenvy = "0.15"
+chrono = "0.4"
 
 # Logging
 tracing = "0.1"

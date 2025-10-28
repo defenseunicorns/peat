@@ -14,7 +14,16 @@ Cargo.lock
 
 # Ditto
 .ditto/
+.ditto1/
+.ditto2/
 *.ditto
+
+# Environment
+.env
+.env.local
+
+# Codex
+Codex.md
 
 # Testing
 coverage/

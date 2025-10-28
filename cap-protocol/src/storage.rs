@@ -2,4 +2,4 @@
 
 pub mod ditto_store;
 
-// Re-exports will be added as modules are implemented
+pub use ditto_store::{DittoConfig, DittoStore};
