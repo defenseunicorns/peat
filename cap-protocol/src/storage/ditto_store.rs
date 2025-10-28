@@ -85,7 +85,9 @@ impl DittoStore {
 
                 // Create SharedKey identity for offline P2P sync
                 // SharedKey uses symmetric encryption for secure peer-to-peer communication
-                identity::SharedKey::new(ditto_root, app_id, &config.shared_key)
+                // Trim the shared_key to handle potential whitespace from environment variables
+                let shared_key = config.shared_key.trim();
+                identity::SharedKey::new(ditto_root, app_id, shared_key)
             })
             .map_err(|e| Error::Storage(format!("Failed to build Ditto: {}", e)))?
             .build()
@@ -154,14 +156,21 @@ impl DittoStore {
         // Load environment variables
         dotenvy::dotenv().ok();
 
+        // Trim all values to handle potential whitespace from environment variables
         let app_id = std::env::var("DITTO_APP_ID")
-            .map_err(|_| Error::Configuration("DITTO_APP_ID not set".to_string()))?;
+            .map_err(|_| Error::Configuration("DITTO_APP_ID not set".to_string()))?
+            .trim()
+            .to_string();
 
         let shared_key = std::env::var("DITTO_SHARED_KEY")
-            .map_err(|_| Error::Configuration("DITTO_SHARED_KEY not set".to_string()))?;
+            .map_err(|_| Error::Configuration("DITTO_SHARED_KEY not set".to_string()))?
+            .trim()
+            .to_string();
 
         let persistence_dir = PathBuf::from(
-            std::env::var("DITTO_PERSISTENCE_DIR").unwrap_or_else(|_| ".ditto".to_string()),
+            std::env::var("DITTO_PERSISTENCE_DIR")
+                .unwrap_or_else(|_| ".ditto".to_string())
+                .trim(),
         );
 
         let config = DittoConfig {
@@ -286,9 +295,15 @@ mod tests {
         dotenvy::dotenv().ok();
 
         let config = DittoConfig {
-            app_id: std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID not set"),
+            app_id: std::env::var("DITTO_APP_ID")
+                .expect("DITTO_APP_ID not set")
+                .trim()
+                .to_string(),
             persistence_dir: PathBuf::from(".ditto_test_init"),
-            shared_key: std::env::var("DITTO_SHARED_KEY").expect("DITTO_SHARED_KEY not set"),
+            shared_key: std::env::var("DITTO_SHARED_KEY")
+                .expect("DITTO_SHARED_KEY not set")
+                .trim()
+                .to_string(),
             tcp_listen_port: None,
             tcp_connect_address: None,
         };
@@ -302,9 +317,15 @@ mod tests {
         dotenvy::dotenv().ok();
 
         let config = DittoConfig {
-            app_id: std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID not set"),
+            app_id: std::env::var("DITTO_APP_ID")
+                .expect("DITTO_APP_ID not set")
+                .trim()
+                .to_string(),
             persistence_dir: PathBuf::from(".ditto_test_crud"),
-            shared_key: std::env::var("DITTO_SHARED_KEY").expect("DITTO_SHARED_KEY not set"),
+            shared_key: std::env::var("DITTO_SHARED_KEY")
+                .expect("DITTO_SHARED_KEY not set")
+                .trim()
+                .to_string(),
             tcp_listen_port: None,
             tcp_connect_address: None,
         };
@@ -346,9 +367,15 @@ mod tests {
         // Create two Ditto instances with unique persistence directories
         // Store1: TCP listener on port 12345 for reliable localhost peer discovery
         let config1 = DittoConfig {
-            app_id: std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID not set"),
+            app_id: std::env::var("DITTO_APP_ID")
+                .expect("DITTO_APP_ID not set")
+                .trim()
+                .to_string(),
             persistence_dir: PathBuf::from(".ditto_test_sync1"),
-            shared_key: std::env::var("DITTO_SHARED_KEY").expect("DITTO_SHARED_KEY not set"),
+            shared_key: std::env::var("DITTO_SHARED_KEY")
+                .expect("DITTO_SHARED_KEY not set")
+                .trim()
+                .to_string(),
             tcp_listen_port: Some(12345),
             tcp_connect_address: None,
         };
@@ -356,9 +383,15 @@ mod tests {
 
         // Store2: TCP client connecting to port 12345
         let config2 = DittoConfig {
-            app_id: std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID not set"),
+            app_id: std::env::var("DITTO_APP_ID")
+                .expect("DITTO_APP_ID not set")
+                .trim()
+                .to_string(),
             persistence_dir: PathBuf::from(".ditto_test_sync2"),
-            shared_key: std::env::var("DITTO_SHARED_KEY").expect("DITTO_SHARED_KEY not set"),
+            shared_key: std::env::var("DITTO_SHARED_KEY")
+                .expect("DITTO_SHARED_KEY not set")
+                .trim()
+                .to_string(),
             tcp_listen_port: None,
             tcp_connect_address: Some("localhost:12345".to_string()),
         };
