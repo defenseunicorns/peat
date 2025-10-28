@@ -1,6 +1,6 @@
 //! Core trait definitions for the CAP protocol
 
-use crate::{Error, Result};
+use crate::Result;
 use async_trait::async_trait;
 use std::fmt::Debug;
 
