@@ -36,8 +36,8 @@
 use dittolive_ditto::prelude::*;
 use dittolive_ditto::AppId;
 use std::sync::Arc;
-use std::time::Duration;
 use std::thread::sleep;
+use std::time::Duration;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load environment variables
@@ -72,29 +72,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating subscriptions for peer discovery...");
     let _sub1_caps = ditto1.store().register_observer_v2(
         "SELECT * FROM platform_capabilities",
-        |_result| { /* Observer callback */ }
+        |_result| { /* Observer callback */ },
     )?;
     let _sub2_caps = ditto2.store().register_observer_v2(
         "SELECT * FROM platform_capabilities",
-        |_result| { /* Observer callback */ }
+        |_result| { /* Observer callback */ },
     )?;
 
     let _sub1_state = ditto1.store().register_observer_v2(
         "SELECT * FROM platform_state",
-        |_result| { /* Observer callback */ }
+        |_result| { /* Observer callback */ },
     )?;
     let _sub2_state = ditto2.store().register_observer_v2(
         "SELECT * FROM platform_state",
-        |_result| { /* Observer callback */ }
+        |_result| { /* Observer callback */ },
     )?;
 
     let _sub1_squad = ditto1.store().register_observer_v2(
         "SELECT * FROM squad_members",
-        |_result| { /* Observer callback */ }
+        |_result| { /* Observer callback */ },
     )?;
     let _sub2_squad = ditto2.store().register_observer_v2(
         "SELECT * FROM squad_members",
-        |_result| { /* Observer callback */ }
+        |_result| { /* Observer callback */ },
     )?;
 
     // Wait for peer discovery
@@ -105,7 +105,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if graph1.remote_peers.is_empty() {
         println!("⚠ Warning: Peers have not discovered each other yet");
     } else {
-        println!("✓ Peers connected ({} remote peers)", graph1.remote_peers.len());
+        println!(
+            "✓ Peers connected ({} remote peers)",
+            graph1.remote_peers.len()
+        );
     }
 
     // Test 1: G-Set (grow-only set) - Platform capabilities
@@ -195,7 +198,10 @@ fn create_ditto_with_tcp(
         }
         if let Some(port) = connect_port {
             // Configure as TCP client (connector)
-            config.connect.tcp_servers.insert(format!("localhost:{}", port));
+            config
+                .connect
+                .tcp_servers
+                .insert(format!("localhost:{}", port));
         }
         // Also enable LAN/mDNS for non-localhost scenarios (works well on macOS)
         config.peer_to_peer.lan.enabled = true;
@@ -205,12 +211,7 @@ fn create_ditto_with_tcp(
 }
 
 fn get_peer_key(ditto: &Ditto) -> String {
-    ditto
-        .presence()
-        .graph()
-        .local_peer
-        .peer_key_string
-        .clone()
+    ditto.presence().graph().local_peer.peer_key_string.clone()
 }
 
 fn test_g_set(ditto1: &Ditto, ditto2: &Ditto) -> Result<(), Box<dyn std::error::Error>> {
@@ -223,10 +224,7 @@ fn test_g_set(ditto1: &Ditto, ditto2: &Ditto) -> Result<(), Box<dyn std::error::
         "capabilities": ["camera", "gps"]
     });
 
-    ditto1
-        .store()
-        .collection(collection_name)?
-        .upsert(doc1)?;
+    ditto1.store().collection(collection_name)?.upsert(doc1)?;
 
     // Wait for sync
     sleep(Duration::from_secs(1));
@@ -264,10 +262,7 @@ fn test_lww_register(ditto1: &Ditto, ditto2: &Ditto) -> Result<(), Box<dyn std::
         "timestamp": chrono::Utc::now().timestamp()
     });
 
-    ditto1
-        .store()
-        .collection(collection_name)?
-        .upsert(doc1)?;
+    ditto1.store().collection(collection_name)?.upsert(doc1)?;
 
     sleep(Duration::from_millis(500));
 
@@ -283,10 +278,7 @@ fn test_lww_register(ditto1: &Ditto, ditto2: &Ditto) -> Result<(), Box<dyn std::
         "timestamp": chrono::Utc::now().timestamp()
     });
 
-    ditto2
-        .store()
-        .collection(collection_name)?
-        .upsert(doc2)?;
+    ditto2.store().collection(collection_name)?.upsert(doc2)?;
 
     // Wait for sync
     sleep(Duration::from_secs(1));
@@ -317,10 +309,7 @@ fn test_or_set(ditto1: &Ditto, ditto2: &Ditto) -> Result<(), Box<dyn std::error:
         "members": ["uav_001", "uav_002"]
     });
 
-    ditto1
-        .store()
-        .collection(collection_name)?
-        .upsert(doc1)?;
+    ditto1.store().collection(collection_name)?.upsert(doc1)?;
 
     sleep(Duration::from_millis(500));
 
@@ -331,10 +320,7 @@ fn test_or_set(ditto1: &Ditto, ditto2: &Ditto) -> Result<(), Box<dyn std::error:
         "members": ["uav_001", "uav_002", "uav_003"]
     });
 
-    ditto2
-        .store()
-        .collection(collection_name)?
-        .upsert(doc2)?;
+    ditto2.store().collection(collection_name)?.upsert(doc2)?;
 
     // Wait for sync
     sleep(Duration::from_secs(1));

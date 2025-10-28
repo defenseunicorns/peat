@@ -2,9 +2,9 @@
 //!
 //! Implements hierarchical message routing and multi-level aggregation.
 
-pub mod router;
-pub mod platoon;
 pub mod flow_control;
 pub mod maintenance;
+pub mod platoon;
+pub mod router;
 
 // Re-exports will be added as modules are implemented
