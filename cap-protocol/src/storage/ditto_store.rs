@@ -197,10 +197,15 @@ impl DittoStore {
     }
 
     /// Execute a query on a collection using DQL (Ditto Query Language)
-    pub async fn query(&self, collection: &str, where_clause: &str) -> Result<Vec<serde_json::Value>> {
+    pub async fn query(
+        &self,
+        collection: &str,
+        where_clause: &str,
+    ) -> Result<Vec<serde_json::Value>> {
         let dql_query = format!("SELECT * FROM {} WHERE {}", collection, where_clause);
 
-        let query_result = self.ditto
+        let query_result = self
+            .ditto
             .store()
             .execute_v2(dql_query)
             .await
@@ -218,19 +223,13 @@ impl DittoStore {
     }
 
     /// Insert/update a document into a collection using DQL
-    pub async fn upsert(
-        &self,
-        collection: &str,
-        document: serde_json::Value,
-    ) -> Result<String> {
+    pub async fn upsert(&self, collection: &str, document: serde_json::Value) -> Result<String> {
         let dql_query = format!("INSERT INTO {} DOCUMENTS (:doc)", collection);
 
-        let query_result = self.ditto
+        let query_result = self
+            .ditto
             .store()
-            .execute_v2((
-                dql_query,
-                serde_json::json!({"doc": document})
-            ))
+            .execute_v2((dql_query, serde_json::json!({"doc": document})))
             .await
             .map_err(|e| Error::Storage(format!("Upsert failed: {}", e)))?;
 
@@ -251,10 +250,7 @@ impl DittoStore {
 
         self.ditto
             .store()
-            .execute_v2((
-                dql_query,
-                serde_json::json!({"id": doc_id})
-            ))
+            .execute_v2((dql_query, serde_json::json!({"id": doc_id})))
             .await
             .map_err(|e| Error::Storage(format!("Remove failed: {}", e)))?;
 
@@ -395,12 +391,9 @@ mod tests {
         let _observer1 = store1
             .ditto()
             .store()
-            .register_observer_v2(
-                "SELECT * FROM sync_test",
-                |result| {
-                    println!("Store1 observer triggered: {} items", result.item_count());
-                }
-            )
+            .register_observer_v2("SELECT * FROM sync_test", |result| {
+                println!("Store1 observer triggered: {} items", result.item_count());
+            })
             .expect("Failed to register observer on store1");
 
         // Store2: Create sync subscription + observer
@@ -413,12 +406,9 @@ mod tests {
         let _observer2 = store2
             .ditto()
             .store()
-            .register_observer_v2(
-                "SELECT * FROM sync_test",
-                |result| {
-                    println!("Store2 observer triggered: {} items", result.item_count());
-                }
-            )
+            .register_observer_v2("SELECT * FROM sync_test", |result| {
+                println!("Store2 observer triggered: {} items", result.item_count());
+            })
             .expect("Failed to register observer on store2");
 
         // Wait for peers to discover each other (with timeout)
@@ -431,7 +421,10 @@ mod tests {
             let peer_count = graph1.remote_peers.len();
 
             if peer_count > 0 {
-                println!("✓ Peers connected after {} attempts ({} peers)", attempt, peer_count);
+                println!(
+                    "✓ Peers connected after {} attempts ({} peers)",
+                    attempt, peer_count
+                );
                 connected = true;
                 break;
             }
@@ -474,7 +467,11 @@ mod tests {
                 .expect("Failed to query on store2");
 
             if !results.is_empty() {
-                println!("✓ Document synced after {} attempts ({} docs)", attempt, results.len());
+                println!(
+                    "✓ Document synced after {} attempts ({} docs)",
+                    attempt,
+                    results.len()
+                );
                 synced = true;
                 break;
             }

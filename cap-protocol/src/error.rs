@@ -42,10 +42,7 @@ pub enum Error {
 
     /// Resource not found
     #[error("Resource not found: {resource_type} with id {id}")]
-    NotFound {
-        resource_type: String,
-        id: String,
-    },
+    NotFound { resource_type: String, id: String },
 
     /// Configuration errors
     #[error("Configuration error: {0}")]

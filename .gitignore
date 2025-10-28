@@ -17,6 +17,7 @@ Cargo.lock
 .ditto1/
 .ditto2/
 *.ditto
+cap-protocol/.ditto*
 
 # Environment
 .env
