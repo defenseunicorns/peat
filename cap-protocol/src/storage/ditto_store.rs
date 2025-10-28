@@ -295,18 +295,22 @@ mod tests {
         dotenvy::dotenv().ok();
 
         // Skip test if Ditto credentials not available (e.g., in CI without secrets)
-        let app_id = std::env::var("DITTO_APP_ID")
-            .ok()
-            .and_then(|v| {
-                let trimmed = v.trim();
-                if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
-            });
-        let shared_key = std::env::var("DITTO_SHARED_KEY")
-            .ok()
-            .and_then(|v| {
-                let trimmed = v.trim();
-                if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
-            });
+        let app_id = std::env::var("DITTO_APP_ID").ok().and_then(|v| {
+            let trimmed = v.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        });
+        let shared_key = std::env::var("DITTO_SHARED_KEY").ok().and_then(|v| {
+            let trimmed = v.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        });
 
         if app_id.is_none() || shared_key.is_none() {
             eprintln!("Skipping test: Ditto credentials not available (required: DITTO_APP_ID, DITTO_SHARED_KEY, DITTO_OFFLINE_TOKEN)");
@@ -330,18 +334,22 @@ mod tests {
         dotenvy::dotenv().ok();
 
         // Skip test if Ditto credentials not available
-        let app_id = std::env::var("DITTO_APP_ID")
-            .ok()
-            .and_then(|v| {
-                let trimmed = v.trim();
-                if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
-            });
-        let shared_key = std::env::var("DITTO_SHARED_KEY")
-            .ok()
-            .and_then(|v| {
-                let trimmed = v.trim();
-                if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
-            });
+        let app_id = std::env::var("DITTO_APP_ID").ok().and_then(|v| {
+            let trimmed = v.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        });
+        let shared_key = std::env::var("DITTO_SHARED_KEY").ok().and_then(|v| {
+            let trimmed = v.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        });
 
         if app_id.is_none() || shared_key.is_none() {
             eprintln!("Skipping test: Ditto credentials not available");
@@ -391,18 +399,22 @@ mod tests {
         dotenvy::dotenv().ok();
 
         // Skip test if Ditto credentials not available
-        let app_id = std::env::var("DITTO_APP_ID")
-            .ok()
-            .and_then(|v| {
-                let trimmed = v.trim();
-                if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
-            });
-        let shared_key = std::env::var("DITTO_SHARED_KEY")
-            .ok()
-            .and_then(|v| {
-                let trimmed = v.trim();
-                if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
-            });
+        let app_id = std::env::var("DITTO_APP_ID").ok().and_then(|v| {
+            let trimmed = v.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        });
+        let shared_key = std::env::var("DITTO_SHARED_KEY").ok().and_then(|v| {
+            let trimmed = v.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        });
 
         if app_id.is_none() || shared_key.is_none() {
             eprintln!("Skipping test: Ditto credentials not available");
