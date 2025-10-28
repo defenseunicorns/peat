@@ -294,16 +294,29 @@ mod tests {
     async fn test_ditto_initialization() {
         dotenvy::dotenv().ok();
 
+        // Skip test if Ditto credentials not available (e.g., in CI without secrets)
+        let app_id = std::env::var("DITTO_APP_ID")
+            .ok()
+            .and_then(|v| {
+                let trimmed = v.trim();
+                if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
+            });
+        let shared_key = std::env::var("DITTO_SHARED_KEY")
+            .ok()
+            .and_then(|v| {
+                let trimmed = v.trim();
+                if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
+            });
+
+        if app_id.is_none() || shared_key.is_none() {
+            eprintln!("Skipping test: Ditto credentials not available (required: DITTO_APP_ID, DITTO_SHARED_KEY, DITTO_OFFLINE_TOKEN)");
+            return;
+        }
+
         let config = DittoConfig {
-            app_id: std::env::var("DITTO_APP_ID")
-                .expect("DITTO_APP_ID not set")
-                .trim()
-                .to_string(),
+            app_id: app_id.unwrap(),
             persistence_dir: PathBuf::from(".ditto_test_init"),
-            shared_key: std::env::var("DITTO_SHARED_KEY")
-                .expect("DITTO_SHARED_KEY not set")
-                .trim()
-                .to_string(),
+            shared_key: shared_key.unwrap(),
             tcp_listen_port: None,
             tcp_connect_address: None,
         };
@@ -316,16 +329,29 @@ mod tests {
     async fn test_basic_crud_operations() {
         dotenvy::dotenv().ok();
 
+        // Skip test if Ditto credentials not available
+        let app_id = std::env::var("DITTO_APP_ID")
+            .ok()
+            .and_then(|v| {
+                let trimmed = v.trim();
+                if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
+            });
+        let shared_key = std::env::var("DITTO_SHARED_KEY")
+            .ok()
+            .and_then(|v| {
+                let trimmed = v.trim();
+                if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
+            });
+
+        if app_id.is_none() || shared_key.is_none() {
+            eprintln!("Skipping test: Ditto credentials not available");
+            return;
+        }
+
         let config = DittoConfig {
-            app_id: std::env::var("DITTO_APP_ID")
-                .expect("DITTO_APP_ID not set")
-                .trim()
-                .to_string(),
+            app_id: app_id.unwrap(),
             persistence_dir: PathBuf::from(".ditto_test_crud"),
-            shared_key: std::env::var("DITTO_SHARED_KEY")
-                .expect("DITTO_SHARED_KEY not set")
-                .trim()
-                .to_string(),
+            shared_key: shared_key.unwrap(),
             tcp_listen_port: None,
             tcp_connect_address: None,
         };
@@ -364,18 +390,34 @@ mod tests {
     async fn test_two_instance_sync() {
         dotenvy::dotenv().ok();
 
+        // Skip test if Ditto credentials not available
+        let app_id = std::env::var("DITTO_APP_ID")
+            .ok()
+            .and_then(|v| {
+                let trimmed = v.trim();
+                if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
+            });
+        let shared_key = std::env::var("DITTO_SHARED_KEY")
+            .ok()
+            .and_then(|v| {
+                let trimmed = v.trim();
+                if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
+            });
+
+        if app_id.is_none() || shared_key.is_none() {
+            eprintln!("Skipping test: Ditto credentials not available");
+            return;
+        }
+
+        let app_id = app_id.unwrap();
+        let shared_key = shared_key.unwrap();
+
         // Create two Ditto instances with unique persistence directories
         // Store1: TCP listener on port 12345 for reliable localhost peer discovery
         let config1 = DittoConfig {
-            app_id: std::env::var("DITTO_APP_ID")
-                .expect("DITTO_APP_ID not set")
-                .trim()
-                .to_string(),
+            app_id: app_id.clone(),
             persistence_dir: PathBuf::from(".ditto_test_sync1"),
-            shared_key: std::env::var("DITTO_SHARED_KEY")
-                .expect("DITTO_SHARED_KEY not set")
-                .trim()
-                .to_string(),
+            shared_key: shared_key.clone(),
             tcp_listen_port: Some(12345),
             tcp_connect_address: None,
         };
@@ -383,15 +425,9 @@ mod tests {
 
         // Store2: TCP client connecting to port 12345
         let config2 = DittoConfig {
-            app_id: std::env::var("DITTO_APP_ID")
-                .expect("DITTO_APP_ID not set")
-                .trim()
-                .to_string(),
+            app_id,
             persistence_dir: PathBuf::from(".ditto_test_sync2"),
-            shared_key: std::env::var("DITTO_SHARED_KEY")
-                .expect("DITTO_SHARED_KEY not set")
-                .trim()
-                .to_string(),
+            shared_key,
             tcp_listen_port: None,
             tcp_connect_address: Some("localhost:12345".to_string()),
         };
