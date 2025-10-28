@@ -41,7 +41,7 @@ use dittolive_ditto::prelude::*;
 use dittolive_ditto::AppId;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tracing::{debug, info};
+use tracing::{debug, error, info, instrument, warn};
 
 /// Configuration for Ditto storage
 #[derive(Debug, Clone)]
@@ -66,13 +66,15 @@ pub struct DittoStore {
 
 impl DittoStore {
     /// Create a new Ditto store with the given configuration
+    #[instrument(skip(config), fields(app_id = %config.app_id, persistence_dir = ?config.persistence_dir))]
     pub fn new(config: DittoConfig) -> Result<Self> {
-        info!("Initializing Ditto store with app_id: {}", config.app_id);
+        info!("Initializing Ditto store");
 
         // Create persistent storage root
         let root = Arc::new(
-            PersistentRoot::new(config.persistence_dir.to_str().unwrap())
-                .map_err(|e| Error::Storage(format!("Failed to create storage root: {}", e)))?,
+            PersistentRoot::new(config.persistence_dir.to_str().unwrap()).map_err(|_| {
+                Error::storage_error("Failed to create storage root", "initialize", None)
+            })?,
         );
 
         // Step 1: Create Ditto instance with SharedKey identity
@@ -89,9 +91,15 @@ impl DittoStore {
                 let shared_key = config.shared_key.trim();
                 identity::SharedKey::new(ditto_root, app_id, shared_key)
             })
-            .map_err(|e| Error::Storage(format!("Failed to build Ditto: {}", e)))?
+            .map_err(|e| {
+                error!("Failed to build Ditto identity: {}", e);
+                Error::storage_error("Failed to build Ditto identity", "initialize", None)
+            })?
             .build()
-            .map_err(|e| Error::Storage(format!("Failed to initialize Ditto: {}", e)))?;
+            .map_err(|e| {
+                error!("Failed to initialize Ditto instance: {}", e);
+                Error::storage_error("Failed to initialize Ditto", "initialize", None)
+            })?;
 
         // Step 2: Activate Ditto with offline license token (REQUIRED for SharedKey)
         //
@@ -102,11 +110,18 @@ impl DittoStore {
         // The offline license token must be obtained from the Ditto portal and stored in
         // the DITTO_OFFLINE_TOKEN environment variable. This token proves you have a valid
         // license without requiring an online connection to Ditto's servers.
-        let offline_token = std::env::var("DITTO_OFFLINE_TOKEN")
-            .map_err(|_| Error::Configuration("DITTO_OFFLINE_TOKEN not set".to_string()))?;
+        let offline_token = std::env::var("DITTO_OFFLINE_TOKEN").map_err(|_| {
+            Error::config_error(
+                "DITTO_OFFLINE_TOKEN not set",
+                Some("DITTO_OFFLINE_TOKEN".to_string()),
+            )
+        })?;
         ditto
             .set_offline_only_license_token(&offline_token)
-            .map_err(|e| Error::Storage(format!("Failed to activate Ditto: {}", e)))?;
+            .map_err(|e| {
+                error!("Failed to activate Ditto with offline license: {}", e);
+                Error::storage_error("Failed to activate Ditto", "activate", None)
+            })?;
 
         // Step 3: Disable sync with v3 peers (REQUIRED for DQL mutations)
         //
@@ -115,9 +130,10 @@ impl DittoStore {
         // and persists across restarts.
         //
         // Calling this before start_sync() improves performance of initial sync.
-        ditto
-            .disable_sync_with_v3()
-            .map_err(|e| Error::Storage(format!("Failed to disable v3 sync: {}", e)))?;
+        ditto.disable_sync_with_v3().map_err(|e| {
+            error!("Failed to disable v3 sync: {}", e);
+            Error::storage_error("Failed to disable v3 sync", "configure", None)
+        })?;
 
         // Step 4: Configure transports for peer discovery
         //
@@ -152,18 +168,28 @@ impl DittoStore {
     }
 
     /// Create a Ditto store from environment variables
+    #[instrument]
     pub fn from_env() -> Result<Self> {
+        info!("Creating DittoStore from environment variables");
+
         // Load environment variables
         dotenvy::dotenv().ok();
 
         // Trim all values to handle potential whitespace from environment variables
         let app_id = std::env::var("DITTO_APP_ID")
-            .map_err(|_| Error::Configuration("DITTO_APP_ID not set".to_string()))?
+            .map_err(|_| {
+                Error::config_error("DITTO_APP_ID not set", Some("DITTO_APP_ID".to_string()))
+            })?
             .trim()
             .to_string();
 
         let shared_key = std::env::var("DITTO_SHARED_KEY")
-            .map_err(|_| Error::Configuration("DITTO_SHARED_KEY not set".to_string()))?
+            .map_err(|_| {
+                Error::config_error(
+                    "DITTO_SHARED_KEY not set",
+                    Some("DITTO_SHARED_KEY".to_string()),
+                )
+            })?
             .trim()
             .to_string();
 
@@ -185,19 +211,23 @@ impl DittoStore {
     }
 
     /// Start sync with peers
+    #[instrument(skip(self))]
     pub fn start_sync(&self) -> Result<()> {
         info!("Starting Ditto sync");
-        self.ditto
-            .start_sync()
-            .map_err(|e| Error::Storage(format!("Failed to start sync: {}", e)))?;
-        info!("Ditto sync started");
+        self.ditto.start_sync().map_err(|e| {
+            error!("Failed to start sync: {}", e);
+            Error::storage_error("Failed to start sync", "start_sync", None)
+        })?;
+        info!("Ditto sync started successfully");
         Ok(())
     }
 
     /// Stop sync
+    #[instrument(skip(self))]
     pub fn stop_sync(&self) {
         info!("Stopping Ditto sync");
         self.ditto.stop_sync();
+        info!("Ditto sync stopped");
     }
 
     /// Get a reference to the underlying Ditto instance
@@ -206,19 +236,28 @@ impl DittoStore {
     }
 
     /// Execute a query on a collection using DQL (Ditto Query Language)
+    #[instrument(skip(self), fields(collection, where_clause))]
     pub async fn query(
         &self,
         collection: &str,
         where_clause: &str,
     ) -> Result<Vec<serde_json::Value>> {
         let dql_query = format!("SELECT * FROM {} WHERE {}", collection, where_clause);
+        debug!("Executing DQL query: {}", dql_query);
 
         let query_result = self
             .ditto
             .store()
             .execute_v2(dql_query)
             .await
-            .map_err(|e| Error::Storage(format!("Query failed: {}", e)))?;
+            .map_err(|e| {
+                error!("Query failed: {}", e);
+                Error::storage_error(
+                    format!("Query failed on collection {}", collection),
+                    "query",
+                    Some(collection.to_string()),
+                )
+            })?;
 
         let documents: Vec<serde_json::Value> = query_result
             .iter()
@@ -228,42 +267,71 @@ impl DittoStore {
             })
             .collect();
 
+        debug!("Query returned {} document(s)", documents.len());
         Ok(documents)
     }
 
     /// Insert/update a document into a collection using DQL
+    #[instrument(skip(self, document), fields(collection))]
     pub async fn upsert(&self, collection: &str, document: serde_json::Value) -> Result<String> {
         let dql_query = format!("INSERT INTO {} DOCUMENTS (:doc)", collection);
+        debug!("Upserting document into collection: {}", collection);
 
         let query_result = self
             .ditto
             .store()
             .execute_v2((dql_query, serde_json::json!({"doc": document})))
             .await
-            .map_err(|e| Error::Storage(format!("Upsert failed: {}", e)))?;
+            .map_err(|e| {
+                error!("Upsert failed: {}", e);
+                Error::storage_error(
+                    format!("Upsert failed on collection {}", collection),
+                    "upsert",
+                    Some(collection.to_string()),
+                )
+            })?;
 
         // Extract the document ID from the mutation result
         let doc_id = query_result
             .mutated_document_ids()
             .first()
             .map(|id| id.to_string())
-            .ok_or_else(|| Error::Storage("No document ID returned from upsert".to_string()))?;
+            .ok_or_else(|| {
+                error!("No document ID returned from upsert");
+                Error::storage_error(
+                    "No document ID returned from upsert",
+                    "upsert",
+                    Some(collection.to_string()),
+                )
+            })?;
 
         debug!("Upserted document with ID: {}", doc_id);
         Ok(doc_id)
     }
 
     /// Remove a document from a collection using DQL
+    #[instrument(skip(self), fields(collection, doc_id))]
     pub async fn remove(&self, collection: &str, doc_id: &str) -> Result<()> {
         let dql_query = format!("EVICT FROM {} WHERE _id = :id", collection);
+        debug!(
+            "Removing document {} from collection: {}",
+            doc_id, collection
+        );
 
         self.ditto
             .store()
             .execute_v2((dql_query, serde_json::json!({"id": doc_id})))
             .await
-            .map_err(|e| Error::Storage(format!("Remove failed: {}", e)))?;
+            .map_err(|e| {
+                error!("Remove failed: {}", e);
+                Error::storage_error(
+                    format!("Remove failed on collection {}", collection),
+                    "remove",
+                    Some(collection.to_string()),
+                )
+            })?;
 
-        debug!("Removed document with ID: {}", doc_id);
+        debug!("Successfully removed document with ID: {}", doc_id);
         Ok(())
     }
 
