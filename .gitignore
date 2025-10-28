@@ -14,7 +14,17 @@ Cargo.lock
 
 # Ditto
 .ditto/
+.ditto1/
+.ditto2/
 *.ditto
+cap-protocol/.ditto*
+
+# Environment
+.env
+.env.local
+
+# Claude Code
+CLAUDE.md
 
 # Testing
 coverage/
