@@ -5,6 +5,8 @@
 pub mod capability_query;
 pub mod coordinator;
 pub mod directed;
+pub mod geo;
 pub mod geographic;
 
-// Re-exports will be added as modules are implemented
+// Re-exports
+pub use geo::{GeoCoordinate, OperationalBox};
