@@ -265,7 +265,10 @@ mod tests {
         let mut state = PlatformState::new((37.7, -122.4, 100.0));
         state.update_phase(Phase::Squad);
 
-        let doc_id = store.store_state("platform_phase_test", &state).await.unwrap();
+        let doc_id = store
+            .store_state("platform_phase_test", &state)
+            .await
+            .unwrap();
         assert!(!doc_id.is_empty());
 
         // Wait longer for Ditto to index the document
