@@ -32,8 +32,8 @@ cd cap
 # Build all crates
 cargo build
 
-# Run tests
-cargo test
+# Run tests (single-threaded to avoid Ditto persistence conflicts)
+cargo test -- --test-threads=1
 
 # Run the simulator
 cargo run --bin cap-sim
