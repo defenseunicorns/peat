@@ -1,6 +1,23 @@
 //! Geographic self-organization strategy for bootstrap phase
 //!
 //! Implements geohash-based spatial clustering for autonomous squad formation.
+//!
+//! # Architecture
+//!
+//! This module implements a two-layer beacon management system:
+//!
+//! ## Ditto Layer (Mesh Network)
+//! - Each platform maintains ONE beacon document: `platform_beacons/{platform_id}`
+//! - Documents have a 30-second TTL for automatic expiration
+//! - Updates are LWW-Register CRDTs (no write conflicts)
+//! - Platforms query by geohash for proximity-based discovery
+//!
+//! ## Local Memory Layer (GeographicDiscovery)
+//! - Each platform maintains an in-memory cache of received beacons
+//! - Janitor service periodically cleans expired beacons from cache
+//! - Provides defense-in-depth against stale data
+//!
+//! See: docs/ADR-002-Beacon-Storage-Architecture.md
 
 use crate::bootstrap::geo::GeoCoordinate;
 use crate::models::capability::Capability;
@@ -9,6 +26,18 @@ use std::collections::HashMap;
 
 /// Geohash precision for ~153m cells
 pub const DEFAULT_GEOHASH_PRECISION: usize = 7;
+
+/// Beacon Time-To-Live (seconds)
+///
+/// Beacons expire after this duration if not updated. This value is used in:
+/// - Ditto document TTL (automatic mesh cleanup)
+/// - Local cache expiration checks (janitor service)
+///
+/// Balances:
+/// - Responsiveness: Detect offline platforms quickly
+/// - Network efficiency: Reduce unnecessary re-broadcasts
+/// - DDIL tolerance: Account for intermittent connectivity
+pub const BEACON_TTL_SECONDS: u64 = 30;
 
 /// Minimum platforms required to form a squad
 pub const MIN_SQUAD_SIZE: usize = 2;
@@ -47,9 +76,12 @@ impl GeographicBeacon {
         }
     }
 
-    /// Check if beacon is expired (older than 30 seconds)
+    /// Check if beacon is expired
+    ///
+    /// Returns true if the beacon timestamp is older than BEACON_TTL_SECONDS.
+    /// This matches the Ditto document TTL for consistency.
     pub fn is_expired(&self, current_time: u64) -> bool {
-        current_time.saturating_sub(self.timestamp) > 30
+        current_time.saturating_sub(self.timestamp) > BEACON_TTL_SECONDS
     }
 }
 
@@ -112,6 +144,35 @@ pub fn decode_geohash(hash: &str) -> Result<GeoCoordinate, &'static str> {
 }
 
 /// Geographic discovery manager for organizing platforms into squads
+///
+/// # Architecture
+///
+/// GeographicDiscovery maintains an in-memory cache of received beacons from the
+/// Ditto mesh network. This cache requires periodic cleanup via a janitor service.
+///
+/// ## Usage Pattern
+///
+/// ```rust,ignore
+/// // Create discovery manager
+/// let discovery = Arc::new(Mutex::new(
+///     GeographicDiscovery::new("platform_1".to_string())
+/// ));
+///
+/// // Spawn janitor service (runs periodically)
+/// let janitor_discovery = discovery.clone();
+/// tokio::spawn(async move {
+///     let mut interval = tokio::time::interval(Duration::from_secs(10));
+///     loop {
+///         interval.tick().await;
+///         janitor_discovery.lock().unwrap().cleanup_expired();
+///     }
+/// });
+///
+/// // Process beacons from Ditto
+/// ditto.observe_beacons(|beacon| {
+///     discovery.lock().unwrap().process_beacon(beacon);
+/// });
+/// ```
 pub struct GeographicDiscovery {
     clusters: HashMap<String, GeographicCluster>,
     my_platform_id: String,
