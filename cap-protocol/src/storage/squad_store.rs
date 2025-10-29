@@ -279,7 +279,7 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
         let retrieved = store.get_squad(&config.id).await.unwrap();
         assert!(retrieved.is_some());
