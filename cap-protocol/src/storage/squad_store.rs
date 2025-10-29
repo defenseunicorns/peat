@@ -35,16 +35,13 @@ impl SquadStore {
             obj.insert("squad_id".to_string(), json!(squad.config.id.clone()));
         }
 
-        self.store
-            .upsert(SQUAD_COLLECTION, doc)
-            .await
-            .map_err(|e| {
-                Error::storage_error(
-                    format!("Failed to store squad: {}", e),
-                    "upsert",
-                    Some(SQUAD_COLLECTION.to_string()),
-                )
-            })
+        self.store.upsert(SQUAD_COLLECTION, doc).await.map_err(|e| {
+            Error::storage_error(
+                format!("Failed to store squad: {}", e),
+                "upsert",
+                Some(SQUAD_COLLECTION.to_string()),
+            )
+        })
     }
 
     /// Retrieve a squad by ID
