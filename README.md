@@ -32,14 +32,30 @@ cd cap
 # Build all crates
 cargo build
 
-# Run tests
-cargo test
+# Run tests (single-threaded to avoid Ditto persistence conflicts)
+cargo test -- --test-threads=1
 
 # Run the simulator
 cargo run --bin cap-sim
 ```
 
 ### Development
+
+The project includes a Makefile for common development tasks:
+
+```bash
+# Show all available commands
+make help
+
+# Run all checks (format, lint, test)
+make check
+
+# Clean Ditto directories and run tests
+make test
+
+# Run pre-commit checks
+make pre-commit
+```
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed setup instructions, architecture overview, and contributing guidelines.
 
