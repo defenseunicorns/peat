@@ -4,7 +4,9 @@
 
 pub mod aggregation;
 pub mod coordinator;
+pub mod election_policy;
 pub mod leader_election;
 pub mod messaging;
 
-// Re-exports will be added as modules are implemented
+// Re-exports
+pub use election_policy::{ElectionContext, ElectionPolicyConfig, LeadershipPolicy};
