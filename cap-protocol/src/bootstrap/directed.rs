@@ -43,22 +43,17 @@ use std::collections::HashMap;
 use tracing::{debug, info, instrument, warn};
 
 /// Assignment priority levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum AssignmentPriority {
     /// Low priority - can be deferred
     Low,
     /// Normal priority - standard assignment
+    #[default]
     Normal,
     /// High priority - process immediately
     High,
     /// Critical priority - override existing assignments
     Critical,
-}
-
-impl Default for AssignmentPriority {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 
 /// Assignment status tracking
