@@ -19,7 +19,7 @@
 //! - Hybrid confidence scoring (technical capability + human authority)
 
 use crate::models::{
-    AuthorityLevel, Capability, CapabilityType, HumanMachinePair, PlatformConfig, PlatformState,
+    AuthorityLevel, CapabilityType, HumanMachinePair, PlatformConfig, PlatformState,
 };
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
@@ -142,13 +142,13 @@ impl CapabilityAggregator {
             let authority = config
                 .operator_binding
                 .as_ref()
-                .and_then(|binding| Self::get_max_authority(binding));
+                .and_then(Self::get_max_authority);
 
             // Add each capability to the map
             for cap in &config.capabilities {
                 capability_map
                     .entry(cap.capability_type)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push((config.id.clone(), cap.confidence, authority));
             }
         }
