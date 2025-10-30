@@ -541,11 +541,8 @@ mod tests {
             "robot_4".to_string(),
         ];
 
-        let binding = HumanMachinePair::new(
-            vec![operator],
-            platform_ids.clone(),
-            BindingType::OneToMany,
-        );
+        let binding =
+            HumanMachinePair::new(vec![operator], platform_ids.clone(), BindingType::OneToMany);
 
         let config = PlatformConfig::with_operator("Swarm Control Station".to_string(), binding);
 
