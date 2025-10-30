@@ -536,4 +536,50 @@ mod tests {
         // Should exclude failed platforms
         assert_eq!(result3.len(), 0);
     }
+
+    #[test]
+    fn test_empty_squad_aggregation() {
+        // Edge case: Empty squad should return empty capabilities
+        let result = CapabilityAggregator::aggregate_capabilities(&[]).unwrap();
+        assert_eq!(result.len(), 0);
+
+        // Readiness score for empty squad should be 0
+        let readiness = CapabilityAggregator::calculate_readiness_score(&result);
+        assert_eq!(readiness, 0.0);
+
+        // Gap identification should show all required capabilities as missing
+        let required = vec![CapabilityType::Communication, CapabilityType::Sensor];
+        let gaps = CapabilityAggregator::identify_gaps(&result, &required);
+        assert_eq!(gaps.len(), 2);
+        assert!(gaps.contains(&CapabilityType::Communication));
+        assert!(gaps.contains(&CapabilityType::Sensor));
+    }
+
+    #[test]
+    fn test_all_platforms_non_operational() {
+        // Edge case: All platforms failed/non-operational
+        let mut platform1 = create_test_platform("p1", vec![(CapabilityType::Sensor, 0.9)], None);
+        platform1.1.health = HealthStatus::Failed;
+
+        let mut platform2 = create_test_platform("p2", vec![(CapabilityType::Communication, 0.8)], None);
+        platform2.1.health = HealthStatus::Failed;
+
+        let result = CapabilityAggregator::aggregate_capabilities(&[platform1, platform2]).unwrap();
+
+        // All platforms excluded, should be empty
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_zero_confidence_capability() {
+        // Edge case: Capability with 0.0 confidence
+        let platform = create_test_platform("p1", vec![(CapabilityType::Sensor, 0.0)], None);
+
+        let result = CapabilityAggregator::aggregate_capabilities(&[platform]).unwrap();
+
+        // Should still aggregate, but with low confidence
+        assert_eq!(result.len(), 1);
+        let sensor_cap = result.get(&CapabilityType::Sensor).unwrap();
+        assert!(sensor_cap.confidence < 0.1);
+    }
 }
