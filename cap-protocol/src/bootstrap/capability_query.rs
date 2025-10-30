@@ -140,8 +140,8 @@ impl CapabilityQuery {
         }
 
         // Average confidence score (10% weight)
-        let avg_confidence: f32 = capabilities.iter().map(|cap| cap.confidence).sum::<f32>()
-            / capabilities.len() as f32;
+        let avg_confidence: f32 =
+            capabilities.iter().map(|cap| cap.confidence).sum::<f32>() / capabilities.len() as f32;
         score += avg_confidence * 0.1;
 
         score.clamp(0.0, 1.0)
@@ -355,11 +355,7 @@ impl CapabilityStats {
 mod tests {
     use super::*;
 
-    fn create_test_capability(
-        id: &str,
-        cap_type: CapabilityType,
-        confidence: f32,
-    ) -> Capability {
+    fn create_test_capability(id: &str, cap_type: CapabilityType, confidence: f32) -> Capability {
         Capability::new(
             id.to_string(),
             format!("{:?} capability", cap_type),
@@ -368,7 +364,11 @@ mod tests {
         )
     }
 
-    fn create_test_platform(id: &str, platform_type: &str, capabilities: Vec<Capability>) -> PlatformConfig {
+    fn create_test_platform(
+        id: &str,
+        platform_type: &str,
+        capabilities: Vec<Capability>,
+    ) -> PlatformConfig {
         let mut platform = PlatformConfig::new(platform_type.to_string());
         platform.id = id.to_string();
         for cap in capabilities {
@@ -407,7 +407,11 @@ mod tests {
         assert!(query.matches(&caps1));
 
         // Platform missing one required capability
-        let caps2 = vec![create_test_capability("sensor1", CapabilityType::Sensor, 0.9)];
+        let caps2 = vec![create_test_capability(
+            "sensor1",
+            CapabilityType::Sensor,
+            0.9,
+        )];
         assert!(!query.matches(&caps2));
 
         // Platform with low confidence
@@ -420,9 +424,7 @@ mod tests {
 
     #[test]
     fn test_query_matches_min_capability_count() {
-        let query = CapabilityQuery::builder()
-            .min_capability_count(3)
-            .build();
+        let query = CapabilityQuery::builder().min_capability_count(3).build();
 
         let caps1 = vec![
             create_test_capability("sensor1", CapabilityType::Sensor, 0.9),
@@ -453,7 +455,11 @@ mod tests {
         let score1 = query.score(&caps1);
 
         // Platform with only required
-        let caps2 = vec![create_test_capability("sensor1", CapabilityType::Sensor, 0.9)];
+        let caps2 = vec![create_test_capability(
+            "sensor1",
+            CapabilityType::Sensor,
+            0.9,
+        )];
         let score2 = query.score(&caps2);
 
         // First platform should score higher
@@ -478,7 +484,11 @@ mod tests {
             create_test_platform(
                 "platform2",
                 "UAV",
-                vec![create_test_capability("sensor2", CapabilityType::Sensor, 0.7)],
+                vec![create_test_capability(
+                    "sensor2",
+                    CapabilityType::Sensor,
+                    0.7,
+                )],
             ),
             create_test_platform(
                 "platform3",
@@ -515,17 +525,29 @@ mod tests {
             create_test_platform(
                 "platform1",
                 "UAV",
-                vec![create_test_capability("sensor1", CapabilityType::Sensor, 0.9)],
+                vec![create_test_capability(
+                    "sensor1",
+                    CapabilityType::Sensor,
+                    0.9,
+                )],
             ),
             create_test_platform(
                 "platform2",
                 "UAV",
-                vec![create_test_capability("sensor2", CapabilityType::Sensor, 0.8)],
+                vec![create_test_capability(
+                    "sensor2",
+                    CapabilityType::Sensor,
+                    0.8,
+                )],
             ),
             create_test_platform(
                 "platform3",
                 "UAV",
-                vec![create_test_capability("sensor3", CapabilityType::Sensor, 0.7)],
+                vec![create_test_capability(
+                    "sensor3",
+                    CapabilityType::Sensor,
+                    0.7,
+                )],
             ),
         ];
 
@@ -568,10 +590,7 @@ mod tests {
 
         assert_eq!(stats.len(), 3);
         assert_eq!(stats.get(&CapabilityType::Sensor).unwrap().count, 2);
-        assert_eq!(
-            stats.get(&CapabilityType::Communication).unwrap().count,
-            1
-        );
+        assert_eq!(stats.get(&CapabilityType::Communication).unwrap().count, 1);
         assert_eq!(stats.get(&CapabilityType::Compute).unwrap().count, 1);
 
         let sensor_stats = stats.get(&CapabilityType::Sensor).unwrap();
