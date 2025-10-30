@@ -29,7 +29,7 @@
 //! - Retransmission on timeout (max 3 retries)
 //! - Message expiration (TTL)
 
-use crate::models::Capability;
+use crate::models::{Capability, SquadRole};
 use crate::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -77,7 +77,12 @@ pub enum SquadMessageType {
     /// Heartbeat/keep-alive
     Heartbeat { platform_id: String },
     /// Role assignment notification
-    RoleAssignment { platform_id: String, role: String },
+    RoleAssignment {
+        platform_id: String,
+        role: SquadRole,
+        score: f64,
+        is_primary: bool,
+    },
     /// Generic squad status update
     StatusUpdate {
         platform_id: String,
@@ -157,6 +162,30 @@ impl SquadMessage {
             .unwrap()
             .as_secs();
         current_time.saturating_sub(self.timestamp) > self.ttl
+    }
+
+    /// Create a role assignment message
+    pub fn role_assignment(
+        sender: String,
+        squad_id: String,
+        seq: SequenceNumber,
+        platform_id: String,
+        role: SquadRole,
+        score: f64,
+        is_primary: bool,
+    ) -> Self {
+        Self::new(
+            sender,
+            squad_id,
+            seq,
+            SquadMessageType::RoleAssignment {
+                platform_id,
+                role,
+                score,
+                is_primary,
+            },
+        )
+        .with_priority(MessagePriority::High)
     }
 }
 
@@ -609,5 +638,38 @@ mod tests {
 
         assert_eq!(retries.len(), 1);
         assert_eq!(retries[0].seq, seq);
+    }
+
+    #[test]
+    fn test_role_assignment_message() {
+        let msg = SquadMessage::role_assignment(
+            "platform_1".to_string(),
+            "squad_1".to_string(),
+            1,
+            "platform_2".to_string(),
+            SquadRole::Sensor,
+            0.85,
+            true,
+        );
+
+        assert_eq!(msg.sender, "platform_1");
+        assert_eq!(msg.squad_id, "squad_1");
+        assert_eq!(msg.seq, 1);
+        assert_eq!(msg.priority, MessagePriority::High);
+
+        match msg.payload {
+            SquadMessageType::RoleAssignment {
+                platform_id,
+                role,
+                score,
+                is_primary,
+            } => {
+                assert_eq!(platform_id, "platform_2");
+                assert_eq!(role, SquadRole::Sensor);
+                assert_eq!(score, 0.85);
+                assert!(is_primary);
+            }
+            _ => panic!("Expected RoleAssignment message"),
+        }
     }
 }
