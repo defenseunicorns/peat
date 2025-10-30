@@ -116,7 +116,7 @@ pub enum OperatorRank {
 
 impl OperatorRank {
     /// Convert rank to numeric score (0.0-1.0) for leadership scoring
-    pub fn to_score(&self) -> f64 {
+    pub fn to_score(self) -> f64 {
         match self {
             Self::E1 => 0.10,
             Self::E2 => 0.15,
@@ -142,7 +142,7 @@ impl OperatorRank {
             Self::O8 => 0.997,
             Self::O9 => 0.999,
             Self::O10 => 1.0,
-            Self::Civilian(level) => (*level as f64) / 10.0,
+            Self::Civilian(level) => (level as f64) / 10.0,
         }
     }
 
@@ -201,7 +201,7 @@ pub enum AuthorityLevel {
 
 impl AuthorityLevel {
     /// Convert authority to numeric score (0.0-1.0) for leadership scoring
-    pub fn to_score(&self) -> f64 {
+    pub fn to_score(self) -> f64 {
         match self {
             Self::Observer => 0.1,
             Self::Advisor => 0.3,
