@@ -158,15 +158,12 @@ impl LeadershipPolicy {
 
     /// Compute weights based on context
     fn compute_contextual_weights(context: &ElectionContext) -> (f64, f64) {
-        // Adjust weights based on mission phase
-        let phase_weight = match context.mission_phase {
+        // Adjust weights based on mission phase (authority_required flag can be checked by caller if needed)
+        match context.mission_phase {
             Phase::Bootstrap => (0.7, 0.3),      // Planning phase - authority matters more
             Phase::Squad => (0.6, 0.4),          // Squad ops - balanced
             Phase::Hierarchical => (0.8, 0.2),   // Hierarchical - authority critical
-        };
-
-        // Return base phase weight (authority_required flag can be checked by caller if needed)
-        phase_weight
+        }
     }
 }
 
