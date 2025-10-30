@@ -5,7 +5,7 @@
 //! - Dynamic state: LWW-Register (last-write-wins) - state updates with timestamps
 //! - Fuel counter: PN-Counter (positive-negative counter) - increments/decrements
 
-use crate::models::Capability;
+use crate::models::{Capability, HumanMachinePair, Operator};
 use crate::traits::Phase;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -23,10 +23,12 @@ pub struct PlatformConfig {
     pub comm_range_m: f32,
     /// Maximum speed in m/s
     pub max_speed_mps: f32,
+    /// Human-machine binding (None for autonomous platforms)
+    pub operator_binding: Option<HumanMachinePair>,
 }
 
 impl PlatformConfig {
-    /// Create a new platform configuration
+    /// Create a new platform configuration (autonomous, no operator)
     pub fn new(platform_type: String) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
@@ -34,6 +36,19 @@ impl PlatformConfig {
             capabilities: Vec::new(),
             comm_range_m: 1000.0,
             max_speed_mps: 10.0,
+            operator_binding: None,
+        }
+    }
+
+    /// Create a new platform with operator binding
+    pub fn with_operator(platform_type: String, operator_binding: HumanMachinePair) -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
+            platform_type,
+            capabilities: Vec::new(),
+            comm_range_m: 1000.0,
+            max_speed_mps: 10.0,
+            operator_binding: Some(operator_binding),
         }
     }
 
@@ -64,6 +79,41 @@ impl PlatformConfig {
             .iter()
             .filter(|c| c.capability_type == capability_type)
             .collect()
+    }
+
+    /// Check if platform has an operator binding
+    pub fn has_operator(&self) -> bool {
+        self.operator_binding.is_some()
+    }
+
+    /// Check if platform is human-operated (has at least one operator)
+    pub fn is_human_operated(&self) -> bool {
+        self.operator_binding
+            .as_ref()
+            .map(|binding| !binding.operators.is_empty())
+            .unwrap_or(false)
+    }
+
+    /// Get the primary operator (highest-ranking) if any
+    pub fn get_primary_operator(&self) -> Option<&Operator> {
+        self.operator_binding
+            .as_ref()
+            .and_then(|binding| binding.primary_operator())
+    }
+
+    /// Get the operator binding
+    pub fn get_operator_binding(&self) -> Option<&HumanMachinePair> {
+        self.operator_binding.as_ref()
+    }
+
+    /// Set or update the operator binding
+    pub fn set_operator_binding(&mut self, binding: Option<HumanMachinePair>) {
+        self.operator_binding = binding;
+    }
+
+    /// Check if platform is autonomous (no operators)
+    pub fn is_autonomous(&self) -> bool {
+        !self.is_human_operated()
     }
 }
 
@@ -349,5 +399,158 @@ mod tests {
         state1.merge(&state2);
 
         assert_eq!(state1.position, original_pos);
+    }
+
+    #[test]
+    fn test_platform_config_autonomous() {
+        let config = PlatformConfig::new("UAV".to_string());
+
+        assert!(!config.has_operator());
+        assert!(!config.is_human_operated());
+        assert!(config.is_autonomous());
+        assert!(config.get_primary_operator().is_none());
+        assert!(config.get_operator_binding().is_none());
+    }
+
+    #[test]
+    fn test_platform_config_with_operator() {
+        use crate::models::{AuthorityLevel, BindingType, Operator, OperatorRank};
+
+        let operator = Operator::new(
+            "op_1".to_string(),
+            "SSG Smith".to_string(),
+            OperatorRank::E6,
+            AuthorityLevel::Commander,
+            "11B".to_string(), // Infantry
+        );
+
+        let binding = HumanMachinePair::new(
+            vec![operator],
+            vec!["platform_1".to_string()],
+            BindingType::OneToOne,
+        );
+
+        let config = PlatformConfig::with_operator("Soldier System".to_string(), binding);
+
+        assert!(config.has_operator());
+        assert!(config.is_human_operated());
+        assert!(!config.is_autonomous());
+
+        let primary = config.get_primary_operator().unwrap();
+        assert_eq!(primary.rank, OperatorRank::E6);
+        assert_eq!(primary.name, "SSG Smith");
+    }
+
+    #[test]
+    fn test_platform_config_set_operator_binding() {
+        use crate::models::{AuthorityLevel, BindingType, Operator, OperatorRank};
+
+        let mut config = PlatformConfig::new("Robot".to_string());
+        assert!(config.is_autonomous());
+
+        // Add operator binding
+        let operator = Operator::new(
+            "op_1".to_string(),
+            "PFC Jones".to_string(),
+            OperatorRank::E3,
+            AuthorityLevel::Supervisor,
+            "11B".to_string(),
+        );
+
+        let binding = HumanMachinePair::new(
+            vec![operator],
+            vec![config.id.clone()],
+            BindingType::OneToOne,
+        );
+
+        config.set_operator_binding(Some(binding));
+        assert!(config.is_human_operated());
+        assert!(!config.is_autonomous());
+
+        // Remove operator binding
+        config.set_operator_binding(None);
+        assert!(config.is_autonomous());
+    }
+
+    #[test]
+    fn test_platform_config_multiple_operators() {
+        use crate::models::{AuthorityLevel, BindingType, Operator, OperatorRank};
+
+        // Command vehicle with multiple operators
+        let commander = Operator::new(
+            "op_1".to_string(),
+            "CPT Williams".to_string(),
+            OperatorRank::O3,
+            AuthorityLevel::Commander,
+            "11A".to_string(), // Infantry Officer
+        );
+
+        let nco = Operator::new(
+            "op_2".to_string(),
+            "SFC Davis".to_string(),
+            OperatorRank::E7,
+            AuthorityLevel::Supervisor,
+            "11B".to_string(),
+        );
+
+        let rto = Operator::new(
+            "op_3".to_string(),
+            "SPC Brown".to_string(),
+            OperatorRank::E4,
+            AuthorityLevel::Advisor,
+            "25U".to_string(), // Signal
+        );
+
+        let binding = HumanMachinePair::new(
+            vec![commander, nco, rto],
+            vec!["command_vehicle_1".to_string()],
+            BindingType::ManyToOne,
+        );
+
+        let config = PlatformConfig::with_operator("Command Vehicle".to_string(), binding);
+
+        assert!(config.is_human_operated());
+
+        // Primary operator should be highest rank (O3)
+        let primary = config.get_primary_operator().unwrap();
+        assert_eq!(primary.rank, OperatorRank::O3);
+        assert_eq!(primary.name, "CPT Williams");
+
+        let binding = config.get_operator_binding().unwrap();
+        assert_eq!(binding.operators.len(), 3);
+        assert_eq!(binding.binding_type, BindingType::ManyToOne);
+    }
+
+    #[test]
+    fn test_platform_config_swarm_operator() {
+        use crate::models::{AuthorityLevel, BindingType, Operator, OperatorRank};
+
+        // One operator controlling multiple platforms
+        let operator = Operator::new(
+            "op_1".to_string(),
+            "SSG Martinez".to_string(),
+            OperatorRank::E6,
+            AuthorityLevel::Supervisor,
+            "11B".to_string(),
+        );
+
+        let platform_ids = vec![
+            "robot_1".to_string(),
+            "robot_2".to_string(),
+            "robot_3".to_string(),
+            "robot_4".to_string(),
+        ];
+
+        let binding =
+            HumanMachinePair::new(vec![operator], platform_ids.clone(), BindingType::OneToMany);
+
+        let config = PlatformConfig::with_operator("Swarm Control Station".to_string(), binding);
+
+        assert!(config.is_human_operated());
+
+        let binding = config.get_operator_binding().unwrap();
+        assert_eq!(binding.binding_type, BindingType::OneToMany);
+        assert_eq!(binding.platform_ids.len(), 4);
+        assert_eq!(binding.operators.len(), 1);
     }
 }

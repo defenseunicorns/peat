@@ -123,7 +123,7 @@ async fn demonstrate_storage_errors() {
 fn demonstrate_error_recovery() {
     println!("Testing error recovery strategies...");
 
-    let errors = vec![
+    let errors = [
         Error::timeout_error("peer_discovery", 5000),
         Error::network_error("Connection refused", Some("peer_123".to_string())),
         Error::storage_error("Query failed", "query", Some("platforms".to_string())),

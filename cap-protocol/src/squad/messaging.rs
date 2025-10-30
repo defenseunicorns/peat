@@ -41,22 +41,17 @@ use tracing::{debug, instrument, warn};
 pub type SequenceNumber = u64;
 
 /// Message priority levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
 pub enum MessagePriority {
     /// Low priority - status updates, periodic beacons
     Low = 0,
     /// Normal priority - standard operations
+    #[default]
     Normal = 1,
     /// High priority - important state changes
     High = 2,
     /// Critical priority - leader election, emergencies
     Critical = 3,
-}
-
-impl Default for MessagePriority {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 
 /// Squad message types
