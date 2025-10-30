@@ -288,7 +288,7 @@ impl CapabilityAggregator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{HealthStatus, Operator, OperatorRank};
+    use crate::models::{Capability, HealthStatus, Operator, OperatorRank};
 
     fn create_test_platform(
         id: &str,
