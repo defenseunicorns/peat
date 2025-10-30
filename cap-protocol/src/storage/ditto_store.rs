@@ -356,6 +356,7 @@ impl Drop for DittoStore {
 mod tests {
     use super::*;
     use std::time::Duration;
+    use tempfile::tempdir;
     use tokio::time::sleep;
 
     #[tokio::test]
@@ -385,9 +386,12 @@ mod tests {
             return;
         }
 
+        // Create unique temp directory for this test
+        let temp_dir = tempdir().expect("Failed to create temp dir");
+
         let config = DittoConfig {
             app_id: app_id.unwrap(),
-            persistence_dir: PathBuf::from(".ditto_test_init"),
+            persistence_dir: temp_dir.path().to_path_buf(),
             shared_key: shared_key.unwrap(),
             tcp_listen_port: None,
             tcp_connect_address: None,
@@ -395,6 +399,8 @@ mod tests {
 
         let store = DittoStore::new(config).expect("Failed to create Ditto store");
         assert!(!store.peer_key().is_empty());
+
+        // Temp dir will be automatically cleaned up when it goes out of scope
     }
 
     #[tokio::test]
@@ -424,9 +430,12 @@ mod tests {
             return;
         }
 
+        // Create unique temp directory for this test
+        let temp_dir = tempdir().expect("Failed to create temp dir");
+
         let config = DittoConfig {
             app_id: app_id.unwrap(),
-            persistence_dir: PathBuf::from(".ditto_test_crud"),
+            persistence_dir: temp_dir.path().to_path_buf(),
             shared_key: shared_key.unwrap(),
             tcp_listen_port: None,
             tcp_connect_address: None,
@@ -492,11 +501,15 @@ mod tests {
         let app_id = app_id.unwrap();
         let shared_key = shared_key.unwrap();
 
+        // Create unique temp directories for both stores
+        let temp_dir1 = tempdir().expect("Failed to create temp dir 1");
+        let temp_dir2 = tempdir().expect("Failed to create temp dir 2");
+
         // Create two Ditto instances with unique persistence directories
         // Store1: TCP listener on port 12345 for reliable localhost peer discovery
         let config1 = DittoConfig {
             app_id: app_id.clone(),
-            persistence_dir: PathBuf::from(".ditto_test_sync1"),
+            persistence_dir: temp_dir1.path().to_path_buf(),
             shared_key: shared_key.clone(),
             tcp_listen_port: Some(12345),
             tcp_connect_address: None,
@@ -506,7 +519,7 @@ mod tests {
         // Store2: TCP client connecting to port 12345
         let config2 = DittoConfig {
             app_id,
-            persistence_dir: PathBuf::from(".ditto_test_sync2"),
+            persistence_dir: temp_dir2.path().to_path_buf(),
             shared_key,
             tcp_listen_port: None,
             tcp_connect_address: Some("localhost:12345".to_string()),
