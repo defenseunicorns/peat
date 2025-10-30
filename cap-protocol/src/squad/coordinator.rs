@@ -580,4 +580,104 @@ mod tests {
         assert!(!coord.human_approved);
         assert!(coord.formation_complete.is_none());
     }
+
+    #[test]
+    fn test_single_member_squad() {
+        // Edge case: Single member (< min_size)
+        let mut coord = SquadCoordinator::new("squad1".to_string());
+
+        let operator = Operator::new(
+            "op1".to_string(),
+            "Test Operator".to_string(),
+            OperatorRank::E5,
+            AuthorityLevel::Commander,
+            "11B".to_string(),
+        );
+
+        let members = vec![create_test_member(
+            "p1",
+            vec![CapabilityType::Communication, CapabilityType::Sensor],
+            Some(SquadRole::Leader),
+            Some(operator),
+        )];
+
+        let complete = coord
+            .check_formation_complete(&members, Some("p1"))
+            .unwrap();
+
+        assert!(!complete);
+        assert!(matches!(
+            coord.status,
+            FormationStatus::Failed(ref msg) if msg.contains("Insufficient members")
+        ));
+    }
+
+    #[test]
+    fn test_exact_minimum_size_squad() {
+        // Boundary case: Exactly min_size (3) members
+        let mut coord = SquadCoordinator::new("squad1".to_string());
+        assert_eq!(coord.min_size, 3);
+
+        let operator = Operator::new(
+            "op1".to_string(),
+            "Test Operator".to_string(),
+            OperatorRank::E5,
+            AuthorityLevel::Commander,
+            "11B".to_string(),
+        );
+
+        let members = vec![
+            create_test_member(
+                "p1",
+                vec![CapabilityType::Communication, CapabilityType::Sensor],
+                Some(SquadRole::Leader),
+                Some(operator),
+            ),
+            create_test_member("p2", vec![CapabilityType::Sensor], Some(SquadRole::Sensor), None),
+            create_test_member(
+                "p3",
+                vec![CapabilityType::Compute],
+                Some(SquadRole::Compute),
+                None,
+            ),
+        ];
+
+        let complete = coord
+            .check_formation_complete(&members, Some("p1"))
+            .unwrap();
+
+        // Should succeed with exactly min_size
+        assert!(complete);
+        assert_eq!(coord.status, FormationStatus::Ready);
+    }
+
+    #[test]
+    fn test_empty_squad_formation() {
+        // Edge case: Zero members
+        let mut coord = SquadCoordinator::new("squad1".to_string());
+
+        let complete = coord.check_formation_complete(&[], None).unwrap();
+
+        assert!(!complete);
+        assert!(matches!(
+            coord.status,
+            FormationStatus::Failed(ref msg) if msg.contains("Insufficient members: 0 < 3")
+        ));
+    }
+
+    #[test]
+    fn test_approval_idempotency() {
+        // Edge case: Multiple approval calls should be idempotent
+        let mut coord = SquadCoordinator::new("squad1".to_string());
+        coord.status = FormationStatus::AwaitingApproval;
+
+        // First approval
+        coord.approve_formation().unwrap();
+        assert_eq!(coord.status, FormationStatus::Ready);
+        assert!(coord.human_approved);
+
+        // Second approval should fail (not awaiting approval anymore)
+        let result = coord.approve_formation();
+        assert!(result.is_err());
+    }
 }

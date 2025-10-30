@@ -524,4 +524,84 @@ mod tests {
         assert!(roles.contains(&SquadRole::Support));
         assert!(roles.contains(&SquadRole::Follower));
     }
+
+    #[test]
+    fn test_degraded_platform_role_scoring() {
+        // Edge case: Degraded platform should have lower score than nominal
+        let (config_nominal, state_nominal) = create_test_platform_with_capabilities(vec![
+            Capability::new(
+                "sensor_1".to_string(),
+                "Sensor".to_string(),
+                CapabilityType::Sensor,
+                0.9,
+            ),
+        ]);
+
+        let (config_degraded, mut state_degraded) = create_test_platform_with_capabilities(vec![
+            Capability::new(
+                "sensor_2".to_string(),
+                "Sensor".to_string(),
+                CapabilityType::Sensor,
+                0.9,
+            ),
+        ]);
+        state_degraded.health = crate::models::HealthStatus::Degraded;
+
+        let score_nominal =
+            RoleScorer::score_platform_for_role(&config_nominal, &state_nominal, SquadRole::Sensor)
+                .unwrap();
+        let score_degraded = RoleScorer::score_platform_for_role(
+            &config_degraded,
+            &state_degraded,
+            SquadRole::Sensor,
+        )
+        .unwrap();
+
+        // Degraded platform should score lower
+        assert!(score_degraded < score_nominal);
+        // But should still be viable (>0.4)
+        assert!(score_degraded > 0.4);
+    }
+
+    #[test]
+    fn test_critical_platform_role_scoring() {
+        // Edge case: Critical health platform
+        let (config, mut state) = create_test_platform_with_capabilities(vec![Capability::new(
+            "sensor_1".to_string(),
+            "Sensor".to_string(),
+            CapabilityType::Sensor,
+            0.9,
+        )]);
+        state.health = crate::models::HealthStatus::Critical;
+
+        let score =
+            RoleScorer::score_platform_for_role(&config, &state, SquadRole::Sensor).unwrap();
+
+        // Critical health (0.3) weighs 20%, so contributes 0.06
+        // High capability (0.9) weighs 30%, so contributes 0.27
+        // Total score should be around 0.5-0.6 range
+        assert!(score > 0.0);
+        assert!(score < 0.7); // Less than nominal but still viable
+    }
+
+    #[test]
+    fn test_failed_platform_role_scoring() {
+        // Edge case: Failed platform
+        let (config, mut state) = create_test_platform_with_capabilities(vec![Capability::new(
+            "sensor_1".to_string(),
+            "Sensor".to_string(),
+            CapabilityType::Sensor,
+            0.9,
+        )]);
+        state.health = crate::models::HealthStatus::Failed;
+
+        let score =
+            RoleScorer::score_platform_for_role(&config, &state, SquadRole::Sensor).unwrap();
+
+        // Failed health (0.0) weighs 20%, so contributes 0.0
+        // High capability (0.9) weighs 30%, so contributes 0.27
+        // Total score should be around 0.4-0.5 (capability only)
+        assert!(score > 0.2);
+        assert!(score < 0.6); // Significantly reduced but not zero
+    }
 }
