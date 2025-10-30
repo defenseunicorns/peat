@@ -283,11 +283,7 @@ impl HumanMachinePair {
 
     /// Create a one-to-one human-platform pair
     pub fn one_to_one(operator: Operator, platform_id: String) -> Self {
-        Self::new(
-            vec![operator],
-            vec![platform_id],
-            BindingType::OneToOne,
-        )
+        Self::new(vec![operator], vec![platform_id], BindingType::OneToOne)
     }
 
     /// Check if this is an autonomous platform (no operators)
@@ -301,33 +297,23 @@ impl HumanMachinePair {
             self.operators.iter().find(|op| &op.id == primary_id)
         } else {
             // Return highest-ranking operator
-            self.operators
-                .iter()
-                .max_by(|a, b| a.rank.cmp(&b.rank))
+            self.operators.iter().max_by(|a, b| a.rank.cmp(&b.rank))
         }
     }
 
     /// Get highest rank among operators
     pub fn max_rank(&self) -> Option<OperatorRank> {
-        self.operators
-            .iter()
-            .map(|op| op.rank)
-            .max()
+        self.operators.iter().map(|op| op.rank).max()
     }
 
     /// Get highest authority level among operators
     pub fn max_authority(&self) -> Option<AuthorityLevel> {
-        self.operators
-            .iter()
-            .map(|op| op.authority)
-            .max()
+        self.operators.iter().map(|op| op.authority).max()
     }
 
     /// Check if any operator is overloaded
     pub fn has_overloaded_operator(&self, threshold: f32) -> bool {
-        self.operators
-            .iter()
-            .any(|op| op.is_overloaded(threshold))
+        self.operators.iter().any(|op| op.is_overloaded(threshold))
     }
 
     /// Get average operator effectiveness across all operators

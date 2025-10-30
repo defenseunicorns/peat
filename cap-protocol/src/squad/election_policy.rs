@@ -31,7 +31,7 @@ impl Default for ElectionPolicyConfig {
                 technical_weight: 0.4,
             },
             min_leader_rank: Some(OperatorRank::E5), // Team leader minimum
-            allow_autonomous_leaders: false,          // Require human leadership by default
+            allow_autonomous_leaders: false,         // Require human leadership by default
             max_cognitive_load: 0.85,
             max_fatigue: 0.75,
         }
@@ -160,9 +160,9 @@ impl LeadershipPolicy {
     fn compute_contextual_weights(context: &ElectionContext) -> (f64, f64) {
         // Adjust weights based on mission phase (authority_required flag can be checked by caller if needed)
         match context.mission_phase {
-            Phase::Bootstrap => (0.7, 0.3),      // Planning phase - authority matters more
-            Phase::Squad => (0.6, 0.4),          // Squad ops - balanced
-            Phase::Hierarchical => (0.8, 0.2),   // Hierarchical - authority critical
+            Phase::Bootstrap => (0.7, 0.3), // Planning phase - authority matters more
+            Phase::Squad => (0.6, 0.4),     // Squad ops - balanced
+            Phase::Hierarchical => (0.8, 0.2), // Hierarchical - authority critical
         }
     }
 }
@@ -379,7 +379,8 @@ mod tests {
     #[test]
     fn test_contextual_policy_with_authority_required() {
         let policy = LeadershipPolicy::Contextual;
-        let context = ElectionContext::new(policy.clone(), Phase::Squad).with_authority_required(true);
+        let context =
+            ElectionContext::new(policy.clone(), Phase::Squad).with_authority_required(true);
 
         let (auth, _tech) = policy.get_weights(&context);
         // Should keep authority weight at phase level when required
