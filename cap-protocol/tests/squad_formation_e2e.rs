@@ -26,11 +26,10 @@ use std::time::Duration;
 /// Test: Verify E2E test harness creates isolated Ditto stores
 #[tokio::test]
 async fn test_harness_creates_isolated_stores() {
-    let ditto_app_id = std::env::var("DITTO_APP_ID").unwrap_or_default();
-    if ditto_app_id.is_empty() {
-        eprintln!("Skipping test - DITTO_APP_ID not configured");
-        return;
-    }
+    // Fail if Ditto credentials not properly configured
+    let ditto_app_id =
+        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("test_harness");
 
@@ -51,11 +50,10 @@ async fn test_harness_creates_isolated_stores() {
 /// - Sync happens deterministically
 #[tokio::test]
 async fn test_ditto_peer_sync_with_observers() {
-    let ditto_app_id = std::env::var("DITTO_APP_ID").unwrap_or_default();
-    if ditto_app_id.is_empty() {
-        eprintln!("Skipping test - DITTO_APP_ID not configured");
-        return;
-    }
+    // Fail if Ditto credentials not properly configured
+    let ditto_app_id =
+        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("e2e_peer_sync");
 
