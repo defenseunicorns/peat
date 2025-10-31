@@ -1,17 +1,17 @@
-//! Squad Formation Coordinator (E4.5)
+//! Cell Formation Coordinator (E4.5)
 //!
-//! Coordinates squad formation completion by integrating role assignment (E4.3) and
+//! Coordinates cell formation completion by integrating role assignment (E4.3) and
 //! capability aggregation (E4.4). Detects when formation is complete and manages
 //! phase transitions with human approval workflow following ADR-004.
 //!
 //! # Formation Completion Criteria
 //!
-//! A squad formation is considered complete when:
+//! A cell formation is considered complete when:
 //! 1. Minimum squad size met (configurable, default 3)
 //! 2. Leader elected and confirmed
 //! 3. All members have assigned roles
 //! 4. Minimum capability coverage achieved (Communication + Sensor required)
-//! 5. Squad readiness score above threshold (default 0.7)
+//! 5. Cell readiness score above threshold (default 0.7)
 //! 6. Human approval obtained (if required by authority levels)
 //!
 //! # Phase Transition Workflow
@@ -22,15 +22,15 @@
 //! - Request human approval if any mission-critical capabilities lack DirectControl authority
 //! - Transition to OperationalReady once approved
 
+use crate::cell::{AggregatedCapability, CapabilityAggregator};
 use crate::models::{PlatformConfig, PlatformState, SquadRole};
-use crate::squad::{AggregatedCapability, CapabilityAggregator};
 use crate::traits::Phase;
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Squad formation status
+/// Cell formation status
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FormationStatus {
     /// Formation in progress
@@ -43,9 +43,9 @@ pub enum FormationStatus {
     Failed(String),
 }
 
-/// Squad formation coordinator
-pub struct SquadCoordinator {
-    /// Squad ID
+/// Cell formation coordinator
+pub struct CellCoordinator {
+    /// Cell ID
     pub squad_id: String,
     /// Minimum squad size
     pub min_size: usize,
@@ -63,7 +63,7 @@ pub struct SquadCoordinator {
     pub formation_complete: Option<u64>,
 }
 
-impl SquadCoordinator {
+impl CellCoordinator {
     /// Create a new squad coordinator
     pub fn new(squad_id: String) -> Self {
         let now = SystemTime::now()
@@ -89,7 +89,7 @@ impl SquadCoordinator {
     /// Check if formation is complete
     ///
     /// # Arguments
-    /// * `members` - Squad members (config, state, role)
+    /// * `members` - Cell members (config, state, role)
     /// * `leader_id` - Optional ID of elected leader
     ///
     /// # Returns

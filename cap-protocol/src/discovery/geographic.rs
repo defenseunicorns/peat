@@ -1,6 +1,6 @@
 //! Geographic self-organization strategy for bootstrap phase
 //!
-//! Implements geohash-based spatial clustering for autonomous squad formation.
+//! Implements geohash-based spatial clustering for autonomous cell formation.
 //!
 //! # Architecture
 //!
@@ -19,7 +19,7 @@
 //!
 //! See: docs/ADR-002-Beacon-Storage-Architecture.md
 
-use crate::bootstrap::geo::GeoCoordinate;
+use crate::discovery::geo::GeoCoordinate;
 use crate::models::capability::Capability;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -34,15 +34,15 @@ pub const DEFAULT_GEOHASH_PRECISION: usize = 7;
 /// - Local cache expiration checks (janitor service)
 ///
 /// Balances:
-/// - Responsiveness: Detect offline platforms quickly
+/// - Responsiveness: Detect offline nodes quickly
 /// - Network efficiency: Reduce unnecessary re-broadcasts
 /// - DDIL tolerance: Account for intermittent connectivity
 pub const BEACON_TTL_SECONDS: u64 = 30;
 
-/// Minimum platforms required to form a squad
+/// Minimum nodes required to form a squad
 pub const MIN_SQUAD_SIZE: usize = 2;
 
-/// Platform beacon for geographic discovery
+/// Node beacon for geographic discovery
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GeographicBeacon {
     pub platform_id: String,
@@ -85,7 +85,7 @@ impl GeographicBeacon {
     }
 }
 
-/// Geographic cluster of platforms in the same geohash cell
+/// Geographic cluster of nodes in the same geohash cell
 #[derive(Debug, Clone)]
 pub struct GeographicCluster {
     pub geohash_cell: String,
@@ -114,7 +114,7 @@ impl GeographicCluster {
         self.platforms.retain(|b| !b.is_expired(current_time));
     }
 
-    /// Check if cluster has enough platforms to form a squad
+    /// Check if cluster has enough nodes to form a squad
     pub fn can_form_squad(&self, min_size: usize) -> bool {
         self.platforms.len() >= min_size
     }
@@ -143,7 +143,7 @@ pub fn decode_geohash(hash: &str) -> Result<GeoCoordinate, &'static str> {
     GeoCoordinate::new(coord.y, coord.x, 0.0)
 }
 
-/// Geographic discovery manager for organizing platforms into squads
+/// Geographic discovery manager for organizing nodes into squads
 ///
 /// # Architecture
 ///
@@ -230,7 +230,7 @@ impl GeographicDiscovery {
         })
     }
 
-    /// Check if this platform should initiate squad formation
+    /// Check if this platform should initiate cell formation
     /// Returns true if this platform is the "leader" (lowest ID) in its cluster
     pub fn should_initiate_squad_formation(&self) -> bool {
         if let Some(cluster) = self.my_cluster() {
@@ -389,7 +389,7 @@ mod tests {
 
         assert_eq!(discovery.total_platforms(), 2);
 
-        // Should be able to form squads now
+        // Should be able to form cells now
         let formable = discovery.find_formable_squads(2);
         assert_eq!(formable.len(), 1);
 

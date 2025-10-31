@@ -1,4 +1,4 @@
-//! Leader Election Algorithm for Squad Formation (Phase 2)
+//! Leader Election Algorithm for Cell Formation (Phase 2)
 //!
 //! Implements deterministic leader selection based on capability scoring with
 //! failure detection and re-election support.
@@ -10,11 +10,11 @@
 //!
 //! ## Election Flow
 //!
-//! 1. **Initialization**: All platforms start in `Candidate` state
+//! 1. **Initialization**: All nodes start in `Candidate` state
 //! 2. **Scoring**: Each platform computes its leadership score
 //! 3. **Announcement**: Platforms announce their candidacy with scores
 //! 4. **Comparison**: Platforms compare received scores with their own
-//! 5. **Convergence**: Platform with highest score becomes leader
+//! 5. **Convergence**: Node with highest score becomes leader
 //! 6. **Confirmation**: Leader announces election win, others follow
 //!
 //! ## Scoring Function
@@ -38,8 +38,8 @@
 //! - Followers detect failure after 3 missed heartbeats (6 seconds)
 //! - Automatic re-election triggered on leader failure
 
+use crate::cell::messaging::{SquadMessage, SquadMessageBus, SquadMessageType};
 use crate::models::{Capability, CapabilityType};
-use crate::squad::messaging::{SquadMessage, SquadMessageBus, SquadMessageType};
 use crate::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -50,11 +50,11 @@ use tracing::{debug, info, instrument, warn};
 /// Election state of a platform
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ElectionState {
-    /// Platform is a candidate for leadership
+    /// Node is a candidate for leadership
     Candidate,
-    /// Platform has been elected as leader
+    /// Node has been elected as leader
     Leader,
-    /// Platform is following an elected leader
+    /// Node is following an elected leader
     Follower,
 }
 
@@ -190,9 +190,9 @@ impl LeaderHeartbeat {
 /// - Leader failure detection
 /// - Automatic re-election
 pub struct LeaderElectionManager {
-    /// Squad ID
+    /// Cell ID
     squad_id: String,
-    /// Platform ID
+    /// Node ID
     platform_id: String,
     /// Message bus for election messages
     message_bus: Arc<SquadMessageBus>,
@@ -262,7 +262,7 @@ impl LeaderElectionManager {
     /// Announce candidacy with leadership score
     fn announce_candidacy(&self, round: u32) -> Result<()> {
         debug!(
-            "Platform {} announcing candidacy for round {}",
+            "Node {} announcing candidacy for round {}",
             self.platform_id, round
         );
 
@@ -438,7 +438,7 @@ impl LeaderElectionManager {
 
     /// Manually set as leader (for testing or C2 override)
     pub fn set_as_leader(&self) {
-        info!("Platform {} set as leader", self.platform_id);
+        info!("Node {} set as leader", self.platform_id);
         *self.state.lock().unwrap() = ElectionState::Leader;
         *self.current_leader.lock().unwrap() = Some(self.platform_id.clone());
     }

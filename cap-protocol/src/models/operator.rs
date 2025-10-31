@@ -124,7 +124,7 @@ impl OperatorRank {
             Self::E4 => 0.30,
             Self::E5 => 0.40,
             Self::E6 => 0.50,
-            Self::E7 => 0.60, // Squad leader typical
+            Self::E7 => 0.60, // Cell leader typical
             Self::E8 => 0.70,
             Self::E9 => 0.80,
             Self::W1 => 0.70,
@@ -242,7 +242,7 @@ impl fmt::Display for AuthorityLevel {
 pub struct HumanMachinePair {
     /// Operator(s) - can be empty for autonomous platforms
     pub operators: Vec<Operator>,
-    /// Platform ID(s) bound to this pairing
+    /// Node ID(s) bound to this pairing
     pub platform_ids: Vec<String>,
     /// Type of binding relationship
     pub binding_type: BindingType,
@@ -319,7 +319,7 @@ impl HumanMachinePair {
     /// Get average operator effectiveness across all operators
     pub fn avg_effectiveness(&self) -> f32 {
         if self.operators.is_empty() {
-            return 1.0; // Autonomous platforms are always "effective"
+            return 1.0; // Autonomous nodes are always "effective"
         }
 
         let sum: f32 = self.operators.iter().map(|op| op.effectiveness()).sum();
@@ -332,7 +332,7 @@ impl HumanMachinePair {
 pub enum BindingType {
     /// One human operating one platform (traditional)
     OneToOne,
-    /// One human controlling multiple platforms (swarm operator)
+    /// One human controlling multiple nodes (swarm operator)
     OneToMany,
     /// Multiple humans sharing one platform (command vehicle)
     ManyToOne,

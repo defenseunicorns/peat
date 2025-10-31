@@ -1,4 +1,4 @@
-//! Squad state data structures
+//! Cell state data structures
 //!
 //! This module defines squad data models with CRDT operations:
 //! - Member list: OR-Set (observed-remove set) - members can be added and removed
@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use uuid::Uuid;
 
-/// Squad configuration
+/// Cell configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SquadConfig {
+pub struct CellConfig {
     /// Unique squad identifier
     pub id: String,
     /// Maximum squad size
@@ -32,11 +32,11 @@ impl SquadConfig {
     }
 }
 
-/// Squad state
+/// Cell state
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SquadState {
-    /// Squad configuration
-    pub config: SquadConfig,
+pub struct CellState {
+    /// Cell configuration
+    pub config: CellConfig,
     /// Current squad leader platform ID
     pub leader_id: Option<String>,
     /// Set of member platform IDs
@@ -51,7 +51,7 @@ pub struct SquadState {
 
 impl SquadState {
     /// Create a new squad state
-    pub fn new(config: SquadConfig) -> Self {
+    pub fn new(config: CellConfig) -> Self {
         Self {
             config,
             leader_id: None,

@@ -11,16 +11,16 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// Errors that can occur in the CAP protocol
 #[derive(Error, Debug)]
 pub enum Error {
-    /// Bootstrap phase errors
-    #[error("Bootstrap error: {message}")]
-    Bootstrap {
+    /// Discovery phase errors
+    #[error("Discovery error: {message}")]
+    Discovery {
         message: String,
         #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 
-    /// Squad formation errors
-    #[error("Squad formation error: {message}")]
+    /// Cell formation errors
+    #[error("Cell formation error: {message}")]
     SquadFormation {
         message: String,
         squad_id: Option<String>,

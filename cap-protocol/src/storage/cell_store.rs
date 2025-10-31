@@ -1,19 +1,19 @@
-//! Squad state storage manager
+//! Cell state storage manager
 //!
 //! This module provides a high-level wrapper around DittoStore for managing
 //! squad state using CRDT operations.
 
-use crate::models::{Capability, SquadState};
+use crate::models::{cell::CellState, Capability};
 use crate::storage::ditto_store::DittoStore;
 use crate::{Error, Result};
 use serde_json::json;
 use tracing::{debug, info, instrument};
 
 /// Collection name
-const SQUAD_COLLECTION: &str = "squads";
+const SQUAD_COLLECTION: &str = "cells";
 
-/// Squad storage manager
-pub struct SquadStore {
+/// Cell storage manager
+pub struct CellStore {
     store: DittoStore,
 }
 
@@ -60,12 +60,12 @@ impl SquadStore {
         Ok(Some(squad))
     }
 
-    /// Get all valid squads (meeting minimum size requirements)
+    /// Get all valid cells (meeting minimum size requirements)
     #[instrument(skip(self))]
     pub async fn get_valid_squads(&self) -> Result<Vec<SquadState>> {
         debug!("Querying valid squads");
 
-        // Query all squads - we'll filter in code since DQL doesn't support array length
+        // Query all cells - we'll filter in code since DQL doesn't support array length
         let docs = self.store.query(SQUAD_COLLECTION, "true").await?;
 
         let squads: Vec<SquadState> = docs
@@ -77,10 +77,10 @@ impl SquadStore {
         Ok(squads)
     }
 
-    /// Get all squads in a platoon
+    /// Get all cells in a platoon
     #[instrument(skip(self))]
     pub async fn get_squads_by_platoon(&self, platoon_id: &str) -> Result<Vec<SquadState>> {
-        debug!("Querying squads by platoon: {}", platoon_id);
+        debug!("Querying cells by platoon: {}", platoon_id);
 
         let where_clause = format!("platoon_id == '{}'", platoon_id);
         let docs = self.store.query(SQUAD_COLLECTION, &where_clause).await?;
@@ -93,15 +93,15 @@ impl SquadStore {
         Ok(squads)
     }
 
-    /// Get squads that have a specific capability type
+    /// Get cells that have a specific capability type
     #[instrument(skip(self))]
     pub async fn get_squads_with_capability(
         &self,
         capability_type: crate::models::CapabilityType,
     ) -> Result<Vec<SquadState>> {
-        debug!("Querying squads with capability: {:?}", capability_type);
+        debug!("Querying cells with capability: {:?}", capability_type);
 
-        // Query all squads - filter by capability in code
+        // Query all cells - filter by capability in code
         let docs = self.store.query(SQUAD_COLLECTION, "true").await?;
 
         let squads: Vec<SquadState> = docs
@@ -113,7 +113,7 @@ impl SquadStore {
         Ok(squads)
     }
 
-    /// Get squads that are not full (can accept more members)
+    /// Get cells that are not full (can accept more members)
     #[instrument(skip(self))]
     pub async fn get_available_squads(&self) -> Result<Vec<SquadState>> {
         debug!("Querying available squads");

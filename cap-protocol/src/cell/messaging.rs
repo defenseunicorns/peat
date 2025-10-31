@@ -1,10 +1,10 @@
-//! Intra-Squad Communication System
+//! Intra-Cell Communication System
 //!
 //! Implements Phase 2 messaging infrastructure for squad cohesion and coordination.
 //!
 //! # Architecture
 //!
-//! Squad messaging provides:
+//! Cell messaging provides:
 //! - **Message Bus**: Publish/subscribe pattern for squad-internal messages
 //! - **Capability Exchange**: Protocol for sharing platform capabilities
 //! - **Message Ordering**: Sequence numbers for ordering guarantees
@@ -14,7 +14,7 @@
 //! ## Message Flow
 //!
 //! ```text
-//! Platform A                    Message Bus                    Platform B
+//! Node A                    Message Bus                    Node B
 //!     |                             |                              |
 //!     |-- Publish(CapabilityMsg) -->|                              |
 //!     |                             |-- Deliver(CapabilityMsg) --->|
@@ -54,17 +54,17 @@ pub enum MessagePriority {
     Critical = 3,
 }
 
-/// Squad message types
+/// Cell message types
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum SquadMessageType {
-    /// Platform joining squad
+pub enum CellMessageType {
+    /// Node joining squad
     Join {
         platform_id: String,
         capabilities: Vec<Capability>,
     },
-    /// Platform leaving squad
+    /// Node leaving squad
     Leave { platform_id: String, reason: String },
-    /// Platform announcing capabilities
+    /// Node announcing capabilities
     CapabilityAnnounce {
         platform_id: String,
         capabilities: Vec<Capability>,
@@ -97,9 +97,9 @@ pub enum SquadMessageType {
     },
 }
 
-/// Squad message envelope
+/// Cell message envelope
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SquadMessage {
+pub struct CellMessage {
     /// Message ID (unique per sender)
     pub message_id: String,
     /// Sequence number for ordering
@@ -111,20 +111,20 @@ pub struct SquadMessage {
     /// Message priority
     pub priority: MessagePriority,
     /// Message payload
-    pub payload: SquadMessageType,
+    pub payload: CellMessageType,
     /// Timestamp (Unix seconds)
     pub timestamp: u64,
     /// Time-to-live (seconds)
     pub ttl: u64,
 }
 
-impl SquadMessage {
+impl CellMessage {
     /// Create a new squad message
     pub fn new(
         sender: String,
         squad_id: String,
         seq: SequenceNumber,
-        payload: SquadMessageType,
+        payload: CellMessageType,
     ) -> Self {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -178,7 +178,7 @@ impl SquadMessage {
             sender,
             squad_id,
             seq,
-            SquadMessageType::RoleAssignment {
+            CellMessageType::RoleAssignment {
                 platform_id,
                 role,
                 score,
@@ -214,15 +214,15 @@ struct TrackedMessage {
 /// Message handler function type
 pub type MessageHandler = Arc<dyn Fn(&SquadMessage) -> Result<()> + Send + Sync>;
 
-/// Squad Message Bus
+/// Cell Message Bus
 ///
 /// Provides publish/subscribe messaging within a squad with:
 /// - Message ordering via sequence numbers
 /// - Reliable delivery with retransmission
 /// - Priority-based delivery
 /// - Message expiration
-pub struct SquadMessageBus {
-    /// Squad ID this bus serves
+pub struct CellMessageBus {
+    /// Cell ID this bus serves
     squad_id: String,
     /// Local platform ID
     platform_id: String,
@@ -242,7 +242,7 @@ pub struct SquadMessageBus {
     max_retries: u32,
 }
 
-impl SquadMessageBus {
+impl CellMessageBus {
     /// Create a new message bus
     pub fn new(squad_id: String, platform_id: String) -> Self {
         Self {
@@ -267,7 +267,7 @@ impl SquadMessageBus {
 
     /// Publish a message to the squad
     #[instrument(skip(self, payload))]
-    pub fn publish(&self, payload: SquadMessageType) -> Result<SequenceNumber> {
+    pub fn publish(&self, payload: CellMessageType) -> Result<SequenceNumber> {
         let seq = {
             let mut next_seq = self.next_seq.lock().unwrap();
             let seq = *next_seq;
@@ -275,7 +275,7 @@ impl SquadMessageBus {
             seq
         };
 
-        let message = SquadMessage::new(
+        let message = CellMessage::new(
             self.platform_id.clone(),
             self.squad_id.clone(),
             seq,
@@ -437,11 +437,11 @@ mod tests {
 
     #[test]
     fn test_message_creation() {
-        let payload = SquadMessageType::Heartbeat {
+        let payload = CellMessageType::Heartbeat {
             platform_id: "platform_1".to_string(),
         };
 
-        let message = SquadMessage::new(
+        let message = CellMessage::new(
             "platform_1".to_string(),
             "squad_alpha".to_string(),
             1,
@@ -457,11 +457,11 @@ mod tests {
 
     #[test]
     fn test_message_expiration() {
-        let payload = SquadMessageType::Heartbeat {
+        let payload = CellMessageType::Heartbeat {
             platform_id: "platform_1".to_string(),
         };
 
-        let mut message = SquadMessage::new(
+        let mut message = CellMessage::new(
             "platform_1".to_string(),
             "squad_alpha".to_string(),
             1,
@@ -477,11 +477,11 @@ mod tests {
 
     #[test]
     fn test_message_priority() {
-        let payload = SquadMessageType::Heartbeat {
+        let payload = CellMessageType::Heartbeat {
             platform_id: "platform_1".to_string(),
         };
 
-        let message = SquadMessage::new(
+        let message = CellMessage::new(
             "platform_1".to_string(),
             "squad_alpha".to_string(),
             1,
@@ -508,7 +508,7 @@ mod tests {
     fn test_publish_message() {
         let bus = SquadMessageBus::new("squad_alpha".to_string(), "platform_1".to_string());
 
-        let payload = SquadMessageType::Heartbeat {
+        let payload = CellMessageType::Heartbeat {
             platform_id: "platform_1".to_string(),
         };
 
@@ -525,11 +525,11 @@ mod tests {
         let bus = SquadMessageBus::new("squad_alpha".to_string(), "platform_1".to_string());
 
         // Publish messages with different priorities
-        let _ = bus.publish(SquadMessageType::Heartbeat {
+        let _ = bus.publish(CellMessageType::Heartbeat {
             platform_id: "platform_1".to_string(),
         });
 
-        let _ = bus.publish(SquadMessageType::LeaderAnnounce {
+        let _ = bus.publish(CellMessageType::LeaderAnnounce {
             leader_id: "platform_2".to_string(),
             election_round: 1,
         });
@@ -551,11 +551,11 @@ mod tests {
     fn test_duplicate_detection() {
         let bus = SquadMessageBus::new("squad_alpha".to_string(), "platform_1".to_string());
 
-        let message = SquadMessage::new(
+        let message = CellMessage::new(
             "platform_2".to_string(),
             "squad_alpha".to_string(),
             1,
-            SquadMessageType::Heartbeat {
+            CellMessageType::Heartbeat {
                 platform_id: "platform_2".to_string(),
             },
         );
@@ -583,11 +583,11 @@ mod tests {
         }))
         .unwrap();
 
-        let message = SquadMessage::new(
+        let message = CellMessage::new(
             "platform_2".to_string(),
             "squad_alpha".to_string(),
             1,
-            SquadMessageType::Heartbeat {
+            CellMessageType::Heartbeat {
                 platform_id: "platform_2".to_string(),
             },
         );
@@ -602,7 +602,7 @@ mod tests {
         let bus = SquadMessageBus::new("squad_alpha".to_string(), "platform_1".to_string());
 
         let seq = bus
-            .publish(SquadMessageType::Heartbeat {
+            .publish(CellMessageType::Heartbeat {
                 platform_id: "platform_1".to_string(),
             })
             .unwrap();
@@ -622,7 +622,7 @@ mod tests {
         bus.retry_timeout = Duration::from_millis(10); // Short timeout for testing
 
         let seq = bus
-            .publish(SquadMessageType::Heartbeat {
+            .publish(CellMessageType::Heartbeat {
                 platform_id: "platform_1".to_string(),
             })
             .unwrap();
@@ -642,7 +642,7 @@ mod tests {
 
     #[test]
     fn test_role_assignment_message() {
-        let msg = SquadMessage::role_assignment(
+        let msg = CellMessage::role_assignment(
             "platform_1".to_string(),
             "squad_1".to_string(),
             1,
@@ -658,7 +658,7 @@ mod tests {
         assert_eq!(msg.priority, MessagePriority::High);
 
         match msg.payload {
-            SquadMessageType::RoleAssignment {
+            CellMessageType::RoleAssignment {
                 platform_id,
                 role,
                 score,

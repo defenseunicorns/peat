@@ -1,19 +1,19 @@
 //! C2-Directed Assignment for bootstrap phase
 //!
-//! Implements Command & Control (C2) directed squad formation where C2 explicitly
-//! assigns platforms to squads based on operational requirements.
+//! Implements Command & Control (C2) directed cell formation where C2 explicitly
+//! assigns nodes to cells based on operational requirements.
 //!
 //! # Architecture
 //!
 //! Unlike autonomous geographic self-organization (E3.1), C2-directed assignment
-//! provides top-down squad formation with explicit authority and validation:
+//! provides top-down cell formation with explicit authority and validation:
 //!
 //! ## Assignment Flow
 //!
 //! 1. **C2 Issues Assignment**: C2 broadcasts `SquadAssignment` messages
-//! 2. **Platform Receives**: Platforms observe assignments via Ditto
-//! 3. **Validation**: Platform validates assignment (exists, not full, authorized)
-//! 4. **Execution**: Platform joins squad and updates state
+//! 2. **Node Receives**: Platforms observe assignments via Ditto
+//! 3. **Validation**: Node validates assignment (exists, not full, authorized)
+//! 4. **Execution**: Node joins squad and updates state
 //! 5. **Confirmation**: Assignment status tracked in distributed state
 //!
 //! ## Message Format
@@ -31,12 +31,12 @@
 //!
 //! ## Use Cases
 //!
-//! - **Pre-planned missions**: Assign platforms based on pre-mission planning
-//! - **Capability requirements**: Form squads with specific capability mixes
+//! - **Pre-planned missions**: Assign nodes based on pre-mission planning
+//! - **Capability requirements**: Form cells with specific capability mixes
 //! - **Command override**: Override autonomous formation when needed
-//! - **Emergency reconstitution**: Rebuild squads after casualties/failures
+//! - **Emergency reconstitution**: Rebuild cells after casualties/failures
 
-use crate::storage::SquadStore;
+use crate::storage::CellStore;
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -69,12 +69,12 @@ pub enum AssignmentStatus {
     Failed { reason: String },
 }
 
-/// Squad assignment message from C2
+/// Cell assignment message from C2
 ///
 /// This message is broadcast via Ditto and contains explicit platform-to-squad
 /// assignments. Platforms observe these messages and execute them if valid.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SquadAssignment {
+pub struct CellAssignment {
     /// Unique identifier for this assignment
     pub assignment_id: String,
     /// Target squad ID
@@ -93,7 +93,7 @@ pub struct SquadAssignment {
     pub context: Option<String>,
 }
 
-impl SquadAssignment {
+impl CellAssignment {
     /// Create a new squad assignment
     pub fn new(
         assignment_id: String,
@@ -159,11 +159,11 @@ impl SquadAssignment {
 pub enum ValidationResult {
     /// Assignment is valid and can be executed
     Valid,
-    /// Squad does not exist
+    /// Cell does not exist
     SquadNotFound,
-    /// Squad is full and cannot accept more members
+    /// Cell is full and cannot accept more members
     SquadFull,
-    /// Platform is already in another squad
+    /// Node is already in another squad
     PlatformAlreadyAssigned { current_squad: String },
     /// Assignment is from unauthorized source
     Unauthorized,
@@ -177,11 +177,11 @@ pub enum ValidationResult {
 ///
 /// Processes C2-issued squad assignments and manages assignment lifecycle.
 pub struct DirectedAssignmentManager {
-    /// Squad storage
+    /// Cell storage
     store: SquadStore,
     /// Active assignments being tracked
     assignments: HashMap<String, SquadAssignment>,
-    /// Platform ID of this node
+    /// Node ID of this node
     my_platform_id: String,
     /// Assignment timeout (seconds)
     assignment_timeout: u64,
@@ -356,7 +356,7 @@ mod tests {
     use super::*;
     use crate::models::{SquadConfig, SquadState};
     use crate::storage::ditto_store::DittoStore;
-    use crate::storage::SquadStore;
+    use crate::storage::CellStore;
 
     #[test]
     fn test_assignment_creation() {

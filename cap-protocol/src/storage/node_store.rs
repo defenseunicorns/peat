@@ -1,20 +1,20 @@
-//! Platform state storage manager
+//! Node state storage manager
 //!
 //! This module provides a high-level wrapper around DittoStore for managing
-//! platform configurations and state using CRDT operations.
+//! node configurations and state using CRDT operations.
 
-use crate::models::{PlatformConfig, PlatformState};
+use crate::models::node::{NodeConfig, NodeState};
 use crate::storage::ditto_store::DittoStore;
 use crate::{Error, Result};
 use serde_json::json;
 use tracing::{debug, info, instrument};
 
 /// Collection names
-const PLATFORM_CONFIG_COLLECTION: &str = "platform_configs";
-const PLATFORM_STATE_COLLECTION: &str = "platform_states";
+const PLATFORM_CONFIG_COLLECTION: &str = "node_configs";
+const PLATFORM_STATE_COLLECTION: &str = "node_states";
 
-/// Platform storage manager
-pub struct PlatformStore {
+/// Node storage manager
+pub struct NodeStore {
     store: DittoStore,
 }
 
@@ -24,7 +24,7 @@ impl PlatformStore {
         Self { store }
     }
 
-    /// Store a platform configuration (G-Set operation)
+    /// Store a node configuration (G-Set operation)
     #[instrument(skip(self, config))]
     pub async fn store_config(&self, config: &PlatformConfig) -> Result<String> {
         info!("Storing platform config: {}", config.id);
@@ -44,7 +44,7 @@ impl PlatformStore {
             })
     }
 
-    /// Retrieve a platform configuration by ID
+    /// Retrieve a node configuration by ID
     #[instrument(skip(self))]
     pub async fn get_config(&self, platform_id: &str) -> Result<Option<PlatformConfig>> {
         debug!("Retrieving platform config: {}", platform_id);
@@ -63,10 +63,10 @@ impl PlatformStore {
         Ok(Some(config))
     }
 
-    /// Store platform state (LWW-Register operation)
+    /// Store node state (LWW-Register operation)
     #[instrument(skip(self, state))]
     pub async fn store_state(&self, platform_id: &str, state: &PlatformState) -> Result<String> {
-        info!("Storing platform state: {}", platform_id);
+        info!("Storing node state: {}", platform_id);
 
         // Create document with platform_id for querying
         let mut doc = serde_json::to_value(state)?;
@@ -79,17 +79,17 @@ impl PlatformStore {
             .await
             .map_err(|e| {
                 Error::storage_error(
-                    format!("Failed to store platform state: {}", e),
+                    format!("Failed to store node state: {}", e),
                     "upsert",
                     Some(PLATFORM_STATE_COLLECTION.to_string()),
                 )
             })
     }
 
-    /// Retrieve platform state by ID
+    /// Retrieve node state by ID
     #[instrument(skip(self))]
     pub async fn get_state(&self, platform_id: &str) -> Result<Option<PlatformState>> {
-        debug!("Retrieving platform state: {}", platform_id);
+        debug!("Retrieving node state: {}", platform_id);
 
         let where_clause = format!("platform_id == '{}'", platform_id);
         let docs = self
@@ -105,13 +105,13 @@ impl PlatformStore {
         Ok(Some(state))
     }
 
-    /// Get all platforms in a specific phase
+    /// Get all nodes in a specific phase
     #[instrument(skip(self))]
     pub async fn get_platforms_by_phase(
         &self,
         phase: crate::traits::Phase,
     ) -> Result<Vec<PlatformState>> {
-        debug!("Querying platforms by phase: {:?}", phase);
+        debug!("Querying nodes by phase: {:?}", phase);
 
         let phase_str = format!("{}", phase);
         let where_clause = format!("phase == '{}'", phase_str);
@@ -128,10 +128,10 @@ impl PlatformStore {
         Ok(states)
     }
 
-    /// Get all platforms in a specific squad
+    /// Get all nodes in a specific squad
     #[instrument(skip(self))]
     pub async fn get_platforms_by_squad(&self, squad_id: &str) -> Result<Vec<PlatformState>> {
-        debug!("Querying platforms by squad: {}", squad_id);
+        debug!("Querying nodes by squad: {}", squad_id);
 
         let where_clause = format!("squad_id == '{}'", squad_id);
         let docs = self
@@ -147,7 +147,7 @@ impl PlatformStore {
         Ok(states)
     }
 
-    /// Get all operational platforms (health != Failed && fuel > 0)
+    /// Get all operational nodes (health != Failed && fuel > 0)
     #[instrument(skip(self))]
     pub async fn get_operational_platforms(&self) -> Result<Vec<PlatformState>> {
         debug!("Querying operational platforms");
@@ -167,7 +167,7 @@ impl PlatformStore {
         Ok(states)
     }
 
-    /// Delete a platform configuration
+    /// Delete a node configuration
     #[instrument(skip(self))]
     pub async fn delete_config(&self, platform_id: &str) -> Result<()> {
         info!("Deleting platform config: {}", platform_id);
@@ -177,10 +177,10 @@ impl PlatformStore {
             .await
     }
 
-    /// Delete a platform state
+    /// Delete a node state
     #[instrument(skip(self))]
     pub async fn delete_state(&self, platform_id: &str) -> Result<()> {
-        info!("Deleting platform state: {}", platform_id);
+        info!("Deleting node state: {}", platform_id);
 
         self.store
             .remove(PLATFORM_STATE_COLLECTION, platform_id)
@@ -310,9 +310,9 @@ mod tests {
         // Wait longer for Ditto to index the document
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-        let platforms = store.get_platforms_by_phase(Phase::Squad).await.unwrap();
+        let nodes = store.get_platforms_by_phase(Phase::Squad).await.unwrap();
         // If still empty, this might be because previous test data is still present
         // Just verify the query doesn't error
-        println!("Found {} platforms in Squad phase", platforms.len());
+        println!("Found {} nodes in Cell phase", platforms.len());
     }
 }

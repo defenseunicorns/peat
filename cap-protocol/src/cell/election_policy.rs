@@ -15,7 +15,7 @@ pub struct ElectionPolicyConfig {
     pub default_policy: LeadershipPolicy,
     /// Minimum rank required for squad leader (None = no minimum)
     pub min_leader_rank: Option<OperatorRank>,
-    /// Whether autonomous platforms can be leaders
+    /// Whether autonomous nodes can be leaders
     pub allow_autonomous_leaders: bool,
     /// Cognitive load threshold for leadership disqualification (0.0-1.0)
     pub max_cognitive_load: f32,
@@ -118,7 +118,7 @@ impl ElectionPolicyConfig {
         true
     }
 
-    /// Check if autonomous platforms are allowed to be leaders
+    /// Check if autonomous nodes are allowed to be leaders
     pub fn allows_autonomous_leader(&self) -> bool {
         self.allow_autonomous_leaders
     }
@@ -160,8 +160,8 @@ impl LeadershipPolicy {
     fn compute_contextual_weights(context: &ElectionContext) -> (f64, f64) {
         // Adjust weights based on mission phase (authority_required flag can be checked by caller if needed)
         match context.mission_phase {
-            Phase::Bootstrap => (0.7, 0.3), // Planning phase - authority matters more
-            Phase::Squad => (0.6, 0.4),     // Squad ops - balanced
+            Phase::Discovery => (0.7, 0.3), // Planning phase - authority matters more
+            Phase::Cell => (0.6, 0.4),      // Cell ops - balanced
             Phase::Hierarchical => (0.8, 0.2), // Hierarchical - authority critical
         }
     }
@@ -360,12 +360,12 @@ mod tests {
     fn test_contextual_policy_weights() {
         let policy = LeadershipPolicy::Contextual;
 
-        // Bootstrap phase - authority matters more
+        // Discovery phase - authority matters more
         let context = ElectionContext::new(policy.clone(), Phase::Bootstrap);
         let (auth, _tech) = policy.get_weights(&context);
         assert_eq!(auth, 0.7);
 
-        // Squad phase - balanced
+        // Cell phase - balanced
         let context = ElectionContext::new(policy.clone(), Phase::Squad);
         let (auth, _tech) = policy.get_weights(&context);
         assert_eq!(auth, 0.6);

@@ -1,6 +1,6 @@
-//! Bootstrap phase implementation (Phase 1)
+//! Discovery phase implementation (Phase 1)
 //!
-//! Implements constrained discovery strategies to form initial squads.
+//! Implements constrained discovery strategies to form initial cells.
 
 pub mod capability_query;
 pub mod coordinator;

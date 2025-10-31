@@ -1,11 +1,11 @@
 //! Capability-based queries for platform and squad discovery
 //!
-//! Implements the capability query system for finding platforms and squads
+//! Implements the capability query system for finding nodes and squads
 //! based on required capabilities during the bootstrap phase.
 //!
 //! # Architecture
 //!
-//! The capability query system allows C2 or platforms to discover other entities
+//! The capability query system allows C2 or nodes to discover other entities
 //! based on capability requirements:
 //!
 //! ## Query Types
@@ -17,15 +17,15 @@
 //!
 //! ## Use Cases
 //!
-//! - **Mission planning**: Find platforms with required sensor capabilities
-//! - **Squad formation**: Form squads with complementary capabilities
+//! - **Mission planning**: Find nodes with required sensor capabilities
+//! - **Cell formation**: Form cells with complementary capabilities
 //! - **Resource discovery**: Locate available compute/comms resources
-//! - **Redundancy**: Find backup platforms with similar capabilities
+//! - **Redundancy**: Find backup nodes with similar capabilities
 //!
 //! ## Example
 //!
 //! ```rust,ignore
-//! // Find platforms with sensor AND communication capabilities
+//! // Find nodes with sensor AND communication capabilities
 //! let query = CapabilityQuery::builder()
 //!     .require_type(CapabilityType::Sensor)
 //!     .require_type(CapabilityType::Communication)
@@ -35,11 +35,11 @@
 //! let matches = engine.query_platforms(&query, &platforms)?;
 //! ```
 
-use crate::models::{Capability, CapabilityType, PlatformConfig, SquadState};
+use crate::models::{cell::CellState, node::NodeConfig, Capability, CapabilityType};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Capability query for finding platforms or squads
+/// Capability query for finding nodes or squads
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapabilityQuery {
     /// Required capability types (AND logic - all must be present)
@@ -218,7 +218,7 @@ pub struct QueryMatch<T> {
     pub score: f32,
 }
 
-/// Capability query engine for finding platforms and squads
+/// Capability query engine for finding nodes and squads
 pub struct CapabilityQueryEngine;
 
 impl CapabilityQueryEngine {
@@ -227,7 +227,7 @@ impl CapabilityQueryEngine {
         Self
     }
 
-    /// Query platforms by capabilities
+    /// Query nodes by capabilities
     pub fn query_platforms(
         &self,
         query: &CapabilityQuery,
@@ -253,7 +253,7 @@ impl CapabilityQueryEngine {
         matches
     }
 
-    /// Query squads by capabilities
+    /// Query cells by capabilities
     pub fn query_squads(
         &self,
         query: &CapabilityQuery,
@@ -399,14 +399,14 @@ mod tests {
             .min_confidence(0.7)
             .build();
 
-        // Platform with both required capabilities
+        // Node with both required capabilities
         let caps1 = vec![
             create_test_capability("sensor1", CapabilityType::Sensor, 0.9),
             create_test_capability("comms1", CapabilityType::Communication, 0.8),
         ];
         assert!(query.matches(&caps1));
 
-        // Platform missing one required capability
+        // Node missing one required capability
         let caps2 = vec![create_test_capability(
             "sensor1",
             CapabilityType::Sensor,
@@ -414,7 +414,7 @@ mod tests {
         )];
         assert!(!query.matches(&caps2));
 
-        // Platform with low confidence
+        // Node with low confidence
         let caps3 = vec![
             create_test_capability("sensor1", CapabilityType::Sensor, 0.9),
             create_test_capability("comms1", CapabilityType::Communication, 0.5),
@@ -447,14 +447,14 @@ mod tests {
             .prefer_type(CapabilityType::Communication)
             .build();
 
-        // Platform with both required and optional
+        // Node with both required and optional
         let caps1 = vec![
             create_test_capability("sensor1", CapabilityType::Sensor, 0.9),
             create_test_capability("comms1", CapabilityType::Communication, 0.8),
         ];
         let score1 = query.score(&caps1);
 
-        // Platform with only required
+        // Node with only required
         let caps2 = vec![create_test_capability(
             "sensor1",
             CapabilityType::Sensor,
@@ -472,7 +472,7 @@ mod tests {
     fn test_query_engine_platforms() {
         let engine = CapabilityQueryEngine::new();
 
-        let platforms = vec![
+        let nodes = vec![
             create_test_platform(
                 "platform1",
                 "UAV",
@@ -509,7 +509,7 @@ mod tests {
 
         let matches = engine.query_platforms(&query, &platforms);
 
-        // All platforms have sensor capability
+        // All nodes have sensor capability
         assert_eq!(matches.len(), 3);
 
         // platform3 should score highest (has all capabilities with high confidence)
@@ -521,7 +521,7 @@ mod tests {
     fn test_query_engine_limit() {
         let engine = CapabilityQueryEngine::new();
 
-        let platforms = vec![
+        let nodes = vec![
             create_test_platform(
                 "platform1",
                 "UAV",
@@ -567,7 +567,7 @@ mod tests {
     fn test_capability_stats() {
         let engine = CapabilityQueryEngine::new();
 
-        let platforms = vec![
+        let nodes = vec![
             create_test_platform(
                 "platform1",
                 "UAV",

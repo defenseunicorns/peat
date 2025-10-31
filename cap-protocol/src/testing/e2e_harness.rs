@@ -1,4 +1,4 @@
-//! E2E Test Harness for Squad Formation
+//! E2E Test Harness for Cell Formation
 //!
 //! Provides infrastructure for end-to-end testing with Ditto synchronization.
 //! Uses observer-based synchronization instead of polling/timeouts.
@@ -30,7 +30,7 @@ use tokio::sync::mpsc;
 use tokio::time::timeout;
 use tracing::{debug, info, warn};
 
-/// Test harness for E2E squad formation testing
+/// Test harness for E2E cell formation testing
 pub struct E2EHarness {
     /// Test scenario name (for logging/debugging)
     pub name: String,
@@ -89,7 +89,7 @@ impl E2EHarness {
         let (tx, rx) = mpsc::unbounded_channel();
 
         // Create sync subscription first (required for P2P sync)
-        let query = format!("SELECT * FROM squads WHERE id == '{}'", squad_id);
+        let query = format!("SELECT * FROM cells WHERE id == '{}'", squad_id);
         let sync_sub = store
             .ditto()
             .sync()
@@ -107,7 +107,7 @@ impl E2EHarness {
             .ditto()
             .store()
             .register_observer_v2(&query, move |result| {
-                debug!("Squad observer triggered: {} items", result.item_count());
+                debug!("Cell observer triggered: {} items", result.item_count());
 
                 // Parse results into SquadState
                 // Note: In real implementation, parse the JSON from result
@@ -122,7 +122,7 @@ impl E2EHarness {
                 )
             })?;
 
-        Ok(SquadObserver {
+        Ok(CellObserver {
             _sync_sub: sync_sub,
             _observer: observer,
             receiver: rx,
@@ -137,7 +137,7 @@ impl E2EHarness {
     ) -> Result<PlatformObserver> {
         let (tx, rx) = mpsc::unbounded_channel();
 
-        let query = format!("SELECT * FROM platforms WHERE id == '{}'", platform_id);
+        let query = format!("SELECT * FROM nodes WHERE id == '{}'", platform_id);
         let sync_sub = store
             .ditto()
             .sync()
@@ -154,7 +154,7 @@ impl E2EHarness {
             .ditto()
             .store()
             .register_observer_v2(&query, move |result| {
-                debug!("Platform observer triggered: {} items", result.item_count());
+                debug!("Node observer triggered: {} items", result.item_count());
                 let _ = tx.send(PlatformObserverEvent::Changed);
             })
             .map_err(|e| {
@@ -165,7 +165,7 @@ impl E2EHarness {
                 )
             })?;
 
-        Ok(PlatformObserver {
+        Ok(NodeObserver {
             _sync_sub: sync_sub,
             _observer: observer,
             receiver: rx,
@@ -217,14 +217,14 @@ impl E2EHarness {
     }
 }
 
-/// Squad observer that emits events on document changes
-pub struct SquadObserver {
+/// Cell observer that emits events on document changes
+pub struct CellObserver {
     _sync_sub: Arc<dittolive_ditto::sync::SyncSubscription>,
     _observer: Arc<dittolive_ditto::store::StoreObserver>,
     receiver: mpsc::UnboundedReceiver<SquadObserverEvent>,
 }
 
-impl SquadObserver {
+impl CellObserver {
     /// Wait for the next event with timeout
     pub async fn wait_for_event(
         &mut self,
@@ -253,18 +253,18 @@ impl SquadObserver {
 
 #[derive(Debug, Clone)]
 pub enum SquadObserverEvent {
-    /// Squad document changed (updated/inserted)
+    /// Cell document changed (updated/inserted)
     Changed,
 }
 
-/// Platform observer that emits events on document changes
-pub struct PlatformObserver {
+/// Node observer that emits events on document changes
+pub struct NodeObserver {
     _sync_sub: Arc<dittolive_ditto::sync::SyncSubscription>,
     _observer: Arc<dittolive_ditto::store::StoreObserver>,
     receiver: mpsc::UnboundedReceiver<PlatformObserverEvent>,
 }
 
-impl PlatformObserver {
+impl NodeObserver {
     /// Wait for the next event with timeout
     pub async fn wait_for_event(
         &mut self,
@@ -293,7 +293,7 @@ impl PlatformObserver {
 
 #[derive(Debug, Clone)]
 pub enum PlatformObserverEvent {
-    /// Platform document changed (updated/inserted)
+    /// Node document changed (updated/inserted)
     Changed,
 }
 

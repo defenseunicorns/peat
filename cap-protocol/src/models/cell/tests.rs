@@ -1,4 +1,4 @@
-//! Tests for Squad CRDT operations
+//! Tests for Cell CRDT operations
 
 use super::*;
 use crate::models::{Capability, CapabilityType};

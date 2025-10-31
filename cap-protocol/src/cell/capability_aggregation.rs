@@ -1,8 +1,8 @@
-//! Squad Capability Aggregation
+//! Cell Capability Aggregation
 //!
 //! This module implements capability aggregation across squad members following ADR-004
 //! human-machine teaming principles. It collects individual platform capabilities and
-//! composes them into emergent squad-level capabilities with human authority integration.
+//! composes them into emergent cell-level capabilities with human authority integration.
 //!
 //! # Key Concepts
 //!
@@ -25,14 +25,14 @@ use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Aggregated squad-level capability with human authority integration
+/// Aggregated cell-level capability with human authority integration
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AggregatedCapability {
     /// Capability type
     pub capability_type: CapabilityType,
     /// Aggregated confidence score (0.0-1.0)
     pub confidence: f32,
-    /// Number of platforms contributing this capability
+    /// Number of nodes contributing this capability
     pub contributor_count: usize,
     /// Contributing platform IDs
     pub contributors: Vec<String>,
@@ -111,7 +111,7 @@ impl AggregatedCapability {
     }
 }
 
-/// Squad capability aggregator
+/// Cell capability aggregator
 pub struct CapabilityAggregator;
 
 impl CapabilityAggregator {
@@ -512,10 +512,10 @@ mod tests {
 
         let result = CapabilityAggregator::aggregate_capabilities(&[platform]).unwrap();
 
-        // Should still include degraded platforms (they're operational)
+        // Should still include degraded nodes (they're operational)
         assert_eq!(result.len(), 1);
 
-        // Critical platforms are still operational (only Failed is non-operational)
+        // Critical nodes are still operational (only Failed is non-operational)
         let mut platform2 = create_test_platform("p2", vec![(CapabilityType::Sensor, 0.9)], None);
         platform2.1.health = HealthStatus::Critical;
 
@@ -554,7 +554,7 @@ mod tests {
 
     #[test]
     fn test_all_platforms_non_operational() {
-        // Edge case: All platforms failed/non-operational
+        // Edge case: All nodes failed/non-operational
         let mut platform1 = create_test_platform("p1", vec![(CapabilityType::Sensor, 0.9)], None);
         platform1.1.health = HealthStatus::Failed;
 
@@ -564,7 +564,7 @@ mod tests {
 
         let result = CapabilityAggregator::aggregate_capabilities(&[platform1, platform2]).unwrap();
 
-        // All platforms excluded, should be empty
+        // All nodes excluded, should be empty
         assert_eq!(result.len(), 0);
     }
 

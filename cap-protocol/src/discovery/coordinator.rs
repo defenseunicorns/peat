@@ -1,34 +1,34 @@
-//! Bootstrap Coordinator for Phase 1
+//! Discovery Coordinator for Phase 1
 //!
-//! Orchestrates the bootstrap phase for platforms to discover and form initial squads.
+//! Orchestrates the bootstrap phase for nodes to discover and form initial squads.
 //!
 //! # Architecture
 //!
 //! The BootstrapCoordinator manages:
-//! - Phase state transitions (Bootstrap → Squad)
-//! - Bootstrap timeout management (default 60s)
+//! - Phase state transitions (Discovery → Squad)
+//! - Discovery timeout management (default 60s)
 //! - Tracking unassigned platforms
-//! - Bootstrap metrics collection
+//! - Discovery metrics collection
 //! - Re-bootstrap on failure
 //!
-//! ## Bootstrap Strategies
+//! ## Discovery Strategies
 //!
 //! Three strategies are supported:
-//! 1. **Geographic Self-Organization** (E3.1) - Platforms form squads based on proximity
-//! 2. **C2-Directed Assignment** (E3.2) - C2 explicitly assigns platforms to squads
-//! 3. **Capability-Based Queries** (E3.3) - Platforms query and form squads by capabilities
+//! 1. **Geographic Self-Organization** (E3.1) - Platforms form cells based on proximity
+//! 2. **C2-Directed Assignment** (E3.2) - C2 explicitly assigns nodes to squads
+//! 3. **Capability-Based Queries** (E3.3) - Platforms query and form cells by capabilities
 //!
 //! ## State Machine
 //!
 //! ```text
-//! Bootstrap (initial)
+//! Discovery (initial)
 //!   │
 //!   ├─ timeout expired & assigned → Squad
 //!   ├─ timeout expired & unassigned → Failed (can retry)
 //!   └─ forced transition → Squad
 //! ```
 
-use crate::storage::SquadStore;
+use crate::storage::CellStore;
 use crate::traits::Phase;
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
@@ -39,10 +39,10 @@ use tracing::{debug, info, instrument, warn};
 /// Default bootstrap timeout (60 seconds)
 pub const DEFAULT_BOOTSTRAP_TIMEOUT_SECS: u64 = 60;
 
-/// Bootstrap strategy selection
+/// Discovery strategy selection
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BootstrapStrategy {
-    /// Geographic proximity-based squad formation
+    /// Geographic proximity-based cell formation
     Geographic,
     /// C2-directed squad assignment
     Directed,
@@ -60,35 +60,35 @@ impl std::fmt::Display for BootstrapStrategy {
     }
 }
 
-/// Bootstrap phase status
+/// Discovery phase status
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BootstrapStatus {
-    /// Bootstrap phase not started
+    /// Discovery phase not started
     NotStarted,
-    /// Bootstrap phase in progress
+    /// Discovery phase in progress
     InProgress,
-    /// Bootstrap completed successfully
+    /// Discovery completed successfully
     Completed,
-    /// Bootstrap failed (timeout with no assignment)
+    /// Discovery failed (timeout with no assignment)
     Failed,
-    /// Bootstrap timed out but partially completed
+    /// Discovery timed out but partially completed
     PartiallyCompleted,
 }
 
-/// Bootstrap metrics for analysis
+/// Discovery metrics for analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BootstrapMetrics {
-    /// Total platforms participating
+pub struct DiscoveryMetrics {
+    /// Total nodes participating
     pub total_platforms: usize,
     /// Platforms successfully assigned to squads
     pub assigned_platforms: usize,
     /// Platforms still unassigned
     pub unassigned_platforms: usize,
-    /// Number of squads formed
+    /// Number of cells formed
     pub squads_formed: usize,
     /// Time elapsed since bootstrap start (seconds)
     pub elapsed_seconds: f64,
-    /// Bootstrap strategy used
+    /// Discovery strategy used
     pub strategy: BootstrapStrategy,
     /// Final status
     pub status: BootstrapStatus,
@@ -96,7 +96,7 @@ pub struct BootstrapMetrics {
     pub messages_sent: Option<usize>,
 }
 
-impl BootstrapMetrics {
+impl DiscoveryMetrics {
     /// Calculate assignment rate (0.0 - 1.0)
     pub fn assignment_rate(&self) -> f32 {
         if self.total_platforms == 0 {
@@ -119,31 +119,31 @@ impl BootstrapMetrics {
     }
 }
 
-/// Bootstrap Coordinator
+/// Discovery Coordinator
 ///
 /// Manages the bootstrap phase lifecycle for a platform or simulation.
-pub struct BootstrapCoordinator {
-    /// Squad storage
+pub struct DiscoveryCoordinator {
+    /// Cell storage
     store: SquadStore,
     /// Current phase
     current_phase: Phase,
-    /// Bootstrap strategy
+    /// Discovery strategy
     strategy: BootstrapStrategy,
-    /// Bootstrap timeout duration
+    /// Discovery timeout duration
     timeout: Duration,
-    /// Bootstrap start time
+    /// Discovery start time
     start_time: Option<Instant>,
-    /// Bootstrap status
+    /// Discovery status
     status: BootstrapStatus,
     /// Tracked platform IDs
     tracked_platforms: HashSet<String>,
-    /// Platform to squad assignments
+    /// Node to squad assignments
     assignments: HashMap<String, String>,
     /// Message count (optional tracking)
     message_count: usize,
 }
 
-impl BootstrapCoordinator {
+impl DiscoveryCoordinator {
     /// Create a new bootstrap coordinator
     pub fn new(store: SquadStore, strategy: BootstrapStrategy) -> Self {
         Self {
@@ -182,12 +182,12 @@ impl BootstrapCoordinator {
             return Err(Error::InvalidTransition {
                 from: format!("{:?}", self.status),
                 to: "InProgress".to_string(),
-                reason: "Bootstrap already started".to_string(),
+                reason: "Discovery already started".to_string(),
             });
         }
 
         info!(
-            "Starting bootstrap with {} platforms using {} strategy",
+            "Starting bootstrap with {} nodes using {} strategy",
             platform_ids.len(),
             self.strategy
         );
@@ -206,7 +206,7 @@ impl BootstrapCoordinator {
             return Err(Error::InvalidTransition {
                 from: format!("{:?}", self.status),
                 to: "Assignment".to_string(),
-                reason: "Bootstrap not in progress".to_string(),
+                reason: "Discovery not in progress".to_string(),
             });
         }
 
@@ -252,17 +252,17 @@ impl BootstrapCoordinator {
         self.assignments.keys().cloned().collect()
     }
 
-    /// Get number of unique squads formed
+    /// Get number of unique cells formed
     pub async fn squads_formed(&self) -> Result<usize> {
-        let squads = self.store.get_valid_squads().await?;
-        Ok(squads.len())
+        let cells = self.store.get_valid_squads().await?;
+        Ok(cells.len())
     }
 
     /// Check if bootstrap is complete
     ///
-    /// Bootstrap is complete when:
+    /// Discovery is complete when:
     /// - Timeout has been reached, OR
-    /// - All platforms have been assigned (100% completion)
+    /// - All nodes have been assigned (100% completion)
     #[instrument(skip(self))]
     pub async fn check_completion(&mut self) -> Result<bool> {
         if self.status != BootstrapStatus::InProgress {
@@ -273,7 +273,7 @@ impl BootstrapCoordinator {
         let timed_out = self.has_timed_out();
 
         if all_assigned {
-            info!("Bootstrap completed: all platforms assigned");
+            info!("Discovery completed: all nodes assigned");
             self.status = BootstrapStatus::Completed;
             return Ok(true);
         }
@@ -284,19 +284,19 @@ impl BootstrapCoordinator {
 
             if assignment_rate > 0.9 {
                 info!(
-                    "Bootstrap timed out but mostly successful ({:.1}% assigned)",
+                    "Discovery timed out but mostly successful ({:.1}% assigned)",
                     assignment_rate * 100.0
                 );
                 self.status = BootstrapStatus::Completed;
             } else if assignment_rate > 0.5 {
                 warn!(
-                    "Bootstrap timed out with partial completion ({:.1}% assigned)",
+                    "Discovery timed out with partial completion ({:.1}% assigned)",
                     assignment_rate * 100.0
                 );
                 self.status = BootstrapStatus::PartiallyCompleted;
             } else {
                 warn!(
-                    "Bootstrap failed: timeout with only {:.1}% assigned",
+                    "Discovery failed: timeout with only {:.1}% assigned",
                     assignment_rate * 100.0
                 );
                 self.status = BootstrapStatus::Failed;
@@ -307,16 +307,16 @@ impl BootstrapCoordinator {
         Ok(false)
     }
 
-    /// Transition to Squad phase
+    /// Transition to Cell phase
     ///
     /// Should be called after bootstrap completes successfully or times out.
     #[instrument(skip(self))]
     pub async fn transition_to_squad_phase(&mut self) -> Result<()> {
-        if self.current_phase != Phase::Bootstrap {
+        if self.current_phase != Phase::Discovery {
             return Err(Error::InvalidTransition {
                 from: format!("{:?}", self.current_phase),
                 to: "Squad".to_string(),
-                reason: "Not in Bootstrap phase".to_string(),
+                reason: "Not in Discovery phase".to_string(),
             });
         }
 
@@ -324,11 +324,11 @@ impl BootstrapCoordinator {
             return Err(Error::InvalidTransition {
                 from: format!("{:?}", self.status),
                 to: "Squad".to_string(),
-                reason: "Bootstrap still in progress".to_string(),
+                reason: "Discovery still in progress".to_string(),
             });
         }
 
-        info!("Transitioning from Bootstrap to Squad phase");
+        info!("Transitioning from Discovery to Cell phase");
         self.current_phase = Phase::Squad;
 
         Ok(())
@@ -367,7 +367,7 @@ impl BootstrapCoordinator {
 
         let squads_formed = self.squads_formed().await?;
 
-        Ok(BootstrapMetrics {
+        Ok(DiscoveryMetrics {
             total_platforms: self.tracked_platforms.len(),
             assigned_platforms: self.assignments.len(),
             unassigned_platforms: self.unassigned_platforms().len(),
@@ -386,7 +386,7 @@ impl BootstrapCoordinator {
             return Err(Error::InvalidTransition {
                 from: format!("{:?}", self.status),
                 to: "Completed".to_string(),
-                reason: "Bootstrap not in progress".to_string(),
+                reason: "Discovery not in progress".to_string(),
             });
         }
 

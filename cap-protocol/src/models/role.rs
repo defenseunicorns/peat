@@ -1,6 +1,6 @@
-//! Squad role model and scoring
+//! Cell role model and scoring
 //!
-//! Defines tactical roles that platforms can fill within a squad, with scoring
+//! Defines tactical roles that nodes can fill within a squad, with scoring
 //! algorithms that consider both platform capabilities and human operator specialties.
 
 use crate::models::{CapabilityType, Operator, PlatformConfig, PlatformState};
@@ -9,8 +9,8 @@ use std::collections::HashMap;
 
 /// Tactical role that a platform can fill within a squad
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum SquadRole {
-    /// Squad leader - elected leader, coordinates squad operations
+pub enum CellRole {
+    /// Cell leader - elected leader, coordinates squad operations
     Leader,
     /// Primary sensor/scout - long-range detection and reconnaissance
     Sensor,
@@ -26,7 +26,7 @@ pub enum SquadRole {
     Follower,
 }
 
-impl SquadRole {
+impl CellRole {
     /// Get all assignable roles (excludes Leader, which is elected)
     pub fn assignable_roles() -> Vec<Self> {
         vec![
@@ -42,7 +42,7 @@ impl SquadRole {
     /// Get human-readable description of role
     pub fn description(&self) -> &'static str {
         match self {
-            Self::Leader => "Squad leader - coordinates operations and makes tactical decisions",
+            Self::Leader => "Cell leader - coordinates operations and makes tactical decisions",
             Self::Sensor => "Sensor/scout - provides long-range detection and reconnaissance",
             Self::Compute => "Compute node - processes sensor data and runs analysis algorithms",
             Self::Relay => "Communications relay - extends network range and connectivity",
@@ -97,10 +97,10 @@ impl SquadRole {
 /// Role assignment for a platform
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoleAssignment {
-    /// Platform ID
+    /// Node ID
     pub platform_id: String,
     /// Assigned role
-    pub role: SquadRole,
+    pub role: CellRole,
     /// Score for this assignment (0.0-1.0)
     pub score: f64,
     /// Whether this is the platform's primary role choice
@@ -109,7 +109,7 @@ pub struct RoleAssignment {
 
 impl RoleAssignment {
     /// Create a new role assignment
-    pub fn new(platform_id: String, role: SquadRole, score: f64, is_primary_choice: bool) -> Self {
+    pub fn new(platform_id: String, role: CellRole, score: f64, is_primary_choice: bool) -> Self {
         Self {
             platform_id,
             role,
@@ -126,15 +126,15 @@ impl RoleScorer {
     /// Score a platform for a specific role
     ///
     /// Scoring considers:
-    /// - Platform capabilities (required and preferred)
+    /// - Node capabilities (required and preferred)
     /// - Human operator MOS (if present)
-    /// - Platform health and readiness
+    /// - Node health and readiness
     ///
     /// Returns score 0.0-1.0, or None if platform cannot fill role
     pub fn score_platform_for_role(
         config: &PlatformConfig,
         state: &PlatformState,
-        role: SquadRole,
+        role: CellRole,
     ) -> Option<f64> {
         let operator = config.get_primary_operator();
         let mut score = 0.0;
@@ -349,7 +349,7 @@ mod tests {
 
     #[test]
     fn test_score_platform_without_required_capability() {
-        // Platform without sensing capability cannot be sensor
+        // Node without sensing capability cannot be sensor
         let (config, state) = create_test_platform_with_capabilities(vec![Capability::new(
             "cpu_1".to_string(),
             "CPU".to_string(),
@@ -363,7 +363,7 @@ mod tests {
 
     #[test]
     fn test_score_platform_with_required_capability() {
-        // Platform with sensing capability can be sensor
+        // Node with sensing capability can be sensor
         let (config, state) = create_test_platform_with_capabilities(vec![Capability::new(
             "radar_1".to_string(),
             "Radar".to_string(),

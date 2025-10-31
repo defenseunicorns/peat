@@ -1,4 +1,4 @@
-//! Platform state data structures
+//! Node state data structures
 //!
 //! This module defines platform data models with CRDT operations:
 //! - Static capabilities: G-Set (grow-only set) - capabilities can only be added
@@ -10,12 +10,12 @@ use crate::traits::Phase;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-/// Platform static configuration (immutable)
+/// Node static configuration (immutable)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlatformConfig {
+pub struct NodeConfig {
     /// Unique platform identifier
     pub id: String,
-    /// Platform type (UAV, UGV, etc.)
+    /// Node type (UAV, UGV, etc.)
     pub platform_type: String,
     /// Static capabilities
     pub capabilities: Vec<Capability>,
@@ -27,8 +27,8 @@ pub struct PlatformConfig {
     pub operator_binding: Option<HumanMachinePair>,
 }
 
-impl PlatformConfig {
-    /// Create a new platform configuration (autonomous, no operator)
+impl NodeConfig {
+    /// Create a new node configuration (autonomous, no operator)
     pub fn new(platform_type: String) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
@@ -117,9 +117,9 @@ impl PlatformConfig {
     }
 }
 
-/// Platform dynamic state (mutable)
+/// Node dynamic state (mutable)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlatformState {
+pub struct NodeState {
     /// Current position (lat, lon, alt in degrees/meters)
     pub position: (f64, f64, f64),
     /// Fuel remaining in minutes
@@ -134,8 +134,8 @@ pub struct PlatformState {
     pub timestamp: u64,
 }
 
-impl PlatformState {
-    /// Create a new platform state at a given position
+impl NodeState {
+    /// Create a new node state at a given position
     pub fn new(position: (f64, f64, f64)) -> Self {
         Self {
             position,
@@ -312,7 +312,7 @@ mod tests {
         state.update_phase(Phase::Squad);
         assert_eq!(state.phase, Phase::Squad);
 
-        // Squad assignment
+        // Cell assignment
         state.assign_squad("squad_1".to_string());
         assert_eq!(state.squad_id, Some("squad_1".to_string()));
 
