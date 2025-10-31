@@ -6,7 +6,9 @@
 pub mod router;
 pub mod routing_cache;
 pub mod routing_table;
+pub mod zone_coordinator;
 
 pub use router::{HierarchicalRouter, RouterStats};
 pub use routing_cache::{CacheStats, RoutingCache};
 pub use routing_table::{RoutingTable, RoutingTableStats};
+pub use zone_coordinator::{ZoneCoordinator, ZoneFormationStatus, ZoneMetrics};
