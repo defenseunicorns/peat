@@ -3,13 +3,13 @@
 > "Let me give you a threshold that's easy to understand: when we can fly drones by command, not by pilot. When your drones can understand commander's intent—that, ladies and gentlemen, is the threshold for AI autonomy to help us."
 > — Brig. Gen. Travis McIntosh, on the Army's goal for autonomous drones
 
-A hierarchical capability composition protocol using CRDTs for autonomous systems that scales to 100+ platforms with O(n log n) message complexity.
+A hierarchical capability composition protocol using CRDTs for autonomous systems that scales to 100+ nodes with O(n log n) message complexity.
 
 ## Overview
 
-The CAP protocol enables scalable coordination of autonomous platforms through:
+The CAP protocol enables scalable coordination of autonomous nodes through:
 
-- **Three-phase protocol**: Bootstrap → Squad Formation → Hierarchical Operations
+- **Three-phase protocol**: Discovery → Cell Formation → Hierarchical Operations
 - **CRDT-based state**: Eventual consistency via Ditto SDK
 - **Capability composition**: Additive, emergent, redundant, and constraint-based patterns
 - **Differential updates**: Bandwidth-efficient delta propagation (95%+ reduction)
@@ -65,8 +65,8 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed setup instructions, architectu
 cap/
 ├── cap-protocol/          # Core protocol library
 │   ├── src/
-│   │   ├── bootstrap/     # Phase 1: Bootstrap
-│   │   ├── squad/         # Phase 2: Squad Formation
+│   │   ├── discovery/     # Phase 1: Bootstrap
+│   │   ├── cell/         # Phase 2: Cell Formation
 │   │   ├── hierarchy/     # Phase 3: Hierarchical Operations
 │   │   ├── composition/   # Capability composition engine
 │   │   ├── delta/         # Differential update system
@@ -103,7 +103,7 @@ This is a proof-of-concept implementation following a 12-week development plan. 
 
 - Epic 1: Complete Ditto SDK integration spike
 - Epic 2: Implement CRDT-based data models
-- Epic 3: Begin bootstrap phase implementation
+- Epic 3: Begin discovery phase implementation
 
 See [GitHub Issues](https://github.com/kitplummer/cap/issues) for current work items.
 
@@ -129,7 +129,7 @@ docs/
 ├── adr/                        # Architecture Decision Records
 │   ├── 001-cap-protocol-poc.md
 │   ├── 002-beacon-storage-architecture.md
-│   └── 004-human-machine-squad-composition.md
+│   └── 004-human-machine-cell-composition.md
 └── [Technical Design Docs]     # Architecture explorations & integration notes
 ```
 
@@ -143,9 +143,9 @@ docs/
 - Capability-based queries
 - O(√n) message complexity
 
-### Phase 2: Squad Formation
+### Phase 2: Cell Formation
 - Deterministic leader election
-- Intra-squad capability exchange
+- Intra-cell capability exchange
 - Emergent capability detection
 - Role assignment
 
@@ -160,7 +160,7 @@ docs/
 - **Scalability**: O(n log n) message complexity (vs. O(n²) baseline)
 - **Efficiency**: 95%+ bandwidth reduction via differential updates
 - **Latency**: Priority 1 updates propagate in <5 seconds
-- **Scale**: Support 100+ platforms in simulation
+- **Scale**: Support 100+ nodes in simulation
 
 ## Technology Stack
 

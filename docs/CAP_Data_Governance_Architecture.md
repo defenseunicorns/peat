@@ -22,7 +22,7 @@ This document explores the architectural considerations for data governance in C
        ├─ Audit Logs (immediate recording)
        └─ Master Data Registry (single source of truth)
        
-Platforms can only operate when connected to center
+Nodes can only operate when connected to center
 ```
 
 **Characteristics:**
@@ -50,7 +50,7 @@ Platforms can only operate when connected to center
        ├─ Distributed Audit Trail (CRDT-based logs)
        └─ Multi-Source Truth (hierarchical reconciliation)
        
-Platforms operate autonomously, synchronize opportunistically
+Nodes operate autonomously, synchronize opportunistically
 ```
 
 **Characteristics:**
@@ -77,9 +77,9 @@ Data Mesh advocates for **domain-oriented decentralized data ownership**. In CAP
 
 **Traditional Military C2 (Centralized):**
 ```
-[Battalion HQ Database] ← All platform data flows here
+[Battalion HQ Database] ← All node data flows here
        ↑
-       ├─ Platform telemetry
+       ├─ Node telemetry
        ├─ Sensor feeds  
        ├─ Mission status
        └─ Capability states
@@ -89,10 +89,10 @@ Problem: HQ is the owner/controller of ALL data
 
 **CAP Data Mesh (Decentralized):**
 ```
-[Squad Domain]          [Platoon Domain]         [Company Domain]
+[Cell Domain]          [Zone Domain]         [Company Domain]
    ↑                          ↑                         ↑
-Platform data     Squad capabilities         Mission readiness
-owned by squad    owned by platoon          owned by company
+Node data     Cell capabilities         Mission readiness
+owned by cell    owned by zone          owned by company
 
 Each domain:
 - Owns its data products
@@ -104,9 +104,9 @@ Each domain:
 **Key Data Mesh Principles for CAP:**
 
 #### 1. Domain Ownership
-- **Platform Level**: Owns sensor data, health status, local decisions
-- **Squad Level**: Owns tactical capabilities, local coordination, squad assignments
-- **Platoon Level**: Owns operational capabilities, resource allocation, mission tasking
+- **Node Level**: Owns sensor data, health status, local decisions
+- **Cell Level**: Owns tactical capabilities, local coordination, cell assignments
+- **Zone Level**: Owns operational capabilities, resource allocation, mission tasking
 - **Company Level**: Owns strategic capabilities, overall mission status, C2 intent
 
 **Governance Implication:** Authority to create/modify data lives at the appropriate domain level, not centralized.
@@ -115,9 +115,9 @@ Each domain:
 Each level publishes well-defined data products:
 
 ```javascript
-// Platform publishes "My Status" product
+// Node publishes "My Status" product
 PlatformStatusProduct = {
-  schema: "platform_status_v2",
+  schema: "node_status_v2",
   fields: {
     id: required,
     capabilities: required,
@@ -130,13 +130,13 @@ PlatformStatusProduct = {
   retention: "24hr"
 }
 
-// Squad publishes "Squad Capability" product  
+// Cell publishes "Cell Capability" product  
 SquadCapabilityProduct = {
-  schema: "squad_capability_v1",
+  schema: "cell_capability_v1",
   fields: {
-    squad_id: required,
+    cell_id: required,
     emergent_capabilities: required,
-    platform_count: required,
+    node_count: required,
     weakest_link: required
   },
   update_frequency: "on_significant_change",
@@ -148,12 +148,12 @@ SquadCapabilityProduct = {
 **Governance Implication:** Each domain is responsible for the quality, schema, and lifecycle of its products.
 
 #### 3. Self-Serve Data Platform
-Platforms/squads should be able to discover and consume data products without centralized coordination:
+Nodes/cells should be able to discover and consume data products without centralized coordination:
 
 ```javascript
-// Platform queries for available products
+// Node queries for available products
 available_products = ditto.discover_products({
-  domain: "platoon",
+  domain: "zone",
   capability_needed: "ISR"
 })
 
@@ -167,9 +167,9 @@ ditto.subscribe(available_products.filter(p => p.relevance_score > 0.7))
 Not all governance happens at the edge OR at the center - it's distributed appropriately:
 
 ```
-Platform Level:     Local policy enforcement (sensor data quality, fuel validity)
-Squad Level:        Tactical policy (capability composition rules, coordination constraints)
-Platoon Level:      Operational policy (mission compliance, resource limits)
+Node Level:     Local policy enforcement (sensor data quality, fuel validity)
+Cell Level:        Tactical policy (capability composition rules, coordination constraints)
+Zone Level:      Operational policy (mission compliance, resource limits)
 Company Level:      Strategic policy (ROE, mission objectives, authority limits)
 ```
 
@@ -194,14 +194,14 @@ DataObject = {
   
   // Governance metadata
   metadata: {
-    owner_domain: "squad_alpha",
-    created_by: "platform_7",
+    owner_domain: "cell_alpha",
+    created_by: "node_7",
     created_at: timestamp,
     authority_level: "tactical",
     classification: "secret",
     validity_window: {start: T1, end: T2},
     quality_score: 0.85,
-    provenance_chain: ["platform_7", "squad_leader"],
+    provenance_chain: ["node_7", "cell_leader"],
     audit_log: CRDT_log
   }
 }
@@ -213,8 +213,8 @@ DataObject = {
 Understanding how data relates across domains:
 
 ```
-Platform_7 --[belongs_to]--> Squad_Alpha
-Squad_Alpha --[provides]--> ISR_Capability  
+Node_7 --[belongs_to]--> Cell_Alpha
+Cell_Alpha --[provides]--> ISR_Capability  
 ISR_Capability --[enables]--> Mission_Objective_1
 Mission_Objective_1 --[authorized_by]--> Company_Commander
 ```
@@ -260,7 +260,7 @@ position_enriched = {
   semantic_location: "within_AO_north",
   threat_level: "moderate",
   civilian_proximity: "urban",
-  authority_required: "platoon_leader_approval"
+  authority_required: "zone_leader_approval"
 }
 ```
 
@@ -283,19 +283,19 @@ Company Commander (Strategic Authority)
   ├─ Allocates resources across platoons
   └─ Cannot: Micromanage individual platforms
   
-Platoon Leader (Operational Authority)  
-  ├─ Assigns squads to objectives
+Zone Leader (Operational Authority)  
+  ├─ Assigns cells to objectives
   ├─ Approves tactical deviations
-  ├─ Reallocates platforms between squads
+  ├─ Reallocates nodes between squads
   └─ Cannot: Violate mission constraints
   
-Squad Leader (Tactical Authority)
-  ├─ Directs platform movements
+Cell Leader (Tactical Authority)
+  ├─ Directs node movements
   ├─ Coordinates local actions
-  ├─ Manages squad-level resources
-  └─ Cannot: Exceed platoon allocations
+  ├─ Manages cell-level resources
+  └─ Cannot: Exceed zone allocations
   
-Platform (Autonomous Authority)
+Node (Autonomous Authority)
   ├─ Self-preservation decisions
   ├─ Sensor activation choices
   ├─ Path planning within constraints
@@ -304,7 +304,7 @@ Platform (Autonomous Authority)
 
 #### Delegation During Disconnection
 
-**Problem:** What happens when a Squad is disconnected from Platoon for 30 minutes?
+**Problem:** What happens when a Cell is disconnected from Zone for 30 minutes?
 
 **Solution: Pre-Delegated Authority with Boundaries**
 
@@ -313,7 +313,7 @@ SquadAuthority = {
   // Normal operations (connected)
   normal: {
     can_engage: "targets_in_approved_kill_box",
-    can_reallocate: "resources_within_squad",
+    can_reallocate: "resources_within_cell",
     must_request: "deviations_from_plan"
   },
   
@@ -347,8 +347,8 @@ AuthorityGrant = {
   type: "LWW_Map",  // Last-Write-Wins with timestamps
   
   grant: {
-    granted_to: "squad_alpha",
-    granted_by: "platoon_1_leader",
+    granted_to: "cell_alpha",
+    granted_by: "zone_1_leader",
     authority_type: "tactical_deviation",
     scope: "within_AO_grid_7",
     valid_from: T1,
@@ -359,7 +359,7 @@ AuthorityGrant = {
   // CRDT metadata
   timestamp: T1,
   issuer_signature: crypto_proof,
-  version_vector: {platoon_1: 47, company: 12}
+  version_vector: {zone_1: 47, company: 12}
 }
 
 // On conflict: Later timestamp wins (LWW)
@@ -378,10 +378,10 @@ AuthorityGrant = {
 #### Ownership Model
 
 ```javascript
-// Platform owns its raw data
+// Node owns its raw data
 PlatformData = {
-  owner: "platform_7",
-  steward: "platform_7",  // Same as owner for raw data
+  owner: "node_7",
+  steward: "node_7",  // Same as owner for raw data
   
   data: {
     sensor_reading: {...},
@@ -390,28 +390,28 @@ PlatformData = {
   },
   
   ownership_rights: {
-    can_modify: ["platform_7"],  // Only owner can modify
-    can_read: ["squad_alpha", "platoon_1", "company_hq"],  // Many can read
-    can_delete: ["platform_7"],  // Only owner can delete
-    must_provide: ["squad_alpha"]  // Must share with squad
+    can_modify: ["node_7"],  // Only owner can modify
+    can_read: ["cell_alpha", "zone_1", "company_hq"],  // Many can read
+    can_delete: ["node_7"],  // Only owner can delete
+    must_provide: ["cell_alpha"]  // Must share with squad
   }
 }
 
-// Squad owns derived capabilities
+// Cell owns derived capabilities
 SquadCapability = {
-  owner: "squad_alpha",
-  steward: "squad_leader_1",  // Leader is responsible for quality
+  owner: "cell_alpha",
+  steward: "cell_leader_1",  // Leader is responsible for quality
   
   data: {
     emergent_capability: "persistent_ISR",
-    composed_from: ["platform_7", "platform_8", "platform_9"]
+    composed_from: ["node_7", "node_8", "node_9"]
   },
   
   ownership_rights: {
-    can_modify: ["squad_leader_1"],
-    can_read: ["platoon_1", "company_hq"],
-    can_delete: ["squad_leader_1"],
-    must_provide: ["platoon_1"]
+    can_modify: ["cell_leader_1"],
+    can_read: ["zone_1", "company_hq"],
+    can_delete: ["cell_leader_1"],
+    must_provide: ["zone_1"]
   },
   
   stewardship_responsibilities: {
@@ -425,25 +425,25 @@ SquadCapability = {
 
 #### Derived Data and Provenance
 
-**Challenge:** When Squad derives capabilities from Platform data, who owns the result?
+**Challenge:** When Cell derives capabilities from Node data, who owns the result?
 
 ```javascript
 // Composition creates new ownership
 DerivationChain = {
   // Original data
   source_data: {
-    platform_7_fuel: {owner: "platform_7"},
-    platform_8_fuel: {owner: "platform_8"}
+    node_7_fuel: {owner: "node_7"},
+    node_8_fuel: {owner: "node_8"}
   },
   
   // Derived capability
   derived_data: {
-    squad_endurance: {
-      owner: "squad_alpha",  // Squad owns the derivation
-      provenance: ["platform_7.fuel", "platform_8.fuel"],
-      derivation_rule: "min(platform_fuels)",
+    cell_endurance: {
+      owner: "cell_alpha",  // Cell owns the derivation
+      provenance: ["node_7.fuel", "node_8.fuel"],
+      derivation_rule: "min(node_fuels)",
       derived_at: timestamp,
-      derived_by: "squad_leader_1"
+      derived_by: "cell_leader_1"
     }
   },
   
@@ -464,19 +464,19 @@ Ownership isn't just rights - it's responsibilities:
 
 ```javascript
 StewardshipContract = {
-  data_product: "squad_alpha_capabilities",
-  steward: "squad_leader_1",
+  data_product: "cell_alpha_capabilities",
+  steward: "cell_leader_1",
   
   quality_responsibilities: {
-    validation: "verify_all_component_platforms_healthy",
+    validation: "verify_all_component_nodes_healthy",
     accuracy: "update_within_30s_of_material_change",  
     completeness: "ensure_all_required_fields_present",
     consistency: "resolve_conflicts_before_publishing"
   },
   
   lifecycle_responsibilities: {
-    creation: "initialize_on_squad_formation",
-    maintenance: "update_on_platform_join_leave",
+    creation: "initialize_on_cell_formation",
+    maintenance: "update_on_node_join_leave",
     archival: "preserve_after_mission_for_AAR",
     deletion: "purge_after_retention_period"
   },
@@ -484,7 +484,7 @@ StewardshipContract = {
   availability_responsibilities: {
     uptime: "best_effort_given_connectivity",
     latency: "priority_1_within_5s",
-    scope: "available_to_platoon_and_above"
+    scope: "available_to_zone_and_above"
   }
 }
 ```
@@ -507,14 +507,14 @@ TrustModel = {
     rationale: "firsthand measurement"
   },
   
-  squad_aggregation: {
+  cell_aggregation: {
     trust_level: 0.85,
     rationale: "composed from trusted sources"
   },
   
-  platoon_summary: {
+  zone_summary: {
     trust_level: 0.75,
-    rationale: "abstracted from squad data"
+    rationale: "abstracted from cell data"
   },
   
   // Trust decreases with age
@@ -578,11 +578,11 @@ DataQuality = {
 
 #### Reputation-Based Trust
 
-Over time, platforms/squads build reputation:
+Over time, nodes/cells build reputation:
 
 ```javascript
 ReputationSystem = {
-  entity: "platform_7",
+  entity: "node_7",
   
   reputation_scores: {
     // Historical accuracy
@@ -616,20 +616,20 @@ ReputationSystem = {
 
 ```
 Company Level:
-  ├─ Can see: All platoon summaries, own directives
-  └─ Cannot see: Individual platform telemetry (too granular)
+  ├─ Can see: All zone summaries, own directives
+  └─ Cannot see: Individual node telemetry (too granular)
   
-Platoon Level:
-  ├─ Can see: All squad capabilities, company directives, own plans
-  └─ Cannot see: Individual platform sensor feeds (too detailed)
+Zone Level:
+  ├─ Can see: All cell capabilities, company directives, own plans
+  └─ Cannot see: Individual node sensor feeds (too detailed)
   
-Squad Level:
-  ├─ Can see: All platform states, platoon tasks, own coordination
-  └─ Cannot see: Other squad internals (need-to-know)
+Cell Level:
+  ├─ Can see: All node states, zone tasks, own coordination
+  └─ Cannot see: Other cell internals (need-to-know)
   
-Platform Level:
-  ├─ Can see: Own state, squad coordination, relevant orders
-  └─ Cannot see: Other squad operations (compartmentalization)
+Node Level:
+  ├─ Can see: Own state, cell coordination, relevant orders
+  └─ Cannot see: Other cell operations (compartmentalization)
 ```
 
 **Implementation via Collection-Based Access:**
@@ -638,19 +638,19 @@ Platform Level:
 // Ditto collections naturally partition access
 Collections = {
   // Each level has its own collections
-  "platforms.raw_telemetry": {
-    access: ["owner_platform", "squad_leader"],
+  "nodes.raw_telemetry": {
+    access: ["owner_node", "cell_leader"],
     not_propagated_above: true
   },
   
-  "squads.capabilities": {
-    access: ["squad_members", "platoon_leader", "company_hq"],
+  "cells.capabilities": {
+    access: ["cell_members", "zone_leader", "company_hq"],
     propagated: "up_only"
   },
   
-  "platoon.taskings": {
-    access: ["platoon_members", "company_hq"],
-    propagated: "down_to_squads"
+  "zone.taskings": {
+    access: ["zone_members", "company_hq"],
+    propagated: "down_to_cells"
   },
   
   "company.orders": {
@@ -660,12 +660,12 @@ Collections = {
 }
 
 // Access enforced by collection membership
-// Platform 7 can't subscribe to Squad_Bravo's internal collection
+// Node 7 can't subscribe to Cell_Bravo's internal collection
 ```
 
 #### Capability-Based Access Control
 
-Instead of identity-based ("Platform 7 can access X"), use capability-based ("Holders of ISR_capability_token can access Y"):
+Instead of identity-based ("Node 7 can access X"), use capability-based ("Holders of ISR_capability_token can access Y"):
 
 ```javascript
 CapabilityToken = {
@@ -678,14 +678,14 @@ CapabilityToken = {
     valid_until: mission_end
   },
   
-  issued_by: "platoon_1_leader",
+  issued_by: "zone_1_leader",
   issued_to: "bearer",  // Any holder can use
   
   // Revocable via CRDT tombstone
   revoked: false
 }
 
-// Platforms trade/delegate tokens as needed
+// Nodes trade/delegate tokens as needed
 // Doesn't require centralized identity checking
 ```
 
@@ -700,9 +700,9 @@ CapabilityToken = {
 **Share only what's needed for the mission:**
 
 ```javascript
-// Platform advertises capabilities, not raw data
+// Node advertises capabilities, not raw data
 PlatformAdvertisement = {
-  platform_id: "platform_7",
+  node_id: "node_7",
   
   // Advertise this
   capabilities: ["EO/IR", "GPS", "mesh_relay"],
@@ -739,10 +739,10 @@ AuditLog = {
     {
       event_id: "uuid_1",
       event_type: "capability_composition",
-      actor: "squad_leader_1",
-      action: "composed ISR capability from platforms 7,8,9",
+      actor: "cell_leader_1",
+      action: "composed ISR capability from nodes 7,8,9",
       timestamp: T1,
-      platform_local_time: T1_platform,
+      node_local_time: T1_node,
       context: {
         authority_level: "tactical",
         connectivity_status: "connected",
@@ -753,10 +753,10 @@ AuditLog = {
     {
       event_id: "uuid_2",
       event_type: "autonomous_decision",
-      actor: "platform_7",  
+      actor: "node_7",  
       action: "deviated from path to avoid threat",
       timestamp: T2,
-      platform_local_time: T2_platform,
+      node_local_time: T2_node,
       context: {
         authority_level: "autonomous_self_preservation",
         connectivity_status: "disconnected",
@@ -776,13 +776,13 @@ AuditLog = {
 
 ```javascript
 ProvenanceChain = {
-  data_id: "squad_alpha_isr_capability",
+  data_id: "cell_alpha_isr_capability",
   
   lineage: [
     {
       step: 1,
       operation: "sensor_reading",
-      actor: "platform_7",
+      actor: "node_7",
       timestamp: T1,
       inputs: [],  // Primary source
       output: "target_detected"
@@ -790,7 +790,7 @@ ProvenanceChain = {
     {
       step: 2,
       operation: "ai_classification",
-      actor: "platform_7.onboard_ai",
+      actor: "node_7.onboard_ai",
       timestamp: T1 + 1s,
       inputs: ["target_detected"],
       output: "vehicle_type_bmp"
@@ -798,10 +798,10 @@ ProvenanceChain = {
     {
       step: 3,
       operation: "capability_composition",
-      actor: "squad_leader_1",
+      actor: "cell_leader_1",
       timestamp: T1 + 5s,
-      inputs: ["vehicle_type_bmp", "platform_8.position", "platform_9.weapon_status"],
-      output: "squad_alpha_strike_chain_capable"
+      inputs: ["vehicle_type_bmp", "node_8.position", "node_9.weapon_status"],
+      output: "cell_alpha_strike_chain_capable"
     }
   ],
   
@@ -836,7 +836,7 @@ TimestampStrategy = {
     },
     {
       source: "peer_consensus",
-      confidence: 0.7,  // Average of squad peers
+      confidence: 0.7,  // Average of cell peers
       time: T_peer_avg
     }
   ],
@@ -930,7 +930,7 @@ Deletion = {
     content: null,  // Optionally wipe content
     visible: false,
     deleted_at: T,
-    deleted_by: "squad_leader_1",
+    deleted_by: "cell_leader_1",
     tombstone: true
   }
   
@@ -1019,7 +1019,7 @@ ConsistencyRequirements = {
   
   // Eventual consistency (will converge)
   eventual: {
-    example: "platform_position",
+    example: "node_position",
     guarantee: "All nodes converge when connected",
     implementation: "Standard CRDT (LWW, OR-Set)",
     cost: "Low overhead"
@@ -1037,44 +1037,44 @@ ConsistencyRequirements = {
 
 #### Conflict Resolution Strategies
 
-When two disconnected squads make conflicting decisions:
+When two disconnected cells make conflicting decisions:
 
 ```javascript
 ConflictScenario = {
-  situation: "Two squads assign Platform_7 to different missions",
+  situation: "Two cells assign Node_7 to different missions",
   
-  // Squad Alpha's view
-  squad_alpha_state: {
-    platform_7_tasking: "ISR_mission_north",
-    assigned_by: "squad_alpha_leader",
+  // Cell Alpha's view
+  cell_alpha_state: {
+    node_7_tasking: "ISR_mission_north",
+    assigned_by: "cell_alpha_leader",
     timestamp: T1,
     authority: "tactical"
   },
   
-  // Squad Bravo's view (disconnected)
-  squad_bravo_state: {
-    platform_7_tasking: "strike_mission_south",
-    assigned_by: "squad_bravo_leader",
+  // Cell Bravo's view (disconnected)
+  cell_bravo_state: {
+    node_7_tasking: "strike_mission_south",
+    assigned_by: "cell_bravo_leader",
     timestamp: T2,  // Later timestamp
     authority: "tactical"
   },
   
-  // When squads reconnect, conflict detected
+  // When cells reconnect, conflict detected
   conflict_resolution: {
     // Strategy 1: Last-Write-Wins
     lww_result: "strike_mission_south",  // T2 > T1
     
     // Strategy 2: Authority-Based
-    authority_result: "escalate_to_platoon",  // Equal authority
+    authority_result: "escalate_to_zone",  // Equal authority
     
     // Strategy 3: Mission-Priority
     priority_result: "ISR_mission_north",  // Higher mission priority
     
     // CAP uses: Combination based on context
     cap_result: {
-      chosen: "escalate_to_platoon",
+      chosen: "escalate_to_zone",
       rationale: "conflicting tactical authorities require higher decision",
-      fallback: "platform_7_continues_current_mission_until_resolved",
+      fallback: "node_7_continues_current_mission_until_resolved",
       logged: true  // Conflict logged for investigation
     }
   }
@@ -1096,17 +1096,17 @@ ConsensusProtocol = {
   decision: "approve_strike_on_building_42",
   
   required_approvals: {
-    squad_leader: "required",
-    platoon_leader: "required",
+    cell_leader: "required",
+    zone_leader: "required",
     legal_advisor: "required_if_connected",
-    strike_platform: "confirm_capability"
+    strike_node: "confirm_capability"
   },
   
   approval_state: {
-    squad_leader: "approved",
-    platoon_leader: "approved",
+    cell_leader: "approved",
+    zone_leader: "approved",
     legal_advisor: "disconnected",  // Not reachable
-    strike_platform: "confirmed"
+    strike_node: "confirmed"
   },
   
   decision_rules: {
@@ -1142,9 +1142,9 @@ Ditto's CRDT implementation provides several governance-friendly features:
 
 ```javascript
 // Each organizational level has its own collections
-ditto.store.collection("platforms.telemetry")  // Platform-owned
-ditto.store.collection("squads.capabilities")  // Squad-owned
-ditto.store.collection("platoon.taskings")     // Platoon-owned
+ditto.store.collection("nodes.telemetry")  // Node-owned
+ditto.store.collection("cells.capabilities")  // Cell-owned
+ditto.store.collection("zone.taskings")     // Zone-owned
 ditto.store.collection("company.orders")       // Company-owned
 
 // Access control via collection membership
@@ -1176,7 +1176,7 @@ ditto.store.collection("bulk_telemetry").syncPreference = {
 ```javascript
 // Policy distributed before disconnection
 localPolicy = ditto.store.collection("policies")
-  .findByID("squad_alpha_policy")
+  .findByID("cell_alpha_policy")
 
 // When disconnected, enforce locally
 if (localPolicy.allows(action)) {
@@ -1197,9 +1197,9 @@ if (localPolicy.allows(action)) {
 ```javascript
 // Version vectors track causality
 document.versionVector = {
-  platform_7: 42,
-  squad_leader: 15,
-  platoon_hq: 8
+  node_7: 42,
+  cell_leader: 15,
+  zone_hq: 8
 }
 
 // Operations applied in causal order
@@ -1215,9 +1215,9 @@ document.versionVector = {
 // Schema enforced locally
 schema = {
   type: "object",
-  required: ["platform_id", "fuel", "capabilities"],
+  required: ["node_id", "fuel", "capabilities"],
   properties: {
-    platform_id: {type: "string"},
+    node_id: {type: "string"},
     fuel: {type: "number", minimum: 0, maximum: 100},
     capabilities: {type: "array", items: {type: "string"}}
   }
@@ -1237,11 +1237,11 @@ schema = {
 ```
 Company HQ: Defines strategic policies
     ↓ (sync once at mission start)
-Platoon: Receives + tailors for operational context
-    ↓ (sync to squads)
-Squad: Receives + tailors for tactical context
-    ↓ (sync to platforms)
-Platform: Enforces locally, even when disconnected
+Zone: Receives + tailors for operational context
+    ↓ (sync to cells)
+Cell: Receives + tailors for tactical context
+    ↓ (sync to nodes)
+Node: Enforces locally, even when disconnected
 
 Updates: Flow down hierarchy
 Violations: Flagged locally, reported up hierarchy
@@ -1257,17 +1257,17 @@ PolicyDistribution = {
     authority_limits: "tactical_leaders_autonomous_within_bounds"
   },
   
-  // Squad tailors for local context (specific)
-  squad_policy: {
+  // Cell tailors for local context (specific)
+  cell_policy: {
     ROE: "weapons_free_in_grid_7_only",  // More specific
     data_retention: "mission_duration + 24hr",  // Same
-    authority_limits: "squad_leader_can_approve_deviations_within_1km"  // Tailored
+    authority_limits: "cell_leader_can_approve_deviations_within_1km"  // Tailored
   },
   
-  // Platform enforces locally
-  platform_enforcement: {
+  // Node enforces locally
+  node_enforcement: {
     before_action: (action) => {
-      if (!squad_policy.allows(action)) {
+      if (!cell_policy.allows(action)) {
         log_violation(action)
         return false
       }
@@ -1280,11 +1280,11 @@ PolicyDistribution = {
 ### Pattern 2: Bidirectional Audit Flow
 
 ```
-Platform: Logs all actions locally
+Node: Logs all actions locally
     ↓ (sync when bandwidth available)
-Squad: Aggregates platform logs, adds squad-level events
+Cell: Aggregates node logs, adds cell-level events
     ↓ (sync)
-Platoon: Aggregates squad logs, adds platoon-level events
+Zone: Aggregates cell logs, adds zone-level events
     ↓ (sync)
 Company: Complete audit trail for after-action review
 
@@ -1295,23 +1295,23 @@ Eventual: Guaranteed (all logs eventually reach appropriate level)
 ### Pattern 3: Capability-Based Routing
 
 ```
-Platform: "I have ISR capability"
+Node: "I have ISR capability"
     ↓
-Squad: "My squad provides persistent ISR"
+Cell: "My cell provides persistent ISR"
     ↓
-Platoon: "I can task ISR across 3 squads"
+Zone: "I can task ISR across 3 cells"
     ↓
 Company: "ISR available for AO North"
 
 Query flows down:
 Company: "Who can provide ISR in Grid 7?"
-    ↓ (routes to appropriate platoon)
-Platoon: "Squad Alpha can"
-    ↓ (routes to Squad Alpha)
-Squad: "Platform 7 and 8 assigned"
+    ↓ (routes to appropriate zone)
+Zone: "Cell Alpha can"
+    ↓ (routes to Cell Alpha)
+Cell: "Node 7 and 8 assigned"
 ```
 
-**Governance Benefit:** Queries routed efficiently without broadcasting to all platforms.
+**Governance Benefit:** Queries routed efficiently without broadcasting to all nodes.
 
 ---
 
@@ -1349,16 +1349,16 @@ Squad: "Platform 7 and 8 assigned"
 
 ### 3. Trust Bootstrapping
 
-**Question:** How do platforms establish trust when first joining network?
+**Question:** How do nodes establish trust when first joining network?
 
 **Challenge:** 
 - Can't rely on central PKI (might be disconnected)
-- Can't accept all platforms (security risk)
+- Can't accept all nodes (security risk)
 - Need fast onboarding (mission tempo)
 
 **Possible Approaches:**
 - Pre-shared certificates (loaded before mission)
-- Vouching system (existing platforms vouch for newcomers)
+- Vouching system (existing nodes vouch for newcomers)
 - Gradual trust (limited capabilities until proven)
 
 ### 4. Governance in Degraded Networks
@@ -1378,7 +1378,7 @@ Squad: "Platform 7 and 8 assigned"
 
 ### 5. Cross-Domain Governance
 
-**Question:** What happens when platforms from different organizations need to interoperate?
+**Question:** What happens when nodes from different organizations need to interoperate?
 
 **Challenge:**
 - Different policies
@@ -1401,7 +1401,7 @@ Squad: "Platform 7 and 8 assigned"
 **Focus: Essential governance that enables autonomous operations**
 
 1. **Hierarchical Authority Model**
-   - Define authority levels (platform → squad → platoon → company)
+   - Define authority levels (node → cell → zone → company)
    - Create delegation rules for disconnected operations
    - Implement authority CRDT structures
 
@@ -1430,7 +1430,7 @@ Squad: "Platform 7 and 8 assigned"
    - Consumer evaluates fitness-for-use
 
 6. **Reputation System**
-   - Track platform/squad accuracy over time
+   - Track node/cell accuracy over time
    - Influence trust scores
    - Visible to consumers
 

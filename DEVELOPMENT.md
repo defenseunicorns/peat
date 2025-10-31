@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repository contains the Capabilities Aggregation Protocol (CAP) proof-of-concept implementation in Rust. The CAP protocol enables scalable coordination of autonomous platforms through hierarchical capability composition using CRDTs.
+This repository contains the Capabilities Aggregation Protocol (CAP) proof-of-concept implementation in Rust. The CAP protocol enables scalable coordination of autonomous nodes through hierarchical capability composition using CRDTs.
 
 ## Repository Structure
 
@@ -10,8 +10,8 @@ This repository contains the Capabilities Aggregation Protocol (CAP) proof-of-co
 cap/
 ├── cap-protocol/          # Core protocol library
 │   ├── src/
-│   │   ├── bootstrap/     # Phase 1: Bootstrap
-│   │   ├── squad/         # Phase 2: Squad Formation
+│   │   ├── discovery/     # Phase 1: Bootstrap
+│   │   ├── cell/         # Phase 2: Cell Formation
 │   │   ├── hierarchy/     # Phase 3: Hierarchical Operations
 │   │   ├── composition/   # Capability composition engine
 │   │   ├── delta/         # Differential update system
@@ -86,7 +86,7 @@ cargo test
 cargo test -- --nocapture
 
 # Run specific test
-cargo test test_platform_state
+cargo test test_node_state
 ```
 
 ### 4. Run the Simulator
@@ -129,7 +129,7 @@ cargo fmt --check && cargo clippy --all-targets --all-features -- -D warnings
 Follow Conventional Commits:
 
 ```
-feat: Add geographic bootstrap strategy
+feat: Add geographic discovery strategy
 fix: Correct leader election tie-breaking
 docs: Update README with setup instructions
 test: Add property tests for CRDT operations
@@ -159,9 +159,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_platform_initialization() {
+    fn test_node_initialization() {
         let config = PlatformConfig::new("UAV".to_string());
-        assert_eq!(config.platform_type, "UAV");
+        assert_eq!(config.node_type, "UAV");
     }
 }
 ```
@@ -171,9 +171,9 @@ mod tests {
 Located in `tests/` directory:
 
 ```rust
-// tests/bootstrap_test.rs
+// tests/discovery_test.rs
 #[tokio::test]
-async fn test_bootstrap_phase() {
+async fn test_discovery_phase() {
     // Test end-to-end bootstrap
 }
 ```
@@ -210,7 +210,7 @@ Use `RUST_LOG` environment variable:
 RUST_LOG=debug cargo run
 
 # Specific module
-RUST_LOG=cap_protocol::bootstrap=trace cargo run
+RUST_LOG=cap_protocol::discovery=trace cargo run
 
 # Multiple modules
 RUST_LOG=cap_protocol=debug,cap_sim=info cargo run
@@ -224,9 +224,9 @@ The project uses `tracing` for structured logging:
 use tracing::{info, debug, warn, error, instrument};
 
 #[instrument]
-async fn bootstrap_platform(id: &str) -> Result<()> {
-    info!("Starting bootstrap for platform {}", id);
-    debug!("Platform details: {:?}", details);
+async fn discovery_node(id: &str) -> Result<()> {
+    info!("Starting discovery for node {}", id);
+    debug!("Node details: {:?}", details);
     // ...
 }
 ```
@@ -235,12 +235,12 @@ async fn bootstrap_platform(id: &str) -> Result<()> {
 
 ### Three-Phase Protocol
 
-1. **Bootstrap Phase** - Constrained discovery and initial group formation
+1. **Discovery Phase** - Constrained discovery and initial group formation
    - Geographic self-organization
    - C2-directed assignment
    - Capability-based queries
 
-2. **Squad Formation Phase** - Intra-squad cohesion and leader election
+2. **Cell Formation Phase** - Intra-cell cohesion and leader election
    - Capability exchange
    - Leader election
    - Role assignment
@@ -255,7 +255,7 @@ async fn bootstrap_platform(id: &str) -> Result<()> {
 ### Data Flow
 
 ```
-Platform State (CRDT)
+Node State (CRDT)
     ↓
 Change Detection
     ↓
@@ -273,7 +273,7 @@ Network Transport
 The protocol uses Ditto SDK for CRDT synchronization:
 
 - **G-Set** - Grow-only sets (static capabilities)
-- **OR-Set** - Observed-remove sets (squad membership)
+- **OR-Set** - Observed-remove sets (cell membership)
 - **LWW-Register** - Last-write-wins registers (leader, position)
 - **PN-Counter** - Positive-negative counters (fuel)
 
@@ -281,11 +281,11 @@ The protocol uses Ditto SDK for CRDT synchronization:
 
 ### Targets
 
-- Platform state update: <10ms p99
+- Node state update: <10ms p99
 - Delta generation: <5ms p99
 - Capability composition: <20ms p99
 - Leader election: <5 seconds
-- Bootstrap (100 platforms): <60 seconds
+- Discovery (100 nodes): <60 seconds
 
 ### Profiling
 
@@ -317,17 +317,17 @@ perf report
 
 3. Add tests
 
-### Adding a Bootstrap Strategy
+### Adding a Discovery Strategy
 
-1. Create module in `bootstrap/`
-2. Implement bootstrap logic
-3. Register in `bootstrap/coordinator.rs`
+1. Create module in `discovery/`
+2. Implement discovery logic
+3. Register in `discovery/coordinator.rs`
 4. Add integration tests
 
 ### Extending the Hierarchy
 
 1. Update `hierarchy/router.rs` for new levels
-2. Update `hierarchy/platoon.rs` for aggregation
+2. Update `hierarchy/zone.rs` for aggregation
 3. Adjust metrics collection
 4. Test with simulation
 
@@ -390,7 +390,7 @@ See the project plan in `docs/CAP-POC-Project-Plan.md` for current priorities an
 
 ### Areas for Contribution
 
-- Phase implementations (bootstrap, squad, hierarchical)
+- Phase implementations (discovery, cell, hierarchical)
 - Composition rule patterns
 - Network simulation realism
 - Visualization improvements

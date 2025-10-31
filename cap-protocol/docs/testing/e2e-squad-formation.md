@@ -1,12 +1,12 @@
-# End-to-End Testing: Squad Formation
+# End-to-End Testing: Cell Formation
 
 ## Overview
 
-The Squad Formation E2E test suite validates **distributed CRDT mesh behavior** using **real Ditto P2P synchronization** across multiple peers. These tests exercise squad formation with actual Ditto instances to validate that platform configurations, capability advertisements, and formation state sync correctly through the mesh.
+The Cell Formation E2E test suite validates **distributed CRDT mesh behavior** using **real Ditto P2P synchronization** across multiple peers. These tests exercise cell formation with actual Ditto instances to validate that node configurations, capability advertisements, and formation state sync correctly through the mesh.
 
 **Critical Distinction**: These are **real E2E tests**, not in-memory scenario tests. They validate that:
-- Platform data stored on peer1 appears on peer2 via Ditto sync
-- Squad formation state propagates across the mesh
+- Node data stored on peer1 appears on peer2 via Ditto sync
+- Cell formation state propagates across the mesh
 - Observer-based notifications trigger on state changes
 - CRDT convergence happens correctly under network conditions
 
@@ -25,8 +25,8 @@ pub struct E2EHarness {
     pub async fn create_ditto_store(&mut self) -> Result<DittoStore>
 
     // Sets up observer subscriptions for event-driven assertions
-    pub async fn observe_squad(&self, store: &DittoStore, squad_id: &str) -> Result<SquadObserver>
-    pub async fn observe_platform(&self, store: &DittoStore, platform_id: &str) -> Result<PlatformObserver>
+    pub async fn observe_cell(&self, store: &DittoStore, cell_id: &str) -> Result<SquadObserver>
+    pub async fn observe_node(&self, store: &DittoStore, node_id: &str) -> Result<PlatformObserver>
 
     // Event-driven peer connection detection
     pub async fn wait_for_peer_connection(&self, ...) -> Result<()>
@@ -40,14 +40,14 @@ pub struct E2EHarness {
 - ✅ Fast execution (<1s per test)
 - ✅ Deterministic results (no polling/arbitrary timeouts)
 
-### Squad Formation Test Scenarios
+### Cell Formation Test Scenarios
 
-The E2E tests validate squad formation across multiple operational dimensions:
+The E2E tests validate cell formation across multiple operational dimensions:
 
 ```rust
 struct SquadFormationScenario {
     name: &'static str,
-    squad_size: usize,
+    cell_size: usize,
     include_operators: bool,
     authority_levels: Vec<Option<AuthorityLevel>>,
     health_statuses: Vec<HealthStatus>,
@@ -61,19 +61,19 @@ struct SquadFormationScenario {
 
 Each scenario can vary across these dimensions:
 
-1. **Squad Size** (3-5 members)
+1. **Cell Size** (3-5 members)
    - Minimum viable: 3 members
    - Medium: 4-5 members
    - Tests boundary conditions
 
-2. **Authority Levels** (per platform)
+2. **Authority Levels** (per node)
    - `DirectControl`: Full autonomous authority
    - `Commander`: Tactical oversight required
    - `Observer`: Monitoring only
    - `Advisor`: Recommendations only
    - `None`: Fully autonomous (no operator)
 
-3. **Health Status** (per platform)
+3. **Health Status** (per node)
    - `Nominal`: Fully operational
    - `Degraded`: Reduced capability
    - `Critical`: Severely limited
@@ -95,11 +95,11 @@ Each scenario can vary across these dimensions:
 
 ## Test Scenarios
 
-### 1. Optimal Squad Formation
+### 1. Optimal Cell Formation
 
 **Configuration:**
 - 5 members, all DirectControl authority
-- All platforms Nominal health
+- All nodes Nominal health
 - Auto-approved formation
 
 **Purpose:** Validates ideal formation conditions with maximum authority and health.
@@ -118,10 +118,10 @@ Each scenario can vary across these dimensions:
   - DirectControl (full authority)
   - Observer (monitoring only)
   - Advisor (recommendations)
-- All platforms Nominal health
+- All nodes Nominal health
 - Requires human approval
 
-**Purpose:** Tests human oversight workflow for low-authority platforms.
+**Purpose:** Tests human oversight workflow for low-authority nodes.
 
 **Expected Outcome:**
 - Formation status: `AwaitingApproval`
@@ -136,7 +136,7 @@ Each scenario can vary across these dimensions:
 - Mixed health: 2 Nominal, 2 Degraded
 - Lower readiness threshold (0.6)
 
-**Purpose:** Validates formation with platform health degradation.
+**Purpose:** Validates formation with node health degradation.
 
 **Expected Outcome:**
 - Formation succeeds despite degraded platforms
@@ -148,14 +148,14 @@ Each scenario can vary across these dimensions:
 
 **Configuration:**
 - 4 members, no human operators
-- All platforms autonomous
+- All nodes autonomous
 - Requires oversight approval
 
-**Purpose:** Tests fully autonomous squad formation requiring human supervision.
+**Purpose:** Tests fully autonomous cell formation requiring human supervision.
 
 **Expected Outcome:**
 - Formation status: `AwaitingApproval`
-- Autonomous squads require human oversight
+- Autonomous cells require human oversight
 - After approval: Ready for operations
 - Validates ADR-004 human-in-loop policy
 
@@ -166,15 +166,15 @@ Each scenario can vary across these dimensions:
 - All DirectControl, Nominal health
 - Minimal capability coverage
 
-**Purpose:** Boundary condition testing at minimum squad size.
+**Purpose:** Boundary condition testing at minimum cell size.
 
 **Expected Outcome:**
 - Formation succeeds at exact minimum
 - All 6 formation criteria met
 - Leader elected despite minimal size
-- Validates minimum viable squad concept
+- Validates minimum viable cell concept
 
-### 6. Critical Platform Squad
+### 6. Critical Node Squad
 
 **Configuration:**
 - 4 members, one with Critical health
@@ -187,7 +187,7 @@ Each scenario can vary across these dimensions:
 - Formation succeeds despite critical member
 - Readiness score heavily impacted
 - Role scoring reflects health penalties
-- Critical platform may get non-critical role
+- Critical node may get non-critical role
 
 ## E2E Flow Validation with Ditto Sync
 
@@ -195,7 +195,7 @@ Each E2E test validates distributed behavior through real Ditto synchronization:
 
 ### Current E2E Infrastructure Tests
 
-**Test 1: Isolated Store Creation** ([`tests/squad_formation_e2e.rs:27`](../../tests/squad_formation_e2e.rs))
+**Test 1: Isolated Store Creation** ([`tests/cell_formation_e2e.rs:27`](../../tests/cell_formation_e2e.rs))
 ```rust
 #[tokio::test]
 async fn test_harness_creates_isolated_stores() {
@@ -209,7 +209,7 @@ async fn test_harness_creates_isolated_stores() {
 ```
 **Validates**: Test harness can create isolated Ditto instances
 
-**Test 2: Multi-Peer Ditto Sync** ([`tests/squad_formation_e2e.rs:52`](../../tests/squad_formation_e2e.rs))
+**Test 2: Multi-Peer Ditto Sync** ([`tests/cell_formation_e2e.rs:52`](../../tests/cell_formation_e2e.rs))
 ```rust
 #[tokio::test]
 async fn test_ditto_peer_sync_with_observers() {
@@ -227,63 +227,63 @@ async fn test_ditto_peer_sync_with_observers() {
 ```
 **Validates**: Two Ditto peers can discover each other via mDNS and establish P2P connection
 
-### Planned Squad Formation E2E Tests
+### Planned Cell Formation E2E Tests
 
 The following tests need implementation to validate real Ditto sync behavior:
 
-#### 1. Platform Advertisement Sync
+#### 1. Node Advertisement Sync
 **Purpose**: Validate PlatformConfig propagates across mesh
 
 ```rust
 #[tokio::test]
-async fn test_platform_sync_across_peers() {
-    let mut harness = E2EHarness::new("platform_sync");
+async fn test_node_sync_across_peers() {
+    let mut harness = E2EHarness::new("node_sync");
 
     let peer1 = harness.create_ditto_store().await.unwrap();
     let peer2 = harness.create_ditto_store().await.unwrap();
 
     // Set up observer BEFORE storing data
-    let mut observer = harness.observe_platform(&peer2, "platform1").await.unwrap();
+    let mut observer = harness.observe_node(&peer2, "node1").await.unwrap();
 
-    // Store platform on peer1
-    let platform = create_test_platform("platform1", vec![Capability::Sensor]);
-    peer1.store_platform(&platform).await.unwrap();
+    // Store node on peer1
+    let node = create_test_node("node1", vec![Capability::Sensor]);
+    peer1.store_node(&node).await.unwrap();
 
     // Wait for observer event (event-driven, not polling!)
     let event = observer.wait_for_event(Duration::from_secs(5)).await.unwrap();
 
     // Validate sync
-    let synced = peer2.get_platform("platform1").await.unwrap();
-    assert_eq!(synced.id, platform.id);
-    assert_eq!(synced.capabilities, platform.capabilities);
+    let synced = peer2.get_node("node1").await.unwrap();
+    assert_eq!(synced.id, node.id);
+    assert_eq!(synced.capabilities, node.capabilities);
 }
 ```
 
-#### 2. Squad Formation State Propagation
+#### 2. Cell Formation State Propagation
 **Purpose**: Validate SquadState syncs across mesh
 
 ```rust
 #[tokio::test]
-async fn test_squad_formation_sync() {
-    let mut harness = E2EHarness::new("squad_sync");
+async fn test_cell_formation_sync() {
+    let mut harness = E2EHarness::new("cell_sync");
 
     let peer1 = harness.create_ditto_store().await.unwrap();
     let peer2 = harness.create_ditto_store().await.unwrap();
 
     // Observer on peer2
-    let mut observer = harness.observe_squad(&peer2, "squad1").await.unwrap();
+    let mut observer = harness.observe_cell(&peer2, "cell1").await.unwrap();
 
-    // Create squad on peer1
-    let mut coordinator = SquadCoordinator::new("squad1");
+    // Create cell on peer1
+    let mut coordinator = SquadCoordinator::new("cell1");
     coordinator.initiate_formation(vec!["p1", "p2", "p3"]).await.unwrap();
-    peer1.store_squad_state(coordinator.to_squad_state()).await.unwrap();
+    peer1.store_cell_state(coordinator.to_cell_state()).await.unwrap();
 
     // Validate sync via observer
     let event = observer.wait_for_event(Duration::from_secs(5)).await.unwrap();
 
-    let synced_squad = peer2.get_squad("squad1").await.unwrap();
-    assert_eq!(synced_squad.id, "squad1");
-    assert_eq!(synced_squad.members.len(), 3);
+    let synced_cell = peer2.get_cell("cell1").await.unwrap();
+    assert_eq!(synced_cell.id, "cell1");
+    assert_eq!(synced_cell.members.len(), 3);
 }
 ```
 
@@ -326,7 +326,7 @@ cd cap-protocol && make test-e2e
 cargo test test_ditto_peer_sync_with_observers -- --nocapture
 
 # Run with environment variables
-DITTO_APP_ID=xxx cargo test --test squad_formation_e2e -- --nocapture
+DITTO_APP_ID=xxx cargo test --test cell_formation_e2e -- --nocapture
 ```
 
 ### Expected Output
@@ -376,18 +376,18 @@ async fn test_your_sync_scenario() {
     harness.wait_for_peer_connection(&peer1, &peer2, Duration::from_secs(10)).await.unwrap();
 
     // 4. Set up observer BEFORE storing data
-    let mut observer = harness.observe_squad(&peer2, "squad1").await.unwrap();
+    let mut observer = harness.observe_cell(&peer2, "cell1").await.unwrap();
 
     // 5. Store data on peer1
-    let squad_state = create_test_squad_state("squad1");
-    peer1.store_squad_state(&squad_state).await.unwrap();
+    let cell_state = create_test_cell_state("cell1");
+    peer1.store_cell_state(&cell_state).await.unwrap();
 
     // 6. Wait for observer event (event-driven!)
     let event = observer.wait_for_event(Duration::from_secs(5)).await.unwrap();
 
     // 7. Validate sync
-    let synced = peer2.get_squad("squad1").await.unwrap();
-    assert_eq!(synced.id, squad_state.id);
+    let synced = peer2.get_cell("cell1").await.unwrap();
+    assert_eq!(synced.id, cell_state.id);
 
     // 8. Clean shutdown
     harness.shutdown_store(peer1).await;
@@ -408,8 +408,8 @@ async fn test_your_sync_scenario() {
 | Test Category | Status | Count | Description |
 |---------------|--------|-------|-------------|
 | Infrastructure | ✅ Implemented | 2 | Harness creation, peer connection |
-| Platform Sync | ⏳ Planned | 0 | Platform advertisement propagation |
-| Squad Sync | ⏳ Planned | 0 | Squad formation state distribution |
+| Node Sync | ⏳ Planned | 0 | Node advertisement propagation |
+| Cell Sync | ⏳ Planned | 0 | Cell formation state distribution |
 | Role Sync | ⏳ Planned | 0 | Role assignment propagation |
 | Approval Sync | ⏳ Planned | 0 | Human approval workflow distribution |
 | Network Partition | ⏳ Planned | 0 | CRDT convergence after partition |
@@ -432,8 +432,8 @@ async fn test_your_sync_scenario() {
 **E2E tests validate distributed behavior, not business logic:**
 
 ✅ **DO validate with E2E tests**:
-- Platform data stored on peer1 appears on peer2 via Ditto sync
-- Squad formation state propagates across mesh
+- Node data stored on peer1 appears on peer2 via Ditto sync
+- Cell formation state propagates across mesh
 - Role assignments sync to all peers
 - Observer notifications trigger on state changes
 - CRDT convergence after network partitions
@@ -479,8 +479,8 @@ Add new E2E tests when:
 ### Test Naming Convention
 
 Use descriptive names that indicate what sync behavior is tested:
-- `test_platform_sync_across_peers`: Platform data syncs
-- `test_squad_formation_sync`: Squad state propagates
+- `test_node_sync_across_peers`: Node data syncs
+- `test_cell_formation_sync`: Cell state propagates
 - `test_role_assignment_distribution`: Roles sync to all peers
 - `test_network_partition_recovery`: CRDT convergence after split
 
@@ -518,14 +518,14 @@ If an E2E test fails:
 
 - **Testing Strategy**: [TESTING_STRATEGY.md](../../../docs/TESTING_STRATEGY.md) - Overall testing philosophy
 - **E2E Test Harness**: [src/testing/e2e_harness.rs](../../src/testing/e2e_harness.rs) - Infrastructure implementation
-- **Squad Coordinator**: [src/squad/coordinator.rs](../../src/squad/coordinator.rs) - Formation business logic (unit tested)
+- **Cell Coordinator**: [src/cell/coordinator.rs](../../src/cell/coordinator.rs) - Formation business logic (unit tested)
 - **Ditto Store**: [src/storage/ditto_store.rs](../../src/storage/ditto_store.rs) - CRDT storage layer
 - **ADR-002**: [Beacon Storage Architecture](../../../docs/adr/002-beacon-storage-architecture.md)
 
 ## Test Statistics
 
 - **Total E2E Tests**: 2 (infrastructure validated)
-- **Planned Tests**: 6+ (squad formation scenarios)
+- **Planned Tests**: 6+ (cell formation scenarios)
 - **E2E Test Code**: ~99 lines (tests) + ~347 lines (harness)
 - **Test Execution Time**: 0.46s
 - **Total Test Suite**: ~172 tests (170 unit + 2 E2E)
@@ -551,8 +551,8 @@ E2E tests are fast but require Ditto:
 ### Next Steps
 
 **Immediate priorities** for E2E test implementation:
-1. Platform advertisement sync (peer1 → peer2)
-2. Squad formation state propagation
+1. Node advertisement sync (peer1 → peer2)
+2. Cell formation state propagation
 3. Role assignment distribution
 4. Human approval workflow sync
 5. Network partition recovery
@@ -562,7 +562,7 @@ See [TESTING_STRATEGY.md](../../../docs/TESTING_STRATEGY.md) for implementation 
 ---
 
 **Last Updated**: 2025-10-31
-**Epic**: E4 - Squad Formation Phase
+**Epic**: E4 - Cell Formation Phase
 **Test Framework**: Tokio async tests with Ditto SDK 4.12+
-**Location**: `tests/squad_formation_e2e.rs`
+**Location**: `tests/cell_formation_e2e.rs`
 **Status**: Infrastructure validated, scenarios pending implementation
