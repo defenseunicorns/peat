@@ -7,7 +7,7 @@ The CAP Protocol is designed for **autonomous multi-agent systems** operating in
 - **Human lives depend on system reliability**
 - **Autonomous agents must coordinate without human intervention**
 - **P2P mesh networks must maintain consistency under network partitions**
-- **Squad formation must happen deterministically across distributed nodes**
+- **Cell formation must happen deterministically across distributed nodes**
 - **Authority levels and human oversight must be enforced correctly**
 
 ### Why Testing Matters for CAP
@@ -41,14 +41,14 @@ The CAP Protocol is designed for **autonomous multi-agent systems** operating in
 - **20% of test effort**
 - Test component interactions
 - May use test doubles for external systems
-- **Example**: Squad coordinator with role allocator
+- **Example**: Cell coordinator with role allocator
 
 ### E2E Tests (Critical Validation)
 - **10% of test effort, 100% of mission assurance value**
 - Test real Ditto P2P synchronization
 - Validate distributed state convergence
 - Observer-based event-driven assertions
-- **Example**: Multi-peer squad formation with CRDT sync
+- **Example**: Multi-peer cell formation with CRDT sync
 
 ## Test Categories
 
@@ -76,7 +76,7 @@ The CAP Protocol is designed for **autonomous multi-agent systems** operating in
 
 **Coverage**:
 - Storage abstractions (mocked Ditto)
-- Squad formation workflow (without real P2P)
+- Cell formation workflow (without real P2P)
 - Phase transitions
 - Error handling paths
 
@@ -94,8 +94,8 @@ The CAP Protocol is designed for **autonomous multi-agent systems** operating in
 
 **Coverage**:
 - Multi-peer Ditto synchronization
-- Platform advertisement propagation
-- Squad formation state convergence
+- Node advertisement propagation
+- Cell formation state convergence
 - Role assignment sync across mesh
 - Human approval workflow distribution
 - Observer-based event notification
@@ -120,7 +120,7 @@ The CAP Protocol is designed for **autonomous multi-agent systems** operating in
 In a distributed CRDT system:
 - ✅ Unit test: "Capability aggregation calculates readiness correctly"
 - ❌ Unit test: Cannot validate that capabilities sync across peers
-- ✅ E2E test: "Platform capabilities stored on peer1 appear on peer2 via observers"
+- ✅ E2E test: "Node capabilities stored on peer1 appear on peer2 via observers"
 
 ### E2E Test Requirements
 
@@ -135,17 +135,17 @@ Every E2E test MUST:
 
 ### E2E Test Scenarios
 
-See [`cap-protocol/docs/testing/e2e-squad-formation.md`](../cap-protocol/docs/testing/e2e-squad-formation.md) for detailed scenario matrix.
+See [`cap-protocol/docs/testing/e2e-cell-formation.md`](../cap-protocol/docs/testing/e2e-cell-formation.md) for detailed scenario matrix.
 
 **Core Scenarios** (must be validated with real Ditto sync):
 
-1. **Platform Advertisement Sync**
+1. **Node Advertisement Sync**
    - Store PlatformConfig on peer1
    - Observe appearance on peer2
    - Validate capability data integrity
 
-2. **Squad Formation Propagation**
-   - Create squad on peer1
+2. **Cell Formation Propagation**
+   - Create cell on peer1
    - Validate members list syncs to peer2/peer3
    - Observer triggers on formation complete
 
@@ -174,7 +174,7 @@ pub struct E2EHarness {
     pub async fn create_ditto_store(&mut self) -> Result<DittoStore>
 
     // Observer-based sync validation
-    pub async fn observe_squad(&self, store: &DittoStore, squad_id: &str) -> Result<SquadObserver>
+    pub async fn observe_cell(&self, store: &DittoStore, cell_id: &str) -> Result<SquadObserver>
 
     // Event-driven peer connection
     pub async fn wait_for_peer_connection(&self, ...) -> Result<()>
@@ -238,8 +238,8 @@ cargo test -- --test-threads=1
 ## Test Data Management
 
 ### Fixtures
-- Platform configurations in `tests/fixtures/`
-- Squad scenarios as code (not JSON)
+- Node configurations in `tests/fixtures/`
+- Cell scenarios as code (not JSON)
 - Reusable test helpers
 
 ### Ditto Test Data
@@ -264,7 +264,7 @@ cargo test -- --test-threads=1
 
 **E2E Test Status**:
 - ✅ Infrastructure validated (harness + peer sync)
-- ⏳ Squad formation scenarios (pending implementation)
+- ⏳ Cell formation scenarios (pending implementation)
 - ⏳ Multi-peer convergence tests (pending)
 - ⏳ Network partition recovery (pending)
 
@@ -284,11 +284,11 @@ cargo test -- --test-threads=1
 ```rust
 #[test]
 fn test_capability_aggregation_nominal_health() {
-    // Arrange: Create platforms with known state
-    let platforms = create_test_platforms();
+    // Arrange: Create nodes with known state
+    let nodes = create_test_nodes();
 
     // Act: Execute function under test
-    let result = CapabilityAggregator::aggregate_capabilities(&platforms);
+    let result = CapabilityAggregator::aggregate_capabilities(&nodes);
 
     // Assert: Validate expected outcomes
     assert!(result.is_ok());
@@ -308,25 +308,25 @@ fn test_capability_aggregation_nominal_health() {
 
 ```rust
 #[tokio::test]
-async fn test_platform_sync_across_peers() {
-    let mut harness = E2EHarness::new("platform_sync");
+async fn test_node_sync_across_peers() {
+    let mut harness = E2EHarness::new("node_sync");
 
     // Create isolated Ditto instances
     let peer1 = harness.create_ditto_store().await.unwrap();
     let peer2 = harness.create_ditto_store().await.unwrap();
 
     // Set up observer BEFORE storing data
-    let mut observer = harness.observe_platform(&peer2, "platform1").await.unwrap();
+    let mut observer = harness.observe_node(&peer2, "node1").await.unwrap();
 
-    // Store platform on peer1
-    peer1.store_platform(&platform_config).await.unwrap();
+    // Store node on peer1
+    peer1.store_node(&node_config).await.unwrap();
 
     // Wait for observer event (not polling!)
     let event = observer.wait_for_event(Duration::from_secs(5)).await.unwrap();
 
     // Validate sync
-    let synced = peer2.get_platform("platform1").await.unwrap();
-    assert_eq!(synced.id, platform_config.id);
+    let synced = peer2.get_node("node1").await.unwrap();
+    assert_eq!(synced.id, node_config.id);
 
     // Cleanup
     harness.shutdown_store(peer1).await;
@@ -360,9 +360,9 @@ async fn test_platform_sync_across_peers() {
 
 ## Related Documentation
 
-- **E2E Squad Formation**: [`cap-protocol/docs/testing/e2e-squad-formation.md`](../cap-protocol/docs/testing/e2e-squad-formation.md)
+- **E2E Cell Formation**: [`cap-protocol/docs/testing/e2e-cell-formation.md`](../cap-protocol/docs/testing/e2e-cell-formation.md)
 - **E2E Test Harness**: [`cap-protocol/src/testing/e2e_harness.rs`](../cap-protocol/src/testing/e2e_harness.rs)
-- **ADR-004**: Human-in-the-Loop Authority ([`docs/adr/004-human-machine-squad-composition.md`](adr/004-human-machine-squad-composition.md))
+- **ADR-004**: Human-in-the-Loop Authority ([`docs/adr/004-human-machine-cell-composition.md`](adr/004-human-machine-cell-composition.md))
 
 ---
 

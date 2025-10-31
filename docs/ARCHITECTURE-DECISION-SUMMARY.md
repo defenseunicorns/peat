@@ -1,4 +1,4 @@
-# Architecture Decision Summary: Human-Machine Squad Composition
+# Architecture Decision Summary: Human-Machine Cell Composition
 
 **Date**: 2025-10-30
 **Status**: PROPOSED - Implementation starting
@@ -10,7 +10,7 @@
 
 ## Why Now?
 
-Squad composition is **foundational architecture** that affects:
+Cell composition is **foundational architecture** that affects:
 - E4.3 (Role Assignment) - needs to consider human roles
 - E4.4 (Capability Aggregation) - must include human authority
 - E4.5 (Phase Transition) - requires human approval policies
@@ -33,7 +33,7 @@ Squad composition is **foundational architecture** that affects:
 - HumanMachinePair binding (supports 1:1, 1:N, N:1, N:M)
 ```
 
-**Platform Extension** (`models/platform.rs`):
+**Node Extension** (`models/node.rs`):
 ```rust
 + operator_binding: Option<HumanMachinePair>
 ```
@@ -72,22 +72,22 @@ Where:
 ## Supported Scenarios
 
 ### Scenario A: Traditional Infantry Squad
-- 9 humans, 9 platforms (1:1 binding)
-- E-7 Squad Leader's platform → squad leader
+- 9 humans, 9 nodes (1:1 binding)
+- E-7 Cell Leader's node → cell leader
 - Policy: `Hybrid(authority=0.7, technical=0.3)`
 
 ### Scenario B: Robot-Augmented Squad
 - 4 humans, 6 autonomous robots (mixed)
-- E-7's platform → tactical leader
+- E-7's node → tactical leader
 - Policy: `Hybrid(authority=0.6, technical=0.4)`
 
 ### Scenario C: Swarm Operator
 - 1 human, 8 robots (1:N binding)
-- Human platform → supervisor
+- Human node → supervisor
 - Policy: `Hybrid(authority=0.5, technical=0.5)` or `TechnicalDominant` for robot sub-coordination
 
 ### Scenario D: Command Vehicle
-- 3 humans (O-3, E-7, E-4), 1 platform (N:1 binding)
+- 3 humans (O-3, E-7, E-4), 1 node (N:1 binding)
 - O-3 has ultimate authority
 - Policy: `RankDominant`
 
@@ -106,7 +106,7 @@ Where:
   - [ ] AuthorityLevel enum
   - [ ] HumanMachinePair struct
   - [ ] Unit tests
-- [ ] Extend `models/platform.rs`
+- [ ] Extend `models/node.rs`
   - [ ] Add operator_binding field
   - [ ] Helper methods
   - [ ] Update existing tests
@@ -118,7 +118,7 @@ Where:
   - [ ] Unit tests
 
 **Week 1: Leader Election Update**
-- [ ] Modify `squad/leader_election.rs`
+- [ ] Modify `cell/leader_election.rs`
   - [ ] Add ElectionContext parameter
   - [ ] Implement compute_authority_score()
   - [ ] Implement rank_to_score() mapping
@@ -167,7 +167,7 @@ Where:
 
 ## Documentation
 
-- **ADR**: [`docs/adr/004-human-machine-squad-composition.md`](./adr/004-human-machine-squad-composition.md)
+- **ADR**: [`docs/adr/004-human-machine-cell-composition.md`](./adr/004-human-machine-cell-composition.md)
 - **Design**: [`docs/human-machine-teaming-design.md`](./human-machine-teaming-design.md)
 - **This Summary**: `docs/ARCHITECTURE-DECISION-SUMMARY.md`
 

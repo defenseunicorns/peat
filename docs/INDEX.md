@@ -18,7 +18,7 @@ ADRs document significant architectural decisions and their rationale.
 |-----|-------|------|--------|
 | [001](adr/001-cap-protocol-poc.md) | CAP Protocol POC | 2024-10-28 | Implemented |
 | [002](adr/002-beacon-storage-architecture.md) | Beacon Storage Architecture | 2024-10-29 | Implemented |
-| [004](adr/004-human-machine-squad-composition.md) | Human-Machine Squad Composition | 2024-10-30 | Implemented |
+| [004](adr/004-human-machine-cell-composition.md) | Human-Machine Cell Composition | 2024-10-30 | Implemented |
 
 **Summary**: [ARCHITECTURE-DECISION-SUMMARY.md](ARCHITECTURE-DECISION-SUMMARY.md)
 
@@ -29,7 +29,7 @@ In-depth technical analysis and design explorations.
 | Document | Topic | Purpose |
 |----------|-------|---------|
 | [CAP_Architecture_EventStreaming_vs_DeltaSync.md](CAP_Architecture_EventStreaming_vs_DeltaSync.md) | Event Streaming vs Delta Sync | Evaluates synchronization approaches for distributed state |
-| [human-machine-teaming-design.md](human-machine-teaming-design.md) | Human-Machine Teaming | Design for human-in-the-loop authority and squad composition |
+| [human-machine-teaming-design.md](human-machine-teaming-design.md) | Human-Machine Teaming | Design for human-in-the-loop authority and cell composition |
 | [Ditto-SDK-Integration-Notes.md](Ditto-SDK-Integration-Notes.md) | Ditto SDK Integration | Integration notes and patterns for Ditto CRDT mesh |
 
 ## Project Planning
@@ -45,7 +45,7 @@ Comprehensive testing strategy and implementation guides.
 | Document | Scope | Purpose |
 |----------|-------|---------|
 | [TESTING_STRATEGY.md](TESTING_STRATEGY.md) | Workspace-wide | Testing philosophy, pyramid, and E2E requirements |
-| [cap-protocol/docs/testing/e2e-squad-formation.md](../cap-protocol/docs/testing/e2e-squad-formation.md) | Squad Formation E2E | Detailed E2E test scenarios and matrix |
+| [cap-protocol/docs/testing/e2e-cell-formation.md](../cap-protocol/docs/testing/e2e-cell-formation.md) | Cell Formation E2E | Detailed E2E test scenarios and matrix |
 
 ### Key Testing Concepts
 
@@ -78,7 +78,7 @@ Comprehensive testing strategy and implementation guides.
 - **Architecture**: ADR-001, ADR-002, ADR-004, ARCHITECTURE-DECISION-SUMMARY.md
 - **Synchronization**: CAP_Architecture_EventStreaming_vs_DeltaSync.md, Ditto-SDK-Integration-Notes.md
 - **Human-Machine Teaming**: ADR-004, human-machine-teaming-design.md
-- **Testing**: TESTING_STRATEGY.md, e2e-squad-formation.md
+- **Testing**: TESTING_STRATEGY.md, e2e-cell-formation.md
 - **Project Management**: CAP-POC-Project-Plan.md
 
 ## Documentation Conventions
@@ -127,8 +127,8 @@ cap/
 - **...why we made a specific decision**: Check [ADRs](adr/)
 - **...how to test**: Read [TESTING_STRATEGY.md](TESTING_STRATEGY.md)
 - **...how Ditto integration works**: See [Ditto-SDK-Integration-Notes.md](Ditto-SDK-Integration-Notes.md)
-- **...human-machine teaming**: Read [ADR-004](adr/004-human-machine-squad-composition.md)
-- **...squad formation E2E tests**: See [e2e-squad-formation.md](../cap-protocol/docs/testing/e2e-squad-formation.md)
+- **...human-machine teaming**: Read [ADR-004](adr/004-human-machine-cell-composition.md)
+- **...cell formation E2E tests**: See [e2e-cell-formation.md](../cap-protocol/docs/testing/e2e-cell-formation.md)
 
 ### "I'm working on..."
 

@@ -16,12 +16,12 @@ This isn't merely an optimization—it's a fundamental rethinking of how distrib
 Current IoT infrastructures and drone systems are built on an **event-centric model**:
 
 ```
-Platform generates event → Timestamp + serialize → Transmit to central collector → Store in time-series DB
+Node generates event → Timestamp + serialize → Transmit to central collector → Store in time-series DB
 ```
 
 **Characteristics:**
 - **Every reading is a new record**: GPS position at 1Hz = 3,600 database entries per hour per platform
-- **All data flows to center**: Every platform transmits to a central broker/database
+- **All data flows to center**: Every node transmits to a central broker/database
 - **Events are immutable**: Once written, records are never modified, only appended
 - **Query by time**: "Show me all events between T1 and T2"
 - **Star topology**: All data paths lead to the central collection point
@@ -32,7 +32,7 @@ Platform generates event → Timestamp + serialize → Transmit to central colle
 // Every second, drone generates and transmits:
 DroneEvent_T1 = {
   timestamp: "2025-10-28T14:23:01Z",
-  platform_id: "UAV_7",
+  node_id: "UAV_7",
   position: {lat: 32.1234, lon: -117.5678, alt: 500},
   fuel: 47,
   sensors: ["EO/IR", "Thermal"],
@@ -44,7 +44,7 @@ DroneEvent_T1 = {
 
 DroneEvent_T2 = {
   timestamp: "2025-10-28T14:23:02Z",
-  platform_id: "UAV_7",
+  node_id: "UAV_7",
   position: {lat: 32.1235, lon: -117.5679, alt: 500}, // Barely moved
   fuel: 47, // Hasn't changed
   sensors: ["EO/IR", "Thermal"], // Still same
@@ -59,7 +59,7 @@ DroneEvent_T2 = {
 
 ### Why This Works (At Small Scale)
 
-For **10-20 platforms** with **good connectivity**:
+For **10-20 nodes** with **good connectivity**:
 - Central database provides simple query model
 - Time-series analysis is straightforward
 - Data warehouse tools work out-of-box
@@ -68,17 +68,17 @@ For **10-20 platforms** with **good connectivity**:
 
 ### Why This Fails (At Large Scale)
 
-For **100+ platforms** with **contested networks**:
+For **100+ nodes** with **contested networks**:
 
-1. **Bandwidth Explosion**: N platforms × M sensors × R rate = overwhelming data volume
+1. **Bandwidth Explosion**: N nodes × M sensors × R rate = overwhelming data volume
 2. **Redundant Transmission**: 95%+ of transmitted data is unchanged state
 3. **Central Bottleneck**: Single collection point becomes failure mode
 4. **Network Topology**: Star topology fails when center unreachable
-5. **No Offline Operation**: Platforms disconnected from center can't share data
-6. **No Peer Coordination**: Platform A and B can't coordinate without center
+5. **No Offline Operation**: Nodes disconnected from center can't share data
+6. **No Peer Coordination**: Node A and B can't coordinate without center
 7. **Late Arrivals**: By the time data reaches center, decision window has closed
 
-**The DIU COD experience validated this**: event-streaming architectures hit a hard wall at approximately 20 platforms on tactical networks.
+**The DIU COD experience validated this**: event-streaming architectures hit a hard wall at approximately 20 nodes on tactical networks.
 
 ---
 
@@ -89,7 +89,7 @@ For **100+ platforms** with **contested networks**:
 CAP inverts the traditional model. Instead of "stream events describing changes," CAP maintains "replicated state that converges through deltas."
 
 ```
-Platform maintains state → Detect actual changes → Transmit only deltas → Peers merge updates → Convergence
+Node maintains state → Detect actual changes → Transmit only deltas → Peers merge updates → Convergence
 ```
 
 ### Key Architectural Features
@@ -101,9 +101,9 @@ Instead of transmitting full state every update cycle, CAP uses CRDT deltas to s
 **Traditional Event Streaming:**
 ```javascript
 // Every update = full event
-Update_1 = {timestamp: T1, platform: "UAV_7", field_1: val_1, ..., field_50: val_50} // 2KB
-Update_2 = {timestamp: T2, platform: "UAV_7", field_1: val_1, ..., field_50: val_50} // 2KB
-Update_3 = {timestamp: T3, platform: "UAV_7", field_1: val_1, ..., field_50: val_50} // 2KB
+Update_1 = {timestamp: T1, node: "UAV_7", field_1: val_1, ..., field_50: val_50} // 2KB
+Update_2 = {timestamp: T2, node: "UAV_7", field_1: val_1, ..., field_50: val_50} // 2KB
+Update_3 = {timestamp: T3, node: "UAV_7", field_1: val_1, ..., field_50: val_50} // 2KB
 // Total: 6KB for 3 updates (even if only 1 field changed)
 ```
 
@@ -111,7 +111,7 @@ Update_3 = {timestamp: T3, platform: "UAV_7", field_1: val_1, ..., field_50: val
 ```javascript
 // Initial state transmitted once
 InitialState = {
-  platform: "UAV_7",
+  node: "UAV_7",
   fuel: 47,
   position: {lat: 32.1, lon: -117.2, alt: 500},
   sensors: ["EO/IR", "Thermal"],
@@ -134,7 +134,7 @@ Delta_2 = [
 **Why This Matters:**
 - Tactical networks operate at 9.6Kbps to 1Mbps
 - Every byte saved is mission capability preserved
-- 95% bandwidth reduction = 20x more platforms on same network
+- 95% bandwidth reduction = 20x more nodes on same network
 
 #### 2. **Peer-to-Peer Mesh: No Central Collection Point**
 
@@ -169,24 +169,24 @@ Not all peers need all data. CAP's mesh allows nodes to:
 
 **Example:**
 ```javascript
-// Platform A has data for Company HQ
+// Node A has data for Company HQ
 DataPacket = {
   destination: "Company_HQ",
-  origin: "Platform_A",
+  origin: "Node_A",
   data: {capability_change: "strike_expended"}
 }
 
-// Platform B is in-between
-Platform_B.receives(DataPacket)
-if (DataPacket.destination != "Platform_B") {
-  Platform_B.route_to_next_hop(DataPacket) // Don't consume, just forward
+// Node B is in-between
+Node_B.receives(DataPacket)
+if (DataPacket.destination != "Node_B") {
+  Node_B.route_to_next_hop(DataPacket) // Don't consume, just forward
 }
 
-// Squad Leader sees packet
+// Cell Leader sees packet
 SquadLeader.receives(DataPacket)
 if (SquadLeader.should_aggregate(DataPacket)) {
-  SquadLeader.aggregate_into_squad_update() // Consume + summarize
-  SquadLeader.forward_summary_to_platoon() // Not original packet
+  SquadLeader.aggregate_into_cell_update() // Consume + summarize
+  SquadLeader.forward_summary_to_zone() // Not original packet
 }
 ```
 
@@ -260,11 +260,11 @@ if (bandwidth > threshold) {
 
 #### 4. **Offline Persistence: Local Autonomy**
 
-Traditional event streaming requires connectivity to the central broker. If disconnected, platforms can't share data. CAP's CRDT model enables **autonomous operation during network partition**.
+Traditional event streaming requires connectivity to the central broker. If disconnected, nodes can't share data. CAP's CRDT model enables **autonomous operation during network partition**.
 
 **Traditional System:**
 ```
-[Platform A] --X-- [Central Broker] --X-- [Platform B]
+[Node A] --X-- [Central Broker] --X-- [Node B]
        ↓                                        ↓
   Can't share data                        Can't share data
   Can't coordinate                        Can't coordinate
@@ -273,7 +273,7 @@ Traditional event streaming requires connectivity to the central broker. If disc
 
 **CAP System:**
 ```
-[Platform A] --X-- [Mesh] --X-- [Platform B]
+[Node A] --X-- [Mesh] --X-- [Node B]
        ↓                              ↓
   Persists changes locally       Persists changes locally
        ↓                              ↓
@@ -287,9 +287,9 @@ Traditional event streaming requires connectivity to the central broker. If disc
 **Example Scenario:**
 
 ```javascript
-// T0: Squad is connected
-Squad_State = {
-  platforms: ["UAV_1", "UAV_2", "UAV_3"],
+// T0: Cell is connected
+Cell_State = {
+  nodes: ["UAV_1", "UAV_2", "UAV_3"],
   mission: "ISR",
   status: "executing"
 }
@@ -330,14 +330,14 @@ Sync_Deltas = {
 }
 
 // CRDTs guarantee convergence
-// All platforms reach consistent state
+// All nodes reach consistent state
 // No conflicts, no data loss
 // Total bytes transmitted: ~500 bytes (just the deltas)
 ```
 
 **Why This Matters:**
 - Contested networks = frequent partitions
-- Platforms must operate autonomously during disconnection
+- Nodes must operate autonomously during disconnection
 - When reconnection occurs, must converge efficiently
 - Traditional systems buffer events and replay (high bandwidth)
 - CAP syncs only the net state changes (low bandwidth)
@@ -346,7 +346,7 @@ Sync_Deltas = {
 
 When connectivity exists, CAP intelligently decides what to sync based on:
 - **Priority**: Mission-critical before routine
-- **Relevance**: Squad-level before company-level for local decisions
+- **Relevance**: Cell-level before company-level for local decisions
 - **Freshness**: Recent changes before historical data
 - **Bandwidth**: Adapt sync rate to available capacity
 - **Latency**: Time-sensitive before archival
@@ -398,14 +398,14 @@ CAP_Approach = {
 CREATE TABLE drone_events (
   id UUID PRIMARY KEY,
   timestamp TIMESTAMP,
-  platform_id VARCHAR,
+  node_id VARCHAR,
   event_type VARCHAR,
   payload JSONB
 );
 
 -- Query: "What's the current fuel?"
 SELECT payload->>'fuel' FROM drone_events
-WHERE platform_id = 'UAV_7'
+WHERE node_id = 'UAV_7'
   AND timestamp < NOW()
 ORDER BY timestamp DESC
 LIMIT 1;
@@ -476,7 +476,7 @@ Peer A                          Peer B
 ```javascript
 // Application polls for updates
 setInterval(() => {
-  fetch('/api/platforms')
+  fetch('/api/nodes')
     .then(data => updateUI(data))
 }, 1000)
 
@@ -489,10 +489,10 @@ setInterval(() => {
 **CAP (Reactive State):**
 ```javascript
 // Application observes CRDT collections
-ditto.store.collection("platforms")
+ditto.store.collection("nodes")
   .find("priority == 1") // Only critical updates
-  .observe((platforms) => {
-    updateUI(platforms)
+  .observe((nodes) => {
+    updateUI(nodes)
   })
 
 // Benefits:
@@ -512,11 +512,11 @@ ditto.store.collection("platforms")
 ```javascript
 // Every second, transmit fuel reading
 Time    Event
-T=0     {platform: UAV_7, fuel: 47, timestamp: T0} // 500 bytes
-T=1     {platform: UAV_7, fuel: 47, timestamp: T1} // 500 bytes
-T=2     {platform: UAV_7, fuel: 47, timestamp: T2} // 500 bytes
-T=3     {platform: UAV_7, fuel: 46, timestamp: T3} // 500 bytes
-T=4     {platform: UAV_7, fuel: 46, timestamp: T4} // 500 bytes
+T=0     {node: UAV_7, fuel: 47, timestamp: T0} // 500 bytes
+T=1     {node: UAV_7, fuel: 47, timestamp: T1} // 500 bytes
+T=2     {node: UAV_7, fuel: 47, timestamp: T2} // 500 bytes
+T=3     {node: UAV_7, fuel: 46, timestamp: T3} // 500 bytes
+T=4     {node: UAV_7, fuel: 46, timestamp: T4} // 500 bytes
 ...
 // 60 seconds = 30KB transmitted (mostly redundant)
 ```
@@ -524,7 +524,7 @@ T=4     {platform: UAV_7, fuel: 46, timestamp: T4} // 500 bytes
 **CAP Delta Sync:**
 ```javascript
 // Initial state
-T=0     {platform: UAV_7, fuel: 47} // 500 bytes once
+T=0     {node: UAV_7, fuel: 47} // 500 bytes once
 
 // Only send when changes
 T=3     {delta: {fuel: 46}, ts: T3} // 50 bytes
@@ -534,11 +534,11 @@ T=28    {delta: {fuel: 44}, ts: T28} // 50 bytes
 // 60 seconds = 650 bytes total (95% reduction)
 ```
 
-### Example 2: Squad Coordination During Network Partition
+### Example 2: Cell Coordination During Network Partition
 
 **Scenario:** 
-- Squad of 5 UAVs conducting ISR
-- Network partition splits squad: UAVs 1-3 connected, UAVs 4-5 isolated
+- Cell of 5 UAVs conducting ISR
+- Network partition splits cell: UAVs 1-3 connected, UAVs 4-5 isolated
 - Mission continues for 10 minutes
 - Network heals
 
@@ -590,36 +590,36 @@ Deltas_Subgroup_B = [
 
 **Traditional Event Streaming:**
 ```javascript
-// Every platform sends full capability set to HQ every N seconds
-Platform_1 → HQ: {id: 1, capabilities: [ISR, Relay], fuel: 45, ...} // 2KB
-Platform_2 → HQ: {id: 2, capabilities: [Strike], fuel: 38, ...}     // 2KB
-Platform_3 → HQ: {id: 3, capabilities: [ISR], fuel: 52, ...}        // 2KB
+// Every node sends full capability set to HQ every N seconds
+Node_1 → HQ: {id: 1, capabilities: [ISR, Relay], fuel: 45, ...} // 2KB
+Node_2 → HQ: {id: 2, capabilities: [Strike], fuel: 38, ...}     // 2KB
+Node_3 → HQ: {id: 3, capabilities: [ISR], fuel: 52, ...}        // 2KB
 ...
-Platform_1000 → HQ: {id: 1000, capabilities: [Logistics], ...}      // 2KB
+Node_1000 → HQ: {id: 1000, capabilities: [Logistics], ...}      // 2KB
 
-// For 1000 platforms at 1Hz: 2MB/second
+// For 1000 nodes at 1Hz: 2MB/second
 // HQ must process all events centrally
 // No hierarchy = all data flows to top
 ```
 
 **CAP Delta Sync with Hierarchical Aggregation:**
 ```javascript
-// Platform level: Only send changes
-Platform_1: {delta: {fuel: 45→44}} // 50B → Squad_Leader_Alpha
+// Node level: Only send changes
+Node_1: {delta: {fuel: 45→44}} // 50B → Cell_Leader_Alpha
 
-// Squad level: Aggregate and compress
-Squad_Alpha: {
-  platforms: 5,
+// Cell level: Aggregate and compress
+Cell_Alpha: {
+  nodes: 5,
   summary: {
     aggregate_fuel: 45min,
     capabilities: [ISR, Strike],
     status: "operational"
   }
-} // 200B → Platoon_Leader_1
+} // 200B → Zone_Leader_1
 
-// Platoon level: Further abstraction
-Platoon_1: {
-  squads: 4,
+// Zone level: Further abstraction
+Zone_1: {
+  cells: 4,
   readiness: "amber",
   endurance: "2hr",
   mission_capable: true
@@ -627,16 +627,16 @@ Platoon_1: {
 
 // Company level: Mission view
 Company_HQ receives: {
-  platoons: 5,
+  zones: 5,
   overall_readiness: "green",
   mission_capability: "ISR+Strike available"
 } // 50B from each platoon
 
 // Result:
-// - 1000 platforms generate ~50KB total to Company (not 2MB)
+// - 1000 nodes generate ~50KB total to Company (not 2MB)
 // - 40x compression through hierarchy
 // - Only relevant abstractions at each level
-// - HQ sees mission capabilities, not platform telemetry
+// - HQ sees mission capabilities, not node telemetry
 ```
 
 ---
@@ -645,7 +645,7 @@ Company_HQ receives: {
 
 ### The Bandwidth Math
 
-**Traditional Event Streaming (1000 platforms):**
+**Traditional Event Streaming (1000 nodes):**
 ```
 Assumptions:
 - 1000 platforms
@@ -660,7 +660,7 @@ Even at 10 second intervals:
 1000 × 2KB ÷ 10s = 1.6 Mbps → still oversubscribed
 ```
 
-**CAP Delta Sync (1000 platforms):**
+**CAP Delta Sync (1000 nodes):**
 ```
 Assumptions:
 - 1000 platforms
@@ -668,27 +668,27 @@ Assumptions:
 - Changes occur every ~5 seconds (not every second)
 - Hierarchical aggregation: 20x compression
 
-Platform to Squad: 1000 × 100B ÷ 5s = 20 KB/s
-Squad to Platoon: 20 KB/s ÷ 20 = 1 KB/s
-Platoon to Company: 1 KB/s ÷ 20 = 50 B/s
+Node to Cell: 1000 × 100B ÷ 5s = 20 KB/s
+Cell to Zone: 20 KB/s ÷ 20 = 1 KB/s
+Zone to Company: 1 KB/s ÷ 20 = 50 B/s
 
 Total bandwidth usage: ~20 KB/s = 160 Kbps
 Available bandwidth: 1 Mbps
 Result: Only 16% utilization → room for growth
 
-Can support 6000+ platforms on same network!
+Can support 6000+ nodes on same network!
 ```
 
 ### The Latency Problem
 
 **Traditional Event Streaming:**
 ```
-Platform detects target
+Node detects target
   ↓ (100ms)
 Serialize event
   ↓ (50ms)
 Transmit to central broker (queue wait)
-  ↓ (2000ms) ← bottleneck: 1000 platforms competing
+  ↓ (2000ms) ← bottleneck: 1000 nodes competing
 Central broker processes
   ↓ (100ms)
 Store in database
@@ -702,13 +702,13 @@ Total: 2.4 seconds (decision window missed)
 
 **CAP Delta Sync:**
 ```
-Platform detects target (Priority 1 update)
+Node detects target (Priority 1 update)
   ↓ (100ms)
 Create delta
   ↓ (10ms) ← minimal serialization
 Transmit peer-to-peer (priority queue)
   ↓ (200ms) ← direct path, no queuing
-Squad leader aggregates
+Cell leader aggregates
   ↓ (50ms)
 Forward to platoon
   ↓ (200ms)
@@ -728,11 +728,11 @@ CAP leverages Ditto's CRDT implementation and edge sync capabilities to realize 
 #### 1. **Automatic Delta Generation**
 ```javascript
 // Ditto handles delta computation automatically
-const platform = ditto.store.collection("platforms")
+const node = ditto.store.collection("nodes")
   .findByID("UAV_7")
 
 // Update state
-platform.update(doc => {
+node.update(doc => {
   doc.fuel = 45 // Changed from 47
   doc.position.lat = 32.11 // Changed slightly
   // Other fields unchanged
@@ -783,9 +783,9 @@ routineUpdates.syncPreference = {
 #### 4. **Offline-First with Automatic Convergence**
 ```javascript
 // Works fully offline
-ditto.store.collection("platforms")
+ditto.store.collection("nodes")
   .upsert({
-    platform_id: "UAV_7",
+    node_id: "UAV_7",
     fuel: 45,
     // ... updates persist locally
   })
@@ -800,12 +800,12 @@ ditto.store.collection("platforms")
 ```javascript
 // Reactive queries update automatically
 ditto.store
-  .collection("platforms")
-  .find("squad_id == 'Alpha' AND fuel < 30")
-  .observe((platforms) => {
+  .collection("nodes")
+  .find("cell_id == 'Alpha' AND fuel < 30")
+  .observe((nodes) => {
     // Callback fires when data changes
     // Even if change came from another peer
-    alertLowFuel(platforms)
+    alertLowFuel(nodes)
   })
 
 // Traditional: Must poll database
@@ -816,7 +816,7 @@ ditto.store
 
 While Ditto provides the CRDT foundation, CAP adds:
 
-1. **Hierarchical Aggregation Rules**: Logic for squad → platoon → company synthesis
+1. **Hierarchical Aggregation Rules**: Logic for cell → zone → company synthesis
 2. **Priority-Based Sync Scheduling**: When to sync which collections based on mission context
 3. **Capability Composition Engine**: Rules for discovering emergent capabilities
 4. **Obsolescence Filtering**: Drop deltas that are no longer decision-relevant
@@ -834,7 +834,7 @@ Organizations can transition incrementally:
 sendEventToDatabase(event)
 
 // Also maintain Ditto state
-ditto.store.collection("platforms").upsert(event)
+ditto.store.collection("nodes").upsert(event)
 
 // Start using Ditto for peer-to-peer coordination
 // Keep database for analytics/historical queries
@@ -842,7 +842,7 @@ ditto.store.collection("platforms").upsert(event)
 
 ### Phase 2: Move Edge Coordination to Ditto
 ```javascript
-// Edge platforms use Ditto exclusively
+// Edge nodes use Ditto exclusively
 // Only send summaries to central system
 squadSummary = aggregateSquadState()
 sendToDatabase(squadSummary) // Much less data
@@ -855,7 +855,7 @@ sendToDatabase(squadSummary) // Much less data
 ```javascript
 // All coordination via Ditto CRDTs
 // Database becomes a subscriber to Ditto
-ditto.store.collection("platforms")
+ditto.store.collection("nodes")
   .observe((changes) => {
     // Archive to database for analytics
     archiveToDatabase(changes)
@@ -887,7 +887,7 @@ The shift from **event streaming** to **delta synchronization** is not merely a 
 
 For autonomous systems operating in **Disconnected, Intermittent, Limited (DIL)** environments at **scale**, the choice is clear: delta synchronization via CRDTs is the only architecture that can meet mission requirements.
 
-The DIU COD work proved traditional approaches fail at ~20 platforms. CAP, built on delta sync and hierarchical aggregation, enables operations at 1000+ platforms on the same networks. This isn't incremental improvement—it's paradigm shift that makes previously impossible missions achievable.
+The DIU COD work proved traditional approaches fail at ~20 nodes. CAP, built on delta sync and hierarchical aggregation, enables operations at 1000+ nodes on the same networks. This isn't incremental improvement—it's paradigm shift that makes previously impossible missions achievable.
 
 ---
 
@@ -903,6 +903,6 @@ The DIU COD work proved traditional approaches fail at ~20 platforms. CAP, built
 
 5. **Treat all data equally** misses decision windows → **Priority collections** ensure critical updates arrive in time
 
-6. **Traditional systems fail at 20 platforms** → **CAP scales to 1000+ platforms**
+6. **Traditional systems fail at 20 nodes** → **CAP scales to 1000+ nodes**
 
 This architectural shift, enabled by CRDTs and Ditto Edge Sync, is the foundation that makes CAP's hierarchical capability composition possible. Without delta sync, the bandwidth and latency requirements of hierarchical coordination would be infeasible on tactical networks.

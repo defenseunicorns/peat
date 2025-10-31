@@ -1,4 +1,4 @@
-//! Squad state data structures
+//! Cell state data structures
 //!
 //! This module defines squad data models with CRDT operations:
 //! - Member list: OR-Set (observed-remove set) - members can be added and removed
@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use uuid::Uuid;
 
-/// Squad configuration
+/// Cell configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SquadConfig {
+pub struct CellConfig {
     /// Unique squad identifier
     pub id: String,
     /// Maximum squad size
@@ -21,7 +21,7 @@ pub struct SquadConfig {
     pub min_size: usize,
 }
 
-impl SquadConfig {
+impl CellConfig {
     /// Create a new squad configuration
     pub fn new(max_size: usize) -> Self {
         Self {
@@ -32,11 +32,11 @@ impl SquadConfig {
     }
 }
 
-/// Squad state
+/// Cell state
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SquadState {
-    /// Squad configuration
-    pub config: SquadConfig,
+pub struct CellState {
+    /// Cell configuration
+    pub config: CellConfig,
     /// Current squad leader platform ID
     pub leader_id: Option<String>,
     /// Set of member platform IDs
@@ -49,9 +49,9 @@ pub struct SquadState {
     pub timestamp: u64,
 }
 
-impl SquadState {
+impl CellState {
     /// Create a new squad state
-    pub fn new(config: SquadConfig) -> Self {
+    pub fn new(config: CellConfig) -> Self {
         Self {
             config,
             leader_id: None,
@@ -87,11 +87,11 @@ impl SquadState {
     ///
     /// This implements an OR-Set CRDT where members can be added and removed.
     /// Concurrent add/remove operations are resolved by: Add wins over Remove.
-    pub fn add_member(&mut self, platform_id: String) -> bool {
+    pub fn add_member(&mut self, node_id: String) -> bool {
         if self.is_full() {
             false
         } else {
-            let added = self.members.insert(platform_id);
+            let added = self.members.insert(node_id);
             if added {
                 self.update_timestamp();
             }
@@ -100,12 +100,12 @@ impl SquadState {
     }
 
     /// Remove a member from the squad (OR-Set remove operation)
-    pub fn remove_member(&mut self, platform_id: &str) -> bool {
-        let removed = self.members.remove(platform_id);
+    pub fn remove_member(&mut self, node_id: &str) -> bool {
+        let removed = self.members.remove(node_id);
         if removed {
             self.update_timestamp();
             // If leader is removed, clear leader
-            if self.leader_id.as_deref() == Some(platform_id) {
+            if self.leader_id.as_deref() == Some(node_id) {
                 self.leader_id = None;
             }
         }
@@ -116,11 +116,11 @@ impl SquadState {
     ///
     /// This implements Last-Write-Wins semantics for leader election.
     /// The leader must be a current member of the squad.
-    pub fn set_leader(&mut self, platform_id: String) -> Result<(), &'static str> {
-        if !self.members.contains(&platform_id) {
+    pub fn set_leader(&mut self, node_id: String) -> Result<(), &'static str> {
+        if !self.members.contains(&node_id) {
             return Err("Leader must be a squad member");
         }
-        self.leader_id = Some(platform_id);
+        self.leader_id = Some(node_id);
         self.update_timestamp();
         Ok(())
     }
@@ -179,7 +179,7 @@ impl SquadState {
     /// - Members: Union (OR-Set merge)
     /// - Leader: Take newer timestamp (LWW-Register merge)
     /// - Capabilities: Union (G-Set merge)
-    pub fn merge(&mut self, other: &SquadState) {
+    pub fn merge(&mut self, other: &CellState) {
         // Merge members (OR-Set union)
         for member in &other.members {
             self.members.insert(member.clone());
@@ -206,13 +206,13 @@ impl SquadState {
     }
 
     /// Check if a platform is a member
-    pub fn is_member(&self, platform_id: &str) -> bool {
-        self.members.contains(platform_id)
+    pub fn is_member(&self, node_id: &str) -> bool {
+        self.members.contains(node_id)
     }
 
     /// Check if this platform is the leader
-    pub fn is_leader(&self, platform_id: &str) -> bool {
-        self.leader_id.as_deref() == Some(platform_id)
+    pub fn is_leader(&self, node_id: &str) -> bool {
+        self.leader_id.as_deref() == Some(node_id)
     }
 }
 

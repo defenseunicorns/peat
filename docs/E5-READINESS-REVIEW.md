@@ -13,10 +13,10 @@ The CAP protocol codebase has successfully completed E1-E4 with solid architectu
 
 **Key Findings:**
 - ✅ **Foundation**: Strong CRDT-based state management, clean module boundaries
-- ✅ **Squad-level messaging**: Robust implementation (E4) ready to extend
-- ⚠️ **Query performance**: Needs optimization for hierarchical scale (100+ platforms)
+- ✅ **Cell-level messaging**: Robust implementation (E4) ready to extend
+- ⚠️ **Query performance**: Needs optimization for hierarchical scale (100+ nodes)
 - ⚠️ **Routing infrastructure**: Empty placeholder modules need implementation
-- ⚠️ **Platoon model**: Missing, must be added
+- ⚠️ **Zone model**: Missing, must be added
 
 **Recommendation:** Proceed with E5 after completing targeted refactoring (2-3 weeks estimated effort).
 
@@ -30,18 +30,18 @@ The CAP protocol codebase has successfully completed E1-E4 with solid architectu
 - Strong development infrastructure
 
 ### ✅ E2: CRDT Integration & Data Models (CLOSED)
-- Platform & Squad models fully implemented
+- Node & Cell models fully implemented
 - Ditto store wrappers with query helpers
 - All CRDT patterns correctly implemented (G-Set, OR-Set, LWW-Register, PN-Counter)
 
-### ✅ E3: Bootstrap Phase (CLOSED)
+### ✅ E3: Discovery Phase (CLOSED)
 - Geographic, C2-directed, capability-based strategies all working
-- Bootstrap coordinator managing phase transitions
-- Success criteria met: 100 platforms organize into squads in <60s
+- Discovery coordinator managing phase transitions
+- Success criteria met: 100 nodes organize into cells in <60s
 
-### ✅ E4: Squad Formation Phase (CLOSED - just merged)
+### ✅ E4: Cell Formation Phase (CLOSED - just merged)
 - All 5 stories complete (E4.1-E4.5)
-- Intra-squad messaging, leader election, role assignment, capability aggregation
+- Intra-cell messaging, leader election, role assignment, capability aggregation
 - Comprehensive E2E test harness
 - Success criteria met: Leader election <5s, handles failures
 
@@ -53,29 +53,29 @@ The CAP protocol codebase has successfully completed E1-E4 with solid architectu
 
 ```
 cap-protocol/src/
-├── bootstrap/          ✅ Complete (E3)
+├── discovery/          ✅ Complete (E3)
 │   ├── geographic.rs   - Geohash-based discovery
 │   ├── directed.rs     - C2-directed assignment
 │   ├── capability_query.rs - Capability-based queries
 │   └── coordinator.rs  - Phase 1 coordinator
-├── squad/              ✅ Complete (E4)
-│   ├── messaging.rs    - Intra-squad message bus
+├── cell/              ✅ Complete (E4)
+│   ├── messaging.rs    - Intra-cell message bus
 │   ├── leader_election.rs - Deterministic leader selection
 │   ├── capability_aggregation.rs - Emergent capabilities
-│   └── coordinator.rs  - Squad formation coordinator
+│   └── coordinator.rs  - Cell formation coordinator
 ├── hierarchy/          ❌ Empty (E5 target)
 │   ├── router.rs       - EMPTY (hierarchical routing needed)
-│   ├── platoon.rs      - EMPTY (platoon coordinator needed)
+│   ├── zone.rs      - EMPTY (zone coordinator needed)
 │   ├── flow_control.rs - EMPTY (bandwidth management needed)
 │   └── maintenance.rs  - EMPTY (rebalancing logic needed)
-├── models/             🟡 Needs Platoon model
-│   ├── platform.rs     ✅ Complete
-│   ├── squad/          ✅ Complete
-│   └── platoon.rs      ❌ MISSING
+├── models/             🟡 Needs Zone model
+│   ├── node.rs     ✅ Complete
+│   ├── cell/          ✅ Complete
+│   └── zone.rs      ❌ MISSING
 ├── storage/            ✅ Complete, needs optimization
 │   ├── ditto_store.rs  - Core Ditto wrapper
-│   ├── platform_store.rs - Platform queries
-│   └── squad_store.rs  - Squad queries
+│   ├── node_store.rs - Node queries
+│   └── cell_store.rs  - Cell queries
 ├── composition/        ⏸️ Deferred (E6)
 ├── delta/              ⏸️ Deferred (E7)
 ├── network/            ⏸️ Deferred (E8)
@@ -85,13 +85,13 @@ cap-protocol/src/
 ### Module Separation Quality
 
 **Strengths:**
-- Clear separation between bootstrap (E3) and squad (E4) modules
+- Clear separation between discovery (E3) and cell (E4) modules
 - No circular dependencies between modules
 - Clean trait boundaries (MessageRouter, PhaseTransition, CapabilityProvider)
 - Storage abstraction isolates Ditto implementation details
 
 **Observations:**
-- Bootstrap and Squad modules are well-isolated and can be extended independently
+- Discovery and Cell modules are well-isolated and can be extended independently
 - Hierarchy module exists but is completely empty (placeholder for E5)
 - Models directory is well-structured with clear ownership
 - Testing module has good E2E harness infrastructure
@@ -104,42 +104,42 @@ cap-protocol/src/
 
 ### 3.1 Current State
 
-**Squad-Level Messaging (E4):**
-- ✅ `SquadMessageBus`: Robust pub/sub for intra-squad communication
+**Cell-Level Messaging (E4):**
+- ✅ `SquadMessageBus`: Robust pub/sub for intra-cell communication
 - ✅ Message types: Join, Leave, LeaderAnnounce, Heartbeat, RoleAssignment
 - ✅ Reliability: Sequence numbers, retransmission, ACK/NACK
 - ✅ Priority queuing: 4 levels (Low, Normal, High, Critical)
 - ✅ Deduplication and TTL handling
 
 **Limitations:**
-- ❌ No hierarchical routing (platform → squad → platoon)
+- ❌ No hierarchical routing (node → cell → zone)
 - ❌ No routing table infrastructure
-- ❌ No cross-squad message rejection
-- ❌ No upward propagation (squad → platoon)
+- ❌ No cross-cell message rejection
+- ❌ No upward propagation (cell → zone)
 
 ### 3.2 Gaps for E5 Requirements
 
 | Requirement | Current State | Gap |
 |------------|---------------|-----|
-| Routing table (platform→squad→platoon) | ❌ Missing | Need `RoutingTable` data structure |
+| Routing table (node→cell→zone) | ❌ Missing | Need `RoutingTable` data structure |
 | Hierarchical message routing | ❌ Missing | Need `HierarchicalRouter` implementation |
-| Cross-squad rejection | ❌ No validation | Need routing rules enforcement |
-| Squad leader → platoon messaging | ❌ No platoon level | Need `PlatoonMessageBus` |
+| Cross-cell rejection | ❌ No validation | Need routing rules enforcement |
+| Cell leader → zone messaging | ❌ No zone level | Need `PlatoonMessageBus` |
 | Message complexity O(n log n) | 🔶 Unclear | Need performance benchmarks |
 
 ### 3.3 E5 Routing Architecture (Proposed)
 
 ```rust
 HierarchicalRouter
-├── PlatformRouter       // Validates platform-level sends
-├── SquadRouter          // Wraps SquadMessageBus, validates squad-level
-├── PlatoonRouter        // NEW - platoon-level messaging
-└── RoutingTable         // platform → squad → platoon mappings
+├── PlatformRouter       // Validates node-level sends
+├── SquadRouter          // Wraps SquadMessageBus, validates cell-level
+├── PlatoonRouter        // NEW - zone-level messaging
+└── RoutingTable         // node → cell → zone mappings
 ```
 
 **Implementation Approach:**
 1. **Extend, don't replace**: SquadMessageBus stays intact, wrap with routing validation
-2. **Add new layer**: PlatoonMessageBus for squad-to-platoon communication
+2. **Add new layer**: PlatoonMessageBus for cell-to-zone communication
 3. **Routing table**: Maintain hierarchy mappings, update on membership changes
 4. **Rules enforcement**: `is_route_valid(from, to)` checks hierarchy constraints
 
@@ -157,7 +157,7 @@ All four CRDT types are correctly implemented with proper merge semantics:
 
 1. **G-Set (Capabilities):** Monotonic growth, correct for capability accumulation
 2. **LWW-Register (State fields):** Timestamp-based conflict resolution
-3. **OR-Set (Squad members):** Add/remove with "add wins" semantics
+3. **OR-Set (Cell members):** Add/remove with "add wins" semantics
 4. **PN-Counter (Fuel):** Saturating arithmetic, prevents underflow
 
 **Example of correct merge logic:**
@@ -177,9 +177,9 @@ pub fn merge(&mut self, other: &PlatformState) {
 
 **Current Design:**
 - `DittoStore`: Core abstraction over Ditto SDK
-- `PlatformStore`: Platform-specific queries
-- `SquadStore`: Squad-specific queries
-- Collections: `platform_configs`, `platform_states`, `squads`
+- `PlatformStore`: Node-specific queries
+- `SquadStore`: Cell-specific queries
+- Collections: `node_configs`, `node_states`, `cells`
 
 **Strengths:**
 - Clean abstraction isolates Ditto implementation details
@@ -190,7 +190,7 @@ pub fn merge(&mut self, other: &PlatformState) {
 
 | Issue | Impact at E5 Scale | Priority |
 |-------|-------------------|----------|
-| Full collection scans | Slow with 100+ platforms | HIGH |
+| Full collection scans | Slow with 100+ nodes | HIGH |
 | No caching | Repeated queries expensive | HIGH |
 | No batching API | Individual ops only | MEDIUM |
 | Client-side filtering | Fetches all docs, filters in memory | HIGH |
@@ -207,21 +207,21 @@ pub fn update_position(&mut self, position: (f64, f64, f64)) {
 ```
 
 **Impact at E5 scale:**
-- 100 platforms × 10 position updates/sec = 1000 sync ops/sec
+- 100 nodes × 10 position updates/sec = 1000 sync ops/sec
 - Could overwhelm Ditto sync bandwidth
 
 **Solution:** Implement update throttling (batch updates, sync every 1 second)
 
 ### 4.4 Hierarchical Query Performance
 
-**Problem:** No efficient way to query "all platforms in platoon X"
+**Problem:** No efficient way to query "all nodes in zone X"
 
 **Current approach requires:**
-1. Query all squads in platoon
-2. For each squad, query all platforms
+1. Query all cells in platoon
+2. For each cell, query all platforms
 3. Aggregate results
 
-**Solution:** Add `platoon_id` field to `PlatformState` for direct queries
+**Solution:** Add `zone_id` field to `PlatformState` for direct queries
 
 ---
 
@@ -231,17 +231,17 @@ pub fn update_position(&mut self, position: (f64, f64, f64)) {
 
 **1. Query Performance (HIGH PRIORITY)**
 - **Problem:** Full collection scans with client-side filtering
-- **Example:** `get_valid_squads()` queries ALL squads, filters in memory
+- **Example:** `get_valid_cells()` queries ALL cells, filters in memory
 - **E5 Impact:** Hierarchical queries will compound this issue
 - **Solution:** Add caching layer, denormalized indices
 
 **2. State Update Frequency (HIGH PRIORITY)**
 - **Problem:** High-frequency updates (position, heartbeat) trigger immediate sync
-- **E5 Impact:** 100+ platforms could generate 1000+ sync ops/sec
+- **E5 Impact:** 100+ nodes could generate 1000+ sync ops/sec
 - **Solution:** Update throttling, batching, smarter change detection
 
 **3. Hierarchical Relationship Traversal (HIGH PRIORITY)**
-- **Problem:** Must query platform → squad → platoon relationships separately
+- **Problem:** Must query node → cell → zone relationships separately
 - **E5 Impact:** Multi-hop queries will be slow
 - **Solution:** Denormalized routing table, in-memory cache
 
@@ -249,7 +249,7 @@ pub fn update_position(&mut self, position: (f64, f64, f64)) {
 
 **4. No Batching API**
 - Individual document operations only
-- Creating platoon with 5 squads = 5 separate upserts
+- Creating zone with 5 cells = 5 separate upserts
 - **Solution:** Implement batch operation support
 
 **5. Lock Contention**
@@ -261,7 +261,7 @@ pub fn update_position(&mut self, position: (f64, f64, f64)) {
 
 ✅ **CI Tests:** <2 minutes for 172 tests (excellent)
 ✅ **Leader Election:** <5 seconds convergence (meets E4 success criteria)
-🔶 **Bootstrap:** <60 seconds for 100 platforms (meets E3 criteria, but not measured at scale)
+🔶 **Discovery:** <60 seconds for 100 nodes (meets E3 criteria, but not measured at scale)
 ❌ **Hierarchical queries:** No benchmarks yet (E5 needs this)
 
 ---
@@ -271,7 +271,7 @@ pub fn update_position(&mut self, position: (f64, f64, f64)) {
 ### 6.1 Documented Issues
 
 **From codebase comments:**
-- `squad_store.rs:298`: Removed `test_squad_member_operations` due to Ditto timing issues
+- `cell_store.rs:298`: Removed `test_cell_member_operations` due to Ditto timing issues
   - Documents known limitation: immediate query after upsert may return stale data
   - Not a blocker (Ditto async persistence characteristic)
 
@@ -283,7 +283,7 @@ pub fn update_position(&mut self, position: (f64, f64, f64)) {
 
 **Empty/Stub implementations:**
 - `hierarchy/router.rs` - EMPTY (E5 target)
-- `hierarchy/platoon.rs` - EMPTY (E5 target)
+- `hierarchy/zone.rs` - EMPTY (E5 target)
 - `hierarchy/flow_control.rs` - EMPTY (E5 target)
 - `hierarchy/maintenance.rs` - EMPTY (E5 target)
 - `composition.rs` - Stub (E6 target)
@@ -294,10 +294,10 @@ pub fn update_position(&mut self, position: (f64, f64, f64)) {
 
 ### 6.3 Missing Models
 
-**Platoon Model:**
-- `models/platoon.rs` does not exist
-- SquadState has `platoon_id: Option<String>` field (aware of platoons)
-- **Must be added for E5.2 (Platoon Level Aggregation)**
+**Zone Model:**
+- `models/zone.rs` does not exist
+- SquadState has `zone_id: Option<String>` field (aware of zones)
+- **Must be added for E5.2 (Zone Level Aggregation)**
 
 ---
 
@@ -307,10 +307,10 @@ pub fn update_position(&mut self, position: (f64, f64, f64)) {
 
 **1. Implement Hierarchical Query Optimization (2-3 days)**
 ```rust
-// Add platoon_id to PlatformState for direct queries
+// Add zone_id to PlatformState for direct queries
 pub struct PlatformState {
-    pub squad_id: Option<String>,
-    pub platoon_id: Option<String>,  // NEW
+    pub cell_id: Option<String>,
+    pub zone_id: Option<String>,  // NEW
     // ...
 }
 ```
@@ -318,8 +318,8 @@ pub struct PlatformState {
 **2. Add Caching Layer for Routing Tables (1-2 days)**
 ```rust
 pub struct RoutingCache {
-    platform_to_squad: Arc<RwLock<HashMap<String, String>>>,
-    squad_to_platoon: Arc<RwLock<HashMap<String, String>>>,
+    node_to_cell: Arc<RwLock<HashMap<String, String>>>,
+    cell_to_zone: Arc<RwLock<HashMap<String, String>>>,
     last_refresh: Arc<RwLock<Instant>>,
 }
 ```
@@ -340,16 +340,16 @@ pub struct ThrottledUpdates {
 **Phase 1: E5.1 - Hierarchical Message Router (3-4 days)**
 - Implement `RoutingTable` data structure
 - Implement `HierarchicalRouter` with routing rules
-- Add validation: platforms only message squad peers
-- Add cross-squad message rejection
+- Add validation: nodes only message cell peers
+- Add cross-cell message rejection
 - Tests: routing rules enforcement
 
-**Phase 2: E5.2 - Platoon Level Aggregation (3-4 days)**
-- Create `Platoon` model (`models/platoon.rs`)
+**Phase 2: E5.2 - Zone Level Aggregation (3-4 days)**
+- Create `Zone` model (`models/zone.rs`)
 - Implement `PlatoonCoordinator`
-- Add squad-to-platoon message types
-- Implement platoon capability aggregation
-- Tests: 3-level hierarchy (platform → squad → platoon)
+- Add cell-to-zone message types
+- Implement zone capability aggregation
+- Tests: 3-level hierarchy (node → cell → zone)
 
 **Phase 3: E5.3/E5.4 - Priority & Flow Control (3-5 days)**
 - Extend existing `MessagePriority` enum
@@ -359,7 +359,7 @@ pub struct ThrottledUpdates {
 - Collect metrics (hops, latency, dropped messages)
 
 **Phase 4: E5.5 - Hierarchy Maintenance (3-4 days)**
-- Squad merge/split algorithms
+- Cell merge/split algorithms
 - Dynamic routing table updates
 - Rebalancing logic
 - Disruption minimization during changes
@@ -380,7 +380,7 @@ pub struct ThrottledUpdates {
 **Testing Strategy:**
 - Unit tests: Routing rules, validation logic
 - Integration tests: Multi-level hierarchy, message flow
-- E2E tests: 100 platforms, 20 squads, 4 platoons
+- E2E tests: 100 nodes, 20 cells, 4 platoons
 - Performance tests: Measure O(n log n) message complexity
 
 ---
@@ -394,7 +394,7 @@ pub struct ThrottledUpdates {
 | Query performance at scale | HIGH | HIGH | Implement caching + denormalization before E5 |
 | Routing table convergence issues | MEDIUM | HIGH | Use Ditto CRDT for routing table, extensive testing |
 | Lock contention in hierarchical router | MEDIUM | MEDIUM | Use RwLock for read-heavy data, profile under load |
-| Platoon coordinator single point of failure | LOW | HIGH | Implement leader failover, similar to squad election |
+| Zone coordinator single point of failure | LOW | HIGH | Implement leader failover, similar to cell election |
 | Ditto sync bandwidth exhaustion | MEDIUM | HIGH | Throttle updates, batch operations, monitor bandwidth |
 
 ### 8.2 Architectural Risks
@@ -403,7 +403,7 @@ pub struct ThrottledUpdates {
 |------|-----------|--------|------------|
 | Hierarchical routing conflicts with CRDT semantics | LOW | HIGH | Already addressed: routing table is CRDT, rules are local |
 | Module coupling increases | LOW | MEDIUM | Maintain clear interfaces, hierarchy module wraps others |
-| State model changes break E3/E4 | LOW | MEDIUM | Additive changes only (add platoon_id, don't modify existing) |
+| State model changes break E3/E4 | LOW | MEDIUM | Additive changes only (add zone_id, don't modify existing) |
 
 ### 8.3 Project Risks
 
@@ -425,24 +425,24 @@ pub struct ThrottledUpdates {
 ### 9.1 Current Test Coverage
 
 ✅ **Unit Tests:** 172 tests passing
-✅ **Integration Tests:** Bootstrap, squad formation scenarios
+✅ **Integration Tests:** Discovery, cell formation scenarios
 ✅ **E2E Tests:** 2 E2E tests with observer-based harness
 ✅ **CI/CD:** <2 min execution, parallel test execution enabled
 
 ### 9.2 E5 Testing Needs
 
 **Performance Benchmarks:**
-- [ ] 100 platforms forming 20 squads
-- [ ] 20 squads forming 4 platoons
+- [ ] 100 nodes forming 20 squads
+- [ ] 20 cells forming 4 platoons
 - [ ] Message complexity measurement (target: O(n log n))
 - [ ] Query latency under hierarchical load
 - [ ] Routing table convergence time
 
 **E2E Scenarios:**
-- [ ] 3-level hierarchy message flow (platform → squad → platoon)
-- [ ] Cross-squad message rejection
+- [ ] 3-level hierarchy message flow (node → cell → zone)
+- [ ] Cross-cell message rejection
 - [ ] Leader-only upward routing enforcement
-- [ ] Squad merge/split with routing table updates
+- [ ] Cell merge/split with routing table updates
 - [ ] Network partition with state recovery
 
 **Load Testing:**
@@ -479,7 +479,7 @@ pub struct ThrottledUpdates {
 
 **Prerequisites:**
 1. Complete targeted refactoring (4-7 days):
-   - Add platoon_id to PlatformState
+   - Add zone_id to PlatformState
    - Implement routing table caching
    - Add state update throttling
 2. Create E5 design document (ADR-005)
@@ -489,13 +489,13 @@ pub struct ThrottledUpdates {
 
 ```
 Week 1: Refactoring & Design
-├── Days 1-3: Implement refactoring (caching, throttling, platoon_id)
+├── Days 1-3: Implement refactoring (caching, throttling, zone_id)
 ├── Day 4: Create E5 design document (ADR-005)
 └── Day 5: Set up performance benchmarking framework
 
 Week 2-3: E5.1 & E5.2 Implementation
 ├── Days 1-4: E5.1 Hierarchical Message Router
-├── Days 5-8: E5.2 Platoon Level Aggregation
+├── Days 5-8: E5.2 Zone Level Aggregation
 └── Day 9: Integration testing
 
 Week 4: E5.3-E5.5 Implementation
@@ -510,12 +510,12 @@ Total: 4 weeks (slightly longer than project plan's 2 weeks)
 ### 11.3 Success Criteria for E5
 
 From project plan, validate:
-- ✅ Platforms only message squad peers
-- ✅ Squad leaders message platoon level
-- ✅ Cross-squad messages rejected
+- ✅ Nodes only message cell peers
+- ✅ Cell leaders message zone level
+- ✅ Cross-cell messages rejected
 - ✅ Message complexity is O(n log n)
 - ✅ Routing table converges after membership changes
-- ✅ 100 platforms, 20 squads, 4 platoons coordinate successfully
+- ✅ 100 nodes, 20 cells, 4 zones coordinate successfully
 
 ### 11.4 Next Steps
 
@@ -543,7 +543,7 @@ From project plan, validate:
 The CAP protocol codebase has made excellent progress through E1-E4. The foundation is solid, the architecture is clean, and the CRDT-based state management is correctly implemented.
 
 **E5 (Hierarchical Operations) is achievable with targeted refactoring.** The main work is:
-1. Adding missing components (Platoon model, HierarchicalRouter)
+1. Adding missing components (Zone model, HierarchicalRouter)
 2. Optimizing for scale (caching, throttling, batching)
 3. Extending existing patterns (SquadMessageBus → PlatoonMessageBus)
 
