@@ -128,8 +128,10 @@ pub struct NodeState {
     pub health: HealthStatus,
     /// Current phase
     pub phase: Phase,
-    /// Assigned squad ID (if any)
-    pub squad_id: Option<String>,
+    /// Assigned cell ID (if any)
+    pub cell_id: Option<String>,
+    /// Assigned zone ID (if any) - for hierarchical routing
+    pub zone_id: Option<String>,
     /// Last update timestamp
     pub timestamp: u64,
 }
@@ -142,7 +144,8 @@ impl NodeState {
             fuel_minutes: 120,
             health: HealthStatus::Nominal,
             phase: Phase::Discovery,
-            squad_id: None,
+            cell_id: None,
+            zone_id: None,
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -179,15 +182,27 @@ impl NodeState {
         self.update_timestamp();
     }
 
-    /// Assign to a squad (LWW-Register operation)
-    pub fn assign_squad(&mut self, squad_id: String) {
-        self.squad_id = Some(squad_id);
+    /// Assign to a cell (LWW-Register operation)
+    pub fn assign_cell(&mut self, cell_id: String) {
+        self.cell_id = Some(cell_id);
         self.update_timestamp();
     }
 
-    /// Remove from squad (LWW-Register operation)
-    pub fn leave_squad(&mut self) {
-        self.squad_id = None;
+    /// Remove from cell (LWW-Register operation)
+    pub fn leave_cell(&mut self) {
+        self.cell_id = None;
+        self.update_timestamp();
+    }
+
+    /// Assign to a zone (LWW-Register operation)
+    pub fn assign_zone(&mut self, zone_id: String) {
+        self.zone_id = Some(zone_id);
+        self.update_timestamp();
+    }
+
+    /// Remove from zone (LWW-Register operation)
+    pub fn leave_zone(&mut self) {
+        self.zone_id = None;
         self.update_timestamp();
     }
 
@@ -225,7 +240,8 @@ impl NodeState {
             self.position = other.position;
             self.health = other.health;
             self.phase = other.phase;
-            self.squad_id = other.squad_id.clone();
+            self.cell_id = other.cell_id.clone();
+            self.zone_id = other.zone_id.clone();
             self.fuel_minutes = other.fuel_minutes;
             self.timestamp = other.timestamp;
         }
@@ -313,11 +329,18 @@ mod tests {
         assert_eq!(state.phase, Phase::Cell);
 
         // Cell assignment
-        state.assign_squad("squad_1".to_string());
-        assert_eq!(state.squad_id, Some("squad_1".to_string()));
+        state.assign_cell("cell_1".to_string());
+        assert_eq!(state.cell_id, Some("cell_1".to_string()));
 
-        state.leave_squad();
-        assert_eq!(state.squad_id, None);
+        state.leave_cell();
+        assert_eq!(state.cell_id, None);
+
+        // Zone assignment
+        state.assign_zone("zone_1".to_string());
+        assert_eq!(state.zone_id, Some("zone_1".to_string()));
+
+        state.leave_zone();
+        assert_eq!(state.zone_id, None);
     }
 
     #[test]
