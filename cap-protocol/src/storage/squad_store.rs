@@ -230,9 +230,45 @@ impl SquadStore {
 mod tests {
     use super::*;
     use crate::models::SquadConfig;
+    use crate::storage::ditto_store::DittoConfig;
 
     async fn create_test_store() -> Result<SquadStore> {
-        let ditto_store = DittoStore::from_env()?;
+        // Create unique temp directory for this test to enable parallel execution
+        // Use tempfile::Builder to create temp dir with a unique name
+        let temp_dir = tempfile::Builder::new()
+            .prefix(&format!("ditto_squad_test_{}_", std::process::id()))
+            .tempdir()
+            .map_err(|e| {
+                Error::storage_error(
+                    format!("Failed to create temp dir: {}", e),
+                    "create_test_store",
+                    None,
+                )
+            })?;
+
+        let app_id = std::env::var("DITTO_APP_ID")
+            .map_err(|_| Error::storage_error("DITTO_APP_ID not set", "create_test_store", None))?;
+
+        let shared_key = std::env::var("DITTO_SHARED_KEY").map_err(|_| {
+            Error::storage_error("DITTO_SHARED_KEY not set", "create_test_store", None)
+        })?;
+
+        // Get the path before dropping temp_dir
+        let persistence_path = temp_dir.path().to_path_buf();
+
+        // Don't drop temp_dir - leak it to keep directory alive for test duration
+        // The OS will clean it up eventually
+        std::mem::forget(temp_dir);
+
+        let config = DittoConfig {
+            app_id,
+            persistence_dir: persistence_path,
+            shared_key,
+            tcp_listen_port: None,
+            tcp_connect_address: None,
+        };
+
+        let ditto_store = DittoStore::new(config)?;
         Ok(SquadStore::new(ditto_store))
     }
 
