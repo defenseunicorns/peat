@@ -72,13 +72,16 @@ cap/
 │   │   ├── delta/         # Differential update system
 │   │   ├── network/       # Network simulation layer
 │   │   ├── models/        # Data structures
-│   │   └── storage/       # Ditto CRDT integration
-│   └── Cargo.toml
+│   │   ├── storage/       # Ditto CRDT integration
+│   │   └── testing/       # E2E test harness
+│   ├── tests/             # Integration & E2E tests
+│   └── docs/testing/      # Test documentation
 ├── cap-sim/               # Reference application & simulator
 │   └── src/main.rs
 ├── docs/                  # Architecture & project docs
-│   ├── ADR-001-CAP-Protocol-POC.md
-│   └── CAP-POC-Project-Plan.md
+│   ├── INDEX.md           # Documentation index (start here)
+│   ├── TESTING_STRATEGY.md # Testing philosophy
+│   └── adr/               # Architecture Decision Records
 └── DEVELOPMENT.md         # Development guide
 ```
 
@@ -106,9 +109,31 @@ See [GitHub Issues](https://github.com/kitplummer/cap/issues) for current work i
 
 ## Documentation
 
-- [Architecture Decision Record](docs/ADR-001-CAP-Protocol-POC.md) - Technical architecture and decisions
-- [Project Plan](docs/CAP-POC-Project-Plan.md) - 12-week implementation roadmap
-- [Development Guide](DEVELOPMENT.md) - Setup, workflow, and contribution guidelines
+**📚 [Complete Documentation Index](docs/INDEX.md)** - Navigate all project documentation
+
+### Quick Links
+
+| Document | Purpose |
+|----------|---------|
+| [DEVELOPMENT.md](DEVELOPMENT.md) | Development setup and workflow |
+| [TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md) | Testing philosophy and E2E requirements |
+| [Architecture Decisions](docs/adr/) | ADRs documenting key technical decisions |
+| [Project Plan](docs/CAP-POC-Project-Plan.md) | 12-week implementation roadmap |
+
+### Documentation Structure
+
+```
+docs/
+├── INDEX.md                    # Complete documentation index
+├── TESTING_STRATEGY.md         # Testing philosophy (Unit, Integration, E2E)
+├── adr/                        # Architecture Decision Records
+│   ├── 001-cap-protocol-poc.md
+│   ├── 002-beacon-storage-architecture.md
+│   └── 004-human-machine-squad-composition.md
+└── [Technical Design Docs]     # Architecture explorations & integration notes
+```
+
+**For AI Assistants**: See [CLAUDE.md](CLAUDE.md) for codebase context and guidelines.
 
 ## Key Features (Planned)
 
