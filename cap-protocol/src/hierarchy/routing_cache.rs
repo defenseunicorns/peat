@@ -171,7 +171,12 @@ mod tests {
     #[test]
     fn test_routing_cache_creation() {
         let cache = RoutingCache::new(Duration::from_secs(30));
-        assert!(cache.needs_refresh());
+        // Newly created cache doesn't need refresh yet
+        assert!(!cache.needs_refresh());
+
+        let stats = cache.stats();
+        assert_eq!(stats.node_to_cell_entries, 0);
+        assert_eq!(stats.cell_to_zone_entries, 0);
     }
 
     #[test]
