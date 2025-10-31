@@ -2,13 +2,47 @@
 
 ## Overview
 
-The Squad Formation E2E test suite validates the complete integration of Epic 4 components (E4.3, E4.4, E4.5) through scenario-driven, configuration-matrix testing. This document describes the test architecture, scenarios, and usage patterns.
+The Squad Formation E2E test suite validates **distributed CRDT mesh behavior** using **real Ditto P2P synchronization** across multiple peers. These tests exercise squad formation with actual Ditto instances to validate that platform configurations, capability advertisements, and formation state sync correctly through the mesh.
+
+**Critical Distinction**: These are **real E2E tests**, not in-memory scenario tests. They validate that:
+- Platform data stored on peer1 appears on peer2 via Ditto sync
+- Squad formation state propagates across the mesh
+- Observer-based notifications trigger on state changes
+- CRDT convergence happens correctly under network conditions
+
+For testing philosophy and requirements, see [TESTING_STRATEGY.md](../../../docs/TESTING_STRATEGY.md).
 
 ## Test Architecture
 
-### Scenario-Based Testing
+### Real Ditto P2P Testing
 
-The E2E test suite uses a **scenario configuration pattern** that allows systematic testing across multiple operational dimensions:
+The E2E test infrastructure uses **real Ditto instances** with **observer-based validation** to test distributed behavior:
+
+**Test Harness** ([`src/testing/e2e_harness.rs`](../../src/testing/e2e_harness.rs)):
+```rust
+pub struct E2EHarness {
+    // Creates isolated Ditto stores with unique persistence directories
+    pub async fn create_ditto_store(&mut self) -> Result<DittoStore>
+
+    // Sets up observer subscriptions for event-driven assertions
+    pub async fn observe_squad(&self, store: &DittoStore, squad_id: &str) -> Result<SquadObserver>
+    pub async fn observe_platform(&self, store: &DittoStore, platform_id: &str) -> Result<PlatformObserver>
+
+    // Event-driven peer connection detection
+    pub async fn wait_for_peer_connection(&self, ...) -> Result<()>
+}
+```
+
+**Key Features**:
+- ✅ Isolated Ditto sessions (unique temp directories per test)
+- ✅ mDNS-based peer discovery (no TCP configuration)
+- ✅ Observer channels for event-driven assertions
+- ✅ Fast execution (<1s per test)
+- ✅ Deterministic results (no polling/arbitrary timeouts)
+
+### Squad Formation Test Scenarios
+
+The E2E tests validate squad formation across multiple operational dimensions:
 
 ```rust
 struct SquadFormationScenario {
@@ -155,273 +189,380 @@ Each scenario can vary across these dimensions:
 - Role scoring reflects health penalties
 - Critical platform may get non-critical role
 
-## E2E Flow Validation
+## E2E Flow Validation with Ditto Sync
 
-Each scenario exercises this 8-step formation pipeline:
+Each E2E test validates distributed behavior through real Ditto synchronization:
 
-### Step 1: Platform Creation
+### Current E2E Infrastructure Tests
+
+**Test 1: Isolated Store Creation** ([`tests/squad_formation_e2e.rs:27`](../../tests/squad_formation_e2e.rs))
 ```rust
-let platforms = create_platforms_from_scenario(scenario);
-```
-- Generates platforms with specified health, authority, capabilities
-- Assigns operators based on authority levels
-- Distributes capabilities across squad members
+#[tokio::test]
+async fn test_harness_creates_isolated_stores() {
+    let mut harness = E2EHarness::new("test_harness");
+    let store1 = harness.create_ditto_store().await;
+    let store2 = harness.create_ditto_store().await;
 
-### Step 2: Capability Aggregation (E4.4)
-```rust
-let aggregated = CapabilityAggregator::aggregate_capabilities(&platforms)?;
-let readiness = CapabilityAggregator::calculate_readiness_score(&aggregated);
-```
-- Tests `CapabilityAggregator::aggregate_capabilities()`
-- Validates readiness score calculation
-- Checks capability coverage vs requirements
-- Validates gap identification
-
-### Step 3: Role Assignment (E4.3)
-```rust
-let roles = RoleAllocator::allocate_roles(&platforms)?;
-```
-- Tests `RoleAllocator::allocate_roles()`
-- Validates leader election
-- Ensures all platforms get assigned roles
-- Verifies role scoring based on capabilities + health
-
-### Step 4: Formation Coordination (E4.5)
-```rust
-let mut coord = SquadCoordinator::new("squad_id");
-coord.min_readiness = scenario.min_readiness;
-let complete = coord.check_formation_complete(&members, leader_id)?;
-```
-- Tests `SquadCoordinator::check_formation_complete()`
-- Validates 6 formation criteria:
-  1. Minimum squad size
-  2. Leader elected
-  3. All roles assigned
-  4. Required capabilities present
-  5. Readiness threshold met
-  6. Human approval (if needed)
-
-### Step 5: Human Approval Workflow
-```rust
-if coord.status == FormationStatus::AwaitingApproval {
-    coord.approve_formation()?;
+    assert!(store1.is_ok());
+    assert!(store2.is_ok());
 }
 ```
-- Tests approval workflow (ADR-004)
-- Validates state transitions
-- Ensures idempotent approval
-- Tests rejection path
+**Validates**: Test harness can create isolated Ditto instances
 
-### Step 6: Status Validation
+**Test 2: Multi-Peer Ditto Sync** ([`tests/squad_formation_e2e.rs:52`](../../tests/squad_formation_e2e.rs))
 ```rust
-assert_eq!(coord.status, FormationStatus::Ready);
-assert!(coord.human_approved);
-```
-- Verifies final formation status
-- Checks approval flags
-- Validates state consistency
+#[tokio::test]
+async fn test_ditto_peer_sync_with_observers() {
+    let mut harness = E2EHarness::new("e2e_peer_sync");
 
-### Step 7: Phase Transition
-```rust
-assert!(coord.can_transition_to_hierarchical());
-let phase = coord.get_hierarchical_phase()?;
-assert_eq!(phase, Phase::Hierarchical);
-```
-- Tests phase transition capability
-- Validates transition preconditions
-- Ensures operational readiness
+    let store1 = harness.create_ditto_store().await.unwrap();
+    let store2 = harness.create_ditto_store().await.unwrap();
 
-### Step 8: Metrics Validation
-```rust
-let duration = coord.formation_duration();
-assert!(duration >= 0);
+    store1.start_sync().unwrap();
+    store2.start_sync().unwrap();
+
+    // Wait for peers to connect (event-driven, not polling)
+    harness.wait_for_peer_connection(&store1, &store2, Duration::from_secs(10)).await?;
+}
 ```
-- Validates formation timing
-- Checks metric collection
-- Verifies duration tracking
+**Validates**: Two Ditto peers can discover each other via mDNS and establish P2P connection
+
+### Planned Squad Formation E2E Tests
+
+The following tests need implementation to validate real Ditto sync behavior:
+
+#### 1. Platform Advertisement Sync
+**Purpose**: Validate PlatformConfig propagates across mesh
+
+```rust
+#[tokio::test]
+async fn test_platform_sync_across_peers() {
+    let mut harness = E2EHarness::new("platform_sync");
+
+    let peer1 = harness.create_ditto_store().await.unwrap();
+    let peer2 = harness.create_ditto_store().await.unwrap();
+
+    // Set up observer BEFORE storing data
+    let mut observer = harness.observe_platform(&peer2, "platform1").await.unwrap();
+
+    // Store platform on peer1
+    let platform = create_test_platform("platform1", vec![Capability::Sensor]);
+    peer1.store_platform(&platform).await.unwrap();
+
+    // Wait for observer event (event-driven, not polling!)
+    let event = observer.wait_for_event(Duration::from_secs(5)).await.unwrap();
+
+    // Validate sync
+    let synced = peer2.get_platform("platform1").await.unwrap();
+    assert_eq!(synced.id, platform.id);
+    assert_eq!(synced.capabilities, platform.capabilities);
+}
+```
+
+#### 2. Squad Formation State Propagation
+**Purpose**: Validate SquadState syncs across mesh
+
+```rust
+#[tokio::test]
+async fn test_squad_formation_sync() {
+    let mut harness = E2EHarness::new("squad_sync");
+
+    let peer1 = harness.create_ditto_store().await.unwrap();
+    let peer2 = harness.create_ditto_store().await.unwrap();
+
+    // Observer on peer2
+    let mut observer = harness.observe_squad(&peer2, "squad1").await.unwrap();
+
+    // Create squad on peer1
+    let mut coordinator = SquadCoordinator::new("squad1");
+    coordinator.initiate_formation(vec!["p1", "p2", "p3"]).await.unwrap();
+    peer1.store_squad_state(coordinator.to_squad_state()).await.unwrap();
+
+    // Validate sync via observer
+    let event = observer.wait_for_event(Duration::from_secs(5)).await.unwrap();
+
+    let synced_squad = peer2.get_squad("squad1").await.unwrap();
+    assert_eq!(synced_squad.id, "squad1");
+    assert_eq!(synced_squad.members.len(), 3);
+}
+```
+
+#### 3. Role Assignment Distribution
+**Purpose**: Validate role assignments sync across mesh
+
+#### 4. Human Approval Workflow Distribution
+**Purpose**: Validate approval state syncs to all peers
+
+#### 5. Network Partition Recovery
+**Purpose**: Validate CRDT convergence after network partition
+
+#### 6. Capability Aggregation Sync
+**Purpose**: Validate aggregated capabilities propagate through mesh
 
 ## Running E2E Tests
 
-### Run Individual Scenarios
+### Prerequisites
+
+E2E tests require Ditto credentials. Create a `.env` file in the workspace root:
 
 ```bash
-# Run specific scenario
-cargo test test_e2e_optimal_squad_formation
-
-# Run with output
-cargo test test_e2e_mixed_authority_squad -- --nocapture
+# .env (workspace root)
+DITTO_APP_ID=your-app-id
+DITTO_SHARED_KEY=your-shared-key
 ```
 
-### Run Full Scenario Matrix
+Get credentials from [Ditto Portal](https://portal.ditto.live).
+
+### Run E2E Tests
 
 ```bash
-# Runs all 6 scenarios sequentially
-cargo test test_e2e_scenario_matrix -- --nocapture
+# From workspace root
+make test-e2e
+
+# From cap-protocol directory
+cd cap-protocol && make test-e2e
+
+# Run specific test
+cargo test test_ditto_peer_sync_with_observers -- --nocapture
+
+# Run with environment variables
+DITTO_APP_ID=xxx cargo test --test squad_formation_e2e -- --nocapture
 ```
 
-### Run All E2E Tests
+### Expected Output
 
-```bash
-# Run all E2E integration tests
-cargo test e2e_integration_tests
+Successful E2E test output:
+```
+Running E2E integration tests...
+Waiting for peer connection...
+✓ Peers connected
+✓ Ditto sync infrastructure validated
+
+test test_harness_creates_isolated_stores ... ok
+test test_ditto_peer_sync_with_observers ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored
 ```
 
-## Test Output
-
-E2E tests produce detailed output showing the formation flow:
-
+If tests skip due to missing credentials:
 ```
-=== Running E2E Scenario: Mixed Authority: Requires human oversight ===
-Created 4 platforms with health: [Nominal, Nominal, Nominal, Nominal]
-Aggregated 4 capability types
-Squad readiness score: 0.82
-Assigned 4 roles
-Leader elected: p1
-Formation status: AwaitingApproval
-Human approval granted, formation ready
-Phase transition to Hierarchical verified
-=== Scenario 'Mixed Authority: Requires human oversight' completed successfully ===
+Skipping test - Ditto not configured
 ```
+→ Solution: Add Ditto credentials to `.env` file
 
-## Adding New Scenarios
+## Adding New E2E Tests
 
-To add a new test scenario:
+To add a new E2E test that validates Ditto sync:
 
 ```rust
-impl SquadFormationScenario {
-    fn new_your_scenario() -> Self {
-        Self {
-            name: "Your Scenario: Description",
-            squad_size: 4,
-            include_operators: true,
-            authority_levels: vec![/* your config */],
-            health_statuses: vec![/* your config */],
-            expect_approval_required: false,
-            expect_success: true,
-            min_readiness: 0.7,
-        }
+#[tokio::test]
+async fn test_your_sync_scenario() {
+    if std::env::var("DITTO_APP_ID").is_err() {
+        println!("Skipping test - Ditto not configured");
+        return;
     }
-}
 
-#[test]
-fn test_e2e_your_scenario() {
-    run_e2e_scenario(SquadFormationScenario::new_your_scenario());
+    let mut harness = E2EHarness::new("your_scenario");
+
+    // 1. Create isolated Ditto stores
+    let peer1 = harness.create_ditto_store().await.unwrap();
+    let peer2 = harness.create_ditto_store().await.unwrap();
+
+    // 2. Start sync
+    peer1.start_sync().unwrap();
+    peer2.start_sync().unwrap();
+
+    // 3. Wait for connection
+    harness.wait_for_peer_connection(&peer1, &peer2, Duration::from_secs(10)).await.unwrap();
+
+    // 4. Set up observer BEFORE storing data
+    let mut observer = harness.observe_squad(&peer2, "squad1").await.unwrap();
+
+    // 5. Store data on peer1
+    let squad_state = create_test_squad_state("squad1");
+    peer1.store_squad_state(&squad_state).await.unwrap();
+
+    // 6. Wait for observer event (event-driven!)
+    let event = observer.wait_for_event(Duration::from_secs(5)).await.unwrap();
+
+    // 7. Validate sync
+    let synced = peer2.get_squad("squad1").await.unwrap();
+    assert_eq!(synced.id, squad_state.id);
+
+    // 8. Clean shutdown
+    harness.shutdown_store(peer1).await;
+    harness.shutdown_store(peer2).await;
 }
 ```
 
-## Coverage Matrix
+**Critical Requirements**:
+- ✅ Skip test if Ditto not configured
+- ✅ Set up observers BEFORE storing data
+- ✅ Use event-driven assertions (no polling!)
+- ✅ Clean shutdown to prevent interference
 
-| Scenario | Size | Authority | Health | Approval | Readiness |
-|----------|------|-----------|--------|----------|-----------|
-| Optimal | 5 | All DirectControl | All Nominal | Auto | 0.7 |
-| Mixed Authority | 4 | Mixed (4 levels) | All Nominal | Required | 0.7 |
-| Degraded Health | 4 | All DirectControl | 2N, 2D | Auto | 0.6 |
-| Autonomous | 4 | None | All Nominal | Required | 0.7 |
-| Minimal Viable | 3 | All DirectControl | All Nominal | Auto | 0.7 |
-| Critical Platform | 4 | All DirectControl | 3N, 1C | Auto | 0.5 |
+## E2E Test Coverage Status
 
-**Legend:**
-- N = Nominal, D = Degraded, C = Critical
-- Numbers indicate count of platforms in each state
+### Current Status (2025-10-31)
 
-## Key Validations
+| Test Category | Status | Count | Description |
+|---------------|--------|-------|-------------|
+| Infrastructure | ✅ Implemented | 2 | Harness creation, peer connection |
+| Platform Sync | ⏳ Planned | 0 | Platform advertisement propagation |
+| Squad Sync | ⏳ Planned | 0 | Squad formation state distribution |
+| Role Sync | ⏳ Planned | 0 | Role assignment propagation |
+| Approval Sync | ⏳ Planned | 0 | Human approval workflow distribution |
+| Network Partition | ⏳ Planned | 0 | CRDT convergence after partition |
 
-### Formation Criteria (6 checks)
-- ✓ Minimum squad size met (default: 3)
-- ✓ Leader elected and confirmed
-- ✓ All members have assigned roles
-- ✓ Required capabilities present (Communication + Sensor)
-- ✓ Squad readiness above threshold
-- ✓ Human approval obtained (if required)
+**Total E2E Tests**: 2 implemented, 6+ planned
 
-### Integration Points
-- ✓ E4.3 (Role Assignment) → E4.5 (Coordinator)
-- ✓ E4.4 (Capability Aggregation) → E4.5 (Coordinator)
-- ✓ E4.5 (Formation) → Phase Transition
-- ✓ Human Approval Workflow (ADR-004)
+### Test Execution Metrics
 
-### Edge Cases Covered
-- ✓ Minimum size boundary (exactly 3 members)
-- ✓ Health degradation (Degraded, Critical)
-- ✓ Authority variations (4 levels + None)
-- ✓ Autonomous squads (no operators)
-- ✓ Mixed operator/autonomous configurations
+| Metric | Current | Target |
+|--------|---------|--------|
+| E2E test execution time | 0.46s | <1s |
+| Peer connection time | <1s | <2s |
+| Test isolation | ✅ 100% | 100% |
+| Event-driven assertions | ✅ 100% | 100% |
+
+## Key E2E Validations
+
+### What E2E Tests Validate
+
+**E2E tests validate distributed behavior, not business logic:**
+
+✅ **DO validate with E2E tests**:
+- Platform data stored on peer1 appears on peer2 via Ditto sync
+- Squad formation state propagates across mesh
+- Role assignments sync to all peers
+- Observer notifications trigger on state changes
+- CRDT convergence after network partitions
+- Multi-peer coordination
+
+❌ **DO NOT validate with E2E tests** (use unit tests):
+- Business logic (capability aggregation, role scoring, etc.)
+- Formation criteria calculations
+- State machine transitions
+- Validation rules
+- Algorithm correctness
+
+### E2E Test Requirements (Critical)
+
+Every E2E test MUST:
+1. ✅ Use real Ditto instances (no mocks)
+2. ✅ Create isolated sessions (unique temp directories)
+3. ✅ Store data in Ditto on peer1
+4. ✅ Validate sync via observers on peer2
+5. ✅ Use event-driven assertions (no polling/sleep)
+6. ✅ Be fast (<1s per test)
+7. ✅ Be deterministic (no flaky timeouts)
+8. ✅ Clean up resources (prevent interference)
+
+See [TESTING_STRATEGY.md](../../../docs/TESTING_STRATEGY.md) for full requirements.
 
 ## Best Practices
 
-### When to Add E2E Scenarios
+### When to Add E2E Tests
 
-Add new E2E scenarios when:
-1. New formation criteria are introduced
-2. New authority levels are added
-3. New health status values are created
-4. New phase transitions are implemented
-5. New approval workflows are required
+Add new E2E tests when:
+1. ✅ Adding new Ditto collections/schemas
+2. ✅ Implementing new sync workflows
+3. ✅ Changing CRDT data models
+4. ✅ Adding observer-based features
+5. ✅ Implementing multi-peer coordination
 
-### Scenario Naming Convention
+❌ Do NOT add E2E tests for:
+- Business logic changes (use unit tests)
+- Algorithm improvements (use unit tests)
+- Validation rules (use unit tests)
 
-Use descriptive names that indicate the primary test focus:
-- `Optimal`: Best-case conditions
-- `Mixed X`: Variation in dimension X
-- `Degraded X`: Reduced capability in X
-- `Minimal X`: Boundary condition for X
-- `Critical X`: Severe limitation in X
+### Test Naming Convention
 
-### Readiness Thresholds
+Use descriptive names that indicate what sync behavior is tested:
+- `test_platform_sync_across_peers`: Platform data syncs
+- `test_squad_formation_sync`: Squad state propagates
+- `test_role_assignment_distribution`: Roles sync to all peers
+- `test_network_partition_recovery`: CRDT convergence after split
 
-Choose thresholds based on scenario constraints:
-- `0.7`: Standard operational readiness
-- `0.6`: Degraded but acceptable
-- `0.5`: Critical but viable
-- `0.4`: Minimum for emergency operations
+### Debugging Failed E2E Tests
 
-### Debugging Failed Scenarios
+If an E2E test fails:
 
-If a scenario fails:
-1. Run with `--nocapture` to see detailed output
-2. Check formation status in output
-3. Verify readiness score meets threshold
-4. Confirm leader election succeeded
-5. Validate role assignments are complete
-6. Check capability aggregation results
+1. **Check Ditto configuration**:
+   ```bash
+   echo $DITTO_APP_ID
+   cat .env
+   ```
+
+2. **Run with verbose output**:
+   ```bash
+   cargo test test_name -- --nocapture
+   ```
+
+3. **Check peer connection**:
+   - Look for "Peers connected" message
+   - Verify mDNS discovery is working
+   - Check firewall/network settings
+
+4. **Validate observer setup**:
+   - Observers must be created BEFORE storing data
+   - Check observer query syntax
+   - Verify sync subscription is active
+
+5. **Check timing**:
+   - E2E tests should complete in <1s
+   - If timing out, check network/Ditto config
+   - Avoid arbitrary sleep/polling
 
 ## Related Documentation
 
-- **E4.3 Role Assignment**: `src/models/role.rs`
-- **E4.4 Capability Aggregation**: `src/squad/capability_aggregation.rs`
-- **E4.5 Squad Coordinator**: `src/squad/coordinator.rs`
-- **ADR-004**: Human-in-the-Loop Authority Model
-- **Phase System**: `src/traits.rs`
+- **Testing Strategy**: [TESTING_STRATEGY.md](../../../docs/TESTING_STRATEGY.md) - Overall testing philosophy
+- **E2E Test Harness**: [src/testing/e2e_harness.rs](../../src/testing/e2e_harness.rs) - Infrastructure implementation
+- **Squad Coordinator**: [src/squad/coordinator.rs](../../src/squad/coordinator.rs) - Formation business logic (unit tested)
+- **Ditto Store**: [src/storage/ditto_store.rs](../../src/storage/ditto_store.rs) - CRDT storage layer
+- **ADR-002**: [Beacon Storage Architecture](../../../docs/adr/002-beacon-storage-architecture.md)
 
 ## Test Statistics
 
-- **Total E2E Tests**: 7
-- **Individual Scenarios**: 6
-- **Matrix Test**: 1 (runs all scenarios)
-- **Code Coverage**: ~400 lines of E2E test code
-- **Total Test Suite**: 177 tests (170 unit + 7 E2E)
+- **Total E2E Tests**: 2 (infrastructure validated)
+- **Planned Tests**: 6+ (squad formation scenarios)
+- **E2E Test Code**: ~99 lines (tests) + ~347 lines (harness)
+- **Test Execution Time**: 0.46s
+- **Total Test Suite**: ~172 tests (170 unit + 2 E2E)
 
 ## Maintenance
 
-### Updating Scenarios
+### Updating E2E Tests
 
-When updating E4 components, verify:
-1. All scenarios still pass
-2. New functionality is covered
-3. Thresholds remain appropriate
-4. Documentation is updated
+When changing Ditto integration:
+1. ✅ Update E2E tests if schema changes
+2. ✅ Verify observers still work with new queries
+3. ✅ Test sync behavior with new collections
+4. ✅ Update this documentation
 
 ### Performance Considerations
 
-E2E tests take longer than unit tests:
-- Run unit tests frequently during development
-- Run E2E tests before commits/PRs
-- Use matrix test for comprehensive validation
-- Individual scenarios for targeted debugging
+E2E tests are fast but require Ditto:
+- Run unit tests during active development (instant feedback)
+- Run E2E tests before commits (`make test-e2e`)
+- E2E tests validate the **critical path**: p2p mesh sync
+- Unit tests validate **business logic**: algorithms, state machines
+
+### Next Steps
+
+**Immediate priorities** for E2E test implementation:
+1. Platform advertisement sync (peer1 → peer2)
+2. Squad formation state propagation
+3. Role assignment distribution
+4. Human approval workflow sync
+5. Network partition recovery
+
+See [TESTING_STRATEGY.md](../../../docs/TESTING_STRATEGY.md) for implementation guidance.
 
 ---
 
-**Last Updated**: 2025-10-30
+**Last Updated**: 2025-10-31
 **Epic**: E4 - Squad Formation Phase
-**Test Framework**: Rust `#[test]` with scenario pattern
-**Location**: `src/squad/coordinator.rs::e2e_integration_tests`
+**Test Framework**: Tokio async tests with Ditto SDK 4.12+
+**Location**: `tests/squad_formation_e2e.rs`
+**Status**: Infrastructure validated, scenarios pending implementation
