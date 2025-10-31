@@ -56,7 +56,7 @@ impl E2EHarness {
     pub async fn create_ditto_store(&mut self) -> Result<DittoStore> {
         let temp_dir = tempfile::tempdir().map_err(|e| {
             Error::storage_error(
-                &format!("Failed to create temp dir: {}", e),
+                format!("Failed to create temp dir: {}", e),
                 "test_setup",
                 None,
             )
@@ -96,7 +96,7 @@ impl E2EHarness {
             .register_subscription_v2(&query)
             .map_err(|e| {
                 Error::storage_error(
-                    &format!("Failed to create sync subscription: {}", e),
+                    format!("Failed to create sync subscription: {}", e),
                     "observe_squad",
                     None,
                 )
@@ -116,7 +116,7 @@ impl E2EHarness {
             })
             .map_err(|e| {
                 Error::storage_error(
-                    &format!("Failed to register observer: {}", e),
+                    format!("Failed to register observer: {}", e),
                     "observe_squad",
                     None,
                 )
@@ -144,7 +144,7 @@ impl E2EHarness {
             .register_subscription_v2(&query)
             .map_err(|e| {
                 Error::storage_error(
-                    &format!("Failed to create sync subscription: {}", e),
+                    format!("Failed to create sync subscription: {}", e),
                     "observe_platform",
                     None,
                 )
@@ -159,7 +159,7 @@ impl E2EHarness {
             })
             .map_err(|e| {
                 Error::storage_error(
-                    &format!("Failed to register observer: {}", e),
+                    format!("Failed to register observer: {}", e),
                     "observe_platform",
                     None,
                 )
@@ -185,7 +185,7 @@ impl E2EHarness {
         let result = timeout(timeout_duration, async {
             loop {
                 let graph = store1.ditto().presence().graph();
-                if graph.remote_peers.len() > 0 {
+                if !graph.remote_peers.is_empty() {
                     info!("Peers connected: {} remote peers", graph.remote_peers.len());
                     return Ok(());
                 }
@@ -308,31 +308,33 @@ mod tests {
         assert_eq!(harness.temp_dirs.len(), 0);
     }
 
+    /// Test harness creation (requires Ditto credentials)
     #[tokio::test]
     async fn test_ditto_store_creation() {
-        let mut harness = E2EHarness::new("test_store_creation");
-
-        // Skip if Ditto not configured
-        if std::env::var("DITTO_APP_ID").is_err() {
-            println!("Skipping test - Ditto not configured");
+        // Skip if Ditto not configured (check if var exists AND has non-empty value)
+        let ditto_app_id = std::env::var("DITTO_APP_ID").unwrap_or_default();
+        if ditto_app_id.is_empty() {
+            eprintln!("Skipping test_ditto_store_creation - DITTO_APP_ID not configured");
             return;
         }
 
+        let mut harness = E2EHarness::new("test_store_creation");
         let store = harness.create_ditto_store().await;
         assert!(store.is_ok(), "Should create Ditto store");
         assert_eq!(harness.temp_dirs.len(), 1);
     }
 
+    /// Test multiple isolated stores (requires Ditto credentials)
     #[tokio::test]
     async fn test_multiple_isolated_stores() {
-        let mut harness = E2EHarness::new("test_isolated_stores");
-
-        // Skip if Ditto not configured
-        if std::env::var("DITTO_APP_ID").is_err() {
-            println!("Skipping test - Ditto not configured");
+        // Skip if Ditto not configured (check if var exists AND has non-empty value)
+        let ditto_app_id = std::env::var("DITTO_APP_ID").unwrap_or_default();
+        if ditto_app_id.is_empty() {
+            eprintln!("Skipping test_multiple_isolated_stores - DITTO_APP_ID not configured");
             return;
         }
 
+        let mut harness = E2EHarness::new("test_isolated_stores");
         let store1 = harness.create_ditto_store().await;
         let store2 = harness.create_ditto_store().await;
 

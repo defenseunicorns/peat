@@ -26,8 +26,9 @@ use std::time::Duration;
 /// Test: Verify E2E test harness creates isolated Ditto stores
 #[tokio::test]
 async fn test_harness_creates_isolated_stores() {
-    if std::env::var("DITTO_APP_ID").is_err() {
-        println!("Skipping test - Ditto not configured");
+    let ditto_app_id = std::env::var("DITTO_APP_ID").unwrap_or_default();
+    if ditto_app_id.is_empty() {
+        eprintln!("Skipping test - DITTO_APP_ID not configured");
         return;
     }
 
@@ -50,8 +51,9 @@ async fn test_harness_creates_isolated_stores() {
 /// - Sync happens deterministically
 #[tokio::test]
 async fn test_ditto_peer_sync_with_observers() {
-    if std::env::var("DITTO_APP_ID").is_err() {
-        println!("Skipping test - Ditto not configured");
+    let ditto_app_id = std::env::var("DITTO_APP_ID").unwrap_or_default();
+    if ditto_app_id.is_empty() {
+        eprintln!("Skipping test - DITTO_APP_ID not configured");
         return;
     }
 
