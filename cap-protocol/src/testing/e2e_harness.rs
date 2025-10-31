@@ -311,12 +311,10 @@ mod tests {
     /// Test harness creation (requires Ditto credentials)
     #[tokio::test]
     async fn test_ditto_store_creation() {
-        // Skip if Ditto not configured (check if var exists AND has non-empty value)
-        let ditto_app_id = std::env::var("DITTO_APP_ID").unwrap_or_default();
-        if ditto_app_id.is_empty() {
-            eprintln!("Skipping test_ditto_store_creation - DITTO_APP_ID not configured");
-            return;
-        }
+        // Fail if Ditto credentials not properly configured
+        let ditto_app_id =
+            std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
+        assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
 
         let mut harness = E2EHarness::new("test_store_creation");
         let store = harness.create_ditto_store().await;
@@ -327,12 +325,10 @@ mod tests {
     /// Test multiple isolated stores (requires Ditto credentials)
     #[tokio::test]
     async fn test_multiple_isolated_stores() {
-        // Skip if Ditto not configured (check if var exists AND has non-empty value)
-        let ditto_app_id = std::env::var("DITTO_APP_ID").unwrap_or_default();
-        if ditto_app_id.is_empty() {
-            eprintln!("Skipping test_multiple_isolated_stores - DITTO_APP_ID not configured");
-            return;
-        }
+        // Fail if Ditto credentials not properly configured
+        let ditto_app_id =
+            std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
+        assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
 
         let mut harness = E2EHarness::new("test_isolated_stores");
         let store1 = harness.create_ditto_store().await;
