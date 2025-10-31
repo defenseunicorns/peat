@@ -11,4 +11,5 @@ pub mod messaging;
 
 // Re-exports
 pub use capability_aggregation::{AggregatedCapability, CapabilityAggregator};
+pub use coordinator::{FormationStatus, SquadCoordinator};
 pub use election_policy::{ElectionContext, ElectionPolicyConfig, LeadershipPolicy};

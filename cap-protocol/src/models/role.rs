@@ -47,7 +47,9 @@ impl SquadRole {
             Self::Compute => "Compute node - processes sensor data and runs analysis algorithms",
             Self::Relay => "Communications relay - extends network range and connectivity",
             Self::Strike => "Strike platform - engages targets with weapons systems",
-            Self::Support => "Support platform - provides logistics, medical, or maintenance support",
+            Self::Support => {
+                "Support platform - provides logistics, medical, or maintenance support"
+            }
             Self::Follower => "General squad member - performs assigned tasks",
         }
     }
@@ -84,7 +86,7 @@ impl SquadRole {
             Self::Leader => vec!["11B", "11C", "19D"], // Infantry, Indirect Fire, Cavalry Scout
             Self::Sensor => vec!["19D", "35M", "35N"], // Cavalry Scout, Human Intel, Signals Intel
             Self::Compute => vec!["35F", "35N", "17C"], // Intel Analyst, Signals Intel, Cyber
-            Self::Relay => vec!["25U", "25B", "25Q"],  // Signal Support, IT Specialist, Multichannel
+            Self::Relay => vec!["25U", "25B", "25Q"], // Signal Support, IT Specialist, Multichannel
             Self::Strike => vec!["11B", "11C", "19K"], // Infantry, Indirect Fire, Armor
             Self::Support => vec!["68W", "88M", "91B"], // Medic, Transport, Mechanic
             Self::Follower => vec![],
@@ -298,9 +300,13 @@ impl RoleScorer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{AuthorityLevel, BindingType, Capability, HumanMachinePair, OperatorRank, PlatformConfig};
+    use crate::models::{
+        AuthorityLevel, BindingType, Capability, HumanMachinePair, OperatorRank, PlatformConfig,
+    };
 
-    fn create_test_platform_with_capabilities(caps: Vec<Capability>) -> (PlatformConfig, PlatformState) {
+    fn create_test_platform_with_capabilities(
+        caps: Vec<Capability>,
+    ) -> (PlatformConfig, PlatformState) {
         let mut config = PlatformConfig::new("test_platform".to_string());
         for cap in caps {
             config.add_capability(cap);
@@ -391,12 +397,13 @@ mod tests {
             RoleScorer::score_platform_for_role(&config, &state, SquadRole::Sensor).unwrap();
 
         // Create platform without operator for comparison
-        let (config_no_op, state_no_op) = create_test_platform_with_capabilities(vec![Capability::new(
-            "camera_2".to_string(),
-            "Camera".to_string(),
-            CapabilityType::Sensor,
-            0.8,
-        )]);
+        let (config_no_op, state_no_op) =
+            create_test_platform_with_capabilities(vec![Capability::new(
+                "camera_2".to_string(),
+                "Camera".to_string(),
+                CapabilityType::Sensor,
+                0.8,
+            )]);
 
         let score_without_operator =
             RoleScorer::score_platform_for_role(&config_no_op, &state_no_op, SquadRole::Sensor)
@@ -496,12 +503,8 @@ mod tests {
 
     #[test]
     fn test_role_assignment_creation() {
-        let assignment = RoleAssignment::new(
-            "platform_1".to_string(),
-            SquadRole::Sensor,
-            0.85,
-            true,
-        );
+        let assignment =
+            RoleAssignment::new("platform_1".to_string(), SquadRole::Sensor, 0.85, true);
 
         assert_eq!(assignment.platform_id, "platform_1");
         assert_eq!(assignment.role, SquadRole::Sensor);
@@ -528,23 +531,21 @@ mod tests {
     #[test]
     fn test_degraded_platform_role_scoring() {
         // Edge case: Degraded platform should have lower score than nominal
-        let (config_nominal, state_nominal) = create_test_platform_with_capabilities(vec![
-            Capability::new(
+        let (config_nominal, state_nominal) =
+            create_test_platform_with_capabilities(vec![Capability::new(
                 "sensor_1".to_string(),
                 "Sensor".to_string(),
                 CapabilityType::Sensor,
                 0.9,
-            ),
-        ]);
+            )]);
 
-        let (config_degraded, mut state_degraded) = create_test_platform_with_capabilities(vec![
-            Capability::new(
+        let (config_degraded, mut state_degraded) =
+            create_test_platform_with_capabilities(vec![Capability::new(
                 "sensor_2".to_string(),
                 "Sensor".to_string(),
                 CapabilityType::Sensor,
                 0.9,
-            ),
-        ]);
+            )]);
         state_degraded.health = crate::models::HealthStatus::Degraded;
 
         let score_nominal =
