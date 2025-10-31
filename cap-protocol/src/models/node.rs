@@ -1,4 +1,4 @@
-//! Platform state data structures
+//! Node state data structures
 //!
 //! This module defines platform data models with CRDT operations:
 //! - Static capabilities: G-Set (grow-only set) - capabilities can only be added
@@ -10,12 +10,12 @@ use crate::traits::Phase;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-/// Platform static configuration (immutable)
+/// Node static configuration (immutable)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlatformConfig {
+pub struct NodeConfig {
     /// Unique platform identifier
     pub id: String,
-    /// Platform type (UAV, UGV, etc.)
+    /// Node type (UAV, UGV, etc.)
     pub platform_type: String,
     /// Static capabilities
     pub capabilities: Vec<Capability>,
@@ -27,8 +27,8 @@ pub struct PlatformConfig {
     pub operator_binding: Option<HumanMachinePair>,
 }
 
-impl PlatformConfig {
-    /// Create a new platform configuration (autonomous, no operator)
+impl NodeConfig {
+    /// Create a new node configuration (autonomous, no operator)
     pub fn new(platform_type: String) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
@@ -117,9 +117,9 @@ impl PlatformConfig {
     }
 }
 
-/// Platform dynamic state (mutable)
+/// Node dynamic state (mutable)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlatformState {
+pub struct NodeState {
     /// Current position (lat, lon, alt in degrees/meters)
     pub position: (f64, f64, f64),
     /// Fuel remaining in minutes
@@ -134,14 +134,14 @@ pub struct PlatformState {
     pub timestamp: u64,
 }
 
-impl PlatformState {
-    /// Create a new platform state at a given position
+impl NodeState {
+    /// Create a new node state at a given position
     pub fn new(position: (f64, f64, f64)) -> Self {
         Self {
             position,
             fuel_minutes: 120,
             health: HealthStatus::Nominal,
-            phase: Phase::Bootstrap,
+            phase: Phase::Discovery,
             squad_id: None,
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -220,7 +220,7 @@ impl PlatformState {
     ///
     /// When receiving updates from other peers, merge based on timestamp.
     /// The state with the later timestamp wins for each field.
-    pub fn merge(&mut self, other: &PlatformState) {
+    pub fn merge(&mut self, other: &NodeState) {
         if other.timestamp > self.timestamp {
             self.position = other.position;
             self.health = other.health;
@@ -252,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_platform_config_add_capability() {
-        let mut config = PlatformConfig::new("UAV".to_string());
+        let mut config = NodeConfig::new("UAV".to_string());
 
         let cap1 = Capability::new(
             "camera_1".to_string(),
@@ -279,7 +279,7 @@ mod tests {
 
     #[test]
     fn test_platform_config_has_capability_type() {
-        let mut config = PlatformConfig::new("UAV".to_string());
+        let mut config = NodeConfig::new("UAV".to_string());
         assert!(!config.has_capability_type(CapabilityType::Sensor));
 
         config.add_capability(Capability::new(
@@ -295,7 +295,7 @@ mod tests {
 
     #[test]
     fn test_platform_state_lww_operations() {
-        let mut state = PlatformState::new((37.7, -122.4, 100.0));
+        let mut state = NodeState::new((37.7, -122.4, 100.0));
         let initial_timestamp = state.timestamp;
 
         // Update position
@@ -309,10 +309,10 @@ mod tests {
         assert_eq!(state.health, HealthStatus::Degraded);
 
         // Update phase
-        state.update_phase(Phase::Squad);
-        assert_eq!(state.phase, Phase::Squad);
+        state.update_phase(Phase::Cell);
+        assert_eq!(state.phase, Phase::Cell);
 
-        // Squad assignment
+        // Cell assignment
         state.assign_squad("squad_1".to_string());
         assert_eq!(state.squad_id, Some("squad_1".to_string()));
 
@@ -322,7 +322,7 @@ mod tests {
 
     #[test]
     fn test_platform_state_fuel_counter() {
-        let mut state = PlatformState::new((0.0, 0.0, 0.0));
+        let mut state = NodeState::new((0.0, 0.0, 0.0));
         assert_eq!(state.fuel_minutes, 120);
 
         // Consume fuel
@@ -344,7 +344,7 @@ mod tests {
 
     #[test]
     fn test_platform_state_operational_checks() {
-        let mut state = PlatformState::new((0.0, 0.0, 0.0));
+        let mut state = NodeState::new((0.0, 0.0, 0.0));
         assert!(state.is_operational());
 
         // No fuel
@@ -361,7 +361,7 @@ mod tests {
 
     #[test]
     fn test_platform_state_needs_refuel() {
-        let mut state = PlatformState::new((0.0, 0.0, 0.0));
+        let mut state = NodeState::new((0.0, 0.0, 0.0));
         assert!(!state.needs_refuel());
 
         state.consume_fuel(100);
@@ -370,7 +370,7 @@ mod tests {
 
     #[test]
     fn test_platform_state_merge_lww() {
-        let mut state1 = PlatformState::new((37.7, -122.4, 100.0));
+        let mut state1 = NodeState::new((37.7, -122.4, 100.0));
         let mut state2 = state1.clone();
 
         // State2 has a later update
@@ -388,11 +388,11 @@ mod tests {
 
     #[test]
     fn test_platform_state_merge_older_ignored() {
-        let mut state1 = PlatformState::new((37.7, -122.4, 100.0));
+        let mut state1 = NodeState::new((37.7, -122.4, 100.0));
         std::thread::sleep(std::time::Duration::from_secs(1));
         state1.update_position((37.8, -122.5, 150.0));
 
-        let state2 = PlatformState::new((38.0, -123.0, 200.0));
+        let state2 = NodeState::new((38.0, -123.0, 200.0));
 
         // Merge older state2 into state1 - state1 should remain unchanged
         let original_pos = state1.position;
@@ -403,7 +403,7 @@ mod tests {
 
     #[test]
     fn test_platform_config_autonomous() {
-        let config = PlatformConfig::new("UAV".to_string());
+        let config = NodeConfig::new("UAV".to_string());
 
         assert!(!config.has_operator());
         assert!(!config.is_human_operated());
@@ -426,11 +426,11 @@ mod tests {
 
         let binding = HumanMachinePair::new(
             vec![operator],
-            vec!["platform_1".to_string()],
+            vec!["node_1".to_string()],
             BindingType::OneToOne,
         );
 
-        let config = PlatformConfig::with_operator("Soldier System".to_string(), binding);
+        let config = NodeConfig::with_operator("Soldier System".to_string(), binding);
 
         assert!(config.has_operator());
         assert!(config.is_human_operated());
@@ -445,7 +445,7 @@ mod tests {
     fn test_platform_config_set_operator_binding() {
         use crate::models::{AuthorityLevel, BindingType, Operator, OperatorRank};
 
-        let mut config = PlatformConfig::new("Robot".to_string());
+        let mut config = NodeConfig::new("Robot".to_string());
         assert!(config.is_autonomous());
 
         // Add operator binding
@@ -507,7 +507,7 @@ mod tests {
             BindingType::ManyToOne,
         );
 
-        let config = PlatformConfig::with_operator("Command Vehicle".to_string(), binding);
+        let config = NodeConfig::with_operator("Command Vehicle".to_string(), binding);
 
         assert!(config.is_human_operated());
 
@@ -544,7 +544,7 @@ mod tests {
         let binding =
             HumanMachinePair::new(vec![operator], platform_ids.clone(), BindingType::OneToMany);
 
-        let config = PlatformConfig::with_operator("Swarm Control Station".to_string(), binding);
+        let config = NodeConfig::with_operator("Swarm Control Station".to_string(), binding);
 
         assert!(config.is_human_operated());
 

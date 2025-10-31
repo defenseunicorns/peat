@@ -30,7 +30,7 @@
 //! ## Peer Discovery
 //!
 //! This implementation enables LAN transport (mDNS) by default, which works well for
-//! localhost peer discovery on macOS and other platforms that support mDNS. For explicit
+//! localhost peer discovery on macOS and other nodes that support mDNS. For explicit
 //! localhost testing or environments where mDNS is unreliable, TCP transport can be
 //! configured with explicit server/client connections.
 //!

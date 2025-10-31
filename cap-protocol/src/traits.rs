@@ -8,9 +8,9 @@ use std::fmt::Debug;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Phase {
     /// Initial discovery and group formation
-    Bootstrap,
-    /// Squad cohesion and leader election
-    Squad,
+    Discovery,
+    /// Cell cohesion and leader election
+    Cell,
     /// Hierarchical operations with constrained messaging
     Hierarchical,
 }
@@ -18,20 +18,26 @@ pub enum Phase {
 impl std::fmt::Display for Phase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Phase::Bootstrap => write!(f, "bootstrap"),
-            Phase::Squad => write!(f, "squad"),
+            Phase::Discovery => write!(f, "discovery"),
+            Phase::Cell => write!(f, "cell"),
             Phase::Hierarchical => write!(f, "hierarchical"),
         }
     }
 }
 
-/// Platform lifecycle management
+// Legacy compatibility - old names as aliases
+impl Phase {
+    pub const BOOTSTRAP: Phase = Phase::Discovery;
+    pub const SQUAD: Phase = Phase::Cell;
+}
+
+/// Node lifecycle management
 #[async_trait]
 pub trait Platform: Send + Sync + Debug {
     /// Initialize the platform with configuration
     async fn initialize(&mut self) -> Result<()>;
 
-    /// Update platform state (called at regular intervals)
+    /// Update node state (called at regular intervals)
     async fn update(&mut self) -> Result<()>;
 
     /// Get the current phase

@@ -92,7 +92,7 @@ fn test_error_context_timeout() {
 
 #[test]
 fn test_error_display() {
-    let err = Error::storage_error("query failed", "query", Some("platforms".to_string()));
+    let err = Error::storage_error("query failed", "query", Some("nodes".to_string()));
     let display = format!("{}", err);
     assert!(display.contains("Storage error"));
     assert!(display.contains("query failed"));
@@ -170,13 +170,13 @@ fn test_invalid_transition_error() {
     let err = Error::InvalidTransition {
         from: "Bootstrap".to_string(),
         to: "Hierarchical".to_string(),
-        reason: "Must go through Squad phase".to_string(),
+        reason: "Must go through Cell phase".to_string(),
     };
 
     let display = format!("{}", err);
     assert!(display.contains("Bootstrap"));
     assert!(display.contains("Hierarchical"));
-    assert!(display.contains("Must go through Squad phase"));
+    assert!(display.contains("Must go through Cell phase"));
 }
 
 #[test]

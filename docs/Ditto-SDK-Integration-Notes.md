@@ -63,10 +63,10 @@ SharedKey identity enables **local-only syncing** without requiring internet con
 3. **Collection API returns Result**
    ```rust
    // OLD
-   let coll = ditto.store().collection("platforms");
+   let coll = ditto.store().collection("nodes");
 
    // NEW
-   let coll = ditto.store().collection("platforms")?;
+   let coll = ditto.store().collection("nodes")?;
    ```
 
 4. **Deprecated Methods**
@@ -81,17 +81,17 @@ SharedKey identity enables **local-only syncing** without requiring internet con
 Ditto implements CRDTs at the document level with JSON-like operations:
 
 1. **G-Set (Grow-Only Set)**
-   - Use case: Static platform capabilities
+   - Use case: Static node capabilities
    - Implementation: Array fields that only grow
    - Operations: Insert only, no removal
 
 2. **OR-Set (Observed-Remove Set)**
-   - Use case: Squad membership
+   - Use case: Cell membership
    - Implementation: Array with add/remove tracking
    - Operations: Add, Remove with causality tracking
 
 3. **LWW-Register (Last-Write-Wins)**
-   - Use case: Platform position, fuel, health
+   - Use case: Node position, fuel, health
    - Implementation: Single value with timestamp
    - Operations: Set with timestamp, last write wins
 
@@ -104,8 +104,8 @@ Ditto implements CRDTs at the document level with JSON-like operations:
 
 ```json
 {
-  "_id": "platform_uav_001",
-  "platform_id": "uav_001",
+  "_id": "node_uav_001",
+  "node_id": "uav_001",
   "static_capabilities": ["camera", "gps", "satcom"],  // G-Set
   "position": {                                         // LWW-Register
     "lat": 37.7749,
@@ -114,7 +114,7 @@ Ditto implements CRDTs at the document level with JSON-like operations:
     "timestamp": 1698765432
   },
   "fuel_minutes": 120,                                  // PN-Counter
-  "squad_id": "alpha"                                   // LWW-Register
+  "cell_id": "alpha"                                   // LWW-Register
 }
 ```
 
@@ -210,7 +210,7 @@ With SharedKey identity, Ditto automatically discovers and syncs with peers usin
    - Plan for production identity (Online with authentication)
 
 2. **Performance Testing**
-   - Measure sync latency at scale (100+ platforms)
+   - Measure sync latency at scale (100+ nodes)
    - Test bandwidth usage patterns
    - Validate CRDT convergence time
 

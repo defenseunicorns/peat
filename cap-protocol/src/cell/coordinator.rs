@@ -1,17 +1,17 @@
-//! Squad Formation Coordinator (E4.5)
+//! Cell Formation Coordinator (E4.5)
 //!
-//! Coordinates squad formation completion by integrating role assignment (E4.3) and
+//! Coordinates cell formation completion by integrating role assignment (E4.3) and
 //! capability aggregation (E4.4). Detects when formation is complete and manages
 //! phase transitions with human approval workflow following ADR-004.
 //!
 //! # Formation Completion Criteria
 //!
-//! A squad formation is considered complete when:
+//! A cell formation is considered complete when:
 //! 1. Minimum squad size met (configurable, default 3)
 //! 2. Leader elected and confirmed
 //! 3. All members have assigned roles
 //! 4. Minimum capability coverage achieved (Communication + Sensor required)
-//! 5. Squad readiness score above threshold (default 0.7)
+//! 5. Cell readiness score above threshold (default 0.7)
 //! 6. Human approval obtained (if required by authority levels)
 //!
 //! # Phase Transition Workflow
@@ -22,15 +22,15 @@
 //! - Request human approval if any mission-critical capabilities lack DirectControl authority
 //! - Transition to OperationalReady once approved
 
-use crate::models::{PlatformConfig, PlatformState, SquadRole};
-use crate::squad::{AggregatedCapability, CapabilityAggregator};
+use crate::cell::{AggregatedCapability, CapabilityAggregator};
+use crate::models::{CellRole, NodeConfig, NodeState};
 use crate::traits::Phase;
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Squad formation status
+/// Cell formation status
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FormationStatus {
     /// Formation in progress
@@ -43,9 +43,9 @@ pub enum FormationStatus {
     Failed(String),
 }
 
-/// Squad formation coordinator
-pub struct SquadCoordinator {
-    /// Squad ID
+/// Cell formation coordinator
+pub struct CellCoordinator {
+    /// Cell ID
     pub squad_id: String,
     /// Minimum squad size
     pub min_size: usize,
@@ -63,7 +63,7 @@ pub struct SquadCoordinator {
     pub formation_complete: Option<u64>,
 }
 
-impl SquadCoordinator {
+impl CellCoordinator {
     /// Create a new squad coordinator
     pub fn new(squad_id: String) -> Self {
         let now = SystemTime::now()
@@ -89,14 +89,14 @@ impl SquadCoordinator {
     /// Check if formation is complete
     ///
     /// # Arguments
-    /// * `members` - Squad members (config, state, role)
+    /// * `members` - Cell members (config, state, role)
     /// * `leader_id` - Optional ID of elected leader
     ///
     /// # Returns
     /// True if formation meets all criteria
     pub fn check_formation_complete(
         &mut self,
-        members: &[(PlatformConfig, PlatformState, Option<SquadRole>)],
+        members: &[(NodeConfig, NodeState, Option<CellRole>)],
         leader_id: Option<&str>,
     ) -> Result<bool> {
         // Criterion 1: Minimum size
@@ -121,7 +121,7 @@ impl SquadCoordinator {
         }
 
         // Criterion 4 & 5: Capability coverage and readiness
-        let members_for_agg: Vec<(PlatformConfig, PlatformState)> = members
+        let members_for_agg: Vec<(NodeConfig, NodeState)> = members
             .iter()
             .map(|(c, s, _)| (c.clone(), s.clone()))
             .collect();
@@ -269,10 +269,10 @@ mod tests {
     fn create_test_member(
         id: &str,
         capabilities: Vec<CapabilityType>,
-        role: Option<SquadRole>,
+        role: Option<CellRole>,
         operator: Option<Operator>,
-    ) -> (PlatformConfig, PlatformState, Option<SquadRole>) {
-        let mut config = PlatformConfig::new("Test".to_string());
+    ) -> (NodeConfig, NodeState, Option<CellRole>) {
+        let mut config = NodeConfig::new("Test".to_string());
         config.id = id.to_string();
 
         for cap_type in capabilities {
@@ -293,15 +293,15 @@ mod tests {
             config.operator_binding = Some(binding);
         }
 
-        let state = PlatformState::new((0.0, 0.0, 0.0));
+        let state = NodeState::new((0.0, 0.0, 0.0));
 
         (config, state, role)
     }
 
     #[test]
     fn test_coordinator_creation() {
-        let coord = SquadCoordinator::new("squad1".to_string());
-        assert_eq!(coord.squad_id, "squad1");
+        let coord = CellCoordinator::new("cell1".to_string());
+        assert_eq!(coord.squad_id, "cell1");
         assert_eq!(coord.status, FormationStatus::Forming);
         assert_eq!(coord.min_size, 3);
         assert!(!coord.human_approved);
@@ -309,19 +309,19 @@ mod tests {
 
     #[test]
     fn test_insufficient_members() {
-        let mut coord = SquadCoordinator::new("squad1".to_string());
+        let mut coord = CellCoordinator::new("cell1".to_string());
 
         let members = vec![
             create_test_member(
                 "p1",
                 vec![CapabilityType::Communication, CapabilityType::Sensor],
-                Some(SquadRole::Leader),
+                Some(CellRole::Leader),
                 None,
             ),
             create_test_member(
                 "p2",
                 vec![CapabilityType::Sensor],
-                Some(SquadRole::Sensor),
+                Some(CellRole::Sensor),
                 None,
             ),
         ];
@@ -339,25 +339,25 @@ mod tests {
 
     #[test]
     fn test_no_leader() {
-        let mut coord = SquadCoordinator::new("squad1".to_string());
+        let mut coord = CellCoordinator::new("cell1".to_string());
 
         let members = vec![
             create_test_member(
                 "p1",
                 vec![CapabilityType::Communication],
-                Some(SquadRole::Follower),
+                Some(CellRole::Follower),
                 None,
             ),
             create_test_member(
                 "p2",
                 vec![CapabilityType::Sensor],
-                Some(SquadRole::Sensor),
+                Some(CellRole::Sensor),
                 None,
             ),
             create_test_member(
                 "p3",
                 vec![CapabilityType::Compute],
-                Some(SquadRole::Compute),
+                Some(CellRole::Compute),
                 None,
             ),
         ];
@@ -370,19 +370,19 @@ mod tests {
 
     #[test]
     fn test_unassigned_roles() {
-        let mut coord = SquadCoordinator::new("squad1".to_string());
+        let mut coord = CellCoordinator::new("cell1".to_string());
 
         let members = vec![
             create_test_member(
                 "p1",
                 vec![CapabilityType::Communication],
-                Some(SquadRole::Leader),
+                Some(CellRole::Leader),
                 None,
             ),
             create_test_member(
                 "p2",
                 vec![CapabilityType::Sensor],
-                Some(SquadRole::Sensor),
+                Some(CellRole::Sensor),
                 None,
             ),
             create_test_member("p3", vec![CapabilityType::Compute], None, None), // No role
@@ -398,25 +398,25 @@ mod tests {
 
     #[test]
     fn test_missing_required_capabilities() {
-        let mut coord = SquadCoordinator::new("squad1".to_string());
+        let mut coord = CellCoordinator::new("cell1".to_string());
 
         let members = vec![
             create_test_member(
                 "p1",
                 vec![CapabilityType::Communication],
-                Some(SquadRole::Leader),
+                Some(CellRole::Leader),
                 None,
             ),
             create_test_member(
                 "p2",
                 vec![CapabilityType::Compute],
-                Some(SquadRole::Compute),
+                Some(CellRole::Compute),
                 None,
             ), // Missing Sensor
             create_test_member(
                 "p3",
                 vec![CapabilityType::Mobility],
-                Some(SquadRole::Follower),
+                Some(CellRole::Follower),
                 None,
             ),
         ];
@@ -434,7 +434,7 @@ mod tests {
 
     #[test]
     fn test_formation_complete_no_approval_needed() {
-        let mut coord = SquadCoordinator::new("squad1".to_string());
+        let mut coord = CellCoordinator::new("cell1".to_string());
 
         // Create operator with Commander authority for Communication
         let operator = Operator::new(
@@ -449,19 +449,19 @@ mod tests {
             create_test_member(
                 "p1",
                 vec![CapabilityType::Communication, CapabilityType::Sensor],
-                Some(SquadRole::Leader),
+                Some(CellRole::Leader),
                 Some(operator),
             ),
             create_test_member(
                 "p2",
                 vec![CapabilityType::Sensor],
-                Some(SquadRole::Sensor),
+                Some(CellRole::Sensor),
                 None,
             ),
             create_test_member(
                 "p3",
                 vec![CapabilityType::Compute],
-                Some(SquadRole::Compute),
+                Some(CellRole::Compute),
                 None,
             ),
         ];
@@ -477,7 +477,7 @@ mod tests {
 
     #[test]
     fn test_formation_awaiting_approval() {
-        let mut coord = SquadCoordinator::new("squad1".to_string());
+        let mut coord = CellCoordinator::new("cell1".to_string());
 
         // Create operator with Commander authority for Communication (p1)
         let operator1 = Operator::new(
@@ -501,19 +501,19 @@ mod tests {
             create_test_member(
                 "p1",
                 vec![CapabilityType::Communication, CapabilityType::Sensor],
-                Some(SquadRole::Leader),
+                Some(CellRole::Leader),
                 Some(operator1),
             ),
             create_test_member(
                 "p2",
                 vec![CapabilityType::Sensor],
-                Some(SquadRole::Sensor),
+                Some(CellRole::Sensor),
                 None,
             ),
             create_test_member(
                 "p3",
                 vec![CapabilityType::Payload], // Oversight-required with low authority
-                Some(SquadRole::Follower),
+                Some(CellRole::Follower),
                 Some(operator3),
             ),
         ];
@@ -528,7 +528,7 @@ mod tests {
 
     #[test]
     fn test_human_approval_workflow() {
-        let mut coord = SquadCoordinator::new("squad1".to_string());
+        let mut coord = CellCoordinator::new("cell1".to_string());
         coord.status = FormationStatus::AwaitingApproval;
 
         coord.approve_formation().unwrap();
@@ -540,7 +540,7 @@ mod tests {
 
     #[test]
     fn test_human_rejection() {
-        let mut coord = SquadCoordinator::new("squad1".to_string());
+        let mut coord = CellCoordinator::new("cell1".to_string());
         coord.status = FormationStatus::AwaitingApproval;
 
         coord
@@ -555,7 +555,7 @@ mod tests {
 
     #[test]
     fn test_phase_transition() {
-        let mut coord = SquadCoordinator::new("squad1".to_string());
+        let mut coord = CellCoordinator::new("cell1".to_string());
         coord.status = FormationStatus::Ready;
 
         assert!(coord.can_transition_to_hierarchical());
@@ -566,7 +566,7 @@ mod tests {
 
     #[test]
     fn test_cannot_transition_when_not_ready() {
-        let coord = SquadCoordinator::new("squad1".to_string());
+        let coord = CellCoordinator::new("cell1".to_string());
 
         assert!(!coord.can_transition_to_hierarchical());
         assert!(coord.get_hierarchical_phase().is_err());
@@ -574,7 +574,7 @@ mod tests {
 
     #[test]
     fn test_formation_duration() {
-        let coord = SquadCoordinator::new("squad1".to_string());
+        let coord = CellCoordinator::new("cell1".to_string());
 
         std::thread::sleep(std::time::Duration::from_secs(1));
 
@@ -584,7 +584,7 @@ mod tests {
 
     #[test]
     fn test_reset_formation() {
-        let mut coord = SquadCoordinator::new("squad1".to_string());
+        let mut coord = CellCoordinator::new("cell1".to_string());
         coord.status = FormationStatus::Ready;
         coord.human_approved = true;
         coord.formation_complete = Some(12345);
@@ -599,7 +599,7 @@ mod tests {
     #[test]
     fn test_single_member_squad() {
         // Edge case: Single member (< min_size)
-        let mut coord = SquadCoordinator::new("squad1".to_string());
+        let mut coord = CellCoordinator::new("cell1".to_string());
 
         let operator = Operator::new(
             "op1".to_string(),
@@ -612,7 +612,7 @@ mod tests {
         let members = vec![create_test_member(
             "p1",
             vec![CapabilityType::Communication, CapabilityType::Sensor],
-            Some(SquadRole::Leader),
+            Some(CellRole::Leader),
             Some(operator),
         )];
 
@@ -630,7 +630,7 @@ mod tests {
     #[test]
     fn test_exact_minimum_size_squad() {
         // Boundary case: Exactly min_size (3) members
-        let mut coord = SquadCoordinator::new("squad1".to_string());
+        let mut coord = CellCoordinator::new("cell1".to_string());
         assert_eq!(coord.min_size, 3);
 
         let operator = Operator::new(
@@ -645,19 +645,19 @@ mod tests {
             create_test_member(
                 "p1",
                 vec![CapabilityType::Communication, CapabilityType::Sensor],
-                Some(SquadRole::Leader),
+                Some(CellRole::Leader),
                 Some(operator),
             ),
             create_test_member(
                 "p2",
                 vec![CapabilityType::Sensor],
-                Some(SquadRole::Sensor),
+                Some(CellRole::Sensor),
                 None,
             ),
             create_test_member(
                 "p3",
                 vec![CapabilityType::Compute],
-                Some(SquadRole::Compute),
+                Some(CellRole::Compute),
                 None,
             ),
         ];
@@ -674,7 +674,7 @@ mod tests {
     #[test]
     fn test_empty_squad_formation() {
         // Edge case: Zero members
-        let mut coord = SquadCoordinator::new("squad1".to_string());
+        let mut coord = CellCoordinator::new("cell1".to_string());
 
         let complete = coord.check_formation_complete(&[], None).unwrap();
 
@@ -688,7 +688,7 @@ mod tests {
     #[test]
     fn test_approval_idempotency() {
         // Edge case: Multiple approval calls should be idempotent
-        let mut coord = SquadCoordinator::new("squad1".to_string());
+        let mut coord = CellCoordinator::new("cell1".to_string());
         coord.status = FormationStatus::AwaitingApproval;
 
         // First approval

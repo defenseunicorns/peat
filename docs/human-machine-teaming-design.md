@@ -2,12 +2,12 @@
 
 ## Problem Statement
 
-The current CAP implementation treats all platforms as equivalent autonomous agents, using purely technical capabilities (compute, communication, sensors) for leader election and decision-making. This creates several architectural gaps:
+The current CAP implementation treats all nodes as equivalent autonomous agents, using purely technical capabilities (compute, communication, sensors) for leader election and decision-making. This creates several architectural gaps:
 
 1. **No human authority model**: Rank, role, and command authority are not represented
-2. **Unclear human-machine binding**: Relationship between humans and platforms undefined
-3. **Missing interface contracts**: No specification for human interaction when platform is leader vs follower
-4. **Squad composition variants**: Multiple human-machine ratios not addressed (1:1, 1:N, N:1, N:M)
+2. **Unclear human-machine binding**: Relationship between humans and nodes undefined
+3. **Missing interface contracts**: No specification for human interaction when node is leader vs follower
+4. **Cell composition variants**: Multiple human-machine ratios not addressed (1:1, 1:N, N:1, N:M)
 
 ## Design Goals
 
@@ -15,7 +15,7 @@ The current CAP implementation treats all platforms as equivalent autonomous age
 2. **Respect human authority** while leveraging machine autonomy appropriately
 3. **Define clear interfaces** for human operators in different roles
 4. **Enable gradual autonomy** from full human control to machine-only squads
-5. **Maintain protocol consistency** whether platforms are human-operated or autonomous
+5. **Maintain protocol consistency** whether nodes are human-operated or autonomous
 
 ## Proposed Architecture
 
@@ -24,7 +24,7 @@ The current CAP implementation treats all platforms as equivalent autonomous age
 #### Operator Struct
 
 ```rust
-/// Human operator of a platform or squad
+/// Human operator of a node or squad
 pub struct Operator {
     /// Unique operator identifier
     pub id: String,
@@ -36,7 +36,7 @@ pub struct Operator {
     pub authority: AuthorityLevel,
     /// Specialization (infantry, armor, aviation, etc.)
     pub mos: String,
-    /// Cognitive load score (0.0-1.0, updated by platform)
+    /// Cognitive load score (0.0-1.0, updated by node)
     pub cognitive_load: f32,
     /// Fatigue level (0.0-1.0, updated by physiological sensors)
     pub fatigue: f32,
@@ -72,12 +72,12 @@ pub enum AuthorityLevel {
 #### Human-Machine Binding
 
 ```rust
-/// Binding between operator(s) and platform(s)
+/// Binding between operator(s) and node(s)
 pub struct HumanMachinePair {
     /// Operator(s) - can be empty for autonomous platforms
     pub operators: Vec<Operator>,
-    /// Platform(s) bound to this pairing
-    pub platform_ids: Vec<String>,
+    /// Node(s) bound to this pairing
+    pub node_ids: Vec<String>,
     /// Binding type
     pub binding_type: BindingType,
     /// Primary operator (for multi-operator scenarios)
@@ -85,15 +85,15 @@ pub struct HumanMachinePair {
 }
 
 pub enum BindingType {
-    /// One human, one platform (traditional)
+    /// One human, one node (traditional)
     OneToOne,
     /// One human controlling multiple platforms
     OneToMany,
-    /// Multiple humans sharing one platform (e.g., command vehicle)
+    /// Multiple humans sharing one node (e.g., command vehicle)
     ManyToOne,
-    /// Complex teaming (platoon-level)
+    /// Complex teaming (zone-level)
     ManyToMany,
-    /// No human (autonomous platform)
+    /// No human (autonomous node)
     Autonomous,
 }
 ```
@@ -149,13 +149,13 @@ impl LeadershipScore {
             OperatorRank::E4 => 0.3,
             OperatorRank::E5 => 0.4,
             OperatorRank::E6 => 0.5,
-            OperatorRank::E7 => 0.6,  // Squad leader typical rank
+            OperatorRank::E7 => 0.6,  // Cell leader typical rank
             OperatorRank::E8 => 0.7,
             OperatorRank::E9 => 0.8,
             OperatorRank::W1..=OperatorRank::W5 => 0.75,
             OperatorRank::O1 => 0.85,
             OperatorRank::O2 => 0.9,
-            OperatorRank::O3 => 0.95,  // Platoon leader
+            OperatorRank::O3 => 0.95,  // Zone leader
             OperatorRank::O4..=OperatorRank::O10 => 1.0,
             OperatorRank::Civilian(level) => level as f64 / 10.0,
         }
@@ -163,56 +163,56 @@ impl LeadershipScore {
 }
 ```
 
-### 3. Squad Composition Scenarios
+### 3. Cell Composition Scenarios
 
-#### Scenario A: Traditional Infantry Squad (9 humans, 9 platforms, 1:1)
+#### Scenario A: Traditional Infantry Cell (9 humans, 9 nodes, 1:1)
 
 ```
-Squad Leader (E-7) + Platform A (leader)
-├─ Team Leader (E-5) + Platform B (follower)
-│  ├─ Rifleman (E-3) + Platform C (follower)
-│  └─ Grenadier (E-4) + Platform D (follower)
-└─ Team Leader (E-5) + Platform E (follower)
-   ├─ SAW Gunner (E-4) + Platform F (follower)
-   └─ Rifleman (E-3) + Platform G (follower)
+Cell Leader (E-7) + Node A (leader)
+├─ Team Leader (E-5) + Node B (follower)
+│  ├─ Rifleman (E-3) + Node C (follower)
+│  └─ Grenadier (E-4) + Node D (follower)
+└─ Team Leader (E-5) + Node E (follower)
+   ├─ SAW Gunner (E-4) + Node F (follower)
+   └─ Rifleman (E-3) + Node G (follower)
 ```
 
 **Leader Election**:
-- E-7's platform has highest authority score → becomes squad leader
+- E-7's node has highest authority score → becomes cell leader
 - Technical capabilities are secondary
-- E-7 provides tactical decisions, platform coordinates execution
+- E-7 provides tactical decisions, node coordinates execution
 
 **Interfaces**:
-- **Leader (E-7)**: Situational awareness dashboard, squad status, voice command input, approval UI for critical decisions
-- **Followers (E-3 to E-5)**: Squad leader's intent display, individual status, local autonomy for movement
+- **Leader (E-7)**: Situational awareness dashboard, cell status, voice command input, approval UI for critical decisions
+- **Followers (E-3 to E-5)**: Cell leader's intent display, individual status, local autonomy for movement
 
-#### Scenario B: Robot-Augmented Squad (4 humans, 6 robots)
+#### Scenario B: Robot-Augmented Cell (4 humans, 6 robots)
 
 ```
-Squad Leader (E-7) + Platform A (leader)
-├─ Team Leader (E-5) + Platform B (follower)
-│  ├─ Robot Platform C (autonomous follower)
-│  └─ Robot Platform D (autonomous follower)
-└─ Team Leader (E-5) + Platform E (follower)
-   ├─ Robot Platform F (autonomous follower)
-   ├─ Robot Platform G (autonomous follower)
-   └─ Specialist (E-4) + Platform H (follower)
+Cell Leader (E-7) + Node A (leader)
+├─ Team Leader (E-5) + Node B (follower)
+│  ├─ Robot Node C (autonomous follower)
+│  └─ Robot Node D (autonomous follower)
+└─ Team Leader (E-5) + Node E (follower)
+   ├─ Robot Node F (autonomous follower)
+   ├─ Robot Node G (autonomous follower)
+   └─ Specialist (E-4) + Node H (follower)
 ```
 
 **Leader Election**:
-- E-7's platform becomes leader (human authority)
+- E-7's node becomes leader (human authority)
 - Robots have high technical scores but no human authority
-- Hybrid squad with mixed autonomy levels
+- Hybrid cell with mixed autonomy levels
 
 **Decision-Making**:
 - **Tactical decisions**: E-7 commands
-- **Coordination/execution**: Platform A manages robot positioning
+- **Coordination/execution**: Node A manages robot positioning
 - **Local navigation**: Each robot autonomous within intent bounds
 
 #### Scenario C: Single Operator, Multiple Robots (1:N)
 
 ```
-Operator (E-6) + Platform A (command platform, leader)
+Operator (E-6) + Node A (command node, leader)
 ├─ Robot 1 (follower)
 ├─ Robot 2 (follower)
 ├─ Robot 3 (follower)
@@ -221,44 +221,44 @@ Operator (E-6) + Platform A (command platform, leader)
 ```
 
 **Leader Election**:
-- Platform A is leader (only human-operated)
+- Node A is leader (only human-operated)
 - Robots automatically follow
 
 **Interface**:
 - Operator needs **supervisory control**: set waypoints, approve engagements, monitor status
-- Cannot micromanage 5 robots → platform autonomy is high
-- Operator sets intent, robots execute with coordination from Platform A
+- Cannot micromanage 5 robots → node autonomy is high
+- Operator sets intent, robots execute with coordination from Node A
 
 #### Scenario D: Command Vehicle (N:1)
 
 ```
-Platform A (command vehicle, high compute/comms)
+Node A (command vehicle, high compute/comms)
 ├─ Commander (O-3) - primary authority
 ├─ NCO (E-7) - tactical advisor
 └─ RTO (E-4) - communications
 
 Commanding:
-├─ Squad 1 (9 platforms)
-├─ Squad 2 (9 platforms)
-└─ Squad 3 (9 platforms)
+├─ Cell 1 (9 nodes)
+├─ Cell 2 (9 nodes)
+└─ Cell 3 (9 nodes)
 ```
 
 **Leader Election**:
-- Platform A has highest technical capabilities
+- Node A has highest technical capabilities
 - O-3 has ultimate authority
-- Platform provides C2 infrastructure
+- Node provides C2 infrastructure
 
 **Interface**:
-- **O-3**: Multi-squad dashboard, intent planning, approval workflows
-- **E-7**: Tactical recommendations, squad status details
+- **O-3**: Multi-cell dashboard, intent planning, approval workflows
+- **E-7**: Tactical recommendations, cell status details
 - **E-4**: Comms management, message routing
 
 ### 4. Interface Contracts
 
-#### Leader Interface (Human is Squad Leader)
+#### Leader Interface (Human is Cell Leader)
 
 **Required UI Components**:
-- Squad member status (health, fuel, position)
+- Cell member status (health, fuel, position)
 - Emergent capability summary
 - Mission objective overlay
 - Voice command input
@@ -267,32 +267,32 @@ Commanding:
 
 **Data Flow**:
 ```
-Human Intent → Platform Interpretation → Squad Message Bus → Followers Execute
+Human Intent → Node Interpretation → Cell Message Bus → Followers Execute
                 ↓
          Continuous Feedback (visual/haptic)
 ```
 
-#### Follower Interface (Human is Squad Member)
+#### Follower Interface (Human is Cell Member)
 
 **Required UI Components**:
-- Squad leader's intent (text or voice)
-- Own platform status
+- Cell leader's intent (text or voice)
+- Own node status
 - Immediate local environment (AR overlay)
 - Quick action buttons (report contact, request support)
 - Simplified situational awareness (leader's position, team positions)
 
 **Data Flow**:
 ```
-Squad Leader Intent → Squad Message Bus → Platform Receives → Human Display
+Cell Leader Intent → Cell Message Bus → Node Receives → Human Display
                                                 ↓
-                                Human Override (if needed) → Platform Executes
+                                Human Override (if needed) → Node Executes
 ```
 
-#### Autonomous Platform (No Human)
+#### Autonomous Node (No Human)
 
 **Behavior**:
-- Full participation in squad protocols
-- Receives orders via Squad Message Bus
+- Full participation in cell protocols
+- Receives orders via Cell Message Bus
 - Reports status and observations
 - No human interface, pure machine-to-machine
 - May have higher technical capabilities than human-worn platforms
@@ -312,7 +312,7 @@ Define when human authority is **required** vs **optional**:
 - Obstacle avoidance
 - Formation maintenance
 - Sensor fusion and reporting
-- Inter-platform coordination
+- Inter-node coordination
 
 **Configurable per Mission**:
 - Engagement rules (ROE)
@@ -322,9 +322,9 @@ Define when human authority is **required** vs **optional**:
 ### 6. Rank and Leader Election Rules
 
 **Option 1: Rank Always Wins** (military hierarchy)
-- Highest-ranking human's platform is always leader
+- Highest-ranking human's node is always leader
 - Technical capabilities break ties between same rank
-- Autonomous platforms can never be leader if humans present
+- Autonomous nodes can never be leader if humans present
 
 **Option 2: Contextual Leadership** (recommended)
 - **Tactical leadership**: Highest rank (human authority)
@@ -363,14 +363,14 @@ Define when human authority is **required** vs **optional**:
 
 ## Open Questions
 
-1. **What happens if squad leader (human) is incapacitated?**
+1. **What happens if cell leader (human) is incapacitated?**
    - Automatic re-election based on next-highest rank?
-   - Platform continues last-known intent until new leader elected?
+   - Node continues last-known intent until new leader elected?
    - Transition to autonomous mode?
 
 2. **How do we handle rank disagreements in distributed system?**
    - Rank should be cryptographically signed by C2
-   - Platforms verify rank claims via certificate chain
+   - Nodes verify rank claims via certificate chain
    - Conflict resolution: defer to higher HQ
 
 3. **What is the cognitive load measurement mechanism?**
@@ -391,9 +391,9 @@ Define when human authority is **required** vs **optional**:
 
 ## Example: Leadership Scoring Comparison
 
-### Scenario: Squad with 3 members
+### Scenario: Cell with 3 members
 
-**Platform A** (autonomous robot):
+**Node A** (autonomous robot):
 - Compute: 1.0
 - Communication: 1.0
 - Sensors: 4 (maxed)
@@ -402,7 +402,7 @@ Define when human authority is **required** vs **optional**:
 - **Authority Score**: 0.0
 - **Total**: 0.95 * 1.0 = **0.95**
 
-**Platform B** (E-5 Team Leader):
+**Node B** (E-5 Team Leader):
 - Compute: 0.6
 - Communication: 0.7
 - Sensors: 1
@@ -411,7 +411,7 @@ Define when human authority is **required** vs **optional**:
 - **Authority Score**: (0.4 rank + 0.9 authority + 0.9 cognitive + 0.95 fatigue) * weights ≈ 0.65
 - **Total**: 0.55 * 0.4 + 0.65 * 0.6 = **0.61**
 
-**Platform C** (E-7 Squad Leader):
+**Node C** (E-7 Cell Leader):
 - Compute: 0.5
 - Communication: 0.6
 - Sensors: 1
@@ -420,14 +420,14 @@ Define when human authority is **required** vs **optional**:
 - **Authority Score**: (0.6 rank + 0.9 authority + 0.7 cognitive + 0.8 fatigue) * weights ≈ 0.75
 - **Total**: 0.48 * 0.4 + 0.75 * 0.6 = **0.64**
 
-**Result**: Platform C (E-7) becomes leader, despite lower technical capabilities than Platform A (robot).
+**Result**: Node C (E-7) becomes leader, despite lower technical capabilities than Node A (robot).
 
 ## Recommendations
 
 1. **Implement Phase 1 before continuing E4.3**: Human-machine model is foundational
 2. **Use Option 2 (Contextual Leadership)**: Provides flexibility for different mission types
 3. **Define interface contracts early**: Prevents integration issues in E5+ (hierarchical ops)
-4. **Add rank/authority to bootstrap**: C2 should assign authority during E3.4 (directed assignment)
+4. **Add rank/authority to discovery**: C2 should assign authority during E3.4 (directed assignment)
 5. **Consider cognitive load as dynamic factor**: Human fatigue should trigger autonomy handoff
 
 ## References

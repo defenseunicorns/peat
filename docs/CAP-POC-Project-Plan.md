@@ -11,8 +11,8 @@
 |---------|-----------|----------|--------------|----------|
 | E1 | Project Foundation & Setup | Week 1 | None | P0 |
 | E2 | CRDT Integration & Data Models | Week 1-2 | E1 | P0 |
-| E3 | Bootstrap Phase Implementation | Week 2-3 | E2 | P0 |
-| E4 | Squad Formation Phase | Week 3-5 | E3 | P0 |
+| E3 | Discovery Phase Implementation | Week 2-3 | E2 | P0 |
+| E4 | Cell Formation Phase | Week 3-5 | E3 | P0 |
 | E5 | Hierarchical Operations | Week 5-7 | E4 | P0 |
 | E6 | Capability Composition Engine | Week 4-6 | E4 | P1 |
 | E7 | Differential Updates System | Week 6-8 | E5 | P1 |
@@ -48,7 +48,7 @@
    - Document SDK quirks and limitations
 
 3. **E1.3** - Core Trait Definitions
-   - Define `Platform` trait with lifecycle methods
+   - Define `Node` trait with lifecycle methods
    - Define `CapabilityProvider` trait
    - Define `MessageRouter` trait
    - Define `PhaseTransition` trait
@@ -72,111 +72,111 @@
 **Goal:** Implement core data structures using Ditto CRDTs
 
 **Success Criteria:**
-- ✓ Platform state persists and syncs via Ditto
-- ✓ Squad state updates propagate correctly
+- ✓ Node state persists and syncs via Ditto
+- ✓ Cell state updates propagate correctly
 - ✓ CRDT operations handle concurrent updates
 - ✓ State can be queried efficiently
 
 **Stories:**
-1. **E2.1** - Platform Capability Model
+1. **E2.1** - Node Capability Model
    - Implement `PlatformCapability` struct
    - Map static config to G-Set CRDT
    - Map dynamic state to LWW-Register CRDT
    - Add fuel counter using PN-Counter
    - Write unit tests for each CRDT type
 
-2. **E2.2** - Squad State Model
+2. **E2.2** - Cell State Model
    - Implement `SquadState` struct
    - Map member list to OR-Set CRDT
    - Add leader election state (LWW-Register)
    - Implement aggregated capability storage
-   - Add squad lifecycle methods
+   - Add cell lifecycle methods
 
 3. **E2.3** - Ditto Collection Managers
    - Create `PlatformStore` wrapper around Ditto
    - Create `SquadStore` wrapper around Ditto
-   - Implement query helpers (by ID, by squad, by capability)
+   - Implement query helpers (by ID, by cell, by capability)
    - Add batch update operations
    - Handle Ditto subscription callbacks
 
 4. **E2.4** - State Serialization
-   - Define JSON schema for platform documents
-   - Define JSON schema for squad documents
+   - Define JSON schema for node documents
+   - Define JSON schema for cell documents
    - Implement serde serialization/deserialization
    - Add schema validation
    - Create test fixtures
 
 **Deliverables:**
-- `src/models/platform.rs` - Platform data model
-- `src/models/squad.rs` - Squad data model
+- `src/models/node.rs` - Node data model
+- `src/models/cell.rs` - Cell data model
 - `src/storage/ditto_store.rs` - Ditto integration
 - Unit tests with 80%+ coverage
 
 ---
 
-### E3: Bootstrap Phase Implementation
+### E3: Discovery Phase Implementation
 
 **Goal:** Implement Phase 1 protocol for initial group formation
 
 **Success Criteria:**
-- ✓ 100 platforms organize into squads in <60s
+- ✓ 100 nodes organize into cells in <60s
 - ✓ Message count is O(√n) or better
-- ✓ All three bootstrap strategies work
+- ✓ All three discovery strategies work
 - ✓ Graceful handling of concurrent joins
 
 **Stories:**
 1. **E3.1** - Geographic Self-Organization
    - Implement geohash-based grid assignment
    - Add local peer discovery within range
-   - Implement "find nearest squad" logic
-   - Handle squad capacity limits (max 5 platforms)
+   - Implement "find nearest cell" logic
+   - Handle cell capacity limits (max 5 nodes)
    - Add metrics for discovery message count
 
 2. **E3.2** - C2-Directed Assignment
-   - Define squad assignment message format
+   - Define cell assignment message format
    - Implement assignment broadcast receiver
-   - Add platform-to-squad matching logic
+   - Add node-to-cell matching logic
    - Handle assignment conflicts (prefer first assignment)
    - Add assignment acknowledgment
 
 3. **E3.3** - Capability-Based Queries
    - Define capability query message format
    - Implement query matching algorithm
-   - Add response with platform capabilities
-   - Implement "first N responders form squad"
+   - Add response with node capabilities
+   - Implement "first N responders form cell"
    - Add query timeout handling
 
-4. **E3.4** - Bootstrap Coordinator
-   - Implement phase state machine (bootstrap → squad)
-   - Add bootstrap timeout (60s default)
+4. **E3.4** - Discovery Coordinator
+   - Implement phase state machine (discovery → cell)
+   - Add discovery timeout (60s default)
    - Track unassigned platforms
-   - Generate bootstrap metrics
-   - Handle re-bootstrap on failure
+   - Generate discovery metrics
+   - Handle re-discovery on failure
 
 **Deliverables:**
-- `src/bootstrap/` - Bootstrap module
-- `src/bootstrap/geographic.rs` - Geographic strategy
-- `src/bootstrap/directed.rs` - C2 directed strategy
-- `src/bootstrap/capability_query.rs` - Query strategy
+- `src/discovery/` - Discovery module
+- `src/discovery/geographic.rs` - Geographic strategy
+- `src/discovery/directed.rs` - C2 directed strategy
+- `src/discovery/capability_query.rs` - Query strategy
 - Integration tests for each strategy
 
 ---
 
-### E4: Squad Formation Phase
+### E4: Cell Formation Phase
 
-**Goal:** Implement Phase 2 protocol for squad cohesion and leader election
+**Goal:** Implement Phase 2 protocol for cell cohesion and leader election
 
 **Success Criteria:**
 - ✓ Leader election converges in <5 seconds
 - ✓ Emergent capabilities discovered
-- ✓ Squad ready for tasking
+- ✓ Cell ready for tasking
 - ✓ Handles leader failure gracefully
 
 **Stories:**
-1. **E4.1** - Intra-Squad Communication
-   - Implement squad membership messaging
+1. **E4.1** - Intra-Cell Communication
+   - Implement cell membership messaging
    - Add capability exchange protocol
-   - Create squad message bus (publish/subscribe)
+   - Create cell message bus (publish/subscribe)
    - Handle message ordering within squad
    - Add retransmission for lost messages
 
@@ -194,26 +194,26 @@
    - Handle role conflicts
    - Support dynamic role changes
 
-4. **E4.4** - Squad Capability Aggregation
+4. **E4.4** - Cell Capability Aggregation
    - Implement capability collector
    - Add composition rule dispatcher
-   - Generate squad capability summary
+   - Generate cell capability summary
    - Detect emergent capabilities
-   - Publish squad capabilities to platoon
+   - Publish cell capabilities to platoon
 
 5. **E4.5** - Phase Transition Logic
-   - Implement squad formation completion detection
-   - Add transition from "squad" to "hierarchical" phase
+   - Implement cell formation completion detection
+   - Add transition from "cell" to "hierarchical" phase
    - Generate formation metrics
    - Handle incomplete formations (timeouts)
-   - Add squad stability verification
+   - Add cell stability verification
 
 **Deliverables:**
-- `src/squad/` - Squad module
-- `src/squad/leader_election.rs` - Leader election
-- `src/squad/aggregation.rs` - Capability aggregation
-- `src/squad/coordinator.rs` - Squad coordinator
-- Integration tests for squad formation
+- `src/cell/` - Cell module
+- `src/cell/leader_election.rs` - Leader election
+- `src/cell/aggregation.rs` - Capability aggregation
+- `src/cell/coordinator.rs` - Cell coordinator
+- Integration tests for cell formation
 
 ---
 
@@ -222,24 +222,24 @@
 **Goal:** Implement Phase 3 protocol with hierarchical message routing
 
 **Success Criteria:**
-- ✓ Platforms only message squad peers
-- ✓ Squad leaders message platoon level
-- ✓ Cross-squad messages rejected
+- ✓ Nodes only message cell peers
+- ✓ Cell leaders message zone level
+- ✓ Cross-cell messages rejected
 - ✓ Message complexity is O(n log n)
 
 **Stories:**
 1. **E5.1** - Hierarchical Message Router
-   - Implement routing table (platform → squad → platoon)
+   - Implement routing table (node → cell → zone)
    - Add routing rules enforcement
-   - Reject cross-squad direct messages
-   - Support upward propagation (platform → squad → platoon)
+   - Reject cross-cell direct messages
+   - Support upward propagation (node → cell → zone)
    - Add routing metrics (hops, latency)
 
-2. **E5.2** - Platoon Level Aggregation
-   - Implement platoon coordinator
-   - Add squad summary collection
-   - Create platoon capability composition
-   - Generate platoon-level abstractions
+2. **E5.2** - Zone Level Aggregation
+   - Implement zone coordinator
+   - Add cell summary collection
+   - Create zone capability composition
+   - Generate zone-level abstractions
    - Publish to company level
 
 3. **E5.3** - Priority-Based Routing
@@ -257,8 +257,8 @@
    - Generate flow control alerts
 
 5. **E5.5** - Hierarchy Maintenance
-   - Handle squad merges (low membership)
-   - Handle squad splits (excess membership)
+   - Handle cell merges (low membership)
+   - Handle cell splits (excess membership)
    - Rebalance hierarchy on changes
    - Update routing tables dynamically
    - Minimize disruption during rebalancing
@@ -266,7 +266,7 @@
 **Deliverables:**
 - `src/hierarchy/` - Hierarchy module
 - `src/hierarchy/router.rs` - Message routing
-- `src/hierarchy/platoon.rs` - Platoon coordinator
+- `src/hierarchy/zone.rs` - Zone coordinator
 - `src/hierarchy/flow_control.rs` - Flow control
 - Integration tests for hierarchical routing
 
@@ -274,7 +274,7 @@
 
 ### E6: Capability Composition Engine
 
-**Goal:** Implement composition rules for aggregating platform capabilities
+**Goal:** Implement composition rules for aggregating node capabilities
 
 **Success Criteria:**
 - ✓ All 4 composition patterns work
@@ -312,7 +312,7 @@
    - Document redundancy math
 
 5. **E6.5** - Constraint-Based Composition
-   - Implement team speed (min of platform speeds)
+   - Implement team speed (min of node speeds)
    - Add communication range (max with mesh, min without)
    - Create constraint propagation logic
    - Handle constraint violations
@@ -450,7 +450,7 @@
 
 **Stories:**
 1. **E9.1** - Simulation Harness
-   - Implement platform spawner (configurable count)
+   - Implement node spawner (configurable count)
    - Add scenario definition format (JSON/YAML)
    - Create simulation orchestrator
    - Support simulation pause/resume
@@ -458,8 +458,8 @@
 
 2. **E9.2** - Terminal UI Dashboard
    - Use `tui-rs` for terminal interface
-   - Display platform count by phase
-   - Show squad formation status
+   - Display node count by phase
+   - Show cell formation status
    - Display real-time metrics
    - Add capability composition view
 
@@ -478,9 +478,9 @@
    - Support SVG/PNG output
 
 5. **E9.5** - Scenario Library
-   - Create 10-platform simple scenario
-   - Create 50-platform medium scenario
-   - Create 100-platform large scenario
+   - Create 10-node simple scenario
+   - Create 50-node medium scenario
+   - Create 100-node large scenario
    - Add network stress scenarios
    - Add failure injection scenarios
 
@@ -508,18 +508,18 @@
    - Achieve 80%+ code coverage
    - Add property tests for CRDT operations
    - Test all composition rules
-   - Test all bootstrap strategies
+   - Test all discovery strategies
    - Add edge case tests
 
 2. **E10.2** - Integration Test Scenarios
-   - Test bootstrap phase end-to-end
-   - Test squad formation end-to-end
+   - Test discovery phase end-to-end
+   - Test cell formation end-to-end
    - Test hierarchical operations end-to-end
    - Test phase transitions
    - Test failure recovery
 
 3. **E10.3** - Performance Benchmarks
-   - Benchmark platform update processing
+   - Benchmark node update processing
    - Benchmark delta generation
    - Benchmark capability composition
    - Benchmark message routing
@@ -527,7 +527,7 @@
 
 4. **E10.4** - Scale Validation
    - Test with 10, 50, 100, 200 platforms
-   - Measure message count vs. platform count
+   - Measure message count vs. node count
    - Prove O(n log n) complexity
    - Measure memory per platform
    - Measure CPU per platform
@@ -570,87 +570,87 @@
 
 **Deliverables:**
 - Working development environment
-- Platform CRDT model implemented
+- Node CRDT model implemented
 - Basic Ditto store operations working
 
-**Demo:** Show platform state persisting and syncing via Ditto between two instances
+**Demo:** Show node state persisting and syncing via Ditto between two instances
 
 ---
 
-### Week 2: Bootstrap Sprint 1
-**Focus:** Complete data models and start bootstrap phase
+### Week 2: Discovery Sprint 1
+**Focus:** Complete data models and start discovery phase
 
 **Epics:** E2 (complete), E3 (partial)
 
 **Goals:**
 - All CRDT models complete and tested
 - Geographic self-organization working
-- Bootstrap coordinator framework in place
+- Discovery coordinator framework in place
 
 **Deliverables:**
 - Complete data model layer
-- Geographic bootstrap strategy implemented
-- Bootstrap metrics collection
+- Geographic discovery strategy implemented
+- Discovery metrics collection
 
-**Demo:** 10 platforms organize into 2 squads using geographic strategy
+**Demo:** 10 nodes organize into 2 cells using geographic strategy
 
 ---
 
-### Week 3: Bootstrap Sprint 2
-**Focus:** Complete bootstrap phase with all strategies
+### Week 3: Discovery Sprint 2
+**Focus:** Complete discovery phase with all strategies
 
 **Epics:** E3 (complete)
 
 **Goals:**
 - C2-directed assignment working
 - Capability-based queries working
-- Bootstrap completes in <60s for 100 platforms
-- All bootstrap metrics validated
+- Discovery completes in <60s for 100 platforms
+- All discovery metrics validated
 
 **Deliverables:**
-- All three bootstrap strategies
-- Bootstrap integration tests
-- Bootstrap performance validated
+- All three discovery strategies
+- Discovery integration tests
+- Discovery performance validated
 
-**Demo:** 50 platforms organize using all three strategies, show message count vs. platform count
+**Demo:** 50 nodes organize using all three strategies, show message count vs. node count
 
 ---
 
-### Week 4: Squad Formation Sprint 1
-**Focus:** Intra-squad communication and leader election
+### Week 4: Cell Formation Sprint 1
+**Focus:** Intra-cell communication and leader election
 
 **Epics:** E4 (partial), E6 (start)
 
 **Goals:**
-- Squad messaging infrastructure working
+- Cell messaging infrastructure working
 - Leader election converges quickly
 - Basic capability aggregation functional
 
 **Deliverables:**
-- Squad messaging bus
+- Cell messaging bus
 - Leader election algorithm
 - Role assignment logic
 
-**Demo:** Squad forms, elects leader, assigns roles within 5 seconds
+**Demo:** Cell forms, elects leader, assigns roles within 5 seconds
 
 ---
 
-### Week 5: Squad Formation Sprint 2
-**Focus:** Complete squad formation and start composition
+### Week 5: Cell Formation Sprint 2
+**Focus:** Complete cell formation and start composition
 
 **Epics:** E4 (complete), E6 (partial)
 
 **Goals:**
-- Squad capability aggregation working
+- Cell capability aggregation working
 - Phase transition to hierarchical mode
 - Additive composition rules implemented
 
 **Deliverables:**
-- Complete squad formation phase
-- Squad to hierarchical transition
+- Complete cell formation phase
+- Cell to hierarchical transition
 - Additive composition rules
 
-**Demo:** Squad discovers emergent ISR capability from member platforms
+**Demo:** Cell discovers emergent ISR capability from member platforms
 
 ---
 
@@ -662,14 +662,14 @@
 **Goals:**
 - Hierarchical message routing working
 - All composition patterns implemented
-- Platoon-level aggregation functional
+- Zone-level aggregation functional
 
 **Deliverables:**
 - Hierarchical router
 - All 4 composition rule types
-- Platoon coordinator
+- Zone coordinator
 
-**Demo:** Multi-squad hierarchy with capability composition at each level
+**Demo:** Multi-cell hierarchy with capability composition at each level
 
 ---
 
@@ -748,7 +748,7 @@
 - Terminal UI dashboard
 - 5 demo scenarios
 
-**Demo:** Run 100-platform scenario with live visualization and metrics
+**Demo:** Run 100-node scenario with live visualization and metrics
 
 ---
 
@@ -760,7 +760,7 @@
 **Goals:**
 - All functional requirements validated
 - Performance benchmarks passing
-- Scale validation complete (100+ platforms)
+- Scale validation complete (100+ nodes)
 - O(n log n) complexity proven
 
 **Deliverables:**
@@ -817,28 +817,28 @@
 ## Success Criteria & Validation
 
 ### Phase 1 Success (Week 3)
-- [ ] 100 platforms organize in <60 seconds
-- [ ] Bootstrap message count is O(√n)
-- [ ] All three bootstrap strategies demonstrated
+- [ ] 100 nodes organize in <60 seconds
+- [ ] Discovery message count is O(√n)
+- [ ] All three discovery strategies demonstrated
 - [ ] Metrics show <1000 messages for 100 platforms
 
 ### Phase 2 Success (Week 5)
 - [ ] Leader election converges in <5 seconds
-- [ ] Squads discover emergent capabilities
-- [ ] Squad formation is deterministic and stable
+- [ ] Cells discover emergent capabilities
+- [ ] Cell formation is deterministic and stable
 - [ ] Phase transition to hierarchical mode works
 
 ### Phase 3 Success (Week 7)
-- [ ] Platforms only communicate with squad peers
+- [ ] Nodes only communicate with cell peers
 - [ ] Message complexity is O(n log n)
 - [ ] Priority 1 updates propagate in <5 seconds
-- [ ] Cross-squad communication prevented
+- [ ] Cross-cell communication prevented
 
 ### Overall Success (Week 12)
 - [ ] All functional requirements (FR-1 through FR-10) validated
 - [ ] All non-functional requirements (NFR-1 through NFR-5) met
 - [ ] Performance benchmarks pass
-- [ ] Scale validation complete (100+ platforms)
+- [ ] Scale validation complete (100+ nodes)
 - [ ] Documentation complete
 - [ ] Demo ready for stakeholders
 
@@ -911,8 +911,8 @@ A story is considered "done" when:
 ```
 E1: Foundation        - 5%
 E2: CRDT Models       - 8%
-E3: Bootstrap         - 12%
-E4: Squad Formation   - 15%
+E3: Discovery         - 12%
+E4: Cell Formation   - 15%
 E5: Hierarchical Ops  - 15%
 E6: Composition       - 12%
 E7: Differentials     - 10%
@@ -929,7 +929,7 @@ E10: Testing & Docs   - 15%
 1. Set up development environment
 2. Create repository with initial structure
 3. Integrate Ditto SDK and validate
-4. Begin platform data model implementation
+4. Begin node data model implementation
 5. Schedule weekly demo time with stakeholders
 
 ### Long-term Planning
