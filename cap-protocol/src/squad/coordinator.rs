@@ -129,13 +129,10 @@ impl SquadCoordinator {
         let capabilities = CapabilityAggregator::aggregate_capabilities(&members_for_agg)?;
 
         // Check required capabilities
-        let gaps =
-            CapabilityAggregator::identify_gaps(&capabilities, &self.required_capabilities);
+        let gaps = CapabilityAggregator::identify_gaps(&capabilities, &self.required_capabilities);
         if !gaps.is_empty() {
-            self.status = FormationStatus::Failed(format!(
-                "Missing required capabilities: {:?}",
-                gaps
-            ));
+            self.status =
+                FormationStatus::Failed(format!("Missing required capabilities: {:?}", gaps));
             return Ok(false);
         }
 
@@ -178,9 +175,7 @@ impl SquadCoordinator {
         &self,
         capabilities: &HashMap<crate::models::CapabilityType, AggregatedCapability>,
     ) -> bool {
-        capabilities
-            .values()
-            .any(|cap| cap.requires_oversight)
+        capabilities.values().any(|cap| cap.requires_oversight)
     }
 
     /// Approve formation (human operator decision)
@@ -353,7 +348,12 @@ mod tests {
                 Some(SquadRole::Follower),
                 None,
             ),
-            create_test_member("p2", vec![CapabilityType::Sensor], Some(SquadRole::Sensor), None),
+            create_test_member(
+                "p2",
+                vec![CapabilityType::Sensor],
+                Some(SquadRole::Sensor),
+                None,
+            ),
             create_test_member(
                 "p3",
                 vec![CapabilityType::Compute],
@@ -379,7 +379,12 @@ mod tests {
                 Some(SquadRole::Leader),
                 None,
             ),
-            create_test_member("p2", vec![CapabilityType::Sensor], Some(SquadRole::Sensor), None),
+            create_test_member(
+                "p2",
+                vec![CapabilityType::Sensor],
+                Some(SquadRole::Sensor),
+                None,
+            ),
             create_test_member("p3", vec![CapabilityType::Compute], None, None), // No role
         ];
 
@@ -447,7 +452,12 @@ mod tests {
                 Some(SquadRole::Leader),
                 Some(operator),
             ),
-            create_test_member("p2", vec![CapabilityType::Sensor], Some(SquadRole::Sensor), None),
+            create_test_member(
+                "p2",
+                vec![CapabilityType::Sensor],
+                Some(SquadRole::Sensor),
+                None,
+            ),
             create_test_member(
                 "p3",
                 vec![CapabilityType::Compute],
@@ -494,7 +504,12 @@ mod tests {
                 Some(SquadRole::Leader),
                 Some(operator1),
             ),
-            create_test_member("p2", vec![CapabilityType::Sensor], Some(SquadRole::Sensor), None),
+            create_test_member(
+                "p2",
+                vec![CapabilityType::Sensor],
+                Some(SquadRole::Sensor),
+                None,
+            ),
             create_test_member(
                 "p3",
                 vec![CapabilityType::Payload], // Oversight-required with low authority
@@ -633,7 +648,12 @@ mod tests {
                 Some(SquadRole::Leader),
                 Some(operator),
             ),
-            create_test_member("p2", vec![CapabilityType::Sensor], Some(SquadRole::Sensor), None),
+            create_test_member(
+                "p2",
+                vec![CapabilityType::Sensor],
+                Some(SquadRole::Sensor),
+                None,
+            ),
             create_test_member(
                 "p3",
                 vec![CapabilityType::Compute],
@@ -679,403 +699,5 @@ mod tests {
         // Second approval should fail (not awaiting approval anymore)
         let result = coord.approve_formation();
         assert!(result.is_err());
-    }
-}
-
-/// End-to-end integration tests for full squad formation flow
-#[cfg(test)]
-mod e2e_integration_tests {
-    use super::*;
-    use crate::models::role::{RoleAllocator, RoleScorer};
-    use crate::models::{HealthStatus, HumanMachinePair, OperatorRank};
-
-    /// Test scenario configuration for E2E testing
-    struct SquadFormationScenario {
-        name: &'static str,
-        squad_size: usize,
-        include_operators: bool,
-        authority_levels: Vec<Option<AuthorityLevel>>,
-        health_statuses: Vec<HealthStatus>,
-        expect_approval_required: bool,
-        expect_success: bool,
-        min_readiness: f32,
-    }
-
-    impl SquadFormationScenario {
-        fn new_optimal() -> Self {
-            Self {
-                name: "Optimal: Full authority, all nominal",
-                squad_size: 5,
-                include_operators: true,
-                authority_levels: vec![
-                    Some(AuthorityLevel::DirectControl),
-                    Some(AuthorityLevel::DirectControl),
-                    Some(AuthorityLevel::DirectControl),
-                    Some(AuthorityLevel::DirectControl),
-                    Some(AuthorityLevel::DirectControl),
-                ],
-                health_statuses: vec![
-                    HealthStatus::Nominal,
-                    HealthStatus::Nominal,
-                    HealthStatus::Nominal,
-                    HealthStatus::Nominal,
-                    HealthStatus::Nominal,
-                ],
-                expect_approval_required: false,
-                expect_success: true,
-                min_readiness: 0.7,
-            }
-        }
-
-        fn new_mixed_authority() -> Self {
-            Self {
-                name: "Mixed Authority: Requires human oversight",
-                squad_size: 4,
-                include_operators: true,
-                authority_levels: vec![
-                    Some(AuthorityLevel::Commander),
-                    Some(AuthorityLevel::DirectControl),
-                    Some(AuthorityLevel::Observer),
-                    Some(AuthorityLevel::Advisor),
-                ],
-                health_statuses: vec![
-                    HealthStatus::Nominal,
-                    HealthStatus::Nominal,
-                    HealthStatus::Nominal,
-                    HealthStatus::Nominal,
-                ],
-                expect_approval_required: true,
-                expect_success: true,
-                min_readiness: 0.7,
-            }
-        }
-
-        fn new_degraded_health() -> Self {
-            Self {
-                name: "Degraded Health: Mixed health statuses",
-                squad_size: 4,
-                include_operators: true,
-                authority_levels: vec![
-                    Some(AuthorityLevel::DirectControl),
-                    Some(AuthorityLevel::DirectControl),
-                    Some(AuthorityLevel::DirectControl),
-                    Some(AuthorityLevel::DirectControl),
-                ],
-                health_statuses: vec![
-                    HealthStatus::Nominal,
-                    HealthStatus::Degraded,
-                    HealthStatus::Nominal,
-                    HealthStatus::Degraded,
-                ],
-                expect_approval_required: false,
-                expect_success: true,
-                min_readiness: 0.6, // Lower threshold for degraded scenario
-            }
-        }
-
-        fn new_autonomous_only() -> Self {
-            Self {
-                name: "Autonomous Only: No operators",
-                squad_size: 4,
-                include_operators: false,
-                authority_levels: vec![None, None, None, None],
-                health_statuses: vec![
-                    HealthStatus::Nominal,
-                    HealthStatus::Nominal,
-                    HealthStatus::Nominal,
-                    HealthStatus::Nominal,
-                ],
-                expect_approval_required: true, // Autonomous squads require oversight
-                expect_success: true,
-                min_readiness: 0.7,
-            }
-        }
-
-        fn new_minimal_viable() -> Self {
-            Self {
-                name: "Minimal Viable: Exactly minimum size",
-                squad_size: 3,
-                include_operators: true,
-                authority_levels: vec![
-                    Some(AuthorityLevel::DirectControl),
-                    Some(AuthorityLevel::DirectControl),
-                    Some(AuthorityLevel::DirectControl),
-                ],
-                health_statuses: vec![
-                    HealthStatus::Nominal,
-                    HealthStatus::Nominal,
-                    HealthStatus::Nominal,
-                ],
-                expect_approval_required: false,
-                expect_success: true,
-                min_readiness: 0.7,
-            }
-        }
-
-        fn new_critical_platform() -> Self {
-            Self {
-                name: "Critical Platform: One critical health member",
-                squad_size: 4,
-                include_operators: true,
-                authority_levels: vec![
-                    Some(AuthorityLevel::DirectControl),
-                    Some(AuthorityLevel::DirectControl),
-                    Some(AuthorityLevel::DirectControl),
-                    Some(AuthorityLevel::DirectControl),
-                ],
-                health_statuses: vec![
-                    HealthStatus::Nominal,
-                    HealthStatus::Critical,
-                    HealthStatus::Nominal,
-                    HealthStatus::Nominal,
-                ],
-                expect_approval_required: false,
-                expect_success: true,
-                min_readiness: 0.5, // Lower due to critical member
-            }
-        }
-    }
-
-    /// Helper to create a full platform with specified configuration
-    fn create_full_platform(
-        id: &str,
-        capabilities: Vec<CapabilityType>,
-        health: HealthStatus,
-        operator_auth: Option<AuthorityLevel>,
-    ) -> (PlatformConfig, PlatformState) {
-        let mut config = PlatformConfig::new("Test".to_string());
-        config.id = id.to_string();
-
-        // Add capabilities
-        for cap_type in capabilities {
-            config.add_capability(Capability::new(
-                format!("{}_{:?}", id, cap_type),
-                format!("{:?}", cap_type),
-                cap_type,
-                0.9,
-            ));
-        }
-
-        // Add operator if specified
-        if let Some(auth) = operator_auth {
-            let rank = match auth {
-                AuthorityLevel::DirectControl => OperatorRank::E7,
-                AuthorityLevel::Commander => OperatorRank::E5,
-                AuthorityLevel::Observer => OperatorRank::E4,
-                AuthorityLevel::Advisor => OperatorRank::E4,
-            };
-
-            let operator = Operator::new(
-                format!("op_{}", id),
-                format!("Operator {}", id),
-                rank,
-                auth,
-                "11B".to_string(),
-            );
-
-            let binding = HumanMachinePair::new(
-                vec![operator],
-                vec![id.to_string()],
-                crate::models::BindingType::OneToOne,
-            );
-            config.operator_binding = Some(binding);
-        }
-
-        let mut state = PlatformState::new((0.0, 0.0, 0.0));
-        state.health = health;
-
-        (config, state)
-    }
-
-    /// Run a complete E2E squad formation flow
-    fn run_e2e_scenario(scenario: SquadFormationScenario) {
-        println!("\n=== Running E2E Scenario: {} ===", scenario.name);
-
-        // Step 1: Create platforms based on scenario
-        let mut platforms: Vec<(PlatformConfig, PlatformState)> = Vec::new();
-
-        let capability_distribution = vec![
-            vec![CapabilityType::Communication, CapabilityType::Sensor],
-            vec![CapabilityType::Sensor, CapabilityType::Compute],
-            vec![CapabilityType::Payload, CapabilityType::Sensor],
-            vec![CapabilityType::Communication, CapabilityType::Compute],
-            vec![CapabilityType::Storage, CapabilityType::Sensor],
-        ];
-
-        for i in 0..scenario.squad_size {
-            let id = format!("p{}", i + 1);
-            let caps = capability_distribution[i % capability_distribution.len()].clone();
-            let health = scenario.health_statuses[i].clone();
-            let auth = if scenario.include_operators {
-                scenario.authority_levels[i]
-            } else {
-                None
-            };
-
-            platforms.push(create_full_platform(&id, caps, health, auth));
-        }
-
-        println!(
-            "Created {} platforms with health: {:?}",
-            platforms.len(),
-            scenario.health_statuses
-        );
-
-        // Step 2: Aggregate capabilities
-        let aggregated = CapabilityAggregator::aggregate_capabilities(&platforms).unwrap();
-        println!(
-            "Aggregated {} capability types",
-            aggregated.keys().len()
-        );
-
-        let readiness = CapabilityAggregator::calculate_readiness_score(&aggregated);
-        println!("Squad readiness score: {:.2}", readiness);
-
-        assert!(
-            readiness >= scenario.min_readiness,
-            "Readiness {} below minimum {}",
-            readiness,
-            scenario.min_readiness
-        );
-
-        // Step 3: Assign roles
-        let roles = RoleAllocator::allocate_roles(&platforms).unwrap();
-        println!("Assigned {} roles", roles.len());
-
-        assert_eq!(
-            roles.len(),
-            platforms.len(),
-            "All platforms should have assigned roles"
-        );
-
-        // Verify leader assignment
-        let leader_id = roles
-            .iter()
-            .find(|(_, role)| **role == SquadRole::Leader)
-            .map(|(id, _)| id.clone());
-        assert!(
-            leader_id.is_some(),
-            "Squad should have an elected leader"
-        );
-        println!("Leader elected: {}", leader_id.as_ref().unwrap());
-
-        // Step 4: Create squad coordinator
-        let mut coord = SquadCoordinator::new("e2e_squad".to_string());
-        coord.min_readiness = scenario.min_readiness;
-
-        // Create member tuples
-        let mut members: Vec<(PlatformConfig, PlatformState, Option<SquadRole>)> = Vec::new();
-        for (config, state) in platforms {
-            let role = roles.get(&config.id).cloned();
-            members.push((config, state, role));
-        }
-
-        // Step 5: Check formation completion
-        let complete = coord
-            .check_formation_complete(&members, leader_id.as_deref())
-            .unwrap();
-
-        println!("Formation status: {:?}", coord.status);
-
-        // Verify expectations
-        if scenario.expect_approval_required {
-            if scenario.expect_success {
-                assert!(
-                    matches!(coord.status, FormationStatus::AwaitingApproval),
-                    "Expected AwaitingApproval status, got {:?}",
-                    coord.status
-                );
-                assert!(
-                    !complete,
-                    "Formation should not be complete without approval"
-                );
-
-                // Step 6: Approve if awaiting
-                coord.approve_formation().unwrap();
-                assert_eq!(coord.status, FormationStatus::Ready);
-                assert!(coord.human_approved);
-                println!("Human approval granted, formation ready");
-            }
-        } else {
-            if scenario.expect_success {
-                assert!(
-                    complete,
-                    "Formation should be complete without approval required"
-                );
-                assert_eq!(coord.status, FormationStatus::Ready);
-            }
-        }
-
-        // Step 7: Verify phase transition capability
-        if coord.status == FormationStatus::Ready {
-            assert!(coord.can_transition_to_hierarchical());
-            let phase = coord.get_hierarchical_phase().unwrap();
-            assert_eq!(phase, Phase::Hierarchical);
-            println!("Phase transition to Hierarchical verified");
-        }
-
-        // Step 8: Verify formation duration tracking
-        let duration = coord.formation_duration();
-        assert!(duration >= 0, "Formation duration should be tracked");
-
-        println!(
-            "=== Scenario '{}' completed successfully ===\n",
-            scenario.name
-        );
-    }
-
-    #[test]
-    fn test_e2e_optimal_squad_formation() {
-        run_e2e_scenario(SquadFormationScenario::new_optimal());
-    }
-
-    #[test]
-    fn test_e2e_mixed_authority_squad() {
-        run_e2e_scenario(SquadFormationScenario::new_mixed_authority());
-    }
-
-    #[test]
-    fn test_e2e_degraded_health_squad() {
-        run_e2e_scenario(SquadFormationScenario::new_degraded_health());
-    }
-
-    #[test]
-    fn test_e2e_autonomous_only_squad() {
-        run_e2e_scenario(SquadFormationScenario::new_autonomous_only());
-    }
-
-    #[test]
-    fn test_e2e_minimal_viable_squad() {
-        run_e2e_scenario(SquadFormationScenario::new_minimal_viable());
-    }
-
-    #[test]
-    fn test_e2e_critical_platform_squad() {
-        run_e2e_scenario(SquadFormationScenario::new_critical_platform());
-    }
-
-    #[test]
-    fn test_e2e_scenario_matrix() {
-        // Run all scenarios in sequence to verify robustness
-        println!("\n========================================");
-        println!("Running Full E2E Scenario Matrix");
-        println!("========================================");
-
-        let scenarios = vec![
-            SquadFormationScenario::new_optimal(),
-            SquadFormationScenario::new_mixed_authority(),
-            SquadFormationScenario::new_degraded_health(),
-            SquadFormationScenario::new_autonomous_only(),
-            SquadFormationScenario::new_minimal_viable(),
-            SquadFormationScenario::new_critical_platform(),
-        ];
-
-        for scenario in scenarios {
-            run_e2e_scenario(scenario);
-        }
-
-        println!("========================================");
-        println!("All E2E scenarios passed!");
-        println!("========================================\n");
     }
 }

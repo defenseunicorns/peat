@@ -400,6 +400,13 @@ mod tests {
         let store = DittoStore::new(config).expect("Failed to create Ditto store");
         assert!(!store.peer_key().is_empty());
 
+        // Explicitly stop sync and drop store to ensure clean shutdown
+        store.stop_sync();
+        drop(store);
+
+        // Give Ditto time to shut down background threads
+        sleep(Duration::from_millis(100)).await;
+
         // Temp dir will be automatically cleaned up when it goes out of scope
     }
 
@@ -469,6 +476,13 @@ mod tests {
             .remove("test_platforms", &doc_id)
             .await
             .expect("Failed to remove");
+
+        // Explicitly stop sync and drop store to ensure clean shutdown
+        store.stop_sync();
+        drop(store);
+
+        // Give Ditto time to shut down background threads
+        sleep(Duration::from_millis(100)).await;
     }
 
     #[tokio::test]
@@ -644,5 +658,21 @@ mod tests {
         }
 
         assert!(synced, "Document should have synced from store1 to store2");
+
+        // Explicitly stop sync and drop stores to ensure clean shutdown
+        // Drop observers and subscriptions first to stop observing changes
+        drop(_observer1);
+        drop(_observer2);
+        drop(_sync_sub1);
+        drop(_sync_sub2);
+
+        // Then stop sync and drop stores
+        store1.stop_sync();
+        store2.stop_sync();
+        drop(store1);
+        drop(store2);
+
+        // Give Ditto time to shut down background threads
+        sleep(Duration::from_millis(200)).await;
     }
 }
