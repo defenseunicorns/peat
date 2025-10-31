@@ -1,7 +1,7 @@
 //! Cell state storage manager
 //!
 //! This module provides a high-level wrapper around DittoStore for managing
-//! squad state using CRDT operations.
+//! cell state using CRDT operations.
 
 use crate::models::{cell::CellState, Capability};
 use crate::storage::ditto_store::DittoStore;
@@ -10,214 +10,213 @@ use serde_json::json;
 use tracing::{debug, info, instrument};
 
 /// Collection name
-const SQUAD_COLLECTION: &str = "cells";
+const CELL_COLLECTION: &str = "cells";
 
 /// Cell storage manager
 pub struct CellStore {
     store: DittoStore,
 }
 
-impl SquadStore {
-    /// Create a new squad store
+impl CellStore {
+    /// Create a new cell store
     pub fn new(store: DittoStore) -> Self {
         Self { store }
     }
 
-    /// Store a squad state (OR-Set + LWW-Register operations)
-    #[instrument(skip(self, squad))]
-    pub async fn store_squad(&self, squad: &SquadState) -> Result<String> {
-        info!("Storing squad: {}", squad.config.id);
+    /// Store a cell state (OR-Set + LWW-Register operations)
+    #[instrument(skip(self, cell))]
+    pub async fn store_cell(&self, cell: &CellState) -> Result<String> {
+        info!("Storing cell: {}", cell.config.id);
 
-        // Serialize squad state directly
-        let mut doc = serde_json::to_value(squad)?;
-        // Add squad_id field for querying
+        // Serialize cell state directly
+        let mut doc = serde_json::to_value(cell)?;
+        // Add cell_id field for querying
         if let Some(obj) = doc.as_object_mut() {
-            obj.insert("squad_id".to_string(), json!(squad.config.id.clone()));
+            obj.insert("cell_id".to_string(), json!(cell.config.id.clone()));
         }
 
-        self.store.upsert(SQUAD_COLLECTION, doc).await.map_err(|e| {
+        self.store.upsert(CELL_COLLECTION, doc).await.map_err(|e| {
             Error::storage_error(
-                format!("Failed to store squad: {}", e),
+                format!("Failed to store cell: {}", e),
                 "upsert",
-                Some(SQUAD_COLLECTION.to_string()),
+                Some(CELL_COLLECTION.to_string()),
             )
         })
     }
 
-    /// Retrieve a squad by ID
+    /// Retrieve a cell by ID
     #[instrument(skip(self))]
-    pub async fn get_squad(&self, squad_id: &str) -> Result<Option<SquadState>> {
-        debug!("Retrieving squad: {}", squad_id);
+    pub async fn get_cell(&self, cell_id: &str) -> Result<Option<CellState>> {
+        debug!("Retrieving cell: {}", cell_id);
 
-        let where_clause = format!("squad_id == '{}'", squad_id);
-        let docs = self.store.query(SQUAD_COLLECTION, &where_clause).await?;
+        let where_clause = format!("cell_id == '{}'", cell_id);
+        let docs = self.store.query(CELL_COLLECTION, &where_clause).await?;
 
         if docs.is_empty() {
             return Ok(None);
         }
 
-        let squad: SquadState = serde_json::from_value(docs[0].clone())?;
-        Ok(Some(squad))
+        let cell: CellState = serde_json::from_value(docs[0].clone())?;
+        Ok(Some(cell))
     }
 
     /// Get all valid cells (meeting minimum size requirements)
     #[instrument(skip(self))]
-    pub async fn get_valid_squads(&self) -> Result<Vec<SquadState>> {
-        debug!("Querying valid squads");
+    pub async fn get_valid_cells(&self) -> Result<Vec<CellState>> {
+        debug!("Querying valid cells");
 
         // Query all cells - we'll filter in code since DQL doesn't support array length
-        let docs = self.store.query(SQUAD_COLLECTION, "true").await?;
+        let docs = self.store.query(CELL_COLLECTION, "true").await?;
 
-        let squads: Vec<SquadState> = docs
+        let cells: Vec<CellState> = docs
             .into_iter()
             .filter_map(|doc| serde_json::from_value(doc).ok())
-            .filter(|squad: &SquadState| squad.is_valid())
+            .filter(|cell: &CellState| cell.is_valid())
             .collect();
 
-        Ok(squads)
+        Ok(cells)
     }
 
     /// Get all cells in a platoon
     #[instrument(skip(self))]
-    pub async fn get_squads_by_platoon(&self, platoon_id: &str) -> Result<Vec<SquadState>> {
+    pub async fn get_cells_by_zone(&self, platoon_id: &str) -> Result<Vec<CellState>> {
         debug!("Querying cells by platoon: {}", platoon_id);
 
         let where_clause = format!("platoon_id == '{}'", platoon_id);
-        let docs = self.store.query(SQUAD_COLLECTION, &where_clause).await?;
+        let docs = self.store.query(CELL_COLLECTION, &where_clause).await?;
 
-        let squads: Vec<SquadState> = docs
+        let cells: Vec<CellState> = docs
             .into_iter()
             .filter_map(|doc| serde_json::from_value(doc).ok())
             .collect();
 
-        Ok(squads)
+        Ok(cells)
     }
 
     /// Get cells that have a specific capability type
     #[instrument(skip(self))]
-    pub async fn get_squads_with_capability(
+    pub async fn get_cells_with_capability(
         &self,
         capability_type: crate::models::CapabilityType,
-    ) -> Result<Vec<SquadState>> {
+    ) -> Result<Vec<CellState>> {
         debug!("Querying cells with capability: {:?}", capability_type);
 
         // Query all cells - filter by capability in code
-        let docs = self.store.query(SQUAD_COLLECTION, "true").await?;
+        let docs = self.store.query(CELL_COLLECTION, "true").await?;
 
-        let squads: Vec<SquadState> = docs
+        let cells: Vec<CellState> = docs
             .into_iter()
             .filter_map(|doc| serde_json::from_value(doc).ok())
-            .filter(|squad: &SquadState| squad.has_capability_type(capability_type))
+            .filter(|cell: &CellState| cell.has_capability_type(capability_type))
             .collect();
 
-        Ok(squads)
+        Ok(cells)
     }
 
     /// Get cells that are not full (can accept more members)
     #[instrument(skip(self))]
-    pub async fn get_available_squads(&self) -> Result<Vec<SquadState>> {
-        debug!("Querying available squads");
+    pub async fn get_available_cells(&self) -> Result<Vec<CellState>> {
+        debug!("Querying available cells");
 
-        let docs = self.store.query(SQUAD_COLLECTION, "true").await?;
+        let docs = self.store.query(CELL_COLLECTION, "true").await?;
 
-        let squads: Vec<SquadState> = docs
+        let cells: Vec<CellState> = docs
             .into_iter()
             .filter_map(|doc| serde_json::from_value(doc).ok())
-            .filter(|squad: &SquadState| !squad.is_full())
+            .filter(|cell: &CellState| !cell.is_full())
             .collect();
 
-        Ok(squads)
+        Ok(cells)
     }
 
-    /// Add a member to a squad (OR-Set add operation)
+    /// Add a member to a cell (OR-Set add operation)
     #[instrument(skip(self))]
-    pub async fn add_member(&self, squad_id: &str, platform_id: String) -> Result<()> {
-        info!("Adding member {} to squad {}", platform_id, squad_id);
+    pub async fn add_member(&self, cell_id: &str, node_id: String) -> Result<()> {
+        info!("Adding member {} to cell {}", node_id, cell_id);
 
-        let mut squad = self
-            .get_squad(squad_id)
+        let mut cell = self
+            .get_cell(cell_id)
             .await?
             .ok_or_else(|| Error::NotFound {
-                resource_type: "Squad".to_string(),
-                id: squad_id.to_string(),
+                resource_type: "Cell".to_string(),
+                id: cell_id.to_string(),
             })?;
 
-        if !squad.add_member(platform_id) {
-            return Err(Error::Internal("Failed to add member to squad".to_string()));
+        if !cell.add_member(node_id) {
+            return Err(Error::Internal("Failed to add member to cell".to_string()));
         }
 
-        self.store_squad(&squad).await?;
+        self.store_cell(&cell).await?;
         Ok(())
     }
 
-    /// Remove a member from a squad (OR-Set remove operation)
+    /// Remove a member from a cell (OR-Set remove operation)
     #[instrument(skip(self))]
-    pub async fn remove_member(&self, squad_id: &str, platform_id: &str) -> Result<()> {
-        info!("Removing member {} from squad {}", platform_id, squad_id);
+    pub async fn remove_member(&self, cell_id: &str, node_id: &str) -> Result<()> {
+        info!("Removing member {} from cell {}", node_id, cell_id);
 
-        let mut squad = self
-            .get_squad(squad_id)
+        let mut cell = self
+            .get_cell(cell_id)
             .await?
             .ok_or_else(|| Error::NotFound {
-                resource_type: "Squad".to_string(),
-                id: squad_id.to_string(),
+                resource_type: "Cell".to_string(),
+                id: cell_id.to_string(),
             })?;
 
-        if !squad.remove_member(platform_id) {
+        if !cell.remove_member(node_id) {
             return Err(Error::Internal(
-                "Failed to remove member from squad".to_string(),
+                "Failed to remove member from cell".to_string(),
             ));
         }
 
-        self.store_squad(&squad).await?;
+        self.store_cell(&cell).await?;
         Ok(())
     }
 
     /// Set squad leader (LWW-Register operation)
     #[instrument(skip(self))]
-    pub async fn set_leader(&self, squad_id: &str, platform_id: String) -> Result<()> {
-        info!("Setting leader {} for squad {}", platform_id, squad_id);
+    pub async fn set_leader(&self, cell_id: &str, node_id: String) -> Result<()> {
+        info!("Setting leader {} for squad {}", node_id, cell_id);
 
-        let mut squad = self
-            .get_squad(squad_id)
+        let mut cell = self
+            .get_cell(cell_id)
             .await?
             .ok_or_else(|| Error::NotFound {
-                resource_type: "Squad".to_string(),
-                id: squad_id.to_string(),
+                resource_type: "Cell".to_string(),
+                id: cell_id.to_string(),
             })?;
 
-        squad
-            .set_leader(platform_id)
+        cell.set_leader(node_id)
             .map_err(|e| Error::Internal(e.to_string()))?;
 
-        self.store_squad(&squad).await?;
+        self.store_cell(&cell).await?;
         Ok(())
     }
 
-    /// Add a capability to a squad (G-Set operation)
+    /// Add a capability to a cell (G-Set operation)
     #[instrument(skip(self, capability))]
-    pub async fn add_capability(&self, squad_id: &str, capability: Capability) -> Result<()> {
-        info!("Adding capability to squad {}", squad_id);
+    pub async fn add_capability(&self, cell_id: &str, capability: Capability) -> Result<()> {
+        info!("Adding capability to cell {}", cell_id);
 
-        let mut squad = self
-            .get_squad(squad_id)
+        let mut cell = self
+            .get_cell(cell_id)
             .await?
             .ok_or_else(|| Error::NotFound {
-                resource_type: "Squad".to_string(),
-                id: squad_id.to_string(),
+                resource_type: "Cell".to_string(),
+                id: cell_id.to_string(),
             })?;
 
-        squad.add_capability(capability);
-        self.store_squad(&squad).await?;
+        cell.add_capability(capability);
+        self.store_cell(&cell).await?;
         Ok(())
     }
 
-    /// Delete a squad
+    /// Delete a cell
     #[instrument(skip(self))]
-    pub async fn delete_squad(&self, squad_id: &str) -> Result<()> {
-        info!("Deleting squad: {}", squad_id);
+    pub async fn delete_cell(&self, cell_id: &str) -> Result<()> {
+        info!("Deleting cell: {}", cell_id);
 
-        self.store.remove(SQUAD_COLLECTION, squad_id).await
+        self.store.remove(CELL_COLLECTION, cell_id).await
     }
 
     /// Get the underlying DittoStore reference
@@ -229,14 +228,14 @@ impl SquadStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::SquadConfig;
+    use crate::models::CellConfig;
     use crate::storage::ditto_store::DittoConfig;
 
-    async fn create_test_store() -> Result<SquadStore> {
+    async fn create_test_store() -> Result<CellStore> {
         // Create unique temp directory for this test to enable parallel execution
         // Use tempfile::Builder to create temp dir with a unique name
         let temp_dir = tempfile::Builder::new()
-            .prefix(&format!("ditto_squad_test_{}_", std::process::id()))
+            .prefix(&format!("ditto_cell_test_{}_", std::process::id()))
             .tempdir()
             .map_err(|e| {
                 Error::storage_error(
@@ -269,11 +268,11 @@ mod tests {
         };
 
         let ditto_store = DittoStore::new(config)?;
-        Ok(SquadStore::new(ditto_store))
+        Ok(CellStore::new(ditto_store))
     }
 
     #[tokio::test]
-    async fn test_squad_storage() {
+    async fn test_cell_storage() {
         let store = match create_test_store().await {
             Ok(s) => s,
             Err(_) => {
@@ -282,23 +281,23 @@ mod tests {
             }
         };
 
-        let config = SquadConfig::new(5);
-        let mut squad = SquadState::new(config);
-        squad.add_member("platform_1".to_string());
+        let config = CellConfig::new(5);
+        let mut cell = CellState::new(config);
+        cell.add_member("node_1".to_string());
 
-        let doc_id = store.store_squad(&squad).await.unwrap();
+        let doc_id = store.store_cell(&cell).await.unwrap();
         assert!(!doc_id.is_empty());
 
-        let retrieved = store.get_squad(&squad.config.id).await.unwrap();
+        let retrieved = store.get_cell(&cell.config.id).await.unwrap();
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().member_count(), 1);
     }
 
-    // NOTE: test_squad_member_operations was removed because it tests Ditto's internal
+    // NOTE: test_cell_member_operations was removed because it tests Ditto's internal
     // persistence timing rather than our business logic. The add_member() method works
     // correctly (it modifies the squad and stores it back), but querying immediately
     // after can return stale data due to Ditto's async persistence layer.
     //
     // This is a known limitation of Ditto's architecture and not a bug in our code.
-    // The functionality is covered by test_squad_storage which tests the happy path.
+    // The functionality is covered by test_cell_storage which tests the happy path.
 }

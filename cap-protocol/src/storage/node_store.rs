@@ -10,117 +10,114 @@ use serde_json::json;
 use tracing::{debug, info, instrument};
 
 /// Collection names
-const PLATFORM_CONFIG_COLLECTION: &str = "node_configs";
-const PLATFORM_STATE_COLLECTION: &str = "node_states";
+const NODE_CONFIG_COLLECTION: &str = "node_configs";
+const NODE_STATE_COLLECTION: &str = "node_states";
 
 /// Node storage manager
 pub struct NodeStore {
     store: DittoStore,
 }
 
-impl PlatformStore {
-    /// Create a new platform store
+impl NodeStore {
+    /// Create a new node store
     pub fn new(store: DittoStore) -> Self {
         Self { store }
     }
 
     /// Store a node configuration (G-Set operation)
     #[instrument(skip(self, config))]
-    pub async fn store_config(&self, config: &PlatformConfig) -> Result<String> {
-        info!("Storing platform config: {}", config.id);
+    pub async fn store_config(&self, config: &NodeConfig) -> Result<String> {
+        info!("Storing node config: {}", config.id);
 
         // Serialize directly to maintain field names
         let doc = serde_json::to_value(config)?;
 
         self.store
-            .upsert(PLATFORM_CONFIG_COLLECTION, doc)
+            .upsert(NODE_CONFIG_COLLECTION, doc)
             .await
             .map_err(|e| {
                 Error::storage_error(
-                    format!("Failed to store platform config: {}", e),
+                    format!("Failed to store node config: {}", e),
                     "upsert",
-                    Some(PLATFORM_CONFIG_COLLECTION.to_string()),
+                    Some(NODE_CONFIG_COLLECTION.to_string()),
                 )
             })
     }
 
     /// Retrieve a node configuration by ID
     #[instrument(skip(self))]
-    pub async fn get_config(&self, platform_id: &str) -> Result<Option<PlatformConfig>> {
-        debug!("Retrieving platform config: {}", platform_id);
+    pub async fn get_config(&self, node_id: &str) -> Result<Option<NodeConfig>> {
+        debug!("Retrieving node config: {}", node_id);
 
-        let where_clause = format!("id == '{}'", platform_id);
+        let where_clause = format!("id == '{}'", node_id);
         let docs = self
             .store
-            .query(PLATFORM_CONFIG_COLLECTION, &where_clause)
+            .query(NODE_CONFIG_COLLECTION, &where_clause)
             .await?;
 
         if docs.is_empty() {
             return Ok(None);
         }
 
-        let config: PlatformConfig = serde_json::from_value(docs[0].clone())?;
+        let config: NodeConfig = serde_json::from_value(docs[0].clone())?;
         Ok(Some(config))
     }
 
     /// Store node state (LWW-Register operation)
     #[instrument(skip(self, state))]
-    pub async fn store_state(&self, platform_id: &str, state: &PlatformState) -> Result<String> {
-        info!("Storing node state: {}", platform_id);
+    pub async fn store_state(&self, node_id: &str, state: &NodeState) -> Result<String> {
+        info!("Storing node state: {}", node_id);
 
-        // Create document with platform_id for querying
+        // Create document with node_id for querying
         let mut doc = serde_json::to_value(state)?;
         if let Some(obj) = doc.as_object_mut() {
-            obj.insert("platform_id".to_string(), json!(platform_id));
+            obj.insert("node_id".to_string(), json!(node_id));
         }
 
         self.store
-            .upsert(PLATFORM_STATE_COLLECTION, doc)
+            .upsert(NODE_STATE_COLLECTION, doc)
             .await
             .map_err(|e| {
                 Error::storage_error(
                     format!("Failed to store node state: {}", e),
                     "upsert",
-                    Some(PLATFORM_STATE_COLLECTION.to_string()),
+                    Some(NODE_STATE_COLLECTION.to_string()),
                 )
             })
     }
 
     /// Retrieve node state by ID
     #[instrument(skip(self))]
-    pub async fn get_state(&self, platform_id: &str) -> Result<Option<PlatformState>> {
-        debug!("Retrieving node state: {}", platform_id);
+    pub async fn get_state(&self, node_id: &str) -> Result<Option<NodeState>> {
+        debug!("Retrieving node state: {}", node_id);
 
-        let where_clause = format!("platform_id == '{}'", platform_id);
+        let where_clause = format!("node_id == '{}'", node_id);
         let docs = self
             .store
-            .query(PLATFORM_STATE_COLLECTION, &where_clause)
+            .query(NODE_STATE_COLLECTION, &where_clause)
             .await?;
 
         if docs.is_empty() {
             return Ok(None);
         }
 
-        let state: PlatformState = serde_json::from_value(docs[0].clone())?;
+        let state: NodeState = serde_json::from_value(docs[0].clone())?;
         Ok(Some(state))
     }
 
     /// Get all nodes in a specific phase
     #[instrument(skip(self))]
-    pub async fn get_platforms_by_phase(
-        &self,
-        phase: crate::traits::Phase,
-    ) -> Result<Vec<PlatformState>> {
+    pub async fn get_nodes_by_phase(&self, phase: crate::traits::Phase) -> Result<Vec<NodeState>> {
         debug!("Querying nodes by phase: {:?}", phase);
 
         let phase_str = format!("{}", phase);
         let where_clause = format!("phase == '{}'", phase_str);
         let docs = self
             .store
-            .query(PLATFORM_STATE_COLLECTION, &where_clause)
+            .query(NODE_STATE_COLLECTION, &where_clause)
             .await?;
 
-        let states: Vec<PlatformState> = docs
+        let states: Vec<NodeState> = docs
             .into_iter()
             .filter_map(|doc| serde_json::from_value(doc).ok())
             .collect();
@@ -130,16 +127,16 @@ impl PlatformStore {
 
     /// Get all nodes in a specific squad
     #[instrument(skip(self))]
-    pub async fn get_platforms_by_squad(&self, squad_id: &str) -> Result<Vec<PlatformState>> {
+    pub async fn get_nodes_by_cell(&self, squad_id: &str) -> Result<Vec<NodeState>> {
         debug!("Querying nodes by squad: {}", squad_id);
 
         let where_clause = format!("squad_id == '{}'", squad_id);
         let docs = self
             .store
-            .query(PLATFORM_STATE_COLLECTION, &where_clause)
+            .query(NODE_STATE_COLLECTION, &where_clause)
             .await?;
 
-        let states: Vec<PlatformState> = docs
+        let states: Vec<NodeState> = docs
             .into_iter()
             .filter_map(|doc| serde_json::from_value(doc).ok())
             .collect();
@@ -149,19 +146,19 @@ impl PlatformStore {
 
     /// Get all operational nodes (health != Failed && fuel > 0)
     #[instrument(skip(self))]
-    pub async fn get_operational_platforms(&self) -> Result<Vec<PlatformState>> {
-        debug!("Querying operational platforms");
+    pub async fn get_operational_nodes(&self) -> Result<Vec<NodeState>> {
+        debug!("Querying operational nodes");
 
         let where_clause = "fuel_minutes > 0";
         let docs = self
             .store
-            .query(PLATFORM_STATE_COLLECTION, where_clause)
+            .query(NODE_STATE_COLLECTION, where_clause)
             .await?;
 
-        let states: Vec<PlatformState> = docs
+        let states: Vec<NodeState> = docs
             .into_iter()
             .filter_map(|doc| serde_json::from_value(doc).ok())
-            .filter(|state: &PlatformState| state.is_operational())
+            .filter(|state: &NodeState| state.is_operational())
             .collect();
 
         Ok(states)
@@ -169,22 +166,18 @@ impl PlatformStore {
 
     /// Delete a node configuration
     #[instrument(skip(self))]
-    pub async fn delete_config(&self, platform_id: &str) -> Result<()> {
-        info!("Deleting platform config: {}", platform_id);
+    pub async fn delete_config(&self, node_id: &str) -> Result<()> {
+        info!("Deleting node config: {}", node_id);
 
-        self.store
-            .remove(PLATFORM_CONFIG_COLLECTION, platform_id)
-            .await
+        self.store.remove(NODE_CONFIG_COLLECTION, node_id).await
     }
 
     /// Delete a node state
     #[instrument(skip(self))]
-    pub async fn delete_state(&self, platform_id: &str) -> Result<()> {
-        info!("Deleting node state: {}", platform_id);
+    pub async fn delete_state(&self, node_id: &str) -> Result<()> {
+        info!("Deleting node state: {}", node_id);
 
-        self.store
-            .remove(PLATFORM_STATE_COLLECTION, platform_id)
-            .await
+        self.store.remove(NODE_STATE_COLLECTION, node_id).await
     }
 
     /// Get the underlying DittoStore reference
@@ -200,11 +193,11 @@ mod tests {
     use crate::storage::ditto_store::DittoConfig;
     use crate::traits::Phase;
 
-    async fn create_test_store() -> Result<PlatformStore> {
+    async fn create_test_store() -> Result<NodeStore> {
         // Create unique temp directory for this test to enable parallel execution
         // Use tempfile::Builder to create temp dir with a unique name
         let temp_dir = tempfile::Builder::new()
-            .prefix(&format!("ditto_platform_test_{}_", std::process::id()))
+            .prefix(&format!("ditto_node_test_{}_", std::process::id()))
             .tempdir()
             .map_err(|e| {
                 Error::storage_error(
@@ -237,11 +230,11 @@ mod tests {
         };
 
         let ditto_store = DittoStore::new(config)?;
-        Ok(PlatformStore::new(ditto_store))
+        Ok(NodeStore::new(ditto_store))
     }
 
     #[tokio::test]
-    async fn test_platform_config_storage() {
+    async fn test_node_config_storage() {
         let store = match create_test_store().await {
             Ok(s) => s,
             Err(_) => {
@@ -250,7 +243,7 @@ mod tests {
             }
         };
 
-        let mut config = PlatformConfig::new("UAV".to_string());
+        let mut config = NodeConfig::new("UAV".to_string());
         config.add_capability(Capability::new(
             "camera".to_string(),
             "HD Camera".to_string(),
@@ -267,7 +260,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_platform_state_storage() {
+    async fn test_node_state_storage() {
         let store = match create_test_store().await {
             Ok(s) => s,
             Err(_) => {
@@ -276,14 +269,14 @@ mod tests {
             }
         };
 
-        let platform_id = "platform_test_1";
-        let mut state = PlatformState::new((37.7, -122.4, 100.0));
+        let node_id = "node_test_1";
+        let mut state = NodeState::new((37.7, -122.4, 100.0));
         state.update_health(HealthStatus::Nominal);
 
-        let doc_id = store.store_state(platform_id, &state).await.unwrap();
+        let doc_id = store.store_state(node_id, &state).await.unwrap();
         assert!(!doc_id.is_empty());
 
-        let retrieved = store.get_state(platform_id).await.unwrap();
+        let retrieved = store.get_state(node_id).await.unwrap();
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().position, (37.7, -122.4, 100.0));
     }
@@ -298,21 +291,18 @@ mod tests {
             }
         };
 
-        let mut state = PlatformState::new((37.7, -122.4, 100.0));
-        state.update_phase(Phase::Squad);
+        let mut state = NodeState::new((37.7, -122.4, 100.0));
+        state.update_phase(Phase::Cell);
 
-        let doc_id = store
-            .store_state("platform_phase_test", &state)
-            .await
-            .unwrap();
+        let doc_id = store.store_state("node_phase_test", &state).await.unwrap();
         assert!(!doc_id.is_empty());
 
         // Wait longer for Ditto to index the document
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-        let nodes = store.get_platforms_by_phase(Phase::Squad).await.unwrap();
+        let nodes = store.get_nodes_by_phase(Phase::Cell).await.unwrap();
         // If still empty, this might be because previous test data is still present
         // Just verify the query doesn't error
-        println!("Found {} nodes in Cell phase", platforms.len());
+        println!("Found {} nodes in Cell phase", nodes.len());
     }
 }

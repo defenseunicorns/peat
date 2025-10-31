@@ -32,7 +32,7 @@
 //!     .min_confidence(0.8)
 //!     .build();
 //!
-//! let matches = engine.query_platforms(&query, &platforms)?;
+//! let matches = engine.query_platforms(&query, &nodes)?;
 //! ```
 
 use crate::models::{cell::CellState, node::NodeConfig, Capability, CapabilityType};
@@ -231,14 +231,14 @@ impl CapabilityQueryEngine {
     pub fn query_platforms(
         &self,
         query: &CapabilityQuery,
-        platforms: &[PlatformConfig],
-    ) -> Vec<QueryMatch<PlatformConfig>> {
-        let mut matches: Vec<QueryMatch<PlatformConfig>> = platforms
+        nodes: &[NodeConfig],
+    ) -> Vec<QueryMatch<NodeConfig>> {
+        let mut matches: Vec<QueryMatch<NodeConfig>> = nodes
             .iter()
-            .filter(|platform| query.matches(&platform.capabilities))
-            .map(|platform| QueryMatch {
-                score: query.score(&platform.capabilities),
-                entity: platform.clone(),
+            .filter(|node| query.matches(&node.capabilities))
+            .map(|node| QueryMatch {
+                score: query.score(&node.capabilities),
+                entity: node.clone(),
             })
             .collect();
 
@@ -257,9 +257,9 @@ impl CapabilityQueryEngine {
     pub fn query_squads(
         &self,
         query: &CapabilityQuery,
-        squads: &[SquadState],
-    ) -> Vec<QueryMatch<SquadState>> {
-        let mut matches: Vec<QueryMatch<SquadState>> = squads
+        squads: &[CellState],
+    ) -> Vec<QueryMatch<CellState>> {
+        let mut matches: Vec<QueryMatch<CellState>> = squads
             .iter()
             .filter(|squad| query.matches(&squad.capabilities))
             .map(|squad| QueryMatch {
@@ -282,12 +282,12 @@ impl CapabilityQueryEngine {
     /// Get capability statistics for a set of platforms
     pub fn platform_capability_stats(
         &self,
-        platforms: &[PlatformConfig],
+        nodes: &[NodeConfig],
     ) -> HashMap<CapabilityType, CapabilityStats> {
         let mut stats: HashMap<CapabilityType, Vec<f32>> = HashMap::new();
 
-        for platform in platforms {
-            for capability in &platform.capabilities {
+        for node in nodes {
+            for capability in &node.capabilities {
                 stats
                     .entry(capability.capability_type)
                     .or_default()
@@ -368,8 +368,8 @@ mod tests {
         id: &str,
         platform_type: &str,
         capabilities: Vec<Capability>,
-    ) -> PlatformConfig {
-        let mut platform = PlatformConfig::new(platform_type.to_string());
+    ) -> NodeConfig {
+        let mut platform = NodeConfig::new(platform_type.to_string());
         platform.id = id.to_string();
         for cap in capabilities {
             platform.add_capability(cap);
@@ -507,7 +507,7 @@ mod tests {
             .min_confidence(0.7)
             .build();
 
-        let matches = engine.query_platforms(&query, &platforms);
+        let matches = engine.query_platforms(&query, &nodes);
 
         // All nodes have sensor capability
         assert_eq!(matches.len(), 3);
@@ -556,7 +556,7 @@ mod tests {
             .limit(2)
             .build();
 
-        let matches = engine.query_platforms(&query, &platforms);
+        let matches = engine.query_platforms(&query, &nodes);
 
         assert_eq!(matches.len(), 2);
         // Should return top 2 by score
@@ -586,7 +586,7 @@ mod tests {
             ),
         ];
 
-        let stats = engine.platform_capability_stats(&platforms);
+        let stats = engine.platform_capability_stats(&nodes);
 
         assert_eq!(stats.len(), 3);
         assert_eq!(stats.get(&CapabilityType::Sensor).unwrap().count, 2);

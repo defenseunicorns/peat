@@ -27,8 +27,8 @@ impl std::fmt::Display for Phase {
 
 // Legacy compatibility - old names as aliases
 impl Phase {
-    pub const Bootstrap: Phase = Phase::Discovery;
-    pub const Squad: Phase = Phase::Cell;
+    pub const BOOTSTRAP: Phase = Phase::Discovery;
+    pub const SQUAD: Phase = Phase::Cell;
 }
 
 /// Node lifecycle management

@@ -187,7 +187,7 @@ impl Default for ElectionContext {
                 authority_weight: 0.6,
                 technical_weight: 0.4,
             },
-            mission_phase: Phase::Squad,
+            mission_phase: Phase::Cell,
             authority_required: false,
             casualty_count: 0,
         }
@@ -361,12 +361,12 @@ mod tests {
         let policy = LeadershipPolicy::Contextual;
 
         // Discovery phase - authority matters more
-        let context = ElectionContext::new(policy.clone(), Phase::Bootstrap);
+        let context = ElectionContext::new(policy.clone(), Phase::Discovery);
         let (auth, _tech) = policy.get_weights(&context);
         assert_eq!(auth, 0.7);
 
         // Cell phase - balanced
-        let context = ElectionContext::new(policy.clone(), Phase::Squad);
+        let context = ElectionContext::new(policy.clone(), Phase::Cell);
         let (auth, _tech) = policy.get_weights(&context);
         assert_eq!(auth, 0.6);
 
@@ -380,7 +380,7 @@ mod tests {
     fn test_contextual_policy_with_authority_required() {
         let policy = LeadershipPolicy::Contextual;
         let context =
-            ElectionContext::new(policy.clone(), Phase::Squad).with_authority_required(true);
+            ElectionContext::new(policy.clone(), Phase::Cell).with_authority_required(true);
 
         let (auth, _tech) = policy.get_weights(&context);
         // Should keep authority weight at phase level when required

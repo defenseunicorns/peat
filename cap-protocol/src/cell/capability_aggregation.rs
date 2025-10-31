@@ -18,9 +18,7 @@
 //! - Human oversight requirements for critical capabilities
 //! - Hybrid confidence scoring (technical capability + human authority)
 
-use crate::models::{
-    AuthorityLevel, CapabilityType, HumanMachinePair, PlatformConfig, PlatformState,
-};
+use crate::models::{AuthorityLevel, CapabilityType, HumanMachinePair, NodeConfig, NodeState};
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -118,12 +116,12 @@ impl CapabilityAggregator {
     /// Aggregate capabilities from a list of squad members
     ///
     /// # Arguments
-    /// * `members` - List of (PlatformConfig, PlatformState) tuples for each squad member
+    /// * `members` - List of (NodeConfig, NodeState) tuples for each squad member
     ///
     /// # Returns
     /// HashMap of CapabilityType to AggregatedCapability
     pub fn aggregate_capabilities(
-        members: &[(PlatformConfig, PlatformState)],
+        members: &[(NodeConfig, NodeState)],
     ) -> Result<HashMap<CapabilityType, AggregatedCapability>> {
         let mut capability_map: HashMap<
             CapabilityType,
@@ -286,8 +284,8 @@ mod tests {
         id: &str,
         capabilities: Vec<(CapabilityType, f32)>,
         operator: Option<Operator>,
-    ) -> (PlatformConfig, PlatformState) {
-        let mut config = PlatformConfig::new("Test".to_string());
+    ) -> (NodeConfig, NodeState) {
+        let mut config = NodeConfig::new("Test".to_string());
         config.id = id.to_string();
 
         for (cap_type, confidence) in capabilities {
@@ -308,7 +306,7 @@ mod tests {
             config.operator_binding = Some(binding);
         }
 
-        let state = PlatformState::new((0.0, 0.0, 0.0));
+        let state = NodeState::new((0.0, 0.0, 0.0));
 
         (config, state)
     }

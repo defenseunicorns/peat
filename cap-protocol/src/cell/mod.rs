@@ -10,6 +10,7 @@ pub mod leader_election;
 pub mod messaging;
 
 // Re-exports
+pub use capability_aggregation::{AggregatedCapability, CapabilityAggregator};
 pub use coordinator::{CellCoordinator, FormationStatus};
 pub use leader_election::{LeaderElectionManager, LeadershipScore};
 pub use messaging::{CellMessage, CellMessageBus, MessagePriority};

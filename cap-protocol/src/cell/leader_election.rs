@@ -38,7 +38,7 @@
 //! - Followers detect failure after 3 missed heartbeats (6 seconds)
 //! - Automatic re-election triggered on leader failure
 
-use crate::cell::messaging::{SquadMessage, SquadMessageBus, SquadMessageType};
+use crate::cell::messaging::{CellMessage, CellMessageBus, CellMessageType};
 use crate::models::{Capability, CapabilityType};
 use crate::Result;
 use serde::{Deserialize, Serialize};
@@ -195,7 +195,7 @@ pub struct LeaderElectionManager {
     /// Node ID
     platform_id: String,
     /// Message bus for election messages
-    message_bus: Arc<SquadMessageBus>,
+    message_bus: Arc<CellMessageBus>,
     /// Current election state
     state: Arc<Mutex<ElectionState>>,
     /// Current election round
@@ -220,7 +220,7 @@ impl LeaderElectionManager {
     pub fn new(
         squad_id: String,
         platform_id: String,
-        message_bus: Arc<SquadMessageBus>,
+        message_bus: Arc<CellMessageBus>,
         capabilities: Vec<Capability>,
     ) -> Self {
         let my_score = LeadershipScore::from_capabilities(&capabilities);
@@ -267,7 +267,7 @@ impl LeaderElectionManager {
         );
 
         // Send candidacy announcement
-        let payload = SquadMessageType::LeaderAnnounce {
+        let payload = CellMessageType::LeaderAnnounce {
             leader_id: self.platform_id.clone(),
             election_round: round,
         };
@@ -279,15 +279,15 @@ impl LeaderElectionManager {
 
     /// Process received election message
     #[instrument(skip(self, message))]
-    pub fn process_election_message(&self, message: &SquadMessage) -> Result<()> {
+    pub fn process_election_message(&self, message: &CellMessage) -> Result<()> {
         match &message.payload {
-            SquadMessageType::LeaderAnnounce {
+            CellMessageType::LeaderAnnounce {
                 leader_id,
                 election_round,
             } => {
                 self.handle_leader_announce(leader_id, *election_round)?;
             }
-            SquadMessageType::Heartbeat { platform_id } => {
+            CellMessageType::Heartbeat { platform_id } => {
                 self.handle_heartbeat(platform_id)?;
             }
             _ => {
@@ -411,7 +411,7 @@ impl LeaderElectionManager {
         let state = *self.state.lock().unwrap();
 
         if state == ElectionState::Leader {
-            let payload = SquadMessageType::Heartbeat {
+            let payload = CellMessageType::Heartbeat {
                 platform_id: self.platform_id.clone(),
             };
             self.message_bus.publish(payload)?;
@@ -573,9 +573,9 @@ mod tests {
 
     #[test]
     fn test_election_manager_creation() {
-        let message_bus = Arc::new(SquadMessageBus::new(
+        let message_bus = Arc::new(CellMessageBus::new(
             "squad_1".to_string(),
-            "platform_1".to_string(),
+            "node_1".to_string(),
         ));
 
         let capabilities = vec![Capability::new(
@@ -587,7 +587,7 @@ mod tests {
 
         let manager = LeaderElectionManager::new(
             "squad_1".to_string(),
-            "platform_1".to_string(),
+            "node_1".to_string(),
             message_bus,
             capabilities,
         );
@@ -599,14 +599,14 @@ mod tests {
 
     #[test]
     fn test_set_as_leader() {
-        let message_bus = Arc::new(SquadMessageBus::new(
+        let message_bus = Arc::new(CellMessageBus::new(
             "squad_1".to_string(),
-            "platform_1".to_string(),
+            "node_1".to_string(),
         ));
 
         let manager = LeaderElectionManager::new(
             "squad_1".to_string(),
-            "platform_1".to_string(),
+            "node_1".to_string(),
             message_bus,
             vec![],
         );
@@ -614,19 +614,19 @@ mod tests {
         manager.set_as_leader();
 
         assert_eq!(manager.get_state(), ElectionState::Leader);
-        assert_eq!(manager.get_leader(), Some("platform_1".to_string()));
+        assert_eq!(manager.get_leader(), Some("node_1".to_string()));
     }
 
     #[test]
     fn test_election_state_transitions() {
-        let message_bus = Arc::new(SquadMessageBus::new(
+        let message_bus = Arc::new(CellMessageBus::new(
             "squad_1".to_string(),
-            "platform_1".to_string(),
+            "node_1".to_string(),
         ));
 
         let manager = LeaderElectionManager::new(
             "squad_1".to_string(),
-            "platform_1".to_string(),
+            "node_1".to_string(),
             message_bus,
             vec![],
         );
@@ -680,9 +680,9 @@ mod tests {
 
     #[test]
     fn test_start_election() {
-        let message_bus = Arc::new(SquadMessageBus::new(
+        let message_bus = Arc::new(CellMessageBus::new(
             "squad_1".to_string(),
-            "platform_1".to_string(),
+            "node_1".to_string(),
         ));
 
         let capabilities = vec![Capability::new(
@@ -694,7 +694,7 @@ mod tests {
 
         let manager = LeaderElectionManager::new(
             "squad_1".to_string(),
-            "platform_1".to_string(),
+            "node_1".to_string(),
             message_bus,
             capabilities,
         );
@@ -704,6 +704,6 @@ mod tests {
 
         // Check that candidacy was recorded
         let round = manager.current_round.lock().unwrap();
-        assert!(round.candidates.contains_key("platform_1"));
+        assert!(round.candidates.contains_key("node_1"));
     }
 }

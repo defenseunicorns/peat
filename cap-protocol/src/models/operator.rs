@@ -451,7 +451,7 @@ mod tests {
 
     #[test]
     fn test_human_machine_pair_autonomous() {
-        let pair = HumanMachinePair::autonomous("platform_1".to_string());
+        let pair = HumanMachinePair::autonomous("node_1".to_string());
         assert!(pair.is_autonomous());
         assert_eq!(pair.operators.len(), 0);
         assert_eq!(pair.binding_type, BindingType::Autonomous);
@@ -468,7 +468,7 @@ mod tests {
             "11B".to_string(),
         );
 
-        let pair = HumanMachinePair::one_to_one(op, "platform_1".to_string());
+        let pair = HumanMachinePair::one_to_one(op, "node_1".to_string());
 
         assert!(!pair.is_autonomous());
         assert_eq!(pair.operators.len(), 1);
@@ -495,7 +495,7 @@ mod tests {
 
         let pair = HumanMachinePair::new(
             vec![op1, op2],
-            vec!["platform_1".to_string()],
+            vec!["node_1".to_string()],
             BindingType::ManyToOne,
         );
 
@@ -524,7 +524,7 @@ mod tests {
 
         let pair = HumanMachinePair::new(
             vec![op1, op2],
-            vec!["platform_1".to_string()],
+            vec!["node_1".to_string()],
             BindingType::ManyToOne,
         );
 
@@ -552,7 +552,7 @@ mod tests {
 
         let pair = HumanMachinePair::new(
             vec![op1, op2],
-            vec!["platform_1".to_string()],
+            vec!["node_1".to_string()],
             BindingType::ManyToOne,
         );
 

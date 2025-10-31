@@ -10,7 +10,7 @@
 //!
 //! ## Assignment Flow
 //!
-//! 1. **C2 Issues Assignment**: C2 broadcasts `SquadAssignment` messages
+//! 1. **C2 Issues Assignment**: C2 broadcasts `CellAssignment` messages
 //! 2. **Node Receives**: Platforms observe assignments via Ditto
 //! 3. **Validation**: Node validates assignment (exists, not full, authorized)
 //! 4. **Execution**: Node joins squad and updates state
@@ -22,7 +22,7 @@
 //! {
 //!   "assignment_id": "assign_123",
 //!   "squad_id": "squad_alpha",
-//!   "platform_ids": ["platform_1", "platform_2", "platform_3"],
+//!   "platform_ids": ["node_1", "node_2", "node_3"],
 //!   "issued_by": "c2_controller_1",
 //!   "timestamp": 1698765432,
 //!   "priority": "high"
@@ -178,9 +178,9 @@ pub enum ValidationResult {
 /// Processes C2-issued squad assignments and manages assignment lifecycle.
 pub struct DirectedAssignmentManager {
     /// Cell storage
-    store: SquadStore,
+    store: CellStore,
     /// Active assignments being tracked
-    assignments: HashMap<String, SquadAssignment>,
+    assignments: HashMap<String, CellAssignment>,
     /// Node ID of this node
     my_platform_id: String,
     /// Assignment timeout (seconds)
@@ -189,7 +189,7 @@ pub struct DirectedAssignmentManager {
 
 impl DirectedAssignmentManager {
     /// Create a new directed assignment manager
-    pub fn new(store: SquadStore, my_platform_id: String) -> Self {
+    pub fn new(store: CellStore, my_platform_id: String) -> Self {
         Self {
             store,
             assignments: HashMap::new(),
@@ -206,7 +206,7 @@ impl DirectedAssignmentManager {
 
     /// Process a received squad assignment
     #[instrument(skip(self, assignment))]
-    pub async fn process_assignment(&mut self, assignment: SquadAssignment) -> Result<()> {
+    pub async fn process_assignment(&mut self, assignment: CellAssignment) -> Result<()> {
         info!(
             "Processing assignment {} for squad {}",
             assignment.assignment_id, assignment.squad_id
@@ -247,7 +247,7 @@ impl DirectedAssignmentManager {
 
     /// Validate a squad assignment
     #[instrument(skip(self, assignment))]
-    async fn validate_assignment(&self, assignment: &SquadAssignment) -> Result<ValidationResult> {
+    async fn validate_assignment(&self, assignment: &CellAssignment) -> Result<ValidationResult> {
         debug!("Validating assignment {}", assignment.assignment_id);
 
         // Check if assignment has expired
@@ -261,7 +261,7 @@ impl DirectedAssignmentManager {
         }
 
         // Check if squad exists
-        let squad = self.store.get_squad(&assignment.squad_id).await?;
+        let squad = self.store.get_cell(&assignment.squad_id).await?;
         if squad.is_none() {
             return Ok(ValidationResult::SquadNotFound);
         }
@@ -287,7 +287,7 @@ impl DirectedAssignmentManager {
 
     /// Execute a validated assignment
     #[instrument(skip(self, assignment))]
-    async fn execute_assignment(&mut self, mut assignment: SquadAssignment) -> Result<()> {
+    async fn execute_assignment(&mut self, mut assignment: CellAssignment) -> Result<()> {
         info!(
             "Executing assignment {} - joining squad {}",
             assignment.assignment_id, assignment.squad_id
@@ -314,7 +314,7 @@ impl DirectedAssignmentManager {
 
     /// Get the current squad for a platform
     async fn get_current_squad(&self, platform_id: &str) -> Result<Option<String>> {
-        let valid_squads = self.store.get_valid_squads().await?;
+        let valid_squads = self.store.get_valid_cells().await?;
 
         for squad in valid_squads {
             if squad.is_member(platform_id) {
@@ -326,12 +326,12 @@ impl DirectedAssignmentManager {
     }
 
     /// Get assignment by ID
-    pub fn get_assignment(&self, assignment_id: &str) -> Option<&SquadAssignment> {
+    pub fn get_assignment(&self, assignment_id: &str) -> Option<&CellAssignment> {
         self.assignments.get(assignment_id)
     }
 
     /// Get all active assignments
-    pub fn active_assignments(&self) -> Vec<&SquadAssignment> {
+    pub fn active_assignments(&self) -> Vec<&CellAssignment> {
         self.assignments
             .values()
             .filter(|a| a.is_active())
@@ -354,16 +354,16 @@ impl DirectedAssignmentManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{SquadConfig, SquadState};
+    use crate::models::{CellConfig, CellState};
     use crate::storage::ditto_store::DittoStore;
     use crate::storage::CellStore;
 
     #[test]
     fn test_assignment_creation() {
-        let assignment = SquadAssignment::new(
+        let assignment = CellAssignment::new(
             "assign_1".to_string(),
             "squad_alpha".to_string(),
-            vec!["platform_1".to_string(), "platform_2".to_string()],
+            vec!["node_1".to_string(), "node_2".to_string()],
             "c2_controller".to_string(),
             AssignmentPriority::High,
         );
@@ -378,25 +378,25 @@ mod tests {
 
     #[test]
     fn test_assignment_includes_platform() {
-        let assignment = SquadAssignment::new(
+        let assignment = CellAssignment::new(
             "assign_1".to_string(),
             "squad_alpha".to_string(),
-            vec!["platform_1".to_string(), "platform_2".to_string()],
+            vec!["node_1".to_string(), "node_2".to_string()],
             "c2_controller".to_string(),
             AssignmentPriority::Normal,
         );
 
-        assert!(assignment.includes_platform("platform_1"));
-        assert!(assignment.includes_platform("platform_2"));
-        assert!(!assignment.includes_platform("platform_3"));
+        assert!(assignment.includes_platform("node_1"));
+        assert!(assignment.includes_platform("node_2"));
+        assert!(!assignment.includes_platform("node_3"));
     }
 
     #[test]
     fn test_assignment_status_transitions() {
-        let mut assignment = SquadAssignment::new(
+        let mut assignment = CellAssignment::new(
             "assign_1".to_string(),
             "squad_alpha".to_string(),
-            vec!["platform_1".to_string()],
+            vec!["node_1".to_string()],
             "c2_controller".to_string(),
             AssignmentPriority::Normal,
         );
@@ -415,10 +415,10 @@ mod tests {
 
     #[test]
     fn test_assignment_with_context() {
-        let assignment = SquadAssignment::new(
+        let assignment = CellAssignment::new(
             "assign_1".to_string(),
             "squad_alpha".to_string(),
-            vec!["platform_1".to_string()],
+            vec!["node_1".to_string()],
             "c2_controller".to_string(),
             AssignmentPriority::Normal,
         )
@@ -441,10 +441,10 @@ mod tests {
             }
         };
 
-        let squad_store = SquadStore::new(ditto_store);
-        let manager = DirectedAssignmentManager::new(squad_store, "platform_1".to_string());
+        let squad_store = CellStore::new(ditto_store);
+        let manager = DirectedAssignmentManager::new(squad_store, "node_1".to_string());
 
-        assert_eq!(manager.my_platform_id, "platform_1");
+        assert_eq!(manager.my_platform_id, "node_1");
         assert_eq!(manager.assignment_timeout, 300);
         assert_eq!(manager.active_assignments().len(), 0);
     }
@@ -459,20 +459,20 @@ mod tests {
             }
         };
 
-        let squad_store = SquadStore::new(ditto_store);
+        let squad_store = CellStore::new(ditto_store);
 
         // Create a test squad
-        let config = SquadConfig::new(5);
-        let squad = SquadState::new(config.clone());
-        let _ = squad_store.store_squad(&squad).await;
+        let config = CellConfig::new(5);
+        let squad = CellState::new(config.clone());
+        let _ = squad_store.store_cell(&squad).await;
 
-        let manager = DirectedAssignmentManager::new(squad_store, "platform_1".to_string());
+        let manager = DirectedAssignmentManager::new(squad_store, "node_1".to_string());
 
         // Create valid assignment
-        let assignment = SquadAssignment::new(
+        let assignment = CellAssignment::new(
             "assign_1".to_string(),
             config.id.clone(),
-            vec!["platform_1".to_string()],
+            vec!["node_1".to_string()],
             "c2_controller".to_string(),
             AssignmentPriority::Normal,
         );
@@ -491,13 +491,13 @@ mod tests {
             }
         };
 
-        let squad_store = SquadStore::new(ditto_store);
-        let manager = DirectedAssignmentManager::new(squad_store, "platform_1".to_string());
+        let squad_store = CellStore::new(ditto_store);
+        let manager = DirectedAssignmentManager::new(squad_store, "node_1".to_string());
 
-        let assignment = SquadAssignment::new(
+        let assignment = CellAssignment::new(
             "assign_1".to_string(),
             "nonexistent_squad".to_string(),
-            vec!["platform_1".to_string()],
+            vec!["node_1".to_string()],
             "c2_controller".to_string(),
             AssignmentPriority::Normal,
         );
@@ -516,14 +516,14 @@ mod tests {
             }
         };
 
-        let squad_store = SquadStore::new(ditto_store);
+        let squad_store = CellStore::new(ditto_store);
         let mut manager =
-            DirectedAssignmentManager::new(squad_store, "platform_1".to_string()).with_timeout(1);
+            DirectedAssignmentManager::new(squad_store, "node_1".to_string()).with_timeout(1);
 
-        let mut assignment = SquadAssignment::new(
+        let mut assignment = CellAssignment::new(
             "assign_1".to_string(),
             "squad_alpha".to_string(),
-            vec!["platform_1".to_string()],
+            vec!["node_1".to_string()],
             "c2_controller".to_string(),
             AssignmentPriority::Normal,
         );

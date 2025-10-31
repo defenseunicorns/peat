@@ -15,7 +15,7 @@
 //! ```ignore
 //! let harness = E2EHarness::new("test_scenario").await?;
 //! let platform_store = harness.create_platform_store().await?;
-//! let observer = harness.observe_squad_changes().await?;
+//! let observer = harness.observe_cell_changes().await?;
 //!
 //! // Trigger formation...
 //! let event = observer.wait_for_event(Duration::from_secs(5)).await?;
@@ -85,11 +85,11 @@ impl E2EHarness {
     ///
     /// Returns a receiver channel that will receive SquadState updates
     /// whenever the squad document changes in Ditto
-    pub async fn observe_squad(&self, store: &DittoStore, squad_id: &str) -> Result<SquadObserver> {
+    pub async fn observe_cell(&self, store: &DittoStore, cell_id: &str) -> Result<CellObserver> {
         let (tx, rx) = mpsc::unbounded_channel();
 
         // Create sync subscription first (required for P2P sync)
-        let query = format!("SELECT * FROM cells WHERE id == '{}'", squad_id);
+        let query = format!("SELECT * FROM cells WHERE id == '{}'", cell_id);
         let sync_sub = store
             .ditto()
             .sync()
@@ -97,7 +97,7 @@ impl E2EHarness {
             .map_err(|e| {
                 Error::storage_error(
                     format!("Failed to create sync subscription: {}", e),
-                    "observe_squad",
+                    "observe_cell",
                     None,
                 )
             })?;
@@ -112,12 +112,12 @@ impl E2EHarness {
                 // Parse results into SquadState
                 // Note: In real implementation, parse the JSON from result
                 // For now, send a notification that data changed
-                let _ = tx.send(SquadObserverEvent::Changed);
+                let _ = tx.send(CellObserverEvent::Changed);
             })
             .map_err(|e| {
                 Error::storage_error(
                     format!("Failed to register observer: {}", e),
-                    "observe_squad",
+                    "observe_cell",
                     None,
                 )
             })?;
@@ -130,14 +130,10 @@ impl E2EHarness {
     }
 
     /// Create a platform observer that triggers on document changes
-    pub async fn observe_platform(
-        &self,
-        store: &DittoStore,
-        platform_id: &str,
-    ) -> Result<PlatformObserver> {
+    pub async fn observe_node(&self, store: &DittoStore, node_id: &str) -> Result<NodeObserver> {
         let (tx, rx) = mpsc::unbounded_channel();
 
-        let query = format!("SELECT * FROM nodes WHERE id == '{}'", platform_id);
+        let query = format!("SELECT * FROM nodes WHERE id == '{}'", node_id);
         let sync_sub = store
             .ditto()
             .sync()
@@ -145,7 +141,7 @@ impl E2EHarness {
             .map_err(|e| {
                 Error::storage_error(
                     format!("Failed to create sync subscription: {}", e),
-                    "observe_platform",
+                    "observe_node",
                     None,
                 )
             })?;
@@ -155,12 +151,12 @@ impl E2EHarness {
             .store()
             .register_observer_v2(&query, move |result| {
                 debug!("Node observer triggered: {} items", result.item_count());
-                let _ = tx.send(PlatformObserverEvent::Changed);
+                let _ = tx.send(NodeObserverEvent::Changed);
             })
             .map_err(|e| {
                 Error::storage_error(
                     format!("Failed to register observer: {}", e),
-                    "observe_platform",
+                    "observe_node",
                     None,
                 )
             })?;
@@ -221,7 +217,7 @@ impl E2EHarness {
 pub struct CellObserver {
     _sync_sub: Arc<dittolive_ditto::sync::SyncSubscription>,
     _observer: Arc<dittolive_ditto::store::StoreObserver>,
-    receiver: mpsc::UnboundedReceiver<SquadObserverEvent>,
+    receiver: mpsc::UnboundedReceiver<CellObserverEvent>,
 }
 
 impl CellObserver {
@@ -229,7 +225,7 @@ impl CellObserver {
     pub async fn wait_for_event(
         &mut self,
         timeout_duration: Duration,
-    ) -> Result<SquadObserverEvent> {
+    ) -> Result<CellObserverEvent> {
         match timeout(timeout_duration, self.receiver.recv()).await {
             Ok(Some(event)) => Ok(event),
             Ok(None) => Err(Error::storage_error(
@@ -246,13 +242,13 @@ impl CellObserver {
     }
 
     /// Try to receive an event without blocking
-    pub fn try_recv(&mut self) -> Option<SquadObserverEvent> {
+    pub fn try_recv(&mut self) -> Option<CellObserverEvent> {
         self.receiver.try_recv().ok()
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum SquadObserverEvent {
+pub enum CellObserverEvent {
     /// Cell document changed (updated/inserted)
     Changed,
 }
@@ -261,7 +257,7 @@ pub enum SquadObserverEvent {
 pub struct NodeObserver {
     _sync_sub: Arc<dittolive_ditto::sync::SyncSubscription>,
     _observer: Arc<dittolive_ditto::store::StoreObserver>,
-    receiver: mpsc::UnboundedReceiver<PlatformObserverEvent>,
+    receiver: mpsc::UnboundedReceiver<NodeObserverEvent>,
 }
 
 impl NodeObserver {
@@ -269,7 +265,7 @@ impl NodeObserver {
     pub async fn wait_for_event(
         &mut self,
         timeout_duration: Duration,
-    ) -> Result<PlatformObserverEvent> {
+    ) -> Result<NodeObserverEvent> {
         match timeout(timeout_duration, self.receiver.recv()).await {
             Ok(Some(event)) => Ok(event),
             Ok(None) => Err(Error::storage_error(
@@ -286,13 +282,13 @@ impl NodeObserver {
     }
 
     /// Try to receive an event without blocking
-    pub fn try_recv(&mut self) -> Option<PlatformObserverEvent> {
+    pub fn try_recv(&mut self) -> Option<NodeObserverEvent> {
         self.receiver.try_recv().ok()
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum PlatformObserverEvent {
+pub enum NodeObserverEvent {
     /// Node document changed (updated/inserted)
     Changed,
 }

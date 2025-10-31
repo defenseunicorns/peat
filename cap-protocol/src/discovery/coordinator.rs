@@ -4,7 +4,7 @@
 //!
 //! # Architecture
 //!
-//! The BootstrapCoordinator manages:
+//! The DiscoveryCoordinator manages:
 //! - Phase state transitions (Discovery → Squad)
 //! - Discovery timeout management (default 60s)
 //! - Tracking unassigned platforms
@@ -124,7 +124,7 @@ impl DiscoveryMetrics {
 /// Manages the bootstrap phase lifecycle for a platform or simulation.
 pub struct DiscoveryCoordinator {
     /// Cell storage
-    store: SquadStore,
+    store: CellStore,
     /// Current phase
     current_phase: Phase,
     /// Discovery strategy
@@ -145,10 +145,10 @@ pub struct DiscoveryCoordinator {
 
 impl DiscoveryCoordinator {
     /// Create a new bootstrap coordinator
-    pub fn new(store: SquadStore, strategy: BootstrapStrategy) -> Self {
+    pub fn new(store: CellStore, strategy: BootstrapStrategy) -> Self {
         Self {
             store,
-            current_phase: Phase::Bootstrap,
+            current_phase: Phase::Discovery,
             strategy,
             timeout: Duration::from_secs(DEFAULT_BOOTSTRAP_TIMEOUT_SECS),
             start_time: None,
@@ -254,7 +254,7 @@ impl DiscoveryCoordinator {
 
     /// Get number of unique cells formed
     pub async fn squads_formed(&self) -> Result<usize> {
-        let cells = self.store.get_valid_squads().await?;
+        let cells = self.store.get_valid_cells().await?;
         Ok(cells.len())
     }
 
@@ -329,7 +329,7 @@ impl DiscoveryCoordinator {
         }
 
         info!("Transitioning from Discovery to Cell phase");
-        self.current_phase = Phase::Squad;
+        self.current_phase = Phase::Cell;
 
         Ok(())
     }
@@ -358,7 +358,7 @@ impl DiscoveryCoordinator {
 
     /// Get current bootstrap metrics
     #[instrument(skip(self))]
-    pub async fn get_metrics(&self) -> Result<BootstrapMetrics> {
+    pub async fn get_metrics(&self) -> Result<DiscoveryMetrics> {
         let elapsed = if let Some(start_time) = self.start_time {
             start_time.elapsed().as_secs_f64()
         } else {
@@ -401,10 +401,10 @@ mod tests {
     use super::*;
     use crate::storage::ditto_store::DittoStore;
 
-    async fn create_test_coordinator() -> Result<BootstrapCoordinator> {
+    async fn create_test_coordinator() -> Result<DiscoveryCoordinator> {
         let ditto_store = DittoStore::from_env()?;
-        let squad_store = SquadStore::new(ditto_store);
-        Ok(BootstrapCoordinator::new(
+        let squad_store = CellStore::new(ditto_store);
+        Ok(DiscoveryCoordinator::new(
             squad_store,
             BootstrapStrategy::Geographic,
         ))
@@ -420,7 +420,7 @@ mod tests {
             }
         };
 
-        assert_eq!(coordinator.phase(), Phase::Bootstrap);
+        assert_eq!(coordinator.phase(), Phase::Discovery);
         assert_eq!(coordinator.status(), BootstrapStatus::NotStarted);
     }
 
@@ -435,9 +435,9 @@ mod tests {
         };
 
         let platform_ids = vec![
-            "platform_1".to_string(),
-            "platform_2".to_string(),
-            "platform_3".to_string(),
+            "node_1".to_string(),
+            "node_2".to_string(),
+            "node_3".to_string(),
         ];
 
         coordinator.start_bootstrap(platform_ids).unwrap();
@@ -457,12 +457,12 @@ mod tests {
             }
         };
 
-        let platform_ids = vec!["platform_1".to_string(), "platform_2".to_string()];
+        let platform_ids = vec!["node_1".to_string(), "node_2".to_string()];
 
         coordinator.start_bootstrap(platform_ids).unwrap();
 
         coordinator
-            .register_assignment("platform_1".to_string(), "squad_alpha".to_string())
+            .register_assignment("node_1".to_string(), "squad_alpha".to_string())
             .unwrap();
 
         assert_eq!(coordinator.assignments.len(), 1);
@@ -480,15 +480,15 @@ mod tests {
             }
         };
 
-        let platform_ids = vec!["platform_1".to_string(), "platform_2".to_string()];
+        let platform_ids = vec!["node_1".to_string(), "node_2".to_string()];
 
         coordinator.start_bootstrap(platform_ids).unwrap();
 
         coordinator
-            .register_assignment("platform_1".to_string(), "squad_alpha".to_string())
+            .register_assignment("node_1".to_string(), "squad_alpha".to_string())
             .unwrap();
         coordinator
-            .register_assignment("platform_2".to_string(), "squad_alpha".to_string())
+            .register_assignment("node_2".to_string(), "squad_alpha".to_string())
             .unwrap();
 
         let complete = coordinator.check_completion().await.unwrap();
@@ -507,7 +507,7 @@ mod tests {
             }
         };
 
-        let platform_ids = vec!["platform_1".to_string()];
+        let platform_ids = vec!["node_1".to_string()];
         coordinator.start_bootstrap(platform_ids).unwrap();
 
         // Wait a tiny bit for timeout
@@ -527,19 +527,19 @@ mod tests {
         };
 
         let platform_ids = vec![
-            "platform_1".to_string(),
-            "platform_2".to_string(),
-            "platform_3".to_string(),
+            "node_1".to_string(),
+            "node_2".to_string(),
+            "node_3".to_string(),
         ];
 
         coordinator.start_bootstrap(platform_ids).unwrap();
 
         // Assign 2 out of 3 (66%)
         coordinator
-            .register_assignment("platform_1".to_string(), "squad_alpha".to_string())
+            .register_assignment("node_1".to_string(), "squad_alpha".to_string())
             .unwrap();
         coordinator
-            .register_assignment("platform_2".to_string(), "squad_alpha".to_string())
+            .register_assignment("node_2".to_string(), "squad_alpha".to_string())
             .unwrap();
 
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
@@ -560,11 +560,11 @@ mod tests {
             }
         };
 
-        let platform_ids = vec!["platform_1".to_string(), "platform_2".to_string()];
+        let platform_ids = vec!["node_1".to_string(), "node_2".to_string()];
 
         coordinator.start_bootstrap(platform_ids).unwrap();
         coordinator
-            .register_assignment("platform_1".to_string(), "squad_alpha".to_string())
+            .register_assignment("node_1".to_string(), "squad_alpha".to_string())
             .unwrap();
         coordinator.increment_messages(10);
 
@@ -587,16 +587,16 @@ mod tests {
             }
         };
 
-        let platform_ids = vec!["platform_1".to_string()];
+        let platform_ids = vec!["node_1".to_string()];
         coordinator.start_bootstrap(platform_ids).unwrap();
         coordinator
-            .register_assignment("platform_1".to_string(), "squad_alpha".to_string())
+            .register_assignment("node_1".to_string(), "squad_alpha".to_string())
             .unwrap();
 
         coordinator.check_completion().await.unwrap();
         coordinator.transition_to_squad_phase().await.unwrap();
 
-        assert_eq!(coordinator.phase(), Phase::Squad);
+        assert_eq!(coordinator.phase(), Phase::Cell);
     }
 
     #[tokio::test]
@@ -609,7 +609,7 @@ mod tests {
             }
         };
 
-        let platform_ids = vec!["platform_1".to_string()];
+        let platform_ids = vec!["node_1".to_string()];
         coordinator.start_bootstrap(platform_ids.clone()).unwrap();
 
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
@@ -634,7 +634,7 @@ mod tests {
             }
         };
 
-        let platform_ids = vec!["platform_1".to_string()];
+        let platform_ids = vec!["node_1".to_string()];
         coordinator.start_bootstrap(platform_ids).unwrap();
 
         coordinator.force_complete().unwrap();
