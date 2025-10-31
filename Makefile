@@ -1,4 +1,4 @@
-.PHONY: help clean clean-ditto build test fmt clippy check all pre-commit ci
+.PHONY: help clean clean-ditto build test test-e2e fmt clippy check all pre-commit ci
 
 # Default target
 help:
@@ -10,6 +10,7 @@ help:
 	@echo "  clean-ditto  - Remove Ditto persistence directories only"
 	@echo "  build        - Build all crates"
 	@echo "  test         - Run all tests (single-threaded to avoid Ditto conflicts)"
+	@echo "  test-e2e     - Run E2E integration tests for Squad Formation"
 	@echo "  fmt          - Format all code with cargo fmt"
 	@echo "  clippy       - Run clippy linter"
 	@echo "  check        - Run fmt + clippy + test"
@@ -38,6 +39,15 @@ test: clean-ditto
 	@echo "Running tests (single-threaded)..."
 	@echo "Note: Tests run with --test-threads=1 to prevent Ditto directory conflicts"
 	cargo test -- --test-threads=1
+
+# Run E2E integration tests
+test-e2e: clean-ditto
+	@echo "Running E2E integration tests..."
+	@if [ ! -f .env ]; then \
+		echo "⚠️  Warning: .env file not found. Ditto tests may be skipped."; \
+		echo "   Create .env with DITTO_APP_ID, DITTO_OFFLINE_TOKEN, DITTO_SHARED_KEY"; \
+	fi
+	cd cap-protocol && export $$(grep -v '^#' ../.env | xargs) && cargo test --test squad_formation_e2e -- --nocapture --test-threads=1
 
 # Format all code
 fmt:

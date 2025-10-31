@@ -20,6 +20,7 @@ tracing-subscriber = { workspace = true }
 dotenvy = { workspace = true }
 chrono = { workspace = true }
 geohash = "0.13"
+tempfile = "3.13"
 
 [dev-dependencies]
 proptest = { workspace = true }

@@ -76,10 +76,7 @@ impl AggregatedCapability {
             }
             CapabilityType::Communication => {
                 // Critical comms require at least Commander authority
-                matches!(
-                    max_authority,
-                    None | Some(AuthorityLevel::Observer)
-                )
+                matches!(max_authority, None | Some(AuthorityLevel::Observer))
             }
             _ => false, // Other capabilities don't require oversight by default
         }
@@ -102,10 +99,10 @@ impl AggregatedCapability {
         if self.requires_oversight {
             match self.max_authority {
                 Some(AuthorityLevel::DirectControl) => confidence *= 1.0, // No penalty
-                Some(AuthorityLevel::Commander) => confidence *= 0.85, // Slight penalty
-                Some(AuthorityLevel::Supervisor) => confidence *= 0.7, // Moderate penalty
-                Some(AuthorityLevel::Advisor) => confidence *= 0.6, // Significant penalty
-                Some(AuthorityLevel::Observer) => confidence *= 0.6, // Significant penalty
+                Some(AuthorityLevel::Commander) => confidence *= 0.85,    // Slight penalty
+                Some(AuthorityLevel::Supervisor) => confidence *= 0.7,    // Moderate penalty
+                Some(AuthorityLevel::Advisor) => confidence *= 0.6,       // Significant penalty
+                Some(AuthorityLevel::Observer) => confidence *= 0.6,      // Significant penalty
                 None => confidence *= 0.5, // Major penalty for autonomous-only
             }
         }
@@ -128,8 +125,10 @@ impl CapabilityAggregator {
     pub fn aggregate_capabilities(
         members: &[(PlatformConfig, PlatformState)],
     ) -> Result<HashMap<CapabilityType, AggregatedCapability>> {
-        let mut capability_map: HashMap<CapabilityType, Vec<(String, f32, Option<AuthorityLevel>)>> =
-            HashMap::new();
+        let mut capability_map: HashMap<
+            CapabilityType,
+            Vec<(String, f32, Option<AuthorityLevel>)>,
+        > = HashMap::new();
 
         // Collect capabilities from all members
         for (config, state) in members {
@@ -177,8 +176,8 @@ impl CapabilityAggregator {
 
         // Calculate aggregated confidence
         // Strategy: Take weighted average with redundancy bonus
-        let avg_confidence: f32 = contributors.iter().map(|(_, conf, _)| conf).sum::<f32>()
-            / contributors.len() as f32;
+        let avg_confidence: f32 =
+            contributors.iter().map(|(_, conf, _)| conf).sum::<f32>() / contributors.len() as f32;
 
         // Redundancy bonus: more contributors = higher confidence
         let redundancy_bonus = match contributors.len() {
@@ -191,10 +190,7 @@ impl CapabilityAggregator {
         let base_confidence = (avg_confidence + redundancy_bonus).min(1.0);
 
         // Authority bonus: higher authority increases confidence
-        let max_authority = contributors
-            .iter()
-            .filter_map(|(_, _, auth)| *auth)
-            .max();
+        let max_authority = contributors.iter().filter_map(|(_, _, auth)| *auth).max();
 
         let authority_bonus = match max_authority {
             Some(AuthorityLevel::DirectControl) => 0.10,
@@ -219,11 +215,7 @@ impl CapabilityAggregator {
 
     /// Get the maximum authority level from a human-machine pair
     fn get_max_authority(binding: &HumanMachinePair) -> Option<AuthorityLevel> {
-        binding
-            .operators
-            .iter()
-            .map(|op| op.authority)
-            .max()
+        binding.operators.iter().map(|op| op.authority).max()
     }
 
     /// Calculate squad readiness score based on aggregated capabilities
@@ -277,7 +269,7 @@ impl CapabilityAggregator {
             match capabilities.get(&cap_type) {
                 None => gaps.push(cap_type), // Missing entirely
                 Some(agg_cap) if !agg_cap.is_mission_ready() => gaps.push(cap_type), // Present but weak
-                _ => {} // Adequate
+                _ => {}                                                              // Adequate
             }
         }
 
@@ -325,7 +317,10 @@ mod tests {
     fn test_aggregate_single_platform() {
         let platform = create_test_platform(
             "p1",
-            vec![(CapabilityType::Sensor, 0.8), (CapabilityType::Communication, 0.9)],
+            vec![
+                (CapabilityType::Sensor, 0.8),
+                (CapabilityType::Communication, 0.9),
+            ],
             None,
         );
 
@@ -367,16 +362,15 @@ mod tests {
             "19D".to_string(),
         );
 
-        let p1 = create_test_platform(
-            "p1",
-            vec![(CapabilityType::Payload, 0.7)],
-            Some(operator),
-        );
+        let p1 = create_test_platform("p1", vec![(CapabilityType::Payload, 0.7)], Some(operator));
 
         let result = CapabilityAggregator::aggregate_capabilities(&[p1]).unwrap();
 
         let payload_cap = result.get(&CapabilityType::Payload).unwrap();
-        assert_eq!(payload_cap.max_authority, Some(AuthorityLevel::DirectControl));
+        assert_eq!(
+            payload_cap.max_authority,
+            Some(AuthorityLevel::DirectControl)
+        );
 
         // Base: 0.7, Authority bonus: 0.10 = 0.80
         assert!((payload_cap.confidence - 0.80).abs() < 0.01);
@@ -483,7 +477,10 @@ mod tests {
     fn test_identify_gaps() {
         let p1 = create_test_platform(
             "p1",
-            vec![(CapabilityType::Sensor, 0.8), (CapabilityType::Communication, 0.9)],
+            vec![
+                (CapabilityType::Sensor, 0.8),
+                (CapabilityType::Communication, 0.9),
+            ],
             None,
         );
 
@@ -561,7 +558,8 @@ mod tests {
         let mut platform1 = create_test_platform("p1", vec![(CapabilityType::Sensor, 0.9)], None);
         platform1.1.health = HealthStatus::Failed;
 
-        let mut platform2 = create_test_platform("p2", vec![(CapabilityType::Communication, 0.8)], None);
+        let mut platform2 =
+            create_test_platform("p2", vec![(CapabilityType::Communication, 0.8)], None);
         platform2.1.health = HealthStatus::Failed;
 
         let result = CapabilityAggregator::aggregate_capabilities(&[platform1, platform2]).unwrap();

@@ -29,6 +29,7 @@ pub mod models;
 pub mod network;
 pub mod squad;
 pub mod storage;
+pub mod testing;
 pub mod traits;
 
 pub use error::{Error, Result};
