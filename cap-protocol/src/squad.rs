@@ -1,6 +1,6 @@
-//! Squad formation phase implementation (Phase 2)
+//! Cell formation phase implementation (Phase 2)
 //!
-//! Implements intra-squad communication, leader election, and capability aggregation.
+//! Implements intra-cell communication, leader election, and capability aggregation.
 
 pub mod aggregation;
 pub mod capability_aggregation;

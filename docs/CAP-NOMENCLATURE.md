@@ -6,7 +6,7 @@
 
 ## Problem Statement
 
-Current terminology uses Army-specific terms (Platform, Squad, Platoon, Company) which:
+Current terminology uses Army-specific terms (Node, Cell, Zone, Company) which:
 - Limits applicability to non-military domains
 - Creates cognitive barriers for civilian applications
 - Assumes a specific organizational structure
@@ -21,9 +21,9 @@ Current terminology uses Army-specific terms (Platform, Squad, Platoon, Company)
 
 | Abstract Term | Description | Current (Military) | Alternative Mappings |
 |--------------|-------------|-------------------|---------------------|
-| **Node** | Individual autonomous unit | Platform | Robot, Vehicle, Drone, Agent, Device, Sensor |
-| **Cell** | Small group (3-7 nodes) | Squad | Team, Group, Cluster, Pod, Ensemble |
-| **Zone** | Mid-level group (3-7 cells) | Platoon | Region, Sector, District, Division, Area |
+| **Node** | Individual autonomous unit | Node | Robot, Vehicle, Drone, Agent, Device, Sensor |
+| **Cell** | Small group (3-7 nodes) | Cell | Team, Group, Cluster, Pod, Ensemble |
+| **Zone** | Mid-level group (3-7 cells) | Zone | Region, Sector, District, Division, Area |
 | **Network** | Top-level group (multiple zones) | Company | Federation, Mesh, Swarm, Fleet, System |
 
 **Rationale:**
@@ -36,8 +36,8 @@ Current terminology uses Army-specific terms (Platform, Squad, Platoon, Company)
 
 | Abstract Term | Description | Current | Alternative Mappings |
 |--------------|-------------|---------|---------------------|
-| **Discovery** | Initial peer finding | Bootstrap | Join, Connect, Initialization |
-| **Formation** | Group organization | Squad Formation | Clustering, Grouping, Coordination |
+| **Discovery** | Initial peer finding | Discovery | Join, Connect, Initialization |
+| **Formation** | Group organization | Cell Formation | Clustering, Grouping, Coordination |
 | **Operations** | Hierarchical coordination | Hierarchical Operations | Execution, Runtime, Active |
 
 ### Role Terminology
@@ -62,10 +62,10 @@ Current terminology uses Army-specific terms (Platform, Squad, Platoon, Company)
 
 ### Military (Current)
 ```
-Platform (UGV, UAV, UUV)
-  └─> Squad (5 platforms)
-      └─> Platoon (4 squads, ~20 platforms)
-          └─> Company (4 platoons, ~80 platforms)
+Node (UGV, UAV, UUV)
+  └─> Cell (5 nodes)
+      └─> Zone (4 cells, ~20 nodes)
+          └─> Company (4 zones, ~80 nodes)
 ```
 
 ### Robotics / Manufacturing
@@ -117,9 +117,9 @@ Compute Node (server, container, VM)
 **Option A: Rename Everything (Breaking Change)**
 ```rust
 // OLD
-Platform → Node
-Squad → Cell
-Platoon → Zone
+Node → Node
+Cell → Cell
+Zone → Zone
 Company → Network
 
 // Example
@@ -143,18 +143,18 @@ pub struct PlatoonCoordinator → pub struct ZoneCoordinator
 **Option B: Alias + Gradual Migration (Non-Breaking)**
 ```rust
 // Create type aliases
-pub type Node = Platform;
+pub type Node = Node;
 pub type NodeConfig = PlatformConfig;
 pub type NodeState = PlatformState;
 
-pub type Cell = Squad;
+pub type Cell = Cell;
 pub type CellConfig = SquadConfig;
 pub type CellState = SquadState;
 
-pub type Zone = /* Platoon (not yet implemented) */;
+pub type Zone = /* Zone (not yet implemented) */;
 
 // Allow both terms in code
-let platform = PlatformConfig::new("UAV".to_string());
+let node = PlatformConfig::new("UAV".to_string());
 let node = NodeConfig::new("UAV".to_string());  // Same thing
 ```
 
@@ -174,16 +174,16 @@ let node = NodeConfig::new("UAV".to_string());  // Same thing
 ```rust
 // Abstract types with configurable labels
 pub struct Hierarchy {
-    level_0_name: String,  // "Platform" or "Node" or "Robot"
-    level_1_name: String,  // "Squad" or "Cell" or "Team"
-    level_2_name: String,  // "Platoon" or "Zone" or "Region"
+    level_0_name: String,  // "Node" or "Node" or "Robot"
+    level_1_name: String,  // "Cell" or "Cell" or "Team"
+    level_2_name: String,  // "Zone" or "Zone" or "Region"
     level_3_name: String,  // "Company" or "Network" or "Fleet"
 }
 
 // Internal code uses abstract names
-pub struct L0Unit { /* ... */ }  // Level-0 unit (platform/node)
-pub struct L1Group { /* ... */ } // Level-1 group (squad/cell)
-pub struct L2Group { /* ... */ } // Level-2 group (platoon/zone)
+pub struct L0Unit { /* ... */ }  // Level-0 unit (node/node)
+pub struct L1Group { /* ... */ } // Level-1 group (cell/cell)
+pub struct L2Group { /* ... */ } // Level-2 group (zone/zone)
 
 // API exposed with configurable names
 pub struct CAP {
@@ -215,12 +215,12 @@ impl CAP {
 ```rust
 // Core protocol uses abstract terms
 cap-protocol/src/
-├── node/           // Individual units (was "platform")
-├── cell/           // Small groups (was "squad")
-├── zone/           // Mid-level groups (was "platoon")
+├── node/           // Individual units (was "node")
+├── cell/           // Small groups (was "cell")
+├── zone/           // Mid-level groups (was "zone")
 ├── network/        // Top-level (future "company")
 └── domains/        // Domain-specific mappings
-    ├── military.rs     // Platform, Squad, Platoon, Company
+    ├── military.rs     // Node, Cell, Zone, Company
     ├── robotics.rs     // Robot, Cell, Zone, Factory
     ├── iot.rs          // Sensor, Cell, Zone, Network
     └── vehicles.rs     // Vehicle, Convoy, Corridor, Fleet
@@ -268,10 +268,10 @@ use cap_protocol::robotics::*;  // Robotics terminology
 - Get stakeholder buy-in
 
 **Phase 2: Refactor Core Types (2-3 days)**
-- Rename `models/platform.rs` → `models/node.rs`
-- Rename `models/squad/` → `models/cell/`
-- Rename `bootstrap/` → `discovery/`
-- Rename `squad/` → `cell/`
+- Rename `models/node.rs` → `models/node.rs`
+- Rename `models/cell/` → `models/cell/`
+- Rename `discovery/` → `discovery/`
+- Rename `cell/` → `cell/`
 - Update all internal references
 
 **Phase 3: Create Domain Modules (1 day)**
@@ -284,7 +284,7 @@ use cap_protocol::robotics::*;  // Robotics terminology
 - Update all ADRs with abstract terminology
 - Update README with domain examples
 - Update project plan with abstract terms
-- Update E5 plan with Zone (not Platoon)
+- Update E5 plan with Zone (not Zone)
 
 **Phase 5: Update Tests (1 day)**
 - Update test names to use abstract terms
@@ -321,7 +321,7 @@ Week 1-4: E5 Implementation (using abstract terms)
 **Option 2: Refactor After E5** (Faster)
 ```
 Week 0: Prerequisites only (5 days)
-Week 1-4: E5 Implementation (using Platoon)
+Week 1-4: E5 Implementation (using Zone)
 Week 5: Nomenclature refactoring (all epics)
 ```
 
@@ -340,8 +340,8 @@ Week 5: Nomenclature refactoring (all epics)
 ```
 Week 0: Prerequisites only (5 days)
 Week 1-4: E5 Implementation
-  └── Use abstract terms for NEW code (Zone, not Platoon)
-  └── Keep existing code as-is (Platform, Squad)
+  └── Use abstract terms for NEW code (Zone, not Zone)
+  └── Keep existing code as-is (Node, Cell)
 Week 5+: Gradually refactor E1-E4 as time permits
 ```
 

@@ -8,16 +8,16 @@
 
 ## Overview
 
-E5 implements Phase 3 of the CAP protocol: hierarchical message routing with platoon-level coordination. This phase enables scalable coordination of 100+ platforms organized into squads and platoons.
+E5 implements Phase 3 of the CAP protocol: hierarchical message routing with zone-level coordination. This phase enables scalable coordination of 100+ nodes organized into cells and zones.
 
-**Goal:** Implement hierarchical message routing (platform → squad → platoon) with O(n log n) message complexity.
+**Goal:** Implement hierarchical message routing (node → cell → zone) with O(n log n) message complexity.
 
 **Success Criteria:**
-- ✅ Platforms only message squad peers
-- ✅ Squad leaders message platoon level
-- ✅ Cross-squad messages rejected
+- ✅ Nodes only message cell peers
+- ✅ Cell leaders message zone level
+- ✅ Cross-cell messages rejected
 - ✅ Message complexity is O(n log n)
-- ✅ 100 platforms, 20 squads, 4 platoons coordinate successfully
+- ✅ 100 nodes, 20 cells, 4 zones coordinate successfully
 
 ---
 
@@ -25,17 +25,17 @@ E5 implements Phase 3 of the CAP protocol: hierarchical message routing with pla
 
 ### 0.1 Refactoring Tasks
 
-**Task 1: Add platoon_id to PlatformState** (0.5 days)
+**Task 1: Add zone_id to PlatformState** (0.5 days)
 ```rust
-// File: cap-protocol/src/models/platform.rs
+// File: cap-protocol/src/models/node.rs
 pub struct PlatformState {
-    pub squad_id: Option<String>,
-    pub platoon_id: Option<String>,  // NEW - for direct platoon queries
+    pub cell_id: Option<String>,
+    pub zone_id: Option<String>,  // NEW - for direct zone queries
     // ... existing fields
 }
 ```
 
-**Rationale:** Enables efficient "all platforms in platoon X" queries without traversing squad relationships.
+**Rationale:** Enables efficient "all nodes in zone X" queries without traversing cell relationships.
 
 **Testing:**
 - Update serialization tests
@@ -52,16 +52,16 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 pub struct RoutingCache {
-    platform_to_squad: Arc<RwLock<HashMap<String, String>>>,
-    squad_to_platoon: Arc<RwLock<HashMap<String, String>>>,
+    node_to_cell: Arc<RwLock<HashMap<String, String>>>,
+    cell_to_zone: Arc<RwLock<HashMap<String, String>>>,
     last_refresh: Arc<RwLock<Instant>>,
     refresh_interval: Duration,
 }
 
 impl RoutingCache {
     pub fn new(refresh_interval: Duration) -> Self;
-    pub async fn get_platform_squad(&self, platform_id: &str) -> Option<String>;
-    pub async fn get_squad_platoon(&self, squad_id: &str) -> Option<String>;
+    pub async fn get_node_cell(&self, node_id: &str) -> Option<String>;
+    pub async fn get_cell_zone(&self, cell_id: &str) -> Option<String>;
     pub async fn refresh(&self, store: &DittoStore) -> Result<()>;
     pub fn invalidate(&self);
 }
@@ -93,7 +93,7 @@ impl ThrottledPlatformStore {
     pub fn new(store: PlatformStore, sync_interval: Duration) -> Self;
 
     /// Queue state update, sync if interval elapsed
-    pub async fn update_state(&self, platform_id: &str, state: &PlatformState)
+    pub async fn update_state(&self, node_id: &str, state: &PlatformState)
         -> Result<()>;
 
     /// Force flush pending updates
@@ -115,7 +115,7 @@ impl ThrottledPlatformStore {
 
 Document architectural decisions for:
 - Hierarchical routing approach (wrapper vs. refactor)
-- Platoon coordinator pattern (leader-based vs. distributed)
+- Zone coordinator pattern (leader-based vs. distributed)
 - Message transport (Ditto vs. P2P vs. hybrid)
 - Flow control strategy
 
@@ -156,15 +156,15 @@ use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Hierarchical routing table (platform → squad → platoon)
+/// Hierarchical routing table (node → cell → zone)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoutingTable {
-    /// Platform → Squad mappings
-    pub platform_assignments: HashMap<String, String>,
-    /// Squad → Platoon mappings
-    pub squad_assignments: HashMap<String, String>,
-    /// Squad leaders (for upward routing privileges)
-    pub squad_leaders: HashMap<String, String>,  // squad_id → leader_platform_id
+    /// Node → Cell mappings
+    pub node_assignments: HashMap<String, String>,
+    /// Cell → Zone mappings
+    pub cell_assignments: HashMap<String, String>,
+    /// Cell leaders (for upward routing privileges)
+    pub cell_leaders: HashMap<String, String>,  // cell_id → leader_node_id
     /// Timestamp for conflict resolution (LWW)
     pub timestamp: u64,
 }
@@ -172,32 +172,32 @@ pub struct RoutingTable {
 impl RoutingTable {
     pub fn new() -> Self;
 
-    /// Assign platform to squad
-    pub fn assign_platform(&mut self, platform_id: String, squad_id: String);
+    /// Assign node to squad
+    pub fn assign_node(&mut self, node_id: String, cell_id: String);
 
-    /// Assign squad to platoon
-    pub fn assign_squad(&mut self, squad_id: String, platoon_id: String);
+    /// Assign cell to platoon
+    pub fn assign_cell(&mut self, cell_id: String, zone_id: String);
 
-    /// Set squad leader
-    pub fn set_squad_leader(&mut self, squad_id: String, leader_id: String);
+    /// Set cell leader
+    pub fn set_cell_leader(&mut self, cell_id: String, leader_id: String);
 
-    /// Get platform's squad
-    pub fn get_platform_squad(&self, platform_id: &str) -> Option<&String>;
+    /// Get node's squad
+    pub fn get_node_cell(&self, node_id: &str) -> Option<&String>;
 
-    /// Get squad's platoon
-    pub fn get_squad_platoon(&self, squad_id: &str) -> Option<&String>;
+    /// Get cell's platoon
+    pub fn get_cell_zone(&self, cell_id: &str) -> Option<&String>;
 
-    /// Get platform's platoon (two-hop lookup)
-    pub fn get_platform_platoon(&self, platform_id: &str) -> Option<String>;
+    /// Get node's zone (two-hop lookup)
+    pub fn get_node_zone(&self, node_id: &str) -> Option<String>;
 
-    /// Check if platform is squad leader
-    pub fn is_squad_leader(&self, platform_id: &str) -> bool;
+    /// Check if node is cell leader
+    pub fn is_cell_leader(&self, node_id: &str) -> bool;
 
-    /// Get all platforms in squad
-    pub fn get_squad_platforms(&self, squad_id: &str) -> Vec<String>;
+    /// Get all nodes in squad
+    pub fn get_cell_nodes(&self, cell_id: &str) -> Vec<String>;
 
-    /// Get all squads in platoon
-    pub fn get_platoon_squads(&self, platoon_id: &str) -> Vec<String>;
+    /// Get all cells in platoon
+    pub fn get_zone_cells(&self, zone_id: &str) -> Vec<String>;
 
     /// Merge with another routing table (CRDT merge semantics)
     pub fn merge(&mut self, other: &RoutingTable);
@@ -206,7 +206,7 @@ impl RoutingTable {
 
 **Testing:**
 - Basic assignment/lookup operations
-- Two-hop lookups (platform → platoon)
+- Two-hop lookups (node → zone)
 - Leader privilege checks
 - CRDT merge with concurrent updates
 - Edge cases (missing mappings, cycles)
@@ -219,32 +219,32 @@ impl RoutingTable {
 
 ```rust
 use crate::traits::MessageRouter;
-use crate::squad::messaging::SquadMessageBus;
+use crate::cell::messaging::SquadMessageBus;
 use crate::{Error, Result};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 /// Hierarchical message router enforcing routing rules
 pub struct HierarchicalRouter {
-    platform_id: String,
+    node_id: String,
     routing_table: Arc<Mutex<RoutingTable>>,
     routing_cache: Arc<RoutingCache>,
-    squad_router: Option<SquadRouter>,
-    platoon_router: Option<PlatoonRouter>,
+    cell_router: Option<SquadRouter>,
+    zone_router: Option<PlatoonRouter>,
 }
 
 impl HierarchicalRouter {
     pub fn new(
-        platform_id: String,
+        node_id: String,
         routing_table: Arc<Mutex<RoutingTable>>,
         routing_cache: Arc<RoutingCache>,
     ) -> Self;
 
-    /// Initialize squad-level routing
-    pub async fn init_squad_router(&mut self, squad_id: String) -> Result<()>;
+    /// Initialize cell-level routing
+    pub async fn init_cell_router(&mut self, cell_id: String) -> Result<()>;
 
-    /// Initialize platoon-level routing (leader only)
-    pub async fn init_platoon_router(&mut self, platoon_id: String) -> Result<()>;
+    /// Initialize zone-level routing (leader only)
+    pub async fn init_zone_router(&mut self, zone_id: String) -> Result<()>;
 
     /// Route message to target (enforces hierarchy rules)
     pub async fn route_message(&self, target: &str, message: Vec<u8>) -> Result<()>;
@@ -265,21 +265,21 @@ impl MessageRouter for HierarchicalRouter {
     fn valid_targets(&self) -> Vec<String>;
 }
 
-/// Squad-level router wrapper
+/// Cell-level router wrapper
 pub struct SquadRouter {
-    squad_id: String,
+    cell_id: String,
     message_bus: Arc<SquadMessageBus>,
     routing_table: Arc<Mutex<RoutingTable>>,
 }
 
 impl SquadRouter {
     pub fn new(
-        squad_id: String,
+        cell_id: String,
         message_bus: Arc<SquadMessageBus>,
         routing_table: Arc<Mutex<RoutingTable>>,
     ) -> Self;
 
-    /// Send message to squad peer (validates target is squad member)
+    /// Send message to cell peer (validates target is cell member)
     pub async fn send_to_peer(&self, target: &str, message: Vec<u8>) -> Result<()>;
 
     /// Validate target is in same squad
@@ -288,13 +288,13 @@ impl SquadRouter {
 ```
 
 **Routing Rules:**
-1. Platform can message: squad peers only (same squad)
-2. Squad leader can message: squad peers + platoon level
-3. Non-leader cannot message: cross-squad, platoon level
-4. Reject all: direct cross-squad messages
+1. Node can message: cell peers only (same cell)
+2. Cell leader can message: cell peers + zone level
+3. Non-leader cannot message: cross-cell, zone level
+4. Reject all: direct cross-cell messages
 
 **Testing:**
-- Routing rule validation (intra-squad allowed, cross-squad rejected)
+- Routing rule validation (intra-cell allowed, cross-cell rejected)
 - Leader privilege enforcement (upward routing)
 - Non-leader upward routing rejection
 - Routing table updates
@@ -318,11 +318,11 @@ impl SquadRouter {
 ### Task 1.4: Routing Rules Tests (0.5 days)
 
 **Test scenarios:**
-- Platform → squad peer (allowed)
-- Platform → different squad platform (rejected)
-- Squad leader → platoon (allowed)
-- Non-leader → platoon (rejected)
-- Invalid target (non-existent platform)
+- Node → cell peer (allowed)
+- Node → different cell node (rejected)
+- Cell leader → zone (allowed)
+- Non-leader → zone (rejected)
+- Invalid target (non-existent node)
 
 **Deliverable:** `cap-protocol/src/hierarchy/router_tests.rs`
 
@@ -332,43 +332,43 @@ impl SquadRouter {
 
 ---
 
-## Phase 2: E5.2 - Platoon Level Aggregation (Days 5-9)
+## Phase 2: E5.2 - Zone Level Aggregation (Days 5-9)
 
-### Story: E5.2 - Platoon Level Aggregation
+### Story: E5.2 - Zone Level Aggregation
 
-**Goal:** Implement platoon model, coordinator, and squad-to-platoon messaging.
+**Goal:** Implement zone model, coordinator, and cell-to-zone messaging.
 
-### Task 2.1: Create Platoon Model (0.5 days)
+### Task 2.1: Create Zone Model (0.5 days)
 
-**File:** `cap-protocol/src/models/platoon.rs`
+**File:** `cap-protocol/src/models/zone.rs`
 
 ```rust
 use crate::models::Capability;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-/// Platoon configuration (G-Set)
+/// Zone configuration (G-Set)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlatoonConfig {
     pub id: String,
-    pub max_squads: usize,
-    pub min_squads: usize,
+    pub max_cells: usize,
+    pub min_cells: usize,
     pub created_at: u64,
 }
 
 impl PlatoonConfig {
-    pub fn new(max_squads: usize) -> Self;
+    pub fn new(max_cells: usize) -> Self;
 }
 
-/// Platoon runtime state (CRDT)
+/// Zone runtime state (CRDT)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlatoonState {
     pub config: PlatoonConfig,
-    /// Platoon commander (LWW-Register)
+    /// Zone commander (LWW-Register)
     pub commander_id: Option<String>,
-    /// Squad membership (OR-Set)
-    pub squads: HashSet<String>,
-    /// Aggregated capabilities from squads (G-Set)
+    /// Cell membership (OR-Set)
+    pub cells: HashSet<String>,
+    /// Aggregated capabilities from cells (G-Set)
     pub aggregated_capabilities: Vec<Capability>,
     /// Timestamp for LWW conflict resolution
     pub timestamp: u64,
@@ -377,25 +377,25 @@ pub struct PlatoonState {
 impl PlatoonState {
     pub fn new(config: PlatoonConfig) -> Self;
 
-    /// Add squad to platoon (OR-Set add)
-    pub fn add_squad(&mut self, squad_id: String) -> bool;
+    /// Add cell to zone (OR-Set add)
+    pub fn add_cell(&mut self, cell_id: String) -> bool;
 
-    /// Remove squad from platoon (OR-Set remove)
-    pub fn remove_squad(&mut self, squad_id: &str) -> bool;
+    /// Remove cell from zone (OR-Set remove)
+    pub fn remove_cell(&mut self, cell_id: &str) -> bool;
 
-    /// Set platoon commander (LWW-Register)
+    /// Set zone commander (LWW-Register)
     pub fn set_commander(&mut self, commander_id: String) -> Result<()>;
 
     /// Add aggregated capability (G-Set add)
     pub fn add_capability(&mut self, capability: Capability);
 
-    /// Check if platoon meets minimum size
+    /// Check if zone meets minimum size
     pub fn is_valid(&self) -> bool;
 
-    /// Check if platoon is at capacity
+    /// Check if zone is at capacity
     pub fn is_full(&self) -> bool;
 
-    /// Merge with another platoon state (CRDT merge)
+    /// Merge with another zone state (CRDT merge)
     pub fn merge(&mut self, other: &PlatoonState);
 
     /// Update timestamp
@@ -404,25 +404,25 @@ impl PlatoonState {
 ```
 
 **Testing:**
-- CRDT operations (add/remove squads, set commander)
+- CRDT operations (add/remove cells, set commander)
 - Merge semantics
-- Validation logic (min/max squads)
+- Validation logic (min/max cells)
 - Serialization round-trip
 
 ---
 
 ### Task 2.2: Implement PlatoonStore (1 day)
 
-**File:** `cap-protocol/src/storage/platoon_store.rs`
+**File:** `cap-protocol/src/storage/zone_store.rs`
 
 ```rust
-use crate::models::platoon::{PlatoonConfig, PlatoonState};
+use crate::models::zone::{PlatoonConfig, PlatoonState};
 use crate::storage::ditto_store::DittoStore;
 use crate::{Error, Result};
 
-const PLATOON_COLLECTION: &str = "platoons";
+const PLATOON_COLLECTION: &str = "zones";
 
-/// Platoon storage manager
+/// Zone storage manager
 pub struct PlatoonStore {
     store: DittoStore,
 }
@@ -430,29 +430,29 @@ pub struct PlatoonStore {
 impl PlatoonStore {
     pub fn new(store: DittoStore) -> Self;
 
-    /// Store platoon state
-    pub async fn store_platoon(&self, platoon: &PlatoonState) -> Result<String>;
+    /// Store zone state
+    pub async fn store_zone(&self, zone: &PlatoonState) -> Result<String>;
 
-    /// Retrieve platoon by ID
-    pub async fn get_platoon(&self, platoon_id: &str) -> Result<Option<PlatoonState>>;
+    /// Retrieve zone by ID
+    pub async fn get_zone(&self, zone_id: &str) -> Result<Option<PlatoonState>>;
 
     /// Get all valid platoons
-    pub async fn get_valid_platoons(&self) -> Result<Vec<PlatoonState>>;
+    pub async fn get_valid_zones(&self) -> Result<Vec<PlatoonState>>;
 
-    /// Get platoons with specific squad
-    pub async fn get_platoons_with_squad(&self, squad_id: &str) -> Result<Vec<PlatoonState>>;
+    /// Get zones with specific squad
+    pub async fn get_zones_with_cell(&self, cell_id: &str) -> Result<Vec<PlatoonState>>;
 
-    /// Add squad to platoon
-    pub async fn add_squad(&self, platoon_id: &str, squad_id: String) -> Result<()>;
+    /// Add cell to platoon
+    pub async fn add_cell(&self, zone_id: &str, cell_id: String) -> Result<()>;
 
-    /// Remove squad from platoon
-    pub async fn remove_squad(&self, platoon_id: &str, squad_id: &str) -> Result<()>;
+    /// Remove cell from platoon
+    pub async fn remove_cell(&self, zone_id: &str, cell_id: &str) -> Result<()>;
 
-    /// Set platoon commander
-    pub async fn set_commander(&self, platoon_id: &str, commander_id: String) -> Result<()>;
+    /// Set zone commander
+    pub async fn set_commander(&self, zone_id: &str, commander_id: String) -> Result<()>;
 
     /// Delete platoon
-    pub async fn delete_platoon(&self, platoon_id: &str) -> Result<()>;
+    pub async fn delete_zone(&self, zone_id: &str) -> Result<()>;
 }
 ```
 
@@ -466,19 +466,19 @@ impl PlatoonStore {
 
 ### Task 2.3: Implement PlatoonMessageBus (1 day)
 
-**File:** `cap-protocol/src/hierarchy/platoon_messaging.rs`
+**File:** `cap-protocol/src/hierarchy/zone_messaging.rs`
 
 ```rust
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-/// Platoon-level message types
+/// Zone-level message types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PlatoonMessage {
-    /// Squad summary from squad leader
+    /// Cell summary from cell leader
     SquadSummary {
-        squad_id: String,
+        cell_id: String,
         member_count: usize,
         capabilities: Vec<Capability>,
         readiness: f32,
@@ -488,33 +488,33 @@ pub enum PlatoonMessage {
         commander_id: String,
         timestamp: u64,
     },
-    /// Platoon status update
+    /// Zone status update
     StatusUpdate {
         status: PlatoonStatus,
         timestamp: u64,
     },
     /// Task assignment to squad
     TaskAssignment {
-        target_squad: String,
+        target_cell: String,
         task: Task,
     },
 }
 
-/// Platoon message bus (squad leader → platoon level)
+/// Zone message bus (cell leader → zone level)
 pub struct PlatoonMessageBus {
-    platoon_id: String,
-    platform_id: String,  // Must be squad leader
+    zone_id: String,
+    node_id: String,  // Must be cell leader
     outbound_queue: Arc<Mutex<VecDeque<PlatoonMessage>>>,
     subscribers: Arc<Mutex<Vec<PlatoonMessageHandler>>>,
 }
 
 impl PlatoonMessageBus {
-    pub fn new(platoon_id: String, platform_id: String) -> Self;
+    pub fn new(zone_id: String, node_id: String) -> Self;
 
-    /// Publish message to platoon (squad leaders only)
+    /// Publish message to zone (cell leaders only)
     pub async fn publish(&self, message: PlatoonMessage) -> Result<()>;
 
-    /// Subscribe to platoon messages
+    /// Subscribe to zone messages
     pub fn subscribe(&mut self, handler: PlatoonMessageHandler);
 
     /// Process pending outbound messages
@@ -527,22 +527,22 @@ pub type PlatoonMessageHandler = Arc<dyn Fn(PlatoonMessage) + Send + Sync>;
 **Testing:**
 - Message publishing
 - Subscription and delivery
-- Squad leader validation
+- Cell leader validation
 - Message ordering
 
 ---
 
 ### Task 2.4: Implement PlatoonCoordinator (1.5 days)
 
-**File:** `cap-protocol/src/hierarchy/platoon.rs`
+**File:** `cap-protocol/src/hierarchy/zone.rs`
 
 ```rust
-use crate::models::platoon::{PlatoonConfig, PlatoonState};
-use crate::models::squad::SquadState;
-use crate::storage::platoon_store::PlatoonStore;
+use crate::models::zone::{PlatoonConfig, PlatoonState};
+use crate::models::cell::SquadState;
+use crate::storage::zone_store::PlatoonStore;
 use crate::{Error, Result};
 
-/// Platoon formation status
+/// Zone formation status
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlatoonFormationStatus {
     Forming,
@@ -550,43 +550,43 @@ pub enum PlatoonFormationStatus {
     Degraded,
 }
 
-/// Platoon formation coordinator (run by platoon commander)
+/// Zone formation coordinator (run by zone commander)
 pub struct PlatoonCoordinator {
-    pub platoon_id: String,
-    pub min_squads: usize,
+    pub zone_id: String,
+    pub min_cells: usize,
     pub min_readiness: f32,
     pub status: PlatoonFormationStatus,
 }
 
 impl PlatoonCoordinator {
-    pub fn new(platoon_id: String, min_squads: usize, min_readiness: f32) -> Self;
+    pub fn new(zone_id: String, min_cells: usize, min_readiness: f32) -> Self;
 
-    /// Check if platoon formation is complete
+    /// Check if zone formation is complete
     pub fn check_formation_complete(
         &mut self,
-        squads: &[SquadState],
+        cells: &[SquadState],
         commander_id: Option<&str>,
     ) -> Result<bool>;
 
     /// Aggregate capabilities from squads
-    pub fn aggregate_capabilities(&self, squads: &[SquadState]) -> Vec<Capability>;
+    pub fn aggregate_capabilities(&self, cells: &[SquadState]) -> Vec<Capability>;
 
-    /// Detect emergent platoon-level capabilities
-    pub fn detect_emergent_capabilities(&self, squads: &[SquadState]) -> Vec<Capability>;
+    /// Detect emergent zone-level capabilities
+    pub fn detect_emergent_capabilities(&self, cells: &[SquadState]) -> Vec<Capability>;
 
-    /// Check if platoon can transition to operations phase
+    /// Check if zone can transition to operations phase
     pub fn can_transition_to_operations(&self) -> bool;
 
     /// Get formation metrics
     pub fn get_metrics(&self) -> PlatoonMetrics;
 }
 
-/// Platoon formation metrics
+/// Zone formation metrics
 #[derive(Debug, Clone)]
 pub struct PlatoonMetrics {
-    pub squad_count: usize,
-    pub total_platforms: usize,
-    pub average_squad_readiness: f32,
+    pub cell_count: usize,
+    pub total_nodes: usize,
+    pub average_cell_readiness: f32,
     pub capability_count: usize,
     pub formation_time_ms: u64,
 }
@@ -603,13 +603,13 @@ pub struct PlatoonMetrics {
 ### Task 2.5: Integration Tests (0.5 days)
 
 **Scenarios:**
-- 4 squads form platoon
+- 4 cells form platoon
 - Commander election
-- Squad summary propagation
+- Cell summary propagation
 - Capability aggregation
-- 3-level hierarchy (platform → squad → platoon)
+- 3-level hierarchy (node → cell → zone)
 
-**Deliverable:** `cap-protocol/src/hierarchy/platoon_tests.rs`
+**Deliverable:** `cap-protocol/src/hierarchy/zone_tests.rs`
 
 ---
 
@@ -625,10 +625,10 @@ pub struct PlatoonMetrics {
 
 ### Task 3.1: Extend MessagePriority (0.5 days)
 
-**File:** `cap-protocol/src/squad/messaging.rs` (extend existing)
+**File:** `cap-protocol/src/cell/messaging.rs` (extend existing)
 
 - Already has 4 priority levels: Low, Normal, High, Critical
-- Add hierarchical context: intra-squad vs. upward propagation
+- Add hierarchical context: intra-cell vs. upward propagation
 - Document priority escalation rules
 
 **Testing:**
@@ -662,8 +662,8 @@ pub struct BandwidthLimit {
 /// Flow control for hierarchical message routing
 pub struct FlowController {
     /// Rate limiters per routing level
-    squad_limiter: Arc<RateLimiter>,
-    platoon_limiter: Arc<RateLimiter>,
+    cell_limiter: Arc<RateLimiter>,
+    zone_limiter: Arc<RateLimiter>,
     /// Backpressure state
     backpressure: Arc<Mutex<BackpressureState>>,
     /// Message dropping policy
@@ -672,8 +672,8 @@ pub struct FlowController {
 
 impl FlowController {
     pub fn new(
-        squad_limit: BandwidthLimit,
-        platoon_limit: BandwidthLimit,
+        cell_limit: BandwidthLimit,
+        zone_limit: BandwidthLimit,
         drop_policy: MessageDropPolicy,
     ) -> Self;
 
@@ -778,8 +778,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// Hierarchical routing metrics
 pub struct RoutingMetrics {
     /// Message counts per level
-    pub squad_messages: Arc<AtomicU64>,
-    pub platoon_messages: Arc<AtomicU64>,
+    pub cell_messages: Arc<AtomicU64>,
+    pub zone_messages: Arc<AtomicU64>,
     /// Hop count distribution
     pub hop_counts: Arc<Mutex<Vec<usize>>>,
     /// Latency tracking
@@ -823,57 +823,57 @@ pub struct MetricsSummary {
 
 ### Story: E5.5 - Dynamic Hierarchy Rebalancing
 
-**Goal:** Implement squad merge/split and routing table maintenance.
+**Goal:** Implement cell merge/split and routing table maintenance.
 
-### Task 4.1: Squad Merge/Split Logic (2 days)
+### Task 4.1: Cell Merge/Split Logic (2 days)
 
 **File:** `cap-protocol/src/hierarchy/maintenance.rs`
 
 ```rust
-use crate::models::squad::SquadState;
-use crate::models::platoon::PlatoonState;
+use crate::models::cell::SquadState;
+use crate::models::zone::PlatoonState;
 use crate::{Error, Result};
 
 /// Hierarchy maintenance coordinator
 pub struct HierarchyMaintainer {
-    /// Squad size constraints
-    pub min_squad_size: usize,
-    pub max_squad_size: usize,
-    /// Platoon size constraints
-    pub min_platoon_squads: usize,
-    pub max_platoon_squads: usize,
+    /// Cell size constraints
+    pub min_cell_size: usize,
+    pub max_cell_size: usize,
+    /// Zone size constraints
+    pub min_zone_cells: usize,
+    pub max_zone_cells: usize,
 }
 
 impl HierarchyMaintainer {
     pub fn new(
-        min_squad_size: usize,
-        max_squad_size: usize,
-        min_platoon_squads: usize,
-        max_platoon_squads: usize,
+        min_cell_size: usize,
+        max_cell_size: usize,
+        min_zone_cells: usize,
+        max_zone_cells: usize,
     ) -> Self;
 
-    /// Check if squad needs rebalancing
-    pub fn needs_rebalance(&self, squad: &SquadState) -> RebalanceAction;
+    /// Check if cell needs rebalancing
+    pub fn needs_rebalance(&self, cell: &SquadState) -> RebalanceAction;
 
     /// Merge undersized squads
-    pub async fn merge_squads(
+    pub async fn merge_cells(
         &self,
-        squad1: &SquadState,
-        squad2: &SquadState,
+        cell1: &SquadState,
+        cell2: &SquadState,
     ) -> Result<SquadState>;
 
     /// Split oversized squad
-    pub async fn split_squad(&self, squad: &SquadState) -> Result<(SquadState, SquadState)>;
+    pub async fn split_cell(&self, cell: &SquadState) -> Result<(SquadState, SquadState)>;
 
-    /// Find merge candidate (nearest squad with capacity)
+    /// Find merge candidate (nearest cell with capacity)
     pub fn find_merge_candidate(
         &self,
-        squad: &SquadState,
+        cell: &SquadState,
         candidates: &[SquadState],
     ) -> Option<String>;
 
-    /// Check if platoon needs rebalancing
-    pub fn needs_platoon_rebalance(&self, platoon: &PlatoonState) -> bool;
+    /// Check if zone needs rebalancing
+    pub fn needs_zone_rebalance(&self, zone: &PlatoonState) -> bool;
 
     /// Get rebalancing metrics
     pub fn get_metrics(&self) -> MaintenanceMetrics;
@@ -897,8 +897,8 @@ pub struct MaintenanceMetrics {
 ```
 
 **Testing:**
-- Squad merge logic
-- Squad split logic
+- Cell merge logic
+- Cell split logic
 - Merge candidate selection
 - Edge cases (min size = 1, max size = capacity)
 
@@ -910,22 +910,22 @@ pub struct MaintenanceMetrics {
 
 ```rust
 impl RoutingTable {
-    /// Update assignments after squad merge
-    pub fn handle_squad_merge(
+    /// Update assignments after cell merge
+    pub fn handle_cell_merge(
         &mut self,
-        old_squad1: &str,
-        old_squad2: &str,
-        new_squad: &str,
+        old_cell1: &str,
+        old_cell2: &str,
+        new_cell: &str,
     );
 
-    /// Update assignments after squad split
-    pub fn handle_squad_split(
+    /// Update assignments after cell split
+    pub fn handle_cell_split(
         &mut self,
-        old_squad: &str,
-        new_squad1: &str,
-        new_squad2: &str,
-        squad1_platforms: &[String],
-        squad2_platforms: &[String],
+        old_cell: &str,
+        new_cell1: &str,
+        new_cell2: &str,
+        cell1_nodes: &[String],
+        cell2_nodes: &[String],
     );
 
     /// Validate routing table consistency
@@ -959,7 +959,7 @@ impl HierarchyMaintainer {
     /// Plan rebalancing with minimal disruption
     pub fn plan_rebalance(
         &self,
-        squads: &[SquadState],
+        cells: &[SquadState],
     ) -> Vec<RebalanceOperation>;
 
     /// Execute rebalancing plan
@@ -969,15 +969,15 @@ impl HierarchyMaintainer {
     ) -> Result<RebalanceResult>;
 
     /// Wait for in-flight messages before rebalance
-    async fn drain_messages(&self, squad_id: &str) -> Result<()>;
+    async fn drain_messages(&self, cell_id: &str) -> Result<()>;
 }
 
 /// Rebalance operation
 #[derive(Debug, Clone)]
 pub enum RebalanceOperation {
-    Merge { squad1: String, squad2: String },
-    Split { squad: String },
-    Reassign { platform: String, from_squad: String, to_squad: String },
+    Merge { cell1: String, cell2: String },
+    Split { cell: String },
+    Reassign { node: String, from_cell: String, to_cell: String },
 }
 
 /// Rebalance result
@@ -1000,8 +1000,8 @@ pub struct RebalanceResult {
 ### Task 4.4: Integration Tests (0.5 days)
 
 **Scenarios:**
-- Squad underflow → merge
-- Squad overflow → split
+- Cell underflow → merge
+- Cell overflow → split
 - Routing table consistency after rebalance
 - Message delivery during rebalance
 - Multiple concurrent rebalances
@@ -1020,20 +1020,20 @@ pub struct RebalanceResult {
 
 **Scenarios:**
 1. **Full Hierarchy Formation**
-   - 100 platforms bootstrap into 20 squads
-   - 20 squads form 4 platoons
+   - 100 nodes discovery into 20 squads
+   - 20 cells form 4 platoons
    - Validate routing table convergence
    - Test message flow at all levels
 
 2. **Hierarchical Message Routing**
-   - Platform messages squad peers (allowed)
-   - Platform messages cross-squad (rejected)
-   - Squad leader messages platoon (allowed)
-   - Non-leader messages platoon (rejected)
+   - Node messages cell peers (allowed)
+   - Node messages cross-cell (rejected)
+   - Cell leader messages zone (allowed)
+   - Non-leader messages zone (rejected)
 
 3. **Dynamic Rebalancing**
-   - Squad underflow triggers merge
-   - Squad overflow triggers split
+   - Cell underflow triggers merge
+   - Cell overflow triggers split
    - Routing table updates correctly
    - Messages continue to flow during rebalance
 
@@ -1044,8 +1044,8 @@ pub struct RebalanceResult {
    - Priority handling
 
 5. **Failure Scenarios**
-   - Squad leader failure → new election
-   - Platoon commander failure → new commander
+   - Cell leader failure → new election
+   - Zone commander failure → new commander
    - Routing table recovery
    - Message delivery guarantees
 
@@ -1064,11 +1064,11 @@ pub struct RebalanceResult {
 1. **Message Complexity**
    - Measure total message count for coordination
    - Target: O(n log n) behavior
-   - Compare to baseline (E4 squad-level only)
+   - Compare to baseline (E4 cell-level only)
 
 2. **Query Performance**
    - Routing table lookups
-   - Hierarchical queries (platform → platoon)
+   - Hierarchical queries (node → zone)
    - Cache hit rates
 
 3. **Throughput**
@@ -1118,7 +1118,7 @@ pub struct RebalanceResult {
 |-------|-------|----------|------|
 | Phase 0 | Prerequisites & Refactoring | 1 week | 0 |
 | Phase 1 | E5.1 - Hierarchical Message Router | 4 days | 1-4 |
-| Phase 2 | E5.2 - Platoon Level Aggregation | 5 days | 5-9 |
+| Phase 2 | E5.2 - Zone Level Aggregation | 5 days | 5-9 |
 | Phase 3 | E5.3/E5.4 - Priority & Flow Control | 4 days | 10-13 |
 | Phase 4 | E5.5 - Hierarchy Maintenance | 5 days | 14-18 |
 | Phase 5 | Integration & E2E Testing | 3 days | 19-21 |
@@ -1144,11 +1144,11 @@ pub struct RebalanceResult {
 
 | Criterion | Validation Method |
 |-----------|------------------|
-| Platforms only message squad peers | Routing rules unit tests, E2E rejection tests |
-| Squad leaders message platoon | Leader privilege tests, platoon message delivery |
-| Cross-squad messages rejected | Routing validation tests |
+| Nodes only message cell peers | Routing rules unit tests, E2E rejection tests |
+| Cell leaders message zone | Leader privilege tests, zone message delivery |
+| Cross-cell messages rejected | Routing validation tests |
 | Message complexity O(n log n) | Performance benchmarks with scaling tests |
-| 100 platforms, 20 squads, 4 platoons | E2E scenario with metrics collection |
+| 100 nodes, 20 cells, 4 zones | E2E scenario with metrics collection |
 
 ---
 
@@ -1157,8 +1157,8 @@ pub struct RebalanceResult {
 **Required for E5:**
 - ✅ E1 (Foundation) - Complete
 - ✅ E2 (CRDT Models) - Complete
-- ✅ E3 (Bootstrap) - Complete
-- ✅ E4 (Squad Formation) - Complete
+- ✅ E3 (Discovery) - Complete
+- ✅ E4 (Cell Formation) - Complete
 - ⏳ Prerequisites (refactoring) - In progress
 
 **Deferred (not blocking):**
@@ -1184,7 +1184,7 @@ pub struct RebalanceResult {
 4. Write routing rules tests
 
 **Week 2 (Phase 2):**
-1. Create Platoon model and store
+1. Create Zone model and store
 2. Implement PlatoonMessageBus
 3. Implement PlatoonCoordinator
 4. Integration tests
@@ -1212,18 +1212,18 @@ cap-protocol/src/
 │   ├── routing_table.rs        (NEW - Phase 1)
 │   ├── routing_cache.rs        (NEW - Prerequisites)
 │   ├── router.rs               (NEW - Phase 1)
-│   ├── platoon_messaging.rs    (NEW - Phase 2)
-│   ├── platoon.rs              (NEW - Phase 2)
+│   ├── zone_messaging.rs    (NEW - Phase 2)
+│   ├── zone.rs              (NEW - Phase 2)
 │   ├── flow_control.rs         (NEW - Phase 3)
 │   ├── maintenance.rs          (NEW - Phase 4)
 │   └── metrics.rs              (NEW - Phase 3)
 ├── models/
-│   ├── platoon.rs              (NEW - Phase 2)
-│   └── platform.rs             (MODIFY - add platoon_id)
+│   ├── zone.rs              (NEW - Phase 2)
+│   └── node.rs             (MODIFY - add zone_id)
 ├── storage/
-│   ├── platoon_store.rs        (NEW - Phase 2)
+│   ├── zone_store.rs        (NEW - Phase 2)
 │   ├── throttled_updates.rs    (NEW - Prerequisites)
-│   └── mod.rs                  (MODIFY - add platoon_store)
+│   └── mod.rs                  (MODIFY - add zone_store)
 └── tests/
     └── e2e_hierarchical_operations.rs  (NEW - Phase 5)
 ```
@@ -1244,18 +1244,18 @@ pub trait MessageRouter: Send + Sync + Debug {
 ### Routing Levels
 ```rust
 pub enum RoutingLevel {
-    Platform,   // Intra-squad messaging
-    Squad,      // Squad-to-platoon messaging (leader only)
-    Platoon,    // Platoon-level coordination
+    Node,   // Intra-cell messaging
+    Cell,      // Cell-to-zone messaging (leader only)
+    Zone,    // Zone-level coordination
 }
 ```
 
 ### Message Types
 ```rust
-// Squad-level (existing)
+// Cell-level (existing)
 pub enum SquadMessage { /* ... */ }
 
-// Platoon-level (new)
+// Zone-level (new)
 pub enum PlatoonMessage {
     SquadSummary { /* ... */ },
     CommanderAnnounce { /* ... */ },

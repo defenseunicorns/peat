@@ -7,19 +7,19 @@
 
 ## Context and Problem Statement
 
-Current autonomous systems architectures fail at scale due to O(n²) message complexity. The DIU COD experience confirmed that all-to-all communication topologies saturate around 10-20 platforms. We need to demonstrate that hierarchical capability composition using CRDTs can:
+Current autonomous systems architectures fail at scale due to O(n²) message complexity. The DIU COD experience confirmed that all-to-all communication topologies saturate around 10-20 nodes. We need to demonstrate that hierarchical capability composition using CRDTs can:
 
 1. Reduce message complexity from O(n²) to O(n log n)
-2. Support 100+ simulated platforms on constrained networks
+2. Support 100+ simulated nodes on constrained networks
 3. Discover and advertise emergent team capabilities
 4. Maintain eventual consistency despite network partitions
 
-**Core Challenge:** How do platforms bootstrap from chaos into hierarchical organization without triggering O(n²) discovery overhead?
+**Core Challenge:** How do nodes discovery from chaos into hierarchical organization without triggering O(n²) discovery overhead?
 
 ## Decision Drivers
 
 ### Primary Requirements
-- **Scalability:** Support 100+ platforms in simulation, architected for 1000+
+- **Scalability:** Support 100+ nodes in simulation, architected for 1000+
 - **Network Efficiency:** 95%+ bandwidth reduction through differential updates
 - **Latency Bounds:** Priority 1 updates propagate through hierarchy in <5 seconds
 - **Eventual Consistency:** CRDT guarantees despite arbitrary network partitions
@@ -33,7 +33,7 @@ Current autonomous systems architectures fail at scale due to O(n²) message com
 
 ### Validation Requirements
 - Demonstrate all 3 operational phases
-- Measure message complexity vs. platform count
+- Measure message complexity vs. node count
 - Prove differential updates reduce bandwidth
 - Show capability composition creates emergent behaviors
 
@@ -70,7 +70,7 @@ Build a Rust library + reference application that demonstrates:
 - Advanced mission planning
 - Security/cryptography
 - Multi-language bindings
-- Embedded platform ports
+- Embedded node ports
 
 ## Technical Approach
 
@@ -86,7 +86,7 @@ Build a Rust library + reference application that demonstrates:
 │                    CAP Protocol Library                  │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
 │  │   Phase 1:   │  │   Phase 2:   │  │   Phase 3:   │ │
-│  │  Bootstrap   │→ │    Squad     │→ │ Hierarchical │ │
+│  │  Discovery   │→ │    Cell     │→ │ Hierarchical │ │
 │  │             │  │  Formation   │  │   Operations │ │
 │  └──────────────┘  └──────────────┘  └──────────────┘ │
 │  ┌──────────────────────────────────────────────────┐  │
@@ -105,19 +105,19 @@ Build a Rust library + reference application that demonstrates:
 
 ### Core Components
 
-#### 1. Platform Agent
-Represents individual autonomous platform with:
+#### 1. Node Agent
+Represents individual autonomous node with:
 - **Static Config:** Sensors, compute, protocols (G-Set CRDT)
 - **Dynamic State:** Position, fuel, health (LWW-Register CRDT)
 - **Capability Vector:** Available capabilities with confidence scores
 - **Message Router:** Enforces hierarchical communication boundaries
 
-#### 2. Squad Coordinator
-Manages squad-level operations:
-- **Member Registry:** OR-Set of active squad members
+#### 2. Cell Coordinator
+Manages cell-level operations:
+- **Member Registry:** OR-Set of active cell members
 - **Leader Election:** Deterministic based on capability score
-- **Capability Aggregator:** Composes platform capabilities into squad capabilities
-- **Upward Reporting:** Generates compressed squad summaries
+- **Capability Aggregator:** Composes node capabilities into cell capabilities
+- **Upward Reporting:** Generates compressed cell summaries
 
 #### 3. Capability Composition Engine
 Implements composition patterns:
@@ -142,15 +142,15 @@ Models realistic constraints:
 
 ### Data Models
 
-#### Platform Capability Document (Ditto Collection: "platforms")
+#### Node Capability Document (Ditto Collection: "nodes")
 ```rust
 {
-  "platform_id": String,
+  "node_id": String,
   "static_config": {
     "sensors": Set<String>,           // G-Set CRDT
     "compute_power": f32,
     "protocols": Set<String>,
-    "platform_type": String
+    "node_type": String
   },
   "dynamic_state": {
     "position": {                     // LWW-Register CRDT
@@ -167,35 +167,35 @@ Models realistic constraints:
     "solo": Vec<Capability>,
     "confidence": Map<String, f32>
   },
-  "squad_id": Option<String>,         // LWW-Register
-  "phase": String                     // "bootstrap" | "squad" | "hierarchical"
+  "cell_id": Option<String>,         // LWW-Register
+  "phase": String                     // "discovery" | "cell" | "hierarchical"
 }
 ```
 
-#### Squad Capability Document (Ditto Collection: "squads")
+#### Cell Capability Document (Ditto Collection: "cells")
 ```rust
 {
-  "squad_id": String,
+  "cell_id": String,
   "leader_id": String,                // LWW-Register
   "members": Set<String>,             // OR-Set CRDT
-  "squad_capabilities": {
+  "cell_capabilities": {
     "coverage_area_km2": f32,
     "endurance_minutes": u32,
     "emergent": Vec<EmergentCapability>
   },
   "compressed_summary": {             // For upward reporting
-    "platform_count": usize,
+    "node_count": usize,
     "mission_capabilities": Map<String, f32>,
     "readiness": String
   },
-  "platoon_id": Option<String>
+  "zone_id": Option<String>
 }
 ```
 
 #### Capability Change Delta
 ```rust
 {
-  "platform_id": String,
+  "node_id": String,
   "timestamp": u64,
   "priority": u8,                     // 1-4
   "operations": Vec<{
@@ -209,49 +209,49 @@ Models realistic constraints:
 
 ### Three-Phase Protocol Operation
 
-#### Phase 1: Bootstrap (Constrained Discovery)
+#### Phase 1: Discovery (Constrained Discovery)
 **Goal:** Form initial groups without O(n²) overhead
 
 **Process:**
-1. Platform joins network, broadcasts existence ONCE
-2. Listens for squad beacon messages (not all platforms)
+1. Node joins network, broadcasts existence ONCE
+2. Listens for cell beacon messages (not all nodes)
 3. Uses one of three strategies:
    - **Geographic:** Self-assign to grid cell, discover local peers
    - **Capability Query:** Respond if matching C2 query
-   - **C2 Directed:** Accept explicit squad assignment
+   - **C2 Directed:** Accept explicit cell assignment
 
 **Message Complexity:** O(√n) using geographic hashing or O(k) where k << n for queries
 
 **Success Criteria:** 
-- 100 platforms organize in <60 seconds
+- 100 nodes organize in <60 seconds
 - Total messages < 1000 (vs. 10,000 for all-to-all)
 
-#### Phase 2: Squad Formation
-**Goal:** Establish squad cohesion and elect leader
+#### Phase 2: Cell Formation
+**Goal:** Establish cell cohesion and elect leader
 
 **Process:**
-1. Intra-squad capability exchange (O(k²) where k=squad size ~5)
+1. Intra-cell capability exchange (O(k²) where k=cell size ~5)
 2. Deterministic leader election: highest capability score
-3. Squad leader computes aggregated capabilities
+3. Cell leader computes aggregated capabilities
 4. Roles assigned based on complementarity
 
-**Message Complexity:** O(k²) within squad, isolated from network scale
+**Message Complexity:** O(k²) within cell, isolated from network scale
 
 **Success Criteria:**
 - Leader election converges in <5 seconds
 - Emergent capabilities discovered and advertised
-- Squad ready for mission tasking
+- Cell ready for mission tasking
 
 #### Phase 3: Hierarchical Operations
 **Goal:** Maintain capabilities while enforcing hierarchy
 
 **Process:**
-1. Platforms send deltas to squad leader only
-2. Squad leaders aggregate and send to platoon
-3. Platoon leaders aggregate and send to company
+1. Nodes send deltas to cell leader only
+2. Cell leaders aggregate and send to platoon
+3. Zone leaders aggregate and send to company
 4. Priority routing ensures critical updates propagate fast
 
-**Message Complexity:** O(n log n) - each platform sends to ~5 peers
+**Message Complexity:** O(n log n) - each node sends to ~5 peers
 
 **Success Criteria:**
 - Priority 1 updates reach top in <5 seconds
@@ -262,8 +262,8 @@ Models realistic constraints:
 
 #### Rule 1: Additive (Coverage Area)
 ```rust
-fn compose_coverage(platforms: &[Platform]) -> f32 {
-    platforms.iter()
+fn compose_coverage(nodes: &[Node]) -> f32 {
+    nodes.iter()
         .map(|p| p.coverage_area_km2)
         .sum()
 }
@@ -271,18 +271,18 @@ fn compose_coverage(platforms: &[Platform]) -> f32 {
 
 #### Rule 2: Emergent (ISR Chain)
 ```rust
-fn compose_isr_chain(platforms: &[Platform]) -> Option<ISRCapability> {
-    let has_sensor = platforms.iter().any(|p| p.has_sensor());
-    let has_compute = platforms.iter().any(|p| p.compute_power > 10.0);
-    let has_comms = platforms.iter().any(|p| p.has_satcom());
+fn compose_isr_chain(nodes: &[Node]) -> Option<ISRCapability> {
+    let has_sensor = nodes.iter().any(|p| p.has_sensor());
+    let has_compute = nodes.iter().any(|p| p.compute_power > 10.0);
+    let has_comms = nodes.iter().any(|p| p.has_satcom());
     
     if has_sensor && has_compute && has_comms {
         Some(ISRCapability {
-            coverage: compose_coverage(platforms),
-            resolution: platforms.iter()
+            coverage: compose_coverage(nodes),
+            resolution: nodes.iter()
                 .filter_map(|p| p.resolution)
                 .max()?,
-            persistence: compute_overlap_schedule(platforms)
+            persistence: compute_overlap_schedule(nodes)
         })
     } else {
         None
@@ -292,8 +292,8 @@ fn compose_isr_chain(platforms: &[Platform]) -> Option<ISRCapability> {
 
 #### Rule 3: Redundant (Detection Reliability)
 ```rust
-fn compose_detection_reliability(platforms: &[Platform]) -> f32 {
-    let failure_prob = platforms.iter()
+fn compose_detection_reliability(nodes: &[Node]) -> f32 {
+    let failure_prob = nodes.iter()
         .map(|p| 1.0 - p.detection_probability)
         .product();
     1.0 - failure_prob
@@ -302,8 +302,8 @@ fn compose_detection_reliability(platforms: &[Platform]) -> f32 {
 
 #### Rule 4: Constraint-Based (Team Speed)
 ```rust
-fn compose_team_speed(platforms: &[Platform]) -> f32 {
-    platforms.iter()
+fn compose_team_speed(nodes: &[Node]) -> f32 {
+    nodes.iter()
         .map(|p| p.max_speed_mps)
         .min_by(|a, b| a.partial_cmp(b).unwrap())
         .unwrap_or(0.0)
@@ -312,31 +312,31 @@ fn compose_team_speed(platforms: &[Platform]) -> f32 {
 
 ## Functional Requirements
 
-### FR-1: Platform Lifecycle Management
-- FR-1.1: Platform shall initialize with static configuration
-- FR-1.2: Platform shall update dynamic state at 1Hz
-- FR-1.3: Platform shall detect and advertise capability changes
-- FR-1.4: Platform shall gracefully handle join/leave events
+### FR-1: Node Lifecycle Management
+- FR-1.1: Node shall initialize with static configuration
+- FR-1.2: Node shall update dynamic state at 1Hz
+- FR-1.3: Node shall detect and advertise capability changes
+- FR-1.4: Node shall gracefully handle join/leave events
 
-### FR-2: Bootstrap Phase
+### FR-2: Discovery Phase
 - FR-2.1: System shall support geographic self-organization
 - FR-2.2: System shall support C2-directed assignment
 - FR-2.3: System shall support capability-based queries
-- FR-2.4: Bootstrap shall complete in <60s for 100 platforms
-- FR-2.5: Bootstrap message count shall be O(√n) or better
+- FR-2.4: Discovery shall complete in <60s for 100 platforms
+- FR-2.5: Discovery message count shall be O(√n) or better
 
-### FR-3: Squad Formation
-- FR-3.1: Squad shall elect leader deterministically
-- FR-3.2: Squad shall compute aggregated capabilities
-- FR-3.3: Squad shall identify emergent capabilities
-- FR-3.4: Squad formation shall converge in <5 seconds
-- FR-3.5: Squad size shall be configurable (default: 5 platforms)
+### FR-3: Cell Formation
+- FR-3.1: Cell shall elect leader deterministically
+- FR-3.2: Cell shall compute aggregated capabilities
+- FR-3.3: Cell shall identify emergent capabilities
+- FR-3.4: Cell formation shall converge in <5 seconds
+- FR-3.5: Cell size shall be configurable (default: 5 nodes)
 
 ### FR-4: Hierarchical Operations
-- FR-4.1: Platforms shall only communicate with squad peers
-- FR-4.2: Squad leaders shall communicate with platoon level
+- FR-4.1: Nodes shall only communicate with cell peers
+- FR-4.2: Cell leaders shall communicate with zone level
 - FR-4.3: Message routing shall enforce hierarchical boundaries
-- FR-4.4: Cross-squad communication shall be prohibited
+- FR-4.4: Cross-cell communication shall be prohibited
 - FR-4.5: Hierarchy depth shall be configurable (default: 4 levels)
 
 ### FR-5: Capability Composition
@@ -361,7 +361,7 @@ fn compose_team_speed(platforms: &[Platform]) -> f32 {
 - FR-7.5: Simulator shall log all network events for analysis
 
 ### FR-8: Metrics and Observability
-- FR-8.1: System shall measure message count vs. platform count
+- FR-8.1: System shall measure message count vs. node count
 - FR-8.2: System shall measure update latency by priority
 - FR-8.3: System shall measure bandwidth utilization
 - FR-8.4: System shall measure capability staleness
@@ -369,14 +369,14 @@ fn compose_team_speed(platforms: &[Platform]) -> f32 {
 
 ### FR-9: Reference Application
 - FR-9.1: Application shall simulate 100+ platforms
-- FR-9.2: Application shall visualize platform organization
+- FR-9.2: Application shall visualize node organization
 - FR-9.3: Application shall display capability composition
 - FR-9.4: Application shall show real-time metrics
 - FR-9.5: Application shall support scenario replay
 
 ### FR-10: Data Persistence
-- FR-10.1: System shall persist platform state via Ditto
-- FR-10.2: System shall persist squad state via Ditto
+- FR-10.1: System shall persist node state via Ditto
+- FR-10.2: System shall persist cell state via Ditto
 - FR-10.3: System shall maintain change history
 - FR-10.4: System shall support state snapshots
 - FR-10.5: System shall recover from crashes
@@ -384,21 +384,21 @@ fn compose_team_speed(platforms: &[Platform]) -> f32 {
 ## Non-Functional Requirements
 
 ### NFR-1: Performance
-- Platform state update processing: <10ms p99
+- Node state update processing: <10ms p99
 - Delta generation: <5ms p99
 - Capability composition: <20ms p99
 - Leader election convergence: <5 seconds
 
 ### NFR-2: Scalability
-- Support 100+ platforms in POC
+- Support 100+ nodes in POC
 - Architecture for 1000+ platforms
-- Memory per platform: <10MB
-- CPU per platform: <5% of one core
+- Memory per node: <10MB
+- CPU per node: <5% of one core
 
 ### NFR-3: Reliability
 - Handle 30% packet loss without data loss
 - Survive network partitions with eventual consistency
-- Gracefully handle platform failures
+- Gracefully handle node failures
 - No message amplification cascades
 
 ### NFR-4: Maintainability
@@ -411,7 +411,7 @@ fn compose_team_speed(platforms: &[Platform]) -> f32 {
 - Pluggable composition rules
 - Configurable hierarchy structures
 - Custom capability types
-- Alternative bootstrap strategies
+- Alternative discovery strategies
 
 ## Implementation Technology Stack
 
@@ -453,13 +453,13 @@ proptest = "1"              # Property testing
 1. **Scalability:** Message complexity is O(n log n) - measured at 10, 50, 100 platforms
 2. **Efficiency:** Differential updates achieve 95%+ bandwidth reduction
 3. **Latency:** Priority 1 updates propagate in <5 seconds through 4-level hierarchy
-4. **Discovery:** Bootstrap completes in <60 seconds for 100 platforms
+4. **Discovery:** Discovery completes in <60 seconds for 100 platforms
 
 ### Secondary Metrics
 1. Emergent capabilities discovered (>3 types demonstrated)
 2. Network partition recovery time (<30 seconds to reconverge)
-3. Memory efficiency (<10MB per platform)
-4. CPU efficiency (<5% per platform on modern CPU)
+3. Memory efficiency (<10MB per node)
+4. CPU efficiency (<5% per node on modern CPU)
 
 ## Risks and Mitigations
 
@@ -476,7 +476,7 @@ proptest = "1"              # Property testing
 **Mitigation:** Start with 4 simple patterns, design for extensibility
 
 ### Risk 4: Performance at Scale
-**Risk:** 100+ platforms may exceed Rust/Ditto performance envelope  
+**Risk:** 100+ nodes may exceed Rust/Ditto performance envelope  
 **Mitigation:** Profile early, optimize hot paths, consider reduced simulation fidelity
 
 ## Future Enhancements (Post-POC)
@@ -484,7 +484,7 @@ proptest = "1"              # Property testing
 1. **Security:** Capability authentication, encrypted comms
 2. **Mission Planning:** Task decomposition and allocation
 3. **Learning:** ML-based composition rule discovery
-4. **Hardware:** Port to embedded platforms (ARM Cortex-M)
+4. **Hardware:** Port to embedded nodes (ARM Cortex-M)
 5. **Multi-Language:** FFI bindings for Python/C++
 6. **Production:** Deployment hardening, monitoring, fault injection
 
@@ -501,7 +501,7 @@ proptest = "1"              # Property testing
 |------|----------|-----------|
 | 2025-10-28 | Use Rust + Ditto | Safety, performance, proven CRDT implementation |
 | 2025-10-28 | Three-phase protocol | Matches CAP specification exactly |
-| 2025-10-28 | POC targets 100 platforms | Sufficient to demonstrate O(n log n) vs. O(n²) |
+| 2025-10-28 | POC targets 100 nodes | Sufficient to demonstrate O(n log n) vs. O(n²) |
 | 2025-10-28 | Simulated networking | Enables rapid iteration vs. hardware testbed |
 
 ---

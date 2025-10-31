@@ -1,6 +1,6 @@
 //! Geographic self-organization strategy for bootstrap phase
 //!
-//! Implements geohash-based spatial clustering for autonomous squad formation.
+//! Implements geohash-based spatial clustering for autonomous cell formation.
 //!
 //! # Architecture
 //!
@@ -19,7 +19,7 @@
 //!
 //! See: docs/ADR-002-Beacon-Storage-Architecture.md
 
-use crate::bootstrap::geo::GeoCoordinate;
+use crate::discovery::geo::GeoCoordinate;
 use crate::models::capability::Capability;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -34,15 +34,15 @@ pub const DEFAULT_GEOHASH_PRECISION: usize = 7;
 /// - Local cache expiration checks (janitor service)
 ///
 /// Balances:
-/// - Responsiveness: Detect offline platforms quickly
+/// - Responsiveness: Detect offline nodes quickly
 /// - Network efficiency: Reduce unnecessary re-broadcasts
 /// - DDIL tolerance: Account for intermittent connectivity
 pub const BEACON_TTL_SECONDS: u64 = 30;
 
-/// Minimum platforms required to form a squad
+/// Minimum nodes required to form a squad
 pub const MIN_SQUAD_SIZE: usize = 2;
 
-/// Platform beacon for geographic discovery
+/// Node beacon for geographic discovery
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GeographicBeacon {
     pub platform_id: String,
@@ -85,7 +85,7 @@ impl GeographicBeacon {
     }
 }
 
-/// Geographic cluster of platforms in the same geohash cell
+/// Geographic cluster of nodes in the same geohash cell
 #[derive(Debug, Clone)]
 pub struct GeographicCluster {
     pub geohash_cell: String,
@@ -114,7 +114,7 @@ impl GeographicCluster {
         self.platforms.retain(|b| !b.is_expired(current_time));
     }
 
-    /// Check if cluster has enough platforms to form a squad
+    /// Check if cluster has enough nodes to form a squad
     pub fn can_form_squad(&self, min_size: usize) -> bool {
         self.platforms.len() >= min_size
     }
@@ -143,7 +143,7 @@ pub fn decode_geohash(hash: &str) -> Result<GeoCoordinate, &'static str> {
     GeoCoordinate::new(coord.y, coord.x, 0.0)
 }
 
-/// Geographic discovery manager for organizing platforms into squads
+/// Geographic discovery manager for organizing nodes into squads
 ///
 /// # Architecture
 ///
@@ -155,7 +155,7 @@ pub fn decode_geohash(hash: &str) -> Result<GeoCoordinate, &'static str> {
 /// ```rust,ignore
 /// // Create discovery manager
 /// let discovery = Arc::new(Mutex::new(
-///     GeographicDiscovery::new("platform_1".to_string())
+///     GeographicDiscovery::new("node_1".to_string())
 /// ));
 ///
 /// // Spawn janitor service (runs periodically)
@@ -230,7 +230,7 @@ impl GeographicDiscovery {
         })
     }
 
-    /// Check if this platform should initiate squad formation
+    /// Check if this platform should initiate cell formation
     /// Returns true if this platform is the "leader" (lowest ID) in its cluster
     pub fn should_initiate_squad_formation(&self) -> bool {
         if let Some(cluster) = self.my_cluster() {
@@ -311,9 +311,9 @@ mod tests {
             },
         ];
 
-        let beacon = GeographicBeacon::new("platform_1".to_string(), pos, caps);
+        let beacon = GeographicBeacon::new("node_1".to_string(), pos, caps);
 
-        assert_eq!(beacon.platform_id, "platform_1");
+        assert_eq!(beacon.platform_id, "node_1");
         assert_eq!(beacon.position, pos);
         assert!(beacon.geohash_cell.starts_with("9q8yy"));
         assert!(beacon.operational);
@@ -323,7 +323,7 @@ mod tests {
     #[test]
     fn test_beacon_expiration() {
         let pos = GeoCoordinate::new(37.7749, -122.4194, 100.0).unwrap();
-        let beacon = GeographicBeacon::new("platform_1".to_string(), pos, vec![]);
+        let beacon = GeographicBeacon::new("node_1".to_string(), pos, vec![]);
 
         // Not expired immediately
         assert!(!beacon.is_expired(beacon.timestamp));
@@ -345,8 +345,8 @@ mod tests {
         let mut cluster = GeographicCluster::new("9q8yyk8".to_string()).unwrap();
         let pos = GeoCoordinate::new(37.7749, -122.4194, 100.0).unwrap();
 
-        let beacon1 = GeographicBeacon::new("platform_1".to_string(), pos, vec![]);
-        let beacon2 = GeographicBeacon::new("platform_2".to_string(), pos, vec![]);
+        let beacon1 = GeographicBeacon::new("node_1".to_string(), pos, vec![]);
+        let beacon2 = GeographicBeacon::new("node_2".to_string(), pos, vec![]);
 
         cluster.add_beacon(beacon1);
         cluster.add_beacon(beacon2);
@@ -355,18 +355,18 @@ mod tests {
         assert!(cluster.can_form_squad(2));
 
         let ids = cluster.platform_ids();
-        assert!(ids.contains(&"platform_1".to_string()));
-        assert!(ids.contains(&"platform_2".to_string()));
+        assert!(ids.contains(&"node_1".to_string()));
+        assert!(ids.contains(&"node_2".to_string()));
     }
 
     #[test]
     fn test_discovery_basic_operations() {
-        let mut discovery = GeographicDiscovery::new("platform_1".to_string());
+        let mut discovery = GeographicDiscovery::new("node_1".to_string());
         assert_eq!(discovery.total_platforms(), 0);
         assert_eq!(discovery.cluster_count(), 0);
 
         let pos = GeoCoordinate::new(37.7749, -122.4194, 100.0).unwrap();
-        let beacon = GeographicBeacon::new("platform_2".to_string(), pos, vec![]);
+        let beacon = GeographicBeacon::new("node_2".to_string(), pos, vec![]);
 
         discovery.process_beacon(beacon);
 
@@ -376,20 +376,20 @@ mod tests {
 
     #[test]
     fn test_discovery_squad_formation() {
-        let mut discovery = GeographicDiscovery::new("platform_1".to_string());
+        let mut discovery = GeographicDiscovery::new("node_1".to_string());
         let pos = GeoCoordinate::new(37.7749, -122.4194, 100.0).unwrap();
 
         // Add own beacon
-        let beacon1 = GeographicBeacon::new("platform_1".to_string(), pos, vec![]);
+        let beacon1 = GeographicBeacon::new("node_1".to_string(), pos, vec![]);
         discovery.process_beacon(beacon1);
 
         // Add another platform in same location
-        let beacon2 = GeographicBeacon::new("platform_2".to_string(), pos, vec![]);
+        let beacon2 = GeographicBeacon::new("node_2".to_string(), pos, vec![]);
         discovery.process_beacon(beacon2);
 
         assert_eq!(discovery.total_platforms(), 2);
 
-        // Should be able to form squads now
+        // Should be able to form cells now
         let formable = discovery.find_formable_squads(2);
         assert_eq!(formable.len(), 1);
 
@@ -399,22 +399,22 @@ mod tests {
         // Get squad members
         let members = discovery.get_squad_members(5).unwrap();
         assert_eq!(members.len(), 2);
-        assert!(members.contains(&"platform_1".to_string()));
-        assert!(members.contains(&"platform_2".to_string()));
+        assert!(members.contains(&"node_1".to_string()));
+        assert!(members.contains(&"node_2".to_string()));
     }
 
     #[test]
     fn test_discovery_multiple_clusters() {
-        let mut discovery = GeographicDiscovery::new("platform_1".to_string());
+        let mut discovery = GeographicDiscovery::new("node_1".to_string());
 
         // Cluster 1: SF
         let pos1 = GeoCoordinate::new(37.7749, -122.4194, 100.0).unwrap();
-        let beacon1 = GeographicBeacon::new("platform_1".to_string(), pos1, vec![]);
-        let beacon2 = GeographicBeacon::new("platform_2".to_string(), pos1, vec![]);
+        let beacon1 = GeographicBeacon::new("node_1".to_string(), pos1, vec![]);
+        let beacon2 = GeographicBeacon::new("node_2".to_string(), pos1, vec![]);
 
         // Cluster 2: LA (different geohash)
         let pos2 = GeoCoordinate::new(34.0522, -118.2437, 100.0).unwrap();
-        let beacon3 = GeographicBeacon::new("platform_3".to_string(), pos2, vec![]);
+        let beacon3 = GeographicBeacon::new("node_3".to_string(), pos2, vec![]);
         let beacon4 = GeographicBeacon::new("platform_4".to_string(), pos2, vec![]);
 
         discovery.process_beacon(beacon1);
@@ -431,10 +431,10 @@ mod tests {
 
     #[test]
     fn test_discovery_cleanup_expired() {
-        let mut discovery = GeographicDiscovery::new("platform_1".to_string());
+        let mut discovery = GeographicDiscovery::new("node_1".to_string());
         let pos = GeoCoordinate::new(37.7749, -122.4194, 100.0).unwrap();
 
-        let mut beacon = GeographicBeacon::new("platform_2".to_string(), pos, vec![]);
+        let mut beacon = GeographicBeacon::new("node_2".to_string(), pos, vec![]);
         beacon.timestamp = 0; // Set to very old timestamp
 
         discovery.process_beacon(beacon);

@@ -1,16 +1,16 @@
-//! Squad role model and scoring
+//! Cell role model and scoring
 //!
-//! Defines tactical roles that platforms can fill within a squad, with scoring
+//! Defines tactical roles that nodes can fill within a squad, with scoring
 //! algorithms that consider both platform capabilities and human operator specialties.
 
-use crate::models::{CapabilityType, Operator, PlatformConfig, PlatformState};
+use crate::models::{CapabilityType, NodeConfig, NodeState, Operator};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Tactical role that a platform can fill within a squad
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum SquadRole {
-    /// Squad leader - elected leader, coordinates squad operations
+pub enum CellRole {
+    /// Cell leader - elected leader, coordinates squad operations
     Leader,
     /// Primary sensor/scout - long-range detection and reconnaissance
     Sensor,
@@ -26,7 +26,7 @@ pub enum SquadRole {
     Follower,
 }
 
-impl SquadRole {
+impl CellRole {
     /// Get all assignable roles (excludes Leader, which is elected)
     pub fn assignable_roles() -> Vec<Self> {
         vec![
@@ -42,7 +42,7 @@ impl SquadRole {
     /// Get human-readable description of role
     pub fn description(&self) -> &'static str {
         match self {
-            Self::Leader => "Squad leader - coordinates operations and makes tactical decisions",
+            Self::Leader => "Cell leader - coordinates operations and makes tactical decisions",
             Self::Sensor => "Sensor/scout - provides long-range detection and reconnaissance",
             Self::Compute => "Compute node - processes sensor data and runs analysis algorithms",
             Self::Relay => "Communications relay - extends network range and connectivity",
@@ -97,10 +97,10 @@ impl SquadRole {
 /// Role assignment for a platform
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoleAssignment {
-    /// Platform ID
+    /// Node ID
     pub platform_id: String,
     /// Assigned role
-    pub role: SquadRole,
+    pub role: CellRole,
     /// Score for this assignment (0.0-1.0)
     pub score: f64,
     /// Whether this is the platform's primary role choice
@@ -109,7 +109,7 @@ pub struct RoleAssignment {
 
 impl RoleAssignment {
     /// Create a new role assignment
-    pub fn new(platform_id: String, role: SquadRole, score: f64, is_primary_choice: bool) -> Self {
+    pub fn new(platform_id: String, role: CellRole, score: f64, is_primary_choice: bool) -> Self {
         Self {
             platform_id,
             role,
@@ -126,15 +126,15 @@ impl RoleScorer {
     /// Score a platform for a specific role
     ///
     /// Scoring considers:
-    /// - Platform capabilities (required and preferred)
+    /// - Node capabilities (required and preferred)
     /// - Human operator MOS (if present)
-    /// - Platform health and readiness
+    /// - Node health and readiness
     ///
     /// Returns score 0.0-1.0, or None if platform cannot fill role
     pub fn score_platform_for_role(
-        config: &PlatformConfig,
-        state: &PlatformState,
-        role: SquadRole,
+        config: &NodeConfig,
+        state: &NodeState,
+        role: CellRole,
     ) -> Option<f64> {
         let operator = config.get_primary_operator();
         let mut score = 0.0;
@@ -183,7 +183,7 @@ impl RoleScorer {
     }
 
     /// Score required capabilities
-    fn score_required_capabilities(config: &PlatformConfig, role: &SquadRole) -> f64 {
+    fn score_required_capabilities(config: &NodeConfig, role: &CellRole) -> f64 {
         let required = role.required_capabilities();
         if required.is_empty() {
             return 1.0;
@@ -210,7 +210,7 @@ impl RoleScorer {
     }
 
     /// Score preferred capabilities
-    fn score_preferred_capabilities(config: &PlatformConfig, role: &SquadRole) -> f64 {
+    fn score_preferred_capabilities(config: &NodeConfig, role: &CellRole) -> f64 {
         let preferred = role.preferred_capabilities();
         if preferred.is_empty() {
             return 1.0;
@@ -243,7 +243,7 @@ impl RoleScorer {
     }
 
     /// Score operator MOS match
-    fn score_operator_mos(operator: &Operator, role: &SquadRole) -> f64 {
+    fn score_operator_mos(operator: &Operator, role: &CellRole) -> f64 {
         let relevant_mos = role.relevant_mos();
         if relevant_mos.is_empty() {
             return 0.5; // Neutral score for roles with no MOS preference
@@ -257,7 +257,7 @@ impl RoleScorer {
     }
 
     /// Score platform health
-    fn score_platform_health(state: &PlatformState) -> f64 {
+    fn score_platform_health(state: &NodeState) -> f64 {
         match state.health {
             crate::models::HealthStatus::Nominal => 1.0,
             crate::models::HealthStatus::Degraded => 0.6,
@@ -267,13 +267,10 @@ impl RoleScorer {
     }
 
     /// Get all role scores for a platform
-    pub fn score_all_roles(
-        config: &PlatformConfig,
-        state: &PlatformState,
-    ) -> HashMap<SquadRole, f64> {
+    pub fn score_all_roles(config: &NodeConfig, state: &NodeState) -> HashMap<CellRole, f64> {
         let mut scores = HashMap::new();
 
-        for role in SquadRole::assignable_roles() {
+        for role in CellRole::assignable_roles() {
             if let Some(score) = Self::score_platform_for_role(config, state, role) {
                 scores.insert(role, score);
             }
@@ -284,9 +281,9 @@ impl RoleScorer {
 
     /// Get the best role for a platform
     pub fn best_role_for_platform(
-        config: &PlatformConfig,
-        state: &PlatformState,
-    ) -> Option<(SquadRole, f64)> {
+        config: &NodeConfig,
+        state: &NodeState,
+    ) -> Option<(CellRole, f64)> {
         Self::score_all_roles(config, state)
             .into_iter()
             .max_by(|(_, score_a), (_, score_b)| {
@@ -301,17 +298,15 @@ impl RoleScorer {
 mod tests {
     use super::*;
     use crate::models::{
-        AuthorityLevel, BindingType, Capability, HumanMachinePair, OperatorRank, PlatformConfig,
+        AuthorityLevel, BindingType, Capability, HumanMachinePair, NodeConfig, OperatorRank,
     };
 
-    fn create_test_platform_with_capabilities(
-        caps: Vec<Capability>,
-    ) -> (PlatformConfig, PlatformState) {
-        let mut config = PlatformConfig::new("test_platform".to_string());
+    fn create_test_platform_with_capabilities(caps: Vec<Capability>) -> (NodeConfig, NodeState) {
+        let mut config = NodeConfig::new("test_platform".to_string());
         for cap in caps {
             config.add_capability(cap);
         }
-        let state = PlatformState::new((0.0, 0.0, 0.0));
+        let state = NodeState::new((0.0, 0.0, 0.0));
         (config, state)
     }
 
@@ -328,28 +323,28 @@ mod tests {
     #[test]
     fn test_role_required_capabilities() {
         assert_eq!(
-            SquadRole::Sensor.required_capabilities(),
+            CellRole::Sensor.required_capabilities(),
             vec![CapabilityType::Sensor]
         );
         assert_eq!(
-            SquadRole::Strike.required_capabilities(),
+            CellRole::Strike.required_capabilities(),
             vec![CapabilityType::Payload]
         );
-        assert!(SquadRole::Follower.required_capabilities().is_empty());
+        assert!(CellRole::Follower.required_capabilities().is_empty());
     }
 
     #[test]
     fn test_role_relevant_mos() {
-        let sensor_mos = SquadRole::Sensor.relevant_mos();
+        let sensor_mos = CellRole::Sensor.relevant_mos();
         assert!(sensor_mos.contains(&"19D")); // Cavalry Scout
 
-        let relay_mos = SquadRole::Relay.relevant_mos();
+        let relay_mos = CellRole::Relay.relevant_mos();
         assert!(relay_mos.contains(&"25U")); // Signal Support
     }
 
     #[test]
     fn test_score_platform_without_required_capability() {
-        // Platform without sensing capability cannot be sensor
+        // Node without sensing capability cannot be sensor
         let (config, state) = create_test_platform_with_capabilities(vec![Capability::new(
             "cpu_1".to_string(),
             "CPU".to_string(),
@@ -357,13 +352,13 @@ mod tests {
             0.8,
         )]);
 
-        let score = RoleScorer::score_platform_for_role(&config, &state, SquadRole::Sensor);
+        let score = RoleScorer::score_platform_for_role(&config, &state, CellRole::Sensor);
         assert!(score.is_none());
     }
 
     #[test]
     fn test_score_platform_with_required_capability() {
-        // Platform with sensing capability can be sensor
+        // Node with sensing capability can be sensor
         let (config, state) = create_test_platform_with_capabilities(vec![Capability::new(
             "radar_1".to_string(),
             "Radar".to_string(),
@@ -371,7 +366,7 @@ mod tests {
             0.9,
         )]);
 
-        let score = RoleScorer::score_platform_for_role(&config, &state, SquadRole::Sensor);
+        let score = RoleScorer::score_platform_for_role(&config, &state, CellRole::Sensor);
         assert!(score.is_some());
         assert!(score.unwrap() > 0.5);
     }
@@ -394,7 +389,7 @@ mod tests {
         config.set_operator_binding(Some(binding));
 
         let score_with_match =
-            RoleScorer::score_platform_for_role(&config, &state, SquadRole::Sensor).unwrap();
+            RoleScorer::score_platform_for_role(&config, &state, CellRole::Sensor).unwrap();
 
         // Create platform without operator for comparison
         let (config_no_op, state_no_op) =
@@ -406,7 +401,7 @@ mod tests {
             )]);
 
         let score_without_operator =
-            RoleScorer::score_platform_for_role(&config_no_op, &state_no_op, SquadRole::Sensor)
+            RoleScorer::score_platform_for_role(&config_no_op, &state_no_op, CellRole::Sensor)
                 .unwrap();
 
         // Score with matching MOS should be higher
@@ -431,7 +426,7 @@ mod tests {
         config.set_operator_binding(Some(binding));
 
         let score_with_mismatch =
-            RoleScorer::score_platform_for_role(&config, &state, SquadRole::Sensor).unwrap();
+            RoleScorer::score_platform_for_role(&config, &state, CellRole::Sensor).unwrap();
 
         // Score should still be valid but not boosted
         assert!(score_with_mismatch > 0.0);
@@ -458,18 +453,18 @@ mod tests {
         let scores = RoleScorer::score_all_roles(&config, &state);
 
         // Should have scores for roles it can fill
-        assert!(scores.contains_key(&SquadRole::Sensor));
-        assert!(scores.contains_key(&SquadRole::Relay));
-        assert!(scores.contains_key(&SquadRole::Follower));
+        assert!(scores.contains_key(&CellRole::Sensor));
+        assert!(scores.contains_key(&CellRole::Relay));
+        assert!(scores.contains_key(&CellRole::Follower));
 
         // Should not have scores for roles requiring capabilities it doesn't have
-        assert!(!scores.contains_key(&SquadRole::Strike));
-        assert!(!scores.contains_key(&SquadRole::Compute));
+        assert!(!scores.contains_key(&CellRole::Strike));
+        assert!(!scores.contains_key(&CellRole::Compute));
     }
 
     #[test]
     fn test_best_role_for_platform() {
-        let mut config = PlatformConfig::new("test_platform".to_string());
+        let mut config = NodeConfig::new("test_platform".to_string());
         config.add_capability(Capability::new(
             "radar_1".to_string(),
             "Radar".to_string(),
@@ -492,40 +487,39 @@ mod tests {
             BindingType::OneToOne,
         ));
 
-        let state = PlatformState::new((0.0, 0.0, 0.0));
+        let state = NodeState::new((0.0, 0.0, 0.0));
 
         let (best_role, score) = RoleScorer::best_role_for_platform(&config, &state).unwrap();
 
         // Best role should be Sensor due to high sensing capability + matching MOS
-        assert_eq!(best_role, SquadRole::Sensor);
+        assert_eq!(best_role, CellRole::Sensor);
         assert!(score > 0.5);
     }
 
     #[test]
     fn test_role_assignment_creation() {
-        let assignment =
-            RoleAssignment::new("platform_1".to_string(), SquadRole::Sensor, 0.85, true);
+        let assignment = RoleAssignment::new("node_1".to_string(), CellRole::Sensor, 0.85, true);
 
-        assert_eq!(assignment.platform_id, "platform_1");
-        assert_eq!(assignment.role, SquadRole::Sensor);
+        assert_eq!(assignment.platform_id, "node_1");
+        assert_eq!(assignment.role, CellRole::Sensor);
         assert_eq!(assignment.score, 0.85);
         assert!(assignment.is_primary_choice);
     }
 
     #[test]
     fn test_assignable_roles() {
-        let roles = SquadRole::assignable_roles();
+        let roles = CellRole::assignable_roles();
 
         // Leader is not assignable (it's elected)
-        assert!(!roles.contains(&SquadRole::Leader));
+        assert!(!roles.contains(&CellRole::Leader));
 
         // All other roles should be assignable
-        assert!(roles.contains(&SquadRole::Sensor));
-        assert!(roles.contains(&SquadRole::Compute));
-        assert!(roles.contains(&SquadRole::Relay));
-        assert!(roles.contains(&SquadRole::Strike));
-        assert!(roles.contains(&SquadRole::Support));
-        assert!(roles.contains(&SquadRole::Follower));
+        assert!(roles.contains(&CellRole::Sensor));
+        assert!(roles.contains(&CellRole::Compute));
+        assert!(roles.contains(&CellRole::Relay));
+        assert!(roles.contains(&CellRole::Strike));
+        assert!(roles.contains(&CellRole::Support));
+        assert!(roles.contains(&CellRole::Follower));
     }
 
     #[test]
@@ -549,12 +543,12 @@ mod tests {
         state_degraded.health = crate::models::HealthStatus::Degraded;
 
         let score_nominal =
-            RoleScorer::score_platform_for_role(&config_nominal, &state_nominal, SquadRole::Sensor)
+            RoleScorer::score_platform_for_role(&config_nominal, &state_nominal, CellRole::Sensor)
                 .unwrap();
         let score_degraded = RoleScorer::score_platform_for_role(
             &config_degraded,
             &state_degraded,
-            SquadRole::Sensor,
+            CellRole::Sensor,
         )
         .unwrap();
 
@@ -575,8 +569,7 @@ mod tests {
         )]);
         state.health = crate::models::HealthStatus::Critical;
 
-        let score =
-            RoleScorer::score_platform_for_role(&config, &state, SquadRole::Sensor).unwrap();
+        let score = RoleScorer::score_platform_for_role(&config, &state, CellRole::Sensor).unwrap();
 
         // Critical health (0.3) weighs 20%, so contributes 0.06
         // High capability (0.9) weighs 30%, so contributes 0.27
@@ -596,8 +589,7 @@ mod tests {
         )]);
         state.health = crate::models::HealthStatus::Failed;
 
-        let score =
-            RoleScorer::score_platform_for_role(&config, &state, SquadRole::Sensor).unwrap();
+        let score = RoleScorer::score_platform_for_role(&config, &state, CellRole::Sensor).unwrap();
 
         // Failed health (0.0) weighs 20%, so contributes 0.0
         // High capability (0.9) weighs 30%, so contributes 0.27
