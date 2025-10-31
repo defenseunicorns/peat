@@ -520,23 +520,23 @@ mod tests {
         let temp_dir2 = tempdir().expect("Failed to create temp dir 2");
 
         // Create two Ditto instances with unique persistence directories
-        // Store1: TCP listener on port 12345 for reliable localhost peer discovery
+        // Both use mDNS for peer discovery (no TCP ports to avoid conflicts)
         let config1 = DittoConfig {
             app_id: app_id.clone(),
             persistence_dir: temp_dir1.path().to_path_buf(),
             shared_key: shared_key.clone(),
-            tcp_listen_port: Some(12345),
+            tcp_listen_port: None, // No TCP - use mDNS only
             tcp_connect_address: None,
         };
         let store1 = DittoStore::new(config1).expect("Failed to create store 1");
 
-        // Store2: TCP client connecting to port 12345
+        // Store2: Also uses mDNS for discovery
         let config2 = DittoConfig {
             app_id,
             persistence_dir: temp_dir2.path().to_path_buf(),
             shared_key,
-            tcp_listen_port: None,
-            tcp_connect_address: Some("localhost:12345".to_string()),
+            tcp_listen_port: None, // No TCP - use mDNS only
+            tcp_connect_address: None,
         };
         let store2 = DittoStore::new(config2).expect("Failed to create store 2");
 
