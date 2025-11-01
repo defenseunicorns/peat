@@ -4,6 +4,8 @@
 //! enforcing rules about which nodes can message which other nodes based
 //! on their position in the node→cell→zone hierarchy.
 
+use crate::cell::messaging::MessagePriority;
+use crate::hierarchy::flow_control::{FlowController, RoutingLevel};
 use crate::hierarchy::routing_table::RoutingTable;
 use crate::Result;
 use std::sync::Arc;
@@ -45,6 +47,8 @@ pub struct HierarchicalRouter {
     node_id: String,
     /// Shared routing table (read-mostly, updated on membership changes)
     routing_table: Arc<RwLock<RoutingTable>>,
+    /// Optional flow controller for rate limiting and backpressure
+    flow_controller: Option<Arc<FlowController>>,
 }
 
 impl HierarchicalRouter {
@@ -57,6 +61,25 @@ impl HierarchicalRouter {
         Self {
             node_id,
             routing_table,
+            flow_controller: None,
+        }
+    }
+
+    /// Create a new hierarchical router with flow control
+    ///
+    /// # Arguments
+    /// * `node_id` - The ID of this node
+    /// * `routing_table` - Shared routing table for the system
+    /// * `flow_controller` - Flow controller for rate limiting
+    pub fn with_flow_control(
+        node_id: String,
+        routing_table: Arc<RwLock<RoutingTable>>,
+        flow_controller: Arc<FlowController>,
+    ) -> Self {
+        Self {
+            node_id,
+            routing_table,
+            flow_controller: Some(flow_controller),
         }
     }
 
@@ -234,6 +257,73 @@ impl HierarchicalRouter {
             false
         }
     }
+
+    /// Route a message with flow control
+    ///
+    /// Checks both routing validity and flow control before allowing message.
+    /// Returns permit if routing is allowed and flow control permits.
+    ///
+    /// # Arguments
+    /// * `from` - Source node ID
+    /// * `to` - Target node ID
+    /// * `message_size` - Size of message in bytes
+    /// * `priority` - Message priority
+    ///
+    /// # Returns
+    /// * `Ok(Some(permit))` - Message can be sent
+    /// * `Ok(None)` - Routing not valid (wrong hierarchy level)
+    /// * `Err(_)` - Flow control error
+    #[instrument(skip(self))]
+    pub async fn route_message(
+        &self,
+        from: &str,
+        to: &str,
+        message_size: usize,
+        priority: MessagePriority,
+    ) -> Result<Option<crate::hierarchy::flow_control::Permit>> {
+        // First check if route is valid per hierarchy rules
+        if !self.is_route_valid(from, to).await {
+            debug!("Route from {} to {} rejected by hierarchy rules", from, to);
+            return Ok(None);
+        }
+
+        // If flow control is enabled, acquire permit
+        if let Some(fc) = &self.flow_controller {
+            // Determine routing level based on target
+            let table = self.routing_table.read().await;
+            let from_cell = table.get_node_cell(from);
+            let to_cell = table.get_node_cell(to);
+
+            let level = if from_cell == to_cell && from_cell.is_some() {
+                // Same cell = intra-cell routing
+                RoutingLevel::Cell
+            } else {
+                // Cross-level routing (to zone)
+                RoutingLevel::Zone
+            };
+
+            // Acquire permit (may block if under backpressure)
+            let permit = fc.acquire_permit(level, message_size, priority).await?;
+            Ok(Some(permit))
+        } else {
+            // No flow control, routing is valid
+            Ok(None) // None means "no permit needed"
+        }
+    }
+
+    /// Check if backpressure is active
+    pub async fn has_backpressure(&self) -> bool {
+        if let Some(fc) = &self.flow_controller {
+            fc.has_backpressure().await
+        } else {
+            false
+        }
+    }
+
+    /// Get flow controller (if enabled)
+    pub fn flow_controller(&self) -> Option<Arc<FlowController>> {
+        self.flow_controller.clone()
+    }
 }
 
 /// Statistics about the router's current state
@@ -391,5 +481,176 @@ mod tests {
 
         let router2 = HierarchicalRouter::new("node2".to_string(), Arc::new(RwLock::new(table)));
         assert!(!router2.is_leader().await); // node2 is not leader
+    }
+
+    // ===== Flow Control Integration Tests =====
+
+    #[tokio::test]
+    async fn test_router_with_flow_control() {
+        use crate::hierarchy::flow_control::{BandwidthLimit, MessageDropPolicy};
+
+        let table = setup_routing_table().await;
+        let fc = Arc::new(FlowController::new(
+            BandwidthLimit::new(10, 1000),
+            BandwidthLimit::new(5, 500),
+            MessageDropPolicy::DropLowPriority,
+        ));
+
+        let router = HierarchicalRouter::with_flow_control(
+            "node1".to_string(),
+            Arc::new(RwLock::new(table)),
+            fc.clone(),
+        );
+
+        // Verify flow controller is set
+        assert!(router.flow_controller().is_some());
+        assert!(!router.has_backpressure().await);
+    }
+
+    #[tokio::test]
+    async fn test_route_message_with_flow_control() {
+        use crate::hierarchy::flow_control::{BandwidthLimit, MessageDropPolicy};
+
+        let table = setup_routing_table().await;
+        let fc = Arc::new(FlowController::new(
+            BandwidthLimit::new(100, 10000),
+            BandwidthLimit::new(50, 5000),
+            MessageDropPolicy::DropLowPriority,
+        ));
+
+        let router = HierarchicalRouter::with_flow_control(
+            "node1".to_string(),
+            Arc::new(RwLock::new(table)),
+            fc.clone(),
+        );
+
+        // Route a message from node1 to node2 (same cell)
+        let result = router
+            .route_message("node1", "node2", 100, MessagePriority::Normal)
+            .await
+            .unwrap();
+
+        // Should get a permit (Some) because routing is valid
+        assert!(result.is_some());
+
+        // Verify flow control metrics updated
+        let metrics = fc.get_metrics();
+        assert_eq!(metrics.cell_messages_sent, 1);
+        assert_eq!(metrics.cell_bytes_sent, 100);
+    }
+
+    #[tokio::test]
+    async fn test_route_message_cross_cell_rejected() {
+        use crate::hierarchy::flow_control::{BandwidthLimit, MessageDropPolicy};
+
+        let table = setup_routing_table().await;
+        let fc = Arc::new(FlowController::new(
+            BandwidthLimit::new(100, 10000),
+            BandwidthLimit::new(50, 5000),
+            MessageDropPolicy::DropLowPriority,
+        ));
+
+        let router = HierarchicalRouter::with_flow_control(
+            "node1".to_string(),
+            Arc::new(RwLock::new(table)),
+            fc.clone(),
+        );
+
+        // Try to route from node1 (cell_alpha) to node4 (cell_beta)
+        let result = router
+            .route_message("node1", "node4", 100, MessagePriority::Normal)
+            .await
+            .unwrap();
+
+        // Should be None because routing is invalid (cross-cell)
+        assert!(result.is_none());
+
+        // Flow control should not have been invoked
+        let metrics = fc.get_metrics();
+        assert_eq!(metrics.cell_messages_sent, 0);
+    }
+
+    #[tokio::test]
+    async fn test_route_message_leader_to_zone() {
+        use crate::hierarchy::flow_control::{BandwidthLimit, MessageDropPolicy};
+
+        let table = setup_routing_table().await;
+        let fc = Arc::new(FlowController::new(
+            BandwidthLimit::new(100, 10000),
+            BandwidthLimit::new(50, 5000),
+            MessageDropPolicy::DropLowPriority,
+        ));
+
+        let router = HierarchicalRouter::with_flow_control(
+            "node1".to_string(),
+            Arc::new(RwLock::new(table)),
+            fc.clone(),
+        );
+
+        // Leader routes to zone coordinator
+        let result = router
+            .route_message("node1", "zone_coordinator", 200, MessagePriority::High)
+            .await
+            .unwrap();
+
+        // Should get permit (upward routing from leader is valid)
+        assert!(result.is_some());
+
+        // Should use zone-level flow control
+        let metrics = fc.get_metrics();
+        assert_eq!(metrics.zone_messages_sent, 1);
+        assert_eq!(metrics.zone_bytes_sent, 200);
+    }
+
+    #[tokio::test]
+    async fn test_priority_affects_flow_control() {
+        use crate::hierarchy::flow_control::{BandwidthLimit, MessageDropPolicy};
+
+        let table = setup_routing_table().await;
+        let fc = Arc::new(FlowController::new(
+            BandwidthLimit::new(10, 1000),
+            BandwidthLimit::new(5, 500),
+            MessageDropPolicy::DropLowPriority,
+        ));
+
+        let router = HierarchicalRouter::with_flow_control(
+            "node1".to_string(),
+            Arc::new(RwLock::new(table)),
+            fc.clone(),
+        );
+
+        // Send critical priority message (consumes 0.5x tokens)
+        let _r1 = router
+            .route_message("node1", "node2", 100, MessagePriority::Critical)
+            .await
+            .unwrap();
+
+        // Send low priority message (consumes 1.5x tokens)
+        let _r2 = router
+            .route_message("node2", "node3", 100, MessagePriority::Low)
+            .await
+            .unwrap();
+
+        // Both should succeed, metrics should show both messages
+        let metrics = fc.get_metrics();
+        assert_eq!(metrics.cell_messages_sent, 2);
+    }
+
+    #[tokio::test]
+    async fn test_router_without_flow_control() {
+        let table = setup_routing_table().await;
+        let router = HierarchicalRouter::new("node1".to_string(), Arc::new(RwLock::new(table)));
+
+        // Route a message without flow control
+        let result = router
+            .route_message("node1", "node2", 100, MessagePriority::Normal)
+            .await
+            .unwrap();
+
+        // Should be None (no permit needed, but routing is valid)
+        assert!(result.is_none());
+
+        // No backpressure without flow controller
+        assert!(!router.has_backpressure().await);
     }
 }
