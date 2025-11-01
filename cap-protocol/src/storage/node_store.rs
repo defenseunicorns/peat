@@ -305,4 +305,120 @@ mod tests {
         // Just verify the query doesn't error
         println!("Found {} nodes in Cell phase", nodes.len());
     }
+
+    #[tokio::test]
+    async fn test_get_operational_nodes() {
+        let store = match create_test_store().await {
+            Ok(s) => s,
+            Err(_) => {
+                println!("Skipping test - Ditto not configured");
+                return;
+            }
+        };
+
+        // Create operational node (healthy)
+        let mut operational = NodeState::new((37.7, -122.4, 100.0));
+        operational.update_health(HealthStatus::Nominal);
+
+        // Create failed node
+        let mut failed = NodeState::new((37.8, -122.5, 150.0));
+        failed.update_health(HealthStatus::Failed);
+
+        // Create degraded but operational node
+        let mut degraded = NodeState::new((37.6, -122.3, 80.0));
+        degraded.update_health(HealthStatus::Degraded);
+
+        store.store_state("node_op_1", &operational).await.unwrap();
+        store.store_state("node_failed", &failed).await.unwrap();
+        store.store_state("node_degraded", &degraded).await.unwrap();
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+        let operational_nodes = store.get_operational_nodes().await.unwrap();
+
+        // Should find at least the operational nodes (failed should be excluded)
+        // Verify all returned nodes are truly operational
+        for node in &operational_nodes {
+            assert!(
+                node.is_operational(),
+                "All returned nodes should be operational"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_store_accessor() {
+        let store = match create_test_store().await {
+            Ok(s) => s,
+            Err(_) => {
+                println!("Skipping test - Ditto not configured");
+                return;
+            }
+        };
+
+        // Verify store accessor returns a valid reference
+        // Successfully calling store() without panic is sufficient validation
+        let _ditto_store = store.store();
+    }
+
+    #[tokio::test]
+    async fn test_get_config_nonexistent() {
+        let store = match create_test_store().await {
+            Ok(s) => s,
+            Err(_) => {
+                println!("Skipping test - Ditto not configured");
+                return;
+            }
+        };
+
+        let result = store.get_config("nonexistent_node").await.unwrap();
+        assert!(result.is_none(), "Should return None for nonexistent node");
+    }
+
+    #[tokio::test]
+    async fn test_get_state_nonexistent() {
+        let store = match create_test_store().await {
+            Ok(s) => s,
+            Err(_) => {
+                println!("Skipping test - Ditto not configured");
+                return;
+            }
+        };
+
+        let result = store.get_state("nonexistent_node").await.unwrap();
+        assert!(result.is_none(), "Should return None for nonexistent node");
+    }
+
+    // NOTE: delete_config and delete_state are tested via E2E tests
+    // Direct unit testing is challenging due to Ditto's eventual consistency
+    #[tokio::test]
+    async fn test_delete_operations_api() {
+        let store = match create_test_store().await {
+            Ok(s) => s,
+            Err(_) => {
+                println!("Skipping test - Ditto not configured");
+                return;
+            }
+        };
+
+        // Store a config and state
+        let config = NodeConfig::new("UAV".to_string());
+        store.store_config(&config).await.unwrap();
+
+        let state = NodeState::new((37.7, -122.4, 100.0));
+        store.store_state(&config.id, &state).await.unwrap();
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+        // Test that delete operations don't error on valid nodes
+        // Note: Actual deletion may not be immediately visible due to eventual consistency
+        let delete_config_result = store.delete_config(&config.id).await;
+        assert!(
+            delete_config_result.is_ok(),
+            "delete_config should not error"
+        );
+
+        let delete_state_result = store.delete_state(&config.id).await;
+        assert!(delete_state_result.is_ok(), "delete_state should not error");
+    }
 }

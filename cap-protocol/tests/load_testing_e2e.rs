@@ -409,15 +409,15 @@ async fn test_load_multi_zone_hierarchy() {
     // Validate: Zone distribution
     let east_cells = all_cells
         .iter()
-        .filter(|c| c.platoon_id.as_ref().map_or(false, |p| p == "zone_east"))
+        .filter(|c| c.platoon_id.as_ref().is_some_and(|p| p == "zone_east"))
         .count();
     let central_cells = all_cells
         .iter()
-        .filter(|c| c.platoon_id.as_ref().map_or(false, |p| p == "zone_central"))
+        .filter(|c| c.platoon_id.as_ref().is_some_and(|p| p == "zone_central"))
         .count();
     let west_cells = all_cells
         .iter()
-        .filter(|c| c.platoon_id.as_ref().map_or(false, |p| p == "zone_west"))
+        .filter(|c| c.platoon_id.as_ref().is_some_and(|p| p == "zone_west"))
         .count();
 
     assert_eq!(east_cells, 3, "Expected 3 cells in East zone");
