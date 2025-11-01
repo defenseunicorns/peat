@@ -346,6 +346,15 @@ impl DittoStore {
     }
 }
 
+impl Clone for DittoStore {
+    fn clone(&self) -> Self {
+        Self {
+            ditto: self.ditto.clone(),
+            _config: self._config.clone(),
+        }
+    }
+}
+
 impl Drop for DittoStore {
     fn drop(&mut self) {
         self.stop_sync();
