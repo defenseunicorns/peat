@@ -13,4 +13,4 @@ pub mod messaging;
 pub use capability_aggregation::{AggregatedCapability, CapabilityAggregator};
 pub use coordinator::{CellCoordinator, FormationStatus};
 pub use leader_election::{LeaderElectionManager, LeadershipScore};
-pub use messaging::{CellMessage, CellMessageBus, MessagePriority};
+pub use messaging::{CellMessage, CellMessageBus, MessagePriority, RoutingContext};
