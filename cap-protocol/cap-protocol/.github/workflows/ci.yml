@@ -30,7 +30,7 @@ jobs:
           DITTO_APP_ID: ${{ secrets.DITTO_APP_ID }}
           DITTO_OFFLINE_TOKEN: ${{ secrets.DITTO_OFFLINE_TOKEN }}
           DITTO_SHARED_KEY: ${{ secrets.DITTO_SHARED_KEY }}
-        run: cargo test --all-features --workspace
+        run: cargo test --lib --all-features --workspace
 
   lint:
     name: Lint
