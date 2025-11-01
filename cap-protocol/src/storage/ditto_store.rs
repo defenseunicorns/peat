@@ -168,6 +168,16 @@ impl DittoStore {
     }
 
     /// Create a Ditto store from environment variables
+    ///
+    /// # Test Mode Isolation
+    ///
+    /// When running tests (detected via `RUST_TEST_THREADS` env var or `cfg(test)`),
+    /// this method automatically creates unique temporary directories for each Ditto
+    /// instance to prevent file locking conflicts. The temporary directories are
+    /// cleaned up automatically when the process exits.
+    ///
+    /// In production mode, uses `DITTO_PERSISTENCE_DIR` environment variable or
+    /// defaults to `.ditto` in the current directory.
     #[instrument]
     pub fn from_env() -> Result<Self> {
         info!("Creating DittoStore from environment variables");
@@ -193,11 +203,28 @@ impl DittoStore {
             .trim()
             .to_string();
 
-        let persistence_dir = PathBuf::from(
-            std::env::var("DITTO_PERSISTENCE_DIR")
-                .unwrap_or_else(|_| ".ditto".to_string())
-                .trim(),
-        );
+        // In test mode (detected via RUST_TEST_THREADS or cfg(test)), use unique temp directory
+        // to prevent file locking conflicts between parallel tests
+        let persistence_dir = if std::env::var("RUST_TEST_THREADS").is_ok() || cfg!(test) {
+            let temp_dir = tempfile::tempdir().map_err(|e| {
+                Error::storage_error(
+                    format!("Failed to create temp dir for test: {}", e),
+                    "from_env",
+                    None,
+                )
+            })?;
+            let path = temp_dir.path().to_path_buf();
+            // Leak temp_dir to keep it alive - test cleanup will handle removal
+            std::mem::forget(temp_dir);
+            debug!("Test mode: Using isolated temp directory: {:?}", path);
+            path
+        } else {
+            PathBuf::from(
+                std::env::var("DITTO_PERSISTENCE_DIR")
+                    .unwrap_or_else(|_| ".ditto".to_string())
+                    .trim(),
+            )
+        };
 
         let config = DittoConfig {
             app_id,

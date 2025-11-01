@@ -245,10 +245,11 @@ criterion_main!(benches);
 **Mitigation**: Graceful timeout handling, skip test with warning
 **Impact**: Tests validate infrastructure even if peers don't connect
 
-### File Locking in Parallel Tests
+### File Locking in Parallel Tests ✅ RESOLVED
 **Issue**: Ditto locks persistence directory, preventing parallel execution
-**Mitigation**: Run with `--test-threads=1` or use isolated temp dirs
-**Impact**: Slower test execution but guaranteed correctness
+**Resolution**: `DittoStore::from_env()` now automatically creates unique temporary directories when running tests (detected via `RUST_TEST_THREADS` env var)
+**Mitigation**: Tests run with `--test-threads=1` as defense-in-depth
+**Impact**: Tests run reliably without file locking conflicts
 
 ### CRDT Eventual Consistency
 **Issue**: Sync is not instantaneous, requires polling
