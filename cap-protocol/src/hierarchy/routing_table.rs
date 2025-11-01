@@ -319,6 +319,142 @@ impl RoutingTable {
             .map(|(cell_id, _)| cell_id.as_str())
             .collect()
     }
+
+    /// Merge multiple cells into a new cell by reassigning all their nodes
+    ///
+    /// This operation is used during cell merging in hierarchy maintenance.
+    /// All nodes from the source cells are reassigned to the new merged cell.
+    /// The old cells are removed from the routing table.
+    ///
+    /// # Arguments
+    /// * `source_cell_ids` - IDs of cells to merge (will be removed)
+    /// * `merged_cell_id` - ID of the new merged cell
+    /// * `zone_id` - Zone ID for the merged cell (optional)
+    /// * `timestamp` - Logical timestamp for all operations
+    ///
+    /// # Returns
+    /// Number of nodes reassigned
+    #[instrument(skip(self))]
+    pub fn merge_cells(
+        &mut self,
+        source_cell_ids: &[&str],
+        merged_cell_id: &str,
+        zone_id: Option<&str>,
+        timestamp: u64,
+    ) -> usize {
+        debug!(
+            "Merging cells {:?} into {} @ {}",
+            source_cell_ids, merged_cell_id, timestamp
+        );
+
+        let mut reassigned_count = 0;
+
+        // Collect all nodes from source cells
+        let nodes_to_reassign: Vec<String> = source_cell_ids
+            .iter()
+            .flat_map(|cell_id| {
+                self.node_to_cell
+                    .iter()
+                    .filter(|(_, (cid, _))| cid == *cell_id)
+                    .map(|(node_id, _)| node_id.clone())
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        // Reassign all nodes to the merged cell
+        for node_id in nodes_to_reassign {
+            if self.assign_node(&node_id, merged_cell_id, timestamp) {
+                reassigned_count += 1;
+            }
+        }
+
+        // Assign merged cell to zone if provided
+        if let Some(zid) = zone_id {
+            self.assign_cell(merged_cell_id, zid, timestamp);
+        }
+
+        // Remove old cells from zone mapping
+        for cell_id in source_cell_ids {
+            self.remove_cell(cell_id, timestamp);
+            self.remove_cell_leader(cell_id, timestamp);
+        }
+
+        debug!(
+            "Merge complete: {} nodes reassigned to {}",
+            reassigned_count, merged_cell_id
+        );
+
+        reassigned_count
+    }
+
+    /// Split a cell into two new cells by partitioning its nodes
+    ///
+    /// This operation is used during cell splitting in hierarchy maintenance.
+    /// Nodes are partitioned between two new cells based on the provided split.
+    /// The old cell is removed from the routing table.
+    ///
+    /// # Arguments
+    /// * `source_cell_id` - ID of cell to split (will be removed)
+    /// * `cell_a_id` - ID of first new cell
+    /// * `cell_b_id` - ID of second new cell
+    /// * `nodes_for_a` - Node IDs to assign to cell A
+    /// * `nodes_for_b` - Node IDs to assign to cell B
+    /// * `zone_id` - Zone ID for both new cells (optional)
+    /// * `timestamp` - Logical timestamp for all operations
+    ///
+    /// # Returns
+    /// Tuple of (nodes_in_a, nodes_in_b)
+    #[instrument(skip(self, nodes_for_a, nodes_for_b))]
+    #[allow(clippy::too_many_arguments)]
+    pub fn split_cell(
+        &mut self,
+        source_cell_id: &str,
+        cell_a_id: &str,
+        cell_b_id: &str,
+        nodes_for_a: &[&str],
+        nodes_for_b: &[&str],
+        zone_id: Option<&str>,
+        timestamp: u64,
+    ) -> (usize, usize) {
+        debug!(
+            "Splitting cell {} into {} and {} @ {}",
+            source_cell_id, cell_a_id, cell_b_id, timestamp
+        );
+
+        let mut count_a = 0;
+        let mut count_b = 0;
+
+        // Assign nodes to cell A
+        for node_id in nodes_for_a {
+            if self.assign_node(node_id, cell_a_id, timestamp) {
+                count_a += 1;
+            }
+        }
+
+        // Assign nodes to cell B
+        for node_id in nodes_for_b {
+            if self.assign_node(node_id, cell_b_id, timestamp) {
+                count_b += 1;
+            }
+        }
+
+        // Assign both cells to zone if provided
+        if let Some(zid) = zone_id {
+            self.assign_cell(cell_a_id, zid, timestamp);
+            self.assign_cell(cell_b_id, zid, timestamp);
+        }
+
+        // Remove old cell from zone mapping and leadership
+        self.remove_cell(source_cell_id, timestamp);
+        self.remove_cell_leader(source_cell_id, timestamp);
+
+        debug!(
+            "Split complete: {} → {} nodes in {}, {} nodes in {}",
+            source_cell_id, count_a, cell_a_id, count_b, cell_b_id
+        );
+
+        (count_a, count_b)
+    }
 }
 
 impl Default for RoutingTable {
@@ -600,5 +736,146 @@ mod tests {
         // Newer timestamp should win
         assert!(table1.is_cell_leader("node2", "cell_alpha"));
         assert!(!table1.is_cell_leader("node1", "cell_alpha"));
+    }
+
+    #[test]
+    fn test_merge_cells() {
+        let mut table = RoutingTable::new();
+
+        // Create two cells with nodes
+        table.assign_node("node1", "cell_alpha", 100);
+        table.assign_node("node2", "cell_alpha", 101);
+        table.assign_node("node3", "cell_beta", 102);
+        table.assign_node("node4", "cell_beta", 103);
+
+        table.assign_cell("cell_alpha", "zone_north", 100);
+        table.assign_cell("cell_beta", "zone_north", 101);
+
+        table.set_cell_leader("cell_alpha", "node1", 100);
+        table.set_cell_leader("cell_beta", "node3", 101);
+
+        // Merge cells
+        let count = table.merge_cells(
+            &["cell_alpha", "cell_beta"],
+            "cell_merged",
+            Some("zone_north"),
+            200,
+        );
+
+        // All 4 nodes should be reassigned
+        assert_eq!(count, 4);
+
+        // Verify all nodes are now in merged cell
+        assert_eq!(table.get_node_cell("node1"), Some("cell_merged"));
+        assert_eq!(table.get_node_cell("node2"), Some("cell_merged"));
+        assert_eq!(table.get_node_cell("node3"), Some("cell_merged"));
+        assert_eq!(table.get_node_cell("node4"), Some("cell_merged"));
+
+        // Verify merged cell is in zone
+        assert_eq!(table.get_cell_zone("cell_merged"), Some("zone_north"));
+
+        // Verify old cells are removed
+        assert_eq!(table.get_cell_zone("cell_alpha"), None);
+        assert_eq!(table.get_cell_zone("cell_beta"), None);
+
+        // Verify old leaders are removed
+        assert_eq!(table.get_cell_leader("cell_alpha"), None);
+        assert_eq!(table.get_cell_leader("cell_beta"), None);
+
+        // Verify merged cell has no leader yet
+        assert_eq!(table.get_cell_leader("cell_merged"), None);
+    }
+
+    #[test]
+    fn test_split_cell() {
+        let mut table = RoutingTable::new();
+
+        // Create a cell with nodes
+        table.assign_node("node1", "cell_alpha", 100);
+        table.assign_node("node2", "cell_alpha", 101);
+        table.assign_node("node3", "cell_alpha", 102);
+        table.assign_node("node4", "cell_alpha", 103);
+
+        table.assign_cell("cell_alpha", "zone_north", 100);
+        table.set_cell_leader("cell_alpha", "node1", 100);
+
+        // Split cell
+        let (count_a, count_b) = table.split_cell(
+            "cell_alpha",
+            "cell_a",
+            "cell_b",
+            &["node1", "node2"],
+            &["node3", "node4"],
+            Some("zone_north"),
+            200,
+        );
+
+        // Verify split counts
+        assert_eq!(count_a, 2);
+        assert_eq!(count_b, 2);
+
+        // Verify nodes are in correct cells
+        assert_eq!(table.get_node_cell("node1"), Some("cell_a"));
+        assert_eq!(table.get_node_cell("node2"), Some("cell_a"));
+        assert_eq!(table.get_node_cell("node3"), Some("cell_b"));
+        assert_eq!(table.get_node_cell("node4"), Some("cell_b"));
+
+        // Verify both cells are in zone
+        assert_eq!(table.get_cell_zone("cell_a"), Some("zone_north"));
+        assert_eq!(table.get_cell_zone("cell_b"), Some("zone_north"));
+
+        // Verify old cell is removed
+        assert_eq!(table.get_cell_zone("cell_alpha"), None);
+
+        // Verify old leader is removed
+        assert_eq!(table.get_cell_leader("cell_alpha"), None);
+
+        // Verify new cells have no leaders yet
+        assert_eq!(table.get_cell_leader("cell_a"), None);
+        assert_eq!(table.get_cell_leader("cell_b"), None);
+    }
+
+    #[test]
+    fn test_merge_cells_without_zone() {
+        let mut table = RoutingTable::new();
+
+        table.assign_node("node1", "cell_alpha", 100);
+        table.assign_node("node2", "cell_beta", 101);
+
+        // Merge without zone assignment
+        let count = table.merge_cells(&["cell_alpha", "cell_beta"], "cell_merged", None, 200);
+
+        assert_eq!(count, 2);
+        assert_eq!(table.get_node_cell("node1"), Some("cell_merged"));
+        assert_eq!(table.get_node_cell("node2"), Some("cell_merged"));
+
+        // Verify merged cell has no zone
+        assert_eq!(table.get_cell_zone("cell_merged"), None);
+    }
+
+    #[test]
+    fn test_split_cell_without_zone() {
+        let mut table = RoutingTable::new();
+
+        table.assign_node("node1", "cell_alpha", 100);
+        table.assign_node("node2", "cell_alpha", 101);
+
+        // Split without zone assignment
+        let (count_a, count_b) = table.split_cell(
+            "cell_alpha",
+            "cell_a",
+            "cell_b",
+            &["node1"],
+            &["node2"],
+            None,
+            200,
+        );
+
+        assert_eq!(count_a, 1);
+        assert_eq!(count_b, 1);
+
+        // Verify new cells have no zone
+        assert_eq!(table.get_cell_zone("cell_a"), None);
+        assert_eq!(table.get_cell_zone("cell_b"), None);
     }
 }
