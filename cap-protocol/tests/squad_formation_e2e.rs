@@ -156,6 +156,9 @@ async fn test_e2e_node_advertisement_sync() {
 
     println!("  ✓ Peers connected");
 
+    // Allow time for Ditto sync channels to stabilize after connection
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
     // Create node configuration on peer1
     let mut node_config = NodeConfig::new("UAV".to_string());
     node_config.id = "node_alpha".to_string();
@@ -250,6 +253,9 @@ async fn test_e2e_capability_multi_peer_propagation() {
     }
 
     println!("  ✓ All peers connected");
+
+    // Allow time for Ditto sync channels to stabilize after connection
+    tokio::time::sleep(Duration::from_secs(2)).await;
 
     // Create nodes with different capability types
     let mut node1 = NodeConfig::new("UAV".to_string());
@@ -387,6 +393,9 @@ async fn test_e2e_cell_formation_multi_peer() {
 
     println!("  ✓ Peers connected");
 
+    // Allow time for Ditto sync channels to stabilize after connection
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
     // Create cell with 3 members on peer1
     let cell_config = CellConfig::new(5);
     let cell_id = cell_config.id.clone();
@@ -469,6 +478,9 @@ async fn test_e2e_role_assignment_sync() {
     }
 
     println!("  ✓ Peers connected");
+
+    // Allow time for Ditto sync channels to stabilize after connection
+    tokio::time::sleep(Duration::from_secs(2)).await;
 
     // Create cell with members
     let cell_config = CellConfig::new(5);
@@ -563,6 +575,9 @@ async fn test_e2e_leader_election_propagation() {
 
     println!("  ✓ All peers connected");
 
+    // Allow time for Ditto sync channels to stabilize after connection
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
     // Create cell with members
     let cell_config = CellConfig::new(5);
     let cell_id = cell_config.id.clone();
@@ -656,6 +671,9 @@ async fn test_e2e_timestamped_state_updates() {
     }
 
     println!("  ✓ Peers connected");
+
+    // Allow time for Ditto sync channels to stabilize after connection
+    tokio::time::sleep(Duration::from_secs(2)).await;
 
     // Create cell with members
     let cell_config = CellConfig::new(5);
@@ -778,6 +796,9 @@ async fn test_e2e_complete_formation_convergence() {
     }
 
     println!("  ✓ All peers connected");
+
+    // Allow time for Ditto sync channels to stabilize after connection
+    tokio::time::sleep(Duration::from_secs(2)).await;
 
     // Step 1: Nodes advertise capabilities
     println!("  2. Nodes advertising capabilities...");
