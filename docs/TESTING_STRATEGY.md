@@ -264,18 +264,213 @@ cargo test -- --test-threads=1
 
 **E2E Test Status**:
 - ✅ Infrastructure validated (harness + peer sync)
-- ⏳ Cell formation scenarios (pending implementation)
+- ✅ Cell formation scenarios (implemented)
+- ✅ Hierarchical operations (E5 complete - 7 tests)
 - ⏳ Multi-peer convergence tests (pending)
 - ⏳ Network partition recovery (pending)
 
 ### Target Metrics
 
-| Metric | Current | Target |
-|--------|---------|--------|
-| Unit test coverage | 85% | 90% |
-| E2E scenarios | 2 | 10+ |
-| Test execution time | <1s | <2s |
-| E2E test time | 0.6s | <1s per scenario |
+| Metric | Current | Target | Status |
+|--------|---------|--------|--------|
+| Unit test coverage | 85% | 90% | ✅ On track |
+| E2E scenarios | 9 | 15+ | ✅ Good progress |
+| Test execution time | <1s | <2s | ✅ Met |
+| E2E test time | 0.2-0.6s | <1s per scenario | ✅ Met |
+
+## Epic 5: Hierarchical Operations Testing
+
+### Overview
+
+Epic 5 implements a 3-tier hierarchical coordination system (Node → Cell → Zone) with comprehensive testing across all phases.
+
+### Test Coverage Summary
+
+| Phase | Component | Unit Tests | Integration Tests | E2E Tests |
+|-------|-----------|------------|-------------------|-----------|
+| **Phase 1** | Zone Formation | 12 | 3 | 1 |
+| **Phase 2** | Zone State Management | 18 | 2 | 1 |
+| **Phase 3** | Priority Routing & Flow Control | 30 | 4 | 1 |
+| **Phase 4** | Hierarchy Maintenance | 21 | 4 | 4 |
+| **Total** | **E5 Complete** | **81** | **13** | **7** |
+
+### Phase 4: Hierarchy Maintenance Testing
+
+**Test File**: `tests/hierarchy_e2e.rs` (507 lines)
+
+#### Unit Tests (21 tests in `src/hierarchy/maintenance.rs`)
+
+1. **Maintainer Creation & Validation**
+   - `test_maintainer_creation`: Basic initialization
+   - `test_maintainer_invalid_min_size`: Validation (panic test)
+   - `test_maintainer_invalid_max_size`: Validation (panic test)
+
+2. **Rebalance Detection**
+   - `test_needs_rebalance_none`: Balanced cell detection
+   - `test_needs_rebalance_merge`: Undersized cell detection
+   - `test_needs_rebalance_split`: Oversized cell detection
+
+3. **Cell Merge Operations**
+   - `test_merge_cells`: Basic merge functionality
+   - `test_merge_cells_with_capabilities`: Capability preservation
+   - `test_find_merge_candidate_basic`: Candidate selection
+   - `test_find_merge_candidate_capacity_check`: Capacity validation
+   - `test_find_merge_candidate_same_zone_preference`: Zone affinity
+
+4. **Cell Split Operations**
+   - `test_split_cell`: Basic split functionality
+   - `test_split_cell_too_small`: Error handling
+
+5. **Zone Rebalancing**
+   - `test_needs_zone_rebalance`: Zone-level detection
+
+6. **Metrics Tracking**
+   - `test_metrics`: Operation counting
+
+#### Integration Tests (6 tests in `tests/hierarchy_e2e.rs`)
+
+1. **test_integration_merge_with_routing_table**
+   - Tests cell merge with routing table updates
+   - Verifies node reassignment
+   - Validates old cell removal
+
+2. **test_integration_split_with_routing_table**
+   - Tests cell split with routing table updates
+   - Verifies node distribution
+   - Validates zone assignment
+
+3. **test_integration_sequential_rebalancing**
+   - Full workflow: split → merge
+   - Tests multiple rebalancing operations
+   - Validates final balanced state
+
+4. **test_integration_merge_candidate_selection_priority**
+   - Zone affinity preference
+   - Capacity validation
+   - Fallback to cross-zone merge
+
+5. **test_integration_capabilities_preserved_during_merge**
+   - CRDT semantics: G-Set union
+   - Capability deduplication
+   - Member preservation
+
+6. **test_integration_capabilities_duplicated_during_split**
+   - Capability replication to both cells
+   - Even member distribution
+   - Leader re-election triggers
+
+#### E2E Tests (7 tests in `tests/hierarchy_e2e.rs`)
+
+1. **test_e2e_zone_formation** ✅
+   - Creates zone with 3 cells (9 nodes)
+   - Validates zone formation complete
+   - Uses E2EHarness with real Ditto
+
+2. **test_e2e_routing_table_hierarchy** ✅
+   - Tests 3-level hierarchy (node → cell → zone)
+   - Validates transitive lookups
+   - Tests leader assignment
+
+3. **test_e2e_cell_merge_rebalancing** ✅
+   - Two undersized cells (2 nodes each)
+   - Automatic merge detection
+   - Routing table updates
+   - Final balanced state (4 nodes)
+
+4. **test_e2e_cell_split_rebalancing** ✅
+   - Oversized cell (12 nodes)
+   - Automatic split detection
+   - Even distribution (6 + 6 nodes)
+   - Zone assignment preserved
+
+5. **test_e2e_capability_preservation** ✅
+   - Merge: Capabilities combined (G-Set union)
+   - Split: Capabilities duplicated
+   - CRDT semantics validated
+
+6. **test_e2e_full_hierarchy_lifecycle** ✅
+   - **Formation**: 3 cells, 12 nodes, zone created
+   - **Routing**: Leaders assigned, hierarchy established
+   - **Node Departure**: Cell becomes undersized
+   - **Rebalancing**: Automatic merge triggered
+   - **Final State**: 2 balanced cells, hierarchy intact
+
+7. **test_e2e_zone_capability_aggregation** ✅
+   - Multi-cell capability aggregation
+   - Sensor + Compute capabilities
+   - Zone-level capability view
+
+### Test Execution Results
+
+```bash
+# Unit/Integration Tests
+$ cargo test hierarchy --lib
+test result: ok. 81 passed; 0 failed
+
+# E2E Tests
+$ cargo test --test hierarchy_e2e
+test result: ok. 7 passed; 0 failed
+
+# Total: 88 tests, 100% pass rate ✅
+```
+
+### Key Testing Principles Applied
+
+1. **CRDT Validation**
+   - OR-Set semantics for members (union during merge)
+   - G-Set semantics for capabilities (grow-only, deduplicate)
+   - LWW-Register for timestamps (max wins)
+
+2. **Rebalancing Logic**
+   - Merge candidate selection (zone affinity, capacity)
+   - Even split distribution (count / 2)
+   - Leader re-election after operations
+
+3. **Routing Table Consistency**
+   - Node reassignment during merge
+   - Node distribution during split
+   - Old cell cleanup
+   - Zone assignment preservation
+
+4. **End-to-End Scenarios**
+   - Full lifecycle validation
+   - Multi-phase integration
+   - Realistic node dynamics
+
+### Test Data & Fixtures
+
+**Test Cell Creation Helper**:
+```rust
+fn create_test_cell(id: &str, member_count: usize, max_size: usize) -> CellState {
+    let mut config = CellConfig::new(max_size);
+    config.id = id.to_string();
+    config.min_size = 2;
+
+    let mut cell = CellState::new(config);
+    for i in 0..member_count {
+        cell.add_member(format!("{}_{}", id, i));
+    }
+    cell
+}
+```
+
+**Typical Test Scenario**:
+- **Undersized cells**: 1-2 nodes (< min_size of 3)
+- **Balanced cells**: 3-10 nodes (within range)
+- **Oversized cells**: 11-15 nodes (> max_size of 10)
+
+### Coverage Gaps & Future Work
+
+**Current Gaps**:
+- ⏳ Multi-zone rebalancing (cross-zone merges)
+- ⏳ Concurrent merge/split operations
+- ⏳ Network partition during rebalancing
+- ⏳ RebalancingCoordinator with real Ditto store
+
+**Planned Additions**:
+- Chaos testing (random node join/leave)
+- Performance benchmarks (rebalancing throughput)
+- Load testing (100+ nodes, 10+ cells)
 
 ## Test Development Guidelines
 

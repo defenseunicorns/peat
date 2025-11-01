@@ -21,16 +21,12 @@
 //! - Tests both steady-state and dynamic rebalancing
 
 use cap_protocol::hierarchy::{
-    FlowController, HierarchicalRouter, HierarchyMaintainer, RebalanceAction, RoutingTable,
-    ZoneCoordinator,
+    HierarchyMaintainer, RebalanceAction, RoutingTable, ZoneCoordinator,
 };
 use cap_protocol::models::cell::{CellConfig, CellState};
 use cap_protocol::models::zone::{ZoneConfig, ZoneState};
 use cap_protocol::models::{Capability, CapabilityType};
-use cap_protocol::storage::{CellStore, NodeStore};
 use cap_protocol::testing::E2EHarness;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 /// Test: Zone formation creates valid zone with multiple cells
 #[tokio::test]
@@ -407,9 +403,9 @@ async fn test_e2e_full_hierarchy_lifecycle() {
     // 3. Simulate node departure → cell becomes undersized
     // Remove 3 nodes from cell_0
     let mut cell_0 = cells[0].clone();
-    cell_0.members.remove(&"node_0_1".to_string());
-    cell_0.members.remove(&"node_0_2".to_string());
-    cell_0.members.remove(&"node_0_3".to_string());
+    cell_0.members.remove("node_0_1");
+    cell_0.members.remove("node_0_2");
+    cell_0.members.remove("node_0_3");
 
     // Now cell_0 has only 1 node (< min_size of 3)
     assert_eq!(cell_0.members.len(), 1);
