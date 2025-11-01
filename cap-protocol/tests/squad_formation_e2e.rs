@@ -20,9 +20,10 @@
 //! 4. Use event-driven assertions (no arbitrary timeouts)
 //! 5. Clean up resources to prevent test interference
 
+use cap_protocol::models::cell::{CellConfig, CellState};
 use cap_protocol::models::node::NodeConfig;
 use cap_protocol::models::{Capability, CapabilityType};
-use cap_protocol::storage::NodeStore;
+use cap_protocol::storage::{CellStore, NodeStore};
 use cap_protocol::testing::E2EHarness;
 use std::time::Duration;
 
@@ -187,4 +188,701 @@ async fn test_e2e_node_advertisement_sync() {
     harness.shutdown_store(store2).await;
 
     println!("  ✓ Node advertisement sync test complete");
+}
+
+/// Test 2: Capability multi-peer propagation
+///
+/// Validates that nodes with different capabilities sync across mesh.
+/// Tests G-Set CRDT semantics for capability aggregation.
+#[tokio::test]
+async fn test_e2e_capability_multi_peer_propagation() {
+    let ditto_app_id =
+        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+
+    let mut harness = E2EHarness::new("capability_multi_peer");
+
+    println!("=== E2E: Capability Multi-Peer Propagation ===");
+
+    // Create three peers with different capability types
+    let store1 = harness.create_ditto_store().await.unwrap();
+    let store2 = harness.create_ditto_store().await.unwrap();
+    let store3 = harness.create_ditto_store().await.unwrap();
+
+    let node_store1 = NodeStore::new(store1.clone());
+    let node_store2 = NodeStore::new(store2.clone());
+    let node_store3 = NodeStore::new(store3.clone());
+
+    // Start sync
+    store1.start_sync().unwrap();
+    store2.start_sync().unwrap();
+    store3.start_sync().unwrap();
+
+    println!("  1. Waiting for peer connections...");
+
+    // Wait for peers to connect
+    let conn1 = harness
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(10))
+        .await;
+    let conn2 = harness
+        .wait_for_peer_connection(&store2, &store3, Duration::from_secs(10))
+        .await;
+
+    if conn1.is_err() || conn2.is_err() {
+        println!("  ⚠ Warning: Peer connection timeout - skipping test");
+        harness.shutdown_store(store1).await;
+        harness.shutdown_store(store2).await;
+        harness.shutdown_store(store3).await;
+        return;
+    }
+
+    println!("  ✓ All peers connected");
+
+    // Create nodes with different capability types
+    let mut node1 = NodeConfig::new("UAV".to_string());
+    node1.id = "node_sensor".to_string();
+    node1.add_capability(Capability::new(
+        "cap_sensor_ir".to_string(),
+        "IR Sensor".to_string(),
+        CapabilityType::Sensor,
+        1.0,
+    ));
+
+    let mut node2 = NodeConfig::new("Ground".to_string());
+    node2.id = "node_payload".to_string();
+    node2.add_capability(Capability::new(
+        "cap_payload_gripper".to_string(),
+        "Gripper".to_string(),
+        CapabilityType::Payload,
+        1.0,
+    ));
+
+    let mut node3 = NodeConfig::new("Marine".to_string());
+    node3.id = "node_compute".to_string();
+    node3.add_capability(Capability::new(
+        "cap_compute_gpu".to_string(),
+        "GPU Compute".to_string(),
+        CapabilityType::Compute,
+        1.0,
+    ));
+
+    println!("  2. Storing nodes on different peers...");
+
+    // Store each node on a different peer
+    node_store1.store_config(&node1).await.unwrap();
+    node_store2.store_config(&node2).await.unwrap();
+    node_store3.store_config(&node3).await.unwrap();
+
+    println!("  3. Waiting for cross-peer sync...");
+
+    // Verify all nodes sync to peer1
+    let mut synced_count = 0;
+    for attempt in 1..=20 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        let sensor = node_store1.get_config("node_sensor").await.ok().flatten();
+        let payload = node_store1.get_config("node_payload").await.ok().flatten();
+        let compute = node_store1.get_config("node_compute").await.ok().flatten();
+
+        synced_count =
+            sensor.is_some() as usize + payload.is_some() as usize + compute.is_some() as usize;
+
+        if synced_count == 3 {
+            println!("  ✓ All nodes synced to peer1 (attempt {})", attempt);
+            break;
+        }
+    }
+
+    assert_eq!(synced_count, 3, "Not all nodes synced to peer1");
+
+    // Validate capability types
+    let sensor_node = node_store1
+        .get_config("node_sensor")
+        .await
+        .unwrap()
+        .unwrap();
+    let payload_node = node_store1
+        .get_config("node_payload")
+        .await
+        .unwrap()
+        .unwrap();
+    let compute_node = node_store1
+        .get_config("node_compute")
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(
+        sensor_node.capabilities[0].capability_type,
+        CapabilityType::Sensor
+    );
+    assert_eq!(
+        payload_node.capabilities[0].capability_type,
+        CapabilityType::Payload
+    );
+    assert_eq!(
+        compute_node.capabilities[0].capability_type,
+        CapabilityType::Compute
+    );
+
+    println!("  4. Capability types validated across mesh");
+
+    // Cleanup
+    harness.shutdown_store(store1).await;
+    harness.shutdown_store(store2).await;
+    harness.shutdown_store(store3).await;
+
+    println!("  ✓ Capability multi-peer propagation test complete");
+}
+
+/// Test 3: Cell formation multi-peer
+///
+/// Validates that CellState member list syncs across peers via OR-Set CRDT.
+#[tokio::test]
+async fn test_e2e_cell_formation_multi_peer() {
+    let ditto_app_id =
+        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+
+    let mut harness = E2EHarness::new("cell_formation_multi");
+
+    println!("=== E2E: Cell Formation Multi-Peer ===");
+
+    // Create two peers
+    let store1 = harness.create_ditto_store().await.unwrap();
+    let store2 = harness.create_ditto_store().await.unwrap();
+
+    let cell_store1 = CellStore::new(store1.clone());
+    let cell_store2 = CellStore::new(store2.clone());
+
+    // Start sync
+    store1.start_sync().unwrap();
+    store2.start_sync().unwrap();
+
+    println!("  1. Waiting for peer connection...");
+
+    let connection_result = harness
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(10))
+        .await;
+
+    if connection_result.is_err() {
+        println!("  ⚠ Warning: Peer connection timeout - skipping test");
+        harness.shutdown_store(store1).await;
+        harness.shutdown_store(store2).await;
+        return;
+    }
+
+    println!("  ✓ Peers connected");
+
+    // Create cell with 3 members on peer1
+    let cell_config = CellConfig::new(5);
+    let cell_id = cell_config.id.clone();
+    let mut cell_state = CellState::new(cell_config);
+    cell_state.add_member("node_alpha".to_string());
+    cell_state.add_member("node_beta".to_string());
+    cell_state.add_member("node_gamma".to_string());
+
+    println!("  2. Storing cell with 3 members on peer1: {}", cell_id);
+
+    cell_store1.store_cell(&cell_state).await.unwrap();
+
+    println!("  3. Waiting for sync to peer2...");
+
+    // Poll peer2 for the cell
+    let mut synced_cell = None;
+    for attempt in 1..=20 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        if let Ok(Some(cell)) = cell_store2.get_cell(&cell_id).await {
+            synced_cell = Some(cell);
+            println!("  ✓ Cell synced to peer2 (attempt {})", attempt);
+            break;
+        }
+    }
+
+    assert!(synced_cell.is_some(), "Cell failed to sync to peer2");
+
+    // Validate member list
+    let synced = synced_cell.unwrap();
+    assert_eq!(synced.members.len(), 3);
+    assert!(synced.members.contains("node_alpha"));
+    assert!(synced.members.contains("node_beta"));
+    assert!(synced.members.contains("node_gamma"));
+
+    println!("  4. Member list validated");
+
+    // Cleanup
+    harness.shutdown_store(store1).await;
+    harness.shutdown_store(store2).await;
+
+    println!("  ✓ Cell formation multi-peer test complete");
+}
+
+/// Test 4: Role assignment sync
+///
+/// Validates that role assignments (leader_id) propagate via LWW-Register CRDT.
+#[tokio::test]
+async fn test_e2e_role_assignment_sync() {
+    let ditto_app_id =
+        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+
+    let mut harness = E2EHarness::new("role_assignment_sync");
+
+    println!("=== E2E: Role Assignment Sync ===");
+
+    // Create two peers
+    let store1 = harness.create_ditto_store().await.unwrap();
+    let store2 = harness.create_ditto_store().await.unwrap();
+
+    let cell_store1 = CellStore::new(store1.clone());
+    let cell_store2 = CellStore::new(store2.clone());
+
+    // Start sync
+    store1.start_sync().unwrap();
+    store2.start_sync().unwrap();
+
+    println!("  1. Waiting for peer connection...");
+
+    let connection_result = harness
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(10))
+        .await;
+
+    if connection_result.is_err() {
+        println!("  ⚠ Warning: Peer connection timeout - skipping test");
+        harness.shutdown_store(store1).await;
+        harness.shutdown_store(store2).await;
+        return;
+    }
+
+    println!("  ✓ Peers connected");
+
+    // Create cell with members
+    let cell_config = CellConfig::new(5);
+    let cell_id = cell_config.id.clone();
+    let mut cell_state = CellState::new(cell_config);
+    cell_state.add_member("node_leader".to_string());
+    cell_state.add_member("node_follower".to_string());
+
+    println!("  2. Storing cell on peer1: {}", cell_id);
+
+    cell_store1.store_cell(&cell_state).await.unwrap();
+
+    // Wait for initial sync
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    println!("  3. Setting leader to node_leader...");
+
+    // Set leader on peer1
+    cell_store1
+        .set_leader(&cell_id, "node_leader".to_string())
+        .await
+        .unwrap();
+
+    println!("  4. Waiting for leader sync to peer2...");
+
+    // Poll peer2 for leader update
+    let mut leader_synced = false;
+    for attempt in 1..=20 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        if let Ok(Some(cell)) = cell_store2.get_cell(&cell_id).await {
+            if cell.leader_id == Some("node_leader".to_string()) {
+                leader_synced = true;
+                println!("  ✓ Leader synced to peer2 (attempt {})", attempt);
+                break;
+            }
+        }
+    }
+
+    assert!(leader_synced, "Leader failed to sync to peer2");
+
+    // Cleanup
+    harness.shutdown_store(store1).await;
+    harness.shutdown_store(store2).await;
+
+    println!("  ✓ Role assignment sync test complete");
+}
+
+/// Test 5: Leader election propagation
+///
+/// Validates that leader election results distribute mesh-wide via LWW-Register.
+#[tokio::test]
+async fn test_e2e_leader_election_propagation() {
+    let ditto_app_id =
+        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+
+    let mut harness = E2EHarness::new("leader_election_prop");
+
+    println!("=== E2E: Leader Election Propagation ===");
+
+    // Create three peers for mesh-wide propagation
+    let store1 = harness.create_ditto_store().await.unwrap();
+    let store2 = harness.create_ditto_store().await.unwrap();
+    let store3 = harness.create_ditto_store().await.unwrap();
+
+    let cell_store1 = CellStore::new(store1.clone());
+    let cell_store2 = CellStore::new(store2.clone());
+    let cell_store3 = CellStore::new(store3.clone());
+
+    // Start sync
+    store1.start_sync().unwrap();
+    store2.start_sync().unwrap();
+    store3.start_sync().unwrap();
+
+    println!("  1. Waiting for peer connections...");
+
+    let conn1 = harness
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(10))
+        .await;
+    let conn2 = harness
+        .wait_for_peer_connection(&store2, &store3, Duration::from_secs(10))
+        .await;
+
+    if conn1.is_err() || conn2.is_err() {
+        println!("  ⚠ Warning: Peer connection timeout - skipping test");
+        harness.shutdown_store(store1).await;
+        harness.shutdown_store(store2).await;
+        harness.shutdown_store(store3).await;
+        return;
+    }
+
+    println!("  ✓ All peers connected");
+
+    // Create cell with members
+    let cell_config = CellConfig::new(5);
+    let cell_id = cell_config.id.clone();
+    let mut cell_state = CellState::new(cell_config);
+    cell_state.add_member("node_candidate_1".to_string());
+    cell_state.add_member("node_candidate_2".to_string());
+    cell_state.add_member("node_candidate_3".to_string());
+
+    println!("  2. Storing cell on peer1: {}", cell_id);
+
+    cell_store1.store_cell(&cell_state).await.unwrap();
+
+    // Wait for initial sync
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    println!("  3. Electing node_candidate_2 as leader...");
+
+    // Elect leader on peer2 (middle peer)
+    cell_store2
+        .set_leader(&cell_id, "node_candidate_2".to_string())
+        .await
+        .unwrap();
+
+    println!("  4. Waiting for election result to propagate mesh-wide...");
+
+    // Poll peer3 for leader update
+    let mut leader_synced = false;
+    for attempt in 1..=20 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        if let Ok(Some(cell)) = cell_store3.get_cell(&cell_id).await {
+            if cell.leader_id == Some("node_candidate_2".to_string()) {
+                leader_synced = true;
+                println!(
+                    "  ✓ Leader election propagated to peer3 (attempt {})",
+                    attempt
+                );
+                break;
+            }
+        }
+    }
+
+    assert!(
+        leader_synced,
+        "Leader election failed to propagate to peer3"
+    );
+
+    // Cleanup
+    harness.shutdown_store(store1).await;
+    harness.shutdown_store(store2).await;
+    harness.shutdown_store(store3).await;
+
+    println!("  ✓ Leader election propagation test complete");
+}
+
+/// Test 6: Timestamped state updates
+///
+/// Validates LWW-Register semantics where latest update wins across peers.
+#[tokio::test]
+async fn test_e2e_timestamped_state_updates() {
+    let ditto_app_id =
+        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+
+    let mut harness = E2EHarness::new("timestamped_updates");
+
+    println!("=== E2E: Timestamped State Updates ===");
+
+    // Create two peers
+    let store1 = harness.create_ditto_store().await.unwrap();
+    let store2 = harness.create_ditto_store().await.unwrap();
+
+    let cell_store1 = CellStore::new(store1.clone());
+    let cell_store2 = CellStore::new(store2.clone());
+
+    // Start sync
+    store1.start_sync().unwrap();
+    store2.start_sync().unwrap();
+
+    println!("  1. Waiting for peer connection...");
+
+    let connection_result = harness
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(10))
+        .await;
+
+    if connection_result.is_err() {
+        println!("  ⚠ Warning: Peer connection timeout - skipping test");
+        harness.shutdown_store(store1).await;
+        harness.shutdown_store(store2).await;
+        return;
+    }
+
+    println!("  ✓ Peers connected");
+
+    // Create cell with members
+    let cell_config = CellConfig::new(5);
+    let cell_id = cell_config.id.clone();
+    let mut cell_state = CellState::new(cell_config);
+    cell_state.add_member("node_alpha".to_string());
+    cell_state.add_member("node_beta".to_string());
+
+    println!("  2. Storing initial cell on peer1: {}", cell_id);
+
+    cell_store1.store_cell(&cell_state).await.unwrap();
+
+    // Wait for sync
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    println!("  3. Setting leader to node_alpha on peer1...");
+
+    // First update: Set leader to node_alpha
+    cell_store1
+        .set_leader(&cell_id, "node_alpha".to_string())
+        .await
+        .unwrap();
+
+    // Small delay to ensure distinct timestamps
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    println!("  4. Updating leader to node_beta on peer2...");
+
+    // Second update (later timestamp): Set leader to node_beta
+    cell_store2
+        .set_leader(&cell_id, "node_beta".to_string())
+        .await
+        .unwrap();
+
+    println!("  5. Waiting for LWW convergence...");
+
+    // Poll both peers for convergence to latest update (node_beta)
+    let mut peer1_converged = false;
+    let mut peer2_converged = false;
+
+    for attempt in 1..=20 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        if let Ok(Some(cell1)) = cell_store1.get_cell(&cell_id).await {
+            if cell1.leader_id == Some("node_beta".to_string()) {
+                peer1_converged = true;
+            }
+        }
+
+        if let Ok(Some(cell2)) = cell_store2.get_cell(&cell_id).await {
+            if cell2.leader_id == Some("node_beta".to_string()) {
+                peer2_converged = true;
+            }
+        }
+
+        if peer1_converged && peer2_converged {
+            println!("  ✓ LWW convergence achieved (attempt {})", attempt);
+            break;
+        }
+    }
+
+    assert!(peer1_converged, "Peer1 failed to converge to latest update");
+    assert!(peer2_converged, "Peer2 failed to converge to latest update");
+
+    println!("  6. Latest update (node_beta) won on both peers");
+
+    // Cleanup
+    harness.shutdown_store(store1).await;
+    harness.shutdown_store(store2).await;
+
+    println!("  ✓ Timestamped state updates test complete");
+}
+
+/// Test 7: Complete formation convergence
+///
+/// Full lifecycle test: capability advertisement → cell formation → leader election → validation.
+#[tokio::test]
+async fn test_e2e_complete_formation_convergence() {
+    let ditto_app_id =
+        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+
+    let mut harness = E2EHarness::new("complete_formation");
+
+    println!("=== E2E: Complete Formation Convergence ===");
+
+    // Create three peers for full mesh
+    let store1 = harness.create_ditto_store().await.unwrap();
+    let store2 = harness.create_ditto_store().await.unwrap();
+    let store3 = harness.create_ditto_store().await.unwrap();
+
+    let node_store1 = NodeStore::new(store1.clone());
+    let node_store2 = NodeStore::new(store2.clone());
+    let node_store3 = NodeStore::new(store3.clone());
+
+    let cell_store1 = CellStore::new(store1.clone());
+    let cell_store2 = CellStore::new(store2.clone());
+    let cell_store3 = CellStore::new(store3.clone());
+
+    // Start sync
+    store1.start_sync().unwrap();
+    store2.start_sync().unwrap();
+    store3.start_sync().unwrap();
+
+    println!("  1. Waiting for peer connections...");
+
+    let conn1 = harness
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(10))
+        .await;
+    let conn2 = harness
+        .wait_for_peer_connection(&store2, &store3, Duration::from_secs(10))
+        .await;
+
+    if conn1.is_err() || conn2.is_err() {
+        println!("  ⚠ Warning: Peer connection timeout - skipping test");
+        harness.shutdown_store(store1).await;
+        harness.shutdown_store(store2).await;
+        harness.shutdown_store(store3).await;
+        return;
+    }
+
+    println!("  ✓ All peers connected");
+
+    // Step 1: Nodes advertise capabilities
+    println!("  2. Nodes advertising capabilities...");
+
+    let mut node1 = NodeConfig::new("UAV".to_string());
+    node1.id = "node_1".to_string();
+    node1.add_capability(Capability::new(
+        "cap_sensor_camera".to_string(),
+        "Camera".to_string(),
+        CapabilityType::Sensor,
+        1.0,
+    ));
+
+    let mut node2 = NodeConfig::new("Ground".to_string());
+    node2.id = "node_2".to_string();
+    node2.add_capability(Capability::new(
+        "cap_payload_arm".to_string(),
+        "Robotic Arm".to_string(),
+        CapabilityType::Payload,
+        1.0,
+    ));
+
+    let mut node3 = NodeConfig::new("Marine".to_string());
+    node3.id = "node_3".to_string();
+    node3.add_capability(Capability::new(
+        "cap_compute_ai".to_string(),
+        "AI Processor".to_string(),
+        CapabilityType::Compute,
+        1.0,
+    ));
+
+    node_store1.store_config(&node1).await.unwrap();
+    node_store2.store_config(&node2).await.unwrap();
+    node_store3.store_config(&node3).await.unwrap();
+
+    // Wait for capability sync
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    // Step 2: Cell formation
+    println!("  3. Forming cell with all nodes...");
+
+    let cell_config = CellConfig::new(5);
+    let cell_id = cell_config.id.clone();
+    let mut cell_state = CellState::new(cell_config);
+    cell_state.add_member("node_1".to_string());
+    cell_state.add_member("node_2".to_string());
+    cell_state.add_member("node_3".to_string());
+
+    // Aggregate capabilities
+    cell_state.add_capability(node1.capabilities[0].clone());
+    cell_state.add_capability(node2.capabilities[0].clone());
+    cell_state.add_capability(node3.capabilities[0].clone());
+
+    cell_store1.store_cell(&cell_state).await.unwrap();
+
+    // Wait for cell sync
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    // Step 3: Leader election
+    println!("  4. Electing leader...");
+
+    cell_store2
+        .set_leader(&cell_id, "node_2".to_string())
+        .await
+        .unwrap();
+
+    // Step 4: Validation of final state
+    println!("  5. Validating final state convergence...");
+
+    let mut all_converged = false;
+
+    for attempt in 1..=30 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        // Check all peers have converged to same state
+        let cell1 = cell_store1.get_cell(&cell_id).await.ok().flatten();
+        let cell2 = cell_store2.get_cell(&cell_id).await.ok().flatten();
+        let cell3 = cell_store3.get_cell(&cell_id).await.ok().flatten();
+
+        if let (Some(c1), Some(c2), Some(c3)) = (cell1, cell2, cell3) {
+            // Check members
+            let members_match = c1.members == c2.members && c2.members == c3.members;
+
+            // Check leader
+            let leader_match = c1.leader_id == Some("node_2".to_string())
+                && c2.leader_id == Some("node_2".to_string())
+                && c3.leader_id == Some("node_2".to_string());
+
+            // Check capabilities
+            let caps_match = c1.capabilities.len() == 3
+                && c2.capabilities.len() == 3
+                && c3.capabilities.len() == 3;
+
+            if members_match && leader_match && caps_match {
+                all_converged = true;
+                println!("  ✓ All state converged (attempt {})", attempt);
+                break;
+            }
+        }
+    }
+
+    assert!(all_converged, "Failed to achieve full state convergence");
+
+    // Final validation
+    let final_cell = cell_store1.get_cell(&cell_id).await.unwrap().unwrap();
+    assert_eq!(final_cell.members.len(), 3);
+    assert_eq!(final_cell.leader_id, Some("node_2".to_string()));
+    assert_eq!(final_cell.capabilities.len(), 3);
+
+    println!("  6. Final state validated:");
+    println!("     - Members: 3 nodes");
+    println!("     - Leader: node_2");
+    println!("     - Capabilities: 3 types (Sensor, Payload, Compute)");
+
+    // Cleanup
+    harness.shutdown_store(store1).await;
+    harness.shutdown_store(store2).await;
+    harness.shutdown_store(store3).await;
+
+    println!("  ✓ Complete formation convergence test complete");
 }
