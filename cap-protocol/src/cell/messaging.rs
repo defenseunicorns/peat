@@ -54,6 +54,91 @@ pub enum MessagePriority {
     Critical = 3,
 }
 
+/// Routing context for hierarchical messaging
+///
+/// Determines how messages are prioritized and routed through the hierarchy.
+/// Messages may be escalated when crossing hierarchy boundaries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RoutingContext {
+    /// Message stays within a single cell (peer-to-peer)
+    IntraCell,
+    /// Message propagates upward from cell to zone level (leader only)
+    CellToZone,
+    /// Message propagates downward from zone to cell (broadcast)
+    ZoneToCell,
+    /// Message stays within zone coordinator level
+    IntraZone,
+}
+
+impl MessagePriority {
+    /// Escalate priority when crossing hierarchy boundaries
+    ///
+    /// # Priority Escalation Rules
+    ///
+    /// 1. **Cell → Zone (Upward)**: All messages escalate +1 level (max: Critical)
+    ///    - Rationale: Zone coordinator processes fewer, more important messages
+    ///    - Low → Normal, Normal → High, High → Critical, Critical → Critical
+    ///
+    /// 2. **Zone → Cell (Downward)**: No escalation (maintain priority)
+    ///    - Rationale: Zone directives already have appropriate priority
+    ///
+    /// 3. **Intra-Cell/Intra-Zone**: No escalation (lateral communication)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cap_protocol::cell::messaging::{MessagePriority, RoutingContext};
+    ///
+    /// let priority = MessagePriority::Normal;
+    ///
+    /// // Escalates when going up the hierarchy
+    /// assert_eq!(
+    ///     priority.escalate(RoutingContext::CellToZone),
+    ///     MessagePriority::High
+    /// );
+    ///
+    /// // No escalation for lateral or downward routing
+    /// assert_eq!(
+    ///     priority.escalate(RoutingContext::IntraCell),
+    ///     MessagePriority::Normal
+    /// );
+    /// ```
+    pub fn escalate(self, context: RoutingContext) -> Self {
+        match context {
+            // Upward routing: escalate priority
+            RoutingContext::CellToZone => match self {
+                MessagePriority::Low => MessagePriority::Normal,
+                MessagePriority::Normal => MessagePriority::High,
+                MessagePriority::High | MessagePriority::Critical => MessagePriority::Critical,
+            },
+            // Lateral and downward routing: no escalation
+            RoutingContext::IntraCell | RoutingContext::ZoneToCell | RoutingContext::IntraZone => {
+                self
+            }
+        }
+    }
+
+    /// Determine if this priority should preempt lower priority messages
+    ///
+    /// Used for flow control and queue management decisions.
+    pub fn can_preempt(self, other: MessagePriority) -> bool {
+        self > other
+    }
+
+    /// Get the numeric value for bandwidth allocation
+    ///
+    /// Higher priorities get more bandwidth allocation in flow control.
+    /// Returns a multiplier for bandwidth limits (1.0 = normal, 2.0 = double bandwidth, etc.)
+    pub fn bandwidth_multiplier(self) -> f32 {
+        match self {
+            MessagePriority::Low => 0.5,
+            MessagePriority::Normal => 1.0,
+            MessagePriority::High => 1.5,
+            MessagePriority::Critical => 2.0,
+        }
+    }
+}
+
 /// Cell message types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CellMessageType {
@@ -110,6 +195,8 @@ pub struct CellMessage {
     pub squad_id: String,
     /// Message priority
     pub priority: MessagePriority,
+    /// Routing context (for hierarchical priority escalation)
+    pub routing_context: RoutingContext,
     /// Message payload
     pub payload: CellMessageType,
     /// Timestamp (Unix seconds)
@@ -119,7 +206,7 @@ pub struct CellMessage {
 }
 
 impl CellMessage {
-    /// Create a new squad message
+    /// Create a new squad message (defaults to intra-cell routing)
     pub fn new(
         sender: String,
         squad_id: String,
@@ -137,6 +224,7 @@ impl CellMessage {
             sender,
             squad_id,
             priority: MessagePriority::Normal,
+            routing_context: RoutingContext::IntraCell,
             payload,
             timestamp,
             ttl: 30, // Default 30 second TTL
@@ -149,10 +237,31 @@ impl CellMessage {
         self
     }
 
+    /// Create a message with custom routing context
+    pub fn with_routing_context(mut self, context: RoutingContext) -> Self {
+        self.routing_context = context;
+        self
+    }
+
     /// Create a message with custom TTL
     pub fn with_ttl(mut self, ttl: u64) -> Self {
         self.ttl = ttl;
         self
+    }
+
+    /// Escalate message priority based on routing context
+    ///
+    /// This should be called when a message crosses hierarchy boundaries.
+    /// For example, when a cell leader forwards a message to zone level.
+    pub fn escalate_priority(&mut self) {
+        self.priority = self.priority.escalate(self.routing_context);
+    }
+
+    /// Get the effective priority after escalation
+    ///
+    /// Returns what the priority would be if escalated, without modifying the message.
+    pub fn effective_priority(&self) -> MessagePriority {
+        self.priority.escalate(self.routing_context)
     }
 
     /// Check if message has expired
@@ -657,5 +766,190 @@ mod tests {
             }
             _ => panic!("Expected RoleAssignment message"),
         }
+    }
+
+    // ===== Hierarchical Priority Tests =====
+
+    #[test]
+    fn test_priority_escalation_upward() {
+        // Low → Normal when going cell to zone
+        assert_eq!(
+            MessagePriority::Low.escalate(RoutingContext::CellToZone),
+            MessagePriority::Normal
+        );
+
+        // Normal → High when going cell to zone
+        assert_eq!(
+            MessagePriority::Normal.escalate(RoutingContext::CellToZone),
+            MessagePriority::High
+        );
+
+        // High → Critical when going cell to zone
+        assert_eq!(
+            MessagePriority::High.escalate(RoutingContext::CellToZone),
+            MessagePriority::Critical
+        );
+
+        // Critical stays Critical (max level)
+        assert_eq!(
+            MessagePriority::Critical.escalate(RoutingContext::CellToZone),
+            MessagePriority::Critical
+        );
+    }
+
+    #[test]
+    fn test_priority_escalation_lateral() {
+        // No escalation for intra-cell routing
+        assert_eq!(
+            MessagePriority::Low.escalate(RoutingContext::IntraCell),
+            MessagePriority::Low
+        );
+        assert_eq!(
+            MessagePriority::Normal.escalate(RoutingContext::IntraCell),
+            MessagePriority::Normal
+        );
+        assert_eq!(
+            MessagePriority::High.escalate(RoutingContext::IntraCell),
+            MessagePriority::High
+        );
+
+        // No escalation for intra-zone routing
+        assert_eq!(
+            MessagePriority::Normal.escalate(RoutingContext::IntraZone),
+            MessagePriority::Normal
+        );
+    }
+
+    #[test]
+    fn test_priority_escalation_downward() {
+        // No escalation when going zone to cell
+        assert_eq!(
+            MessagePriority::Low.escalate(RoutingContext::ZoneToCell),
+            MessagePriority::Low
+        );
+        assert_eq!(
+            MessagePriority::Normal.escalate(RoutingContext::ZoneToCell),
+            MessagePriority::Normal
+        );
+        assert_eq!(
+            MessagePriority::Critical.escalate(RoutingContext::ZoneToCell),
+            MessagePriority::Critical
+        );
+    }
+
+    #[test]
+    fn test_message_routing_context() {
+        let payload = CellMessageType::Heartbeat {
+            platform_id: "node_1".to_string(),
+        };
+
+        // Default is intra-cell
+        let msg = CellMessage::new("node_1".to_string(), "squad_alpha".to_string(), 1, payload);
+        assert_eq!(msg.routing_context, RoutingContext::IntraCell);
+
+        // Can set custom context
+        let msg2 = CellMessage::new(
+            "node_1".to_string(),
+            "squad_alpha".to_string(),
+            2,
+            CellMessageType::Heartbeat {
+                platform_id: "node_1".to_string(),
+            },
+        )
+        .with_routing_context(RoutingContext::CellToZone);
+
+        assert_eq!(msg2.routing_context, RoutingContext::CellToZone);
+    }
+
+    #[test]
+    fn test_message_escalate_priority() {
+        let payload = CellMessageType::Heartbeat {
+            platform_id: "node_1".to_string(),
+        };
+
+        let mut msg = CellMessage::new("node_1".to_string(), "squad_alpha".to_string(), 1, payload)
+            .with_priority(MessagePriority::Normal)
+            .with_routing_context(RoutingContext::CellToZone);
+
+        // Before escalation
+        assert_eq!(msg.priority, MessagePriority::Normal);
+
+        // Escalate based on context
+        msg.escalate_priority();
+
+        // After escalation (Normal → High for CellToZone)
+        assert_eq!(msg.priority, MessagePriority::High);
+    }
+
+    #[test]
+    fn test_message_effective_priority() {
+        let payload = CellMessageType::Heartbeat {
+            platform_id: "node_1".to_string(),
+        };
+
+        let msg = CellMessage::new("node_1".to_string(), "squad_alpha".to_string(), 1, payload)
+            .with_priority(MessagePriority::Low)
+            .with_routing_context(RoutingContext::CellToZone);
+
+        // Original priority unchanged
+        assert_eq!(msg.priority, MessagePriority::Low);
+
+        // Effective priority considers context
+        assert_eq!(msg.effective_priority(), MessagePriority::Normal);
+    }
+
+    #[test]
+    fn test_priority_preemption() {
+        assert!(MessagePriority::Critical.can_preempt(MessagePriority::High));
+        assert!(MessagePriority::High.can_preempt(MessagePriority::Normal));
+        assert!(MessagePriority::Normal.can_preempt(MessagePriority::Low));
+
+        assert!(!MessagePriority::Low.can_preempt(MessagePriority::Normal));
+        assert!(!MessagePriority::Normal.can_preempt(MessagePriority::High));
+        assert!(!MessagePriority::Normal.can_preempt(MessagePriority::Normal)); // Same level
+    }
+
+    #[test]
+    fn test_priority_bandwidth_multiplier() {
+        assert_eq!(MessagePriority::Low.bandwidth_multiplier(), 0.5);
+        assert_eq!(MessagePriority::Normal.bandwidth_multiplier(), 1.0);
+        assert_eq!(MessagePriority::High.bandwidth_multiplier(), 1.5);
+        assert_eq!(MessagePriority::Critical.bandwidth_multiplier(), 2.0);
+    }
+
+    #[test]
+    fn test_priority_level_ordering() {
+        // Priority should be ordered: Low < Normal < High < Critical
+        assert!(MessagePriority::Low < MessagePriority::Normal);
+        assert!(MessagePriority::Normal < MessagePriority::High);
+        assert!(MessagePriority::High < MessagePriority::Critical);
+
+        // Verify transitivity
+        assert!(MessagePriority::Low < MessagePriority::Critical);
+    }
+
+    #[test]
+    fn test_hierarchical_message_workflow() {
+        // Simulate a message going from node → cell leader → zone
+        let payload = CellMessageType::StatusUpdate {
+            platform_id: "node_1".to_string(),
+            status: serde_json::json!({"health": "ok"}),
+        };
+
+        // Step 1: Node sends normal priority message within cell
+        let mut msg = CellMessage::new("node_1".to_string(), "squad_alpha".to_string(), 1, payload)
+            .with_priority(MessagePriority::Normal)
+            .with_routing_context(RoutingContext::IntraCell);
+
+        assert_eq!(msg.priority, MessagePriority::Normal);
+        assert_eq!(msg.routing_context, RoutingContext::IntraCell);
+
+        // Step 2: Cell leader receives and decides to forward to zone
+        msg.routing_context = RoutingContext::CellToZone;
+        msg.escalate_priority();
+
+        // Priority should now be High (escalated from Normal)
+        assert_eq!(msg.priority, MessagePriority::High);
+        assert_eq!(msg.routing_context, RoutingContext::CellToZone);
     }
 }
