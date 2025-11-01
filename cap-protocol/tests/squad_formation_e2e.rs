@@ -27,6 +27,19 @@ use cap_protocol::storage::{CellStore, NodeStore};
 use cap_protocol::testing::E2EHarness;
 use std::time::Duration;
 
+/// Returns the number of sync attempts based on environment.
+/// CI environments need more time due to resource contention and network latency.
+///
+/// - Local: 20 attempts × 500ms = 10 seconds
+/// - CI: 60 attempts × 500ms = 30 seconds
+fn sync_timeout_attempts() -> usize {
+    if std::env::var("CI").is_ok() {
+        60 // 30 seconds for CI
+    } else {
+        20 // 10 seconds for local
+    }
+}
+
 /// Test: Verify E2E test harness creates isolated Ditto stores
 #[tokio::test]
 async fn test_harness_creates_isolated_stores() {
@@ -162,7 +175,7 @@ async fn test_e2e_node_advertisement_sync() {
 
     // Poll peer2 for the node (Ditto sync is eventual)
     let mut synced_node = None;
-    for attempt in 1..=20 {
+    for attempt in 1..=sync_timeout_attempts() {
         tokio::time::sleep(Duration::from_millis(500)).await;
 
         if let Ok(Some(node)) = node_store2.get_config("node_alpha").await {
@@ -277,7 +290,7 @@ async fn test_e2e_capability_multi_peer_propagation() {
 
     // Verify all nodes sync to peer1
     let mut synced_count = 0;
-    for attempt in 1..=20 {
+    for attempt in 1..=sync_timeout_attempts() {
         tokio::time::sleep(Duration::from_millis(500)).await;
 
         let sensor = node_store1.get_config("node_sensor").await.ok().flatten();
@@ -390,7 +403,7 @@ async fn test_e2e_cell_formation_multi_peer() {
 
     // Poll peer2 for the cell
     let mut synced_cell = None;
-    for attempt in 1..=20 {
+    for attempt in 1..=sync_timeout_attempts() {
         tokio::time::sleep(Duration::from_millis(500)).await;
 
         if let Ok(Some(cell)) = cell_store2.get_cell(&cell_id).await {
@@ -483,7 +496,7 @@ async fn test_e2e_role_assignment_sync() {
 
     // Poll peer2 for leader update
     let mut leader_synced = false;
-    for attempt in 1..=20 {
+    for attempt in 1..=sync_timeout_attempts() {
         tokio::time::sleep(Duration::from_millis(500)).await;
 
         if let Ok(Some(cell)) = cell_store2.get_cell(&cell_id).await {
@@ -577,7 +590,7 @@ async fn test_e2e_leader_election_propagation() {
 
     // Poll peer3 for leader update
     let mut leader_synced = false;
-    for attempt in 1..=20 {
+    for attempt in 1..=sync_timeout_attempts() {
         tokio::time::sleep(Duration::from_millis(500)).await;
 
         if let Ok(Some(cell)) = cell_store3.get_cell(&cell_id).await {
@@ -683,7 +696,7 @@ async fn test_e2e_timestamped_state_updates() {
     let mut peer1_converged = false;
     let mut peer2_converged = false;
 
-    for attempt in 1..=20 {
+    for attempt in 1..=sync_timeout_attempts() {
         tokio::time::sleep(Duration::from_millis(500)).await;
 
         if let Ok(Some(cell1)) = cell_store1.get_cell(&cell_id).await {
@@ -836,7 +849,7 @@ async fn test_e2e_complete_formation_convergence() {
 
     let mut all_converged = false;
 
-    for attempt in 1..=30 {
+    for attempt in 1..=sync_timeout_attempts() {
         tokio::time::sleep(Duration::from_millis(500)).await;
 
         // Check all peers have converged to same state
