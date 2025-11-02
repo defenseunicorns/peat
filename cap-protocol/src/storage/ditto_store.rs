@@ -392,7 +392,14 @@ impl Clone for DittoStore {
 
 impl Drop for DittoStore {
     fn drop(&mut self) {
+        // Stop sync to release network resources
         self.stop_sync();
+
+        // If this is the last reference to the Ditto instance, close it properly
+        // Note: Arc::try_unwrap requires ownership, which we don't have in drop()
+        // The best we can do is stop_sync() and let the Arc drop naturally
+        // Ditto's Drop implementation should handle cleanup when the last Arc is dropped
+        debug!("DittoStore dropped, sync stopped");
     }
 }
 

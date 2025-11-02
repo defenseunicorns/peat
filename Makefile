@@ -9,7 +9,7 @@ help:
 	@echo "  clean        - Remove build artifacts and Ditto directories"
 	@echo "  clean-ditto  - Remove Ditto persistence directories only"
 	@echo "  build        - Build all crates"
-	@echo "  test         - Run all tests (single-threaded to avoid Ditto conflicts)"
+	@echo "  test         - Run all tests (single-threaded to prevent FD exhaustion)"
 	@echo "  test-e2e     - Run E2E integration tests for Squad Formation"
 	@echo "  fmt          - Format all code with cargo fmt"
 	@echo "  clippy       - Run clippy linter"
@@ -34,10 +34,11 @@ build:
 	@echo "Building all crates..."
 	cargo build
 
-# Run tests (single-threaded to avoid Ditto persistence conflicts)
+# Run tests (single-threaded to prevent Ditto file descriptor exhaustion)
 test: clean-ditto
 	@echo "Running tests (single-threaded)..."
-	@echo "Note: Tests run with --test-threads=1 to prevent Ditto directory conflicts"
+	@echo "Note: Tests use isolated temp directories, but run single-threaded to"
+	@echo "      prevent file descriptor exhaustion from too many concurrent Ditto instances"
 	cargo test -- --test-threads=1
 
 # Run E2E integration tests
@@ -69,7 +70,7 @@ pre-commit: clean-ditto
 	@cargo fmt --all
 	@echo "2. Running clippy..."
 	@cargo clippy --all-targets --all-features -- -D warnings
-	@echo "3. Running tests..."
+	@echo "3. Running tests (single-threaded)..."
 	@cargo test -- --test-threads=1
 	@echo ""
 	@echo "✅ All pre-commit checks passed!"
@@ -81,7 +82,7 @@ ci: clean-ditto
 	@cargo fmt --all -- --check
 	@echo "2. Running clippy..."
 	@cargo clippy --all-targets --all-features -- -D warnings
-	@echo "3. Running tests..."
+	@echo "3. Running tests (single-threaded)..."
 	@cargo test -- --test-threads=1
 	@echo ""
 	@echo "✅ CI pipeline passed!"
