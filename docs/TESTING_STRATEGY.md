@@ -235,6 +235,35 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test -- --test-threads=1
 ```
 
+### CI vs Local Testing Strategy
+
+**GitHub Actions CI** (Automated on PR):
+- Runs **ONLY unit tests**: `cargo test --lib`
+- Fast and reliable (<2 minutes)
+- No Ditto mDNS/CRDT sync required
+- Provides quick feedback on PRs
+
+**Why E2E tests are excluded from CI**:
+- E2E tests depend on Ditto mDNS peer discovery and CRDT synchronization
+- GitHub Actions CI environment has unreliable network timing and resource contention
+- mDNS discovery can fail or timeout inconsistently in containerized CI environments
+- CRDT sync requires stabilization time after peer connection that varies by CI load
+
+**Local Development** (Pre-commit hooks):
+- Runs **ALL tests**: `cargo test` (unit + integration + E2E)
+- E2E tests work reliably in local development environments
+- Pre-commit hooks ensure E2E tests pass before commits
+- Provides full validation including distributed system behavior
+
+**Developer Workflow**:
+1. **During development**: Run `cargo test --lib` for fast feedback
+2. **Before committing**: Run `make test` or `cargo test` to include E2E tests
+3. **Pre-commit hook**: Automatically runs all tests (can take 10-30s)
+4. **CI validation**: Quick unit test validation on PR (unit tests only)
+5. **Merge confidence**: Local E2E tests + CI unit tests = high confidence
+
+**Important**: Even though E2E tests don't run in CI, they are **critical** for validating distributed behavior and **must pass locally** before committing.
+
 ## Test Data Management
 
 ### Fixtures
