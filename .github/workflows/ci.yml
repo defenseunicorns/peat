@@ -25,12 +25,15 @@ jobs:
         with:
           cache-on-failure: true
 
+      - name: Clean Ditto directories
+        run: find . -type d -name ".ditto*" -exec rm -rf {} + 2>/dev/null || true
+
       - name: Run tests
         env:
           DITTO_APP_ID: ${{ secrets.DITTO_APP_ID }}
           DITTO_OFFLINE_TOKEN: ${{ secrets.DITTO_OFFLINE_TOKEN }}
           DITTO_SHARED_KEY: ${{ secrets.DITTO_SHARED_KEY }}
-        run: cargo test --lib --all-features --workspace
+        run: cargo test --all-features --workspace -- --test-threads=1
 
   lint:
     name: Lint

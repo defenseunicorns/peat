@@ -143,10 +143,18 @@ impl DittoStore {
         //
         // TCP transport is more reliable for localhost testing where mDNS may not work.
         ditto.update_transport_config(|transport_config| {
-            // Enable LAN/mDNS for automatic discovery
+            // Enable LAN transport for local peer discovery
             transport_config.peer_to_peer.lan.enabled = true;
+            transport_config.peer_to_peer.lan.multicast_enabled = true;
 
-            // Configure TCP listener if specified
+            // Disable BLE
+            transport_config.peer_to_peer.bluetooth_le.enabled = false;
+
+            // Disable listen transports (we don't need TCP servers)
+            transport_config.listen.tcp.enabled = false;
+            transport_config.listen.http.enabled = false;
+
+            // Only enable explicit TCP if configured
             if let Some(port) = config.tcp_listen_port {
                 transport_config.listen.tcp.enabled = true;
                 transport_config.listen.tcp.interface_ip = "127.0.0.1".to_string();
