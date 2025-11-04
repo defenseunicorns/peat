@@ -22,6 +22,7 @@ cap-protocol/.ditto*
 # Environment
 .env
 .env.local
+.env.kit
 
 # Claude Code
 CLAUDE.md

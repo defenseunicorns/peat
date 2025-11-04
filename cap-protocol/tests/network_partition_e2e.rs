@@ -414,11 +414,24 @@ async fn test_e2e_multi_zone_partition_isolation() {
 
     println!("=== E2E: Multi-Zone Partition Isolation ===");
 
-    // Create 4 peers: 2 for zone_alpha, 2 for zone_beta
-    let store_alpha1 = harness.create_ditto_store().await.unwrap();
-    let store_alpha2 = harness.create_ditto_store().await.unwrap();
-    let store_beta1 = harness.create_ditto_store().await.unwrap();
-    let store_beta2 = harness.create_ditto_store().await.unwrap();
+    // Create 4 peers using explicit TCP topology to avoid mDNS file descriptor issues
+    // Star topology: alpha1 (hub on port 12345), others connect to it
+    let store_alpha1 = harness
+        .create_ditto_store_with_tcp(Some(12345), None)
+        .await
+        .unwrap();
+    let store_alpha2 = harness
+        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12345".to_string()))
+        .await
+        .unwrap();
+    let store_beta1 = harness
+        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12345".to_string()))
+        .await
+        .unwrap();
+    let store_beta2 = harness
+        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12345".to_string()))
+        .await
+        .unwrap();
 
     let cell_store_alpha1 = CellStore::new(store_alpha1.clone());
     let _cell_store_alpha2 = CellStore::new(store_alpha2.clone());

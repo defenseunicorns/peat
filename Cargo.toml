@@ -14,7 +14,7 @@ repository = "https://github.com/kitplummer/cap"
 
 [workspace.dependencies]
 # CRDT synchronization
-dittolive-ditto = "4"
+dittolive-ditto = "=4.11.5"
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }

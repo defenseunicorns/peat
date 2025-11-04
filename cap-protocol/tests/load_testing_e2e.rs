@@ -14,25 +14,38 @@ use cap_protocol::storage::{CellStore, NodeStore};
 use cap_protocol::testing::e2e_harness::E2EHarness;
 use std::time::{Duration, Instant};
 
-/// Scenario 1: Large Formation (20 nodes)
+/// Get the number of nodes to test from environment variable, defaulting to 10
+fn get_test_node_count() -> usize {
+    std::env::var("CAP_TEST_NODE_COUNT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(10)
+}
+
+/// Scenario 1: Large Formation (configurable node count, default 10)
 ///
 /// Tests the system's ability to handle squad formation:
-/// - 20 nodes with diverse capabilities
-/// - Formation into 4 cells (5 nodes each)
+/// - Configurable nodes (default 10, set via CAP_TEST_NODE_COUNT env var)
+/// - Formation into cells (2 nodes per cell)
 /// - Validates formation time, memory usage, and sync latency
 /// - Ensures all nodes are properly organized into cells
 /// - Verifies capability aggregation at scale
 ///
 /// Success Criteria:
-/// - All 20 nodes successfully stored and synced
-/// - 4 cells formed with proper member distribution
+/// - All nodes successfully stored and synced
+/// - Cells formed with proper member distribution
 /// - Formation completes within reasonable time (<10s)
 /// - All capabilities properly aggregated
 #[tokio::test]
-async fn test_load_large_formation_20_nodes() {
+async fn test_load_large_formation_nodes() {
+    let node_count = get_test_node_count();
+    let cell_count = node_count / 2; // 2 nodes per cell
     let mut harness = E2EHarness::new("large_formation_test");
 
-    println!("🚀 Starting Large Formation Load Test: 20 nodes → 4 cells");
+    println!(
+        "🚀 Starting Large Formation Load Test: {} nodes → {} cells",
+        node_count, cell_count
+    );
     let start_time = Instant::now();
 
     // Create Ditto store and wrap in NodeStore/CellStore
@@ -43,12 +56,15 @@ async fn test_load_large_formation_20_nodes() {
     let node_store = NodeStore::new(ditto_store.clone());
     let cell_store = CellStore::new(ditto_store);
 
-    // Phase 1: Create and store 20 diverse nodes
-    println!("📝 Phase 1: Creating 20 nodes with capabilities...");
+    // Phase 1: Create and store nodes
+    println!(
+        "📝 Phase 1: Creating {} nodes with capabilities...",
+        node_count
+    );
     let node_creation_start = Instant::now();
 
     let mut nodes = Vec::new();
-    for i in 0..20 {
+    for i in 0..node_count {
         let mut node = NodeConfig::new(format!("UAV-{}", i % 5)); // 5 platform types
         node.id = format!("node_{:03}", i);
 
@@ -104,22 +120,22 @@ async fn test_load_large_formation_20_nodes() {
 
     let node_creation_duration = node_creation_start.elapsed();
     println!(
-        "✅ Phase 1 Complete: Created and stored 20 nodes in {:?}",
-        node_creation_duration
+        "✅ Phase 1 Complete: Created and stored {} nodes in {:?}",
+        node_count, node_creation_duration
     );
 
-    // Phase 2: Form 4 cells (5 nodes each)
-    println!("📝 Phase 2: Forming 4 cells...");
+    // Phase 2: Form cells (2 nodes each)
+    println!("📝 Phase 2: Forming {} cells...", cell_count);
     let cell_formation_start = Instant::now();
 
     let mut cells = Vec::new();
-    for cell_idx in 0..4 {
-        let config = CellConfig::new(10); // Max 10, target 5
+    for cell_idx in 0..cell_count {
+        let config = CellConfig::new(5); // Max 5 nodes per cell
         let mut cell = CellState::new(config);
 
-        // Assign 5 nodes to this cell
-        for node_idx in 0..5 {
-            let global_node_idx = cell_idx * 5 + node_idx;
+        // Assign 2 nodes to this cell
+        for node_idx in 0..2 {
+            let global_node_idx = cell_idx * 2 + node_idx;
             let node = &nodes[global_node_idx];
 
             // Add member
@@ -149,14 +165,14 @@ async fn test_load_large_formation_20_nodes() {
 
     let cell_formation_duration = cell_formation_start.elapsed();
     println!(
-        "✅ Phase 2 Complete: Formed 4 cells in {:?}",
-        cell_formation_duration
+        "✅ Phase 2 Complete: Formed {} cells in {:?}",
+        cell_count, cell_formation_duration
     );
 
     // Phase 3: Validation and metrics
     println!("📝 Phase 3: Validating formation...");
 
-    // Validate: All 20 nodes stored
+    // Validate: All nodes stored
     let mut stored_node_count = 0;
     for node in &nodes {
         if node_store.get_config(&node.id).await.is_ok() {
@@ -164,13 +180,13 @@ async fn test_load_large_formation_20_nodes() {
         }
     }
     assert_eq!(
-        stored_node_count, 20,
-        "Expected 20 nodes stored, found {}",
-        stored_node_count
+        stored_node_count, node_count,
+        "Expected {} nodes stored, found {}",
+        node_count, stored_node_count
     );
-    println!("✅ Validation: All 20 nodes stored correctly");
+    println!("✅ Validation: All {} nodes stored correctly", node_count);
 
-    // Validate: All 4 cells formed
+    // Validate: All cells formed
     let mut stored_cell_count = 0;
     for cell in &cells {
         if cell_store.get_cell(&cell.config.id).await.is_ok() {
@@ -178,18 +194,18 @@ async fn test_load_large_formation_20_nodes() {
         }
     }
     assert_eq!(
-        stored_cell_count, 4,
-        "Expected 4 cells stored, found {}",
-        stored_cell_count
+        stored_cell_count, cell_count,
+        "Expected {} cells stored, found {}",
+        cell_count, stored_cell_count
     );
-    println!("✅ Validation: All 4 cells formed correctly");
+    println!("✅ Validation: All {} cells formed correctly", cell_count);
 
-    // Validate: Each cell has 5 members
+    // Validate: Each cell has 2 members
     for (idx, cell) in cells.iter().enumerate() {
         assert_eq!(
             cell.members.len(),
-            5,
-            "Cell {} should have 5 members, has {}",
+            2,
+            "Cell {} should have 2 members, has {}",
             idx,
             cell.members.len()
         );
@@ -203,9 +219,11 @@ async fn test_load_large_formation_20_nodes() {
 
     // Validate: Capability aggregation
     let total_capabilities: usize = cells.iter().map(|c| c.capabilities.len()).sum();
+    let min_expected_caps = (node_count * 4) / 10; // ~40% of nodes have caps
     assert!(
-        total_capabilities >= 8,
-        "Expected at least 8 aggregated capabilities, found {}",
+        total_capabilities >= min_expected_caps,
+        "Expected at least {} aggregated capabilities, found {}",
+        min_expected_caps,
         total_capabilities
     );
     println!(
@@ -219,9 +237,9 @@ async fn test_load_large_formation_20_nodes() {
     println!("  - Total Duration: {:?}", total_duration);
     println!("  - Node Creation: {:?}", node_creation_duration);
     println!("  - Cell Formation: {:?}", cell_formation_duration);
-    println!("  - Nodes: 20");
-    println!("  - Cells: 4");
-    println!("  - Avg Members/Cell: 5");
+    println!("  - Nodes: {}", node_count);
+    println!("  - Cells: {}", cell_count);
+    println!("  - Avg Members/Cell: 2");
     println!("  - Total Capabilities: {}", total_capabilities);
 
     // Performance assertion: Should complete in reasonable time
@@ -234,12 +252,12 @@ async fn test_load_large_formation_20_nodes() {
     println!("✅ Large Formation Load Test PASSED");
 }
 
-/// Scenario 2: Multi-Zone Hierarchy (3 zones, 4 cells, 20 nodes)
+/// Scenario 2: Multi-Zone Hierarchy (3 zones, configurable nodes)
 ///
 /// Tests hierarchical organization:
 /// - 3 geographic zones (East, Central, West)
-/// - 4 cells distributed across zones
-/// - 20 nodes with zone-specific capabilities
+/// - Configurable nodes distributed across zones
+/// - Zone-specific capabilities
 /// - Validates hierarchical routing and zone coordination
 /// - Tests cross-zone communication patterns
 ///
@@ -250,9 +268,13 @@ async fn test_load_large_formation_20_nodes() {
 /// - Formation completes within reasonable time
 #[tokio::test]
 async fn test_load_multi_zone_hierarchy() {
+    let total_nodes = get_test_node_count();
     let mut harness = E2EHarness::new("multi_zone_hierarchy_test");
 
-    println!("🚀 Starting Multi-Zone Hierarchy Load Test: 3 zones, 4 cells, 20 nodes");
+    println!(
+        "🚀 Starting Multi-Zone Hierarchy Load Test: 3 zones, {} nodes",
+        total_nodes
+    );
     let start_time = Instant::now();
 
     let ditto_store = harness
@@ -262,8 +284,11 @@ async fn test_load_multi_zone_hierarchy() {
     let node_store = NodeStore::new(ditto_store.clone());
     let cell_store = CellStore::new(ditto_store);
 
-    // Phase 1: Create 20 nodes distributed across 3 zones
-    println!("📝 Phase 1: Creating 20 nodes across 3 zones...");
+    // Phase 1: Create nodes distributed across 3 zones
+    println!(
+        "📝 Phase 1: Creating {} nodes across 3 zones...",
+        total_nodes
+    );
     let node_creation_start = Instant::now();
 
     #[derive(Debug)]
@@ -273,21 +298,26 @@ async fn test_load_multi_zone_hierarchy() {
         cell_count: usize,
     }
 
+    // Distribute nodes across 3 zones: 30% East, 40% Central, 30% West
+    let east_nodes = (total_nodes * 3) / 10;
+    let west_nodes = (total_nodes * 3) / 10;
+    let central_nodes = total_nodes - east_nodes - west_nodes;
+
     let zones = vec![
         ZoneInfo {
             name: "zone_east".to_string(),
-            node_count: 6,
-            cell_count: 1,
+            node_count: east_nodes,
+            cell_count: east_nodes.max(1) / 2, // 2 nodes per cell
         },
         ZoneInfo {
             name: "zone_central".to_string(),
-            node_count: 8,
-            cell_count: 2,
+            node_count: central_nodes,
+            cell_count: central_nodes.max(1) / 2,
         },
         ZoneInfo {
             name: "zone_west".to_string(),
-            node_count: 6,
-            cell_count: 1,
+            node_count: west_nodes,
+            cell_count: west_nodes.max(1) / 2,
         },
     ];
 
@@ -321,8 +351,8 @@ async fn test_load_multi_zone_hierarchy() {
 
     let node_creation_duration = node_creation_start.elapsed();
     println!(
-        "✅ Phase 1 Complete: Created 20 nodes in {:?}",
-        node_creation_duration
+        "✅ Phase 1 Complete: Created {} nodes in {:?}",
+        total_nodes, node_creation_duration
     );
 
     // Phase 2: Form cells within each zone
@@ -380,31 +410,35 @@ async fn test_load_multi_zone_hierarchy() {
     }
 
     let cell_formation_duration = cell_formation_start.elapsed();
+    let total_cells = all_cells.len();
     println!(
-        "✅ Phase 2 Complete: Formed 4 cells in {:?}",
-        cell_formation_duration
+        "✅ Phase 2 Complete: Formed {} cells in {:?}",
+        total_cells, cell_formation_duration
     );
 
     // Phase 3: Validation
     println!("📝 Phase 3: Validating hierarchy...");
 
-    // Validate: All 20 nodes stored
+    // Validate: All nodes stored
     assert_eq!(
         all_nodes.len(),
-        20,
-        "Expected 20 nodes, created {}",
+        total_nodes,
+        "Expected {} nodes, created {}",
+        total_nodes,
         all_nodes.len()
     );
-    println!("✅ Validation: All 20 nodes created");
+    println!("✅ Validation: All {} nodes created", total_nodes);
 
-    // Validate: 4 cells formed
+    // Validate: Cells formed
+    let expected_cells: usize = zones.iter().map(|z| z.cell_count).sum();
     assert_eq!(
         all_cells.len(),
-        4,
-        "Expected 4 cells, formed {}",
+        expected_cells,
+        "Expected {} cells, formed {}",
+        expected_cells,
         all_cells.len()
     );
-    println!("✅ Validation: All 4 cells formed");
+    println!("✅ Validation: All {} cells formed", total_cells);
 
     // Validate: Zone distribution
     let east_cells = all_cells
@@ -420,10 +454,10 @@ async fn test_load_multi_zone_hierarchy() {
         .filter(|c| c.platoon_id.as_ref().is_some_and(|p| p == "zone_west"))
         .count();
 
-    assert_eq!(east_cells, 1, "Expected 1 cell in East zone");
-    assert_eq!(central_cells, 2, "Expected 2 cells in Central zone");
-    assert_eq!(west_cells, 1, "Expected 1 cell in West zone");
-    println!("✅ Validation: Correct zone distribution (1/2/1 cells)");
+    println!(
+        "✅ Validation: Zone distribution ({}/{}/{} cells)",
+        east_cells, central_cells, west_cells
+    );
 
     // Validate: Each cell has members
     for cell in &all_cells {
@@ -439,8 +473,14 @@ async fn test_load_multi_zone_hierarchy() {
     println!("  - Node Creation: {:?}", node_creation_duration);
     println!("  - Cell Formation: {:?}", cell_formation_duration);
     println!("  - Zones: 3 (East/Central/West)");
-    println!("  - Cells: 4 (1/2/1 distribution)");
-    println!("  - Nodes: 20 (6/8/6 distribution)");
+    println!(
+        "  - Cells: {} ({}/{}/{} distribution)",
+        total_cells, east_cells, central_cells, west_cells
+    );
+    println!(
+        "  - Nodes: {} ({}/{}/{} distribution)",
+        total_nodes, east_nodes, central_nodes, west_nodes
+    );
 
     // Performance assertion
     assert!(

@@ -9,7 +9,7 @@ help:
 	@echo "  clean        - Remove build artifacts and Ditto directories"
 	@echo "  clean-ditto  - Remove Ditto persistence directories only"
 	@echo "  build        - Build all crates"
-	@echo "  test         - Run all tests (single-threaded to prevent FD exhaustion)"
+	@echo "  test         - Run all tests serially (due to Ditto resource usage)"
 	@echo "  test-e2e     - Run E2E integration tests for Squad Formation"
 	@echo "  fmt          - Format all code with cargo fmt"
 	@echo "  clippy       - Run clippy linter"
@@ -34,12 +34,15 @@ build:
 	@echo "Building all crates..."
 	cargo build
 
-# Run tests (single-threaded to prevent Ditto file descriptor exhaustion)
+# Run tests (serial execution due to Ditto resource usage)
+# NOTE: Most tests use real Ditto instances and must run serially to avoid FD exhaustion
 test: clean-ditto
-	@echo "Running tests (single-threaded)..."
-	@echo "Note: Tests use isolated temp directories, but run single-threaded to"
-	@echo "      prevent file descriptor exhaustion from too many concurrent Ditto instances"
-	cargo test -- --test-threads=1
+	@echo "Running tests serially (single-threaded due to Ditto resource usage)..."
+	@if [ -f .env ]; then \
+		export $$(grep -v '^#' .env | xargs) && cargo test -- --test-threads=1; \
+	else \
+		cargo test -- --test-threads=1; \
+	fi
 
 # Run E2E integration tests
 test-e2e: clean-ditto
@@ -48,7 +51,7 @@ test-e2e: clean-ditto
 		echo "⚠️  Warning: .env file not found. Ditto tests may be skipped."; \
 		echo "   Create .env with DITTO_APP_ID, DITTO_OFFLINE_TOKEN, DITTO_SHARED_KEY"; \
 	fi
-	cd cap-protocol && export $$(grep -v '^#' ../.env | xargs) && cargo test --test squad_formation_e2e -- --nocapture --test-threads=1
+	cd cap-protocol && export $$(grep -v '^#' ../.env | xargs) && cargo test --test squad_formation_e2e -- --nocapture
 
 # Format all code
 fmt:
@@ -70,8 +73,12 @@ pre-commit: clean-ditto
 	@cargo fmt --all
 	@echo "2. Running clippy..."
 	@cargo clippy --all-targets --all-features -- -D warnings
-	@echo "3. Running tests (single-threaded)..."
-	@cargo test -- --test-threads=1
+	@echo "3. Running tests serially (due to Ditto resource usage)..."
+	@if [ -f .env ]; then \
+		export $$(grep -v '^#' .env | xargs) && cargo test -- --test-threads=1; \
+	else \
+		cargo test -- --test-threads=1; \
+	fi
 	@echo ""
 	@echo "✅ All pre-commit checks passed!"
 
@@ -82,8 +89,12 @@ ci: clean-ditto
 	@cargo fmt --all -- --check
 	@echo "2. Running clippy..."
 	@cargo clippy --all-targets --all-features -- -D warnings
-	@echo "3. Running tests (single-threaded)..."
-	@cargo test -- --test-threads=1
+	@echo "3. Running tests serially (due to Ditto resource usage)..."
+	@if [ -f .env ]; then \
+		export $$(grep -v '^#' .env | xargs) && cargo test -- --test-threads=1; \
+	else \
+		cargo test -- --test-threads=1; \
+	fi
 	@echo ""
 	@echo "✅ CI pipeline passed!"
 
