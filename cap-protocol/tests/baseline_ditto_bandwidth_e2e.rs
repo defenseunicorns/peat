@@ -22,6 +22,7 @@ use cap_protocol::models::cell::{CellConfig, CellState};
 use cap_protocol::models::node::NodeConfig;
 use cap_protocol::models::{Capability, CapabilityType};
 use cap_protocol::storage::{CellStore, NodeStore};
+use cap_protocol::sync::ditto::DittoBackend;
 use cap_protocol::testing::E2EHarness;
 use std::time::{Duration, Instant};
 
@@ -43,8 +44,8 @@ async fn test_baseline_cell_formation_bandwidth() {
     let store1 = harness.create_ditto_store().await.unwrap();
     let store2 = harness.create_ditto_store().await.unwrap();
 
-    let cell_store1 = CellStore::new(store1.clone());
-    let cell_store2 = CellStore::new(store2.clone());
+    let cell_store1: CellStore<DittoBackend> = CellStore::new(store1.clone().into()).await.unwrap();
+    let cell_store2: CellStore<DittoBackend> = CellStore::new(store2.clone().into()).await.unwrap();
 
     // Start sync
     store1.start_sync().unwrap();
@@ -185,8 +186,9 @@ async fn test_baseline_rapid_updates_bandwidth() {
     let store1 = harness.create_ditto_store().await.unwrap();
     let store2 = harness.create_ditto_store().await.unwrap();
 
-    let cell_store1 = CellStore::new(store1.clone());
-    let _cell_store2 = CellStore::new(store2.clone());
+    let cell_store1: CellStore<DittoBackend> = CellStore::new(store1.clone().into()).await.unwrap();
+    let _cell_store2: CellStore<DittoBackend> =
+        CellStore::new(store2.clone().into()).await.unwrap();
 
     store1.start_sync().unwrap();
     store2.start_sync().unwrap();

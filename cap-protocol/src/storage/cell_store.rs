@@ -1,12 +1,12 @@
 //! Cell state storage manager
 //!
-//! This module provides a high-level wrapper around DittoStore for managing
+//! This module provides a high-level wrapper around data sync backends for managing
 //! cell state using CRDT operations.
 
 use crate::models::{cell::CellState, Capability};
-use crate::storage::ditto_store::DittoStore;
+use crate::sync::{DataSyncBackend, Document, Query, SyncSubscription, Value};
 use crate::{Error, Result};
-use serde_json::json;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, info, instrument};
 
@@ -14,27 +14,55 @@ use tracing::{debug, info, instrument};
 const CELL_COLLECTION: &str = "cells";
 
 /// Cell storage manager
-pub struct CellStore {
-    store: DittoStore,
-    _sync_sub: Arc<dittolive_ditto::sync::SyncSubscription>,
+pub struct CellStore<B: DataSyncBackend> {
+    backend: Arc<B>,
+    _sync_sub: SyncSubscription,
 }
 
-impl CellStore {
+impl<B: DataSyncBackend> CellStore<B> {
     /// Create a new cell store with sync subscription for P2P replication
-    pub fn new(store: DittoStore) -> Self {
+    pub async fn new(backend: Arc<B>) -> Result<Self> {
         // Create sync subscription for the cells collection
         // This is REQUIRED for P2P replication - without it, data stays local
-        let query = format!("SELECT * FROM {}", CELL_COLLECTION);
-        let sync_sub = store
-            .ditto()
-            .sync()
-            .register_subscription_v2(&query)
-            .expect("Failed to create sync subscription for cells");
+        let query = Query::All;
+        let sync_sub = backend
+            .sync_engine()
+            .subscribe(CELL_COLLECTION, &query)
+            .await
+            .map_err(|e| {
+                Error::storage_error(
+                    format!("Failed to create sync subscription for cells: {}", e),
+                    "new",
+                    Some(CELL_COLLECTION.to_string()),
+                )
+            })?;
 
-        Self {
-            store,
+        Ok(Self {
+            backend,
             _sync_sub: sync_sub,
-        }
+        })
+    }
+
+    /// Convert CellState to Document
+    fn cell_to_document(cell: &CellState) -> Result<Document> {
+        let json_val = serde_json::to_value(cell)?;
+        let fields = json_val
+            .as_object()
+            .ok_or_else(|| Error::Internal("Failed to serialize cell to object".into()))?
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect::<HashMap<String, Value>>();
+
+        let mut doc = Document::new(fields);
+        // Add cell_id field for querying
+        doc.set("cell_id".to_string(), Value::String(cell.config.id.clone()));
+        Ok(doc)
+    }
+
+    /// Convert Document to CellState
+    fn document_to_cell(doc: &Document) -> Result<CellState> {
+        let json_val = serde_json::to_value(&doc.fields)?;
+        Ok(serde_json::from_value(json_val)?)
     }
 
     /// Store a cell state (OR-Set + LWW-Register operations)
@@ -42,21 +70,20 @@ impl CellStore {
     pub async fn store_cell(&self, cell: &CellState) -> Result<String> {
         info!("Storing cell: {}", cell.config.id);
 
-        // Serialize cell state directly
-        let mut doc = serde_json::to_value(cell)?;
-        // Add cell_id field for querying
-        if let Some(obj) = doc.as_object_mut() {
-            obj.insert("cell_id".to_string(), json!(cell.config.id.clone()));
-        }
+        let doc = Self::cell_to_document(cell)?;
 
         // Always INSERT - get_cell will query for latest by updated_at timestamp
-        self.store.upsert(CELL_COLLECTION, doc).await.map_err(|e| {
-            Error::storage_error(
-                format!("Failed to store cell: {}", e),
-                "upsert",
-                Some(CELL_COLLECTION.to_string()),
-            )
-        })
+        self.backend
+            .document_store()
+            .upsert(CELL_COLLECTION, doc)
+            .await
+            .map_err(|e| {
+                Error::storage_error(
+                    format!("Failed to store cell: {}", e),
+                    "upsert",
+                    Some(CELL_COLLECTION.to_string()),
+                )
+            })
     }
 
     /// Retrieve a cell by ID
@@ -64,8 +91,15 @@ impl CellStore {
     pub async fn get_cell(&self, cell_id: &str) -> Result<Option<CellState>> {
         debug!("Retrieving cell: {}", cell_id);
 
-        let where_clause = format!("cell_id == '{}'", cell_id);
-        let mut docs = self.store.query(CELL_COLLECTION, &where_clause).await?;
+        let query = Query::Eq {
+            field: "cell_id".to_string(),
+            value: Value::String(cell_id.to_string()),
+        };
+        let mut docs = self
+            .backend
+            .document_store()
+            .query(CELL_COLLECTION, &query)
+            .await?;
 
         if docs.is_empty() {
             return Ok(None);
@@ -74,12 +108,12 @@ impl CellStore {
         // Sort by updated_at descending to get the latest version
         // (since we always INSERT new documents rather than updating)
         docs.sort_by(|a, b| {
-            let a_ts = a.get("updated_at").and_then(|v| v.as_i64()).unwrap_or(0);
-            let b_ts = b.get("updated_at").and_then(|v| v.as_i64()).unwrap_or(0);
+            let a_ts = a.updated_at;
+            let b_ts = b.updated_at;
             b_ts.cmp(&a_ts) // Descending order
         });
 
-        let cell: CellState = serde_json::from_value(docs[0].clone())?;
+        let cell = Self::document_to_cell(&docs[0])?;
         Ok(Some(cell))
     }
 
@@ -88,12 +122,17 @@ impl CellStore {
     pub async fn get_valid_cells(&self) -> Result<Vec<CellState>> {
         debug!("Querying valid cells");
 
-        // Query all cells - we'll filter in code since DQL doesn't support array length
-        let docs = self.store.query(CELL_COLLECTION, "true").await?;
+        // Query all cells - we'll filter in code since query abstraction doesn't support array length
+        let query = Query::All;
+        let docs = self
+            .backend
+            .document_store()
+            .query(CELL_COLLECTION, &query)
+            .await?;
 
         let cells: Vec<CellState> = docs
             .into_iter()
-            .filter_map(|doc| serde_json::from_value(doc).ok())
+            .filter_map(|doc| Self::document_to_cell(&doc).ok())
             .filter(|cell: &CellState| cell.is_valid())
             .collect();
 
@@ -105,12 +144,19 @@ impl CellStore {
     pub async fn get_cells_by_zone(&self, platoon_id: &str) -> Result<Vec<CellState>> {
         debug!("Querying cells by platoon: {}", platoon_id);
 
-        let where_clause = format!("platoon_id == '{}'", platoon_id);
-        let docs = self.store.query(CELL_COLLECTION, &where_clause).await?;
+        let query = Query::Eq {
+            field: "platoon_id".to_string(),
+            value: Value::String(platoon_id.to_string()),
+        };
+        let docs = self
+            .backend
+            .document_store()
+            .query(CELL_COLLECTION, &query)
+            .await?;
 
         let cells: Vec<CellState> = docs
             .into_iter()
-            .filter_map(|doc| serde_json::from_value(doc).ok())
+            .filter_map(|doc| Self::document_to_cell(&doc).ok())
             .collect();
 
         Ok(cells)
@@ -125,11 +171,16 @@ impl CellStore {
         debug!("Querying cells with capability: {:?}", capability_type);
 
         // Query all cells - filter by capability in code
-        let docs = self.store.query(CELL_COLLECTION, "true").await?;
+        let query = Query::All;
+        let docs = self
+            .backend
+            .document_store()
+            .query(CELL_COLLECTION, &query)
+            .await?;
 
         let cells: Vec<CellState> = docs
             .into_iter()
-            .filter_map(|doc| serde_json::from_value(doc).ok())
+            .filter_map(|doc| Self::document_to_cell(&doc).ok())
             .filter(|cell: &CellState| cell.has_capability_type(capability_type))
             .collect();
 
@@ -141,11 +192,16 @@ impl CellStore {
     pub async fn get_available_cells(&self) -> Result<Vec<CellState>> {
         debug!("Querying available cells");
 
-        let docs = self.store.query(CELL_COLLECTION, "true").await?;
+        let query = Query::All;
+        let docs = self
+            .backend
+            .document_store()
+            .query(CELL_COLLECTION, &query)
+            .await?;
 
         let cells: Vec<CellState> = docs
             .into_iter()
-            .filter_map(|doc| serde_json::from_value(doc).ok())
+            .filter_map(|doc| Self::document_to_cell(&doc).ok())
             .filter(|cell: &CellState| !cell.is_full())
             .collect();
 
@@ -239,12 +295,15 @@ impl CellStore {
     pub async fn delete_cell(&self, cell_id: &str) -> Result<()> {
         info!("Deleting cell: {}", cell_id);
 
-        self.store.remove(CELL_COLLECTION, cell_id).await
+        self.backend
+            .document_store()
+            .remove(CELL_COLLECTION, &cell_id.to_string())
+            .await
     }
 
-    /// Get the underlying DittoStore reference
-    pub fn store(&self) -> &DittoStore {
-        &self.store
+    /// Get the underlying backend reference
+    pub fn backend(&self) -> &B {
+        &self.backend
     }
 }
 
@@ -252,9 +311,11 @@ impl CellStore {
 mod tests {
     use super::*;
     use crate::models::CellConfig;
-    use crate::storage::ditto_store::DittoConfig;
+    use crate::sync::ditto::DittoBackend;
+    use crate::sync::{BackendConfig, TransportConfig};
+    use std::collections::HashMap;
 
-    async fn create_test_store() -> Result<CellStore> {
+    async fn create_test_store() -> Result<CellStore<DittoBackend>> {
         // Create unique temp directory for this test to enable parallel execution
         // Use tempfile::Builder to create temp dir with a unique name
         let temp_dir = tempfile::Builder::new()
@@ -282,16 +343,19 @@ mod tests {
         // The OS will clean it up eventually
         std::mem::forget(temp_dir);
 
-        let config = DittoConfig {
+        let config = BackendConfig {
             app_id,
             persistence_dir: persistence_path,
-            shared_key,
-            tcp_listen_port: None,
-            tcp_connect_address: None,
+            shared_key: Some(shared_key),
+            transport: TransportConfig::default(),
+            extra: HashMap::new(),
         };
 
-        let ditto_store = DittoStore::new(config)?;
-        Ok(CellStore::new(ditto_store))
+        let backend = DittoBackend::new();
+        backend.initialize(config).await?;
+        backend.sync_engine().start_sync().await?;
+
+        CellStore::new(Arc::new(backend)).await
     }
 
     #[tokio::test]
@@ -669,7 +733,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_store_accessor() {
+    async fn test_backend_accessor() {
         let store = match create_test_store().await {
             Ok(s) => s,
             Err(_) => {
@@ -678,8 +742,8 @@ mod tests {
             }
         };
 
-        // Just verify we can access the underlying store
-        let _ditto_store = store.store();
+        // Just verify we can access the underlying backend
+        let _backend = store.backend();
         // If we get here without panic, the accessor works
     }
 }

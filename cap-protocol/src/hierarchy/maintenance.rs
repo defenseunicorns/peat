@@ -451,14 +451,14 @@ pub struct MaintenanceMetrics {
 /// );
 /// # }
 /// ```
-pub struct RebalancingCoordinator {
+pub struct RebalancingCoordinator<B: crate::sync::DataSyncBackend> {
     maintainer: Arc<HierarchyMaintainer>,
     routing_table: Arc<std::sync::Mutex<crate::hierarchy::RoutingTable>>,
-    cell_store: Arc<std::sync::Mutex<crate::storage::CellStore>>,
+    cell_store: Arc<std::sync::Mutex<crate::storage::CellStore<B>>>,
     check_interval_secs: u64,
 }
 
-impl RebalancingCoordinator {
+impl<B: crate::sync::DataSyncBackend> RebalancingCoordinator<B> {
     /// Create a new rebalancing coordinator
     ///
     /// # Arguments
@@ -469,7 +469,7 @@ impl RebalancingCoordinator {
     pub fn new(
         maintainer: Arc<HierarchyMaintainer>,
         routing_table: Arc<std::sync::Mutex<crate::hierarchy::RoutingTable>>,
-        cell_store: Arc<std::sync::Mutex<crate::storage::CellStore>>,
+        cell_store: Arc<std::sync::Mutex<crate::storage::CellStore<B>>>,
         check_interval_secs: u64,
     ) -> Self {
         Self {

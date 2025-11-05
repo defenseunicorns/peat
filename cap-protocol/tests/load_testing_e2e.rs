@@ -48,13 +48,21 @@ async fn test_load_large_formation_nodes() {
     );
     let start_time = Instant::now();
 
-    // Create Ditto store and wrap in NodeStore/CellStore
+    // Create stores for both NodeStore (uses DittoStore) and CellStore (uses DittoBackend)
+    // TODO: Once NodeStore is migrated to DataSyncBackend, use single backend for both
     let ditto_store = harness
         .create_ditto_store()
         .await
         .expect("Failed to create Ditto store");
-    let node_store = NodeStore::new(ditto_store.clone());
-    let cell_store = CellStore::new(ditto_store);
+    let backend = harness
+        .create_ditto_backend()
+        .await
+        .expect("Failed to create Ditto backend");
+
+    let node_store = NodeStore::new(ditto_store);
+    let cell_store = CellStore::new(backend)
+        .await
+        .expect("Failed to create CellStore");
 
     // Phase 1: Create and store nodes
     println!(
@@ -277,12 +285,21 @@ async fn test_load_multi_zone_hierarchy() {
     );
     let start_time = Instant::now();
 
+    // Create stores for both NodeStore (uses DittoStore) and CellStore (uses DittoBackend)
+    // TODO: Once NodeStore is migrated to DataSyncBackend, use single backend for both
     let ditto_store = harness
         .create_ditto_store()
         .await
         .expect("Failed to create Ditto store");
-    let node_store = NodeStore::new(ditto_store.clone());
-    let cell_store = CellStore::new(ditto_store);
+    let backend = harness
+        .create_ditto_backend()
+        .await
+        .expect("Failed to create Ditto backend");
+
+    let node_store = NodeStore::new(ditto_store);
+    let cell_store = CellStore::new(backend)
+        .await
+        .expect("Failed to create CellStore");
 
     // Phase 1: Create nodes distributed across 3 zones
     println!(

@@ -42,6 +42,16 @@ impl DittoBackend {
         }
     }
 
+    /// Create a Ditto backend from an existing DittoStore
+    ///
+    /// This is useful for tests that create stores directly.
+    pub fn from_store(store: DittoStore) -> Self {
+        Self {
+            store: Arc::new(Mutex::new(Some(store))),
+            peer_callbacks: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
     /// Get a reference to the underlying store (if initialized)
     fn get_store(&self) -> Result<DittoStore> {
         self.store
