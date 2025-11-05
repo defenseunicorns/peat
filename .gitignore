@@ -39,3 +39,6 @@ build/
 
 # Shadow simulator
 shadow.data/
+
+# ContainerLab
+cap-sim/topologies/clab-*/

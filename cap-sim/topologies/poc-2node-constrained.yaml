@@ -1,0 +1,65 @@
+# ContainerLab Topology: 2-Node POC with Network Constraints
+#
+# Purpose: Validate network constraint capabilities for E8
+# Tests:
+#   1. Bandwidth limiting (56 Kbps - tactical radio)
+#   2. Latency injection (50ms)
+#   3. Packet loss (1%)
+#   4. Jitter (10ms)
+#
+# Expected Behavior:
+#   - Document sync should be noticeably slower than unconstrained
+#   - Sync time should be measurably longer (expect 2-5s vs <1s)
+#
+# Usage:
+#   containerlab deploy -t cap-sim/topologies/poc-2node-constrained.yaml
+#   containerlab inspect -t cap-sim/topologies/poc-2node-constrained.yaml
+#
+#   # View link impairments
+#   containerlab tools netem show -t cap-sim/topologies/poc-2node-constrained.yaml
+#
+#   # Destroy when done
+#   containerlab destroy -t cap-sim/topologies/poc-2node-constrained.yaml
+
+name: cap-poc-2node-constrained
+
+topology:
+  nodes:
+    # node1: Writer (creates document)
+    node1:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: node1
+        MODE: writer
+        TCP_LISTEN: "12345"
+
+    # node2: Reader (receives document)
+    node2:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: node2
+        MODE: reader
+        TCP_CONNECT: "node1:12345"
+
+  links:
+    # Constrained link simulating tactical radio conditions
+    - endpoints: ["node1:eth1", "node2:eth1"]
+      # Apply network impairments to simulate realistic conditions
+      # These are applied bidirectionally by default
+      impairments:
+        # Bandwidth limit: 56 Kbps (typical tactical radio)
+        rate: 56kbps
+
+        # Latency: 50ms one-way (100ms RTT)
+        delay: 50ms
+
+        # Jitter: 10ms variance in latency
+        jitter: 10ms
+
+        # Packet loss: 1% (realistic for radio links)
+        loss: 1%
+
+        # Optional: Packet corruption (uncomment to test)
+        # corruption: 0.1%
