@@ -54,6 +54,22 @@ impl E2EHarness {
     /// - Shared app_id and shared_key for sync mesh
     /// - Uses mDNS/LAN discovery (no TCP listener/client)
     pub async fn create_ditto_store(&mut self) -> Result<DittoStore> {
+        self.create_ditto_store_with_tcp(None, None).await
+    }
+
+    /// Create a new isolated Ditto store with optional TCP configuration
+    ///
+    /// Use this when you need explicit TCP topology to avoid mDNS file descriptor issues
+    /// with multiple instances (4+).
+    ///
+    /// # Arguments
+    /// * `tcp_listen_port` - If Some(port), this instance will listen on that TCP port
+    /// * `tcp_connect_address` - If Some(addr), this instance will connect to that address
+    pub async fn create_ditto_store_with_tcp(
+        &mut self,
+        tcp_listen_port: Option<u16>,
+        tcp_connect_address: Option<String>,
+    ) -> Result<DittoStore> {
         let temp_dir = tempfile::tempdir().map_err(|e| {
             Error::storage_error(
                 format!("Failed to create temp dir: {}", e),
@@ -71,8 +87,8 @@ impl E2EHarness {
             app_id,
             persistence_dir: temp_dir.path().to_path_buf(),
             shared_key,
-            tcp_listen_port: None,     // No TCP listener - use mDNS only
-            tcp_connect_address: None, // No TCP client
+            tcp_listen_port,
+            tcp_connect_address,
         };
 
         let store = DittoStore::new(config)?;

@@ -143,31 +143,42 @@ impl DittoStore {
         //
         // TCP transport is more reliable for localhost testing where mDNS may not work.
         ditto.update_transport_config(|transport_config| {
-            // Enable LAN transport for local peer discovery
-            transport_config.peer_to_peer.lan.enabled = true;
-            transport_config.peer_to_peer.lan.multicast_enabled = true;
-
             // Disable BLE
             transport_config.peer_to_peer.bluetooth_le.enabled = false;
 
-            // Disable listen transports (we don't need TCP servers)
-            transport_config.listen.tcp.enabled = false;
+            // Disable HTTP listen
             transport_config.listen.http.enabled = false;
 
-            // Only enable explicit TCP if configured
-            if let Some(port) = config.tcp_listen_port {
-                transport_config.listen.tcp.enabled = true;
-                transport_config.listen.tcp.interface_ip = "127.0.0.1".to_string();
-                transport_config.listen.tcp.port = port;
-            }
+            // Configure transport based on whether we're using explicit TCP or mDNS
+            if config.tcp_listen_port.is_some() || config.tcp_connect_address.is_some() {
+                // Using explicit TCP connections - disable mDNS/LAN discovery
+                transport_config.peer_to_peer.lan.enabled = false;
+                debug!("mDNS/LAN discovery disabled (using explicit TCP connections)");
 
-            // Configure TCP client connection if specified
-            if let Some(ref address) = config.tcp_connect_address {
-                transport_config.connect.tcp_servers.insert(address.clone());
+                // Enable TCP listener if port specified
+                if let Some(port) = config.tcp_listen_port {
+                    transport_config.listen.tcp.enabled = true;
+                    transport_config.listen.tcp.interface_ip = "127.0.0.1".to_string();
+                    transport_config.listen.tcp.port = port;
+                    debug!("TCP listen enabled on 127.0.0.1:{}", port);
+                } else {
+                    transport_config.listen.tcp.enabled = false;
+                }
+
+                // Configure TCP client connection if specified
+                if let Some(ref address) = config.tcp_connect_address {
+                    transport_config.connect.tcp_servers.insert(address.clone());
+                    debug!("TCP client will connect to: {}", address);
+                }
+            } else {
+                // No explicit TCP - use mDNS/LAN for peer discovery
+                transport_config.peer_to_peer.lan.enabled = true;
+                transport_config.listen.tcp.enabled = false;
+                debug!("Using mDNS/LAN for peer discovery (no explicit TCP configured)");
             }
         });
 
-        info!("Ditto store initialized successfully (v3 sync disabled, LAN transport enabled)");
+        info!("Ditto store initialized successfully (v3 sync disabled)");
 
         Ok(Self {
             ditto: Arc::new(ditto),
@@ -344,6 +355,39 @@ impl DittoStore {
         Ok(doc_id)
     }
 
+    /// Replace a document completely using EVICT + INSERT pattern
+    /// This is the recommended way to do "updates" in Ditto when you need to replace the whole document
+    #[instrument(skip(self, document), fields(collection, where_clause))]
+    pub async fn replace(
+        &self,
+        collection: &str,
+        where_clause: &str,
+        document: serde_json::Value,
+    ) -> Result<String> {
+        debug!(
+            "Replacing documents in collection {} where {}",
+            collection, where_clause
+        );
+
+        // First evict matching documents
+        let evict_query = format!("EVICT FROM {} WHERE {}", collection, where_clause);
+        self.ditto
+            .store()
+            .execute_v2((evict_query, serde_json::json!({})))
+            .await
+            .map_err(|e| {
+                error!("Evict before replace failed: {}", e);
+                Error::storage_error(
+                    format!("Evict failed on collection {}", collection),
+                    "replace",
+                    Some(collection.to_string()),
+                )
+            })?;
+
+        // Then insert new document
+        self.upsert(collection, document).await
+    }
+
     /// Remove a document from a collection using DQL
     #[instrument(skip(self), fields(collection, doc_id))]
     pub async fn remove(&self, collection: &str, doc_id: &str) -> Result<()> {
@@ -392,7 +436,14 @@ impl Clone for DittoStore {
 
 impl Drop for DittoStore {
     fn drop(&mut self) {
+        // Stop sync to release network resources
         self.stop_sync();
+
+        // If this is the last reference to the Ditto instance, close it properly
+        // Note: Arc::try_unwrap requires ownership, which we don't have in drop()
+        // The best we can do is stop_sync() and let the Arc drop naturally
+        // Ditto's Drop implementation should handle cleanup when the last Arc is dropped
+        debug!("DittoStore dropped, sync stopped");
     }
 }
 
@@ -529,6 +580,39 @@ mod tests {
         sleep(Duration::from_millis(100)).await;
     }
 
+    /// Helper to clean up Ditto stores - ensures proper shutdown with sufficient wait time
+    async fn cleanup_stores(
+        observers: (
+            Arc<dittolive_ditto::store::StoreObserver>,
+            Arc<dittolive_ditto::store::StoreObserver>,
+        ),
+        subs: (
+            Arc<dittolive_ditto::sync::SyncSubscription>,
+            Arc<dittolive_ditto::sync::SyncSubscription>,
+        ),
+        stores: (DittoStore, DittoStore),
+    ) {
+        // Drop observers and subscriptions first
+        drop(observers);
+        drop(subs);
+        sleep(Duration::from_millis(200)).await;
+
+        // Stop sync on both stores
+        stores.0.stop_sync();
+        stores.1.stop_sync();
+        sleep(Duration::from_secs(1)).await;
+
+        // Drop the stores
+        drop(stores.0);
+        drop(stores.1);
+
+        // CRITICAL: Ditto SDK has background threads (tombstone reaper, etc.) that need
+        // significant time to exit. Without this, tests will hang for 60+ seconds.
+        // The E2E tests work because there's natural time between tests, but this unit test
+        // needs explicit cleanup time. 3 seconds should be enough for Ditto to fully shut down.
+        sleep(Duration::from_secs(3)).await;
+    }
+
     #[tokio::test]
     async fn test_two_instance_sync() {
         dotenvy::dotenv().ok();
@@ -563,24 +647,26 @@ mod tests {
         let temp_dir1 = tempdir().expect("Failed to create temp dir 1");
         let temp_dir2 = tempdir().expect("Failed to create temp dir 2");
 
-        // Create two Ditto instances with unique persistence directories
-        // Both use mDNS for peer discovery (no TCP ports to avoid conflicts)
+        // Create two Ditto instances with explicit TCP connection for reliable testing
+        // Store1 listens on TCP port, Store2 connects to it
+        let tcp_port: u16 = 12345; // Fixed port for testing
+
         let config1 = DittoConfig {
             app_id: app_id.clone(),
             persistence_dir: temp_dir1.path().to_path_buf(),
             shared_key: shared_key.clone(),
-            tcp_listen_port: None, // No TCP - use mDNS only
+            tcp_listen_port: Some(tcp_port), // Store1 listens
             tcp_connect_address: None,
         };
         let store1 = DittoStore::new(config1).expect("Failed to create store 1");
 
-        // Store2: Also uses mDNS for discovery
+        // Store2: Connect to Store1's TCP port
         let config2 = DittoConfig {
             app_id,
             persistence_dir: temp_dir2.path().to_path_buf(),
             shared_key,
-            tcp_listen_port: None, // No TCP - use mDNS only
-            tcp_connect_address: None,
+            tcp_listen_port: None, // Store2 doesn't listen
+            tcp_connect_address: Some(format!("127.0.0.1:{}", tcp_port)),
         };
         let store2 = DittoStore::new(config2).expect("Failed to create store 2");
 
@@ -602,13 +688,13 @@ mod tests {
         // Peers only discover and sync when they have COMMON subscriptions.
 
         // Store1: Create sync subscription + observer
-        let _sync_sub1 = store1
+        let sync_sub1 = store1
             .ditto()
             .sync()
             .register_subscription_v2("SELECT * FROM sync_test")
             .expect("Failed to create sync subscription on store1");
 
-        let _observer1 = store1
+        let observer1 = store1
             .ditto()
             .store()
             .register_observer_v2("SELECT * FROM sync_test", |result| {
@@ -617,13 +703,13 @@ mod tests {
             .expect("Failed to register observer on store1");
 
         // Store2: Create sync subscription + observer
-        let _sync_sub2 = store2
+        let sync_sub2 = store2
             .ditto()
             .sync()
             .register_subscription_v2("SELECT * FROM sync_test")
             .expect("Failed to create sync subscription on store2");
 
-        let _observer2 = store2
+        let observer2 = store2
             .ditto()
             .store()
             .register_observer_v2("SELECT * FROM sync_test", |result| {
@@ -631,37 +717,55 @@ mod tests {
             })
             .expect("Failed to register observer on store2");
 
-        // Wait for peers to discover each other (with timeout)
-        println!("Waiting for peer discovery...");
-        let mut connected = false;
-        for attempt in 1..=10 {
-            sleep(Duration::from_millis(500)).await;
+        // Use presence observer to detect TCP peer connection (observer-based, not polling)
+        println!("Setting up presence observer for TCP peer connection...");
+        let (presence_tx, mut presence_rx) = tokio::sync::mpsc::unbounded_channel();
 
-            let graph1 = store1.ditto().presence().graph();
-            let peer_count = graph1.remote_peers.len();
-
+        let presence_observer = store1.ditto().presence().observe(move |graph| {
+            let peer_count = graph.remote_peers.len();
             if peer_count > 0 {
-                println!(
-                    "✓ Peers connected after {} attempts ({} peers)",
-                    attempt, peer_count
-                );
-                connected = true;
-                break;
+                let _ = presence_tx.send(peer_count);
             }
+        });
 
-            if attempt % 2 == 0 {
-                println!("  Still waiting... (attempt {}/10)", attempt);
+        // Wait for TCP connection to establish (with timeout)
+        // Note: There's a delay between physical TCP connection and presence graph update
+        println!("Waiting for TCP connection between peers...");
+        let connected = tokio::time::timeout(Duration::from_secs(10), presence_rx.recv()).await;
+
+        let _peer_count = match connected {
+            Ok(Some(peer_count)) => {
+                println!("✓ TCP peers connected ({} peers discovered)", peer_count);
+                peer_count
             }
-        }
-
-        if !connected {
-            println!("⚠ Warning: Peers did not discover each other within timeout");
-            println!("  This can happen in test environments with localhost");
-            return; // Skip the sync assertion
-        }
+            Ok(None) => {
+                eprintln!("⚠️  Skipping test: Presence observer channel closed unexpectedly");
+                drop(presence_observer);
+                cleanup_stores(
+                    (observer1, observer2),
+                    (sync_sub1, sync_sub2),
+                    (store1, store2),
+                )
+                .await;
+                return;
+            }
+            Err(_) => {
+                eprintln!("⚠️  Skipping test: TCP peer connection failed within 10s");
+                eprintln!("    This may indicate a port conflict or network issue.");
+                eprintln!("    P2P sync functionality is tested in E2E tests.");
+                drop(presence_observer);
+                cleanup_stores(
+                    (observer1, observer2),
+                    (sync_sub1, sync_sub2),
+                    (store1, store2),
+                )
+                .await;
+                return;
+            }
+        };
 
         // Give a bit more time for initial connection handshake
-        sleep(Duration::from_millis(500)).await;
+        sleep(Duration::from_millis(1000)).await;
 
         // Insert on store1
         let doc = serde_json::json!({
@@ -679,7 +783,7 @@ mod tests {
         // Wait for sync to propagate
         let mut synced = false;
         for attempt in 1..=20 {
-            sleep(Duration::from_millis(500)).await;
+            sleep(Duration::from_millis(1000)).await;
 
             let results = store2
                 .query("sync_test", "test_id == 'sync_test'")
@@ -703,20 +807,13 @@ mod tests {
 
         assert!(synced, "Document should have synced from store1 to store2");
 
-        // Explicitly stop sync and drop stores to ensure clean shutdown
-        // Drop observers and subscriptions first to stop observing changes
-        drop(_observer1);
-        drop(_observer2);
-        drop(_sync_sub1);
-        drop(_sync_sub2);
-
-        // Then stop sync and drop stores
-        store1.stop_sync();
-        store2.stop_sync();
-        drop(store1);
-        drop(store2);
-
-        // Give Ditto time to shut down background threads
-        sleep(Duration::from_millis(200)).await;
+        // Drop presence observer first, then call cleanup helper
+        drop(presence_observer);
+        cleanup_stores(
+            (observer1, observer2),
+            (sync_sub1, sync_sub2),
+            (store1, store2),
+        )
+        .await;
     }
 }

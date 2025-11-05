@@ -74,9 +74,15 @@ async fn test_ditto_peer_sync_with_observers() {
 
     let mut harness = E2EHarness::new("e2e_peer_sync");
 
-    // Create two Ditto stores for testing peer sync
-    let store1 = harness.create_ditto_store().await.unwrap();
-    let store2 = harness.create_ditto_store().await.unwrap();
+    // Create two Ditto stores with explicit TCP connections (mDNS unreliable in 4.11.5)
+    let store1 = harness
+        .create_ditto_store_with_tcp(Some(12345), None)
+        .await
+        .unwrap();
+    let store2 = harness
+        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12345".to_string()))
+        .await
+        .unwrap();
 
     // Start sync
     store1.start_sync().unwrap();
@@ -86,7 +92,7 @@ async fn test_ditto_peer_sync_with_observers() {
 
     // Wait for peers to connect (event-driven, not polling)
     let connection_result = harness
-        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(10))
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(60))
         .await;
 
     if connection_result.is_err() {
@@ -128,9 +134,15 @@ async fn test_e2e_node_advertisement_sync() {
 
     println!("=== E2E: Node Advertisement Sync ===");
 
-    // Create two Ditto stores for peer sync
-    let store1 = harness.create_ditto_store().await.unwrap();
-    let store2 = harness.create_ditto_store().await.unwrap();
+    // Create two Ditto stores with explicit TCP connections (mDNS unreliable in 4.11.5)
+    let store1 = harness
+        .create_ditto_store_with_tcp(Some(12346), None)
+        .await
+        .unwrap();
+    let store2 = harness
+        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12346".to_string()))
+        .await
+        .unwrap();
 
     // Create node stores
     let node_store1 = NodeStore::new(store1.clone());
@@ -144,7 +156,7 @@ async fn test_e2e_node_advertisement_sync() {
 
     // Wait for peers to connect
     let connection_result = harness
-        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(10))
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(60))
         .await;
 
     if connection_result.is_err() {
@@ -220,10 +232,19 @@ async fn test_e2e_capability_multi_peer_propagation() {
 
     println!("=== E2E: Capability Multi-Peer Propagation ===");
 
-    // Create three peers with different capability types
-    let store1 = harness.create_ditto_store().await.unwrap();
-    let store2 = harness.create_ditto_store().await.unwrap();
-    let store3 = harness.create_ditto_store().await.unwrap();
+    // Create three peers with explicit TCP (star topology: store1 is hub)
+    let store1 = harness
+        .create_ditto_store_with_tcp(Some(12347), None)
+        .await
+        .unwrap();
+    let store2 = harness
+        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12347".to_string()))
+        .await
+        .unwrap();
+    let store3 = harness
+        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12347".to_string()))
+        .await
+        .unwrap();
 
     let node_store1 = NodeStore::new(store1.clone());
     let node_store2 = NodeStore::new(store2.clone());
@@ -238,10 +259,10 @@ async fn test_e2e_capability_multi_peer_propagation() {
 
     // Wait for peers to connect
     let conn1 = harness
-        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(10))
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(60))
         .await;
     let conn2 = harness
-        .wait_for_peer_connection(&store2, &store3, Duration::from_secs(10))
+        .wait_for_peer_connection(&store2, &store3, Duration::from_secs(60))
         .await;
 
     if conn1.is_err() || conn2.is_err() {
@@ -367,9 +388,15 @@ async fn test_e2e_cell_formation_multi_peer() {
 
     println!("=== E2E: Cell Formation Multi-Peer ===");
 
-    // Create two peers
-    let store1 = harness.create_ditto_store().await.unwrap();
-    let store2 = harness.create_ditto_store().await.unwrap();
+    // Create two peers with explicit TCP connections (mDNS unreliable in 4.11.5)
+    let store1 = harness
+        .create_ditto_store_with_tcp(Some(12348), None)
+        .await
+        .unwrap();
+    let store2 = harness
+        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12348".to_string()))
+        .await
+        .unwrap();
 
     let cell_store1 = CellStore::new(store1.clone());
     let cell_store2 = CellStore::new(store2.clone());
@@ -381,7 +408,7 @@ async fn test_e2e_cell_formation_multi_peer() {
     println!("  1. Waiting for peer connection...");
 
     let connection_result = harness
-        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(10))
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(60))
         .await;
 
     if connection_result.is_err() {
@@ -453,9 +480,15 @@ async fn test_e2e_role_assignment_sync() {
 
     println!("=== E2E: Role Assignment Sync ===");
 
-    // Create two peers
-    let store1 = harness.create_ditto_store().await.unwrap();
-    let store2 = harness.create_ditto_store().await.unwrap();
+    // Create two peers with explicit TCP connections (mDNS unreliable in 4.11.5)
+    let store1 = harness
+        .create_ditto_store_with_tcp(Some(12349), None)
+        .await
+        .unwrap();
+    let store2 = harness
+        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12349".to_string()))
+        .await
+        .unwrap();
 
     let cell_store1 = CellStore::new(store1.clone());
     let cell_store2 = CellStore::new(store2.clone());
@@ -467,7 +500,7 @@ async fn test_e2e_role_assignment_sync() {
     println!("  1. Waiting for peer connection...");
 
     let connection_result = harness
-        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(10))
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(60))
         .await;
 
     if connection_result.is_err() {
@@ -493,8 +526,27 @@ async fn test_e2e_role_assignment_sync() {
 
     cell_store1.store_cell(&cell_state).await.unwrap();
 
-    // Wait for initial sync
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    // Wait for cell to sync to peer2 before modifying
+    println!("  2a. Waiting for cell to sync to peer2...");
+    let mut cell_synced = false;
+    for attempt in 1..=sync_timeout_attempts() {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        if cell_store2
+            .get_cell(&cell_id)
+            .await
+            .ok()
+            .flatten()
+            .is_some()
+        {
+            cell_synced = true;
+            println!("  ✓ Cell synced to peer2 (attempt {})", attempt);
+            break;
+        }
+    }
+    assert!(
+        cell_synced,
+        "Cell failed to sync to peer2 before leader assignment"
+    );
 
     println!("  3. Setting leader to node_leader...");
 
@@ -542,10 +594,19 @@ async fn test_e2e_leader_election_propagation() {
 
     println!("=== E2E: Leader Election Propagation ===");
 
-    // Create three peers for mesh-wide propagation
-    let store1 = harness.create_ditto_store().await.unwrap();
-    let store2 = harness.create_ditto_store().await.unwrap();
-    let store3 = harness.create_ditto_store().await.unwrap();
+    // Create three peers with explicit TCP (star topology: store1 is hub)
+    let store1 = harness
+        .create_ditto_store_with_tcp(Some(12350), None)
+        .await
+        .unwrap();
+    let store2 = harness
+        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12350".to_string()))
+        .await
+        .unwrap();
+    let store3 = harness
+        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12350".to_string()))
+        .await
+        .unwrap();
 
     let cell_store1 = CellStore::new(store1.clone());
     let cell_store2 = CellStore::new(store2.clone());
@@ -559,10 +620,10 @@ async fn test_e2e_leader_election_propagation() {
     println!("  1. Waiting for peer connections...");
 
     let conn1 = harness
-        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(10))
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(60))
         .await;
     let conn2 = harness
-        .wait_for_peer_connection(&store2, &store3, Duration::from_secs(10))
+        .wait_for_peer_connection(&store2, &store3, Duration::from_secs(60))
         .await;
 
     if conn1.is_err() || conn2.is_err() {
@@ -590,8 +651,42 @@ async fn test_e2e_leader_election_propagation() {
 
     cell_store1.store_cell(&cell_state).await.unwrap();
 
-    // Wait for initial sync
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    // Wait for cell to sync to peer2 before modifying
+    println!("  2a. Waiting for cell to sync to all peers...");
+    let mut cell_synced_to_2 = false;
+    let mut cell_synced_to_3 = false;
+    for attempt in 1..=sync_timeout_attempts() {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        if !cell_synced_to_2
+            && cell_store2
+                .get_cell(&cell_id)
+                .await
+                .ok()
+                .flatten()
+                .is_some()
+        {
+            cell_synced_to_2 = true;
+            println!("  ✓ Cell synced to peer2 (attempt {})", attempt);
+        }
+        if !cell_synced_to_3
+            && cell_store3
+                .get_cell(&cell_id)
+                .await
+                .ok()
+                .flatten()
+                .is_some()
+        {
+            cell_synced_to_3 = true;
+            println!("  ✓ Cell synced to peer3 (attempt {})", attempt);
+        }
+        if cell_synced_to_2 && cell_synced_to_3 {
+            break;
+        }
+    }
+    assert!(
+        cell_synced_to_2 && cell_synced_to_3,
+        "Cell failed to sync to all peers before leader election"
+    );
 
     println!("  3. Electing node_candidate_2 as leader...");
 
@@ -603,12 +698,26 @@ async fn test_e2e_leader_election_propagation() {
 
     println!("  4. Waiting for election result to propagate mesh-wide...");
 
-    // Poll peer3 for leader update
+    // Poll all peers for leader update
     let mut leader_synced = false;
     for attempt in 1..=sync_timeout_attempts() {
         tokio::time::sleep(Duration::from_millis(500)).await;
 
-        if let Ok(Some(cell)) = cell_store3.get_cell(&cell_id).await {
+        let cell1 = cell_store1.get_cell(&cell_id).await.ok().flatten();
+        let cell2 = cell_store2.get_cell(&cell_id).await.ok().flatten();
+        let cell3 = cell_store3.get_cell(&cell_id).await.ok().flatten();
+
+        if attempt % 4 == 0 {
+            println!(
+                "    Attempt {}: peer1={:?}, peer2={:?}, peer3={:?}",
+                attempt,
+                cell1.as_ref().and_then(|c| c.leader_id.as_ref()),
+                cell2.as_ref().and_then(|c| c.leader_id.as_ref()),
+                cell3.as_ref().and_then(|c| c.leader_id.as_ref())
+            );
+        }
+
+        if let Some(cell) = cell3 {
             if cell.leader_id == Some("node_candidate_2".to_string()) {
                 leader_synced = true;
                 println!(
@@ -646,9 +755,15 @@ async fn test_e2e_timestamped_state_updates() {
 
     println!("=== E2E: Timestamped State Updates ===");
 
-    // Create two peers
-    let store1 = harness.create_ditto_store().await.unwrap();
-    let store2 = harness.create_ditto_store().await.unwrap();
+    // Create two peers with explicit TCP connections (mDNS unreliable in 4.11.5)
+    let store1 = harness
+        .create_ditto_store_with_tcp(Some(12351), None)
+        .await
+        .unwrap();
+    let store2 = harness
+        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12351".to_string()))
+        .await
+        .unwrap();
 
     let cell_store1 = CellStore::new(store1.clone());
     let cell_store2 = CellStore::new(store2.clone());
@@ -660,7 +775,7 @@ async fn test_e2e_timestamped_state_updates() {
     println!("  1. Waiting for peer connection...");
 
     let connection_result = harness
-        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(10))
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(60))
         .await;
 
     if connection_result.is_err() {
@@ -686,16 +801,84 @@ async fn test_e2e_timestamped_state_updates() {
 
     cell_store1.store_cell(&cell_state).await.unwrap();
 
-    // Wait for sync
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    // Wait for cell to sync to peer2 before modifying
+    println!("  2a. Waiting for cell to sync to peer2...");
+    let mut cell_synced = false;
+    for attempt in 1..=sync_timeout_attempts() {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        if cell_store2
+            .get_cell(&cell_id)
+            .await
+            .ok()
+            .flatten()
+            .is_some()
+        {
+            cell_synced = true;
+            println!("  ✓ Cell synced to peer2 (attempt {})", attempt);
+            break;
+        }
+    }
+    assert!(
+        cell_synced,
+        "Cell failed to sync to peer2 before leader updates"
+    );
 
     println!("  3. Setting leader to node_alpha on peer1...");
 
+    // Debug: check members before set_leader
+    let pre_leader_cell = cell_store1.get_cell(&cell_id).await.unwrap().unwrap();
+    println!(
+        "  3a. Cell members before set_leader: {:?}",
+        pre_leader_cell.members
+    );
+
     // First update: Set leader to node_alpha
-    cell_store1
+    let set_leader_result = cell_store1
         .set_leader(&cell_id, "node_alpha".to_string())
-        .await
-        .unwrap();
+        .await;
+
+    if let Err(e) = &set_leader_result {
+        println!("  ✗ set_leader failed: {:?}", e);
+    }
+    set_leader_result.unwrap();
+
+    // Verify peer1 sees its own update
+    let peer1_cell = cell_store1.get_cell(&cell_id).await.unwrap().unwrap();
+    println!(
+        "  3b. Peer1 immediately after set_leader: {:?}, members={:?}",
+        peer1_cell.leader_id, peer1_cell.members
+    );
+
+    // Wait for peer1's leader update to sync to peer2 before peer2 modifies
+    println!("  3c. Waiting for leader update to sync to peer2...");
+    let mut alpha_synced = false;
+    for attempt in 1..=sync_timeout_attempts() {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        let cell1 = cell_store1.get_cell(&cell_id).await.ok().flatten();
+        let cell2 = cell_store2.get_cell(&cell_id).await.ok().flatten();
+
+        if attempt % 4 == 0 {
+            println!(
+                "    Attempt {}: peer1={:?}, peer2={:?}",
+                attempt,
+                cell1.as_ref().and_then(|c| c.leader_id.as_ref()),
+                cell2.as_ref().and_then(|c| c.leader_id.as_ref())
+            );
+        }
+
+        if let Some(cell) = cell2 {
+            if cell.leader_id == Some("node_alpha".to_string()) {
+                alpha_synced = true;
+                println!("  ✓ Leader alpha synced to peer2 (attempt {})", attempt);
+                break;
+            }
+        }
+    }
+    assert!(
+        alpha_synced,
+        "Leader alpha failed to sync to peer2 before peer2's update"
+    );
 
     // Small delay to ensure distinct timestamps
     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -703,10 +886,21 @@ async fn test_e2e_timestamped_state_updates() {
     println!("  4. Updating leader to node_beta on peer2...");
 
     // Second update (later timestamp): Set leader to node_beta
-    cell_store2
+    let set_beta_result = cell_store2
         .set_leader(&cell_id, "node_beta".to_string())
-        .await
-        .unwrap();
+        .await;
+
+    if let Err(e) = &set_beta_result {
+        println!("  ✗ set_leader(node_beta) failed: {:?}", e);
+    }
+    set_beta_result.unwrap();
+
+    // Verify peer2 sees its own update
+    let peer2_cell_after = cell_store2.get_cell(&cell_id).await.unwrap().unwrap();
+    println!(
+        "  4b. Peer2 immediately after setting node_beta: {:?}, timestamp={:?}",
+        peer2_cell_after.leader_id, peer2_cell_after.timestamp
+    );
 
     println!("  5. Waiting for LWW convergence...");
 
@@ -717,16 +911,28 @@ async fn test_e2e_timestamped_state_updates() {
     for attempt in 1..=sync_timeout_attempts() {
         tokio::time::sleep(Duration::from_millis(500)).await;
 
-        if let Ok(Some(cell1)) = cell_store1.get_cell(&cell_id).await {
-            if cell1.leader_id == Some("node_beta".to_string()) {
+        let cell1 = cell_store1.get_cell(&cell_id).await.ok().flatten();
+        let cell2 = cell_store2.get_cell(&cell_id).await.ok().flatten();
+
+        if let Some(c1) = &cell1 {
+            if c1.leader_id == Some("node_beta".to_string()) {
                 peer1_converged = true;
             }
         }
 
-        if let Ok(Some(cell2)) = cell_store2.get_cell(&cell_id).await {
-            if cell2.leader_id == Some("node_beta".to_string()) {
+        if let Some(c2) = &cell2 {
+            if c2.leader_id == Some("node_beta".to_string()) {
                 peer2_converged = true;
             }
+        }
+
+        if attempt % 4 == 0 {
+            println!(
+                "    Attempt {}: peer1={:?}, peer2={:?}",
+                attempt,
+                cell1.as_ref().and_then(|c| c.leader_id.as_ref()),
+                cell2.as_ref().and_then(|c| c.leader_id.as_ref())
+            );
         }
 
         if peer1_converged && peer2_converged {
@@ -760,10 +966,19 @@ async fn test_e2e_complete_formation_convergence() {
 
     println!("=== E2E: Complete Formation Convergence ===");
 
-    // Create three peers for full mesh
-    let store1 = harness.create_ditto_store().await.unwrap();
-    let store2 = harness.create_ditto_store().await.unwrap();
-    let store3 = harness.create_ditto_store().await.unwrap();
+    // Create three peers with explicit TCP (star topology: store1 is hub)
+    let store1 = harness
+        .create_ditto_store_with_tcp(Some(12352), None)
+        .await
+        .unwrap();
+    let store2 = harness
+        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12352".to_string()))
+        .await
+        .unwrap();
+    let store3 = harness
+        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12352".to_string()))
+        .await
+        .unwrap();
 
     let node_store1 = NodeStore::new(store1.clone());
     let node_store2 = NodeStore::new(store2.clone());
@@ -781,10 +996,10 @@ async fn test_e2e_complete_formation_convergence() {
     println!("  1. Waiting for peer connections...");
 
     let conn1 = harness
-        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(10))
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(60))
         .await;
     let conn2 = harness
-        .wait_for_peer_connection(&store2, &store3, Duration::from_secs(10))
+        .wait_for_peer_connection(&store2, &store3, Duration::from_secs(60))
         .await;
 
     if conn1.is_err() || conn2.is_err() {
@@ -854,8 +1069,42 @@ async fn test_e2e_complete_formation_convergence() {
 
     cell_store1.store_cell(&cell_state).await.unwrap();
 
-    // Wait for cell sync
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    // Wait for cell to sync to all peers before modifying
+    println!("  3a. Waiting for cell to sync to all peers...");
+    let mut cell_synced_to_2 = false;
+    let mut cell_synced_to_3 = false;
+    for attempt in 1..=sync_timeout_attempts() {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        if !cell_synced_to_2
+            && cell_store2
+                .get_cell(&cell_id)
+                .await
+                .ok()
+                .flatten()
+                .is_some()
+        {
+            cell_synced_to_2 = true;
+            println!("  ✓ Cell synced to peer2 (attempt {})", attempt);
+        }
+        if !cell_synced_to_3
+            && cell_store3
+                .get_cell(&cell_id)
+                .await
+                .ok()
+                .flatten()
+                .is_some()
+        {
+            cell_synced_to_3 = true;
+            println!("  ✓ Cell synced to peer3 (attempt {})", attempt);
+        }
+        if cell_synced_to_2 && cell_synced_to_3 {
+            break;
+        }
+    }
+    assert!(
+        cell_synced_to_2 && cell_synced_to_3,
+        "Cell failed to sync to all peers before leader election"
+    );
 
     // Step 3: Leader election
     println!("  4. Electing leader...");

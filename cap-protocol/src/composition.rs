@@ -14,11 +14,13 @@
 //!
 //! ```rust,no_run
 //! use cap_protocol::composition::{CompositionEngine, CompositionContext};
+//! use cap_protocol::composition::additive::SensorCoverageRule;
 //! use cap_protocol::models::capability::Capability;
+//! use std::sync::Arc;
 //!
 //! # async fn example() -> cap_protocol::Result<()> {
 //! let mut engine = CompositionEngine::new();
-//! // Register rules here
+//! engine.register_rule(Arc::new(SensorCoverageRule::default()));
 //!
 //! let capabilities = vec![/* capabilities */];
 //! let context = CompositionContext::new(vec!["node1".to_string()]);
@@ -28,6 +30,7 @@
 //! # }
 //! ```
 
+pub mod additive;
 pub mod engine;
 pub mod rules;
 
