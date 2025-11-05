@@ -7,6 +7,7 @@ use crate::models::node::{NodeConfig, NodeState};
 use crate::storage::ditto_store::DittoStore;
 use crate::{Error, Result};
 use serde_json::json;
+use std::sync::Arc;
 use tracing::{debug, info, instrument};
 
 /// Collection names
@@ -16,12 +17,34 @@ const NODE_STATE_COLLECTION: &str = "node_states";
 /// Node storage manager
 pub struct NodeStore {
     store: DittoStore,
+    _config_sync_sub: Arc<dittolive_ditto::sync::SyncSubscription>,
+    _state_sync_sub: Arc<dittolive_ditto::sync::SyncSubscription>,
 }
 
 impl NodeStore {
-    /// Create a new node store
+    /// Create a new node store with sync subscriptions for P2P replication
     pub fn new(store: DittoStore) -> Self {
-        Self { store }
+        // Create sync subscriptions for both collections
+        // This is REQUIRED for P2P replication - without it, data stays local
+        let config_query = format!("SELECT * FROM {}", NODE_CONFIG_COLLECTION);
+        let config_sync_sub = store
+            .ditto()
+            .sync()
+            .register_subscription_v2(&config_query)
+            .expect("Failed to create sync subscription for node_configs");
+
+        let state_query = format!("SELECT * FROM {}", NODE_STATE_COLLECTION);
+        let state_sync_sub = store
+            .ditto()
+            .sync()
+            .register_subscription_v2(&state_query)
+            .expect("Failed to create sync subscription for node_states");
+
+        Self {
+            store,
+            _config_sync_sub: config_sync_sub,
+            _state_sync_sub: state_sync_sub,
+        }
     }
 
     /// Store a node configuration (G-Set operation)
