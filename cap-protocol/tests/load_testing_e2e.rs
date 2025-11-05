@@ -11,6 +11,7 @@ use cap_protocol::models::capability::{Capability, CapabilityType};
 use cap_protocol::models::cell::{CellConfig, CellState};
 use cap_protocol::models::node::NodeConfig;
 use cap_protocol::storage::{CellStore, NodeStore};
+use cap_protocol::sync::ditto::DittoBackend;
 use cap_protocol::testing::e2e_harness::E2EHarness;
 use std::time::{Duration, Instant};
 
@@ -59,7 +60,9 @@ async fn test_load_large_formation_nodes() {
         .await
         .expect("Failed to create Ditto backend");
 
-    let node_store = NodeStore::new(ditto_store);
+    let node_store: NodeStore<DittoBackend> = NodeStore::new(ditto_store.into())
+        .await
+        .expect("Failed to create NodeStore");
     let cell_store = CellStore::new(backend)
         .await
         .expect("Failed to create CellStore");
@@ -296,7 +299,9 @@ async fn test_load_multi_zone_hierarchy() {
         .await
         .expect("Failed to create Ditto backend");
 
-    let node_store = NodeStore::new(ditto_store);
+    let node_store: NodeStore<DittoBackend> = NodeStore::new(ditto_store.into())
+        .await
+        .expect("Failed to create NodeStore");
     let cell_store = CellStore::new(backend)
         .await
         .expect("Failed to create CellStore");

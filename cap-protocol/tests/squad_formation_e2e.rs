@@ -146,8 +146,8 @@ async fn test_e2e_node_advertisement_sync() {
         .unwrap();
 
     // Create node stores
-    let node_store1 = NodeStore::new(store1.clone());
-    let node_store2 = NodeStore::new(store2.clone());
+    let node_store1: NodeStore<DittoBackend> = NodeStore::new(store1.clone().into()).await.unwrap();
+    let node_store2: NodeStore<DittoBackend> = NodeStore::new(store2.clone().into()).await.unwrap();
 
     // Start sync
     store1.start_sync().unwrap();
@@ -247,9 +247,9 @@ async fn test_e2e_capability_multi_peer_propagation() {
         .await
         .unwrap();
 
-    let node_store1 = NodeStore::new(store1.clone());
-    let node_store2 = NodeStore::new(store2.clone());
-    let node_store3 = NodeStore::new(store3.clone());
+    let node_store1: NodeStore<DittoBackend> = NodeStore::new(store1.clone().into()).await.unwrap();
+    let node_store2: NodeStore<DittoBackend> = NodeStore::new(store2.clone().into()).await.unwrap();
+    let node_store3: NodeStore<DittoBackend> = NodeStore::new(store3.clone().into()).await.unwrap();
 
     // Start sync
     store1.start_sync().unwrap();
@@ -981,9 +981,9 @@ async fn test_e2e_complete_formation_convergence() {
         .await
         .unwrap();
 
-    let node_store1 = NodeStore::new(store1.clone());
-    let node_store2 = NodeStore::new(store2.clone());
-    let node_store3 = NodeStore::new(store3.clone());
+    let node_store1: NodeStore<DittoBackend> = NodeStore::new(store1.clone().into()).await.unwrap();
+    let node_store2: NodeStore<DittoBackend> = NodeStore::new(store2.clone().into()).await.unwrap();
+    let node_store3: NodeStore<DittoBackend> = NodeStore::new(store3.clone().into()).await.unwrap();
 
     let cell_store1: CellStore<DittoBackend> = CellStore::new(store1.clone().into()).await.unwrap();
     let cell_store2: CellStore<DittoBackend> = CellStore::new(store2.clone().into()).await.unwrap();

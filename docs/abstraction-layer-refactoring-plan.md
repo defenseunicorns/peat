@@ -4,10 +4,10 @@
 
 ✅ **Task 1: Create trait definitions** - COMPLETED (commit: dc407d3)
 ✅ **Task 2: Implement DittoBackend** - COMPLETED (commit: dc407d3)
-✅ **Task 3: Refactor CellStore** - COMPLETED (library compiles, E2E tests pending)
-⏭️ **Task 4: Update E2E tests** - NEXT
-🔜 **Task 5: Refactor NodeStore** - PENDING
-🔜 **Task 6: Verify no regressions** - PENDING
+✅ **Task 3: Refactor CellStore** - COMPLETED (commit: 072a358)
+✅ **Task 4: Refactor NodeStore** - COMPLETED (all tests compile)
+⏭️ **Task 5: Run full test suite** - NEXT
+🔜 **Task 6: Document and finalize** - PENDING
 
 ---
 

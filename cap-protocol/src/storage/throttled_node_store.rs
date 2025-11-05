@@ -1,10 +1,11 @@
-//! Throttled state updates for reduced Ditto write load
+//! Throttled state updates for reduced write load
 //!
 //! This module provides a throttling wrapper around NodeStore to batch
-//! state updates and reduce the frequency of writes to Ditto at scale.
+//! state updates and reduce the frequency of writes to the backend at scale.
 
 use crate::models::node::NodeState;
 use crate::storage::node_store::NodeStore;
+use crate::sync::DataSyncBackend;
 use crate::{Error, Result};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -14,18 +15,21 @@ use tracing::{debug, info, instrument, warn};
 
 /// Wrapper around NodeStore that throttles state updates
 ///
-/// Batches pending updates and only syncs to Ditto after a configurable interval.
+/// Batches pending updates and only syncs to backend after a configurable interval.
 /// This significantly reduces write load when many nodes are updating frequently.
 ///
 /// # Example
 /// ```no_run
 /// use cap_protocol::storage::{NodeStore, ThrottledNodeStore};
 /// use cap_protocol::models::node::NodeState;
+/// use cap_protocol::sync::ditto::DittoBackend;
 /// use std::time::Duration;
+/// use std::sync::Arc;
 ///
 /// # async fn example() -> cap_protocol::Result<()> {
 /// // Assuming you have a NodeStore
-/// # let store = NodeStore::new(unimplemented!());
+/// # let backend = Arc::new(DittoBackend::new());
+/// # let store = NodeStore::new(backend).await?;
 /// let throttled = ThrottledNodeStore::new(store, Duration::from_secs(5));
 ///
 /// // Updates are queued, not immediately written
@@ -37,24 +41,24 @@ use tracing::{debug, info, instrument, warn};
 /// # Ok(())
 /// # }
 /// ```
-pub struct ThrottledNodeStore {
-    /// Inner node store for actual Ditto operations
-    inner: NodeStore,
+pub struct ThrottledNodeStore<B: DataSyncBackend> {
+    /// Inner node store for actual backend operations
+    inner: NodeStore<B>,
     /// Pending state updates (node_id -> state)
     pending_updates: Arc<Mutex<HashMap<String, NodeState>>>,
-    /// Last time we synced to Ditto
+    /// Last time we synced to backend
     last_sync: Arc<Mutex<Instant>>,
     /// Minimum time between syncs
     sync_interval: Duration,
 }
 
-impl ThrottledNodeStore {
+impl<B: DataSyncBackend> ThrottledNodeStore<B> {
     /// Create a new throttled store wrapper
     ///
     /// # Arguments
     /// * `store` - The underlying NodeStore to wrap
-    /// * `sync_interval` - Minimum duration between Ditto syncs
-    pub fn new(store: NodeStore, sync_interval: Duration) -> Self {
+    /// * `sync_interval` - Minimum duration between backend syncs
+    pub fn new(store: NodeStore<B>, sync_interval: Duration) -> Self {
         Self {
             inner: store,
             pending_updates: Arc::new(Mutex::new(HashMap::new())),
@@ -155,7 +159,7 @@ impl ThrottledNodeStore {
     /// Get a reference to the inner NodeStore for direct operations
     ///
     /// Use this for read operations that don't need throttling
-    pub fn inner(&self) -> &NodeStore {
+    pub fn inner(&self) -> &NodeStore<B> {
         &self.inner
     }
 }
@@ -176,9 +180,10 @@ pub struct ThrottleStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::ditto_store::{DittoConfig, DittoStore};
+    use crate::sync::ditto::DittoBackend;
+    use crate::sync::{BackendConfig, TransportConfig};
 
-    fn create_test_store() -> Result<NodeStore> {
+    async fn create_test_store() -> Result<NodeStore<DittoBackend>> {
         let temp_dir = tempfile::Builder::new()
             .prefix("throttled_test_")
             .tempdir()
@@ -197,21 +202,24 @@ mod tests {
         let persistence_path = temp_dir.path().to_path_buf();
         std::mem::forget(temp_dir); // Keep directory alive
 
-        let config = DittoConfig {
+        let config = BackendConfig {
             app_id,
             persistence_dir: persistence_path,
-            shared_key,
-            tcp_listen_port: None,
-            tcp_connect_address: None,
+            shared_key: Some(shared_key),
+            transport: TransportConfig::default(),
+            extra: HashMap::new(),
         };
 
-        let ditto_store = DittoStore::new(config)?;
-        Ok(NodeStore::new(ditto_store))
+        let backend = DittoBackend::new();
+        backend.initialize(config).await?;
+        backend.sync_engine().start_sync().await?;
+
+        NodeStore::new(Arc::new(backend)).await
     }
 
     #[tokio::test]
     async fn test_throttled_store_creation() {
-        if let Ok(store) = create_test_store() {
+        if let Ok(store) = create_test_store().await {
             let throttled = ThrottledNodeStore::new(store, Duration::from_secs(5));
             assert_eq!(throttled.pending_count().await, 0);
         }
@@ -219,7 +227,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_queuing() {
-        if let Ok(store) = create_test_store() {
+        if let Ok(store) = create_test_store().await {
             let throttled = ThrottledNodeStore::new(store, Duration::from_secs(60));
             let state = NodeState::new((37.7, -122.4, 100.0));
 
@@ -233,7 +241,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_manual_flush() {
-        if let Ok(store) = create_test_store() {
+        if let Ok(store) = create_test_store().await {
             let throttled = ThrottledNodeStore::new(store, Duration::from_secs(60));
             let state = NodeState::new((37.7, -122.4, 100.0));
 
@@ -247,7 +255,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_auto_flush_on_interval() {
-        if let Ok(store) = create_test_store() {
+        if let Ok(store) = create_test_store().await {
             let throttled = ThrottledNodeStore::new(store, Duration::from_millis(100));
             let state = NodeState::new((37.7, -122.4, 100.0));
 
@@ -267,7 +275,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_stats() {
-        if let Ok(store) = create_test_store() {
+        if let Ok(store) = create_test_store().await {
             let throttled = ThrottledNodeStore::new(store, Duration::from_secs(5));
             let stats = throttled.stats().await;
 

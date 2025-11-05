@@ -31,6 +31,7 @@ use cap_protocol::models::cell::{CellConfig, CellState};
 use cap_protocol::models::node::NodeConfig;
 use cap_protocol::models::{Capability, CapabilityType};
 use cap_protocol::storage::{CellStore, NodeStore};
+use cap_protocol::sync::ditto::DittoBackend;
 use cap_protocol::testing::E2EHarness;
 use std::time::Duration;
 
@@ -52,8 +53,8 @@ async fn test_e2e_nodestore_gset_sync() {
     let store1 = harness.create_ditto_store().await.unwrap();
     let store2 = harness.create_ditto_store().await.unwrap();
 
-    let node_store1 = NodeStore::new(store1.clone());
-    let node_store2 = NodeStore::new(store2.clone());
+    let node_store1: NodeStore<DittoBackend> = NodeStore::new(store1.clone().into()).await.unwrap();
+    let node_store2: NodeStore<DittoBackend> = NodeStore::new(store2.clone().into()).await.unwrap();
 
     // Start sync
     store1.start_sync().unwrap();

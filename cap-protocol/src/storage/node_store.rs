@@ -1,12 +1,12 @@
 //! Node state storage manager
 //!
-//! This module provides a high-level wrapper around DittoStore for managing
+//! This module provides a high-level wrapper around data sync backends for managing
 //! node configurations and state using CRDT operations.
 
 use crate::models::node::{NodeConfig, NodeState};
-use crate::storage::ditto_store::DittoStore;
+use crate::sync::{DataSyncBackend, Document, Query, SyncSubscription, Value};
 use crate::{Error, Result};
-use serde_json::json;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, info, instrument};
 
@@ -15,36 +15,88 @@ const NODE_CONFIG_COLLECTION: &str = "node_configs";
 const NODE_STATE_COLLECTION: &str = "node_states";
 
 /// Node storage manager
-pub struct NodeStore {
-    store: DittoStore,
-    _config_sync_sub: Arc<dittolive_ditto::sync::SyncSubscription>,
-    _state_sync_sub: Arc<dittolive_ditto::sync::SyncSubscription>,
+pub struct NodeStore<B: DataSyncBackend> {
+    backend: Arc<B>,
+    _config_sync_sub: SyncSubscription,
+    _state_sync_sub: SyncSubscription,
 }
 
-impl NodeStore {
+impl<B: DataSyncBackend> NodeStore<B> {
     /// Create a new node store with sync subscriptions for P2P replication
-    pub fn new(store: DittoStore) -> Self {
+    pub async fn new(backend: Arc<B>) -> Result<Self> {
         // Create sync subscriptions for both collections
         // This is REQUIRED for P2P replication - without it, data stays local
-        let config_query = format!("SELECT * FROM {}", NODE_CONFIG_COLLECTION);
-        let config_sync_sub = store
-            .ditto()
-            .sync()
-            .register_subscription_v2(&config_query)
-            .expect("Failed to create sync subscription for node_configs");
+        let query = Query::All;
+        let config_sync_sub = backend
+            .sync_engine()
+            .subscribe(NODE_CONFIG_COLLECTION, &query)
+            .await
+            .map_err(|e| {
+                Error::storage_error(
+                    format!("Failed to create sync subscription for node_configs: {}", e),
+                    "new",
+                    Some(NODE_CONFIG_COLLECTION.to_string()),
+                )
+            })?;
 
-        let state_query = format!("SELECT * FROM {}", NODE_STATE_COLLECTION);
-        let state_sync_sub = store
-            .ditto()
-            .sync()
-            .register_subscription_v2(&state_query)
-            .expect("Failed to create sync subscription for node_states");
+        let state_sync_sub = backend
+            .sync_engine()
+            .subscribe(NODE_STATE_COLLECTION, &query)
+            .await
+            .map_err(|e| {
+                Error::storage_error(
+                    format!("Failed to create sync subscription for node_states: {}", e),
+                    "new",
+                    Some(NODE_STATE_COLLECTION.to_string()),
+                )
+            })?;
 
-        Self {
-            store,
+        Ok(Self {
+            backend,
             _config_sync_sub: config_sync_sub,
             _state_sync_sub: state_sync_sub,
-        }
+        })
+    }
+
+    /// Convert NodeConfig to Document
+    fn config_to_document(config: &NodeConfig) -> Result<Document> {
+        let json_val = serde_json::to_value(config)?;
+        let fields = json_val
+            .as_object()
+            .ok_or_else(|| Error::Internal("Failed to serialize config to object".into()))?
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect::<HashMap<String, Value>>();
+
+        Ok(Document::new(fields))
+    }
+
+    /// Convert Document to NodeConfig
+    fn document_to_config(doc: &Document) -> Result<NodeConfig> {
+        let json_val = serde_json::to_value(&doc.fields)?;
+        Ok(serde_json::from_value(json_val)?)
+    }
+
+    /// Convert NodeState to Document with node_id
+    fn state_to_document(node_id: &str, state: &NodeState) -> Result<Document> {
+        let json_val = serde_json::to_value(state)?;
+        let mut fields = json_val
+            .as_object()
+            .ok_or_else(|| Error::Internal("Failed to serialize state to object".into()))?
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect::<HashMap<String, Value>>();
+
+        // Add node_id field for querying
+        fields.insert("node_id".to_string(), Value::String(node_id.to_string()));
+
+        Ok(Document::new(fields))
+    }
+
+    /// Convert Document to NodeState
+    fn document_to_state(doc: &Document) -> Result<NodeState> {
+        let json_val = serde_json::to_value(&doc.fields)?;
+        Ok(serde_json::from_value(json_val)?)
     }
 
     /// Store a node configuration (G-Set operation)
@@ -52,10 +104,10 @@ impl NodeStore {
     pub async fn store_config(&self, config: &NodeConfig) -> Result<String> {
         info!("Storing node config: {}", config.id);
 
-        // Serialize directly to maintain field names
-        let doc = serde_json::to_value(config)?;
+        let doc = Self::config_to_document(config)?;
 
-        self.store
+        self.backend
+            .document_store()
             .upsert(NODE_CONFIG_COLLECTION, doc)
             .await
             .map_err(|e| {
@@ -72,17 +124,21 @@ impl NodeStore {
     pub async fn get_config(&self, node_id: &str) -> Result<Option<NodeConfig>> {
         debug!("Retrieving node config: {}", node_id);
 
-        let where_clause = format!("id == '{}'", node_id);
+        let query = Query::Eq {
+            field: "id".to_string(),
+            value: Value::String(node_id.to_string()),
+        };
         let docs = self
-            .store
-            .query(NODE_CONFIG_COLLECTION, &where_clause)
+            .backend
+            .document_store()
+            .query(NODE_CONFIG_COLLECTION, &query)
             .await?;
 
         if docs.is_empty() {
             return Ok(None);
         }
 
-        let config: NodeConfig = serde_json::from_value(docs[0].clone())?;
+        let config = Self::document_to_config(&docs[0])?;
         Ok(Some(config))
     }
 
@@ -91,13 +147,10 @@ impl NodeStore {
     pub async fn store_state(&self, node_id: &str, state: &NodeState) -> Result<String> {
         info!("Storing node state: {}", node_id);
 
-        // Create document with node_id for querying
-        let mut doc = serde_json::to_value(state)?;
-        if let Some(obj) = doc.as_object_mut() {
-            obj.insert("node_id".to_string(), json!(node_id));
-        }
+        let doc = Self::state_to_document(node_id, state)?;
 
-        self.store
+        self.backend
+            .document_store()
             .upsert(NODE_STATE_COLLECTION, doc)
             .await
             .map_err(|e| {
@@ -114,17 +167,21 @@ impl NodeStore {
     pub async fn get_state(&self, node_id: &str) -> Result<Option<NodeState>> {
         debug!("Retrieving node state: {}", node_id);
 
-        let where_clause = format!("node_id == '{}'", node_id);
+        let query = Query::Eq {
+            field: "node_id".to_string(),
+            value: Value::String(node_id.to_string()),
+        };
         let docs = self
-            .store
-            .query(NODE_STATE_COLLECTION, &where_clause)
+            .backend
+            .document_store()
+            .query(NODE_STATE_COLLECTION, &query)
             .await?;
 
         if docs.is_empty() {
             return Ok(None);
         }
 
-        let state: NodeState = serde_json::from_value(docs[0].clone())?;
+        let state = Self::document_to_state(&docs[0])?;
         Ok(Some(state))
     }
 
@@ -134,15 +191,19 @@ impl NodeStore {
         debug!("Querying nodes by phase: {:?}", phase);
 
         let phase_str = format!("{}", phase);
-        let where_clause = format!("phase == '{}'", phase_str);
+        let query = Query::Eq {
+            field: "phase".to_string(),
+            value: Value::String(phase_str),
+        };
         let docs = self
-            .store
-            .query(NODE_STATE_COLLECTION, &where_clause)
+            .backend
+            .document_store()
+            .query(NODE_STATE_COLLECTION, &query)
             .await?;
 
         let states: Vec<NodeState> = docs
             .into_iter()
-            .filter_map(|doc| serde_json::from_value(doc).ok())
+            .filter_map(|doc| Self::document_to_state(&doc).ok())
             .collect();
 
         Ok(states)
@@ -153,15 +214,19 @@ impl NodeStore {
     pub async fn get_nodes_by_cell(&self, squad_id: &str) -> Result<Vec<NodeState>> {
         debug!("Querying nodes by squad: {}", squad_id);
 
-        let where_clause = format!("squad_id == '{}'", squad_id);
+        let query = Query::Eq {
+            field: "squad_id".to_string(),
+            value: Value::String(squad_id.to_string()),
+        };
         let docs = self
-            .store
-            .query(NODE_STATE_COLLECTION, &where_clause)
+            .backend
+            .document_store()
+            .query(NODE_STATE_COLLECTION, &query)
             .await?;
 
         let states: Vec<NodeState> = docs
             .into_iter()
-            .filter_map(|doc| serde_json::from_value(doc).ok())
+            .filter_map(|doc| Self::document_to_state(&doc).ok())
             .collect();
 
         Ok(states)
@@ -172,15 +237,19 @@ impl NodeStore {
     pub async fn get_operational_nodes(&self) -> Result<Vec<NodeState>> {
         debug!("Querying operational nodes");
 
-        let where_clause = "fuel_minutes > 0";
+        let query = Query::Gt {
+            field: "fuel_minutes".to_string(),
+            value: serde_json::json!(0),
+        };
         let docs = self
-            .store
-            .query(NODE_STATE_COLLECTION, where_clause)
+            .backend
+            .document_store()
+            .query(NODE_STATE_COLLECTION, &query)
             .await?;
 
         let states: Vec<NodeState> = docs
             .into_iter()
-            .filter_map(|doc| serde_json::from_value(doc).ok())
+            .filter_map(|doc| Self::document_to_state(&doc).ok())
             .filter(|state: &NodeState| state.is_operational())
             .collect();
 
@@ -192,7 +261,10 @@ impl NodeStore {
     pub async fn delete_config(&self, node_id: &str) -> Result<()> {
         info!("Deleting node config: {}", node_id);
 
-        self.store.remove(NODE_CONFIG_COLLECTION, node_id).await
+        self.backend
+            .document_store()
+            .remove(NODE_CONFIG_COLLECTION, &node_id.to_string())
+            .await
     }
 
     /// Delete a node state
@@ -200,12 +272,15 @@ impl NodeStore {
     pub async fn delete_state(&self, node_id: &str) -> Result<()> {
         info!("Deleting node state: {}", node_id);
 
-        self.store.remove(NODE_STATE_COLLECTION, node_id).await
+        self.backend
+            .document_store()
+            .remove(NODE_STATE_COLLECTION, &node_id.to_string())
+            .await
     }
 
-    /// Get the underlying DittoStore reference
-    pub fn store(&self) -> &DittoStore {
-        &self.store
+    /// Get the underlying backend reference
+    pub fn backend(&self) -> &B {
+        &self.backend
     }
 }
 
@@ -213,10 +288,11 @@ impl NodeStore {
 mod tests {
     use super::*;
     use crate::models::{Capability, CapabilityType, HealthStatus};
-    use crate::storage::ditto_store::DittoConfig;
+    use crate::sync::ditto::DittoBackend;
+    use crate::sync::{BackendConfig, TransportConfig};
     use crate::traits::Phase;
 
-    async fn create_test_store() -> Result<NodeStore> {
+    async fn create_test_store() -> Result<NodeStore<DittoBackend>> {
         // Create unique temp directory for this test to enable parallel execution
         // Use tempfile::Builder to create temp dir with a unique name
         let temp_dir = tempfile::Builder::new()
@@ -244,16 +320,19 @@ mod tests {
         // The OS will clean it up eventually
         std::mem::forget(temp_dir);
 
-        let config = DittoConfig {
+        let config = BackendConfig {
             app_id,
             persistence_dir: persistence_path,
-            shared_key,
-            tcp_listen_port: None,
-            tcp_connect_address: None,
+            shared_key: Some(shared_key),
+            transport: TransportConfig::default(),
+            extra: HashMap::new(),
         };
 
-        let ditto_store = DittoStore::new(config)?;
-        Ok(NodeStore::new(ditto_store))
+        let backend = DittoBackend::new();
+        backend.initialize(config).await?;
+        backend.sync_engine().start_sync().await?;
+
+        NodeStore::new(Arc::new(backend)).await
     }
 
     #[tokio::test]
@@ -370,7 +449,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_store_accessor() {
+    async fn test_backend_accessor() {
         let store = match create_test_store().await {
             Ok(s) => s,
             Err(_) => {
@@ -379,9 +458,9 @@ mod tests {
             }
         };
 
-        // Verify store accessor returns a valid reference
-        // Successfully calling store() without panic is sufficient validation
-        let _ditto_store = store.store();
+        // Verify backend accessor returns a valid reference
+        // Successfully calling backend() without panic is sufficient validation
+        let _backend = store.backend();
     }
 
     #[tokio::test]

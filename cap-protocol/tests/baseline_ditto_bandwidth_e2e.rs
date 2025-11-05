@@ -130,6 +130,9 @@ async fn test_baseline_cell_formation_bandwidth() {
     // Final document size
     let final_size = serde_json::to_vec(&cell).unwrap().len();
 
+    // Give more time for final sync to complete (async backend may need extra time)
+    tokio::time::sleep(Duration::from_millis(1000)).await;
+
     // Verify sync to peer2
     let synced_cell = cell_store2.get_cell(&cell.config.id).await.unwrap();
     assert!(synced_cell.is_some(), "Cell should sync to peer2");
@@ -268,8 +271,9 @@ async fn test_baseline_node_config_bandwidth() {
     let store1 = harness.create_ditto_store().await.unwrap();
     let store2 = harness.create_ditto_store().await.unwrap();
 
-    let node_store1 = NodeStore::new(store1.clone());
-    let _node_store2 = NodeStore::new(store2.clone());
+    let node_store1: NodeStore<DittoBackend> = NodeStore::new(store1.clone().into()).await.unwrap();
+    let _node_store2: NodeStore<DittoBackend> =
+        NodeStore::new(store2.clone().into()).await.unwrap();
 
     store1.start_sync().unwrap();
     store2.start_sync().unwrap();
