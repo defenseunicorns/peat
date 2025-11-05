@@ -33,6 +33,9 @@ topology:
         NODE_ID: node1
         MODE: writer
         TCP_LISTEN: "12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
 
     # node2: Reader (receives document)
     node2:
@@ -42,24 +45,12 @@ topology:
         NODE_ID: node2
         MODE: reader
         TCP_CONNECT: "node1:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
 
   links:
     # Constrained link simulating tactical radio conditions
+    # NOTE: Impairments are applied via 'containerlab tools netem' after deployment
+    # ContainerLab 0.71.1 doesn't support impairments in YAML
     - endpoints: ["node1:eth1", "node2:eth1"]
-      # Apply network impairments to simulate realistic conditions
-      # These are applied bidirectionally by default
-      impairments:
-        # Bandwidth limit: 56 Kbps (typical tactical radio)
-        rate: 56kbps
-
-        # Latency: 50ms one-way (100ms RTT)
-        delay: 50ms
-
-        # Jitter: 10ms variance in latency
-        jitter: 10ms
-
-        # Packet loss: 1% (realistic for radio links)
-        loss: 1%
-
-        # Optional: Packet corruption (uncomment to test)
-        # corruption: 0.1%
