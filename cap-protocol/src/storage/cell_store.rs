@@ -7,6 +7,7 @@ use crate::models::{cell::CellState, Capability};
 use crate::storage::ditto_store::DittoStore;
 use crate::{Error, Result};
 use serde_json::json;
+use std::sync::Arc;
 use tracing::{debug, info, instrument};
 
 /// Collection name
@@ -15,12 +16,25 @@ const CELL_COLLECTION: &str = "cells";
 /// Cell storage manager
 pub struct CellStore {
     store: DittoStore,
+    _sync_sub: Arc<dittolive_ditto::sync::SyncSubscription>,
 }
 
 impl CellStore {
-    /// Create a new cell store
+    /// Create a new cell store with sync subscription for P2P replication
     pub fn new(store: DittoStore) -> Self {
-        Self { store }
+        // Create sync subscription for the cells collection
+        // This is REQUIRED for P2P replication - without it, data stays local
+        let query = format!("SELECT * FROM {}", CELL_COLLECTION);
+        let sync_sub = store
+            .ditto()
+            .sync()
+            .register_subscription_v2(&query)
+            .expect("Failed to create sync subscription for cells");
+
+        Self {
+            store,
+            _sync_sub: sync_sub,
+        }
     }
 
     /// Store a cell state (OR-Set + LWW-Register operations)
@@ -35,6 +49,7 @@ impl CellStore {
             obj.insert("cell_id".to_string(), json!(cell.config.id.clone()));
         }
 
+        // Always INSERT - get_cell will query for latest by updated_at timestamp
         self.store.upsert(CELL_COLLECTION, doc).await.map_err(|e| {
             Error::storage_error(
                 format!("Failed to store cell: {}", e),
@@ -50,11 +65,19 @@ impl CellStore {
         debug!("Retrieving cell: {}", cell_id);
 
         let where_clause = format!("cell_id == '{}'", cell_id);
-        let docs = self.store.query(CELL_COLLECTION, &where_clause).await?;
+        let mut docs = self.store.query(CELL_COLLECTION, &where_clause).await?;
 
         if docs.is_empty() {
             return Ok(None);
         }
+
+        // Sort by updated_at descending to get the latest version
+        // (since we always INSERT new documents rather than updating)
+        docs.sort_by(|a, b| {
+            let a_ts = a.get("updated_at").and_then(|v| v.as_i64()).unwrap_or(0);
+            let b_ts = b.get("updated_at").and_then(|v| v.as_i64()).unwrap_or(0);
+            b_ts.cmp(&a_ts) // Descending order
+        });
 
         let cell: CellState = serde_json::from_value(docs[0].clone())?;
         Ok(Some(cell))
