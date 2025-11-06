@@ -122,9 +122,9 @@ impl DiscoveryMetrics {
 /// Discovery Coordinator
 ///
 /// Manages the bootstrap phase lifecycle for a platform or simulation.
-pub struct DiscoveryCoordinator {
+pub struct DiscoveryCoordinator<B: crate::sync::DataSyncBackend> {
     /// Cell storage
-    store: CellStore,
+    store: CellStore<B>,
     /// Current phase
     current_phase: Phase,
     /// Discovery strategy
@@ -143,9 +143,9 @@ pub struct DiscoveryCoordinator {
     message_count: usize,
 }
 
-impl DiscoveryCoordinator {
+impl<B: crate::sync::DataSyncBackend> DiscoveryCoordinator<B> {
     /// Create a new bootstrap coordinator
-    pub fn new(store: CellStore, strategy: BootstrapStrategy) -> Self {
+    pub fn new(store: CellStore<B>, strategy: BootstrapStrategy) -> Self {
         Self {
             store,
             current_phase: Phase::Discovery,
@@ -399,11 +399,51 @@ impl DiscoveryCoordinator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::ditto_store::DittoStore;
+    use crate::sync::ditto::DittoBackend;
+    use crate::sync::{BackendConfig, DataSyncBackend, TransportConfig};
+    use std::collections::HashMap;
+    use std::sync::Arc;
 
-    async fn create_test_coordinator() -> Result<DiscoveryCoordinator> {
-        let ditto_store = DittoStore::from_env()?;
-        let squad_store = CellStore::new(ditto_store);
+    async fn create_test_coordinator() -> Result<DiscoveryCoordinator<DittoBackend>> {
+        // Create unique temp directory for this test to enable parallel execution
+        let temp_dir = tempfile::Builder::new()
+            .prefix(&format!("ditto_coord_test_{}_", std::process::id()))
+            .tempdir()
+            .map_err(|e| {
+                Error::storage_error(
+                    format!("Failed to create temp dir: {}", e),
+                    "create_test_coordinator",
+                    None,
+                )
+            })?;
+
+        let app_id = std::env::var("DITTO_APP_ID").map_err(|_| {
+            Error::storage_error("DITTO_APP_ID not set", "create_test_coordinator", None)
+        })?;
+
+        let shared_key = std::env::var("DITTO_SHARED_KEY").map_err(|_| {
+            Error::storage_error("DITTO_SHARED_KEY not set", "create_test_coordinator", None)
+        })?;
+
+        // Get the path before dropping temp_dir
+        let persistence_path = temp_dir.path().to_path_buf();
+
+        // Don't drop temp_dir - leak it to keep directory alive for test duration
+        std::mem::forget(temp_dir);
+
+        let config = BackendConfig {
+            app_id,
+            persistence_dir: persistence_path,
+            shared_key: Some(shared_key),
+            transport: TransportConfig::default(),
+            extra: HashMap::new(),
+        };
+
+        let backend = DittoBackend::new();
+        backend.initialize(config).await?;
+        backend.sync_engine().start_sync().await?;
+
+        let squad_store = CellStore::new(Arc::new(backend)).await?;
         Ok(DiscoveryCoordinator::new(
             squad_store,
             BootstrapStrategy::Geographic,
