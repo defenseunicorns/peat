@@ -76,7 +76,8 @@ pub mod traits;
 pub mod types;
 
 // Backend implementations
-pub mod ditto; // Wraps existing Ditto SDK
+pub mod automerge;
+pub mod ditto; // Wraps existing Ditto SDK // Automerge CRDT backend (E8 evaluation)
 
 // Re-export core types and traits for convenience
 pub use traits::*;
