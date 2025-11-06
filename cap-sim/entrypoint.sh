@@ -27,8 +27,10 @@ fi
 # Parse TCP configuration from environment
 # TCP_LISTEN: port to listen on (for writers/servers)
 # TCP_CONNECT: address:port to connect to (for readers/clients)
+# BACKEND: sync backend type (default: ditto)
 
-ARGS="--node-id ${NODE_ID} --mode ${MODE}"
+BACKEND=${BACKEND:-ditto}
+ARGS="--node-id ${NODE_ID} --mode ${MODE} --backend ${BACKEND}"
 
 if [ -n "$TCP_LISTEN" ]; then
     ARGS="$ARGS --tcp-listen ${TCP_LISTEN}"
@@ -45,7 +47,6 @@ export DITTO_APP_ID
 export DITTO_OFFLINE_TOKEN
 export DITTO_SHARED_KEY
 
-# Run the simulation node
-# For now, using shadow_poc as the binary
-# TODO: Create proper cap-sim-node binary
-exec /app/target/release/examples/shadow_poc $ARGS
+# Run the simulation node (trait-based with DQL v2)
+echo "[${NODE_ID}] Backend: ${BACKEND}"
+exec /app/target/release/examples/cap_sim_node $ARGS

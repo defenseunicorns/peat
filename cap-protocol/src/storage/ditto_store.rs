@@ -143,6 +143,10 @@ impl DittoStore {
         // - TCP transport (optional) for explicit server/client connections
         //
         // TCP transport is more reliable for localhost testing where mDNS may not work.
+        eprintln!(
+            "DittoStore: Configuring transport - listen={:?}, connect={:?}",
+            config.tcp_listen_port, config.tcp_connect_address
+        );
         ditto.update_transport_config(|transport_config| {
             // Disable BLE
             transport_config.peer_to_peer.bluetooth_le.enabled = false;
@@ -159,9 +163,9 @@ impl DittoStore {
                 // Enable TCP listener if port specified
                 if let Some(port) = config.tcp_listen_port {
                     transport_config.listen.tcp.enabled = true;
-                    transport_config.listen.tcp.interface_ip = "127.0.0.1".to_string();
+                    transport_config.listen.tcp.interface_ip = "0.0.0.0".to_string();
                     transport_config.listen.tcp.port = port;
-                    debug!("TCP listen enabled on 127.0.0.1:{}", port);
+                    debug!("TCP listen enabled on 0.0.0.0:{}", port);
                 } else {
                     transport_config.listen.tcp.enabled = false;
                 }
@@ -321,18 +325,22 @@ impl DittoStore {
     /// Insert/update a document into a collection using DQL
     #[instrument(skip(self, document), fields(collection))]
     pub async fn upsert(&self, collection: &str, document: serde_json::Value) -> Result<String> {
-        let dql_query = format!("INSERT INTO {} DOCUMENTS (:doc)", collection);
         debug!("Upserting document into collection: {}", collection);
+
+        // Use DQL v2 API - INSERT handles both insert and update (upsert behavior)
+        let dql_query = format!("INSERT INTO {} DOCUMENTS (:doc)", collection);
 
         let query_result = self
             .ditto
             .store()
-            .execute_v2((dql_query, serde_json::json!({"doc": document})))
+            .execute_v2((dql_query.clone(), serde_json::json!({"doc": document})))
             .await
             .map_err(|e| {
+                eprintln!("DQL upsert error: {:?}", e);
+                eprintln!("DQL query was: {}", dql_query);
                 error!("Upsert failed: {}", e);
                 Error::storage_error(
-                    format!("Upsert failed on collection {}", collection),
+                    format!("Upsert failed on collection {} - error: {}", collection, e),
                     "upsert",
                     Some(collection.to_string()),
                 )

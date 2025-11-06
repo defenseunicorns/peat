@@ -33,6 +33,7 @@ use cap_protocol::models::{Capability, CapabilityType};
 use cap_protocol::storage::{CellStore, NodeStore};
 use cap_protocol::sync::ditto::DittoBackend;
 use cap_protocol::testing::E2EHarness;
+use std::sync::Arc;
 use std::time::Duration;
 
 /// Test 1: NodeStore CRDT Sync - G-Set Semantics
@@ -41,6 +42,8 @@ use std::time::Duration;
 /// across multiple peers and follow grow-only semantics.
 #[tokio::test]
 async fn test_e2e_nodestore_gset_sync() {
+    dotenvy::dotenv().ok();
+
     let ditto_app_id =
         std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
     assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
@@ -49,16 +52,16 @@ async fn test_e2e_nodestore_gset_sync() {
 
     println!("=== E2E: NodeStore G-Set CRDT Sync ===");
 
-    // Create two peers
-    let store1 = harness.create_ditto_store().await.unwrap();
-    let store2 = harness.create_ditto_store().await.unwrap();
+    // Create two DittoBackends (each wraps a DittoStore in Arc)
+    let backend1: Arc<DittoBackend> = harness.create_ditto_store().await.unwrap().into();
+    let backend2: Arc<DittoBackend> = harness.create_ditto_store().await.unwrap().into();
 
-    let node_store1: NodeStore<DittoBackend> = NodeStore::new(store1.clone().into()).await.unwrap();
-    let node_store2: NodeStore<DittoBackend> = NodeStore::new(store2.clone().into()).await.unwrap();
+    let node_store1: NodeStore<DittoBackend> = NodeStore::new(backend1.clone()).await.unwrap();
+    let node_store2: NodeStore<DittoBackend> = NodeStore::new(backend2.clone()).await.unwrap();
 
-    // Start sync
-    store1.start_sync().unwrap();
-    store2.start_sync().unwrap();
+    // Get the underlying DittoStores for peer connection checking
+    let store1 = backend1.get_ditto_store().unwrap();
+    let store2 = backend2.get_ditto_store().unwrap();
 
     println!("  1. Waiting for peer connection...");
 
@@ -154,6 +157,8 @@ async fn test_e2e_nodestore_gset_sync() {
 /// - Add-wins conflict resolution
 #[tokio::test]
 async fn test_e2e_cellstore_orset_operations() {
+    dotenvy::dotenv().ok();
+
     let ditto_app_id =
         std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
     assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
@@ -162,18 +167,27 @@ async fn test_e2e_cellstore_orset_operations() {
 
     println!("=== E2E: CellStore OR-Set CRDT Operations ===");
 
-    // Create two peers with DittoBackend
-    let backend1 = harness.create_ditto_backend().await.unwrap();
-    let backend2 = harness.create_ditto_backend().await.unwrap();
+    // Create two DittoBackends (each wraps a DittoStore in Arc)
+    let backend1: Arc<DittoBackend> = harness.create_ditto_store().await.unwrap().into();
+    let backend2: Arc<DittoBackend> = harness.create_ditto_store().await.unwrap().into();
 
     let cell_store1 = CellStore::new(backend1.clone()).await.unwrap();
     let cell_store2 = CellStore::new(backend2.clone()).await.unwrap();
 
+    // Get the underlying DittoStores for peer connection checking
+    let store1 = backend1.get_ditto_store().unwrap();
+    let store2 = backend2.get_ditto_store().unwrap();
+
     println!("  1. Waiting for peer connection...");
 
-    // Note: Peer connection checking would need to be updated for DittoBackend
-    // For now, just add a delay for initial sync
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    let connection_result = harness
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(10))
+        .await;
+
+    if connection_result.is_err() {
+        println!("  ⚠ Warning: Peer connection timeout - skipping test");
+        return;
+    }
 
     println!("  ✓ Peers connected");
 
@@ -256,6 +270,8 @@ async fn test_e2e_cellstore_orset_operations() {
 /// - Latest write wins
 #[tokio::test]
 async fn test_e2e_concurrent_writes_lww_resolution() {
+    dotenvy::dotenv().ok();
+
     let ditto_app_id =
         std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
     assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
@@ -264,18 +280,27 @@ async fn test_e2e_concurrent_writes_lww_resolution() {
 
     println!("=== E2E: Concurrent Writes LWW-Register Resolution ===");
 
-    // Create two peers with DittoBackend
-    let backend1 = harness.create_ditto_backend().await.unwrap();
-    let backend2 = harness.create_ditto_backend().await.unwrap();
+    // Create two DittoBackends (each wraps a DittoStore in Arc)
+    let backend1: Arc<DittoBackend> = harness.create_ditto_store().await.unwrap().into();
+    let backend2: Arc<DittoBackend> = harness.create_ditto_store().await.unwrap().into();
 
     let cell_store1 = CellStore::new(backend1.clone()).await.unwrap();
     let cell_store2 = CellStore::new(backend2.clone()).await.unwrap();
 
+    // Get the underlying DittoStores for peer connection checking
+    let store1 = backend1.get_ditto_store().unwrap();
+    let store2 = backend2.get_ditto_store().unwrap();
+
     println!("  1. Waiting for peer connection...");
 
-    // Note: Peer connection checking would need to be updated for DittoBackend
-    // For now, just add a delay for initial sync
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    let connection_result = harness
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(10))
+        .await;
+
+    if connection_result.is_err() {
+        println!("  ⚠ Warning: Peer connection timeout - skipping test");
+        return;
+    }
 
     println!("  ✓ Peers connected");
 

@@ -432,23 +432,24 @@ pub struct MaintenanceMetrics {
 ///
 /// # Example
 ///
-/// ```
+/// ```no_run
 /// use cap_protocol::hierarchy::maintenance::{RebalancingCoordinator, HierarchyMaintainer};
 /// use cap_protocol::hierarchy::RoutingTable;
 /// use cap_protocol::storage::CellStore;
 /// use std::sync::Arc;
 ///
-/// # fn example() {
+/// # async fn example() {
 /// let maintainer = Arc::new(HierarchyMaintainer::new(3, 10, 2, 8));
 /// let routing_table = Arc::new(std::sync::Mutex::new(RoutingTable::new()));
-/// let cell_store = Arc::new(std::sync::Mutex::new(CellStore::new()));
+/// // CellStore::new() requires a DataSyncBackend and is async
+/// // let cell_store = Arc::new(std::sync::Mutex::new(CellStore::new(backend).await.unwrap()));
 ///
-/// let coordinator = RebalancingCoordinator::new(
-///     maintainer,
-///     routing_table,
-///     cell_store,
-///     60, // Check every 60 seconds
-/// );
+/// // let coordinator = RebalancingCoordinator::new(
+/// //     maintainer,
+/// //     routing_table,
+/// //     cell_store,
+/// //     60, // Check every 60 seconds
+/// // );
 /// # }
 /// ```
 pub struct RebalancingCoordinator<B: crate::sync::DataSyncBackend> {

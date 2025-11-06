@@ -23,7 +23,11 @@ geohash = "0.13"
 tempfile = "3.13"
 
 # CRDT Backends (E8 Evaluation - ADR-007)
-automerge = "0.7.1"  # Automerge CRDT library for evaluation
+automerge = { version = "0.7.1", optional = true }  # Automerge CRDT library for evaluation
+
+[features]
+default = []
+automerge-backend = ["automerge"]
 
 [dev-dependencies]
 proptest = { workspace = true }
