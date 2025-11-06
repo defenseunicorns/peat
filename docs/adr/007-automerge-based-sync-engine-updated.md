@@ -2018,6 +2018,234 @@ This ADR commits to:
 
 ---
 
-**Last Updated**: 2025-11-05  
-**Status**: Ready for E8 Evaluation  
-**Review Date**: End of E8 (2 weeks)
+## E8 Evaluation Results (2025-11-06)
+
+### Evaluation Summary
+
+**Status**: Evaluation Complete - **Decision: Continue with Ditto**
+
+The E8 evaluation successfully implemented and tested an AutomergeBackend to understand the gap between raw CRDT libraries and production-ready distributed systems. While Automerge 0.7.1 provides excellent CRDT sync primitives, the evaluation revealed a critical insight: **the CRDT sync protocol is only 20% of the problem; the network mesh layer is the other 80%**.
+
+**Commit**: 94b7f10 "E8: Implement Automerge backend (Phase 1)"
+- 750 lines of AutomergeBackend implementation
+- All 15 tests passing (5 unit + 10 integration)
+- Full DataSyncBackend trait implementation
+- Benchmark suite created
+
+### What We Built (AutomergeBackend Phase 1)
+
+**Achievements**:
+- ✅ Document storage with Automerge CRDTs
+- ✅ CRDT sync protocol (`generate_sync_message` / `receive_sync_message`)
+- ✅ Per-peer sync state management
+- ✅ Document conversion layer (CAP models ↔ Automerge)
+- ✅ Full trait compliance (DocumentStore, SyncEngine, PeerDiscovery stub, DataSyncBackend)
+- ✅ Integration with CellStore/NodeStore
+
+**What's Missing (The Network Gap)**:
+- ❌ TCP transport layer (sockets, framing, connection management)
+- ❌ Peer discovery (mDNS, Bluetooth LE)
+- ❌ Mesh construction and maintenance
+- ❌ Background sync coordination
+- ❌ Multi-transport support
+- ❌ Connection recovery and failover
+- ❌ Multi-hop routing
+- ❌ Backpressure and flow control
+
+### The Network Stack Reality
+
+This evaluation exposed a fundamental truth: **Ditto's value proposition is not the CRDT (Automerge is excellent), but the production-ready mesh networking stack**.
+
+#### What Ditto Provides Beyond CRDT Sync
+
+**1. Automatic Peer Discovery**
+- **mDNS (Multicast DNS)**: Local network service discovery without infrastructure
+- **Bluetooth LE**: Ad-hoc discovery in disconnected environments
+- **Background scanning**: Continuous discovery without explicit user action
+- **Service registration**: Automatic advertisement of node capabilities
+
+**Ditto Implementation**: Built-in, multi-platform, battle-tested across thousands of deployments
+
+**Automerge Gap**: None - would require 1-2 weeks to implement using `mdns-sd` and `btleplug` crates
+
+**2. Mesh Construction and Maintenance**
+- **Multi-transport coordination**: Simultaneous TCP + Bluetooth + mDNS connections
+- **Topology adaptation**: Automatically adjusts to network changes
+- **Connection pooling**: Manages multiple peer connections efficiently
+- **Mesh healing**: Detects and recovers from network partitions
+- **Transport preference**: Selects fastest available transport automatically
+
+**Ditto Implementation**: Proprietary mesh protocol with 8+ years of development and field testing
+
+**Automerge Gap**: 2-3 weeks to implement basic version, months for production-grade reliability
+
+**3. Multi-Hop Routing**
+- **Store-and-forward**: Messages route through intermediate peers
+- **Path discovery**: Finds optimal routes through mesh topology
+- **Loop prevention**: Avoids circular message propagation
+- **TTL management**: Controls message lifetime and flooding
+
+**Ditto Implementation**: Integrated into transport layer, handles NAT traversal
+
+**Automerge Gap**: Not planned for E9 - would add 2-4 weeks and significant complexity
+
+**4. Connection Lifecycle Management**
+- **Automatic reconnection**: Exponential backoff on disconnects
+- **Keepalive/heartbeat**: Detects dead connections quickly
+- **Graceful degradation**: Continues operating with partial connectivity
+- **Resource cleanup**: Prevents connection leaks
+- **Timeout management**: Configurable per transport type
+
+**Ditto Implementation**: Robust state machine handling edge cases (network switches, sleep/wake, airplane mode)
+
+**Automerge Gap**: 1 week for basic implementation, ongoing work for edge cases
+
+**5. Background Sync Coordination**
+- **Task scheduling**: Coordinates sync operations across peers
+- **Prioritization**: Syncs critical data first (e.g., CellState before telemetry)
+- **Bandwidth management**: Throttles sync to avoid congestion
+- **Conflict-free ordering**: Ensures deterministic merge behavior
+- **Change notification**: Efficiently detects and propagates updates
+
+**Ditto Implementation**: Built on Tokio, integrated with CRDT layer
+
+**Automerge Gap**: 1-2 weeks for basic coordinator (see E9 Phase 1-3)
+
+**6. Platform Integration**
+- **iOS/Android/Desktop**: Native bindings for all platforms
+- **Battery optimization**: Power-aware Bluetooth scanning
+- **Network change handling**: Adapts to WiFi ↔ cellular ↔ offline transitions
+- **Background execution**: Continues syncing when app is backgrounded
+- **Privacy controls**: User-facing permissions management
+
+**Ditto Implementation**: Years of mobile platform work
+
+**Automerge Gap**: Platform-specific - would require native development expertise
+
+#### E9 Implementation Plan: 3-4 Weeks to Basic Parity
+
+See `docs/E9-NETWORK-TRANSPORT-LAYER-PLAN.md` for full details:
+
+**Phase 1 (Week 1)**: TCP Transport Foundation
+- WireProtocol (length-prefixed framing)
+- Connection module (TcpStream wrapper)
+- ConnectionManager (listener, pool)
+- Manual peer addition (parse address, connect, handshake)
+- SyncCoordinator (background sync task)
+
+**Phase 2 (Week 2)**: mDNS Discovery
+- mDNS service registration (`_automerge-cap._tcp.local`)
+- Automatic peer discovery
+- Connection pool integration
+
+**Phase 3 (Week 3)**: Sync Optimization
+- Selective sync (only changed documents)
+- Backpressure handling (bounded queues)
+- Connection recovery (reconnection logic)
+- Performance tuning
+
+**Phase 4 (Week 4, Optional)**: Bluetooth Support
+- Bluetooth LE discovery
+- Multi-transport coordination
+- Transport fallback logic
+
+**Total Effort**: 3-4 weeks for basic functionality, **months for production-grade reliability comparable to Ditto**
+
+### Decision Rationale: Continue with Ditto
+
+**Primary Reasons**:
+
+1. **Network Stack Complexity Dominates CRDT Choice**
+   - CRDT sync protocol: ~750 lines, 1 week of work (✅ complete in E8)
+   - Network mesh layer: ~2000+ lines, 3-4 weeks minimum (❌ not started)
+   - Production hardening: Months of edge case testing
+   - **Verdict**: 80% of value is in the mesh, not the CRDT
+
+2. **Ditto's Mesh is Battle-Tested**
+   - 8+ years of development
+   - Deployed in thousands of production apps
+   - Mobile platform expertise (iOS, Android)
+   - Multi-transport coordination already solved
+   - Known failure modes and recovery strategies
+   - **Verdict**: Re-implementing this is high risk with limited upside
+
+3. **E9 Implementation is Substantial Work**
+   - 3-4 weeks for basic TCP + mDNS
+   - No multi-hop routing (limits tactical scenarios)
+   - No Bluetooth support in Phase 1
+   - Platform integration not addressed
+   - Edge cases (NAT, sleep/wake, network changes) would take months
+   - **Verdict**: Resource cost outweighs licensing concern at this stage
+
+4. **Licensing Constraint is Future Problem**
+   - CAP Protocol is pre-production (no deployments yet)
+   - Ditto licensing negotiable for government/defense use
+   - NATO STANAG timeline is 12-24 months out
+   - Abstraction layer makes future swap feasible
+   - **Verdict**: Defer licensing decision until closer to production deployment
+
+5. **Focus on CAP Protocol Innovation**
+   - CAP's value is in hierarchical capability composition, not CRDT implementation
+   - Building network stack diverts from core research
+   - Ditto enables faster iteration on cell formation logic
+   - E2E tests validate distributed behavior, not transport internals
+   - **Verdict**: Use best available tools, focus on novel contributions
+
+**Secondary Considerations**:
+
+- **Automerge document size advantage**: Relevant for bandwidth, but TCP compression can close gap
+- **Loro performance advantage**: Not evaluated, but less mature ecosystem
+- **GOTS positioning**: Valid long-term concern, but premature for research phase
+- **Open-source preference**: Philosophical, but pragmatism wins for now
+
+### Updated Strategy
+
+**Immediate (Next 3 months)**:
+- ✅ Continue with Ditto for all CAP Protocol development
+- ✅ Focus on hierarchical composition rules (E6, E7)
+- ✅ Validate cell formation logic with E2E tests
+- ✅ Document Ditto-specific assumptions for future portability
+
+**Mid-term (6-12 months)**:
+- Evaluate Ditto licensing for government use cases
+- Monitor Automerge/Loro ecosystem maturity
+- Keep abstraction layer clean for potential backend swap
+- Consider E9 implementation if licensing becomes blocker
+
+**Long-term (12-24 months)**:
+- Revisit CRDT backend decision before NATO STANAG submission
+- Assess feasibility of GOTS version with Automerge + E9 network layer
+- Evaluate commercial licensing vs open-source alternatives
+- Make final call based on deployment requirements
+
+### Lessons Learned
+
+1. **CRDT libraries ≠ Distributed systems**: Automerge provides excellent CRDT primitives, but building a production mesh requires significant additional engineering.
+
+2. **Network stack is underestimated**: The 3-4 week E9 estimate is for basic functionality; production-grade reliability (handling NAT, network transitions, battery optimization) takes months.
+
+3. **Abstraction layer validated**: The DataSyncBackend abstraction successfully isolated CRDT concerns, making this evaluation possible. Swapping backends in the future is feasible.
+
+4. **Benchmarks are valuable**: Creating CAP-specific benchmarks (CellState, NodeConfig) provides data for future decisions, even if not used immediately.
+
+5. **Mesh features matter for tactical networks**: Multi-hop routing, Bluetooth support, and automatic recovery are critical for military use cases. Ditto's mesh handles these; basic TCP doesn't.
+
+### Archive: AutomergeBackend Implementation
+
+The AutomergeBackend implementation (commit 94b7f10) is preserved in the repository as:
+- Reference implementation for future CRDT work
+- Proof that backend abstraction works
+- Benchmark baseline for performance comparisons
+- Starting point if E9 is needed later
+
+**Key files**:
+- `cap-protocol/src/sync/automerge.rs` - Full backend implementation
+- `cap-protocol/tests/automerge_backend_integration.rs` - Integration tests
+- `cap-protocol/benches/backend_comparison.rs` - Performance benchmarks
+- `docs/E9-NETWORK-TRANSPORT-LAYER-PLAN.md` - Network layer implementation plan
+
+---
+
+**Last Updated**: 2025-11-06
+**Status**: Decided - Continue with Ditto (E8 Evaluation Complete)
+**Review Date**: 6 months (2025-05-06) - Reassess licensing and GOTS requirements
