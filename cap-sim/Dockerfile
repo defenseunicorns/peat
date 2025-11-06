@@ -21,9 +21,8 @@ WORKDIR /app
 # Copy entire workspace
 COPY . .
 
-# Build the cap-sim-node binary (using shadow_poc as base for now)
-# We'll create a proper cap-sim-node later
-RUN cargo build --release --example shadow_poc
+# Build the cap-sim-node binary (trait-based, engine-agnostic)
+RUN cargo build --release --example cap_sim_node
 
 # Create runtime directory for Ditto persistence
 RUN mkdir -p /data/ditto
