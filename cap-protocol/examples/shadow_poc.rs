@@ -46,8 +46,8 @@
 use dittolive_ditto::prelude::*;
 use dittolive_ditto::AppId;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 use std::thread::sleep;
+use std::time::{Duration, Instant};
 
 /// Test document structure
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -214,7 +214,10 @@ fn create_ditto_instance(
                 transport_config.listen.tcp.enabled = true;
                 transport_config.listen.tcp.interface_ip = "0.0.0.0".to_string();
                 transport_config.listen.tcp.port = port;
-                println!("[{}] Transport config: TCP listener on 0.0.0.0:{}", node_id, port);
+                println!(
+                    "[{}] Transport config: TCP listener on 0.0.0.0:{}",
+                    node_id, port
+                );
             } else {
                 transport_config.listen.tcp.enabled = false;
             }
@@ -222,7 +225,10 @@ fn create_ditto_instance(
             // Configure TCP client connection if specified
             if let Some(ref addr) = tcp_connect_addr {
                 transport_config.connect.tcp_servers.insert(addr.clone());
-                println!("[{}] Transport config: TCP client connecting to {}", node_id, addr);
+                println!(
+                    "[{}] Transport config: TCP client connecting to {}",
+                    node_id, addr
+                );
             }
         } else {
             // No TCP config - use LAN/mDNS (won't work in Shadow but useful for native testing)
@@ -277,7 +283,10 @@ fn reader_mode(ditto: &Ditto, node_id: &str) -> Result<(), Box<dyn std::error::E
     let timeout = Duration::from_secs(20);
     let start = Instant::now();
 
-    println!("[{}] Waiting for test document (timeout: {:?})...", node_id, timeout);
+    println!(
+        "[{}] Waiting for test document (timeout: {:?})...",
+        node_id, timeout
+    );
 
     // Poll for document
     loop {
