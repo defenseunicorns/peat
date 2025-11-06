@@ -1,0 +1,34 @@
+// Common message types used across CAP Protocol
+// Version: 1.0.0
+
+syntax = "proto3";
+
+package cap.common.v1;
+
+// Unique identifier (UUID)
+message Uuid {
+  string value = 1;
+}
+
+// Timestamp in Unix epoch seconds
+message Timestamp {
+  uint64 seconds = 1;
+  uint32 nanos = 2;
+}
+
+// Geographic position
+message Position {
+  double latitude = 1;   // Degrees
+  double longitude = 2;  // Degrees
+  double altitude = 3;   // Meters above sea level
+}
+
+// Confidence score (0.0 - 1.0)
+message Confidence {
+  float value = 1;  // Must be between 0.0 and 1.0
+}
+
+// Generic key-value metadata
+message Metadata {
+  map<string, string> fields = 1;
+}

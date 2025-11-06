@@ -1,0 +1,100 @@
+// Cell (squad) definitions for CAP Protocol
+// Version: 1.0.0
+
+syntax = "proto3";
+
+package cap.cell.v1;
+
+import "common.proto";
+import "capability.proto";
+
+// Cell configuration
+message CellConfig {
+  // Unique cell identifier
+  string id = 1;
+
+  // Maximum cell size (number of members)
+  uint32 max_size = 2;
+
+  // Minimum cell size (number of members)
+  uint32 min_size = 3;
+
+  // Timestamp when cell was configured
+  common.v1.Timestamp created_at = 4;
+}
+
+// Cell state (dynamic)
+message CellState {
+  // Cell configuration
+  CellConfig config = 1;
+
+  // Current cell leader node ID (LWW-Register)
+  optional string leader_id = 2;
+
+  // Set of member node IDs (OR-Set)
+  repeated string members = 3;
+
+  // Aggregated cell capabilities (G-Set: grow-only)
+  repeated capability.v1.Capability capabilities = 4;
+
+  // Parent platoon/zone ID for hierarchy (LWW-Register)
+  optional string platoon_id = 5;
+
+  // Last update timestamp (for LWW conflict resolution)
+  common.v1.Timestamp timestamp = 6;
+}
+
+// Complete cell representation
+message Cell {
+  // Cell configuration
+  CellConfig config = 1;
+
+  // Cell state
+  CellState state = 2;
+}
+
+// Cell formation request
+message CellFormationRequest {
+  // Requesting node ID
+  string node_id = 1;
+
+  // Required capabilities for the cell
+  repeated capability.v1.CapabilityType required_capabilities = 2;
+
+  // Timestamp of request
+  common.v1.Timestamp requested_at = 3;
+}
+
+// Cell formation response
+message CellFormationResponse {
+  // Formed cell (if successful)
+  optional Cell cell = 1;
+
+  // Success indicator
+  bool success = 2;
+
+  // Reason for failure (if any)
+  optional string failure_reason = 3;
+}
+
+// Cell membership change
+message CellMembershipChange {
+  // Cell ID
+  string cell_id = 1;
+
+  // Change type
+  enum ChangeType {
+    CHANGE_TYPE_UNSPECIFIED = 0;
+    CHANGE_TYPE_JOIN = 1;    // Node joined cell
+    CHANGE_TYPE_LEAVE = 2;   // Node left cell
+    CHANGE_TYPE_LEADER = 3;  // Leader changed
+  }
+
+  ChangeType change_type = 2;
+
+  // Node ID involved in the change
+  string node_id = 3;
+
+  // Timestamp of change
+  common.v1.Timestamp timestamp = 4;
+}

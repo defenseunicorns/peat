@@ -1,0 +1,91 @@
+// Beacon (discovery) definitions for CAP Protocol
+// Version: 1.0.0
+
+syntax = "proto3";
+
+package cap.beacon.v1;
+
+import "common.proto";
+import "node.proto";
+import "capability.proto";
+
+// Beacon message for discovery phase
+message Beacon {
+  // Node ID broadcasting this beacon
+  string node_id = 1;
+
+  // Node configuration summary
+  node.v1.NodeConfig node_config = 2;
+
+  // Current node state
+  node.v1.NodeState node_state = 3;
+
+  // Advertised capabilities
+  repeated capability.v1.Capability capabilities = 4;
+
+  // Beacon sequence number (for detecting gaps)
+  uint64 sequence_number = 5;
+
+  // Time-to-live (number of hops for relay)
+  uint32 ttl = 6;
+
+  // Beacon timestamp
+  common.v1.Timestamp timestamp = 7;
+
+  // Optional cell ID if already part of a cell
+  optional string current_cell_id = 8;
+}
+
+// Beacon query for discovering nodes
+message BeaconQuery {
+  // Filter by platform type (e.g., "UAV", "UGV")
+  optional string platform_type = 1;
+
+  // Filter by required capabilities
+  repeated capability.v1.CapabilityType required_capabilities = 2;
+
+  // Filter by phase
+  optional node.v1.Phase phase = 3;
+
+  // Maximum distance in meters (geo-fence)
+  optional float max_distance_m = 4;
+
+  // Reference position for distance calculation
+  optional common.v1.Position reference_position = 5;
+
+  // Filter by health status
+  optional node.v1.HealthStatus min_health = 6;
+
+  // Minimum fuel requirement in minutes
+  optional uint32 min_fuel_minutes = 7;
+}
+
+// Beacon query response
+message BeaconQueryResponse {
+  // Matching beacons
+  repeated Beacon beacons = 1;
+
+  // Total count
+  uint32 total_count = 2;
+
+  // Timestamp of query execution
+  common.v1.Timestamp queried_at = 3;
+}
+
+// Beacon storage entry (for CRDT persistence)
+message BeaconRecord {
+  // The beacon itself
+  Beacon beacon = 1;
+
+  // First seen timestamp
+  common.v1.Timestamp first_seen = 2;
+
+  // Last seen timestamp
+  common.v1.Timestamp last_seen = 3;
+
+  // Number of times seen
+  uint64 seen_count = 4;
+
+  // Whether this beacon is still active (TTL not expired)
+  bool active = 5;
+}
