@@ -1,0 +1,345 @@
+# ContainerLab Topology: 12-Node Squad Formation
+#
+# Purpose: Validate squad-level cell formation with realistic military structure
+#
+# Squad Structure:
+#   - 9 Soldiers (dismounted infantry with sensors/comms)
+#   - 1 UGV (unmanned ground vehicle - autonomous resupply/ISR)
+#   - 2 UAVs (quadcopter drones for aerial reconnaissance)
+#
+# Network Design:
+#   - Intra-squad mesh: 100 Kbps, 100ms (local WiFi/Bluetooth mesh)
+#   - Soldier-UGV links: 1 Mbps, 50ms (high bandwidth, UGV is comm relay)
+#   - UAV-Squad links: 56 Kbps, 500ms (aerial radio, higher latency)
+#
+# Reference: ADR-008 Network Simulation Layer
+#
+# Usage:
+#   containerlab deploy -t cap-sim/topologies/squad-12node.yaml --env-file .env
+#   containerlab inspect -t cap-sim/topologies/squad-12node.yaml
+#   containerlab destroy -t cap-sim/topologies/squad-12node.yaml
+
+name: cap-squad-12node
+
+topology:
+  nodes:
+    # ============================================
+    # SQUAD LEADER (Soldier 1)
+    # ============================================
+    soldier-1:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: soldier-1
+        ROLE: squad_leader
+        PLATFORM_TYPE: soldier
+        MODE: writer  # Creates initial test document
+        # TCP mesh: Listen and connect to all peers
+        TCP_LISTEN: "12345"
+        # Ditto credentials from .env
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+      ports:
+        - "12345:12345"  # Squad leader port
+
+    # ============================================
+    # SOLDIERS 2-9 (Squad Members)
+    # ============================================
+    soldier-2:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: soldier-2
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader  # Waits for document sync
+        TCP_LISTEN: "12346"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    soldier-3:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: soldier-3
+        ROLE: grenadier
+        PLATFORM_TYPE: soldier
+        MODE: reader  # Waits for document sync
+        TCP_LISTEN: "12347"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    soldier-4:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: soldier-4
+        ROLE: automatic_rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader  # Waits for document sync
+        TCP_LISTEN: "12348"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    soldier-5:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: soldier-5
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader  # Waits for document sync
+        TCP_LISTEN: "12349"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    soldier-6:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: soldier-6
+        ROLE: team_leader
+        PLATFORM_TYPE: soldier
+        MODE: reader  # Waits for document sync
+        TCP_LISTEN: "12350"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    soldier-7:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: soldier-7
+        ROLE: grenadier
+        PLATFORM_TYPE: soldier
+        MODE: reader  # Waits for document sync
+        TCP_LISTEN: "12351"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    soldier-8:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: soldier-8
+        ROLE: automatic_rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader  # Waits for document sync
+        TCP_LISTEN: "12352"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    soldier-9:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: soldier-9
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader  # Waits for document sync
+        TCP_LISTEN: "12353"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    # ============================================
+    # UGV (Unmanned Ground Vehicle)
+    # ============================================
+    ugv-1:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: ugv-1
+        ROLE: resupply_isr
+        PLATFORM_TYPE: ugv
+        MODE: reader  # Waits for document sync
+        TCP_LISTEN: "12354"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    # ============================================
+    # UAVs (Unmanned Aerial Vehicles)
+    # ============================================
+    uav-1:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: uav-1
+        ROLE: reconnaissance
+        PLATFORM_TYPE: uav
+        MODE: reader  # Waits for document sync
+        TCP_LISTEN: "12355"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    uav-2:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: uav-2
+        ROLE: reconnaissance
+        PLATFORM_TYPE: uav
+        MODE: reader  # Waits for document sync
+        TCP_LISTEN: "12356"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+  # ============================================
+  # NETWORK LINKS
+  # ============================================
+  links:
+    # --------------------------------------------
+    # Soldier-to-Soldier Links (Intra-Squad Mesh)
+    # 100 Kbps, 100ms latency, 1% loss
+    # Represents local WiFi/Bluetooth mesh
+    # --------------------------------------------
+    - endpoints: ["soldier-1:eth1", "soldier-2:eth1"]
+      impairments:
+        rate: 100kbps
+        delay: 100ms
+        jitter: 20ms
+        loss: 1
+
+    - endpoints: ["soldier-1:eth1", "soldier-3:eth1"]
+      impairments:
+        rate: 100kbps
+        delay: 100ms
+        jitter: 20ms
+        loss: 1
+
+    - endpoints: ["soldier-2:eth1", "soldier-3:eth1"]
+      impairments:
+        rate: 100kbps
+        delay: 100ms
+        jitter: 20ms
+        loss: 1
+
+    - endpoints: ["soldier-2:eth1", "soldier-4:eth1"]
+      impairments:
+        rate: 100kbps
+        delay: 100ms
+        jitter: 20ms
+        loss: 1
+
+    - endpoints: ["soldier-3:eth1", "soldier-5:eth1"]
+      impairments:
+        rate: 100kbps
+        delay: 100ms
+        jitter: 20ms
+        loss: 1
+
+    - endpoints: ["soldier-4:eth1", "soldier-5:eth1"]
+      impairments:
+        rate: 100kbps
+        delay: 100ms
+        jitter: 20ms
+        loss: 1
+
+    - endpoints: ["soldier-4:eth1", "soldier-6:eth1"]
+      impairments:
+        rate: 100kbps
+        delay: 100ms
+        jitter: 20ms
+        loss: 1
+
+    - endpoints: ["soldier-5:eth1", "soldier-7:eth1"]
+      impairments:
+        rate: 100kbps
+        delay: 100ms
+        jitter: 20ms
+        loss: 1
+
+    - endpoints: ["soldier-6:eth1", "soldier-7:eth1"]
+      impairments:
+        rate: 100kbps
+        delay: 100ms
+        jitter: 20ms
+        loss: 1
+
+    - endpoints: ["soldier-6:eth1", "soldier-8:eth1"]
+      impairments:
+        rate: 100kbps
+        delay: 100ms
+        jitter: 20ms
+        loss: 1
+
+    - endpoints: ["soldier-7:eth1", "soldier-9:eth1"]
+      impairments:
+        rate: 100kbps
+        delay: 100ms
+        jitter: 20ms
+        loss: 1
+
+    - endpoints: ["soldier-8:eth1", "soldier-9:eth1"]
+      impairments:
+        rate: 100kbps
+        delay: 100ms
+        jitter: 20ms
+        loss: 1
+
+    # --------------------------------------------
+    # UGV-to-Soldier Links (High Bandwidth)
+    # 1 Mbps, 50ms latency, 0.5% loss
+    # UGV acts as communication relay
+    # --------------------------------------------
+    - endpoints: ["ugv-1:eth1", "soldier-1:eth2"]
+      impairments:
+        rate: 1000kbps
+        delay: 50ms
+        jitter: 10ms
+        loss: 0.5
+
+    - endpoints: ["ugv-1:eth2", "soldier-6:eth2"]
+      impairments:
+        rate: 1000kbps
+        delay: 50ms
+        jitter: 10ms
+        loss: 0.5
+
+    # --------------------------------------------
+    # UAV-to-Squad Links (Aerial Radio)
+    # 56 Kbps, 500ms latency, 5% loss
+    # Constrained aerial link with higher latency
+    # --------------------------------------------
+    - endpoints: ["uav-1:eth1", "soldier-1:eth3"]
+      impairments:
+        rate: 56kbps
+        delay: 500ms
+        jitter: 100ms
+        loss: 5
+
+    - endpoints: ["uav-2:eth1", "soldier-6:eth3"]
+      impairments:
+        rate: 56kbps
+        delay: 500ms
+        jitter: 100ms
+        loss: 5
+
+    # --------------------------------------------
+    # UGV-to-UAV Links (Air-Ground Coordination)
+    # 100 Kbps, 200ms latency, 2% loss
+    # --------------------------------------------
+    - endpoints: ["ugv-1:eth3", "uav-1:eth2"]
+      impairments:
+        rate: 100kbps
+        delay: 200ms
+        jitter: 50ms
+        loss: 2
+
+    - endpoints: ["ugv-1:eth4", "uav-2:eth2"]
+      impairments:
+        rate: 100kbps
+        delay: 200ms
+        jitter: 50ms
+        loss: 2
