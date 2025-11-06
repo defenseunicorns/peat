@@ -31,7 +31,10 @@
 //! ```
 
 pub mod additive;
+pub mod constraint;
+pub mod emergent;
 pub mod engine;
+pub mod redundant;
 pub mod rules;
 
 pub use engine::CompositionEngine;
