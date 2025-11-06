@@ -25,7 +25,8 @@ type PeerCallbacks = Arc<Mutex<Vec<Box<dyn Fn(PeerEvent) + Send + Sync>>>>;
 /// Wraps the existing DittoStore to provide trait-based abstraction.
 pub struct DittoBackend {
     /// Underlying Ditto store (None until initialized)
-    store: Arc<Mutex<Option<DittoStore>>>,
+    /// Wrapped in Arc so all operations use the same instance
+    store: Arc<Mutex<Option<Arc<DittoStore>>>>,
 
     /// Peer event callbacks
     peer_callbacks: PeerCallbacks,
@@ -47,19 +48,29 @@ impl DittoBackend {
     /// This is useful for tests that create stores directly.
     pub fn from_store(store: DittoStore) -> Self {
         Self {
-            store: Arc::new(Mutex::new(Some(store))),
+            store: Arc::new(Mutex::new(Some(Arc::new(store)))),
             peer_callbacks: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
     /// Get a reference to the underlying store (if initialized)
-    fn get_store(&self) -> Result<DittoStore> {
+    ///
+    /// Returns Arc to ensure all operations use the same DittoStore instance.
+    /// This is critical for peer discovery to work correctly.
+    fn get_store(&self) -> Result<Arc<DittoStore>> {
         self.store
             .lock()
             .unwrap()
             .as_ref()
             .cloned()
             .ok_or_else(|| Error::config_error("Backend not initialized", None))
+    }
+
+    /// Get a reference to the underlying DittoStore for testing/debugging
+    ///
+    /// Exposes the Arc-wrapped DittoStore for tests that need direct access.
+    pub fn get_ditto_store(&self) -> Result<Arc<DittoStore>> {
+        self.get_store()
     }
 }
 
@@ -86,8 +97,9 @@ impl DataSyncBackend for DittoBackend {
             tcp_connect_address: config.transport.tcp_connect_address,
         };
 
-        // Create DittoStore
-        let store = DittoStore::new(ditto_config)?;
+        // Create DittoStore wrapped in Arc
+        // Arc ensures all trait method calls use the same instance for peer discovery
+        let store = Arc::new(DittoStore::new(ditto_config)?);
 
         // Store it
         *self.store.lock().unwrap() = Some(store);
@@ -454,6 +466,7 @@ impl PeerDiscovery for DittoBackend {
 impl SyncEngine for DittoBackend {
     async fn start_sync(&self) -> Result<()> {
         let store = self.get_store()?;
+        eprintln!("DittoBackend::start_sync - Ditto ptr: {:p}", store.ditto());
         store.start_sync()
     }
 
@@ -468,7 +481,9 @@ impl SyncEngine for DittoBackend {
         let where_clause = query_to_dql(query);
         let dql_query = format!("SELECT * FROM {} WHERE {}", collection, where_clause);
 
-        // Create Ditto sync subscription
+        eprintln!("DittoBackend::subscribe - Ditto ptr: {:p}", store.ditto());
+
+        // Use Sync API register_subscription_v2 (as per Ditto docs)
         let sync_sub = store
             .ditto()
             .sync()
@@ -480,6 +495,11 @@ impl SyncEngine for DittoBackend {
                     Some(collection.to_string()),
                 )
             })?;
+
+        eprintln!(
+            "DittoBackend: Created subscription for query: {}",
+            dql_query
+        );
 
         // Wrap in our SyncSubscription abstraction
         Ok(SyncSubscription::new(collection, sync_sub))
@@ -716,5 +736,182 @@ mod tests {
         if let Err(e) = result {
             assert!(e.to_string().contains("Backend not initialized"));
         }
+    }
+
+    #[tokio::test]
+    async fn test_trait_two_node_sync() {
+        use crate::sync::{BackendConfig, TransportConfig};
+        use std::collections::HashMap;
+        use tempfile::tempdir;
+        use tokio::time::{sleep, Duration};
+
+        dotenvy::dotenv().ok();
+
+        // Skip test if Ditto credentials not available
+        let app_id = std::env::var("DITTO_APP_ID").ok().and_then(|v| {
+            let trimmed = v.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        });
+        let shared_key = std::env::var("DITTO_SHARED_KEY").ok().and_then(|v| {
+            let trimmed = v.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        });
+
+        if app_id.is_none() || shared_key.is_none() {
+            eprintln!("Skipping test: Ditto credentials not available");
+            return;
+        }
+
+        let app_id = app_id.unwrap();
+        let shared_key = shared_key.unwrap();
+
+        // Create temp directories
+        let temp_dir1 = tempdir().expect("Failed to create temp dir 1");
+        let temp_dir2 = tempdir().expect("Failed to create temp dir 2");
+
+        // Create two backends using concrete types (not boxed traits)
+        let backend1 = DittoBackend::new();
+        let backend2 = DittoBackend::new();
+
+        let tcp_port: u16 = 12346; // Different port from DittoStore test
+
+        // Configure backend1 (listener)
+        let config1 = BackendConfig {
+            app_id: app_id.clone(),
+            persistence_dir: temp_dir1.path().to_path_buf(),
+            shared_key: Some(shared_key.clone()),
+            transport: TransportConfig {
+                tcp_listen_port: Some(tcp_port),
+                tcp_connect_address: None,
+                enable_mdns: false,
+                enable_bluetooth: false,
+                enable_websocket: false,
+                custom: HashMap::new(),
+            },
+            extra: HashMap::new(),
+        };
+
+        // Configure backend2 (connector)
+        let config2 = BackendConfig {
+            app_id,
+            persistence_dir: temp_dir2.path().to_path_buf(),
+            shared_key: Some(shared_key),
+            transport: TransportConfig {
+                tcp_listen_port: None,
+                tcp_connect_address: Some(format!("127.0.0.1:{}", tcp_port)),
+                enable_mdns: false,
+                enable_bluetooth: false,
+                enable_websocket: false,
+                custom: HashMap::new(),
+            },
+            extra: HashMap::new(),
+        };
+
+        // Initialize backends
+        println!("Initializing backends via trait...");
+        backend1
+            .initialize(config1)
+            .await
+            .expect("Failed to init backend1");
+        backend2
+            .initialize(config2)
+            .await
+            .expect("Failed to init backend2");
+
+        // Get sync engines via trait abstraction
+        let sync1 = backend1.sync_engine();
+        let sync2 = backend2.sync_engine();
+
+        // Start sync via trait
+        println!("Starting sync via trait...");
+        sync1.start_sync().await.expect("Failed to start sync1");
+        sync2.start_sync().await.expect("Failed to start sync2");
+
+        // Create subscriptions via trait
+        println!("Creating subscriptions via trait...");
+        let _sub1 = sync1
+            .subscribe("trait_sync_test", &Query::All)
+            .await
+            .expect("Failed to create subscription on backend1");
+        let _sub2 = sync2
+            .subscribe("trait_sync_test", &Query::All)
+            .await
+            .expect("Failed to create subscription on backend2");
+
+        // Wait for peer connection
+        println!("Waiting for peer connection...");
+        sleep(Duration::from_secs(5)).await;
+
+        // Check discovered peers via trait
+        let peers1 = backend1
+            .peer_discovery()
+            .discovered_peers()
+            .await
+            .expect("Failed to get peers from backend1");
+        let peers2 = backend2
+            .peer_discovery()
+            .discovered_peers()
+            .await
+            .expect("Failed to get peers from backend2");
+
+        println!("Backend1 discovered {} peers", peers1.len());
+        println!("Backend2 discovered {} peers", peers2.len());
+
+        // Insert document via trait
+        println!("Inserting document via trait...");
+        let mut fields = HashMap::new();
+        fields.insert(
+            "test_field".to_string(),
+            Value::String("trait_test_value".to_string()),
+        );
+        let doc = Document::with_id("trait_test_001", fields);
+
+        backend1
+            .document_store()
+            .upsert("trait_sync_test", doc)
+            .await
+            .expect("Failed to insert document");
+
+        // Poll for document via trait
+        println!("Waiting for document sync...");
+        let mut synced = false;
+        for attempt in 1..=20 {
+            sleep(Duration::from_millis(500)).await;
+
+            let query = Query::Eq {
+                field: "_id".to_string(),
+                value: Value::String("trait_test_001".to_string()),
+            };
+
+            let docs = backend2
+                .document_store()
+                .query("trait_sync_test", &query)
+                .await
+                .expect("Failed to query");
+
+            if !docs.is_empty() {
+                println!("✓ Document synced after {} attempts", attempt);
+                synced = true;
+                break;
+            }
+        }
+
+        // Shutdown
+        backend1.shutdown().await.ok();
+        backend2.shutdown().await.ok();
+        sleep(Duration::from_millis(100)).await;
+
+        assert!(
+            synced,
+            "Document failed to sync between backends using trait abstraction"
+        );
     }
 }

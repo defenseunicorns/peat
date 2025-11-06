@@ -47,6 +47,6 @@ export DITTO_APP_ID
 export DITTO_OFFLINE_TOKEN
 export DITTO_SHARED_KEY
 
-# Run the simulation node (trait-based, engine-agnostic)
+# Run the simulation node (trait-based with DQL v2)
 echo "[${NODE_ID}] Backend: ${BACKEND}"
 exec /app/target/release/examples/cap_sim_node $ARGS

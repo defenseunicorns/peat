@@ -47,10 +47,8 @@
 //! **Automerge Backend:**
 //! - (None required - uses local storage only)
 
-use cap_protocol::sync::{
-    BackendConfig, DataSyncBackend, Document, Query, TransportConfig, Value,
-};
 use cap_protocol::sync::ditto::DittoBackend;
+use cap_protocol::sync::{BackendConfig, DataSyncBackend, Document, Query, TransportConfig, Value};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -138,22 +136,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     backend.initialize(config).await?;
     println!("[{}] ✓ Backend initialized", node_id);
 
-    // Start peer discovery
-    println!("[{}] Starting peer discovery...", node_id);
-    backend.peer_discovery().start().await?;
-    println!("[{}] ✓ Peer discovery started", node_id);
+    // Get sync engine once (don't create multiple Arcs)
+    let sync_engine = backend.sync_engine();
 
     // Create subscription for the test collection
     println!("[{}] Creating sync subscription...", node_id);
-    let _subscription = backend
-        .sync_engine()
-        .subscribe("sim_poc", &Query::All)
-        .await?;
+    let _subscription = sync_engine.subscribe("sim_poc", &Query::All).await?;
     println!("[{}] ✓ Sync subscription created", node_id);
 
-    // Start sync
+    // Start sync (on the same sync_engine instance)
+    // Peer discovery happens automatically when sync starts
     println!("[{}] Starting sync...", node_id);
-    backend.sync_engine().start_sync().await?;
+    sync_engine.start_sync().await?;
     println!("[{}] ✓ Sync started", node_id);
 
     // Wait a moment for peer discovery
@@ -162,8 +156,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Execute mode-specific behavior
     let result = match mode.as_str() {
-        "writer" => writer_mode(&backend, &node_id).await,
-        "reader" => reader_mode(&backend, &node_id).await,
+        "writer" => writer_mode(&*backend, &node_id).await,
+        "reader" => reader_mode(&*backend, &node_id).await,
         _ => {
             eprintln!("[{}] ✗ Invalid mode: {}", node_id, mode);
             std::process::exit(1);
@@ -186,7 +180,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Create a backend instance based on type
-fn create_backend(backend_type: &str) -> Result<Box<dyn DataSyncBackend>, Box<dyn std::error::Error>> {
+fn create_backend(
+    backend_type: &str,
+) -> Result<Box<dyn DataSyncBackend>, Box<dyn std::error::Error>> {
     match backend_type {
         "ditto" => Ok(Box::new(DittoBackend::new())),
         // Future: "automerge" => Ok(Box::new(AutomergeBackend::new())),
@@ -207,12 +203,17 @@ fn create_backend_config(
     let enable_mdns = tcp_listen_port.is_none() && tcp_connect_addr.is_none();
     let transport = TransportConfig {
         tcp_listen_port,
-        tcp_connect_address: tcp_connect_addr,
+        tcp_connect_address: tcp_connect_addr.clone(),
         enable_mdns,
         enable_bluetooth: false,
         enable_websocket: false,
         custom: HashMap::new(),
     };
+
+    eprintln!(
+        "[{}] Transport config: listen={:?}, connect={:?}, mdns={}",
+        node_id, tcp_listen_port, tcp_connect_addr, enable_mdns
+    );
 
     let config = match backend_type {
         "ditto" => {
@@ -246,7 +247,7 @@ fn create_backend_config(
 
 /// Writer mode: Create a test document
 async fn writer_mode(
-    backend: &Box<dyn DataSyncBackend>,
+    backend: &dyn DataSyncBackend,
     node_id: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("[{}] === WRITER MODE ===", node_id);
@@ -285,7 +286,7 @@ async fn writer_mode(
 
 /// Reader mode: Wait for document to arrive
 async fn reader_mode(
-    backend: &Box<dyn DataSyncBackend>,
+    backend: &dyn DataSyncBackend,
     node_id: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("[{}] === READER MODE ===", node_id);

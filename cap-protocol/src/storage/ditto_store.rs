@@ -143,6 +143,10 @@ impl DittoStore {
         // - TCP transport (optional) for explicit server/client connections
         //
         // TCP transport is more reliable for localhost testing where mDNS may not work.
+        eprintln!(
+            "DittoStore: Configuring transport - listen={:?}, connect={:?}",
+            config.tcp_listen_port, config.tcp_connect_address
+        );
         ditto.update_transport_config(|transport_config| {
             // Disable BLE
             transport_config.peer_to_peer.bluetooth_le.enabled = false;
