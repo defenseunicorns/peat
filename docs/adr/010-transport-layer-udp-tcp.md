@@ -1,11 +1,36 @@
 # ADR-010: Transport Layer - UDP vs TCP for CAP Protocol
 
-**Status**: Proposed  
-**Date**: 2025-11-05  
-**Authors**: Research Team  
-**Relates To**: ADR-001, ADR-007, ADR-009
+**Status**: Superseded by ADR-011 (Automerge + Iroh Integration)
+**Date**: 2025-11-05
+**Superseded Date**: 2025-11-06
+**Authors**: Research Team
+**Relates To**: ADR-001, ADR-007, ADR-009, ADR-011
 
-## Context and Problem Statement
+---
+
+## Superseded Notice
+
+**This ADR has been superseded by ADR-011 (CRDT + Networking Stack Selection).**
+
+ADR-011 adopts **Iroh** for networking, which provides:
+- **QUIC protocol**: Modern transport with built-in multiplexing, eliminating UDP vs TCP debate
+- **Multi-path support**: Simultaneous use of multiple network interfaces (Starlink + MANET + 5G)
+- **Connection migration**: Sub-second network switching without reconnection
+- **Stream prioritization**: Separate streams for commands vs telemetry (solves head-of-line blocking)
+- **Loss tolerance**: Tunable per-stream, better than TCP or UDP alone
+
+**Why QUIC via Iroh is superior to this proposal**:
+1. TCP vs UDP is a false choice - QUIC provides benefits of both
+2. Multi-path networking requirements demand more than UDP multicast
+3. Connection migration critical for tactical environments (network transitions)
+4. Stream multiplexing eliminates head-of-line blocking without UDP complexity
+5. Iroh provides production-ready peer-to-peer mesh with DHT-based discovery
+
+**This ADR remains for historical context showing the evolution of transport thinking.**
+
+---
+
+## Context and Problem Statement (Original)
 
 The CAP protocol currently assumes TCP as the primary transport layer (via Tokio TcpStream). However, different types of data in the CAP ecosystem have fundamentally different delivery requirements:
 
