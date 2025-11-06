@@ -10,7 +10,9 @@
 //! not just generic CRDT performance. This helps make an evidence-based decision
 //! between Automerge and Ditto for the CAP Protocol.
 //!
-//! Run with: `cargo bench --bench backend_comparison`
+//! Run with: `cargo bench --bench backend_comparison --features automerge-backend`
+
+#![cfg(feature = "automerge-backend")]
 
 use cap_protocol::models::capability::{Capability, CapabilityType};
 use cap_protocol::models::cell::{CellConfig, CellState};
