@@ -11,6 +11,7 @@ use cap_protocol::models::capability::{Capability, CapabilityType};
 use cap_protocol::models::cell::{CellConfig, CellState};
 use cap_protocol::models::node::NodeConfig;
 use cap_protocol::storage::{CellStore, NodeStore};
+use cap_protocol::sync::ditto::DittoBackend;
 use cap_protocol::testing::e2e_harness::E2EHarness;
 use std::time::{Duration, Instant};
 
@@ -48,13 +49,23 @@ async fn test_load_large_formation_nodes() {
     );
     let start_time = Instant::now();
 
-    // Create Ditto store and wrap in NodeStore/CellStore
+    // Create stores for both NodeStore (uses DittoStore) and CellStore (uses DittoBackend)
+    // TODO: Once NodeStore is migrated to DataSyncBackend, use single backend for both
     let ditto_store = harness
         .create_ditto_store()
         .await
         .expect("Failed to create Ditto store");
-    let node_store = NodeStore::new(ditto_store.clone());
-    let cell_store = CellStore::new(ditto_store);
+    let backend = harness
+        .create_ditto_backend()
+        .await
+        .expect("Failed to create Ditto backend");
+
+    let node_store: NodeStore<DittoBackend> = NodeStore::new(ditto_store.into())
+        .await
+        .expect("Failed to create NodeStore");
+    let cell_store = CellStore::new(backend)
+        .await
+        .expect("Failed to create CellStore");
 
     // Phase 1: Create and store nodes
     println!(
@@ -277,12 +288,23 @@ async fn test_load_multi_zone_hierarchy() {
     );
     let start_time = Instant::now();
 
+    // Create stores for both NodeStore (uses DittoStore) and CellStore (uses DittoBackend)
+    // TODO: Once NodeStore is migrated to DataSyncBackend, use single backend for both
     let ditto_store = harness
         .create_ditto_store()
         .await
         .expect("Failed to create Ditto store");
-    let node_store = NodeStore::new(ditto_store.clone());
-    let cell_store = CellStore::new(ditto_store);
+    let backend = harness
+        .create_ditto_backend()
+        .await
+        .expect("Failed to create Ditto backend");
+
+    let node_store: NodeStore<DittoBackend> = NodeStore::new(ditto_store.into())
+        .await
+        .expect("Failed to create NodeStore");
+    let cell_store = CellStore::new(backend)
+        .await
+        .expect("Failed to create CellStore");
 
     // Phase 1: Create nodes distributed across 3 zones
     println!(

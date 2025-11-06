@@ -24,6 +24,7 @@
 
 use cap_protocol::models::cell::{CellConfig, CellState};
 use cap_protocol::storage::CellStore;
+use cap_protocol::sync::ditto::DittoBackend;
 use cap_protocol::testing::E2EHarness;
 use std::time::Duration;
 
@@ -50,9 +51,9 @@ async fn test_e2e_partition_during_formation() {
     let store2 = harness.create_ditto_store().await.unwrap();
     let store3 = harness.create_ditto_store().await.unwrap();
 
-    let cell_store1 = CellStore::new(store1.clone());
-    let cell_store2 = CellStore::new(store2.clone());
-    let cell_store3 = CellStore::new(store3.clone());
+    let cell_store1: CellStore<DittoBackend> = CellStore::new(store1.clone().into()).await.unwrap();
+    let cell_store2: CellStore<DittoBackend> = CellStore::new(store2.clone().into()).await.unwrap();
+    let cell_store3: CellStore<DittoBackend> = CellStore::new(store3.clone().into()).await.unwrap();
 
     // Start sync on all peers
     store1.start_sync().unwrap();
@@ -165,9 +166,10 @@ async fn test_e2e_partition_recovery_convergence() {
     let store2 = harness.create_ditto_store().await.unwrap();
     let store3 = harness.create_ditto_store().await.unwrap();
 
-    let cell_store1 = CellStore::new(store1.clone());
-    let _cell_store2 = CellStore::new(store2.clone());
-    let cell_store3 = CellStore::new(store3.clone());
+    let cell_store1: CellStore<DittoBackend> = CellStore::new(store1.clone().into()).await.unwrap();
+    let _cell_store2: CellStore<DittoBackend> =
+        CellStore::new(store2.clone().into()).await.unwrap();
+    let cell_store3: CellStore<DittoBackend> = CellStore::new(store3.clone().into()).await.unwrap();
 
     // Start all peers
     store1.start_sync().unwrap();
@@ -296,9 +298,9 @@ async fn test_e2e_leader_reelection_after_partition() {
     let store2 = harness.create_ditto_store().await.unwrap();
     let store3 = harness.create_ditto_store().await.unwrap();
 
-    let cell_store1 = CellStore::new(store1.clone());
-    let cell_store2 = CellStore::new(store2.clone());
-    let cell_store3 = CellStore::new(store3.clone());
+    let cell_store1: CellStore<DittoBackend> = CellStore::new(store1.clone().into()).await.unwrap();
+    let cell_store2: CellStore<DittoBackend> = CellStore::new(store2.clone().into()).await.unwrap();
+    let cell_store3: CellStore<DittoBackend> = CellStore::new(store3.clone().into()).await.unwrap();
 
     store1.start_sync().unwrap();
     store2.start_sync().unwrap();
@@ -433,10 +435,14 @@ async fn test_e2e_multi_zone_partition_isolation() {
         .await
         .unwrap();
 
-    let cell_store_alpha1 = CellStore::new(store_alpha1.clone());
-    let _cell_store_alpha2 = CellStore::new(store_alpha2.clone());
-    let cell_store_beta1 = CellStore::new(store_beta1.clone());
-    let _cell_store_beta2 = CellStore::new(store_beta2.clone());
+    let cell_store_alpha1: CellStore<DittoBackend> =
+        CellStore::new(store_alpha1.clone().into()).await.unwrap();
+    let _cell_store_alpha2: CellStore<DittoBackend> =
+        CellStore::new(store_alpha2.clone().into()).await.unwrap();
+    let cell_store_beta1: CellStore<DittoBackend> =
+        CellStore::new(store_beta1.clone().into()).await.unwrap();
+    let _cell_store_beta2: CellStore<DittoBackend> =
+        CellStore::new(store_beta2.clone().into()).await.unwrap();
 
     // Start all peers
     store_alpha1.start_sync().unwrap();

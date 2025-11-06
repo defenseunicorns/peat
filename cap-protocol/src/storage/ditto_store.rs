@@ -36,6 +36,7 @@
 //!
 //! See `examples/ditto_spike.rs` for an example of TCP transport configuration.
 
+use crate::sync::ditto::DittoBackend;
 use crate::{Error, Result};
 use dittolive_ditto::prelude::*;
 use dittolive_ditto::AppId;
@@ -444,6 +445,14 @@ impl Drop for DittoStore {
         // The best we can do is stop_sync() and let the Arc drop naturally
         // Ditto's Drop implementation should handle cleanup when the last Arc is dropped
         debug!("DittoStore dropped, sync stopped");
+    }
+}
+
+// Conversion from DittoStore to Arc<DittoBackend>
+// This allows tests using DittoStore to work with the new abstraction layer
+impl From<DittoStore> for Arc<DittoBackend> {
+    fn from(store: DittoStore) -> Self {
+        Arc::new(DittoBackend::from_store(store))
     }
 }
 

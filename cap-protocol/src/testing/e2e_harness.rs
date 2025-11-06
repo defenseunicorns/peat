@@ -23,7 +23,10 @@
 //! ```
 
 use crate::storage::ditto_store::{DittoConfig, DittoStore};
+use crate::sync::ditto::DittoBackend;
+use crate::sync::{BackendConfig, DataSyncBackend, TransportConfig};
 use crate::{Error, Result};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -95,6 +98,66 @@ impl E2EHarness {
         self.temp_dirs.push(temp_dir);
 
         Ok(store)
+    }
+
+    /// Create a new isolated Ditto backend for testing
+    ///
+    /// This is the recommended method for tests using CellStore, which requires
+    /// Arc<DittoBackend>. Each backend gets:
+    /// - Unique persistence directory
+    /// - Shared app_id and shared_key for sync mesh
+    /// - Uses mDNS/LAN discovery (no TCP listener/client)
+    pub async fn create_ditto_backend(&mut self) -> Result<Arc<DittoBackend>> {
+        self.create_ditto_backend_with_tcp(None, None).await
+    }
+
+    /// Create a new isolated Ditto backend with optional TCP configuration
+    ///
+    /// Use this when you need explicit TCP topology to avoid mDNS file descriptor issues
+    /// with multiple instances (4+).
+    ///
+    /// # Arguments
+    /// * `tcp_listen_port` - If Some(port), this instance will listen on that TCP port
+    /// * `tcp_connect_address` - If Some(addr), this instance will connect to that address
+    pub async fn create_ditto_backend_with_tcp(
+        &mut self,
+        tcp_listen_port: Option<u16>,
+        tcp_connect_address: Option<String>,
+    ) -> Result<Arc<DittoBackend>> {
+        let temp_dir = tempfile::tempdir().map_err(|e| {
+            Error::storage_error(
+                format!("Failed to create temp dir: {}", e),
+                "test_setup",
+                None,
+            )
+        })?;
+
+        let app_id = std::env::var("DITTO_APP_ID")
+            .unwrap_or_else(|_| "00000000-0000-0000-0000-000000000000".to_string());
+        let shared_key = std::env::var("DITTO_SHARED_KEY")
+            .unwrap_or_else(|_| "shared_key_for_testing".to_string());
+
+        let persistence_path = temp_dir.path().to_path_buf();
+
+        let config = BackendConfig {
+            app_id,
+            persistence_dir: persistence_path,
+            shared_key: Some(shared_key),
+            transport: TransportConfig {
+                tcp_listen_port,
+                tcp_connect_address,
+                ..Default::default()
+            },
+            extra: HashMap::new(),
+        };
+
+        let backend = DittoBackend::new();
+        backend.initialize(config).await?;
+        backend.sync_engine().start_sync().await?;
+
+        self.temp_dirs.push(temp_dir);
+
+        Ok(Arc::new(backend))
     }
 
     /// Create a squad observer that triggers on document changes
