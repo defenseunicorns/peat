@@ -22,6 +22,9 @@ chrono = { workspace = true }
 geohash = "0.13"
 tempfile = "3.13"
 
+# CRDT Backends (E8 Evaluation - ADR-007)
+automerge = "0.7.1"  # Automerge CRDT library for evaluation
+
 [dev-dependencies]
 proptest = { workspace = true }
 criterion = { workspace = true }

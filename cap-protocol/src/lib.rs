@@ -29,6 +29,7 @@ pub mod hierarchy;
 pub mod models;
 pub mod network;
 pub mod storage;
+pub mod sync; // Data synchronization abstraction layer
 pub mod testing;
 pub mod traits;
 

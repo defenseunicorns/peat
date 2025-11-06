@@ -176,9 +176,9 @@ pub enum ValidationResult {
 /// C2-Directed Assignment Manager
 ///
 /// Processes C2-issued squad assignments and manages assignment lifecycle.
-pub struct DirectedAssignmentManager {
+pub struct DirectedAssignmentManager<B: crate::sync::DataSyncBackend> {
     /// Cell storage
-    store: CellStore,
+    store: CellStore<B>,
     /// Active assignments being tracked
     assignments: HashMap<String, CellAssignment>,
     /// Node ID of this node
@@ -187,9 +187,9 @@ pub struct DirectedAssignmentManager {
     assignment_timeout: u64,
 }
 
-impl DirectedAssignmentManager {
+impl<B: crate::sync::DataSyncBackend> DirectedAssignmentManager<B> {
     /// Create a new directed assignment manager
-    pub fn new(store: CellStore, my_platform_id: String) -> Self {
+    pub fn new(store: CellStore<B>, my_platform_id: String) -> Self {
         Self {
             store,
             assignments: HashMap::new(),
@@ -355,8 +355,53 @@ impl DirectedAssignmentManager {
 mod tests {
     use super::*;
     use crate::models::{CellConfig, CellState};
-    use crate::storage::ditto_store::DittoStore;
     use crate::storage::CellStore;
+    use crate::sync::ditto::DittoBackend;
+    use crate::sync::{BackendConfig, DataSyncBackend, TransportConfig};
+    use crate::{Error, Result};
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    async fn create_test_store() -> Result<CellStore<DittoBackend>> {
+        // Create unique temp directory for this test to enable parallel execution
+        let temp_dir = tempfile::Builder::new()
+            .prefix(&format!("ditto_directed_test_{}_", std::process::id()))
+            .tempdir()
+            .map_err(|e| {
+                Error::storage_error(
+                    format!("Failed to create temp dir: {}", e),
+                    "create_test_store",
+                    None,
+                )
+            })?;
+
+        let app_id = std::env::var("DITTO_APP_ID")
+            .map_err(|_| Error::storage_error("DITTO_APP_ID not set", "create_test_store", None))?;
+
+        let shared_key = std::env::var("DITTO_SHARED_KEY").map_err(|_| {
+            Error::storage_error("DITTO_SHARED_KEY not set", "create_test_store", None)
+        })?;
+
+        // Get the path before dropping temp_dir
+        let persistence_path = temp_dir.path().to_path_buf();
+
+        // Don't drop temp_dir - leak it to keep directory alive for test duration
+        std::mem::forget(temp_dir);
+
+        let config = BackendConfig {
+            app_id,
+            persistence_dir: persistence_path,
+            shared_key: Some(shared_key),
+            transport: TransportConfig::default(),
+            extra: HashMap::new(),
+        };
+
+        let backend = DittoBackend::new();
+        backend.initialize(config).await?;
+        backend.sync_engine().start_sync().await?;
+
+        CellStore::new(Arc::new(backend)).await
+    }
 
     #[test]
     fn test_assignment_creation() {
@@ -433,15 +478,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_directed_assignment_manager() {
-        let ditto_store = match DittoStore::from_env() {
-            Ok(store) => store,
+        let squad_store = match create_test_store().await {
+            Ok(s) => s,
             Err(_) => {
                 println!("Skipping test - Ditto not configured");
                 return;
             }
         };
 
-        let squad_store = CellStore::new(ditto_store);
         let manager = DirectedAssignmentManager::new(squad_store, "node_1".to_string());
 
         assert_eq!(manager.my_platform_id, "node_1");
@@ -451,15 +495,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_assignment_validation() {
-        let ditto_store = match DittoStore::from_env() {
-            Ok(store) => store,
+        let squad_store = match create_test_store().await {
+            Ok(s) => s,
             Err(_) => {
                 println!("Skipping test - Ditto not configured");
                 return;
             }
         };
-
-        let squad_store = CellStore::new(ditto_store);
 
         // Create a test squad
         let config = CellConfig::new(5);
@@ -483,15 +525,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_assignment_nonexistent_squad() {
-        let ditto_store = match DittoStore::from_env() {
-            Ok(store) => store,
+        let squad_store = match create_test_store().await {
+            Ok(s) => s,
             Err(_) => {
                 println!("Skipping test - Ditto not configured");
                 return;
             }
         };
 
-        let squad_store = CellStore::new(ditto_store);
         let manager = DirectedAssignmentManager::new(squad_store, "node_1".to_string());
 
         let assignment = CellAssignment::new(
@@ -508,15 +549,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_assignment_cleanup() {
-        let ditto_store = match DittoStore::from_env() {
-            Ok(store) => store,
+        let squad_store = match create_test_store().await {
+            Ok(s) => s,
             Err(_) => {
                 println!("Skipping test - Ditto not configured");
                 return;
             }
         };
 
-        let squad_store = CellStore::new(ditto_store);
         let mut manager =
             DirectedAssignmentManager::new(squad_store, "node_1".to_string()).with_timeout(1);
 
