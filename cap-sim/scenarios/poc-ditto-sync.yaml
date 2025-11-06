@@ -1,0 +1,95 @@
+# Shadow Network Simulator Configuration
+# E8.0 POC: Ditto + Shadow Validation
+#
+# This configuration runs two instances of the shadow_poc binary to test
+# whether Ditto SDK works correctly under Shadow's syscall interception.
+#
+# Architecture:
+# - node1 (writer): Creates a test document
+# - node2 (reader): Waits to receive the document via Ditto sync
+# - Both nodes connect via simulated LAN network (mDNS discovery)
+
+general:
+  # Stop simulation after 30 seconds
+  stop_time: 30s
+
+  # Random seed for deterministic simulation
+  # Same seed should produce identical results (critical requirement)
+  seed: 42
+
+  # Logging level (debug, info, warn, error)
+  log_level: info
+
+  # Use multiple cores if available
+  parallelism: 2
+
+  # Data directory for Shadow output
+  data_directory: shadow.data
+
+# Network topology
+network:
+  graph:
+    # Simple network: All hosts on same LAN segment
+    # This is a fast, unconstrained network to isolate Ditto behavior
+    type: gml
+    inline: |
+      graph [
+        node [
+          id 0
+          host_bandwidth_down "100 Mbit"
+          host_bandwidth_up "100 Mbit"
+        ]
+        edge [
+          source 0
+          target 0
+          latency "10 ms"
+          packet_loss 0.0
+        ]
+      ]
+
+# Virtual hosts (simulated nodes)
+hosts:
+  # Writer node: Creates the test document
+  node1:
+    network_node_id: 0
+    processes:
+      - path: target/debug/examples/shadow_poc
+        args: --node-id node1 --mode writer
+        start_time: 1s
+        environment:
+          DITTO_APP_ID: "***REMOVED***"
+          DITTO_OFFLINE_TOKEN: "***REMOVED***"
+          DITTO_SHARED_KEY: "***REMOVED***"
+
+  # Reader node: Waits for the document
+  node2:
+    network_node_id: 0
+    processes:
+      - path: target/debug/examples/shadow_poc
+        args: --node-id node2 --mode reader
+        start_time: 1s
+        environment:
+          DITTO_APP_ID: "***REMOVED***"
+          DITTO_OFFLINE_TOKEN: "***REMOVED***"
+          DITTO_SHARED_KEY: "***REMOVED***"
+
+# Expected behavior:
+# 1. Both nodes start at t=1s
+# 2. Both initialize Ditto instances
+# 3. Both start sync and discover each other (mDNS)
+# 4. node1 (writer) creates document at t~=6s
+# 5. Document syncs to node2 (reader) via Ditto CRDT mesh
+# 6. node2 verifies document received
+# 7. Both exit with success (exit code 0)
+#
+# Success criteria (GO):
+# - Both processes exit with code 0
+# - No syscall errors in Shadow logs
+# - Document sync confirmed in logs
+# - Deterministic (re-run with seed 42 produces same result)
+#
+# Failure criteria (NO-GO):
+# - Ditto crashes or hangs
+# - Syscall errors (unsupported functions)
+# - Timeout (document doesn't sync in 20s)
+# - Non-deterministic behavior

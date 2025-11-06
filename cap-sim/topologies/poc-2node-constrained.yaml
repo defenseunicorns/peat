@@ -1,0 +1,56 @@
+# ContainerLab Topology: 2-Node POC with Network Constraints
+#
+# Purpose: Validate network constraint capabilities for E8
+# Tests:
+#   1. Bandwidth limiting (56 Kbps - tactical radio)
+#   2. Latency injection (50ms)
+#   3. Packet loss (1%)
+#   4. Jitter (10ms)
+#
+# Expected Behavior:
+#   - Document sync should be noticeably slower than unconstrained
+#   - Sync time should be measurably longer (expect 2-5s vs <1s)
+#
+# Usage:
+#   containerlab deploy -t cap-sim/topologies/poc-2node-constrained.yaml
+#   containerlab inspect -t cap-sim/topologies/poc-2node-constrained.yaml
+#
+#   # View link impairments
+#   containerlab tools netem show -t cap-sim/topologies/poc-2node-constrained.yaml
+#
+#   # Destroy when done
+#   containerlab destroy -t cap-sim/topologies/poc-2node-constrained.yaml
+
+name: cap-poc-2node-constrained
+
+topology:
+  nodes:
+    # node1: Writer (creates document)
+    node1:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: node1
+        MODE: writer
+        TCP_LISTEN: "12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    # node2: Reader (receives document)
+    node2:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: node2
+        MODE: reader
+        TCP_CONNECT: "node1:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+  links:
+    # Constrained link simulating tactical radio conditions
+    # NOTE: Impairments are applied via 'containerlab tools netem' after deployment
+    # ContainerLab 0.71.1 doesn't support impairments in YAML
+    - endpoints: ["node1:eth1", "node2:eth1"]

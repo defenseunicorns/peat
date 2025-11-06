@@ -1,0 +1,104 @@
+# Shadow Network Simulator - Extreme Constraint Validation
+# E8.1 Priority 1: Validate Shadow can constrain Ditto traffic
+#
+# This scenario tests whether Shadow's network constraints (bandwidth, latency, packet loss)
+# actually affect Ditto's network behavior. This is a CRITICAL validation before proceeding
+# with full E8.1 implementation.
+#
+# Test Configuration:
+# - EXTREME constraints to make effects obvious
+# - 56 Kbps bandwidth (tactical radio constraint)
+# - 1000ms latency (very high - effects should be obvious)
+# - 5% packet loss (should see retransmissions)
+#
+# Success Criteria:
+# - Document sync takes significantly longer than baseline (expect >2s vs <1s)
+# - Bandwidth usage stays under 56 Kbps limit
+# - Evidence of packet loss/retransmissions
+# - Constraints are measurable in Shadow metrics
+#
+# If these criteria fail, Shadow cannot constrain Ditto traffic and we must
+# fall back to Linux namespaces approach (ADR-008 Option 1).
+
+general:
+  # Run for 40 seconds to allow enough time for sync with high latency
+  stop_time: 40s
+
+  # Deterministic seed
+  seed: 42
+
+  # Logging level
+  log_level: info
+
+  # Use multiple cores
+  parallelism: 2
+
+  # Data directory
+  data_directory: shadow.data
+
+# Network topology with EXTREME constraints
+network:
+  graph:
+    type: gml
+    inline: |
+      graph [
+        node [
+          id 0
+          host_bandwidth_down "56 Kbit"
+          host_bandwidth_up "56 Kbit"
+        ]
+        edge [
+          source 0
+          target 0
+          latency "1000 ms"
+          packet_loss 0.05
+        ]
+      ]
+
+# Virtual hosts
+hosts:
+  # node1: Writer + TCP listener (server)
+  node1:
+    network_node_id: 0
+    processes:
+      - path: target/debug/examples/shadow_poc
+        args: --node-id node1 --mode writer --tcp-listen 12345
+        start_time: 1s
+        environment:
+          DITTO_APP_ID: "***REMOVED***"
+          DITTO_OFFLINE_TOKEN: "***REMOVED***"
+          DITTO_SHARED_KEY: "***REMOVED***"
+
+  # node2: Reader + TCP client (connects to node1)
+  node2:
+    network_node_id: 0
+    processes:
+      - path: target/debug/examples/shadow_poc
+        args: --node-id node2 --mode reader --tcp-connect 11.0.0.1:12345
+        start_time: 1s
+        environment:
+          DITTO_APP_ID: "***REMOVED***"
+          DITTO_OFFLINE_TOKEN: "***REMOVED***"
+          DITTO_SHARED_KEY: "***REMOVED***"
+
+# Expected behavior with extreme constraints:
+#
+# 1. Both nodes start at t=1s
+# 2. TCP connection established (with 1000ms latency - expect ~2s to establish)
+# 3. Ditto handshake/peer discovery (with latency - expect another 2-3s)
+# 4. node1 creates document at t~=6s
+# 5. Document syncs to node2 with:
+#    - 1000ms round-trip latency
+#    - 56 Kbps bandwidth limit
+#    - 5% packet loss (some retransmissions)
+# 6. Expect sync to complete in 10-20s (vs <1s without constraints)
+# 7. Both nodes exit successfully
+#
+# Validation Analysis:
+# - Compare sync time vs baseline (should be MUCH slower)
+# - Check Shadow bandwidth metrics (should not exceed 56 Kbps)
+# - Look for TCP retransmissions in logs (packet loss effect)
+# - Verify latency affects observable timing
+#
+# GO criteria: Clear evidence that constraints affect Ditto behavior
+# NO-GO criteria: Sync time/bandwidth same as unconstrained baseline
