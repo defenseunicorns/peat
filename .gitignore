@@ -36,3 +36,9 @@ coverage/
 # Build artifacts
 dist/
 build/
+
+# Shadow simulator
+shadow.data/
+
+# ContainerLab
+cap-sim/topologies/clab-*/
