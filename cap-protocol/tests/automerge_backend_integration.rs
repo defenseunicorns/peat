@@ -6,6 +6,8 @@
 //! Unlike Ditto integration tests, these don't require external credentials
 //! and can test CRDT merge behavior directly using Automerge's sync protocol.
 
+#![cfg(feature = "automerge-backend")]
+
 use cap_protocol::models::cell::{CellConfig, CellState};
 use cap_protocol::models::node::NodeConfig;
 use cap_protocol::models::{Capability, CapabilityType};
