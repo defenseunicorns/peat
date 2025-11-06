@@ -26,6 +26,7 @@ use cap_protocol::models::{Capability, CapabilityType};
 use cap_protocol::storage::{CellStore, NodeStore};
 use cap_protocol::sync::ditto::DittoBackend;
 use cap_protocol::testing::E2EHarness;
+use std::sync::Arc;
 use std::time::Duration;
 
 /// Returns the number of sync attempts based on environment.
@@ -748,6 +749,8 @@ async fn test_e2e_leader_election_propagation() {
 /// Validates LWW-Register semantics where latest update wins across peers.
 #[tokio::test]
 async fn test_e2e_timestamped_state_updates() {
+    dotenvy::dotenv().ok();
+
     let ditto_app_id =
         std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
     assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
@@ -756,22 +759,24 @@ async fn test_e2e_timestamped_state_updates() {
 
     println!("=== E2E: Timestamped State Updates ===");
 
-    // Create two peers with explicit TCP connections (mDNS unreliable in 4.11.5)
-    let store1 = harness
+    // Create two DittoBackends (each wraps a DittoStore in Arc)
+    let backend1: Arc<DittoBackend> = harness
         .create_ditto_store_with_tcp(Some(12351), None)
         .await
-        .unwrap();
-    let store2 = harness
+        .unwrap()
+        .into();
+    let backend2: Arc<DittoBackend> = harness
         .create_ditto_store_with_tcp(None, Some("127.0.0.1:12351".to_string()))
         .await
-        .unwrap();
+        .unwrap()
+        .into();
 
-    let cell_store1: CellStore<DittoBackend> = CellStore::new(store1.clone().into()).await.unwrap();
-    let cell_store2: CellStore<DittoBackend> = CellStore::new(store2.clone().into()).await.unwrap();
+    let cell_store1: CellStore<DittoBackend> = CellStore::new(backend1.clone()).await.unwrap();
+    let cell_store2: CellStore<DittoBackend> = CellStore::new(backend2.clone()).await.unwrap();
 
-    // Start sync
-    store1.start_sync().unwrap();
-    store2.start_sync().unwrap();
+    // Get the underlying DittoStores for peer connection checking
+    let store1 = backend1.get_ditto_store().unwrap();
+    let store2 = backend2.get_ditto_store().unwrap();
 
     println!("  1. Waiting for peer connection...");
 
@@ -781,8 +786,12 @@ async fn test_e2e_timestamped_state_updates() {
 
     if connection_result.is_err() {
         println!("  ⚠ Warning: Peer connection timeout - skipping test");
-        harness.shutdown_store(store1).await;
-        harness.shutdown_store(store2).await;
+        harness
+            .shutdown_store(Arc::try_unwrap(store1).unwrap_or_else(|arc| (*arc).clone()))
+            .await;
+        harness
+            .shutdown_store(Arc::try_unwrap(store2).unwrap_or_else(|arc| (*arc).clone()))
+            .await;
         return;
     }
 
@@ -948,8 +957,12 @@ async fn test_e2e_timestamped_state_updates() {
     println!("  6. Latest update (node_beta) won on both peers");
 
     // Cleanup
-    harness.shutdown_store(store1).await;
-    harness.shutdown_store(store2).await;
+    harness
+        .shutdown_store(Arc::try_unwrap(store1).unwrap_or_else(|arc| (*arc).clone()))
+        .await;
+    harness
+        .shutdown_store(Arc::try_unwrap(store2).unwrap_or_else(|arc| (*arc).clone()))
+        .await;
 
     println!("  ✓ Timestamped state updates test complete");
 }

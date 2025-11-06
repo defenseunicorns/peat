@@ -242,7 +242,6 @@ impl Default for TransportConfig {
 ///
 /// Keeps sync active for a collection while alive.
 /// Drop to unsubscribe.
-#[derive(Debug)]
 pub struct SyncSubscription {
     collection: String,
     _handle: Box<dyn std::any::Any + Send + Sync>,
@@ -251,6 +250,7 @@ pub struct SyncSubscription {
 impl SyncSubscription {
     /// Create a new subscription
     pub fn new(collection: impl Into<String>, handle: impl std::any::Any + Send + Sync) -> Self {
+        eprintln!("SyncSubscription::new() - Creating subscription wrapper");
         Self {
             collection: collection.into(),
             _handle: Box::new(handle),
@@ -260,6 +260,23 @@ impl SyncSubscription {
     /// Get the collection this subscription is for
     pub fn collection(&self) -> &str {
         &self.collection
+    }
+}
+
+impl Drop for SyncSubscription {
+    fn drop(&mut self) {
+        eprintln!(
+            "SyncSubscription::drop() - Subscription for '{}' is being dropped!",
+            self.collection
+        );
+    }
+}
+
+impl std::fmt::Debug for SyncSubscription {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SyncSubscription")
+            .field("collection", &self.collection)
+            .finish_non_exhaustive()
     }
 }
 
