@@ -58,9 +58,10 @@ test_mode() {
         fi
     fi
 
-    # Wait for initialization
-    echo "[$(date +%T)] Waiting for node initialization (15s)..."
-    sleep 15
+    # Wait for initialization and test completion
+    # Writer needs 15s for updates + readers need 20s to receive + buffer
+    echo "[$(date +%T)] Waiting for node initialization and test completion (40s)..."
+    sleep 40
 
     # Collect metrics
     echo "[$(date +%T)] Collecting metrics..."
@@ -92,7 +93,9 @@ test_mode() {
     echo "[$(date +%T)] Capturing all container logs..."
     local log_files=""
     for container in $(docker ps --filter "name=clab-cap-" --format "{{.Names}}"); do
-        local log_file="$RESULTS_DIR/${mode_name}_${container##*-}.log"
+        # Extract node name (e.g., "soldier-1", "uav-1", "ugv-1") from container name
+        local node_name=$(echo "$container" | sed 's/.*-\([^-]*-[0-9]*\)$/\1/')
+        local log_file="$RESULTS_DIR/${mode_name}_${node_name}.log"
         docker logs "$container" > "$log_file" 2>&1
         log_files="$log_files $log_file"
     done
@@ -108,15 +111,20 @@ test_mode() {
         local latency_mean=$(jq -r '.latency.mean // 0' "$metrics_json" 2>/dev/null | awk '{printf "%.2f", $1}')
         local latency_p90=$(jq -r '.latency.p90 // 0' "$metrics_json" 2>/dev/null | awk '{printf "%.2f", $1}')
         local latency_p99=$(jq -r '.latency.p99 // 0' "$metrics_json" 2>/dev/null | awk '{printf "%.2f", $1}')
+        local round_trip_ms=$(jq -r '.acknowledgments.round_trip_latency_ms // 0' "$metrics_json" 2>/dev/null | awk '{printf "%.2f", $1}')
+        local ack_count=$(jq -r '.acknowledgments.ack_count // 0' "$metrics_json" 2>/dev/null)
 
         echo "  Convergence time: ${convergence_ms}ms"
         echo "  Latency: mean=${latency_mean}ms, p90=${latency_p90}ms, p99=${latency_p99}ms"
+        echo "  Round-trip latency: ${round_trip_ms}ms (${ack_count} acks)"
     else
         echo "  Warning: Metrics analysis failed"
         convergence_ms="N/A"
         latency_mean="N/A"
         latency_p90="N/A"
         latency_p99="N/A"
+        round_trip_ms="N/A"
+        ack_count="0"
     fi
 
     # Calculate test duration
@@ -135,6 +143,8 @@ Convergence Time: ${convergence_ms}ms
 Latency Mean: ${latency_mean}ms
 Latency P90: ${latency_p90}ms
 Latency P99: ${latency_p99}ms
+Round-trip Latency: ${round_trip_ms}ms
+Acknowledgments Received: ${ack_count}
 Timestamp: $(date)
 EOF
 
@@ -231,11 +241,60 @@ cat >> "$RESULTS_DIR/SUMMARY.md" <<EOF
 
 ### Latency Distribution
 
+**Per-Update Latency** (individual message transmission):
+
 | Metric | Mode 1 | Mode 2 | Mode 3 |
 |--------|--------|--------|--------|
 | Mean Latency | $(grep "Latency Mean:" "$RESULTS_DIR/mode1-client-server_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Latency Mean:" "$RESULTS_DIR/mode2-hub-spoke_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Latency Mean:" "$RESULTS_DIR/mode3-dynamic-mesh_summary.txt" | cut -d: -f2 | tr -d ' ') |
 | P90 Latency | $(grep "Latency P90:" "$RESULTS_DIR/mode1-client-server_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Latency P90:" "$RESULTS_DIR/mode2-hub-spoke_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Latency P90:" "$RESULTS_DIR/mode3-dynamic-mesh_summary.txt" | cut -d: -f2 | tr -d ' ') |
 | P99 Latency | $(grep "Latency P99:" "$RESULTS_DIR/mode1-client-server_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Latency P99:" "$RESULTS_DIR/mode2-hub-spoke_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Latency P99:" "$RESULTS_DIR/mode3-dynamic-mesh_summary.txt" | cut -d: -f2 | tr -d ' ') |
+
+**Round-Trip Latency** (write → all readers acknowledge):
+
+| Metric | Mode 1 | Mode 2 | Mode 3 |
+|--------|--------|--------|--------|
+| Round-Trip Time | $(grep "Round-trip Latency:" "$RESULTS_DIR/mode1-client-server_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Round-trip Latency:" "$RESULTS_DIR/mode2-hub-spoke_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Round-trip Latency:" "$RESULTS_DIR/mode3-dynamic-mesh_summary.txt" | cut -d: -f2 | tr -d ' ') |
+| Acknowledgments | $(grep "Acknowledgments Received:" "$RESULTS_DIR/mode1-client-server_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Acknowledgments Received:" "$RESULTS_DIR/mode2-hub-spoke_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Acknowledgments Received:" "$RESULTS_DIR/mode3-dynamic-mesh_summary.txt" | cut -d: -f2 | tr -d ' ') |
+
+### Traffic Analysis
+
+**Note:** Traffic metrics measure update frequency and bandwidth usage per node type during the test period.
+
+| Metric | Mode 1 | Mode 2 | Mode 3 |
+|--------|--------|--------|--------|
+| Total Messages | $(jq -r '.traffic.total.messages // "N/A"' "$RESULTS_DIR/mode1-client-server_metrics.json" 2>/dev/null || echo "N/A") | $(jq -r '.traffic.total.messages // "N/A"' "$RESULTS_DIR/mode2-hub-spoke_metrics.json" 2>/dev/null || echo "N/A") | $(jq -r '.traffic.total.messages // "N/A"' "$RESULTS_DIR/mode3-dynamic-mesh_metrics.json" 2>/dev/null || echo "N/A") |
+| Messages/sec | $(jq -r '.traffic.total.messages_per_sec // "N/A"' "$RESULTS_DIR/mode1-client-server_metrics.json" 2>/dev/null || echo "N/A") | $(jq -r '.traffic.total.messages_per_sec // "N/A"' "$RESULTS_DIR/mode2-hub-spoke_metrics.json" 2>/dev/null || echo "N/A") | $(jq -r '.traffic.total.messages_per_sec // "N/A"' "$RESULTS_DIR/mode3-dynamic-mesh_metrics.json" 2>/dev/null || echo "N/A") |
+| Bandwidth (kbps) | $(jq -r '.traffic.total.bandwidth_kbps // "N/A"' "$RESULTS_DIR/mode1-client-server_metrics.json" 2>/dev/null || echo "N/A") | $(jq -r '.traffic.total.bandwidth_kbps // "N/A"' "$RESULTS_DIR/mode2-hub-spoke_metrics.json" 2>/dev/null || echo "N/A") | $(jq -r '.traffic.total.bandwidth_kbps // "N/A"' "$RESULTS_DIR/mode3-dynamic-mesh_metrics.json" 2>/dev/null || echo "N/A") |
+
+**By Node Type (Mode 1):**
+
+$(if [ -f "$RESULTS_DIR/mode1-client-server_metrics.json" ]; then
+    echo "| Node Type | Messages | Msg/sec | Bandwidth (kbps) | Avg Size (bytes) |"
+    echo "|-----------|----------|---------|------------------|------------------|"
+    jq -r '.traffic.by_node_type | to_entries[] | "| \(.key) | \(.value.total_messages) | \(.value.messages_per_sec) | \(.value.bandwidth_kbps) | \(.value.avg_message_size) |"' "$RESULTS_DIR/mode1-client-server_metrics.json" 2>/dev/null || echo "| N/A | N/A | N/A | N/A | N/A |"
+else
+    echo "_Traffic data not available_"
+fi)
+
+**By Node Type (Mode 2):**
+
+$(if [ -f "$RESULTS_DIR/mode2-hub-spoke_metrics.json" ]; then
+    echo "| Node Type | Messages | Msg/sec | Bandwidth (kbps) | Avg Size (bytes) |"
+    echo "|-----------|----------|---------|------------------|------------------|"
+    jq -r '.traffic.by_node_type | to_entries[] | "| \(.key) | \(.value.total_messages) | \(.value.messages_per_sec) | \(.value.bandwidth_kbps) | \(.value.avg_message_size) |"' "$RESULTS_DIR/mode2-hub-spoke_metrics.json" 2>/dev/null || echo "| N/A | N/A | N/A | N/A | N/A |"
+else
+    echo "_Traffic data not available_"
+fi)
+
+**By Node Type (Mode 3):**
+
+$(if [ -f "$RESULTS_DIR/mode3-dynamic-mesh_metrics.json" ]; then
+    echo "| Node Type | Messages | Msg/sec | Bandwidth (kbps) | Avg Size (bytes) |"
+    echo "|-----------|----------|---------|------------------|------------------|"
+    jq -r '.traffic.by_node_type | to_entries[] | "| \(.key) | \(.value.total_messages) | \(.value.messages_per_sec) | \(.value.bandwidth_kbps) | \(.value.avg_message_size) |"' "$RESULTS_DIR/mode3-dynamic-mesh_metrics.json" 2>/dev/null || echo "| N/A | N/A | N/A | N/A | N/A |"
+else
+    echo "_Traffic data not available_"
+fi)
 
 ### Connection Analysis
 

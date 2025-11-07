@@ -336,8 +336,8 @@ impl DittoStore {
     pub async fn upsert(&self, collection: &str, document: serde_json::Value) -> Result<String> {
         debug!("Upserting document into collection: {}", collection);
 
-        // Use DQL v2 API - INSERT handles both insert and update (upsert behavior)
-        let dql_query = format!("INSERT INTO {} DOCUMENTS (:doc)", collection);
+        // Use DQL v2 API with ON ID CONFLICT DO UPDATE for proper upsert behavior
+        let dql_query = format!("INSERT INTO {} DOCUMENTS (:doc) ON ID CONFLICT DO UPDATE", collection);
 
         let query_result = self
             .ditto

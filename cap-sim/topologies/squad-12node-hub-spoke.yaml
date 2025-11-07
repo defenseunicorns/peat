@@ -26,7 +26,9 @@ topology:
         NODE_ID: soldier-1
         ROLE: squad_leader
         PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
         MODE: writer
+        UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12345"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
@@ -41,6 +43,7 @@ topology:
         NODE_ID: soldier-2
         ROLE: rifleman
         PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
         MODE: reader
         TCP_LISTEN: "12346"
         TCP_CONNECT: "soldier-1:12345"
@@ -55,6 +58,7 @@ topology:
         NODE_ID: soldier-3
         ROLE: grenadier
         PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
         MODE: reader
         TCP_LISTEN: "12347"
         TCP_CONNECT: "soldier-1:12345"
@@ -69,6 +73,7 @@ topology:
         NODE_ID: soldier-4
         ROLE: automatic_rifleman
         PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
         MODE: reader
         TCP_LISTEN: "12348"
         TCP_CONNECT: "soldier-1:12345"
@@ -83,6 +88,7 @@ topology:
         NODE_ID: soldier-5
         ROLE: rifleman
         PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
         MODE: reader
         TCP_LISTEN: "12349"
         TCP_CONNECT: "soldier-1:12345"
@@ -97,6 +103,7 @@ topology:
         NODE_ID: soldier-6
         ROLE: team_leader
         PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
         MODE: reader
         TCP_LISTEN: "12350"
         TCP_CONNECT: "soldier-1:12345"
@@ -113,6 +120,7 @@ topology:
         NODE_ID: soldier-7
         ROLE: grenadier
         PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
         MODE: reader
         TCP_LISTEN: "12351"
         TCP_CONNECT: "soldier-6:12350"
@@ -127,6 +135,7 @@ topology:
         NODE_ID: soldier-8
         ROLE: automatic_rifleman
         PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
         MODE: reader
         TCP_LISTEN: "12352"
         TCP_CONNECT: "soldier-6:12350"
@@ -141,6 +150,7 @@ topology:
         NODE_ID: soldier-9
         ROLE: rifleman
         PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
         MODE: reader
         TCP_LISTEN: "12353"
         TCP_CONNECT: "soldier-6:12350"
@@ -155,6 +165,7 @@ topology:
         NODE_ID: ugv-1
         ROLE: resupply_isr
         PLATFORM_TYPE: ugv
+        NODE_TYPE: ugv
         MODE: reader
         TCP_LISTEN: "12354"
         TCP_CONNECT: "soldier-1:12345,soldier-6:12350"
@@ -169,6 +180,7 @@ topology:
         NODE_ID: uav-1
         ROLE: reconnaissance
         PLATFORM_TYPE: uav
+        NODE_TYPE: uav
         MODE: reader
         TCP_LISTEN: "12355"
         TCP_CONNECT: "soldier-1:12345"
@@ -183,6 +195,7 @@ topology:
         NODE_ID: uav-2
         ROLE: reconnaissance
         PLATFORM_TYPE: uav
+        NODE_TYPE: uav
         MODE: reader
         TCP_LISTEN: "12356"
         TCP_CONNECT: "soldier-6:12350"

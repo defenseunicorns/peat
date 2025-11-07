@@ -171,3 +171,26 @@ sim-clean: sim-destroy
 	@echo "Cleaning up ContainerLab artifacts..."
 	@cd cap-sim && rm -rf topologies/clab-* || true
 	@echo "✅ Simulation cleanup complete"
+
+# E8 Performance Test Suite (Three-Way Comparison)
+# Runs 36 tests across 3 configurations: Ditto Baseline, CAP Full, CAP Differential
+# Estimated time: 35-40 minutes
+e8-performance-tests:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║   E8 Performance Test Suite - Three-Way Comparison        ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "This will run 36 tests and take approximately 35-40 minutes"
+	@echo "Tests: 3 configs × 4 bandwidths × 3 topologies"
+	@echo ""
+	@cd cap-sim && ./run-e8-performance-suite.sh
+
+# Compare E8 performance results and generate analysis report
+e8-compare-results:
+	@if [ -z "$(DIR)" ]; then \
+		echo "Usage: make e8-compare-results DIR=<results-directory>"; \
+		echo "Example: make e8-compare-results DIR=cap-sim/e8-performance-results-20251107-140000"; \
+		exit 1; \
+	fi
+	@echo "Generating three-way comparison report for $(DIR)..."
+	@echo "TODO: Implement comparison script"

@@ -6,6 +6,7 @@ This script extracts:
 - Convergence time (time from insert to last reader receiving document)
 - Latency distribution (p50, p90, p99)
 - Per-node latency statistics
+- Traffic analysis (messages/sec, bandwidth per node type)
 """
 
 import json
@@ -17,7 +18,10 @@ def parse_metrics(log_file: str) -> Dict[str, Any]:
     """Parse METRICS JSON lines from a log file."""
     metrics = {
         'inserts': [],
-        'receives': []
+        'receives': [],
+        'messages': [],
+        'acknowledgments': [],
+        'all_acks_received': []
     }
 
     with open(log_file, 'r') as f:
@@ -37,6 +41,12 @@ def parse_metrics(log_file: str) -> Dict[str, Any]:
                     metrics['inserts'].append(event)
                 elif event_type == 'DocumentReceived':
                     metrics['receives'].append(event)
+                elif event_type == 'MessageSent':
+                    metrics['messages'].append(event)
+                elif event_type == 'DocumentAcknowledged':
+                    metrics['acknowledgments'].append(event)
+                elif event_type == 'AllAcksReceived':
+                    metrics['all_acks_received'].append(event)
             except json.JSONDecodeError as e:
                 print(f"Warning: Failed to parse JSON: {json_str}", file=sys.stderr)
                 continue
@@ -109,6 +119,111 @@ def analyze_convergence(inserts: List[Dict], receives: List[Dict]) -> Dict[str, 
         'nodes_received': len(receive_times)
     }
 
+def analyze_traffic(messages: List[Dict]) -> Dict[str, Any]:
+    """Analyze traffic patterns by node type."""
+    if not messages:
+        return {
+            'by_node_type': {},
+            'total': {
+                'messages': 0,
+                'total_bytes': 0,
+                'duration_sec': 0,
+                'messages_per_sec': 0,
+                'bandwidth_kbps': 0
+            }
+        }
+
+    # Group messages by node type
+    by_type = {}
+    for msg in messages:
+        node_type = msg.get('node_type', 'unknown')
+        if node_type not in by_type:
+            by_type[node_type] = []
+        by_type[node_type].append(msg)
+
+    # Calculate stats per node type
+    type_stats = {}
+    for node_type, type_messages in by_type.items():
+        if not type_messages:
+            continue
+
+        # Get time range
+        timestamps = [m['timestamp_us'] for m in type_messages]
+        min_time = min(timestamps)
+        max_time = max(timestamps)
+        duration_us = max_time - min_time
+        duration_sec = duration_us / 1_000_000.0 if duration_us > 0 else 1.0
+
+        # Calculate totals
+        total_messages = len(type_messages)
+        total_bytes = sum(m['message_size_bytes'] for m in type_messages)
+
+        # Calculate rates
+        messages_per_sec = total_messages / duration_sec if duration_sec > 0 else 0
+        bytes_per_sec = total_bytes / duration_sec if duration_sec > 0 else 0
+        bandwidth_kbps = (bytes_per_sec * 8) / 1000.0  # Convert to kilobits per second
+
+        # Count unique nodes
+        unique_nodes = len(set(m['node_id'] for m in type_messages))
+
+        type_stats[node_type] = {
+            'total_messages': total_messages,
+            'total_bytes': total_bytes,
+            'duration_sec': round(duration_sec, 2),
+            'messages_per_sec': round(messages_per_sec, 2),
+            'bytes_per_sec': round(bytes_per_sec, 2),
+            'bandwidth_kbps': round(bandwidth_kbps, 2),
+            'avg_message_size': round(total_bytes / total_messages, 2) if total_messages > 0 else 0,
+            'unique_nodes': unique_nodes
+        }
+
+    # Calculate overall totals
+    all_timestamps = [m['timestamp_us'] for m in messages]
+    total_duration_us = max(all_timestamps) - min(all_timestamps)
+    total_duration_sec = total_duration_us / 1_000_000.0 if total_duration_us > 0 else 1.0
+    total_messages = len(messages)
+    total_bytes = sum(m['message_size_bytes'] for m in messages)
+    total_msg_per_sec = total_messages / total_duration_sec if total_duration_sec > 0 else 0
+    total_bytes_per_sec = total_bytes / total_duration_sec if total_duration_sec > 0 else 0
+    total_bandwidth_kbps = (total_bytes_per_sec * 8) / 1000.0
+
+    return {
+        'by_node_type': type_stats,
+        'total': {
+            'messages': total_messages,
+            'total_bytes': total_bytes,
+            'duration_sec': round(total_duration_sec, 2),
+            'messages_per_sec': round(total_msg_per_sec, 2),
+            'bytes_per_sec': round(total_bytes_per_sec, 2),
+            'bandwidth_kbps': round(total_bandwidth_kbps, 2)
+        }
+    }
+
+def analyze_acknowledgments(acks: List[Dict], all_acks_received: List[Dict]) -> Dict[str, Any]:
+    """Analyze round-trip acknowledgment latency."""
+    if not all_acks_received:
+        return {
+            'round_trip_latency_ms': 0,
+            'ack_count': 0,
+            'acknowledgments': []
+        }
+
+    # There should be only one AllAcksReceived event (from the writer)
+    ack_event = all_acks_received[0] if all_acks_received else None
+
+    if not ack_event:
+        return {
+            'round_trip_latency_ms': 0,
+            'ack_count': 0,
+            'acknowledgments': []
+        }
+
+    return {
+        'round_trip_latency_ms': ack_event.get('round_trip_latency_ms', 0),
+        'ack_count': ack_event.get('ack_count', 0),
+        'acknowledgments': [{'node_id': a['node_id'], 'doc_id': a['doc_id']} for a in acks]
+    }
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: analyze_metrics.py <log_file1> [log_file2 ...]", file=sys.stderr)
@@ -116,6 +231,9 @@ def main():
 
     all_inserts = []
     all_receives = []
+    all_messages = []
+    all_acknowledgments = []
+    all_acks_received = []
 
     # Parse all log files
     for log_file in sys.argv[1:]:
@@ -123,6 +241,9 @@ def main():
             metrics = parse_metrics(log_file)
             all_inserts.extend(metrics['inserts'])
             all_receives.extend(metrics['receives'])
+            all_messages.extend(metrics['messages'])
+            all_acknowledgments.extend(metrics['acknowledgments'])
+            all_acks_received.extend(metrics['all_acks_received'])
         except FileNotFoundError:
             print(f"Warning: File not found: {log_file}", file=sys.stderr)
             continue
@@ -134,10 +255,18 @@ def main():
     # Calculate convergence time
     convergence = analyze_convergence(all_inserts, all_receives)
 
+    # Calculate traffic statistics
+    traffic = analyze_traffic(all_messages)
+
+    # Calculate acknowledgment statistics
+    acknowledgments = analyze_acknowledgments(all_acknowledgments, all_acks_received)
+
     # Output as JSON for easy parsing
     result = {
         'latency': latency_stats,
         'convergence': convergence,
+        'traffic': traffic,
+        'acknowledgments': acknowledgments,
         'per_node': []
     }
 
