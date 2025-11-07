@@ -271,6 +271,7 @@ impl GeographicDiscovery {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::CapabilityExt;
 
     #[test]
     fn test_geohash_encoding() {
@@ -295,20 +296,18 @@ mod tests {
 
         let pos = GeoCoordinate::new(37.7749, -122.4194, 100.0).unwrap();
         let caps = vec![
-            Capability {
-                id: "intel1".to_string(),
-                name: "Intelligence".to_string(),
-                capability_type: CapabilityType::Sensor,
-                confidence: 0.9,
-                metadata: serde_json::json!({}),
-            },
-            Capability {
-                id: "comms1".to_string(),
-                name: "Communications".to_string(),
-                capability_type: CapabilityType::Communication,
-                confidence: 0.95,
-                metadata: serde_json::json!({}),
-            },
+            Capability::new(
+                "intel1".to_string(),
+                "Intelligence".to_string(),
+                CapabilityType::Sensor,
+                0.9,
+            ),
+            Capability::new(
+                "comms1".to_string(),
+                "Communications".to_string(),
+                CapabilityType::Communication,
+                0.95,
+            ),
         ];
 
         let beacon = GeographicBeacon::new("node_1".to_string(), pos, caps);

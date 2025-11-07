@@ -3,7 +3,7 @@
 //! This module defines tunable policies for hybrid human-machine leadership election.
 //! Policies can be loaded from configuration files, environment variables, or C2 directives.
 
-use crate::models::{Operator, OperatorRank};
+use crate::models::{Operator, OperatorExt, OperatorRank};
 use crate::traits::Phase;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -99,19 +99,24 @@ impl ElectionPolicyConfig {
     /// Check if an operator is qualified to be squad leader
     pub fn is_qualified_leader(&self, operator: &Operator) -> bool {
         // Check cognitive load
-        if operator.cognitive_load > self.max_cognitive_load {
+        if operator.cognitive_load() > self.max_cognitive_load {
             return false;
         }
 
         // Check fatigue
-        if operator.fatigue > self.max_fatigue {
+        if operator.fatigue() > self.max_fatigue {
             return false;
         }
 
         // Check minimum rank
         if let Some(min_rank) = &self.min_leader_rank {
-            if operator.rank < *min_rank {
-                return false;
+            let op_rank = OperatorRank::try_from(operator.rank).ok();
+            if let Some(op_rank) = op_rank {
+                if op_rank < *min_rank {
+                    return false;
+                }
+            } else {
+                return false; // Invalid rank
             }
         }
 
@@ -162,7 +167,8 @@ impl LeadershipPolicy {
         match context.mission_phase {
             Phase::Discovery => (0.7, 0.3), // Planning phase - authority matters more
             Phase::Cell => (0.6, 0.4),      // Cell ops - balanced
-            Phase::Hierarchical => (0.8, 0.2), // Hierarchical - authority critical
+            Phase::Hierarchy => (0.8, 0.2), // Hierarchical - authority critical
+            Phase::Unspecified => (0.6, 0.4), // Default to balanced
         }
     }
 }
@@ -266,7 +272,7 @@ fn parse_rank_string(s: &str) -> Option<OperatorRank> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::AuthorityLevel;
+    use crate::models::{AuthorityLevel, OperatorExt};
 
     #[test]
     fn test_default_config() {
@@ -327,12 +333,12 @@ mod tests {
 
         // Disqualified - high cognitive load
         let mut overloaded = qualified.clone();
-        overloaded.cognitive_load = 0.95;
+        overloaded.update_cognitive_load(0.95);
         assert!(!config.is_qualified_leader(&overloaded));
 
         // Disqualified - high fatigue
         let mut fatigued = qualified.clone();
-        fatigued.fatigue = 0.90;
+        fatigued.update_fatigue(0.90);
         assert!(!config.is_qualified_leader(&fatigued));
     }
 
@@ -371,7 +377,7 @@ mod tests {
         assert_eq!(auth, 0.6);
 
         // Hierarchical phase - authority critical
-        let context = ElectionContext::new(policy.clone(), Phase::Hierarchical);
+        let context = ElectionContext::new(policy.clone(), Phase::Hierarchy);
         let (auth, _tech) = policy.get_weights(&context);
         assert_eq!(auth, 0.8);
     }
@@ -405,12 +411,12 @@ mod tests {
                 authority_weight: 0.6,
                 technical_weight: 0.4,
             },
-            Phase::Hierarchical,
+            Phase::Hierarchy,
         )
         .with_authority_required(true)
         .with_casualties(2);
 
-        assert_eq!(context.mission_phase, Phase::Hierarchical);
+        assert_eq!(context.mission_phase, Phase::Hierarchy);
         assert!(context.authority_required);
         assert_eq!(context.casualty_count, 2);
     }

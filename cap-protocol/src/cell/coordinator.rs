@@ -244,7 +244,7 @@ impl CellCoordinator {
             });
         }
 
-        Ok(Phase::Hierarchical)
+        Ok(Phase::Hierarchy)
     }
 
     /// Reset formation (for retry scenarios)
@@ -263,7 +263,8 @@ impl CellCoordinator {
 mod tests {
     use super::*;
     use crate::models::{
-        AuthorityLevel, Capability, CapabilityType, HumanMachinePair, Operator, OperatorRank,
+        AuthorityLevel, Capability, CapabilityExt, CapabilityType, HumanMachinePair,
+        HumanMachinePairExt, NodeConfigExt, NodeStateExt, Operator, OperatorExt, OperatorRank,
     };
 
     fn create_test_member(
@@ -561,7 +562,7 @@ mod tests {
         assert!(coord.can_transition_to_hierarchical());
 
         let phase = coord.get_hierarchical_phase().unwrap();
-        assert_eq!(phase, Phase::Hierarchical);
+        assert_eq!(phase, Phase::Hierarchy);
     }
 
     #[test]
