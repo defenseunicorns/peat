@@ -1,31 +1,24 @@
-# ContainerLab Topology: 12-Node Squad Formation
+# ContainerLab Topology: 12-Node Squad - Mode 2 (Hub-Spoke)
 #
-# Purpose: Validate squad-level cell formation with realistic military structure
+# Purpose: Realistic hierarchical structure with squad/team leaders
+# Tests: Hierarchical sync, O(n log n) messaging, relay behavior
 #
-# Squad Structure:
-#   - 9 Soldiers (dismounted infantry with sensors/comms)
-#   - 1 UGV (unmanned ground vehicle - autonomous resupply/ISR)
-#   - 2 UAVs (quadcopter drones for aerial reconnaissance)
+# Network Topology:
+#   Squad Leader (soldier-1)
+#     ├─ Fire Team 1 (soldiers 2-5)
+#     ├─ Team Leader 2 (soldier-6)
+#     │   └─ Fire Team 2 (soldiers 7-9)
+#     ├─ UGV (connects to both leaders - relay)
+#     └─ UAV-1
+#   Team Leader 2
+#     └─ UAV-2
 #
-# Network Design:
-#   - Intra-squad mesh: 100 Kbps, 100ms (local WiFi/Bluetooth mesh)
-#   - Soldier-UGV links: 1 Mbps, 50ms (high bandwidth, UGV is comm relay)
-#   - UAV-Squad links: 56 Kbps, 500ms (aerial radio, higher latency)
-#
-# Reference: ADR-008 Network Simulation Layer
-#
-# Usage:
-#   containerlab deploy -t cap-sim/topologies/squad-12node.yaml --env-file .env
-#   containerlab inspect -t cap-sim/topologies/squad-12node.yaml
-#   containerlab destroy -t cap-sim/topologies/squad-12node.yaml
+# Use: make sim-deploy-squad-hierarchical
 
-name: cap-squad-12node
+name: cap-squad-hub-spoke
 
 topology:
   nodes:
-    # ============================================
-    # SQUAD LEADER (Soldier 1)
-    # ============================================
     soldier-1:
       kind: linux
       image: cap-sim-node:latest
@@ -33,19 +26,14 @@ topology:
         NODE_ID: soldier-1
         ROLE: squad_leader
         PLATFORM_TYPE: soldier
-        MODE: writer  # Creates initial test document
-        # TCP mesh: Listen and connect to all peers
+        MODE: writer
         TCP_LISTEN: "12345"
-        # Ditto credentials from .env
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
       ports:
-        - "12345:12345"  # Squad leader port
+        - "12345:12345"
 
-    # ============================================
-    # SOLDIERS 2-9 (Squad Members)
-    # ============================================
     soldier-2:
       kind: linux
       image: cap-sim-node:latest
@@ -53,8 +41,9 @@ topology:
         NODE_ID: soldier-2
         ROLE: rifleman
         PLATFORM_TYPE: soldier
-        MODE: reader  # Waits for document sync
+        MODE: reader
         TCP_LISTEN: "12346"
+        TCP_CONNECT: "soldier-1:12345"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
@@ -66,8 +55,9 @@ topology:
         NODE_ID: soldier-3
         ROLE: grenadier
         PLATFORM_TYPE: soldier
-        MODE: reader  # Waits for document sync
+        MODE: reader
         TCP_LISTEN: "12347"
+        TCP_CONNECT: "soldier-1:12345"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
@@ -79,8 +69,9 @@ topology:
         NODE_ID: soldier-4
         ROLE: automatic_rifleman
         PLATFORM_TYPE: soldier
-        MODE: reader  # Waits for document sync
+        MODE: reader
         TCP_LISTEN: "12348"
+        TCP_CONNECT: "soldier-1:12345"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
@@ -92,8 +83,9 @@ topology:
         NODE_ID: soldier-5
         ROLE: rifleman
         PLATFORM_TYPE: soldier
-        MODE: reader  # Waits for document sync
+        MODE: reader
         TCP_LISTEN: "12349"
+        TCP_CONNECT: "soldier-1:12345"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
@@ -105,11 +97,14 @@ topology:
         NODE_ID: soldier-6
         ROLE: team_leader
         PLATFORM_TYPE: soldier
-        MODE: reader  # Waits for document sync
+        MODE: reader
         TCP_LISTEN: "12350"
+        TCP_CONNECT: "soldier-1:12345"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+      ports:
+        - "12350:12350"
 
     soldier-7:
       kind: linux
@@ -118,8 +113,9 @@ topology:
         NODE_ID: soldier-7
         ROLE: grenadier
         PLATFORM_TYPE: soldier
-        MODE: reader  # Waits for document sync
+        MODE: reader
         TCP_LISTEN: "12351"
+        TCP_CONNECT: "soldier-6:12350"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
@@ -131,8 +127,9 @@ topology:
         NODE_ID: soldier-8
         ROLE: automatic_rifleman
         PLATFORM_TYPE: soldier
-        MODE: reader  # Waits for document sync
+        MODE: reader
         TCP_LISTEN: "12352"
+        TCP_CONNECT: "soldier-6:12350"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
@@ -144,15 +141,13 @@ topology:
         NODE_ID: soldier-9
         ROLE: rifleman
         PLATFORM_TYPE: soldier
-        MODE: reader  # Waits for document sync
+        MODE: reader
         TCP_LISTEN: "12353"
+        TCP_CONNECT: "soldier-6:12350"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
 
-    # ============================================
-    # UGV (Unmanned Ground Vehicle)
-    # ============================================
     ugv-1:
       kind: linux
       image: cap-sim-node:latest
@@ -160,15 +155,13 @@ topology:
         NODE_ID: ugv-1
         ROLE: resupply_isr
         PLATFORM_TYPE: ugv
-        MODE: reader  # Waits for document sync
+        MODE: reader
         TCP_LISTEN: "12354"
+        TCP_CONNECT: "soldier-1:12345,soldier-6:12350"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
 
-    # ============================================
-    # UAVs (Unmanned Aerial Vehicles)
-    # ============================================
     uav-1:
       kind: linux
       image: cap-sim-node:latest
@@ -176,8 +169,9 @@ topology:
         NODE_ID: uav-1
         ROLE: reconnaissance
         PLATFORM_TYPE: uav
-        MODE: reader  # Waits for document sync
+        MODE: reader
         TCP_LISTEN: "12355"
+        TCP_CONNECT: "soldier-1:12345"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
@@ -189,21 +183,9 @@ topology:
         NODE_ID: uav-2
         ROLE: reconnaissance
         PLATFORM_TYPE: uav
-        MODE: reader  # Waits for document sync
+        MODE: reader
         TCP_LISTEN: "12356"
+        TCP_CONNECT: "soldier-6:12350"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
-
-  # ============================================
-  # NETWORK TOPOLOGY
-  # ============================================
-  # All nodes connect via ContainerLab's management network (eth0)
-  # This creates a shared L2 domain for all nodes
-  # Network impairments will be applied post-deployment via 'containerlab tools netem'
-  #
-  # Planned Constraints (to be applied manually):
-  # - Soldier mesh: 100 Kbps, 100ms, 1% loss (via eth0)
-  # - UGV relay: 1 Mbps, 50ms, 0.5% loss
-  # - UAV aerial: 56 Kbps, 500ms, 5% loss
-  # - UGV-UAV: 100 Kbps, 200ms, 2% loss
