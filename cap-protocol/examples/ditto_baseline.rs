@@ -1,29 +1,29 @@
-//! Shadow + Ditto POC - GO/NO-GO Validation
+//! Ditto Baseline - Pure Ditto Performance Without CAP Protocol
 //!
-//! This is a minimal test to validate that Ditto SDK works correctly under Shadow's
-//! syscall interception. This is the critical gate for E8 network simulation approach.
+//! This binary provides baseline Ditto performance metrics without CAP Protocol overhead.
+//! Used for comparison testing to measure CAP's performance impact.
 //!
 //! # What This Tests
 //!
-//! - Ditto initialization under Shadow
-//! - Peer discovery (using LAN/mDNS transport)
-//! - Document creation and replication
-//! - CRDT sync across Shadow's simulated network
+//! - Pure Ditto SDK performance (no CAP overhead)
+//! - Document creation and replication baseline
+//! - CRDT sync performance without capability checks
+//! - Baseline metrics for CAP Protocol comparison
 //!
 //! # Architecture
 //!
-//! Shadow will run multiple instances of this binary as separate processes:
-//! - Instance "node1": Creates a test document
-//! - Instance "node2": Waits to receive the document
-//! - Both instances use LAN transport for peer discovery
+//! ContainerLab runs multiple instances of this binary:
+//! - Writer nodes: Create test documents
+//! - Reader nodes: Wait to receive documents
+//! - Uses raw Ditto SDK without CAP Protocol layer
 //!
 //! # Success Criteria
 //!
-//! - Both Ditto instances start successfully
+//! - Ditto instances start successfully
 //! - Peers discover each other
-//! - Document syncs from node1 to node2
-//! - No syscall errors in Shadow logs
-//! - Deterministic behavior (same seed = same result)
+//! - Document syncs from writer to readers
+//! - Provides baseline performance metrics
+//! - Comparable with cap_sim_node results
 //!
 //! # Command Line Arguments
 //!
@@ -128,11 +128,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create subscription for peer discovery
     // Peers only discover each other when they have common subscriptions
     println!("[{}] Creating subscription...", node_id);
-    let _subscription = ditto
-        .store()
-        .collection("shadow_poc")?
-        .find_all()
-        .subscribe();
+    let _subscription = ditto.store().collection("baseline")?.find_all().subscribe();
     println!("[{}] ✓ Subscription created", node_id);
 
     // Start sync
@@ -180,7 +176,7 @@ fn create_ditto_instance(
     let shared_key = std::env::var("DITTO_SHARED_KEY")?;
 
     // Create persistence directory
-    let persistence_dir = format!("/tmp/ditto_shadow_poc_{}", node_id);
+    let persistence_dir = format!("/tmp/ditto_baseline_{}", node_id);
     std::fs::create_dir_all(&persistence_dir)?;
 
     // Step 1: Create persistent root
@@ -264,7 +260,7 @@ fn writer_mode(ditto: &Ditto, node_id: &str) -> Result<(), Box<dyn std::error::E
         "created_by": node_id,
     });
 
-    ditto.store().collection("shadow_poc")?.upsert(doc_json)?;
+    ditto.store().collection("baseline")?.upsert(doc_json)?;
 
     println!("[{}] ✓ Document inserted", node_id);
 
@@ -297,7 +293,7 @@ fn reader_mode(ditto: &Ditto, node_id: &str) -> Result<(), Box<dyn std::error::E
         // Query for test document using Collection API
         let docs = ditto
             .store()
-            .collection("shadow_poc")?
+            .collection("baseline")?
             .find("_id == 'shadow_test_001'")
             .exec()?;
 

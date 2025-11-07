@@ -13,6 +13,9 @@ RUN apt-get update && apt-get install -y \
     net-tools \
     curl \
     jq \
+    iperf3 \
+    python3 \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -23,7 +26,7 @@ COPY . .
 
 # Build BOTH binaries for comparison testing
 RUN cargo build --release --example cap_sim_node
-RUN cargo build --release --example shadow_poc
+RUN cargo build --release --example ditto_baseline
 
 # Create runtime directory for Ditto persistence
 RUN mkdir -p /data/ditto

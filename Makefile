@@ -1,10 +1,11 @@
 .PHONY: help clean clean-ditto build test test-e2e fmt clippy check all pre-commit ci
+.PHONY: sim-build sim-deploy-poc sim-deploy-squad sim-destroy sim-logs sim-clean
 
 # Default target
 help:
 	@echo "CAP Protocol Development Makefile"
 	@echo ""
-	@echo "Available targets:"
+	@echo "Development:"
 	@echo "  help         - Show this help message"
 	@echo "  clean        - Remove build artifacts and Ditto directories"
 	@echo "  clean-ditto  - Remove Ditto persistence directories only"
@@ -17,6 +18,18 @@ help:
 	@echo "  pre-commit   - Run all checks before committing (fmt + clippy + test)"
 	@echo "  ci           - Run full CI pipeline (fmt check + clippy + test)"
 	@echo "  all          - Clean, build, and run all checks"
+	@echo ""
+	@echo "Network Simulation (E8 - requires Linux with ContainerLab):"
+	@echo "  sim-build                  - Build cap-sim-node Docker image"
+	@echo "  sim-deploy-poc             - Deploy 2-node POC topology"
+	@echo "  sim-deploy-squad-simple    - Deploy squad (Mode 1: Client-Server)"
+	@echo "  sim-deploy-squad-hierarchical - Deploy squad (Mode 2: Hub-Spoke)"
+	@echo "  sim-deploy-squad-dynamic   - Deploy squad (Mode 3: Dynamic Mesh) ⭐"
+	@echo "  sim-deploy-squad           - Alias for Mode 3 (recommended)"
+	@echo "  sim-logs NODE=x            - Show logs for specific node"
+	@echo "  sim-inspect                - Inspect running topologies"
+	@echo "  sim-destroy                - Destroy running topology"
+	@echo "  sim-clean                  - Destroy all and clean up artifacts"
 
 # Clean build artifacts and Ditto directories
 clean: clean-ditto
@@ -102,3 +115,82 @@ ci: clean-ditto
 all: clean build check
 	@echo ""
 	@echo "✅ All tasks completed successfully!"
+
+# ============================================
+# E8 Network Simulation (ContainerLab)
+# ============================================
+
+# Build cap-sim-node Docker image
+sim-build:
+	@echo "Building cap-sim-node Docker image..."
+	@docker build -f cap-sim/Dockerfile -t cap-sim-node:latest .
+
+# Deploy 2-node POC
+sim-deploy-poc:
+	@echo "Deploying 2-node POC topology..."
+	@bash -c 'set -a && source .env && set +a && cd cap-sim && containerlab deploy -t topologies/poc-2node.yaml'
+
+# Deploy 12-node squad (Mode 1: Client-Server)
+sim-deploy-squad-simple:
+	@echo "Deploying 12-node squad (Mode 1: Client-Server)..."
+	@bash -c 'set -a && source .env && set +a && cd cap-sim && containerlab deploy -t topologies/squad-12node-client-server.yaml'
+
+# Deploy 12-node squad (Mode 2: Hub-Spoke)
+sim-deploy-squad-hierarchical:
+	@echo "Deploying 12-node squad (Mode 2: Hub-Spoke - Hierarchical)..."
+	@bash -c 'set -a && source .env && set +a && cd cap-sim && containerlab deploy -t topologies/squad-12node-hub-spoke.yaml'
+
+# Deploy 12-node squad (Mode 3: Dynamic Mesh)
+sim-deploy-squad-dynamic:
+	@echo "Deploying 12-node squad (Mode 3: Dynamic Mesh)..."
+	@bash -c 'set -a && source .env && set +a && cd cap-sim && containerlab deploy -t topologies/squad-12node-dynamic-mesh.yaml'
+
+# Deploy 12-node squad (alias for Mode 3 - recommended)
+sim-deploy-squad: sim-deploy-squad-dynamic
+
+# Show logs for specific node
+sim-logs:
+	@if [ -z "$(NODE)" ]; then \
+		echo "Usage: make sim-logs NODE=<container-name>"; \
+		echo "Example: make sim-logs NODE=clab-cap-squad-12node-soldier-1"; \
+		exit 1; \
+	fi
+	@docker logs -f $(NODE)
+
+# Inspect running topologies
+sim-inspect:
+	@containerlab inspect --all
+
+# Destroy current topology
+sim-destroy:
+	@echo "Destroying all ContainerLab topologies..."
+	@containerlab destroy --all --cleanup
+
+# Clean up all simulation artifacts
+sim-clean: sim-destroy
+	@echo "Cleaning up ContainerLab artifacts..."
+	@cd cap-sim && rm -rf topologies/clab-* || true
+	@echo "✅ Simulation cleanup complete"
+
+# E8 Performance Test Suite (Three-Way Comparison)
+# Runs 36 tests across 3 configurations: Ditto Baseline, CAP Full, CAP Differential
+# Estimated time: 35-40 minutes
+e8-performance-tests:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║   E8 Performance Test Suite - Three-Way Comparison        ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "This will run 36 tests and take approximately 35-40 minutes"
+	@echo "Tests: 3 configs × 4 bandwidths × 3 topologies"
+	@echo ""
+	@cd cap-sim && ./run-e8-performance-suite.sh
+
+# Compare E8 performance results and generate analysis report
+e8-compare-results:
+	@if [ -z "$(DIR)" ]; then \
+		echo "Usage: make e8-compare-results DIR=<results-directory>"; \
+		echo "Example: make e8-compare-results DIR=cap-sim/e8-performance-results-20251107-140000"; \
+		exit 1; \
+	fi
+	@echo "Generating three-way comparison report for $(DIR)..."
+	@echo "TODO: Implement comparison script"
