@@ -42,3 +42,4 @@ shadow.data/
 
 # ContainerLab
 cap-sim/topologies/clab-*/
+cap-sim/test-results-*/
