@@ -1,0 +1,169 @@
+// Node definitions for CAP Protocol
+// Version: 1.0.0
+
+syntax = "proto3";
+
+package cap.node.v1;
+
+import "common.proto";
+import "capability.proto";
+
+// Protocol phase enumeration
+enum Phase {
+  PHASE_UNSPECIFIED = 0;
+  PHASE_DISCOVERY = 1;    // Discovery phase (beacon broadcasting)
+  PHASE_CELL = 2;         // Cell formation phase
+  PHASE_HIERARCHY = 3;    // Hierarchical operations phase
+}
+
+// Health status enumeration
+enum HealthStatus {
+  HEALTH_STATUS_UNSPECIFIED = 0;
+  HEALTH_STATUS_NOMINAL = 1;    // Operating normally
+  HEALTH_STATUS_DEGRADED = 2;   // Degraded but operational
+  HEALTH_STATUS_CRITICAL = 3;   // Critical failure imminent
+  HEALTH_STATUS_FAILED = 4;     // Failed/offline
+}
+
+// Operator rank enumeration (military ranks)
+enum OperatorRank {
+  OPERATOR_RANK_UNSPECIFIED = 0;
+  // Enlisted ranks (E1-E9)
+  OPERATOR_RANK_E1 = 1;
+  OPERATOR_RANK_E2 = 2;
+  OPERATOR_RANK_E3 = 3;
+  OPERATOR_RANK_E4 = 4;
+  OPERATOR_RANK_E5 = 5;
+  OPERATOR_RANK_E6 = 6;
+  OPERATOR_RANK_E7 = 7;
+  OPERATOR_RANK_E8 = 8;
+  OPERATOR_RANK_E9 = 9;
+  // Officer ranks (O1-O10)
+  OPERATOR_RANK_O1 = 11;
+  OPERATOR_RANK_O2 = 12;
+  OPERATOR_RANK_O3 = 13;
+  OPERATOR_RANK_O4 = 14;
+  OPERATOR_RANK_O5 = 15;
+  OPERATOR_RANK_O6 = 16;
+  OPERATOR_RANK_O7 = 17;
+  OPERATOR_RANK_O8 = 18;
+  OPERATOR_RANK_O9 = 19;
+  OPERATOR_RANK_O10 = 20;
+  // Warrant Officer ranks (W1-W5)
+  OPERATOR_RANK_W1 = 21;
+  OPERATOR_RANK_W2 = 22;
+  OPERATOR_RANK_W3 = 23;
+  OPERATOR_RANK_W4 = 24;
+  OPERATOR_RANK_W5 = 25;
+}
+
+// Authority level for human-machine teaming
+enum AuthorityLevel {
+  AUTHORITY_LEVEL_UNSPECIFIED = 0;
+  AUTHORITY_LEVEL_OBSERVER = 1;    // Can observe only
+  AUTHORITY_LEVEL_ADVISOR = 2;     // Can provide advice
+  AUTHORITY_LEVEL_SUPERVISOR = 3;  // Can approve/reject actions
+  AUTHORITY_LEVEL_COMMANDER = 4;   // Full command authority
+}
+
+// Binding type for human-machine pairs
+enum BindingType {
+  BINDING_TYPE_UNSPECIFIED = 0;
+  BINDING_TYPE_ONE_TO_ONE = 1;    // One operator, one platform
+  BINDING_TYPE_ONE_TO_MANY = 2;   // One operator, multiple platforms (swarm)
+  BINDING_TYPE_MANY_TO_ONE = 3;   // Multiple operators, one platform
+  BINDING_TYPE_MANY_TO_MANY = 4;  // Multiple operators, multiple platforms
+}
+
+// Human operator information
+message Operator {
+  // Unique operator identifier
+  string id = 1;
+
+  // Operator name
+  string name = 2;
+
+  // Military rank
+  OperatorRank rank = 3;
+
+  // Authority level
+  AuthorityLevel authority_level = 4;
+
+  // Military Occupational Specialty (MOS)
+  string mos = 5;
+
+  // Additional operator metadata
+  string metadata_json = 6;
+}
+
+// Human-machine binding
+message HumanMachinePair {
+  // List of operators
+  repeated Operator operators = 1;
+
+  // List of platform/node IDs
+  repeated string platform_ids = 2;
+
+  // Binding type
+  BindingType binding_type = 3;
+
+  // Timestamp when binding was established
+  common.v1.Timestamp bound_at = 4;
+}
+
+// Node static configuration (immutable)
+message NodeConfig {
+  // Unique platform identifier
+  string id = 1;
+
+  // Node type (UAV, UGV, Soldier System, etc.)
+  string platform_type = 2;
+
+  // Static capabilities (G-Set: grow-only)
+  repeated capability.v1.Capability capabilities = 3;
+
+  // Maximum communication range in meters
+  float comm_range_m = 4;
+
+  // Maximum speed in m/s
+  float max_speed_mps = 5;
+
+  // Human-machine binding (optional)
+  optional HumanMachinePair operator_binding = 6;
+
+  // Timestamp when node was configured
+  common.v1.Timestamp created_at = 7;
+}
+
+// Node dynamic state (mutable, LWW-Register)
+message NodeState {
+  // Current position
+  common.v1.Position position = 1;
+
+  // Fuel remaining in minutes (PN-Counter)
+  uint32 fuel_minutes = 2;
+
+  // Health status (LWW-Register)
+  HealthStatus health = 3;
+
+  // Current phase (LWW-Register)
+  Phase phase = 4;
+
+  // Assigned cell ID (LWW-Register)
+  optional string cell_id = 5;
+
+  // Assigned zone ID for hierarchical routing (LWW-Register)
+  optional string zone_id = 6;
+
+  // Last update timestamp (for LWW conflict resolution)
+  common.v1.Timestamp timestamp = 7;
+}
+
+// Complete node representation
+message Node {
+  // Static configuration
+  NodeConfig config = 1;
+
+  // Dynamic state
+  NodeState state = 2;
+}

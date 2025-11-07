@@ -1,0 +1,61 @@
+// Capability definitions for CAP Protocol
+// Version: 1.0.0
+
+syntax = "proto3";
+
+package cap.capability.v1;
+
+import "common.proto";
+
+// Capability type enumeration
+enum CapabilityType {
+  CAPABILITY_TYPE_UNSPECIFIED = 0;
+  CAPABILITY_TYPE_SENSOR = 1;       // Sensing capabilities (cameras, radar, etc.)
+  CAPABILITY_TYPE_COMPUTE = 2;      // Computing capabilities
+  CAPABILITY_TYPE_COMMUNICATION = 3; // Communication capabilities
+  CAPABILITY_TYPE_MOBILITY = 4;     // Mobility capabilities
+  CAPABILITY_TYPE_PAYLOAD = 5;      // Payload/weapon capabilities
+  CAPABILITY_TYPE_EMERGENT = 6;     // Emergent capability from composition
+}
+
+// Represents a platform or squad capability
+message Capability {
+  // Unique capability identifier
+  string id = 1;
+
+  // Human-readable name
+  string name = 2;
+
+  // Capability type
+  CapabilityType capability_type = 3;
+
+  // Confidence score (0.0 - 1.0)
+  float confidence = 4;
+
+  // Additional metadata (JSON-encoded for flexibility)
+  string metadata_json = 5;
+
+  // Timestamp when capability was registered
+  common.v1.Timestamp registered_at = 6;
+}
+
+// Capability query for discovery
+message CapabilityQuery {
+  // Required capability types
+  repeated CapabilityType required_types = 1;
+
+  // Minimum confidence threshold (0.0 - 1.0)
+  float min_confidence = 2;
+
+  // Optional metadata filters (key-value pairs)
+  map<string, string> metadata_filters = 3;
+}
+
+// Capability response
+message CapabilityResponse {
+  // List of matching capabilities
+  repeated Capability capabilities = 1;
+
+  // Total count of capabilities
+  uint32 total_count = 2;
+}

@@ -1,0 +1,121 @@
+// Zone (hierarchy) definitions for CAP Protocol
+// Version: 1.0.0
+
+syntax = "proto3";
+
+package cap.zone.v1;
+
+import "common.proto";
+import "capability.proto";
+
+// Zone configuration (immutable properties)
+message ZoneConfig {
+  // Unique zone identifier
+  string id = 1;
+
+  // Maximum number of cells in this zone
+  uint32 max_cells = 2;
+
+  // Minimum number of cells required for valid zone
+  uint32 min_cells = 3;
+
+  // Timestamp when zone was created
+  common.v1.Timestamp created_at = 4;
+}
+
+// Zone runtime state (CRDT-based)
+message ZoneState {
+  // Zone configuration
+  ZoneConfig config = 1;
+
+  // Zone coordinator node ID (LWW-Register)
+  optional string coordinator_id = 2;
+
+  // Cell membership (OR-Set)
+  repeated string cells = 3;
+
+  // Aggregated capabilities from all cells (G-Set)
+  repeated capability.v1.Capability aggregated_capabilities = 4;
+
+  // Timestamp for LWW conflict resolution
+  common.v1.Timestamp timestamp = 5;
+}
+
+// Complete zone representation
+message Zone {
+  // Zone configuration
+  ZoneConfig config = 1;
+
+  // Zone state
+  ZoneState state = 2;
+}
+
+// Zone statistics (derived from state)
+message ZoneStats {
+  // Zone ID
+  string zone_id = 1;
+
+  // Number of cells in zone
+  uint32 cell_count = 2;
+
+  // Total number of nodes across all cells
+  uint32 total_nodes = 3;
+
+  // Number of unique capability types
+  uint32 unique_capability_count = 4;
+
+  // Whether zone meets minimum cell requirement
+  bool is_valid = 5;
+
+  // Whether zone is at capacity
+  bool is_full = 6;
+
+  // Timestamp of statistics calculation
+  common.v1.Timestamp calculated_at = 7;
+}
+
+// Zone formation request
+message ZoneFormationRequest {
+  // Requesting cell ID
+  string cell_id = 1;
+
+  // Required zone capabilities
+  repeated capability.v1.CapabilityType required_capabilities = 2;
+
+  // Timestamp of request
+  common.v1.Timestamp requested_at = 3;
+}
+
+// Zone formation response
+message ZoneFormationResponse {
+  // Formed zone (if successful)
+  optional Zone zone = 1;
+
+  // Success indicator
+  bool success = 2;
+
+  // Reason for failure (if any)
+  optional string failure_reason = 3;
+}
+
+// Zone membership change
+message ZoneMembershipChange {
+  // Zone ID
+  string zone_id = 1;
+
+  // Change type
+  enum ChangeType {
+    CHANGE_TYPE_UNSPECIFIED = 0;
+    CHANGE_TYPE_CELL_JOIN = 1;        // Cell joined zone
+    CHANGE_TYPE_CELL_LEAVE = 2;       // Cell left zone
+    CHANGE_TYPE_COORDINATOR_CHANGE = 3; // Zone coordinator changed
+  }
+
+  ChangeType change_type = 2;
+
+  // Cell ID involved in the change
+  string cell_id = 3;
+
+  // Timestamp of change
+  common.v1.Timestamp timestamp = 4;
+}
