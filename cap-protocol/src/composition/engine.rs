@@ -104,7 +104,7 @@ impl Default for CompositionEngine {
 mod tests {
     use super::*;
     use crate::composition::rules::CompositionRule;
-    use crate::models::capability::CapabilityType;
+    use crate::models::capability::{CapabilityExt, CapabilityType};
     use async_trait::async_trait;
 
     // Mock rule for testing

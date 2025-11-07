@@ -4,31 +4,34 @@ use crate::Result;
 use async_trait::async_trait;
 use std::fmt::Debug;
 
-/// Represents a protocol phase
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum Phase {
-    /// Initial discovery and group formation
-    Discovery,
-    /// Cell cohesion and leader election
-    Cell,
-    /// Hierarchical operations with constrained messaging
-    Hierarchical,
+// Re-export Phase from cap_schema
+pub use cap_schema::node::v1::Phase;
+
+/// Extension trait for Phase enum
+pub trait PhaseExt {
+    /// Get lowercase string representation
+    fn as_str(&self) -> &'static str;
+
+    /// Legacy compatibility constants
+    const BOOTSTRAP: Phase;
+    const SQUAD: Phase;
+    const HIERARCHICAL: Phase;
 }
 
-impl std::fmt::Display for Phase {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl PhaseExt for Phase {
+    fn as_str(&self) -> &'static str {
         match self {
-            Phase::Discovery => write!(f, "discovery"),
-            Phase::Cell => write!(f, "cell"),
-            Phase::Hierarchical => write!(f, "hierarchical"),
+            Phase::Unspecified => "unspecified",
+            Phase::Discovery => "discovery",
+            Phase::Cell => "cell",
+            Phase::Hierarchy => "hierarchical",
         }
     }
-}
 
-// Legacy compatibility - old names as aliases
-impl Phase {
-    pub const BOOTSTRAP: Phase = Phase::Discovery;
-    pub const SQUAD: Phase = Phase::Cell;
+    // Legacy compatibility - old names as aliases
+    const BOOTSTRAP: Phase = Phase::Discovery;
+    const SQUAD: Phase = Phase::Cell;
+    const HIERARCHICAL: Phase = Phase::Hierarchy;
 }
 
 /// Node lifecycle management
@@ -106,4 +109,68 @@ pub trait Storage: Send + Sync + Debug {
 
     /// Query values matching a predicate
     async fn query(&self, query: &str) -> Result<Vec<serde_json::Value>>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_phase_as_str() {
+        assert_eq!(Phase::Unspecified.as_str(), "unspecified");
+        assert_eq!(Phase::Discovery.as_str(), "discovery");
+        assert_eq!(Phase::Cell.as_str(), "cell");
+        assert_eq!(Phase::Hierarchy.as_str(), "hierarchical");
+    }
+
+    #[test]
+    fn test_phase_legacy_constants() {
+        assert_eq!(Phase::BOOTSTRAP, Phase::Discovery);
+        assert_eq!(Phase::SQUAD, Phase::Cell);
+        assert_eq!(Phase::HIERARCHICAL, Phase::Hierarchy);
+    }
+
+    #[test]
+    fn test_phase_as_str_all_variants() {
+        // Ensure all Phase variants have string representations
+        let phases = vec![
+            Phase::Unspecified,
+            Phase::Discovery,
+            Phase::Cell,
+            Phase::Hierarchy,
+        ];
+
+        for phase in phases {
+            let s = phase.as_str();
+            assert!(!s.is_empty());
+            assert!(s.chars().all(|c| c.is_ascii_lowercase() || c == '_'));
+        }
+    }
+
+    #[test]
+    fn test_phase_enum_values() {
+        // Test that Phase enum can be converted to/from i32
+        assert_eq!(Phase::Unspecified as i32, 0);
+        assert_eq!(Phase::Discovery as i32, 1);
+        assert_eq!(Phase::Cell as i32, 2);
+        assert_eq!(Phase::Hierarchy as i32, 3);
+    }
+
+    #[test]
+    fn test_phase_pattern_matching() {
+        let phase = Phase::Discovery;
+        match phase {
+            Phase::Unspecified => panic!("Wrong phase"),
+            Phase::Discovery => {} // Expected
+            Phase::Cell => panic!("Wrong phase"),
+            Phase::Hierarchy => panic!("Wrong phase"),
+        }
+    }
+
+    #[test]
+    fn test_phase_equality() {
+        assert_eq!(Phase::Discovery, Phase::Discovery);
+        assert_ne!(Phase::Discovery, Phase::Cell);
+        assert_eq!(Phase::BOOTSTRAP, Phase::Discovery); // Legacy constant
+    }
 }

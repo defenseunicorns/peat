@@ -25,7 +25,10 @@ use cap_protocol::hierarchy::{
 };
 use cap_protocol::models::cell::{CellConfig, CellState};
 use cap_protocol::models::zone::{ZoneConfig, ZoneState};
-use cap_protocol::models::{Capability, CapabilityType};
+use cap_protocol::models::zone::{ZoneConfigExt, ZoneStateExt};
+use cap_protocol::models::{
+    Capability, CapabilityExt, CapabilityType, CellConfigExt, CellStateExt,
+};
 use cap_protocol::testing::E2EHarness;
 
 /// Test: Zone formation creates valid zone with multiple cells
@@ -68,9 +71,9 @@ async fn test_e2e_zone_formation() {
 
     // Add cells to zone
     let mut zone = ZoneState::new(zone_config);
-    zone.add_cell(cell1_full.config.id.clone());
-    zone.add_cell(cell2_full.config.id.clone());
-    zone.add_cell(cell3_full.config.id.clone());
+    zone.add_cell(cell1_full.get_id().unwrap().to_string());
+    zone.add_cell(cell2_full.get_id().unwrap().to_string());
+    zone.add_cell(cell3_full.get_id().unwrap().to_string());
 
     // Verify zone is valid
     assert!(zone.is_valid());
@@ -144,14 +147,12 @@ async fn test_e2e_cell_merge_rebalancing() {
     let mut routing_table = RoutingTable::new();
 
     // Create two undersized cells (< min_size of 3)
-    let mut cell1 = CellState::new(CellConfig::new(10));
-    cell1.config.id = "cell_small_1".to_string();
+    let mut cell1 = CellState::new(CellConfig::with_id("cell_small_1".to_string(), 10));
     cell1.add_member("node_1".to_string());
     cell1.add_member("node_2".to_string());
     cell1.platoon_id = Some("zone_alpha".to_string());
 
-    let mut cell2 = CellState::new(CellConfig::new(10));
-    cell2.config.id = "cell_small_2".to_string();
+    let mut cell2 = CellState::new(CellConfig::with_id("cell_small_2".to_string(), 10));
     cell2.add_member("node_3".to_string());
     cell2.add_member("node_4".to_string());
     cell2.platoon_id = Some("zone_alpha".to_string());
@@ -177,33 +178,25 @@ async fn test_e2e_cell_merge_rebalancing() {
     assert_eq!(merged.members.len(), 4);
 
     // Update routing table
+    let merged_id = merged.get_id().unwrap();
     routing_table.merge_cells(
         &["cell_small_1", "cell_small_2"],
-        &merged.config.id,
+        merged_id,
         Some("zone_alpha"),
         200,
     );
 
     // Verify all nodes now in merged cell
-    assert_eq!(
-        routing_table.get_node_cell("node_1"),
-        Some(merged.config.id.as_str())
-    );
-    assert_eq!(
-        routing_table.get_node_cell("node_2"),
-        Some(merged.config.id.as_str())
-    );
-    assert_eq!(
-        routing_table.get_node_cell("node_3"),
-        Some(merged.config.id.as_str())
-    );
-    assert_eq!(
-        routing_table.get_node_cell("node_4"),
-        Some(merged.config.id.as_str())
-    );
+    assert_eq!(routing_table.get_node_cell("node_1"), Some(merged_id));
+    assert_eq!(routing_table.get_node_cell("node_2"), Some(merged_id));
+    assert_eq!(routing_table.get_node_cell("node_3"), Some(merged_id));
+    assert_eq!(routing_table.get_node_cell("node_4"), Some(merged_id));
 
     // Verify merged cell is balanced
     assert_eq!(maintainer.needs_rebalance(&merged), RebalanceAction::None);
+
+    // Verify merged cell in zone
+    assert_eq!(routing_table.get_cell_zone(merged_id), Some("zone_alpha"));
 
     // Verify old cells removed
     assert_eq!(routing_table.get_cell_zone("cell_small_1"), None);
@@ -219,8 +212,7 @@ async fn test_e2e_cell_split_rebalancing() {
     let mut routing_table = RoutingTable::new();
 
     // Create oversized cell (> max_size of 10)
-    let mut cell = CellState::new(CellConfig::new(15));
-    cell.config.id = "cell_oversized".to_string();
+    let mut cell = CellState::new(CellConfig::with_id("cell_oversized".to_string(), 15));
     cell.platoon_id = Some("zone_beta".to_string());
 
     for i in 0..12 {
@@ -242,11 +234,13 @@ async fn test_e2e_cell_split_rebalancing() {
     // Update routing table
     let nodes_a: Vec<&str> = cell_a.members.iter().map(|s| s.as_str()).collect();
     let nodes_b: Vec<&str> = cell_b.members.iter().map(|s| s.as_str()).collect();
+    let cell_a_id = cell_a.get_id().unwrap();
+    let cell_b_id = cell_b.get_id().unwrap();
 
     routing_table.split_cell(
         "cell_oversized",
-        &cell_a.config.id,
-        &cell_b.config.id,
+        cell_a_id,
+        cell_b_id,
         &nodes_a,
         &nodes_b,
         Some("zone_beta"),
@@ -254,22 +248,16 @@ async fn test_e2e_cell_split_rebalancing() {
     );
 
     // Verify nodes distributed
-    assert_eq!(routing_table.get_cell_nodes(&cell_a.config.id).len(), 6);
-    assert_eq!(routing_table.get_cell_nodes(&cell_b.config.id).len(), 6);
+    assert_eq!(routing_table.get_cell_nodes(cell_a_id).len(), 6);
+    assert_eq!(routing_table.get_cell_nodes(cell_b_id).len(), 6);
 
     // Verify both cells balanced
     assert_eq!(maintainer.needs_rebalance(&cell_a), RebalanceAction::None);
     assert_eq!(maintainer.needs_rebalance(&cell_b), RebalanceAction::None);
 
     // Verify both cells in zone
-    assert_eq!(
-        routing_table.get_cell_zone(&cell_a.config.id),
-        Some("zone_beta")
-    );
-    assert_eq!(
-        routing_table.get_cell_zone(&cell_b.config.id),
-        Some("zone_beta")
-    );
+    assert_eq!(routing_table.get_cell_zone(cell_a_id), Some("zone_beta"));
+    assert_eq!(routing_table.get_cell_zone(cell_b_id), Some("zone_beta"));
 
     // Verify old cell removed
     assert_eq!(routing_table.get_cell_zone("cell_oversized"), None);
@@ -357,18 +345,18 @@ async fn test_e2e_full_hierarchy_lifecycle() {
 
     let mut cells = Vec::new();
     for cell_idx in 0..3 {
-        let mut cell = CellState::new(CellConfig::new(10));
-        cell.config.id = format!("cell_{}", cell_idx);
+        let cell_id = format!("cell_{}", cell_idx);
+        let mut cell = CellState::new(CellConfig::with_id(cell_id.clone(), 10));
         cell.platoon_id = Some("zone_gamma".to_string());
 
         // Add 4 nodes to each cell
         for node_idx in 0..4 {
             let node_id = format!("node_{}_{}", cell_idx, node_idx);
             cell.add_member(node_id.clone());
-            routing_table.assign_node(&node_id, &cell.config.id, 100 + node_idx);
+            routing_table.assign_node(&node_id, &cell_id, 100 + node_idx);
         }
 
-        routing_table.assign_cell(&cell.config.id, "zone_gamma", 200 + cell_idx as u64);
+        routing_table.assign_cell(&cell_id, "zone_gamma", 200 + cell_idx as u64);
         cells.push(cell);
     }
 
@@ -377,7 +365,7 @@ async fn test_e2e_full_hierarchy_lifecycle() {
     // Verify zone formation
     let mut zone = ZoneState::new(zone_config);
     for cell in &cells {
-        zone.add_cell(cell.config.id.clone());
+        zone.add_cell(cell.get_id().unwrap().to_string());
     }
 
     assert!(zone.is_valid());
@@ -389,7 +377,8 @@ async fn test_e2e_full_hierarchy_lifecycle() {
     // 2. Routing Setup: Assign leaders
     for (idx, cell) in cells.iter().enumerate() {
         let leader = format!("node_{}_0", idx);
-        routing_table.set_cell_leader(&cell.config.id, &leader, 300 + idx as u64);
+        let cell_id = cell.get_id().unwrap();
+        routing_table.set_cell_leader(cell_id, &leader, 300 + idx as u64);
     }
 
     println!("  2. Routing configured: leaders assigned");
@@ -397,15 +386,16 @@ async fn test_e2e_full_hierarchy_lifecycle() {
     // Verify routing
     for (idx, cell) in cells.iter().enumerate() {
         let leader = format!("node_{}_0", idx);
-        assert!(routing_table.is_cell_leader(&leader, &cell.config.id));
+        let cell_id = cell.get_id().unwrap();
+        assert!(routing_table.is_cell_leader(&leader, cell_id));
     }
 
     // 3. Simulate node departure → cell becomes undersized
     // Remove 3 nodes from cell_0
     let mut cell_0 = cells[0].clone();
-    cell_0.members.remove("node_0_1");
-    cell_0.members.remove("node_0_2");
-    cell_0.members.remove("node_0_3");
+    cell_0
+        .members
+        .retain(|m| m != "node_0_1" && m != "node_0_2" && m != "node_0_3");
 
     // Now cell_0 has only 1 node (< min_size of 3)
     assert_eq!(cell_0.members.len(), 1);
@@ -420,12 +410,8 @@ async fn test_e2e_full_hierarchy_lifecycle() {
     let merged = maintainer.merge_cells(&cell_0, &cells[1]).unwrap();
     assert_eq!(merged.members.len(), 5); // 1 + 4
 
-    routing_table.merge_cells(
-        &["cell_0", "cell_1"],
-        &merged.config.id,
-        Some("zone_gamma"),
-        400,
-    );
+    let merged_id = merged.get_id().unwrap();
+    routing_table.merge_cells(&["cell_0", "cell_1"], merged_id, Some("zone_gamma"), 400);
 
     println!(
         "  4. Rebalancing: merged cell_0 + cell_1 → {} nodes",
@@ -434,10 +420,7 @@ async fn test_e2e_full_hierarchy_lifecycle() {
 
     // 5. Verify final state
     assert_eq!(maintainer.needs_rebalance(&merged), RebalanceAction::None);
-    assert_eq!(
-        routing_table.get_cell_zone(&merged.config.id),
-        Some("zone_gamma")
-    );
+    assert_eq!(routing_table.get_cell_zone(merged_id), Some("zone_gamma"));
 
     // Original cells removed
     assert_eq!(routing_table.get_cell_zone("cell_0"), None);
@@ -457,8 +440,7 @@ async fn test_e2e_zone_capability_aggregation() {
     let coordinator = ZoneCoordinator::new("zone_delta".to_string(), 2, 0.5);
 
     // Create cells with different capabilities
-    let mut cell1 = CellState::new(CellConfig::new(10));
-    cell1.config.id = "cell_sensors".to_string();
+    let mut cell1 = CellState::new(CellConfig::with_id("cell_sensors".to_string(), 10));
     for i in 0..3 {
         cell1.add_member(format!("sensor_node_{}", i));
     }
@@ -471,8 +453,7 @@ async fn test_e2e_zone_capability_aggregation() {
     );
     cell1.capabilities.push(cap_sensor);
 
-    let mut cell2 = CellState::new(CellConfig::new(10));
-    cell2.config.id = "cell_compute".to_string();
+    let mut cell2 = CellState::new(CellConfig::with_id("cell_compute".to_string(), 10));
     for i in 0..3 {
         cell2.add_member(format!("compute_node_{}", i));
     }
@@ -494,10 +475,10 @@ async fn test_e2e_zone_capability_aggregation() {
     assert_eq!(aggregated.len(), 2);
     assert!(aggregated
         .iter()
-        .any(|c| c.capability_type == CapabilityType::Sensor));
+        .any(|c| c.get_capability_type() == CapabilityType::Sensor));
     assert!(aggregated
         .iter()
-        .any(|c| c.capability_type == CapabilityType::Compute));
+        .any(|c| c.get_capability_type() == CapabilityType::Compute));
 
     println!("✓ Zone aggregation: 2 capabilities from 2 cells");
 }

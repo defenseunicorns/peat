@@ -29,7 +29,9 @@
 
 use cap_protocol::models::cell::{CellConfig, CellState};
 use cap_protocol::models::node::NodeConfig;
-use cap_protocol::models::{Capability, CapabilityType};
+use cap_protocol::models::{
+    Capability, CapabilityExt, CapabilityType, CellConfigExt, CellStateExt, NodeConfigExt,
+};
 use cap_protocol::storage::{CellStore, NodeStore};
 use cap_protocol::sync::ditto::DittoBackend;
 use cap_protocol::testing::E2EHarness;
@@ -232,9 +234,9 @@ async fn test_e2e_cellstore_orset_operations() {
         if let Ok(Some(cell)) = cell_store1.get_cell(&cell_id).await {
             // Expected: alpha (kept), gamma (added), beta (removed)
             if cell.members.len() == 2
-                && cell.members.contains("node_alpha")
-                && cell.members.contains("node_gamma")
-                && !cell.members.contains("node_beta")
+                && cell.is_member("node_alpha")
+                && cell.is_member("node_gamma")
+                && !cell.is_member("node_beta")
             {
                 converged = true;
                 println!("  ✓ OR-Set converged (attempt {})", attempt);
@@ -248,9 +250,9 @@ async fn test_e2e_cellstore_orset_operations() {
     // Validate on peer2 as well
     let cell2 = cell_store2.get_cell(&cell_id).await.unwrap().unwrap();
     assert_eq!(cell2.members.len(), 2);
-    assert!(cell2.members.contains("node_alpha"));
-    assert!(cell2.members.contains("node_gamma"));
-    assert!(!cell2.members.contains("node_beta"));
+    assert!(cell2.is_member("node_alpha"));
+    assert!(cell2.is_member("node_gamma"));
+    assert!(!cell2.is_member("node_beta"));
 
     println!("  6. OR-Set semantics validated:");
     println!("     - Add operation: ✓ (node_gamma added)");
