@@ -10,7 +10,7 @@
 
 use cap_protocol::models::cell::{CellConfig, CellState};
 use cap_protocol::models::node::NodeConfig;
-use cap_protocol::models::{Capability, CapabilityType};
+use cap_protocol::models::{Capability, CapabilityExt, CapabilityType};
 use cap_protocol::storage::{CellStore, NodeStore};
 use cap_protocol::sync::automerge::AutomergeBackend;
 use cap_protocol::sync::{

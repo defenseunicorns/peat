@@ -3,7 +3,7 @@
 //! Defines tactical roles that nodes can fill within a squad, with scoring
 //! algorithms that consider both platform capabilities and human operator specialties.
 
-use crate::models::{CapabilityType, NodeConfig, NodeState, Operator};
+use crate::models::{CapabilityExt, CapabilityType, NodeConfig, NodeState, Operator};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -145,7 +145,7 @@ impl RoleScorer {
             let has_required = config
                 .capabilities
                 .iter()
-                .any(|c| c.capability_type == required_cap_type);
+                .any(|c| c.get_capability_type() == required_cap_type);
 
             if !has_required {
                 return None; // Cannot fill this role
@@ -194,7 +194,7 @@ impl RoleScorer {
             let best_capability = config
                 .capabilities
                 .iter()
-                .filter(|c| c.capability_type == *req_type)
+                .filter(|c| c.get_capability_type() == *req_type)
                 .max_by(|a, b| {
                     a.confidence
                         .partial_cmp(&b.confidence)
@@ -223,7 +223,7 @@ impl RoleScorer {
             if let Some(best_cap) = config
                 .capabilities
                 .iter()
-                .filter(|c| c.capability_type == pref_type)
+                .filter(|c| c.get_capability_type() == pref_type)
                 .max_by(|a, b| {
                     a.confidence
                         .partial_cmp(&b.confidence)

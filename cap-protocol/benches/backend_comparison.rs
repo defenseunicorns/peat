@@ -14,7 +14,7 @@
 
 #![cfg(feature = "automerge-backend")]
 
-use cap_protocol::models::capability::{Capability, CapabilityType};
+use cap_protocol::models::capability::{Capability, CapabilityExt, CapabilityType};
 use cap_protocol::models::cell::{CellConfig, CellState};
 use cap_protocol::models::node::NodeConfig;
 use cap_protocol::sync::automerge::AutomergeBackend;

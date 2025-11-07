@@ -5,7 +5,7 @@
 //! - Leader election: LWW-Register (last-write-wins) - leader updates with timestamps
 //! - Aggregated capabilities: G-Set (grow-only set) - capabilities accumulate
 
-use crate::models::Capability;
+use crate::models::{Capability, CapabilityExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use uuid::Uuid;
@@ -150,7 +150,7 @@ impl CellState {
     ) -> Vec<&Capability> {
         self.capabilities
             .iter()
-            .filter(|c| c.capability_type == capability_type)
+            .filter(|c| c.get_capability_type() == capability_type)
             .collect()
     }
 
@@ -158,7 +158,7 @@ impl CellState {
     pub fn has_capability_type(&self, capability_type: crate::models::CapabilityType) -> bool {
         self.capabilities
             .iter()
-            .any(|c| c.capability_type == capability_type)
+            .any(|c| c.get_capability_type() == capability_type)
     }
 
     /// Assign squad to a platoon (LWW-Register operation)

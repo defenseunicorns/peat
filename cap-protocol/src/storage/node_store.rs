@@ -287,7 +287,7 @@ impl<B: DataSyncBackend> NodeStore<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{Capability, CapabilityType, HealthStatus};
+    use crate::models::{Capability, CapabilityExt, CapabilityType, HealthStatus};
     use crate::sync::ditto::DittoBackend;
     use crate::sync::{BackendConfig, TransportConfig};
     use crate::traits::Phase;

@@ -22,7 +22,7 @@ use cap_protocol::delta::change_tracker::ChangeTracker;
 use cap_protocol::delta::generator::{Delta, DeltaBatch, DeltaGenerator, DeltaOp, DeltaStats};
 use cap_protocol::delta::priority::{DeltaQueue, Priority, PriorityClassifier};
 use cap_protocol::models::cell::{CellConfig, CellState};
-use cap_protocol::models::{Capability, CapabilityType};
+use cap_protocol::models::{Capability, CapabilityExt, CapabilityType};
 use cap_protocol::storage::CellStore;
 use cap_protocol::testing::E2EHarness;
 use std::time::Duration;

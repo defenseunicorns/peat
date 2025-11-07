@@ -22,7 +22,7 @@
 
 use cap_protocol::models::cell::{CellConfig, CellState};
 use cap_protocol::models::node::NodeConfig;
-use cap_protocol::models::{Capability, CapabilityType};
+use cap_protocol::models::{Capability, CapabilityExt, CapabilityType};
 use cap_protocol::storage::{CellStore, NodeStore};
 use cap_protocol::sync::ditto::DittoBackend;
 use cap_protocol::testing::E2EHarness;
@@ -355,15 +355,15 @@ async fn test_e2e_capability_multi_peer_propagation() {
         .unwrap();
 
     assert_eq!(
-        sensor_node.capabilities[0].capability_type,
+        sensor_node.capabilities[0].get_capability_type(),
         CapabilityType::Sensor
     );
     assert_eq!(
-        payload_node.capabilities[0].capability_type,
+        payload_node.capabilities[0].get_capability_type(),
         CapabilityType::Payload
     );
     assert_eq!(
-        compute_node.capabilities[0].capability_type,
+        compute_node.capabilities[0].get_capability_type(),
         CapabilityType::Compute
     );
 

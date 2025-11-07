@@ -18,7 +18,9 @@
 //! - Human oversight requirements for critical capabilities
 //! - Hybrid confidence scoring (technical capability + human authority)
 
-use crate::models::{AuthorityLevel, CapabilityType, HumanMachinePair, NodeConfig, NodeState};
+use crate::models::{
+    AuthorityLevel, CapabilityExt, CapabilityType, HumanMachinePair, NodeConfig, NodeState,
+};
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -144,7 +146,7 @@ impl CapabilityAggregator {
             // Add each capability to the map
             for cap in &config.capabilities {
                 capability_map
-                    .entry(cap.capability_type)
+                    .entry(cap.get_capability_type())
                     .or_default()
                     .push((config.id.clone(), cap.confidence, authority));
             }

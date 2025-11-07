@@ -594,7 +594,7 @@ impl<B: crate::sync::DataSyncBackend> RebalancingCoordinator<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::Capability;
+    use crate::models::{Capability, CapabilityExt};
 
     fn create_test_cell(id: &str, member_count: usize, max_size: usize) -> CellState {
         let mut config = CellConfig::new(max_size);

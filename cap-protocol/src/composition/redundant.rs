@@ -10,9 +10,10 @@
 
 use crate::composition::rules::{CompositionContext, CompositionResult, CompositionRule};
 use crate::models::capability::{Capability, CapabilityType};
+use crate::models::CapabilityExt;
 use crate::Result;
 use async_trait::async_trait;
-use serde_json::json;
+use serde_json::{json, Value};
 
 /// Rule for improving detection reliability through redundant sensors
 ///
@@ -63,7 +64,8 @@ impl CompositionRule for DetectionReliabilityRule {
         let qualified_sensors = capabilities
             .iter()
             .filter(|c| {
-                c.capability_type == CapabilityType::Sensor && c.confidence >= self.min_confidence
+                c.get_capability_type() == CapabilityType::Sensor
+                    && c.confidence >= self.min_confidence
             })
             .count();
 
@@ -78,7 +80,8 @@ impl CompositionRule for DetectionReliabilityRule {
         let sensors: Vec<&Capability> = capabilities
             .iter()
             .filter(|c| {
-                c.capability_type == CapabilityType::Sensor && c.confidence >= self.min_confidence
+                c.get_capability_type() == CapabilityType::Sensor
+                    && c.confidence >= self.min_confidence
             })
             .collect();
 
@@ -93,24 +96,29 @@ impl CompositionRule for DetectionReliabilityRule {
         // Calculate coverage overlap (if metadata available)
         let total_coverage: f64 = sensors
             .iter()
-            .filter_map(|cap| cap.metadata.get("coverage_area").and_then(|v| v.as_f64()))
+            .filter_map(|cap| {
+                serde_json::from_str::<Value>(&cap.metadata_json)
+                    .ok()
+                    .and_then(|v| v.get("coverage_area").and_then(|c| c.as_f64()))
+            })
             .sum();
 
-        let composed = Capability {
-            id: format!("redundant_detection_{}", uuid::Uuid::new_v4()),
-            name: "Redundant Detection".to_string(),
-            capability_type: CapabilityType::Emergent,
-            confidence: combined_confidence,
-            metadata: json!({
-                "composition_type": "redundant",
-                "pattern": "detection_reliability",
-                "sensor_count": sensors.len(),
-                "coverage_area": total_coverage,
-                "individual_confidences": confidences,
-                "reliability_improvement": combined_confidence - confidences.iter().cloned().fold(0.0, f32::max),
-                "description": "Improved detection through sensor redundancy"
-            }),
-        };
+        let mut composed = Capability::new(
+            format!("redundant_detection_{}", uuid::Uuid::new_v4()),
+            "Redundant Detection".to_string(),
+            CapabilityType::Emergent,
+            combined_confidence,
+        );
+        composed.metadata_json = serde_json::to_string(&json!({
+            "composition_type": "redundant",
+            "pattern": "detection_reliability",
+            "sensor_count": sensors.len(),
+            "coverage_area": total_coverage,
+            "individual_confidences": confidences,
+            "reliability_improvement": combined_confidence - confidences.iter().cloned().fold(0.0, f32::max),
+            "description": "Improved detection through sensor redundancy"
+        }))
+        .unwrap_or_default();
 
         let contributor_ids: Vec<String> = sensors.iter().map(|c| c.id.clone()).collect();
 
@@ -161,8 +169,11 @@ impl CompositionRule for ContinuousCoverageRule {
         let qualified_sensors = capabilities
             .iter()
             .filter(|c| {
-                c.capability_type == CapabilityType::Sensor
-                    && c.metadata.get("coverage_area").is_some()
+                c.get_capability_type() == CapabilityType::Sensor
+                    && serde_json::from_str::<Value>(&c.metadata_json)
+                        .ok()
+                        .and_then(|v| v.get("coverage_area").cloned())
+                        .is_some()
             })
             .count();
 
@@ -177,8 +188,11 @@ impl CompositionRule for ContinuousCoverageRule {
         let sensors: Vec<&Capability> = capabilities
             .iter()
             .filter(|c| {
-                c.capability_type == CapabilityType::Sensor
-                    && c.metadata.get("coverage_area").is_some()
+                c.get_capability_type() == CapabilityType::Sensor
+                    && serde_json::from_str::<Value>(&c.metadata_json)
+                        .ok()
+                        .and_then(|v| v.get("coverage_area").cloned())
+                        .is_some()
             })
             .collect();
 
@@ -189,7 +203,11 @@ impl CompositionRule for ContinuousCoverageRule {
         // Calculate total coverage area
         let total_coverage: f64 = sensors
             .iter()
-            .filter_map(|cap| cap.metadata.get("coverage_area").and_then(|v| v.as_f64()))
+            .filter_map(|cap| {
+                serde_json::from_str::<Value>(&cap.metadata_json)
+                    .ok()
+                    .and_then(|v| v.get("coverage_area").and_then(|c| c.as_f64()))
+            })
             .sum();
 
         // Estimate overlap (simplified - assumes some redundancy)
@@ -207,22 +225,23 @@ impl CompositionRule for ContinuousCoverageRule {
         // Boost confidence for continuous coverage
         let continuous_confidence = (avg_confidence + overlap_factor * 0.2).min(1.0);
 
-        let composed = Capability {
-            id: format!("continuous_coverage_{}", uuid::Uuid::new_v4()),
-            name: "Continuous Coverage".to_string(),
-            capability_type: CapabilityType::Emergent,
-            confidence: continuous_confidence,
-            metadata: json!({
-                "composition_type": "redundant",
-                "pattern": "continuous_coverage",
-                "platform_count": sensors.len(),
-                "total_coverage_area": total_coverage,
-                "estimated_overlap": overlap_factor,
-                "coverage_redundancy": (sensors.len() as f32 * overlap_factor),
-                "cell_id": context.cell_id,
-                "description": "Continuous monitoring through overlapping coverage"
-            }),
-        };
+        let mut composed = Capability::new(
+            format!("continuous_coverage_{}", uuid::Uuid::new_v4()),
+            "Continuous Coverage".to_string(),
+            CapabilityType::Emergent,
+            continuous_confidence,
+        );
+        composed.metadata_json = serde_json::to_string(&json!({
+            "composition_type": "redundant",
+            "pattern": "continuous_coverage",
+            "platform_count": sensors.len(),
+            "total_coverage_area": total_coverage,
+            "estimated_overlap": overlap_factor,
+            "coverage_redundancy": (sensors.len() as f32 * overlap_factor),
+            "cell_id": context.cell_id,
+            "description": "Continuous monitoring through overlapping coverage"
+        }))
+        .unwrap_or_default();
 
         let contributor_ids: Vec<String> = sensors.iter().map(|c| c.id.clone()).collect();
 
@@ -281,7 +300,7 @@ impl CompositionRule for FaultToleranceRule {
     fn applies_to(&self, capabilities: &[Capability]) -> bool {
         let redundant_count = capabilities
             .iter()
-            .filter(|c| c.capability_type == self.capability_type)
+            .filter(|c| c.get_capability_type() == self.capability_type)
             .count();
 
         redundant_count >= self.min_redundancy
@@ -294,7 +313,7 @@ impl CompositionRule for FaultToleranceRule {
     ) -> Result<CompositionResult> {
         let redundant_caps: Vec<&Capability> = capabilities
             .iter()
-            .filter(|c| c.capability_type == self.capability_type)
+            .filter(|c| c.get_capability_type() == self.capability_type)
             .collect();
 
         if redundant_caps.len() < self.min_redundancy {
@@ -305,26 +324,27 @@ impl CompositionRule for FaultToleranceRule {
         let confidences: Vec<f32> = redundant_caps.iter().map(|c| c.confidence).collect();
         let system_reliability = self.system_reliability(&confidences);
 
-        let composed = Capability {
-            id: format!(
+        let mut composed = Capability::new(
+            format!(
                 "fault_tolerant_{:?}_{}",
                 self.capability_type,
                 uuid::Uuid::new_v4()
             ),
-            name: format!("Fault-Tolerant {:?}", self.capability_type),
-            capability_type: CapabilityType::Emergent,
-            confidence: system_reliability,
-            metadata: json!({
-                "composition_type": "redundant",
-                "pattern": "fault_tolerance",
-                "base_capability_type": format!("{:?}", self.capability_type),
-                "redundancy_level": redundant_caps.len(),
-                "system_reliability": system_reliability,
-                "individual_reliabilities": confidences,
-                "description": format!("Fault-tolerant {:?} with {}-way redundancy",
-                    self.capability_type, redundant_caps.len())
-            }),
-        };
+            format!("Fault-Tolerant {:?}", self.capability_type),
+            CapabilityType::Emergent,
+            system_reliability,
+        );
+        composed.metadata_json = serde_json::to_string(&json!({
+            "composition_type": "redundant",
+            "pattern": "fault_tolerance",
+            "base_capability_type": format!("{:?}", self.capability_type),
+            "redundancy_level": redundant_caps.len(),
+            "system_reliability": system_reliability,
+            "individual_reliabilities": confidences,
+            "description": format!("Fault-tolerant {:?} with {}-way redundancy",
+                self.capability_type, redundant_caps.len())
+        }))
+        .unwrap_or_default();
 
         let contributor_ids: Vec<String> = redundant_caps.iter().map(|c| c.id.clone()).collect();
 
@@ -342,21 +362,23 @@ mod tests {
     async fn test_detection_reliability_two_sensors() {
         let rule = DetectionReliabilityRule::default();
 
-        let sensor1 = Capability {
-            id: "sensor1".to_string(),
-            name: "Camera 1".to_string(),
-            capability_type: CapabilityType::Sensor,
-            confidence: 0.7,
-            metadata: json!({"coverage_area": 100.0}),
-        };
+        let mut sensor1 = Capability::new(
+            "sensor1".to_string(),
+            "Camera 1".to_string(),
+            CapabilityType::Sensor,
+            0.7,
+        );
+        sensor1.metadata_json =
+            serde_json::to_string(&json!({"coverage_area": 100.0})).unwrap_or_default();
 
-        let sensor2 = Capability {
-            id: "sensor2".to_string(),
-            name: "Camera 2".to_string(),
-            capability_type: CapabilityType::Sensor,
-            confidence: 0.7,
-            metadata: json!({"coverage_area": 100.0}),
-        };
+        let mut sensor2 = Capability::new(
+            "sensor2".to_string(),
+            "Camera 2".to_string(),
+            CapabilityType::Sensor,
+            0.7,
+        );
+        sensor2.metadata_json =
+            serde_json::to_string(&json!({"coverage_area": 100.0})).unwrap_or_default();
 
         let caps = vec![sensor1, sensor2];
         let context = CompositionContext::new(vec!["node1".to_string()]);
@@ -367,7 +389,8 @@ mod tests {
         let composed = &result.composed_capabilities[0];
         // P(detect) = 1 - (1-0.7)(1-0.7) = 1 - 0.09 = 0.91
         assert!((composed.confidence - 0.91).abs() < 0.01);
-        assert_eq!(composed.metadata["sensor_count"].as_u64().unwrap(), 2);
+        let metadata: Value = serde_json::from_str(&composed.metadata_json).unwrap();
+        assert_eq!(metadata["sensor_count"].as_u64().unwrap(), 2);
     }
 
     #[tokio::test]
@@ -375,12 +398,13 @@ mod tests {
         let rule = DetectionReliabilityRule::new(3, 0.6);
 
         let sensors: Vec<Capability> = (0..3)
-            .map(|i| Capability {
-                id: format!("sensor{}", i),
-                name: format!("Sensor {}", i),
-                capability_type: CapabilityType::Sensor,
-                confidence: 0.7,
-                metadata: json!({}),
+            .map(|i| {
+                Capability::new(
+                    format!("sensor{}", i),
+                    format!("Sensor {}", i),
+                    CapabilityType::Sensor,
+                    0.7,
+                )
             })
             .collect();
 
@@ -416,21 +440,23 @@ mod tests {
     async fn test_continuous_coverage() {
         let rule = ContinuousCoverageRule::default();
 
-        let sensor1 = Capability {
-            id: "sensor1".to_string(),
-            name: "Platform 1".to_string(),
-            capability_type: CapabilityType::Sensor,
-            confidence: 0.85,
-            metadata: json!({"coverage_area": 200.0}),
-        };
+        let mut sensor1 = Capability::new(
+            "sensor1".to_string(),
+            "Platform 1".to_string(),
+            CapabilityType::Sensor,
+            0.85,
+        );
+        sensor1.metadata_json =
+            serde_json::to_string(&json!({"coverage_area": 200.0})).unwrap_or_default();
 
-        let sensor2 = Capability {
-            id: "sensor2".to_string(),
-            name: "Platform 2".to_string(),
-            capability_type: CapabilityType::Sensor,
-            confidence: 0.8,
-            metadata: json!({"coverage_area": 200.0}),
-        };
+        let mut sensor2 = Capability::new(
+            "sensor2".to_string(),
+            "Platform 2".to_string(),
+            CapabilityType::Sensor,
+            0.8,
+        );
+        sensor2.metadata_json =
+            serde_json::to_string(&json!({"coverage_area": 200.0})).unwrap_or_default();
 
         let caps = vec![sensor1, sensor2];
         let context = CompositionContext::new(vec!["node1".to_string(), "node2".to_string()])
@@ -443,10 +469,8 @@ mod tests {
 
         let composed = &result.composed_capabilities[0];
         assert_eq!(composed.name, "Continuous Coverage");
-        assert_eq!(
-            composed.metadata["total_coverage_area"].as_f64().unwrap(),
-            400.0
-        );
+        let metadata: Value = serde_json::from_str(&composed.metadata_json).unwrap();
+        assert_eq!(metadata["total_coverage_area"].as_f64().unwrap(), 400.0);
         assert!(composed.confidence > 0.8); // Should be boosted by redundancy
         assert_eq!(result.contributing_capabilities.len(), 2);
     }
@@ -456,12 +480,16 @@ mod tests {
         let rule = FaultToleranceRule::default(); // 3-way redundant comms
 
         let comms: Vec<Capability> = (0..3)
-            .map(|i| Capability {
-                id: format!("comm{}", i),
-                name: format!("Radio {}", i),
-                capability_type: CapabilityType::Communication,
-                confidence: 0.8,
-                metadata: json!({"bandwidth": 10.0}),
+            .map(|i| {
+                let mut cap = Capability::new(
+                    format!("comm{}", i),
+                    format!("Radio {}", i),
+                    CapabilityType::Communication,
+                    0.8,
+                );
+                cap.metadata_json =
+                    serde_json::to_string(&json!({"bandwidth": 10.0})).unwrap_or_default();
+                cap
             })
             .collect();
 
@@ -475,7 +503,8 @@ mod tests {
         let composed = &result.composed_capabilities[0];
         // System reliability = 1 - (1-0.8)^3 = 1 - 0.008 = 0.992
         assert!((composed.confidence - 0.992).abs() < 0.01);
-        assert_eq!(composed.metadata["redundancy_level"].as_u64().unwrap(), 3);
+        let metadata: Value = serde_json::from_str(&composed.metadata_json).unwrap();
+        assert_eq!(metadata["redundancy_level"].as_u64().unwrap(), 3);
     }
 
     #[tokio::test]

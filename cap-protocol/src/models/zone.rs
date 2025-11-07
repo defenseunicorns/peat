@@ -10,7 +10,7 @@
 //! - Zone coordinator assignment (LWW-Register)
 //! - Capability aggregation (G-Set)
 
-use crate::models::Capability;
+use crate::models::{Capability, CapabilityExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -209,7 +209,7 @@ impl ZoneState {
         if !self
             .aggregated_capabilities
             .iter()
-            .any(|c| c.capability_type == capability.capability_type)
+            .any(|c| c.get_capability_type() == capability.get_capability_type())
         {
             self.aggregated_capabilities.push(capability);
             self.update_timestamp();
@@ -267,7 +267,7 @@ impl ZoneState {
             if !self
                 .aggregated_capabilities
                 .iter()
-                .any(|c| c.capability_type == capability.capability_type)
+                .any(|c| c.get_capability_type() == capability.get_capability_type())
             {
                 self.aggregated_capabilities.push(capability.clone());
             }

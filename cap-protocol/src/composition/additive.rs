@@ -8,7 +8,7 @@
 //! - Communication bandwidth (aggregate throughput)
 
 use crate::composition::rules::{CompositionContext, CompositionResult, CompositionRule};
-use crate::models::capability::{Capability, CapabilityType};
+use crate::models::capability::{Capability, CapabilityExt, CapabilityType};
 use crate::Result;
 use async_trait::async_trait;
 use serde_json::json;
@@ -48,7 +48,7 @@ impl CompositionRule for SensorCoverageRule {
     fn applies_to(&self, capabilities: &[Capability]) -> bool {
         let sensor_count = capabilities
             .iter()
-            .filter(|c| c.capability_type == CapabilityType::Sensor)
+            .filter(|c| c.get_capability_type() == CapabilityType::Sensor)
             .count();
 
         sensor_count >= self.min_sensors
@@ -61,34 +61,39 @@ impl CompositionRule for SensorCoverageRule {
     ) -> Result<CompositionResult> {
         let sensors: Vec<&Capability> = capabilities
             .iter()
-            .filter(|c| c.capability_type == CapabilityType::Sensor)
+            .filter(|c| c.get_capability_type() == CapabilityType::Sensor)
             .collect();
 
         if sensors.len() < self.min_sensors {
             return Ok(CompositionResult::new(vec![], 0.0));
         }
 
-        // Sum coverage areas from metadata
+        // Sum coverage areas from metadata (parse from JSON string)
         let total_coverage: f64 = sensors
             .iter()
-            .filter_map(|cap| cap.metadata.get("coverage_area").and_then(|v| v.as_f64()))
+            .filter_map(|cap| {
+                serde_json::from_str::<serde_json::Value>(&cap.metadata_json)
+                    .ok()
+                    .and_then(|v| v.get("coverage_area").and_then(|v| v.as_f64()))
+            })
             .sum();
 
         // Average confidence across sensors
         let avg_confidence: f32 =
             sensors.iter().map(|c| c.confidence).sum::<f32>() / sensors.len() as f32;
 
-        let composed = Capability {
-            id: format!("composed_sensor_coverage_{}", uuid::Uuid::new_v4()),
-            name: "Aggregate Sensor Coverage".to_string(),
-            capability_type: CapabilityType::Emergent,
-            confidence: avg_confidence,
-            metadata: json!({
-                "coverage_area": total_coverage,
-                "sensor_count": sensors.len(),
-                "composition_type": "additive"
-            }),
-        };
+        let mut composed = Capability::new(
+            format!("composed_sensor_coverage_{}", uuid::Uuid::new_v4()),
+            "Aggregate Sensor Coverage".to_string(),
+            CapabilityType::Emergent,
+            avg_confidence,
+        );
+        composed.metadata_json = json!({
+            "coverage_area": total_coverage,
+            "sensor_count": sensors.len(),
+            "composition_type": "additive"
+        })
+        .to_string();
 
         let contributor_ids: Vec<String> = sensors.iter().map(|c| c.id.clone()).collect();
 
@@ -132,7 +137,7 @@ impl CompositionRule for PayloadCapacityRule {
     fn applies_to(&self, capabilities: &[Capability]) -> bool {
         let payload_count = capabilities
             .iter()
-            .filter(|c| c.capability_type == CapabilityType::Payload)
+            .filter(|c| c.get_capability_type() == CapabilityType::Payload)
             .count();
 
         payload_count >= self.min_payloads
@@ -145,7 +150,7 @@ impl CompositionRule for PayloadCapacityRule {
     ) -> Result<CompositionResult> {
         let payloads: Vec<&Capability> = capabilities
             .iter()
-            .filter(|c| c.capability_type == CapabilityType::Payload)
+            .filter(|c| c.get_capability_type() == CapabilityType::Payload)
             .collect();
 
         if payloads.len() < self.min_payloads {
@@ -155,24 +160,29 @@ impl CompositionRule for PayloadCapacityRule {
         // Sum lift capacities from metadata
         let total_capacity: f64 = payloads
             .iter()
-            .filter_map(|cap| cap.metadata.get("lift_capacity").and_then(|v| v.as_f64()))
+            .filter_map(|cap| {
+                serde_json::from_str::<serde_json::Value>(&cap.metadata_json)
+                    .ok()
+                    .and_then(|v| v.get("lift_capacity").and_then(|v| v.as_f64()))
+            })
             .sum();
 
         // Average confidence across payloads
         let avg_confidence: f32 =
             payloads.iter().map(|c| c.confidence).sum::<f32>() / payloads.len() as f32;
 
-        let composed = Capability {
-            id: format!("composed_payload_capacity_{}", uuid::Uuid::new_v4()),
-            name: "Aggregate Payload Capacity".to_string(),
-            capability_type: CapabilityType::Emergent,
-            confidence: avg_confidence,
-            metadata: json!({
-                "lift_capacity": total_capacity,
-                "payload_count": payloads.len(),
-                "composition_type": "additive"
-            }),
-        };
+        let mut composed = Capability::new(
+            format!("composed_payload_capacity_{}", uuid::Uuid::new_v4()),
+            "Aggregate Payload Capacity".to_string(),
+            CapabilityType::Emergent,
+            avg_confidence,
+        );
+        composed.metadata_json = json!({
+            "lift_capacity": total_capacity,
+            "payload_count": payloads.len(),
+            "composition_type": "additive"
+        })
+        .to_string();
 
         let contributor_ids: Vec<String> = payloads.iter().map(|c| c.id.clone()).collect();
 
@@ -216,7 +226,7 @@ impl CompositionRule for CommunicationBandwidthRule {
     fn applies_to(&self, capabilities: &[Capability]) -> bool {
         let comm_count = capabilities
             .iter()
-            .filter(|c| c.capability_type == CapabilityType::Communication)
+            .filter(|c| c.get_capability_type() == CapabilityType::Communication)
             .count();
 
         comm_count >= self.min_comms
@@ -229,7 +239,7 @@ impl CompositionRule for CommunicationBandwidthRule {
     ) -> Result<CompositionResult> {
         let comms: Vec<&Capability> = capabilities
             .iter()
-            .filter(|c| c.capability_type == CapabilityType::Communication)
+            .filter(|c| c.get_capability_type() == CapabilityType::Communication)
             .collect();
 
         if comms.len() < self.min_comms {
@@ -239,24 +249,29 @@ impl CompositionRule for CommunicationBandwidthRule {
         // Sum bandwidth from metadata
         let total_bandwidth: f64 = comms
             .iter()
-            .filter_map(|cap| cap.metadata.get("bandwidth").and_then(|v| v.as_f64()))
+            .filter_map(|cap| {
+                serde_json::from_str::<serde_json::Value>(&cap.metadata_json)
+                    .ok()
+                    .and_then(|v| v.get("bandwidth").and_then(|v| v.as_f64()))
+            })
             .sum();
 
         // Average confidence across communication capabilities
         let avg_confidence: f32 =
             comms.iter().map(|c| c.confidence).sum::<f32>() / comms.len() as f32;
 
-        let composed = Capability {
-            id: format!("composed_comm_bandwidth_{}", uuid::Uuid::new_v4()),
-            name: "Aggregate Communication Bandwidth".to_string(),
-            capability_type: CapabilityType::Emergent,
-            confidence: avg_confidence,
-            metadata: json!({
-                "bandwidth": total_bandwidth,
-                "comm_count": comms.len(),
-                "composition_type": "additive"
-            }),
-        };
+        let mut composed = Capability::new(
+            format!("composed_comm_bandwidth_{}", uuid::Uuid::new_v4()),
+            "Aggregate Communication Bandwidth".to_string(),
+            CapabilityType::Emergent,
+            avg_confidence,
+        );
+        composed.metadata_json = json!({
+            "bandwidth": total_bandwidth,
+            "comm_count": comms.len(),
+            "composition_type": "additive"
+        })
+        .to_string();
 
         let contributor_ids: Vec<String> = comms.iter().map(|c| c.id.clone()).collect();
 
@@ -274,21 +289,21 @@ mod tests {
     async fn test_sensor_coverage_composition() {
         let rule = SensorCoverageRule::default();
 
-        let sensor1 = Capability {
-            id: "sensor1".to_string(),
-            name: "Camera 1".to_string(),
-            capability_type: CapabilityType::Sensor,
-            confidence: 0.9,
-            metadata: json!({"coverage_area": 100.0}),
-        };
+        let mut sensor1 = Capability::new(
+            "sensor1".to_string(),
+            "Camera 1".to_string(),
+            CapabilityType::Sensor,
+            0.9,
+        );
+        sensor1.metadata_json = json!({"coverage_area": 100.0}).to_string();
 
-        let sensor2 = Capability {
-            id: "sensor2".to_string(),
-            name: "Camera 2".to_string(),
-            capability_type: CapabilityType::Sensor,
-            confidence: 0.8,
-            metadata: json!({"coverage_area": 150.0}),
-        };
+        let mut sensor2 = Capability::new(
+            "sensor2".to_string(),
+            "Camera 2".to_string(),
+            CapabilityType::Sensor,
+            0.8,
+        );
+        sensor2.metadata_json = json!({"coverage_area": 150.0}).to_string();
 
         let caps = vec![sensor1, sensor2];
         let context = CompositionContext::new(vec!["node1".to_string()]);
@@ -299,9 +314,10 @@ mod tests {
         assert_eq!(result.composed_capabilities.len(), 1);
 
         let composed = &result.composed_capabilities[0];
-        assert_eq!(composed.capability_type, CapabilityType::Emergent);
-        assert_eq!(composed.metadata["coverage_area"].as_f64().unwrap(), 250.0);
-        assert_eq!(composed.metadata["sensor_count"].as_u64().unwrap(), 2);
+        assert_eq!(composed.get_capability_type(), CapabilityType::Emergent);
+        let metadata: serde_json::Value = serde_json::from_str(&composed.metadata_json).unwrap();
+        assert_eq!(metadata["coverage_area"].as_f64().unwrap(), 250.0);
+        assert_eq!(metadata["sensor_count"].as_u64().unwrap(), 2);
         assert_eq!(result.contributing_capabilities.len(), 2);
     }
 
@@ -309,13 +325,13 @@ mod tests {
     async fn test_sensor_coverage_insufficient_sensors() {
         let rule = SensorCoverageRule::default();
 
-        let sensor1 = Capability {
-            id: "sensor1".to_string(),
-            name: "Camera 1".to_string(),
-            capability_type: CapabilityType::Sensor,
-            confidence: 0.9,
-            metadata: json!({"coverage_area": 100.0}),
-        };
+        let mut sensor1 = Capability::new(
+            "sensor1".to_string(),
+            "Camera 1".to_string(),
+            CapabilityType::Sensor,
+            0.9,
+        );
+        sensor1.metadata_json = json!({"coverage_area": 100.0}).to_string();
 
         let caps = vec![sensor1];
         let context = CompositionContext::new(vec!["node1".to_string()]);
@@ -329,21 +345,21 @@ mod tests {
     async fn test_payload_capacity_composition() {
         let rule = PayloadCapacityRule::default();
 
-        let payload1 = Capability {
-            id: "payload1".to_string(),
-            name: "Drone 1".to_string(),
-            capability_type: CapabilityType::Payload,
-            confidence: 0.95,
-            metadata: json!({"lift_capacity": 5.0}),
-        };
+        let mut payload1 = Capability::new(
+            "payload1".to_string(),
+            "Drone 1".to_string(),
+            CapabilityType::Payload,
+            0.95,
+        );
+        payload1.metadata_json = json!({"lift_capacity": 5.0}).to_string();
 
-        let payload2 = Capability {
-            id: "payload2".to_string(),
-            name: "Drone 2".to_string(),
-            capability_type: CapabilityType::Payload,
-            confidence: 0.85,
-            metadata: json!({"lift_capacity": 7.0}),
-        };
+        let mut payload2 = Capability::new(
+            "payload2".to_string(),
+            "Drone 2".to_string(),
+            CapabilityType::Payload,
+            0.85,
+        );
+        payload2.metadata_json = json!({"lift_capacity": 7.0}).to_string();
 
         let caps = vec![payload1, payload2];
         let context = CompositionContext::new(vec!["node1".to_string(), "node2".to_string()]);
@@ -354,37 +370,38 @@ mod tests {
         assert_eq!(result.composed_capabilities.len(), 1);
 
         let composed = &result.composed_capabilities[0];
-        assert_eq!(composed.metadata["lift_capacity"].as_f64().unwrap(), 12.0);
-        assert_eq!(composed.metadata["payload_count"].as_u64().unwrap(), 2);
+        let metadata: serde_json::Value = serde_json::from_str(&composed.metadata_json).unwrap();
+        assert_eq!(metadata["lift_capacity"].as_f64().unwrap(), 12.0);
+        assert_eq!(metadata["payload_count"].as_u64().unwrap(), 2);
     }
 
     #[tokio::test]
     async fn test_communication_bandwidth_composition() {
         let rule = CommunicationBandwidthRule::default();
 
-        let comm1 = Capability {
-            id: "comm1".to_string(),
-            name: "Radio 1".to_string(),
-            capability_type: CapabilityType::Communication,
-            confidence: 0.9,
-            metadata: json!({"bandwidth": 10.0}),
-        };
+        let mut comm1 = Capability::new(
+            "comm1".to_string(),
+            "Radio 1".to_string(),
+            CapabilityType::Communication,
+            0.9,
+        );
+        comm1.metadata_json = json!({"bandwidth": 10.0}).to_string();
 
-        let comm2 = Capability {
-            id: "comm2".to_string(),
-            name: "Radio 2".to_string(),
-            capability_type: CapabilityType::Communication,
-            confidence: 0.85,
-            metadata: json!({"bandwidth": 15.0}),
-        };
+        let mut comm2 = Capability::new(
+            "comm2".to_string(),
+            "Radio 2".to_string(),
+            CapabilityType::Communication,
+            0.85,
+        );
+        comm2.metadata_json = json!({"bandwidth": 15.0}).to_string();
 
-        let comm3 = Capability {
-            id: "comm3".to_string(),
-            name: "Satellite".to_string(),
-            capability_type: CapabilityType::Communication,
-            confidence: 0.95,
-            metadata: json!({"bandwidth": 50.0}),
-        };
+        let mut comm3 = Capability::new(
+            "comm3".to_string(),
+            "Satellite".to_string(),
+            CapabilityType::Communication,
+            0.95,
+        );
+        comm3.metadata_json = json!({"bandwidth": 50.0}).to_string();
 
         let caps = vec![comm1, comm2, comm3];
         let context = CompositionContext::new(vec!["node1".to_string()]);
@@ -393,8 +410,9 @@ mod tests {
 
         assert!(result.has_compositions());
         let composed = &result.composed_capabilities[0];
-        assert_eq!(composed.metadata["bandwidth"].as_f64().unwrap(), 75.0);
-        assert_eq!(composed.metadata["comm_count"].as_u64().unwrap(), 3);
+        let metadata: serde_json::Value = serde_json::from_str(&composed.metadata_json).unwrap();
+        assert_eq!(metadata["bandwidth"].as_f64().unwrap(), 75.0);
+        assert_eq!(metadata["comm_count"].as_u64().unwrap(), 3);
     }
 
     #[tokio::test]
@@ -435,21 +453,21 @@ mod tests {
     async fn test_confidence_averaging() {
         let rule = SensorCoverageRule::default();
 
-        let sensor1 = Capability {
-            id: "sensor1".to_string(),
-            name: "High Confidence Sensor".to_string(),
-            capability_type: CapabilityType::Sensor,
-            confidence: 0.9,
-            metadata: json!({"coverage_area": 100.0}),
-        };
+        let mut sensor1 = Capability::new(
+            "sensor1".to_string(),
+            "High Confidence Sensor".to_string(),
+            CapabilityType::Sensor,
+            0.9,
+        );
+        sensor1.metadata_json = json!({"coverage_area": 100.0}).to_string();
 
-        let sensor2 = Capability {
-            id: "sensor2".to_string(),
-            name: "Low Confidence Sensor".to_string(),
-            capability_type: CapabilityType::Sensor,
-            confidence: 0.5,
-            metadata: json!({"coverage_area": 100.0}),
-        };
+        let mut sensor2 = Capability::new(
+            "sensor2".to_string(),
+            "Low Confidence Sensor".to_string(),
+            CapabilityType::Sensor,
+            0.5,
+        );
+        sensor2.metadata_json = json!({"coverage_area": 100.0}).to_string();
 
         let caps = vec![sensor1, sensor2];
         let context = CompositionContext::new(vec!["node1".to_string()]);

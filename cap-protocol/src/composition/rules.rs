@@ -109,7 +109,7 @@ pub trait CompositionRule: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::capability::CapabilityType;
+    use crate::models::capability::{CapabilityExt, CapabilityType};
 
     #[test]
     fn test_composition_context_creation() {

@@ -10,9 +10,10 @@
 
 use crate::composition::rules::{CompositionContext, CompositionResult, CompositionRule};
 use crate::models::capability::{Capability, CapabilityType};
+use crate::models::CapabilityExt;
 use crate::Result;
 use async_trait::async_trait;
-use serde_json::json;
+use serde_json::{json, Value};
 
 /// Rule for detecting ISR (Intelligence, Surveillance, Reconnaissance) chain capability
 ///
@@ -48,15 +49,16 @@ impl CompositionRule for IsrChainRule {
 
     fn applies_to(&self, capabilities: &[Capability]) -> bool {
         let has_sensor = capabilities.iter().any(|c| {
-            c.capability_type == CapabilityType::Sensor && c.confidence >= self.min_confidence
+            c.get_capability_type() == CapabilityType::Sensor && c.confidence >= self.min_confidence
         });
 
         let has_compute = capabilities.iter().any(|c| {
-            c.capability_type == CapabilityType::Compute && c.confidence >= self.min_confidence
+            c.get_capability_type() == CapabilityType::Compute
+                && c.confidence >= self.min_confidence
         });
 
         let has_comms = capabilities.iter().any(|c| {
-            c.capability_type == CapabilityType::Communication
+            c.get_capability_type() == CapabilityType::Communication
                 && c.confidence >= self.min_confidence
         });
 
@@ -71,17 +73,17 @@ impl CompositionRule for IsrChainRule {
         // Find best capability of each required type
         let best_sensor = capabilities
             .iter()
-            .filter(|c| c.capability_type == CapabilityType::Sensor)
+            .filter(|c| c.get_capability_type() == CapabilityType::Sensor)
             .max_by(|a, b| a.confidence.partial_cmp(&b.confidence).unwrap());
 
         let best_compute = capabilities
             .iter()
-            .filter(|c| c.capability_type == CapabilityType::Compute)
+            .filter(|c| c.get_capability_type() == CapabilityType::Compute)
             .max_by(|a, b| a.confidence.partial_cmp(&b.confidence).unwrap());
 
         let best_comms = capabilities
             .iter()
-            .filter(|c| c.capability_type == CapabilityType::Communication)
+            .filter(|c| c.get_capability_type() == CapabilityType::Communication)
             .max_by(|a, b| a.confidence.partial_cmp(&b.confidence).unwrap());
 
         // Check if we have all required components
@@ -93,22 +95,23 @@ impl CompositionRule for IsrChainRule {
                 .min(compute.confidence)
                 .min(comms.confidence);
 
-            let composed = Capability {
-                id: format!("emergent_isr_chain_{}", uuid::Uuid::new_v4()),
-                name: "ISR Chain".to_string(),
-                capability_type: CapabilityType::Emergent,
-                confidence: chain_confidence,
-                metadata: json!({
-                    "composition_type": "emergent",
-                    "pattern": "isr_chain",
-                    "components": {
-                        "sensor": sensor.id,
-                        "compute": compute.id,
-                        "communication": comms.id
-                    },
-                    "description": "Complete intelligence gathering capability"
-                }),
-            };
+            let mut composed = Capability::new(
+                format!("emergent_isr_chain_{}", uuid::Uuid::new_v4()),
+                "ISR Chain".to_string(),
+                CapabilityType::Emergent,
+                chain_confidence,
+            );
+            composed.metadata_json = serde_json::to_string(&json!({
+                "composition_type": "emergent",
+                "pattern": "isr_chain",
+                "components": {
+                    "sensor": sensor.id,
+                    "compute": compute.id,
+                    "communication": comms.id
+                },
+                "description": "Complete intelligence gathering capability"
+            }))
+            .unwrap_or_default();
 
             let contributors = vec![sensor.id.clone(), compute.id.clone(), comms.id.clone()];
 
@@ -155,20 +158,35 @@ impl CompositionRule for Mapping3dRule {
     fn applies_to(&self, capabilities: &[Capability]) -> bool {
         // Look for camera sensor
         let has_camera = capabilities.iter().any(|c| {
-            c.capability_type == CapabilityType::Sensor
+            c.get_capability_type() == CapabilityType::Sensor
                 && c.confidence >= self.min_confidence
-                && (c.metadata.get("sensor_type").and_then(|v| v.as_str()) == Some("camera"))
+                && serde_json::from_str::<Value>(&c.metadata_json)
+                    .ok()
+                    .and_then(|v| {
+                        v.get("sensor_type")
+                            .and_then(|s| s.as_str())
+                            .map(|s| s == "camera")
+                    })
+                    .unwrap_or(false)
         });
 
         // Look for lidar sensor
         let has_lidar = capabilities.iter().any(|c| {
-            c.capability_type == CapabilityType::Sensor
+            c.get_capability_type() == CapabilityType::Sensor
                 && c.confidence >= self.min_confidence
-                && (c.metadata.get("sensor_type").and_then(|v| v.as_str()) == Some("lidar"))
+                && serde_json::from_str::<Value>(&c.metadata_json)
+                    .ok()
+                    .and_then(|v| {
+                        v.get("sensor_type")
+                            .and_then(|s| s.as_str())
+                            .map(|s| s == "lidar")
+                    })
+                    .unwrap_or(false)
         });
 
         let has_compute = capabilities.iter().any(|c| {
-            c.capability_type == CapabilityType::Compute && c.confidence >= self.min_confidence
+            c.get_capability_type() == CapabilityType::Compute
+                && c.confidence >= self.min_confidence
         });
 
         has_camera && has_lidar && has_compute
@@ -181,18 +199,32 @@ impl CompositionRule for Mapping3dRule {
     ) -> Result<CompositionResult> {
         // Find required capabilities
         let camera = capabilities.iter().find(|c| {
-            c.capability_type == CapabilityType::Sensor
-                && (c.metadata.get("sensor_type").and_then(|v| v.as_str()) == Some("camera"))
+            c.get_capability_type() == CapabilityType::Sensor
+                && serde_json::from_str::<Value>(&c.metadata_json)
+                    .ok()
+                    .and_then(|v| {
+                        v.get("sensor_type")
+                            .and_then(|s| s.as_str())
+                            .map(|s| s == "camera")
+                    })
+                    .unwrap_or(false)
         });
 
         let lidar = capabilities.iter().find(|c| {
-            c.capability_type == CapabilityType::Sensor
-                && (c.metadata.get("sensor_type").and_then(|v| v.as_str()) == Some("lidar"))
+            c.get_capability_type() == CapabilityType::Sensor
+                && serde_json::from_str::<Value>(&c.metadata_json)
+                    .ok()
+                    .and_then(|v| {
+                        v.get("sensor_type")
+                            .and_then(|s| s.as_str())
+                            .map(|s| s == "lidar")
+                    })
+                    .unwrap_or(false)
         });
 
         let compute = capabilities
             .iter()
-            .filter(|c| c.capability_type == CapabilityType::Compute)
+            .filter(|c| c.get_capability_type() == CapabilityType::Compute)
             .max_by(|a, b| a.confidence.partial_cmp(&b.confidence).unwrap());
 
         if let (Some(camera), Some(lidar), Some(compute)) = (camera, lidar, compute) {
@@ -202,22 +234,23 @@ impl CompositionRule for Mapping3dRule {
                 .min(lidar.confidence)
                 .min(compute.confidence);
 
-            let composed = Capability {
-                id: format!("emergent_3d_mapping_{}", uuid::Uuid::new_v4()),
-                name: "3D Mapping".to_string(),
-                capability_type: CapabilityType::Emergent,
-                confidence: mapping_confidence,
-                metadata: json!({
-                    "composition_type": "emergent",
-                    "pattern": "3d_mapping",
-                    "components": {
-                        "camera": camera.id,
-                        "lidar": lidar.id,
-                        "compute": compute.id
-                    },
-                    "description": "Real-time 3D environment mapping"
-                }),
-            };
+            let mut composed = Capability::new(
+                format!("emergent_3d_mapping_{}", uuid::Uuid::new_v4()),
+                "3D Mapping".to_string(),
+                CapabilityType::Emergent,
+                mapping_confidence,
+            );
+            composed.metadata_json = serde_json::to_string(&json!({
+                "composition_type": "emergent",
+                "pattern": "3d_mapping",
+                "components": {
+                    "camera": camera.id,
+                    "lidar": lidar.id,
+                    "compute": compute.id
+                },
+                "description": "Real-time 3D environment mapping"
+            }))
+            .unwrap_or_default();
 
             let contributors = vec![camera.id.clone(), lidar.id.clone(), compute.id.clone()];
 
@@ -264,28 +297,35 @@ impl CompositionRule for StrikeChainRule {
     fn applies_to(&self, capabilities: &[Capability]) -> bool {
         // Look for ISR capability (could be emergent from another rule)
         let has_isr = capabilities.iter().any(|c| {
-            (c.capability_type == CapabilityType::Emergent
-                && (c.metadata.get("pattern").and_then(|v| v.as_str()) == Some("isr_chain"))
-                || c.metadata
-                    .get("isr_capable")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false))
+            c.get_capability_type() == CapabilityType::Emergent
                 && c.confidence >= self.min_confidence
+                && serde_json::from_str::<Value>(&c.metadata_json)
+                    .ok()
+                    .map(|v| {
+                        let is_isr_pattern =
+                            v.get("pattern").and_then(|p| p.as_str()) == Some("isr_chain");
+                        let is_isr_capable = v
+                            .get("isr_capable")
+                            .and_then(|i| i.as_bool())
+                            .unwrap_or(false);
+                        is_isr_pattern || is_isr_capable
+                    })
+                    .unwrap_or(false)
         });
 
         // Look for strike/payload capability
         let has_strike = capabilities.iter().any(|c| {
-            c.capability_type == CapabilityType::Payload
+            c.get_capability_type() == CapabilityType::Payload
                 && c.confidence >= self.min_confidence
-                && c.metadata
-                    .get("strike_capable")
-                    .and_then(|v| v.as_bool())
+                && serde_json::from_str::<Value>(&c.metadata_json)
+                    .ok()
+                    .and_then(|v| v.get("strike_capable").and_then(|s| s.as_bool()))
                     .unwrap_or(false)
         });
 
         // Look for BDA capability (sensor for assessment)
         let has_bda = capabilities.iter().any(|c| {
-            c.capability_type == CapabilityType::Sensor && c.confidence >= self.min_confidence
+            c.get_capability_type() == CapabilityType::Sensor && c.confidence >= self.min_confidence
         });
 
         has_isr && has_strike && has_bda
@@ -298,18 +338,25 @@ impl CompositionRule for StrikeChainRule {
     ) -> Result<CompositionResult> {
         // Find ISR capability
         let isr = capabilities.iter().find(|c| {
-            c.capability_type == CapabilityType::Emergent
-                && (c.metadata.get("pattern").and_then(|v| v.as_str()) == Some("isr_chain"))
+            c.get_capability_type() == CapabilityType::Emergent
+                && serde_json::from_str::<Value>(&c.metadata_json)
+                    .ok()
+                    .and_then(|v| {
+                        v.get("pattern")
+                            .and_then(|p| p.as_str())
+                            .map(|s| s == "isr_chain")
+                    })
+                    .unwrap_or(false)
         });
 
         // Find strike capability
         let strike = capabilities
             .iter()
             .filter(|c| {
-                c.capability_type == CapabilityType::Payload
-                    && c.metadata
-                        .get("strike_capable")
-                        .and_then(|v| v.as_bool())
+                c.get_capability_type() == CapabilityType::Payload
+                    && serde_json::from_str::<Value>(&c.metadata_json)
+                        .ok()
+                        .and_then(|v| v.get("strike_capable").and_then(|s| s.as_bool()))
                         .unwrap_or(false)
             })
             .max_by(|a, b| a.confidence.partial_cmp(&b.confidence).unwrap());
@@ -317,30 +364,31 @@ impl CompositionRule for StrikeChainRule {
         // Find BDA sensor
         let bda = capabilities
             .iter()
-            .filter(|c| c.capability_type == CapabilityType::Sensor)
+            .filter(|c| c.get_capability_type() == CapabilityType::Sensor)
             .max_by(|a, b| a.confidence.partial_cmp(&b.confidence).unwrap());
 
         if let (Some(isr), Some(strike), Some(bda)) = (isr, strike, bda) {
             // Confidence is minimum of all components (critical for strike operations)
             let chain_confidence = isr.confidence.min(strike.confidence).min(bda.confidence);
 
-            let composed = Capability {
-                id: format!("emergent_strike_chain_{}", uuid::Uuid::new_v4()),
-                name: "Strike Chain".to_string(),
-                capability_type: CapabilityType::Emergent,
-                confidence: chain_confidence,
-                metadata: json!({
-                    "composition_type": "emergent",
-                    "pattern": "strike_chain",
-                    "components": {
-                        "isr": isr.id,
-                        "strike": strike.id,
-                        "bda": bda.id
-                    },
-                    "description": "Complete targeting cycle with assessment",
-                    "requires_human_approval": true // Safety critical
-                }),
-            };
+            let mut composed = Capability::new(
+                format!("emergent_strike_chain_{}", uuid::Uuid::new_v4()),
+                "Strike Chain".to_string(),
+                CapabilityType::Emergent,
+                chain_confidence,
+            );
+            composed.metadata_json = serde_json::to_string(&json!({
+                "composition_type": "emergent",
+                "pattern": "strike_chain",
+                "components": {
+                    "isr": isr.id,
+                    "strike": strike.id,
+                    "bda": bda.id
+                },
+                "description": "Complete targeting cycle with assessment",
+                "requires_human_approval": true // Safety critical
+            }))
+            .unwrap_or_default();
 
             let contributors = vec![isr.id.clone(), strike.id.clone(), bda.id.clone()];
 
@@ -361,29 +409,30 @@ mod tests {
     async fn test_isr_chain_detection() {
         let rule = IsrChainRule::default();
 
-        let sensor = Capability {
-            id: "sensor1".to_string(),
-            name: "EO Camera".to_string(),
-            capability_type: CapabilityType::Sensor,
-            confidence: 0.9,
-            metadata: json!({"sensor_type": "camera"}),
-        };
+        let mut sensor = Capability::new(
+            "sensor1".to_string(),
+            "EO Camera".to_string(),
+            CapabilityType::Sensor,
+            0.9,
+        );
+        sensor.metadata_json =
+            serde_json::to_string(&json!({"sensor_type": "camera"})).unwrap_or_default();
 
-        let compute = Capability {
-            id: "compute1".to_string(),
-            name: "Edge Compute".to_string(),
-            capability_type: CapabilityType::Compute,
-            confidence: 0.85,
-            metadata: json!({}),
-        };
+        let compute = Capability::new(
+            "compute1".to_string(),
+            "Edge Compute".to_string(),
+            CapabilityType::Compute,
+            0.85,
+        );
 
-        let comms = Capability {
-            id: "comms1".to_string(),
-            name: "Tactical Radio".to_string(),
-            capability_type: CapabilityType::Communication,
-            confidence: 0.8,
-            metadata: json!({"bandwidth": 10.0}),
-        };
+        let mut comms = Capability::new(
+            "comms1".to_string(),
+            "Tactical Radio".to_string(),
+            CapabilityType::Communication,
+            0.8,
+        );
+        comms.metadata_json =
+            serde_json::to_string(&json!({"bandwidth": 10.0})).unwrap_or_default();
 
         let caps = vec![sensor, compute, comms];
         let context = CompositionContext::new(vec!["node1".to_string()]);
@@ -395,7 +444,7 @@ mod tests {
         assert_eq!(result.composed_capabilities.len(), 1);
 
         let composed = &result.composed_capabilities[0];
-        assert_eq!(composed.capability_type, CapabilityType::Emergent);
+        assert_eq!(composed.get_capability_type(), CapabilityType::Emergent);
         assert_eq!(composed.name, "ISR Chain");
         // Confidence should be minimum of all components (0.8)
         assert_eq!(composed.confidence, 0.8);
@@ -430,29 +479,30 @@ mod tests {
     async fn test_3d_mapping_detection() {
         let rule = Mapping3dRule::default();
 
-        let camera = Capability {
-            id: "camera1".to_string(),
-            name: "RGB Camera".to_string(),
-            capability_type: CapabilityType::Sensor,
-            confidence: 0.95,
-            metadata: json!({"sensor_type": "camera"}),
-        };
+        let mut camera = Capability::new(
+            "camera1".to_string(),
+            "RGB Camera".to_string(),
+            CapabilityType::Sensor,
+            0.95,
+        );
+        camera.metadata_json =
+            serde_json::to_string(&json!({"sensor_type": "camera"})).unwrap_or_default();
 
-        let lidar = Capability {
-            id: "lidar1".to_string(),
-            name: "3D Lidar".to_string(),
-            capability_type: CapabilityType::Sensor,
-            confidence: 0.9,
-            metadata: json!({"sensor_type": "lidar"}),
-        };
+        let mut lidar = Capability::new(
+            "lidar1".to_string(),
+            "3D Lidar".to_string(),
+            CapabilityType::Sensor,
+            0.9,
+        );
+        lidar.metadata_json =
+            serde_json::to_string(&json!({"sensor_type": "lidar"})).unwrap_or_default();
 
-        let compute = Capability {
-            id: "compute1".to_string(),
-            name: "GPU Compute".to_string(),
-            capability_type: CapabilityType::Compute,
-            confidence: 0.85,
-            metadata: json!({}),
-        };
+        let compute = Capability::new(
+            "compute1".to_string(),
+            "GPU Compute".to_string(),
+            CapabilityType::Compute,
+            0.85,
+        );
 
         let caps = vec![camera, lidar, compute];
         let context = CompositionContext::new(vec!["node1".to_string()]);
@@ -473,31 +523,32 @@ mod tests {
         let rule = StrikeChainRule::default();
 
         // Create an ISR capability (would come from IsrChainRule)
-        let isr = Capability {
-            id: "isr1".to_string(),
-            name: "ISR Chain".to_string(),
-            capability_type: CapabilityType::Emergent,
-            confidence: 0.9,
-            metadata: json!({
-                "pattern": "isr_chain"
-            }),
-        };
+        let mut isr = Capability::new(
+            "isr1".to_string(),
+            "ISR Chain".to_string(),
+            CapabilityType::Emergent,
+            0.9,
+        );
+        isr.metadata_json = serde_json::to_string(&json!({
+            "pattern": "isr_chain"
+        }))
+        .unwrap_or_default();
 
-        let strike = Capability {
-            id: "strike1".to_string(),
-            name: "Precision Munition".to_string(),
-            capability_type: CapabilityType::Payload,
-            confidence: 0.95,
-            metadata: json!({"strike_capable": true}),
-        };
+        let mut strike = Capability::new(
+            "strike1".to_string(),
+            "Precision Munition".to_string(),
+            CapabilityType::Payload,
+            0.95,
+        );
+        strike.metadata_json =
+            serde_json::to_string(&json!({"strike_capable": true})).unwrap_or_default();
 
-        let bda_sensor = Capability {
-            id: "bda1".to_string(),
-            name: "BDA Camera".to_string(),
-            capability_type: CapabilityType::Sensor,
-            confidence: 0.85,
-            metadata: json!({}),
-        };
+        let bda_sensor = Capability::new(
+            "bda1".to_string(),
+            "BDA Camera".to_string(),
+            CapabilityType::Sensor,
+            0.85,
+        );
 
         let caps = vec![isr, strike, bda_sensor];
         let context = CompositionContext::new(vec!["node1".to_string(), "node2".to_string()]);
@@ -510,9 +561,8 @@ mod tests {
         let composed = &result.composed_capabilities[0];
         assert_eq!(composed.name, "Strike Chain");
         assert_eq!(composed.confidence, 0.85); // Min of all components
-        assert!(composed.metadata["requires_human_approval"]
-            .as_bool()
-            .unwrap());
+        let metadata: Value = serde_json::from_str(&composed.metadata_json).unwrap();
+        assert!(metadata["requires_human_approval"].as_bool().unwrap());
         assert_eq!(result.contributing_capabilities.len(), 3);
     }
 

@@ -25,7 +25,7 @@ use cap_protocol::hierarchy::{
 };
 use cap_protocol::models::cell::{CellConfig, CellState};
 use cap_protocol::models::zone::{ZoneConfig, ZoneState};
-use cap_protocol::models::{Capability, CapabilityType};
+use cap_protocol::models::{Capability, CapabilityExt, CapabilityType};
 use cap_protocol::testing::E2EHarness;
 
 /// Test: Zone formation creates valid zone with multiple cells
@@ -494,10 +494,10 @@ async fn test_e2e_zone_capability_aggregation() {
     assert_eq!(aggregated.len(), 2);
     assert!(aggregated
         .iter()
-        .any(|c| c.capability_type == CapabilityType::Sensor));
+        .any(|c| c.get_capability_type() == CapabilityType::Sensor));
     assert!(aggregated
         .iter()
-        .any(|c| c.capability_type == CapabilityType::Compute));
+        .any(|c| c.get_capability_type() == CapabilityType::Compute));
 
     println!("✓ Zone aggregation: 2 capabilities from 2 cells");
 }

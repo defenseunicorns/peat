@@ -6,7 +6,7 @@
 //! - Emergent capability detection
 //! - Zone readiness assessment
 
-use crate::models::{Capability, CapabilityType, CellState};
+use crate::models::{Capability, CapabilityExt, CapabilityType, CellState};
 use crate::Result;
 use std::time::{Duration, Instant};
 use tracing::{debug, info, instrument};
@@ -174,7 +174,7 @@ impl ZoneCoordinator {
         for cell in cells {
             for cap in &cell.capabilities {
                 capability_map
-                    .entry(cap.capability_type)
+                    .entry(cap.get_capability_type())
                     .and_modify(|existing| {
                         // Keep capability with higher confidence
                         if cap.confidence > existing.confidence {
@@ -221,7 +221,7 @@ impl ZoneCoordinator {
         let mut capability_types = HashSet::new();
         for cell in cells {
             for cap in &cell.capabilities {
-                capability_types.insert(cap.capability_type);
+                capability_types.insert(cap.get_capability_type());
             }
         }
 
@@ -471,7 +471,7 @@ mod tests {
         // Sensor should have higher confidence (0.9 from cell1)
         let sensor_cap = aggregated
             .iter()
-            .find(|c| c.capability_type == CapabilityType::Sensor)
+            .find(|c| c.get_capability_type() == CapabilityType::Sensor)
             .unwrap();
         assert_eq!(sensor_cap.confidence, 0.9);
     }
@@ -491,7 +491,7 @@ mod tests {
 
         // Should detect ISR emergent capability
         assert_eq!(emergent.len(), 1);
-        assert_eq!(emergent[0].capability_type, CapabilityType::Emergent);
+        assert_eq!(emergent[0].get_capability_type(), CapabilityType::Emergent);
         assert!(emergent[0].name.contains("ISR"));
     }
 

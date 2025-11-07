@@ -39,7 +39,7 @@
 //! - Automatic re-election triggered on leader failure
 
 use crate::cell::messaging::{CellMessage, CellMessageBus, CellMessageType};
-use crate::models::{Capability, CapabilityType};
+use crate::models::{Capability, CapabilityExt, CapabilityType};
 use crate::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -86,7 +86,7 @@ impl LeadershipScore {
 
         // Analyze capabilities
         for cap in capabilities {
-            match cap.capability_type {
+            match cap.get_capability_type() {
                 CapabilityType::Compute => compute = cap.confidence as f64,
                 CapabilityType::Communication => communication = cap.confidence as f64,
                 CapabilityType::Sensor => sensors += 0.25, // Each sensor adds 25% up to 100%

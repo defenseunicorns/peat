@@ -5,7 +5,7 @@
 //! - Dynamic state: LWW-Register (last-write-wins) - state updates with timestamps
 //! - Fuel counter: PN-Counter (positive-negative counter) - increments/decrements
 
-use crate::models::{Capability, HumanMachinePair, Operator};
+use crate::models::{Capability, CapabilityExt, HumanMachinePair, Operator};
 use crate::traits::Phase;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -67,7 +67,7 @@ impl NodeConfig {
     pub fn has_capability_type(&self, capability_type: crate::models::CapabilityType) -> bool {
         self.capabilities
             .iter()
-            .any(|c| c.capability_type == capability_type)
+            .any(|c| c.get_capability_type() == capability_type)
     }
 
     /// Get all capabilities of a specific type
@@ -77,7 +77,7 @@ impl NodeConfig {
     ) -> Vec<&Capability> {
         self.capabilities
             .iter()
-            .filter(|c| c.capability_type == capability_type)
+            .filter(|c| c.get_capability_type() == capability_type)
             .collect()
     }
 
