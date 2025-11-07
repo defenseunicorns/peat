@@ -3,7 +3,9 @@
 //! Defines tactical roles that nodes can fill within a squad, with scoring
 //! algorithms that consider both platform capabilities and human operator specialties.
 
-use crate::models::{CapabilityType, NodeConfig, NodeState, Operator};
+use crate::models::{
+    CapabilityExt, CapabilityType, NodeConfig, NodeConfigExt, NodeState, NodeStateExt, Operator,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -145,7 +147,7 @@ impl RoleScorer {
             let has_required = config
                 .capabilities
                 .iter()
-                .any(|c| c.capability_type == required_cap_type);
+                .any(|c| c.get_capability_type() == required_cap_type);
 
             if !has_required {
                 return None; // Cannot fill this role
@@ -194,7 +196,7 @@ impl RoleScorer {
             let best_capability = config
                 .capabilities
                 .iter()
-                .filter(|c| c.capability_type == *req_type)
+                .filter(|c| c.get_capability_type() == *req_type)
                 .max_by(|a, b| {
                     a.confidence
                         .partial_cmp(&b.confidence)
@@ -223,7 +225,7 @@ impl RoleScorer {
             if let Some(best_cap) = config
                 .capabilities
                 .iter()
-                .filter(|c| c.capability_type == pref_type)
+                .filter(|c| c.get_capability_type() == pref_type)
                 .max_by(|a, b| {
                     a.confidence
                         .partial_cmp(&b.confidence)
@@ -258,11 +260,12 @@ impl RoleScorer {
 
     /// Score platform health
     fn score_platform_health(state: &NodeState) -> f64 {
-        match state.health {
+        match state.get_health() {
             crate::models::HealthStatus::Nominal => 1.0,
             crate::models::HealthStatus::Degraded => 0.6,
             crate::models::HealthStatus::Critical => 0.3,
             crate::models::HealthStatus::Failed => 0.0,
+            crate::models::HealthStatus::Unspecified => 0.5,
         }
     }
 
@@ -298,7 +301,8 @@ impl RoleScorer {
 mod tests {
     use super::*;
     use crate::models::{
-        AuthorityLevel, BindingType, Capability, HumanMachinePair, NodeConfig, OperatorRank,
+        AuthorityLevel, BindingType, Capability, HumanMachinePair, HumanMachinePairExt, NodeConfig,
+        NodeConfigExt, NodeStateExt, OperatorExt, OperatorRank,
     };
 
     fn create_test_platform_with_capabilities(caps: Vec<Capability>) -> (NodeConfig, NodeState) {
@@ -540,7 +544,7 @@ mod tests {
                 CapabilityType::Sensor,
                 0.9,
             )]);
-        state_degraded.health = crate::models::HealthStatus::Degraded;
+        state_degraded.update_health(crate::models::HealthStatus::Degraded);
 
         let score_nominal =
             RoleScorer::score_platform_for_role(&config_nominal, &state_nominal, CellRole::Sensor)
@@ -567,7 +571,7 @@ mod tests {
             CapabilityType::Sensor,
             0.9,
         )]);
-        state.health = crate::models::HealthStatus::Critical;
+        state.update_health(crate::models::HealthStatus::Critical);
 
         let score = RoleScorer::score_platform_for_role(&config, &state, CellRole::Sensor).unwrap();
 
@@ -587,7 +591,7 @@ mod tests {
             CapabilityType::Sensor,
             0.9,
         )]);
-        state.health = crate::models::HealthStatus::Failed;
+        state.update_health(crate::models::HealthStatus::Failed);
 
         let score = RoleScorer::score_platform_for_role(&config, &state, CellRole::Sensor).unwrap();
 

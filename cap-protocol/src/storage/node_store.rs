@@ -3,7 +3,7 @@
 //! This module provides a high-level wrapper around data sync backends for managing
 //! node configurations and state using CRDT operations.
 
-use crate::models::node::{NodeConfig, NodeState};
+use crate::models::node::{NodeConfig, NodeState, NodeStateExt};
 use crate::sync::{DataSyncBackend, Document, Query, SyncSubscription, Value};
 use crate::{Error, Result};
 use std::collections::HashMap;
@@ -188,9 +188,10 @@ impl<B: DataSyncBackend> NodeStore<B> {
     /// Get all nodes in a specific phase
     #[instrument(skip(self))]
     pub async fn get_nodes_by_phase(&self, phase: crate::traits::Phase) -> Result<Vec<NodeState>> {
+        use crate::traits::PhaseExt;
         debug!("Querying nodes by phase: {:?}", phase);
 
-        let phase_str = format!("{}", phase);
+        let phase_str = phase.as_str().to_string();
         let query = Query::Eq {
             field: "phase".to_string(),
             value: Value::String(phase_str),
@@ -287,7 +288,9 @@ impl<B: DataSyncBackend> NodeStore<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{Capability, CapabilityType, HealthStatus};
+    use crate::models::{
+        Capability, CapabilityExt, CapabilityType, HealthStatus, NodeConfigExt, NodeStateExt,
+    };
     use crate::sync::ditto::DittoBackend;
     use crate::sync::{BackendConfig, TransportConfig};
     use crate::traits::Phase;
@@ -380,7 +383,7 @@ mod tests {
 
         let retrieved = store.get_state(node_id).await.unwrap();
         assert!(retrieved.is_some());
-        assert_eq!(retrieved.unwrap().position, (37.7, -122.4, 100.0));
+        assert_eq!(retrieved.unwrap().get_position(), (37.7, -122.4, 100.0));
     }
 
     #[tokio::test]

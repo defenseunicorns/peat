@@ -36,6 +36,7 @@
 //! - **Command override**: Override autonomous formation when needed
 //! - **Emergency reconstitution**: Rebuild cells after casualties/failures
 
+use crate::models::CellStateExt;
 use crate::storage::CellStore;
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
@@ -318,7 +319,7 @@ impl<B: crate::sync::DataSyncBackend> DirectedAssignmentManager<B> {
 
         for squad in valid_squads {
             if squad.is_member(platform_id) {
-                return Ok(Some(squad.config.id.clone()));
+                return Ok(squad.config.as_ref().map(|c| c.id.clone()));
             }
         }
 
@@ -354,7 +355,7 @@ impl<B: crate::sync::DataSyncBackend> DirectedAssignmentManager<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{CellConfig, CellState};
+    use crate::models::{CellConfig, CellConfigExt, CellState, CellStateExt};
     use crate::storage::CellStore;
     use crate::sync::ditto::DittoBackend;
     use crate::sync::{BackendConfig, DataSyncBackend, TransportConfig};

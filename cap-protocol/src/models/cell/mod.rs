@@ -5,118 +5,201 @@
 //! - Leader election: LWW-Register (last-write-wins) - leader updates with timestamps
 //! - Aggregated capabilities: G-Set (grow-only set) - capabilities accumulate
 
-use crate::models::Capability;
-use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use crate::models::{Capability, CapabilityExt};
 use uuid::Uuid;
 
-/// Cell configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CellConfig {
-    /// Unique squad identifier
-    pub id: String,
-    /// Maximum squad size
-    pub max_size: usize,
-    /// Minimum squad size
-    pub min_size: usize,
+// Re-export protobuf types
+pub use cap_schema::cell::v1::{CellConfig, CellState};
+
+// Extension trait for CellConfig helper methods
+pub trait CellConfigExt {
+    /// Create a new cell configuration
+    fn new(max_size: u32) -> Self;
+
+    /// Create a new cell configuration with a specific ID
+    fn with_id(id: String, max_size: u32) -> Self;
 }
 
-impl CellConfig {
-    /// Create a new squad configuration
-    pub fn new(max_size: usize) -> Self {
+impl CellConfigExt for CellConfig {
+    fn new(max_size: u32) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
             max_size,
             min_size: 2,
+            created_at: Some(cap_schema::common::v1::Timestamp {
+                seconds: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+                nanos: 0,
+            }),
         }
     }
-}
 
-/// Cell state
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CellState {
-    /// Cell configuration
-    pub config: CellConfig,
-    /// Current squad leader platform ID
-    pub leader_id: Option<String>,
-    /// Set of member platform IDs
-    pub members: HashSet<String>,
-    /// Aggregated squad capabilities
-    pub capabilities: Vec<Capability>,
-    /// Parent platoon ID (if any)
-    pub platoon_id: Option<String>,
-    /// Last update timestamp
-    pub timestamp: u64,
-}
-
-impl CellState {
-    /// Create a new squad state
-    pub fn new(config: CellConfig) -> Self {
+    fn with_id(id: String, max_size: u32) -> Self {
         Self {
-            config,
-            leader_id: None,
-            members: HashSet::new(),
-            capabilities: Vec::new(),
-            platoon_id: None,
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            id,
+            max_size,
+            min_size: 2,
+            created_at: Some(cap_schema::common::v1::Timestamp {
+                seconds: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+                nanos: 0,
+            }),
         }
     }
+}
+
+// Extension trait for CellState helper methods with CRDT operations
+pub trait CellStateExt {
+    /// Create a new cell state
+    fn new(config: CellConfig) -> Self;
 
     /// Update the timestamp to current time
-    fn update_timestamp(&mut self) {
-        self.timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-    }
+    fn update_timestamp(&mut self);
 
-    /// Check if the squad is at capacity
-    pub fn is_full(&self) -> bool {
-        self.members.len() >= self.config.max_size
-    }
+    /// Check if the cell is at capacity
+    fn is_full(&self) -> bool;
 
-    /// Check if the squad meets minimum size
-    pub fn is_valid(&self) -> bool {
-        self.members.len() >= self.config.min_size
-    }
+    /// Check if the cell meets minimum size
+    fn is_valid(&self) -> bool;
 
-    /// Add a member to the squad (OR-Set add operation)
+    /// Add a member to the cell (OR-Set add operation)
     ///
     /// This implements an OR-Set CRDT where members can be added and removed.
     /// Concurrent add/remove operations are resolved by: Add wins over Remove.
-    pub fn add_member(&mut self, node_id: String) -> bool {
-        if self.is_full() {
-            false
-        } else {
-            let added = self.members.insert(node_id);
-            if added {
-                self.update_timestamp();
-            }
-            added
+    fn add_member(&mut self, node_id: String) -> bool;
+
+    /// Remove a member from the cell (OR-Set remove operation)
+    fn remove_member(&mut self, node_id: &str) -> bool;
+
+    /// Set the cell leader (LWW-Register operation)
+    ///
+    /// This implements Last-Write-Wins semantics for leader election.
+    /// The leader must be a current member of the cell.
+    fn set_leader(&mut self, node_id: String) -> Result<(), &'static str>;
+
+    /// Clear the cell leader
+    fn clear_leader(&mut self);
+
+    /// Add a capability to the cell (G-Set operation)
+    ///
+    /// This implements a G-Set CRDT where capabilities can only be added.
+    /// Capabilities are aggregated from all cell members.
+    fn add_capability(&mut self, capability: Capability);
+
+    /// Get all capabilities of a specific type
+    fn get_capabilities_by_type(
+        &self,
+        capability_type: crate::models::CapabilityType,
+    ) -> Vec<&Capability>;
+
+    /// Check if cell has a specific capability type
+    fn has_capability_type(&self, capability_type: crate::models::CapabilityType) -> bool;
+
+    /// Assign cell to a platoon (LWW-Register operation)
+    fn assign_platoon(&mut self, platoon_id: String);
+
+    /// Remove cell from platoon
+    fn leave_platoon(&mut self);
+
+    /// Merge with another cell state (CRDT merge)
+    ///
+    /// Merges two cell states using CRDT semantics:
+    /// - Members: Union (OR-Set merge)
+    /// - Leader: Take newer timestamp (LWW-Register merge)
+    /// - Capabilities: Union (G-Set merge)
+    fn merge(&mut self, other: &CellState);
+
+    /// Get the count of members
+    fn member_count(&self) -> usize;
+
+    /// Check if a node is a member
+    fn is_member(&self, node_id: &str) -> bool;
+
+    /// Check if this node is the leader
+    fn is_leader(&self, node_id: &str) -> bool;
+
+    /// Get the cell ID (convenience method)
+    fn get_id(&self) -> Option<&str>;
+}
+
+impl CellStateExt for CellState {
+    fn new(config: CellConfig) -> Self {
+        Self {
+            config: Some(config),
+            leader_id: None,
+            members: Vec::new(),
+            capabilities: Vec::new(),
+            platoon_id: None,
+            timestamp: Some(cap_schema::common::v1::Timestamp {
+                seconds: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+                nanos: 0,
+            }),
         }
     }
 
-    /// Remove a member from the squad (OR-Set remove operation)
-    pub fn remove_member(&mut self, node_id: &str) -> bool {
-        let removed = self.members.remove(node_id);
-        if removed {
+    fn update_timestamp(&mut self) {
+        self.timestamp = Some(cap_schema::common::v1::Timestamp {
+            seconds: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            nanos: 0,
+        });
+    }
+
+    fn is_full(&self) -> bool {
+        if let Some(ref config) = self.config {
+            self.members.len() >= config.max_size as usize
+        } else {
+            false
+        }
+    }
+
+    fn is_valid(&self) -> bool {
+        if let Some(ref config) = self.config {
+            self.members.len() >= config.min_size as usize
+        } else {
+            false
+        }
+    }
+
+    fn add_member(&mut self, node_id: String) -> bool {
+        if self.is_full() {
+            false
+        } else {
+            // Check if already a member
+            if self.members.contains(&node_id) {
+                false
+            } else {
+                self.members.push(node_id);
+                self.update_timestamp();
+                true
+            }
+        }
+    }
+
+    fn remove_member(&mut self, node_id: &str) -> bool {
+        if let Some(pos) = self.members.iter().position(|id| id == node_id) {
+            self.members.remove(pos);
             self.update_timestamp();
             // If leader is removed, clear leader
             if self.leader_id.as_deref() == Some(node_id) {
                 self.leader_id = None;
             }
+            true
+        } else {
+            false
         }
-        removed
     }
 
-    /// Set the squad leader (LWW-Register operation)
-    ///
-    /// This implements Last-Write-Wins semantics for leader election.
-    /// The leader must be a current member of the squad.
-    pub fn set_leader(&mut self, node_id: String) -> Result<(), &'static str> {
+    fn set_leader(&mut self, node_id: String) -> Result<(), &'static str> {
         if !self.members.contains(&node_id) {
             return Err("Leader must be a squad member");
         }
@@ -125,17 +208,12 @@ impl CellState {
         Ok(())
     }
 
-    /// Clear the squad leader
-    pub fn clear_leader(&mut self) {
+    fn clear_leader(&mut self) {
         self.leader_id = None;
         self.update_timestamp();
     }
 
-    /// Add a capability to the squad (G-Set operation)
-    ///
-    /// This implements a G-Set CRDT where capabilities can only be added.
-    /// Capabilities are aggregated from all squad members.
-    pub fn add_capability(&mut self, capability: Capability) {
+    fn add_capability(&mut self, capability: Capability) {
         // Check if capability already exists (by ID)
         if !self.capabilities.iter().any(|c| c.id == capability.id) {
             self.capabilities.push(capability);
@@ -143,46 +221,38 @@ impl CellState {
         }
     }
 
-    /// Get all capabilities of a specific type
-    pub fn get_capabilities_by_type(
+    fn get_capabilities_by_type(
         &self,
         capability_type: crate::models::CapabilityType,
     ) -> Vec<&Capability> {
         self.capabilities
             .iter()
-            .filter(|c| c.capability_type == capability_type)
+            .filter(|c| c.get_capability_type() == capability_type)
             .collect()
     }
 
-    /// Check if squad has a specific capability type
-    pub fn has_capability_type(&self, capability_type: crate::models::CapabilityType) -> bool {
+    fn has_capability_type(&self, capability_type: crate::models::CapabilityType) -> bool {
         self.capabilities
             .iter()
-            .any(|c| c.capability_type == capability_type)
+            .any(|c| c.get_capability_type() == capability_type)
     }
 
-    /// Assign squad to a platoon (LWW-Register operation)
-    pub fn assign_platoon(&mut self, platoon_id: String) {
+    fn assign_platoon(&mut self, platoon_id: String) {
         self.platoon_id = Some(platoon_id);
         self.update_timestamp();
     }
 
-    /// Remove squad from platoon
-    pub fn leave_platoon(&mut self) {
+    fn leave_platoon(&mut self) {
         self.platoon_id = None;
         self.update_timestamp();
     }
 
-    /// Merge with another squad state (CRDT merge)
-    ///
-    /// Merges two squad states using CRDT semantics:
-    /// - Members: Union (OR-Set merge)
-    /// - Leader: Take newer timestamp (LWW-Register merge)
-    /// - Capabilities: Union (G-Set merge)
-    pub fn merge(&mut self, other: &CellState) {
+    fn merge(&mut self, other: &CellState) {
         // Merge members (OR-Set union)
         for member in &other.members {
-            self.members.insert(member.clone());
+            if !self.members.contains(member) {
+                self.members.push(member.clone());
+            }
         }
 
         // Merge capabilities (G-Set union)
@@ -193,26 +263,30 @@ impl CellState {
         }
 
         // Merge leader and platoon (LWW-Register - take newer)
-        if other.timestamp > self.timestamp {
+        let self_ts = self.timestamp.as_ref().map(|t| t.seconds).unwrap_or(0);
+        let other_ts = other.timestamp.as_ref().map(|t| t.seconds).unwrap_or(0);
+
+        if other_ts > self_ts {
             self.leader_id = other.leader_id.clone();
             self.platoon_id = other.platoon_id.clone();
             self.timestamp = other.timestamp;
         }
     }
 
-    /// Get the count of members
-    pub fn member_count(&self) -> usize {
+    fn member_count(&self) -> usize {
         self.members.len()
     }
 
-    /// Check if a platform is a member
-    pub fn is_member(&self, node_id: &str) -> bool {
-        self.members.contains(node_id)
+    fn is_member(&self, node_id: &str) -> bool {
+        self.members.iter().any(|id| id == node_id)
     }
 
-    /// Check if this platform is the leader
-    pub fn is_leader(&self, node_id: &str) -> bool {
+    fn is_leader(&self, node_id: &str) -> bool {
         self.leader_id.as_deref() == Some(node_id)
+    }
+
+    fn get_id(&self) -> Option<&str> {
+        self.config.as_ref().map(|c| c.id.as_str())
     }
 }
 

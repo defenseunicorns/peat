@@ -10,6 +10,7 @@
 use cap_protocol::models::capability::{Capability, CapabilityType};
 use cap_protocol::models::cell::{CellConfig, CellState};
 use cap_protocol::models::node::NodeConfig;
+use cap_protocol::models::{CapabilityExt, CellConfigExt, CellStateExt, NodeConfigExt};
 use cap_protocol::storage::{CellStore, NodeStore};
 use cap_protocol::sync::ditto::DittoBackend;
 use cap_protocol::testing::e2e_harness::E2EHarness;
@@ -150,7 +151,7 @@ async fn test_load_large_formation_nodes() {
             let node = &nodes[global_node_idx];
 
             // Add member
-            cell.members.insert(node.id.clone());
+            cell.members.push(node.id.clone());
 
             // Aggregate capabilities
             for cap in &node.capabilities {
@@ -200,8 +201,10 @@ async fn test_load_large_formation_nodes() {
     // Validate: All cells formed
     let mut stored_cell_count = 0;
     for cell in &cells {
-        if cell_store.get_cell(&cell.config.id).await.is_ok() {
-            stored_cell_count += 1;
+        if let Some(cell_id) = cell.get_id() {
+            if cell_store.get_cell(cell_id).await.is_ok() {
+                stored_cell_count += 1;
+            }
         }
     }
     assert_eq!(
@@ -409,7 +412,7 @@ async fn test_load_multi_zone_hierarchy() {
             };
 
             for node in &zone_nodes[start_idx..end_idx] {
-                cell.members.insert(node.id.clone());
+                cell.members.push(node.id.clone());
                 for cap in &node.capabilities {
                     cell.capabilities.push(cap.clone());
                 }

@@ -6,7 +6,7 @@
 //! - Emergent capability detection
 //! - Zone readiness assessment
 
-use crate::models::{Capability, CapabilityType, CellState};
+use crate::models::{Capability, CapabilityExt, CapabilityType, CellState};
 use crate::Result;
 use std::time::{Duration, Instant};
 use tracing::{debug, info, instrument};
@@ -147,7 +147,11 @@ impl ZoneCoordinator {
             .iter()
             .map(|cell| {
                 let member_count = cell.members.len() as f32;
-                let max_size = cell.config.max_size as f32;
+                let max_size = cell
+                    .config
+                    .as_ref()
+                    .map(|c| c.max_size as f32)
+                    .unwrap_or(1.0);
                 member_count / max_size
             })
             .sum();
@@ -174,7 +178,7 @@ impl ZoneCoordinator {
         for cell in cells {
             for cap in &cell.capabilities {
                 capability_map
-                    .entry(cap.capability_type)
+                    .entry(cap.get_capability_type())
                     .and_modify(|existing| {
                         // Keep capability with higher confidence
                         if cap.confidence > existing.confidence {
@@ -221,7 +225,7 @@ impl ZoneCoordinator {
         let mut capability_types = HashSet::new();
         for cell in cells {
             for cap in &cell.capabilities {
-                capability_types.insert(cap.capability_type);
+                capability_types.insert(cap.get_capability_type());
             }
         }
 
@@ -355,7 +359,7 @@ pub struct ZoneMetrics {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::CellConfig;
+    use crate::models::{CellConfig, CellConfigExt, CellStateExt};
 
     fn create_test_cell(id: &str, member_count: usize) -> CellState {
         let mut config = CellConfig::new(10);
@@ -371,8 +375,9 @@ mod tests {
     }
 
     fn add_capability(cell: &mut CellState, cap_type: CapabilityType, confidence: f32) {
+        let cell_id = cell.get_id().unwrap_or("unknown");
         cell.capabilities.push(Capability::new(
-            format!("{}_{:?}", cell.config.id, cap_type),
+            format!("{}_{:?}", cell_id, cap_type),
             format!("{:?} Capability", cap_type),
             cap_type,
             confidence,
@@ -471,7 +476,7 @@ mod tests {
         // Sensor should have higher confidence (0.9 from cell1)
         let sensor_cap = aggregated
             .iter()
-            .find(|c| c.capability_type == CapabilityType::Sensor)
+            .find(|c| c.get_capability_type() == CapabilityType::Sensor)
             .unwrap();
         assert_eq!(sensor_cap.confidence, 0.9);
     }
@@ -491,7 +496,7 @@ mod tests {
 
         // Should detect ISR emergent capability
         assert_eq!(emergent.len(), 1);
-        assert_eq!(emergent[0].capability_type, CapabilityType::Emergent);
+        assert_eq!(emergent[0].get_capability_type(), CapabilityType::Emergent);
         assert!(emergent[0].name.contains("ISR"));
     }
 

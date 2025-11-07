@@ -35,7 +35,7 @@
 //! let matches = engine.query_platforms(&query, &nodes)?;
 //! ```
 
-use crate::models::{cell::CellState, node::NodeConfig, Capability, CapabilityType};
+use crate::models::{cell::CellState, node::NodeConfig, Capability, CapabilityExt, CapabilityType};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -72,7 +72,7 @@ impl CapabilityQuery {
         // Check all required types are present with sufficient confidence
         for required_type in &self.required_types {
             let has_type = capabilities.iter().any(|cap| {
-                cap.capability_type == *required_type && cap.confidence >= self.min_confidence
+                cap.get_capability_type() == *required_type && cap.confidence >= self.min_confidence
             });
 
             if !has_type {
@@ -104,7 +104,7 @@ impl CapabilityQuery {
                 .map(|req_type| {
                     capabilities
                         .iter()
-                        .filter(|cap| cap.capability_type == *req_type)
+                        .filter(|cap| cap.get_capability_type() == *req_type)
                         .map(|cap| cap.confidence)
                         .max_by(|a, b| a.partial_cmp(b).unwrap())
                         .unwrap_or(0.0)
@@ -126,7 +126,7 @@ impl CapabilityQuery {
                 .map(|opt_type| {
                     capabilities
                         .iter()
-                        .filter(|cap| cap.capability_type == *opt_type)
+                        .filter(|cap| cap.get_capability_type() == *opt_type)
                         .map(|cap| cap.confidence)
                         .max_by(|a, b| a.partial_cmp(b).unwrap())
                         .unwrap_or(0.0)
@@ -289,7 +289,7 @@ impl CapabilityQueryEngine {
         for node in nodes {
             for capability in &node.capabilities {
                 stats
-                    .entry(capability.capability_type)
+                    .entry(capability.get_capability_type())
                     .or_default()
                     .push(capability.confidence);
             }
@@ -354,6 +354,7 @@ impl CapabilityStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::{CapabilityExt, NodeConfigExt};
 
     fn create_test_capability(id: &str, cap_type: CapabilityType, confidence: f32) -> Capability {
         Capability::new(
