@@ -244,7 +244,7 @@ impl CellCoordinator {
             });
         }
 
-        Ok(Phase::Hierarchical)
+        Ok(Phase::Hierarchy)
     }
 
     /// Reset formation (for retry scenarios)
@@ -562,7 +562,7 @@ mod tests {
         assert!(coord.can_transition_to_hierarchical());
 
         let phase = coord.get_hierarchical_phase().unwrap();
-        assert_eq!(phase, Phase::Hierarchical);
+        assert_eq!(phase, Phase::Hierarchy);
     }
 
     #[test]

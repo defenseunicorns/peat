@@ -4,31 +4,34 @@ use crate::Result;
 use async_trait::async_trait;
 use std::fmt::Debug;
 
-/// Represents a protocol phase
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum Phase {
-    /// Initial discovery and group formation
-    Discovery,
-    /// Cell cohesion and leader election
-    Cell,
-    /// Hierarchical operations with constrained messaging
-    Hierarchical,
+// Re-export Phase from cap_schema
+pub use cap_schema::node::v1::Phase;
+
+/// Extension trait for Phase enum
+pub trait PhaseExt {
+    /// Get lowercase string representation
+    fn as_str(&self) -> &'static str;
+
+    /// Legacy compatibility constants
+    const BOOTSTRAP: Phase;
+    const SQUAD: Phase;
+    const HIERARCHICAL: Phase;
 }
 
-impl std::fmt::Display for Phase {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl PhaseExt for Phase {
+    fn as_str(&self) -> &'static str {
         match self {
-            Phase::Discovery => write!(f, "discovery"),
-            Phase::Cell => write!(f, "cell"),
-            Phase::Hierarchical => write!(f, "hierarchical"),
+            Phase::Unspecified => "unspecified",
+            Phase::Discovery => "discovery",
+            Phase::Cell => "cell",
+            Phase::Hierarchy => "hierarchical",
         }
     }
-}
 
-// Legacy compatibility - old names as aliases
-impl Phase {
-    pub const BOOTSTRAP: Phase = Phase::Discovery;
-    pub const SQUAD: Phase = Phase::Cell;
+    // Legacy compatibility - old names as aliases
+    const BOOTSTRAP: Phase = Phase::Discovery;
+    const SQUAD: Phase = Phase::Cell;
+    const HIERARCHICAL: Phase = Phase::Hierarchy;
 }
 
 /// Node lifecycle management

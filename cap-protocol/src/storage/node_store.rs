@@ -188,9 +188,10 @@ impl<B: DataSyncBackend> NodeStore<B> {
     /// Get all nodes in a specific phase
     #[instrument(skip(self))]
     pub async fn get_nodes_by_phase(&self, phase: crate::traits::Phase) -> Result<Vec<NodeState>> {
+        use crate::traits::PhaseExt;
         debug!("Querying nodes by phase: {:?}", phase);
 
-        let phase_str = format!("{}", phase);
+        let phase_str = phase.as_str().to_string();
         let query = Query::Eq {
             field: "phase".to_string(),
             value: Value::String(phase_str),

@@ -162,7 +162,8 @@ impl LeadershipPolicy {
         match context.mission_phase {
             Phase::Discovery => (0.7, 0.3), // Planning phase - authority matters more
             Phase::Cell => (0.6, 0.4),      // Cell ops - balanced
-            Phase::Hierarchical => (0.8, 0.2), // Hierarchical - authority critical
+            Phase::Hierarchy => (0.8, 0.2), // Hierarchical - authority critical
+            Phase::Unspecified => (0.6, 0.4), // Default to balanced
         }
     }
 }
@@ -371,7 +372,7 @@ mod tests {
         assert_eq!(auth, 0.6);
 
         // Hierarchical phase - authority critical
-        let context = ElectionContext::new(policy.clone(), Phase::Hierarchical);
+        let context = ElectionContext::new(policy.clone(), Phase::Hierarchy);
         let (auth, _tech) = policy.get_weights(&context);
         assert_eq!(auth, 0.8);
     }
@@ -405,12 +406,12 @@ mod tests {
                 authority_weight: 0.6,
                 technical_weight: 0.4,
             },
-            Phase::Hierarchical,
+            Phase::Hierarchy,
         )
         .with_authority_required(true)
         .with_casualties(2);
 
-        assert_eq!(context.mission_phase, Phase::Hierarchical);
+        assert_eq!(context.mission_phase, Phase::Hierarchy);
         assert!(context.authority_required);
         assert_eq!(context.casualty_count, 2);
     }
