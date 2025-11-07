@@ -22,7 +22,9 @@ use cap_protocol::delta::change_tracker::ChangeTracker;
 use cap_protocol::delta::generator::{Delta, DeltaBatch, DeltaGenerator, DeltaOp, DeltaStats};
 use cap_protocol::delta::priority::{DeltaQueue, Priority, PriorityClassifier};
 use cap_protocol::models::cell::{CellConfig, CellState};
-use cap_protocol::models::{Capability, CapabilityExt, CapabilityType};
+use cap_protocol::models::{
+    Capability, CapabilityExt, CapabilityType, CellConfigExt, CellStateExt,
+};
 use cap_protocol::storage::CellStore;
 use cap_protocol::testing::E2EHarness;
 use std::time::Duration;
@@ -341,9 +343,9 @@ async fn test_e2e_delta_sync_with_ditto() {
     println!("  ✓ Peers connected");
 
     // Create initial cell state on peer1
-    let cell_config = CellConfig::new(5);
+    let cell_id = "cell_delta_sync".to_string();
+    let cell_config = CellConfig::with_id(cell_id.clone(), 5);
     let mut cell = CellState::new(cell_config);
-    cell.config.id = "cell_delta_sync".to_string();
 
     println!("  2. Storing initial cell state on peer1...");
     cell_store1.store_cell(&cell).await.unwrap();
@@ -352,7 +354,7 @@ async fn test_e2e_delta_sync_with_ditto() {
     tokio::time::sleep(Duration::from_secs(1)).await;
 
     // Verify initial sync
-    let cell_peer2_initial = cell_store2.get_cell(&cell.config.id).await.unwrap();
+    let cell_peer2_initial = cell_store2.get_cell(&cell_id).await.unwrap();
     assert!(
         cell_peer2_initial.is_some(),
         "Initial cell should sync to peer2"
@@ -367,11 +369,11 @@ async fn test_e2e_delta_sync_with_ditto() {
 
     // Change 1: Add member (must be member before being leader)
     cell.add_member("node1".to_string());
-    tracker.mark_changed(&cell.config.id, "members");
+    tracker.mark_changed(&cell_id, "members");
 
     // Change 2: Set leader
     cell.set_leader("node1".to_string()).unwrap();
-    tracker.mark_changed(&cell.config.id, "leader_id");
+    tracker.mark_changed(&cell_id, "leader_id");
 
     // Change 3: Add capability
     cell.add_capability(Capability::new(
@@ -380,7 +382,7 @@ async fn test_e2e_delta_sync_with_ditto() {
         CapabilityType::Sensor,
         1.0,
     ));
-    tracker.mark_changed(&cell.config.id, "capabilities");
+    tracker.mark_changed(&cell_id, "capabilities");
 
     // Generate delta for changes
     let batch = generator.generate_all("cells");
@@ -396,7 +398,7 @@ async fn test_e2e_delta_sync_with_ditto() {
     tokio::time::sleep(Duration::from_secs(1)).await;
 
     // Verify changes synced
-    let cell_peer2_updated = cell_store2.get_cell(&cell.config.id).await.unwrap();
+    let cell_peer2_updated = cell_store2.get_cell(&cell_id).await.unwrap();
     assert!(cell_peer2_updated.is_some());
 
     let synced_cell = cell_peer2_updated.unwrap();

@@ -8,7 +8,7 @@
 
 #![cfg(feature = "automerge-backend")]
 
-use cap_protocol::models::cell::{CellConfig, CellState};
+use cap_protocol::models::cell::{CellConfig, CellConfigExt, CellState, CellStateExt};
 use cap_protocol::models::node::{NodeConfig, NodeConfigExt};
 use cap_protocol::models::{Capability, CapabilityExt, CapabilityType};
 use cap_protocol::storage::{CellStore, NodeStore};
@@ -258,9 +258,8 @@ async fn test_cellstore_compatibility() {
         .expect("CellStore should initialize with AutomergeBackend");
 
     // Create a cell
-    let cell_config = CellConfig::new(5);
+    let cell_config = CellConfig::with_id("test_cell".to_string(), 5);
     let mut cell = CellState::new(cell_config);
-    cell.config.id = "test_cell".to_string();
     cell.add_member("node1".to_string());
     cell.set_leader("node1".to_string()).unwrap();
 

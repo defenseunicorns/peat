@@ -147,7 +147,11 @@ impl ZoneCoordinator {
             .iter()
             .map(|cell| {
                 let member_count = cell.members.len() as f32;
-                let max_size = cell.config.max_size as f32;
+                let max_size = cell
+                    .config
+                    .as_ref()
+                    .map(|c| c.max_size as f32)
+                    .unwrap_or(1.0);
                 member_count / max_size
             })
             .sum();
@@ -355,7 +359,7 @@ pub struct ZoneMetrics {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::CellConfig;
+    use crate::models::{CellConfig, CellConfigExt, CellStateExt};
 
     fn create_test_cell(id: &str, member_count: usize) -> CellState {
         let mut config = CellConfig::new(10);
@@ -371,8 +375,9 @@ mod tests {
     }
 
     fn add_capability(cell: &mut CellState, cap_type: CapabilityType, confidence: f32) {
+        let cell_id = cell.get_id().unwrap_or("unknown");
         cell.capabilities.push(Capability::new(
-            format!("{}_{:?}", cell.config.id, cap_type),
+            format!("{}_{:?}", cell_id, cap_type),
             format!("{:?} Capability", cap_type),
             cap_type,
             confidence,

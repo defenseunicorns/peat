@@ -3,7 +3,10 @@
 //! This module provides a high-level wrapper around data sync backends for managing
 //! cell state using CRDT operations.
 
-use crate::models::{cell::CellState, Capability};
+use crate::models::{
+    cell::{CellState, CellStateExt},
+    Capability,
+};
 use crate::sync::{DataSyncBackend, Document, Query, SyncSubscription, Value};
 use crate::{Error, Result};
 use std::collections::HashMap;
@@ -55,7 +58,9 @@ impl<B: DataSyncBackend> CellStore<B> {
 
         let mut doc = Document::new(fields);
         // Add cell_id field for querying
-        doc.set("cell_id".to_string(), Value::String(cell.config.id.clone()));
+        if let Some(id) = cell.get_id() {
+            doc.set("cell_id".to_string(), Value::String(id.to_string()));
+        }
         Ok(doc)
     }
 
@@ -68,7 +73,7 @@ impl<B: DataSyncBackend> CellStore<B> {
     /// Store a cell state (OR-Set + LWW-Register operations)
     #[instrument(skip(self, cell))]
     pub async fn store_cell(&self, cell: &CellState) -> Result<String> {
-        info!("Storing cell: {}", cell.config.id);
+        info!("Storing cell: {}", cell.get_id().unwrap_or("<unknown>"));
 
         let doc = Self::cell_to_document(cell)?;
 
@@ -310,7 +315,7 @@ impl<B: DataSyncBackend> CellStore<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{CapabilityExt, CellConfig};
+    use crate::models::{CapabilityExt, CellConfig, CellConfigExt};
     use crate::sync::ditto::DittoBackend;
     use crate::sync::{BackendConfig, TransportConfig};
     use std::collections::HashMap;
@@ -375,7 +380,8 @@ mod tests {
         let doc_id = store.store_cell(&cell).await.unwrap();
         assert!(!doc_id.is_empty());
 
-        let retrieved = store.get_cell(&cell.config.id).await.unwrap();
+        let cell_id = cell.get_id().unwrap();
+        let retrieved = store.get_cell(cell_id).await.unwrap();
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().member_count(), 1);
     }
@@ -406,7 +412,7 @@ mod tests {
 
         let valid_cells = store.get_valid_cells().await.unwrap();
         assert_eq!(valid_cells.len(), 1);
-        assert_eq!(valid_cells[0].config.id, valid_cell.config.id);
+        assert_eq!(valid_cells[0].get_id(), valid_cell.get_id());
     }
 
     #[tokio::test]
@@ -432,7 +438,7 @@ mod tests {
 
         let alpha_cells = store.get_cells_by_zone("platoon_alpha").await.unwrap();
         assert_eq!(alpha_cells.len(), 1);
-        assert_eq!(alpha_cells[0].config.id, cell1.config.id);
+        assert_eq!(alpha_cells[0].get_id(), cell1.get_id());
     }
 
     #[tokio::test]
@@ -471,7 +477,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(sensor_cells.len(), 1);
-        assert_eq!(sensor_cells[0].config.id, cell_with_sensor.config.id);
+        assert_eq!(sensor_cells[0].get_id(), cell_with_sensor.get_id());
     }
 
     #[tokio::test]
@@ -501,7 +507,7 @@ mod tests {
 
         let available = store.get_available_cells().await.unwrap();
         assert_eq!(available.len(), 1);
-        assert_eq!(available[0].config.id, available_cell.config.id);
+        assert_eq!(available[0].get_id(), available_cell.get_id());
     }
 
     // NOTE: Mutation methods (add_member, remove_member, set_leader, add_capability, delete_cell)

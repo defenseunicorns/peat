@@ -239,4 +239,134 @@ mod tests {
         // New capabilities start with no timestamp
         assert!(cap.registered_at.is_none());
     }
+
+    #[test]
+    fn test_capability_with_empty_strings() {
+        let cap = Capability::new(String::new(), String::new(), CapabilityType::Sensor, 0.5);
+
+        assert_eq!(cap.id, "");
+        assert_eq!(cap.name, "");
+        assert_eq!(cap.confidence, 0.5);
+    }
+
+    #[test]
+    fn test_capability_confidence_boundary_values() {
+        // Test exact boundary values
+        let cap_zero = Capability::new(
+            "test".to_string(),
+            "Test".to_string(),
+            CapabilityType::Sensor,
+            0.0,
+        );
+        assert_eq!(cap_zero.confidence, 0.0);
+        assert!(cap_zero.is_valid(0.0));
+        assert!(!cap_zero.is_valid(0.000001));
+
+        let cap_one = Capability::new(
+            "test".to_string(),
+            "Test".to_string(),
+            CapabilityType::Sensor,
+            1.0,
+        );
+        assert_eq!(cap_one.confidence, 1.0);
+        assert!(cap_one.is_valid(1.0));
+        assert!(cap_one.is_valid(0.999999));
+    }
+
+    #[test]
+    fn test_capability_type_set_then_get() {
+        let mut cap = Capability::new(
+            "test".to_string(),
+            "Test".to_string(),
+            CapabilityType::Unspecified,
+            0.5,
+        );
+
+        // Test setting each capability type
+        for cap_type in [
+            CapabilityType::Sensor,
+            CapabilityType::Compute,
+            CapabilityType::Communication,
+            CapabilityType::Mobility,
+            CapabilityType::Payload,
+            CapabilityType::Emergent,
+        ] {
+            cap.set_capability_type(cap_type);
+            assert_eq!(cap.get_capability_type(), cap_type);
+            assert_eq!(cap.capability_type, cap_type as i32);
+        }
+    }
+
+    #[test]
+    fn test_capability_clone() {
+        let cap1 = Capability::new(
+            "sensor-1".to_string(),
+            "Camera".to_string(),
+            CapabilityType::Sensor,
+            0.85,
+        );
+
+        let cap2 = cap1.clone();
+        assert_eq!(cap1.id, cap2.id);
+        assert_eq!(cap1.name, cap2.name);
+        assert_eq!(cap1.capability_type, cap2.capability_type);
+        assert_eq!(cap1.confidence, cap2.confidence);
+    }
+
+    #[test]
+    fn test_capability_metadata_json_manipulation() {
+        let mut cap = Capability::new(
+            "test".to_string(),
+            "Test".to_string(),
+            CapabilityType::Sensor,
+            0.8,
+        );
+
+        // Set complex JSON
+        cap.metadata_json =
+            r#"{"manufacturer": "ACME", "model": "X1000", "version": "2.1"}"#.to_string();
+        assert!(cap.metadata_json.contains("ACME"));
+
+        // Parse to ensure it's valid JSON
+        let parsed: serde_json::Value = serde_json::from_str(&cap.metadata_json).unwrap();
+        assert_eq!(parsed["manufacturer"], "ACME");
+        assert_eq!(parsed["model"], "X1000");
+    }
+
+    #[test]
+    fn test_is_valid_threshold_variations() {
+        let cap = Capability::new(
+            "test".to_string(),
+            "Test".to_string(),
+            CapabilityType::Sensor,
+            0.75,
+        );
+
+        // Test various thresholds
+        assert!(cap.is_valid(0.0));
+        assert!(cap.is_valid(0.5));
+        assert!(cap.is_valid(0.74));
+        assert!(cap.is_valid(0.75)); // Equal to confidence
+        assert!(!cap.is_valid(0.76));
+        assert!(!cap.is_valid(0.9));
+        assert!(!cap.is_valid(1.0));
+    }
+
+    #[test]
+    fn test_capability_protobuf_field_access() {
+        let cap = Capability::new(
+            "test-id".to_string(),
+            "Test Name".to_string(),
+            CapabilityType::Compute,
+            0.9,
+        );
+
+        // Direct protobuf field access
+        assert_eq!(cap.id, "test-id");
+        assert_eq!(cap.name, "Test Name");
+        assert_eq!(cap.capability_type, CapabilityType::Compute as i32);
+        assert_eq!(cap.confidence, 0.9);
+        assert_eq!(cap.metadata_json, "");
+        assert!(cap.registered_at.is_none());
+    }
 }

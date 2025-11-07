@@ -507,4 +507,343 @@ mod tests {
         assert!(pair.has_overloaded_operator(0.8));
         assert!(!pair.has_overloaded_operator(0.95));
     }
+
+    #[test]
+    fn test_operator_cognitive_load_clamping() {
+        let mut op = Operator::new(
+            "op1".to_string(),
+            "Test".to_string(),
+            OperatorRank::E5,
+            AuthorityLevel::Supervisor,
+            "11B".to_string(),
+        );
+
+        // Test upper bound clamping
+        op.update_cognitive_load(2.0);
+        assert_eq!(op.cognitive_load(), 1.0);
+
+        // Test lower bound clamping
+        op.update_cognitive_load(-0.5);
+        assert_eq!(op.cognitive_load(), 0.0);
+
+        // Test normal value
+        op.update_cognitive_load(0.5);
+        assert_eq!(op.cognitive_load(), 0.5);
+    }
+
+    #[test]
+    fn test_operator_fatigue_clamping() {
+        let mut op = Operator::new(
+            "op1".to_string(),
+            "Test".to_string(),
+            OperatorRank::E5,
+            AuthorityLevel::Supervisor,
+            "11B".to_string(),
+        );
+
+        // Test upper bound clamping
+        op.update_fatigue(1.5);
+        assert_eq!(op.fatigue(), 1.0);
+
+        // Test lower bound clamping
+        op.update_fatigue(-0.3);
+        assert_eq!(op.fatigue(), 0.0);
+    }
+
+    #[test]
+    fn test_operator_is_overloaded_edge_cases() {
+        let mut op = Operator::new(
+            "op1".to_string(),
+            "Test".to_string(),
+            OperatorRank::E5,
+            AuthorityLevel::Supervisor,
+            "11B".to_string(),
+        );
+
+        op.update_cognitive_load(0.75);
+
+        // Test exact threshold
+        assert!(!op.is_overloaded(0.75));
+        assert!(!op.is_overloaded(0.76));
+        assert!(op.is_overloaded(0.74));
+        assert!(op.is_overloaded(0.0));
+    }
+
+    #[test]
+    fn test_operator_is_fatigued_edge_cases() {
+        let mut op = Operator::new(
+            "op1".to_string(),
+            "Test".to_string(),
+            OperatorRank::E5,
+            AuthorityLevel::Supervisor,
+            "11B".to_string(),
+        );
+
+        op.update_fatigue(0.6);
+
+        // Test exact threshold
+        assert!(!op.is_fatigued(0.6));
+        assert!(!op.is_fatigued(0.7));
+        assert!(op.is_fatigued(0.5));
+    }
+
+    #[test]
+    fn test_operator_effectiveness_edge_cases() {
+        let mut op = Operator::new(
+            "op1".to_string(),
+            "Test".to_string(),
+            OperatorRank::E5,
+            AuthorityLevel::Supervisor,
+            "11B".to_string(),
+        );
+
+        // Fully effective
+        assert_eq!(op.effectiveness(), 1.0);
+
+        // Completely overloaded and fatigued
+        op.update_cognitive_load(1.0);
+        op.update_fatigue(1.0);
+        assert_eq!(op.effectiveness(), 0.0);
+
+        // Only cognitive load affected
+        op.update_cognitive_load(1.0);
+        op.update_fatigue(0.0);
+        let eff = op.effectiveness();
+        assert!(eff > 0.0 && eff < 1.0);
+        assert_eq!(eff, 0.4); // 0% cognitive * 0.6 + 100% fatigue * 0.4 = 0.4
+    }
+
+    #[test]
+    fn test_operator_metadata_json_invalid() {
+        let mut op = Operator::new(
+            "op1".to_string(),
+            "Test".to_string(),
+            OperatorRank::E5,
+            AuthorityLevel::Supervisor,
+            "11B".to_string(),
+        );
+
+        // Set invalid JSON
+        op.metadata_json = "not valid json".to_string();
+
+        // Should return default values (0.0) when JSON is invalid
+        assert_eq!(op.cognitive_load(), 0.0);
+        assert_eq!(op.fatigue(), 0.0);
+    }
+
+    #[test]
+    fn test_rank_to_score_all_ranks() {
+        // Test that all ranks have scores in valid range
+        // Note: Scores are not strictly ascending across E/W/O categories
+        // because W (Warrant) and O (Officer) ranks can overlap with senior E ranks
+        let ranks = vec![
+            (OperatorRank::E1, 0.10),
+            (OperatorRank::E2, 0.15),
+            (OperatorRank::E3, 0.20),
+            (OperatorRank::E4, 0.30),
+            (OperatorRank::E5, 0.40),
+            (OperatorRank::E6, 0.50),
+            (OperatorRank::E7, 0.60),
+            (OperatorRank::E8, 0.70),
+            (OperatorRank::E9, 0.80),
+            (OperatorRank::W1, 0.70),
+            (OperatorRank::W2, 0.75),
+            (OperatorRank::W3, 0.80),
+            (OperatorRank::W4, 0.85),
+            (OperatorRank::W5, 0.90),
+            (OperatorRank::O1, 0.85),
+            (OperatorRank::O2, 0.90),
+            (OperatorRank::O3, 0.95),
+            (OperatorRank::O4, 0.97),
+            (OperatorRank::O5, 0.98),
+            (OperatorRank::O6, 0.99),
+            (OperatorRank::O7, 0.995),
+            (OperatorRank::O8, 0.997),
+            (OperatorRank::O9, 0.999),
+            (OperatorRank::O10, 1.0),
+        ];
+
+        for (rank, expected_score) in ranks {
+            let score = rank.to_score();
+            assert_eq!(
+                score, expected_score,
+                "Rank {:?} should have score {}",
+                rank, expected_score
+            );
+            assert!((0.0..=1.0).contains(&score));
+        }
+
+        // Verify that enlisted ranks are ascending
+        assert!(OperatorRank::E2.to_score() > OperatorRank::E1.to_score());
+        assert!(OperatorRank::E9.to_score() > OperatorRank::E8.to_score());
+
+        // Verify that warrant ranks are ascending
+        assert!(OperatorRank::W2.to_score() > OperatorRank::W1.to_score());
+        assert!(OperatorRank::W5.to_score() > OperatorRank::W4.to_score());
+
+        // Verify that officer ranks are ascending
+        assert!(OperatorRank::O2.to_score() > OperatorRank::O1.to_score());
+        assert!(OperatorRank::O10.to_score() > OperatorRank::O9.to_score());
+    }
+
+    #[test]
+    fn test_rank_name_all_ranks() {
+        // Ensure all ranks have names
+        let ranks = vec![
+            OperatorRank::Unspecified,
+            OperatorRank::E1,
+            OperatorRank::E5,
+            OperatorRank::E9,
+            OperatorRank::W1,
+            OperatorRank::W5,
+            OperatorRank::O1,
+            OperatorRank::O10,
+        ];
+
+        for rank in ranks {
+            let name = rank.name();
+            assert!(!name.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_authority_level_to_score() {
+        assert_eq!(AuthorityLevel::Unspecified.to_score(), 0.0);
+        assert_eq!(AuthorityLevel::Observer.to_score(), 0.1);
+        assert_eq!(AuthorityLevel::Advisor.to_score(), 0.3);
+        assert_eq!(AuthorityLevel::Supervisor.to_score(), 0.5);
+        assert_eq!(AuthorityLevel::Commander.to_score(), 0.8);
+
+        // Verify ordering
+        assert!(AuthorityLevel::Commander.to_score() > AuthorityLevel::Supervisor.to_score());
+        assert!(AuthorityLevel::Supervisor.to_score() > AuthorityLevel::Advisor.to_score());
+        assert!(AuthorityLevel::Advisor.to_score() > AuthorityLevel::Observer.to_score());
+    }
+
+    #[test]
+    fn test_authority_requires_approval() {
+        assert!(!AuthorityLevel::Unspecified.requires_approval());
+        assert!(!AuthorityLevel::Observer.requires_approval());
+        assert!(!AuthorityLevel::Advisor.requires_approval());
+        assert!(!AuthorityLevel::Supervisor.requires_approval());
+        assert!(AuthorityLevel::Commander.requires_approval());
+    }
+
+    #[test]
+    fn test_human_machine_pair_avg_effectiveness_multiple() {
+        let mut op1 = Operator::new(
+            "op1".to_string(),
+            "Op1".to_string(),
+            OperatorRank::E5,
+            AuthorityLevel::Supervisor,
+            "11B".to_string(),
+        );
+        op1.update_cognitive_load(0.2);
+        op1.update_fatigue(0.2);
+
+        let mut op2 = Operator::new(
+            "op2".to_string(),
+            "Op2".to_string(),
+            OperatorRank::E6,
+            AuthorityLevel::Supervisor,
+            "11B".to_string(),
+        );
+        op2.update_cognitive_load(0.8);
+        op2.update_fatigue(0.8);
+
+        let pair = HumanMachinePair::new(
+            vec![op1.clone(), op2.clone()],
+            vec!["node_1".to_string()],
+            BindingType::ManyToOne,
+        );
+
+        let avg = pair.avg_effectiveness();
+        let expected = (op1.effectiveness() + op2.effectiveness()) / 2.0;
+        assert_eq!(avg, expected);
+    }
+
+    #[test]
+    fn test_human_machine_pair_multiple_platforms() {
+        let op = Operator::new(
+            "op1".to_string(),
+            "Operator".to_string(),
+            OperatorRank::E6,
+            AuthorityLevel::Supervisor,
+            "11B".to_string(),
+        );
+
+        let platform_ids = vec![
+            "p1".to_string(),
+            "p2".to_string(),
+            "p3".to_string(),
+            "p4".to_string(),
+            "p5".to_string(),
+        ];
+
+        let pair = HumanMachinePair::new(vec![op], platform_ids.clone(), BindingType::OneToMany);
+
+        assert_eq!(pair.platform_ids.len(), 5);
+        assert_eq!(pair.operators.len(), 1);
+        assert!(!pair.is_autonomous());
+    }
+
+    #[test]
+    fn test_human_machine_pair_max_rank_and_authority_mismatch() {
+        // Lower rank but higher authority
+        let op1 = Operator::new(
+            "op1".to_string(),
+            "Junior Commander".to_string(),
+            OperatorRank::E4,
+            AuthorityLevel::Commander,
+            "11B".to_string(),
+        );
+
+        // Higher rank but lower authority
+        let op2 = Operator::new(
+            "op2".to_string(),
+            "Senior Advisor".to_string(),
+            OperatorRank::E8,
+            AuthorityLevel::Advisor,
+            "11B".to_string(),
+        );
+
+        let pair = HumanMachinePair::new(
+            vec![op1, op2],
+            vec!["node_1".to_string()],
+            BindingType::ManyToOne,
+        );
+
+        // Primary operator should be highest rank (E8)
+        let primary = pair.primary_operator().unwrap();
+        assert_eq!(primary.rank, OperatorRank::E8 as i32);
+
+        // But max authority should be Commander
+        assert_eq!(pair.max_authority(), Some(AuthorityLevel::Commander));
+
+        // Max rank should be E8
+        assert_eq!(pair.max_rank(), Some(OperatorRank::E8));
+    }
+
+    #[test]
+    fn test_human_machine_pair_binding_types() {
+        let op = Operator::new(
+            "op1".to_string(),
+            "Operator".to_string(),
+            OperatorRank::E5,
+            AuthorityLevel::Supervisor,
+            "11B".to_string(),
+        );
+
+        for binding_type in [
+            BindingType::Unspecified,
+            BindingType::OneToOne,
+            BindingType::OneToMany,
+            BindingType::ManyToOne,
+            BindingType::ManyToMany,
+        ] {
+            let pair =
+                HumanMachinePair::new(vec![op.clone()], vec!["node_1".to_string()], binding_type);
+            assert_eq!(pair.binding_type, binding_type as i32);
+        }
+    }
 }

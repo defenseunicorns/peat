@@ -16,7 +16,7 @@ use cap_protocol::discovery::capability_query::{CapabilityQuery, CapabilityQuery
 use cap_protocol::discovery::geographic::{GeographicBeacon, GeographicDiscovery};
 use cap_protocol::discovery::GeoCoordinate;
 use cap_protocol::models::capability::{Capability, CapabilityExt, CapabilityType};
-use cap_protocol::models::cell::{CellConfig, CellState};
+use cap_protocol::models::cell::{CellConfig, CellConfigExt, CellState, CellStateExt};
 use cap_protocol::models::node::{NodeConfig, NodeConfigExt};
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::collections::HashSet;
@@ -56,7 +56,7 @@ fn bench_cell_formation_throughput(c: &mut Criterion) {
                         let config = CellConfig::new(5);
                         let mut cell = CellState::new(config);
                         for node in chunk {
-                            cell.members.insert(node.id.clone());
+                            cell.members.push(node.id.clone());
                             for cap in &node.capabilities {
                                 cell.capabilities.push(cap.clone());
                             }
@@ -91,7 +91,7 @@ fn bench_leader_election(c: &mut Criterion) {
                 let members: Vec<String> = (0..size).map(|i| format!("node_{}", i)).collect();
 
                 for member in &members {
-                    cell.members.insert(member.clone());
+                    cell.members.push(member.clone());
                 }
 
                 b.iter(|| {
@@ -103,7 +103,9 @@ fn bench_leader_election(c: &mut Criterion) {
                     // Update cell
                     let mut test_cell = cell.clone();
                     test_cell.leader_id = leader;
-                    test_cell.timestamp += 1;
+                    if let Some(ref mut ts) = test_cell.timestamp {
+                        ts.seconds += 1;
+                    }
 
                     black_box(test_cell)
                 });
@@ -187,7 +189,7 @@ fn bench_rebalancing_operations(c: &mut Criterion) {
         let mut cell2 = CellState::new(config2);
 
         for i in 0..3 {
-            cell1.members.insert(format!("node_1_{}", i));
+            cell1.members.push(format!("node_1_{}", i));
             cell1.capabilities.push(Capability::new(
                 format!("cap_1_{}", i),
                 "Cap".to_string(),
@@ -197,7 +199,7 @@ fn bench_rebalancing_operations(c: &mut Criterion) {
         }
 
         for i in 0..3 {
-            cell2.members.insert(format!("node_2_{}", i));
+            cell2.members.push(format!("node_2_{}", i));
             cell2.capabilities.push(Capability::new(
                 format!("cap_2_{}", i),
                 "Cap".to_string(),
@@ -210,10 +212,12 @@ fn bench_rebalancing_operations(c: &mut Criterion) {
             // Merge cell2 into cell1
             let mut merged = cell1.clone();
             for member in &cell2.members {
-                merged.members.insert(member.clone());
+                merged.members.push(member.clone());
             }
             merged.capabilities.extend(cell2.capabilities.clone());
-            merged.timestamp += 1;
+            if let Some(ref mut ts) = merged.timestamp {
+                ts.seconds += 1;
+            }
 
             black_box(merged)
         });
@@ -225,7 +229,7 @@ fn bench_rebalancing_operations(c: &mut Criterion) {
         let config = CellConfig::new(20);
         let mut cell = CellState::new(config);
         for i in 0..10 {
-            cell.members.insert(format!("node_{}", i));
+            cell.members.push(format!("node_{}", i));
             cell.capabilities.push(Capability::new(
                 format!("cap_{}", i),
                 "Cap".to_string(),
@@ -236,7 +240,7 @@ fn bench_rebalancing_operations(c: &mut Criterion) {
 
         b.iter(|| {
             // Split into two cells
-            let members: Vec<String> = cell.members.iter().cloned().collect();
+            let members: Vec<String> = cell.members.to_vec();
             let mid = members.len() / 2;
 
             let config1 = CellConfig::new(10);
@@ -246,9 +250,9 @@ fn bench_rebalancing_operations(c: &mut Criterion) {
 
             for (i, member) in members.iter().enumerate() {
                 if i < mid {
-                    cell1.members.insert(member.clone());
+                    cell1.members.push(member.clone());
                 } else {
-                    cell2.members.insert(member.clone());
+                    cell2.members.push(member.clone());
                 }
             }
 
@@ -285,8 +289,10 @@ fn bench_crdt_sync(c: &mut Criterion) {
                     .map(|i| {
                         let config = CellConfig::new(10);
                         let mut cell = CellState::new(config);
-                        cell.members.insert(format!("node_{}", i));
-                        cell.timestamp = i as u64;
+                        cell.members.push(format!("node_{}", i));
+                        if let Some(ref mut ts) = cell.timestamp {
+                            ts.seconds = i as u64;
+                        }
                         cell
                     })
                     .collect();
@@ -296,7 +302,9 @@ fn bench_crdt_sync(c: &mut Criterion) {
                     let mut merged = cells[0].clone();
 
                     for cell in &cells[1..] {
-                        if cell.timestamp > merged.timestamp {
+                        let cell_ts = cell.timestamp.as_ref().map(|t| t.seconds).unwrap_or(0);
+                        let merged_ts = merged.timestamp.as_ref().map(|t| t.seconds).unwrap_or(0);
+                        if cell_ts > merged_ts {
                             merged = cell.clone();
                         }
                     }
@@ -304,7 +312,9 @@ fn bench_crdt_sync(c: &mut Criterion) {
                     // Merge members (OR-Set semantics - union)
                     for cell in &cells {
                         for member in &cell.members {
-                            merged.members.insert(member.clone());
+                            if !merged.members.contains(member) {
+                                merged.members.push(member.clone());
+                            }
                         }
                     }
 

@@ -110,3 +110,67 @@ pub trait Storage: Send + Sync + Debug {
     /// Query values matching a predicate
     async fn query(&self, query: &str) -> Result<Vec<serde_json::Value>>;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_phase_as_str() {
+        assert_eq!(Phase::Unspecified.as_str(), "unspecified");
+        assert_eq!(Phase::Discovery.as_str(), "discovery");
+        assert_eq!(Phase::Cell.as_str(), "cell");
+        assert_eq!(Phase::Hierarchy.as_str(), "hierarchical");
+    }
+
+    #[test]
+    fn test_phase_legacy_constants() {
+        assert_eq!(Phase::BOOTSTRAP, Phase::Discovery);
+        assert_eq!(Phase::SQUAD, Phase::Cell);
+        assert_eq!(Phase::HIERARCHICAL, Phase::Hierarchy);
+    }
+
+    #[test]
+    fn test_phase_as_str_all_variants() {
+        // Ensure all Phase variants have string representations
+        let phases = vec![
+            Phase::Unspecified,
+            Phase::Discovery,
+            Phase::Cell,
+            Phase::Hierarchy,
+        ];
+
+        for phase in phases {
+            let s = phase.as_str();
+            assert!(!s.is_empty());
+            assert!(s.chars().all(|c| c.is_ascii_lowercase() || c == '_'));
+        }
+    }
+
+    #[test]
+    fn test_phase_enum_values() {
+        // Test that Phase enum can be converted to/from i32
+        assert_eq!(Phase::Unspecified as i32, 0);
+        assert_eq!(Phase::Discovery as i32, 1);
+        assert_eq!(Phase::Cell as i32, 2);
+        assert_eq!(Phase::Hierarchy as i32, 3);
+    }
+
+    #[test]
+    fn test_phase_pattern_matching() {
+        let phase = Phase::Discovery;
+        match phase {
+            Phase::Unspecified => panic!("Wrong phase"),
+            Phase::Discovery => {} // Expected
+            Phase::Cell => panic!("Wrong phase"),
+            Phase::Hierarchy => panic!("Wrong phase"),
+        }
+    }
+
+    #[test]
+    fn test_phase_equality() {
+        assert_eq!(Phase::Discovery, Phase::Discovery);
+        assert_ne!(Phase::Discovery, Phase::Cell);
+        assert_eq!(Phase::BOOTSTRAP, Phase::Discovery); // Legacy constant
+    }
+}

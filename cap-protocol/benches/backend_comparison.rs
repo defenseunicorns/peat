@@ -15,7 +15,7 @@
 #![cfg(feature = "automerge-backend")]
 
 use cap_protocol::models::capability::{Capability, CapabilityExt, CapabilityType};
-use cap_protocol::models::cell::{CellConfig, CellState};
+use cap_protocol::models::cell::{CellConfig, CellConfigExt, CellState, CellStateExt};
 use cap_protocol::models::node::{NodeConfig, NodeConfigExt};
 use cap_protocol::sync::automerge::AutomergeBackend;
 use cap_protocol::sync::{BackendConfig, DataSyncBackend, Document, TransportConfig, Value};
@@ -26,9 +26,8 @@ use tokio::runtime::Runtime;
 
 /// Helper to create a CellState document
 fn create_cell_document(member_count: usize, capability_count: usize) -> Document {
-    let config = CellConfig::new(member_count * 2);
+    let config = CellConfig::with_id("benchmark_cell".to_string(), (member_count * 2) as u32);
     let mut cell = CellState::new(config);
-    cell.config.id = "benchmark_cell".to_string();
 
     // Add members
     for i in 0..member_count {

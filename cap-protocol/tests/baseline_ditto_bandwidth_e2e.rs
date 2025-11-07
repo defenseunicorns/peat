@@ -20,7 +20,9 @@
 
 use cap_protocol::models::cell::{CellConfig, CellState};
 use cap_protocol::models::node::NodeConfig;
-use cap_protocol::models::{Capability, CapabilityExt, CapabilityType, NodeConfigExt};
+use cap_protocol::models::{
+    Capability, CapabilityExt, CapabilityType, CellConfigExt, CellStateExt, NodeConfigExt,
+};
 use cap_protocol::storage::{CellStore, NodeStore};
 use cap_protocol::sync::ditto::DittoBackend;
 use cap_protocol::testing::E2EHarness;
@@ -67,9 +69,9 @@ async fn test_baseline_cell_formation_bandwidth() {
     println!("  ✓ Peers connected\n");
 
     // Create initial cell
-    let cell_config = CellConfig::new(5); // max 5 members
+    let cell_id = "baseline_cell".to_string();
+    let cell_config = CellConfig::with_id(cell_id.clone(), 5); // max 5 members
     let mut cell = CellState::new(cell_config);
-    cell.config.id = "baseline_cell".to_string();
 
     // Measure initial document size
     let initial_size = serde_json::to_vec(&cell).unwrap().len();
@@ -134,7 +136,7 @@ async fn test_baseline_cell_formation_bandwidth() {
     tokio::time::sleep(Duration::from_millis(1000)).await;
 
     // Verify sync to peer2
-    let synced_cell = cell_store2.get_cell(&cell.config.id).await.unwrap();
+    let synced_cell = cell_store2.get_cell(&cell_id).await.unwrap();
     assert!(synced_cell.is_some(), "Cell should sync to peer2");
 
     println!("\n  📊 BASELINE METRICS:");
@@ -212,9 +214,9 @@ async fn test_baseline_rapid_updates_bandwidth() {
     println!("  ✓ Peers connected\n");
 
     // Create cell
-    let cell_config = CellConfig::new(10);
+    let cell_id = "rapid_test_cell".to_string();
+    let cell_config = CellConfig::with_id(cell_id, 10);
     let mut cell = CellState::new(cell_config);
-    cell.config.id = "rapid_test_cell".to_string();
 
     println!("  2. Making 10 rapid updates (100ms apart)...");
     let start = Instant::now();

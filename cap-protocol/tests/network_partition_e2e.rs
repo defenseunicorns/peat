@@ -23,6 +23,7 @@
 //! - LWW-Register (leader): Last-write-wins based on timestamp
 
 use cap_protocol::models::cell::{CellConfig, CellState};
+use cap_protocol::models::{CellConfigExt, CellStateExt};
 use cap_protocol::storage::CellStore;
 use cap_protocol::sync::ditto::DittoBackend;
 use cap_protocol::testing::E2EHarness;
@@ -65,8 +66,7 @@ async fn test_e2e_partition_during_formation() {
     tokio::time::sleep(Duration::from_secs(2)).await;
 
     // Create cell on peer1
-    let mut cell = CellState::new(CellConfig::new(10));
-    cell.config.id = "cell_partition_1".to_string();
+    let mut cell = CellState::new(CellConfig::with_id("cell_partition_1".to_string(), 10));
     cell.add_member("node_1".to_string());
 
     cell_store1.store_cell(&cell).await.unwrap();
@@ -207,16 +207,14 @@ async fn test_e2e_multi_zone_partition_isolation() {
     tokio::time::sleep(Duration::from_secs(2)).await;
 
     // Create cells in zone alpha
-    let mut cell_alpha = CellState::new(CellConfig::new(10));
-    cell_alpha.config.id = "cell_alpha_1".to_string();
+    let mut cell_alpha = CellState::new(CellConfig::with_id("cell_alpha_1".to_string(), 10));
     cell_alpha.platoon_id = Some("zone_alpha".to_string());
     cell_alpha.add_member("node_alpha_1".to_string());
 
     cell_store_alpha1.store_cell(&cell_alpha).await.unwrap();
 
     // Create cells in zone beta
-    let mut cell_beta = CellState::new(CellConfig::new(10));
-    cell_beta.config.id = "cell_beta_1".to_string();
+    let mut cell_beta = CellState::new(CellConfig::with_id("cell_beta_1".to_string(), 10));
     cell_beta.platoon_id = Some("zone_beta".to_string());
     cell_beta.add_member("node_beta_1".to_string());
 

@@ -9,7 +9,7 @@ pub mod zone;
 
 // Re-export commonly used types at module level
 pub use capability::{Capability, CapabilityExt, CapabilityType};
-pub use cell::{CellConfig, CellState};
+pub use cell::{CellConfig, CellConfigExt, CellState, CellStateExt};
 pub use node::{HealthStatus, NodeConfig, NodeConfigExt, NodeState, NodeStateExt};
 pub use operator::{
     AuthorityLevel, AuthorityLevelExt, BindingType, HumanMachinePair, HumanMachinePairExt,

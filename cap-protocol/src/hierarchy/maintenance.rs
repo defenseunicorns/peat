@@ -56,7 +56,7 @@
 //! # }
 //! ```
 
-use crate::models::cell::{CellConfig, CellState};
+use crate::models::cell::{CellConfig, CellConfigExt, CellState, CellStateExt};
 use crate::models::zone::ZoneState;
 use crate::Result;
 use std::collections::HashSet;
@@ -147,13 +147,17 @@ impl HierarchyMaintainer {
         if size < self.min_cell_size {
             debug!(
                 "Cell {} needs merge: {} members < {} min",
-                cell.config.id, size, self.min_cell_size
+                cell.get_id().unwrap_or("<unknown>"),
+                size,
+                self.min_cell_size
             );
             RebalanceAction::Merge
         } else if size > self.max_cell_size {
             debug!(
                 "Cell {} needs split: {} members > {} max",
-                cell.config.id, size, self.max_cell_size
+                cell.get_id().unwrap_or("<unknown>"),
+                size,
+                self.max_cell_size
             );
             RebalanceAction::Split
         } else {
@@ -179,24 +183,25 @@ impl HierarchyMaintainer {
     pub fn merge_cells(&self, cell1: &CellState, cell2: &CellState) -> Result<CellState> {
         info!(
             "Merging cells {} ({} members) and {} ({} members)",
-            cell1.config.id,
+            cell1.get_id().unwrap_or("<unknown>"),
             cell1.members.len(),
-            cell2.config.id,
+            cell2.get_id().unwrap_or("<unknown>"),
             cell2.members.len()
         );
 
         // Create new config with combined capacity
         let total_members = cell1.members.len() + cell2.members.len();
-        let mut new_config = CellConfig::new(self.max_cell_size.max(total_members));
+        let max_size = (self.max_cell_size as u32).max(total_members as u32);
+        let mut new_config = CellConfig::new(max_size);
         new_config.id = Uuid::new_v4().to_string();
-        new_config.min_size = self.min_cell_size;
+        new_config.min_size = self.min_cell_size as u32;
 
         // Create new cell state
         let mut merged = CellState::new(new_config);
 
-        // Combine members (OR-Set union)
+        // Combine members (OR-Set union) - use add_member to avoid duplicates
         for member in cell1.members.iter().chain(cell2.members.iter()) {
-            merged.members.insert(member.clone());
+            merged.add_member(member.clone());
         }
 
         // Combine capabilities (G-Set union, deduplicate by ID)
@@ -207,8 +212,14 @@ impl HierarchyMaintainer {
             }
         }
 
-        // Use latest timestamp
-        merged.timestamp = cell1.timestamp.max(cell2.timestamp);
+        // Use latest timestamp (LWW merge)
+        let cell1_ts = cell1.timestamp.as_ref().map(|t| t.seconds).unwrap_or(0);
+        let cell2_ts = cell2.timestamp.as_ref().map(|t| t.seconds).unwrap_or(0);
+        if cell2_ts > cell1_ts {
+            merged.timestamp = cell2.timestamp;
+        } else {
+            merged.timestamp = cell1.timestamp;
+        }
 
         // Inherit platoon from either cell (prefer non-None)
         merged.platoon_id = cell1
@@ -227,7 +238,7 @@ impl HierarchyMaintainer {
 
         info!(
             "Merge complete: new cell {} with {} members",
-            merged.config.id,
+            merged.get_id().unwrap_or("<unknown>"),
             merged.members.len()
         );
 
@@ -260,20 +271,21 @@ impl HierarchyMaintainer {
 
         info!(
             "Splitting cell {} with {} members",
-            cell.config.id, member_count
+            cell.get_id().unwrap_or("<unknown>"),
+            member_count
         );
 
         // Calculate split point
         let split_point = member_count / 2;
 
         // Create two new cells
-        let mut config_a = CellConfig::new(self.max_cell_size);
+        let mut config_a = CellConfig::new(self.max_cell_size as u32);
         config_a.id = Uuid::new_v4().to_string();
-        config_a.min_size = self.min_cell_size;
+        config_a.min_size = self.min_cell_size as u32;
 
-        let mut config_b = CellConfig::new(self.max_cell_size);
+        let mut config_b = CellConfig::new(self.max_cell_size as u32);
         config_b.id = Uuid::new_v4().to_string();
-        config_b.min_size = self.min_cell_size;
+        config_b.min_size = self.min_cell_size as u32;
 
         let mut cell_a = CellState::new(config_a);
         let mut cell_b = CellState::new(config_b);
@@ -282,9 +294,9 @@ impl HierarchyMaintainer {
         let members: Vec<_> = cell.members.iter().collect();
         for (i, member) in members.iter().enumerate() {
             if i < split_point {
-                cell_a.members.insert((*member).clone());
+                cell_a.add_member((*member).clone());
             } else {
-                cell_b.members.insert((*member).clone());
+                cell_b.add_member((*member).clone());
             }
         }
 
@@ -313,9 +325,9 @@ impl HierarchyMaintainer {
         info!(
             "Split complete: {} members -> cell_a {} ({} members), cell_b {} ({} members)",
             member_count,
-            cell_a.config.id,
+            cell_a.get_id().unwrap_or("<unknown>"),
             cell_a.members.len(),
-            cell_b.config.id,
+            cell_b.get_id().unwrap_or("<unknown>"),
             cell_b.members.len()
         );
 
@@ -346,7 +358,7 @@ impl HierarchyMaintainer {
 
         for candidate in candidates {
             // Skip self
-            if candidate.config.id == cell.config.id {
+            if candidate.get_id().unwrap_or("<unknown>") == cell.get_id().unwrap_or("<unknown>") {
                 continue;
             }
 
@@ -375,7 +387,7 @@ impl HierarchyMaintainer {
             }
         }
 
-        best_candidate.map(|(c, _)| c.config.id.clone())
+        best_candidate.map(|(c, _)| c.get_id().unwrap_or("<unknown>").to_string())
     }
 
     /// Check if a zone needs rebalancing
@@ -519,7 +531,11 @@ impl<B: crate::sync::DataSyncBackend> RebalancingCoordinator<B> {
                     let candidate_id = self.maintainer.find_merge_candidate(cell, &all_cells);
 
                     if let Some(target_id) = candidate_id {
-                        info!("Triggering merge: {} → {}", cell.config.id, target_id);
+                        info!(
+                            "Triggering merge: {} → {}",
+                            cell.get_id().unwrap_or("<unknown>"),
+                            target_id
+                        );
 
                         // Perform merge in routing table
                         let mut routing = self.routing_table.lock().unwrap();
@@ -527,7 +543,7 @@ impl<B: crate::sync::DataSyncBackend> RebalancingCoordinator<B> {
 
                         let merged_id = uuid::Uuid::new_v4().to_string();
                         routing.merge_cells(
-                            &[&cell.config.id, &target_id],
+                            &[cell.get_id().unwrap_or("<unknown>"), &target_id],
                             &merged_id,
                             zone_id,
                             timestamp,
@@ -537,13 +553,13 @@ impl<B: crate::sync::DataSyncBackend> RebalancingCoordinator<B> {
                     } else {
                         warn!(
                             "No merge candidate found for undersized cell {}",
-                            cell.config.id
+                            cell.get_id().unwrap_or("<unknown>")
                         );
                     }
                 }
 
                 RebalanceAction::Split => {
-                    info!("Triggering split: {}", cell.config.id);
+                    info!("Triggering split: {}", cell.get_id().unwrap_or("<unknown>"));
 
                     // Perform split
                     let (cell_a, cell_b) = self.maintainer.split_cell(cell)?;
@@ -557,9 +573,9 @@ impl<B: crate::sync::DataSyncBackend> RebalancingCoordinator<B> {
                     let nodes_b: Vec<&str> = cell_b.members.iter().map(|s| s.as_str()).collect();
 
                     routing.split_cell(
-                        &cell.config.id,
-                        &cell_a.config.id,
-                        &cell_b.config.id,
+                        cell.get_id().unwrap_or("<unknown>"),
+                        cell_a.get_id().unwrap_or("<unknown>"),
+                        cell_b.get_id().unwrap_or("<unknown>"),
                         &nodes_a,
                         &nodes_b,
                         zone_id,
@@ -597,7 +613,7 @@ mod tests {
     use crate::models::{Capability, CapabilityExt};
 
     fn create_test_cell(id: &str, member_count: usize, max_size: usize) -> CellState {
-        let mut config = CellConfig::new(max_size);
+        let mut config = CellConfig::new(max_size as u32);
         config.id = id.to_string();
         config.min_size = 2;
 
@@ -666,8 +682,14 @@ mod tests {
         assert_eq!(merged.members.len(), 5);
 
         // Should have new ID
-        assert_ne!(merged.config.id, cell1.config.id);
-        assert_ne!(merged.config.id, cell2.config.id);
+        assert_ne!(
+            merged.get_id().unwrap_or("<unknown>"),
+            cell1.get_id().unwrap_or("<unknown>")
+        );
+        assert_ne!(
+            merged.get_id().unwrap_or("<unknown>"),
+            cell2.get_id().unwrap_or("<unknown>")
+        );
 
         // Leader should be None (needs re-election)
         assert_eq!(merged.leader_id, None);
@@ -720,9 +742,18 @@ mod tests {
         assert_eq!(cell_a.members.len() + cell_b.members.len(), 12);
 
         // Should have new IDs
-        assert_ne!(cell_a.config.id, cell.config.id);
-        assert_ne!(cell_b.config.id, cell.config.id);
-        assert_ne!(cell_a.config.id, cell_b.config.id);
+        assert_ne!(
+            cell_a.get_id().unwrap_or("<unknown>"),
+            cell.get_id().unwrap_or("<unknown>")
+        );
+        assert_ne!(
+            cell_b.get_id().unwrap_or("<unknown>"),
+            cell.get_id().unwrap_or("<unknown>")
+        );
+        assert_ne!(
+            cell_a.get_id().unwrap_or("<unknown>"),
+            cell_b.get_id().unwrap_or("<unknown>")
+        );
 
         // Leaders should be None (need re-election)
         assert_eq!(cell_a.leader_id, None);
@@ -864,29 +895,17 @@ mod tests {
         let merged = maintainer.merge_cells(&cell1, &cell2).unwrap();
 
         // Update routing table
-        let merged_id = merged.config.id.clone();
-        routing_table.merge_cells(&["cell_1", "cell_2"], &merged_id, Some("zone_north"), 200);
+        let merged_id = merged.get_id().unwrap_or("<unknown>");
+        routing_table.merge_cells(&["cell_1", "cell_2"], merged_id, Some("zone_north"), 200);
 
         // Verify all nodes are now in merged cell
-        assert_eq!(
-            routing_table.get_node_cell("cell_1_0"),
-            Some(merged_id.as_str())
-        );
-        assert_eq!(
-            routing_table.get_node_cell("cell_1_1"),
-            Some(merged_id.as_str())
-        );
-        assert_eq!(
-            routing_table.get_node_cell("cell_2_0"),
-            Some(merged_id.as_str())
-        );
-        assert_eq!(
-            routing_table.get_node_cell("cell_2_1"),
-            Some(merged_id.as_str())
-        );
+        assert_eq!(routing_table.get_node_cell("cell_1_0"), Some(merged_id));
+        assert_eq!(routing_table.get_node_cell("cell_1_1"), Some(merged_id));
+        assert_eq!(routing_table.get_node_cell("cell_2_0"), Some(merged_id));
+        assert_eq!(routing_table.get_node_cell("cell_2_1"), Some(merged_id));
 
         // Verify merged cell is in zone
-        assert_eq!(routing_table.get_cell_zone(&merged_id), Some("zone_north"));
+        assert_eq!(routing_table.get_cell_zone(merged_id), Some("zone_north"));
 
         // Verify old cells are removed
         assert_eq!(routing_table.get_cell_zone("cell_1"), None);
@@ -920,8 +939,8 @@ mod tests {
         // Update routing table
         routing_table.split_cell(
             "cell_oversized",
-            &cell_a.config.id,
-            &cell_b.config.id,
+            cell_a.get_id().unwrap_or("<unknown>"),
+            cell_b.get_id().unwrap_or("<unknown>"),
             &nodes_a,
             &nodes_b,
             Some("zone_south"),
@@ -929,16 +948,26 @@ mod tests {
         );
 
         // Verify nodes are distributed correctly
-        assert_eq!(routing_table.get_cell_nodes(&cell_a.config.id).len(), 6);
-        assert_eq!(routing_table.get_cell_nodes(&cell_b.config.id).len(), 6);
+        assert_eq!(
+            routing_table
+                .get_cell_nodes(cell_a.get_id().unwrap_or("<unknown>"))
+                .len(),
+            6
+        );
+        assert_eq!(
+            routing_table
+                .get_cell_nodes(cell_b.get_id().unwrap_or("<unknown>"))
+                .len(),
+            6
+        );
 
         // Verify both cells are in zone
         assert_eq!(
-            routing_table.get_cell_zone(&cell_a.config.id),
+            routing_table.get_cell_zone(cell_a.get_id().unwrap_or("<unknown>")),
             Some("zone_south")
         );
         assert_eq!(
-            routing_table.get_cell_zone(&cell_b.config.id),
+            routing_table.get_cell_zone(cell_b.get_id().unwrap_or("<unknown>")),
             Some("zone_south")
         );
 
@@ -973,8 +1002,8 @@ mod tests {
 
         routing_table.split_cell(
             "cell_1",
-            &cell_a.config.id,
-            &cell_b.config.id,
+            cell_a.get_id().unwrap_or("<unknown>"),
+            cell_b.get_id().unwrap_or("<unknown>"),
             &nodes_a,
             &nodes_b,
             Some("zone_alpha"),
@@ -997,16 +1026,26 @@ mod tests {
         let merged = maintainer.merge_cells(&cell_small, &cell_a).unwrap();
 
         routing_table.merge_cells(
-            &["cell_small", &cell_a.config.id],
-            &merged.config.id,
+            &["cell_small", cell_a.get_id().unwrap_or("<unknown>")],
+            merged.get_id().unwrap_or("<unknown>"),
             Some("zone_alpha"),
             400,
         );
 
         // Verify final state
         // Should have 2 cells: merged (8 nodes) and cell_b (6 nodes)
-        assert_eq!(routing_table.get_cell_nodes(&merged.config.id).len(), 8);
-        assert_eq!(routing_table.get_cell_nodes(&cell_b.config.id).len(), 6);
+        assert_eq!(
+            routing_table
+                .get_cell_nodes(merged.get_id().unwrap_or("<unknown>"))
+                .len(),
+            8
+        );
+        assert_eq!(
+            routing_table
+                .get_cell_nodes(cell_b.get_id().unwrap_or("<unknown>"))
+                .len(),
+            6
+        );
 
         // Both should be balanced
         assert_eq!(maintainer.needs_rebalance(&merged), RebalanceAction::None);

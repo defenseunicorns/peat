@@ -639,4 +639,190 @@ mod tests {
         assert_eq!(binding.platform_ids.len(), 4);
         assert_eq!(binding.operators.len(), 1);
     }
+
+    #[test]
+    fn test_node_config_get_capabilities_by_type_multiple() {
+        let mut config = NodeConfig::new("Multi-sensor platform".to_string());
+
+        // Add multiple sensors
+        for i in 1..=3 {
+            config.add_capability(Capability::new(
+                format!("sensor_{}", i),
+                format!("Sensor {}", i),
+                CapabilityType::Sensor,
+                0.9,
+            ));
+        }
+
+        // Add compute capability
+        config.add_capability(Capability::new(
+            "compute_1".to_string(),
+            "Edge Compute".to_string(),
+            CapabilityType::Compute,
+            0.8,
+        ));
+
+        let sensors = config.get_capabilities_by_type(CapabilityType::Sensor);
+        assert_eq!(sensors.len(), 3);
+
+        let compute = config.get_capabilities_by_type(CapabilityType::Compute);
+        assert_eq!(compute.len(), 1);
+
+        let mobility = config.get_capabilities_by_type(CapabilityType::Mobility);
+        assert_eq!(mobility.len(), 0);
+    }
+
+    #[test]
+    fn test_node_state_health_transitions() {
+        let mut state = NodeState::new((0.0, 0.0, 0.0));
+
+        // Test all health status transitions
+        for health in [
+            HealthStatus::Nominal,
+            HealthStatus::Degraded,
+            HealthStatus::Critical,
+            HealthStatus::Failed,
+        ] {
+            state.update_health(health);
+            assert_eq!(state.get_health(), health);
+        }
+    }
+
+    #[test]
+    fn test_node_state_phase_transitions() {
+        use crate::traits::Phase;
+
+        let mut state = NodeState::new((0.0, 0.0, 0.0));
+
+        // Test all phase transitions
+        for phase in [Phase::Discovery, Phase::Cell, Phase::Hierarchy] {
+            state.update_phase(phase);
+            assert_eq!(state.get_phase(), phase);
+        }
+    }
+
+    #[test]
+    fn test_node_state_fuel_edge_cases() {
+        let mut state = NodeState::new((0.0, 0.0, 0.0));
+
+        // Test saturating add
+        state.replenish_fuel(u32::MAX);
+        assert!(state.fuel_minutes > 0);
+
+        // Consume all fuel
+        state.consume_fuel(u32::MAX);
+        assert_eq!(state.fuel_minutes, 0);
+        assert!(!state.is_operational());
+    }
+
+    #[test]
+    fn test_node_state_position_updates() {
+        let mut state = NodeState::new((37.7, -122.4, 100.0));
+
+        let pos1 = state.get_position();
+        assert_eq!(pos1, (37.7, -122.4, 100.0));
+
+        // Update multiple times
+        state.update_position((38.0, -123.0, 200.0));
+        assert_eq!(state.get_position(), (38.0, -123.0, 200.0));
+
+        state.update_position((39.0, -124.0, 300.0));
+        assert_eq!(state.get_position(), (39.0, -124.0, 300.0));
+    }
+
+    #[test]
+    fn test_node_state_merge_with_equal_timestamps() {
+        let mut state1 = NodeState::new((37.7, -122.4, 100.0));
+        let state2 = state1.clone();
+
+        // Same timestamp - state1 should remain unchanged
+        let original_pos = state1.get_position();
+        state1.merge(&state2);
+        assert_eq!(state1.get_position(), original_pos);
+    }
+
+    #[test]
+    fn test_node_state_cell_and_zone_assignments() {
+        let mut state = NodeState::new((0.0, 0.0, 0.0));
+
+        assert!(state.cell_id.is_none());
+        assert!(state.zone_id.is_none());
+
+        // Assign both
+        state.assign_cell("cell_1".to_string());
+        state.assign_zone("zone_1".to_string());
+
+        assert_eq!(state.cell_id, Some("cell_1".to_string()));
+        assert_eq!(state.zone_id, Some("zone_1".to_string()));
+
+        // Leave cell but keep zone
+        state.leave_cell();
+        assert!(state.cell_id.is_none());
+        assert_eq!(state.zone_id, Some("zone_1".to_string()));
+
+        // Leave zone
+        state.leave_zone();
+        assert!(state.zone_id.is_none());
+    }
+
+    #[test]
+    fn test_node_state_needs_refuel_threshold() {
+        let mut state = NodeState::new((0.0, 0.0, 0.0));
+        assert_eq!(state.fuel_minutes, 120);
+        assert!(!state.needs_refuel());
+
+        // At threshold (30)
+        state.consume_fuel(90);
+        assert_eq!(state.fuel_minutes, 30);
+        assert!(!state.needs_refuel());
+
+        // Below threshold
+        state.consume_fuel(1);
+        assert_eq!(state.fuel_minutes, 29);
+        assert!(state.needs_refuel());
+    }
+
+    #[test]
+    fn test_node_config_empty_binding() {
+        // Empty operators but binding exists
+        let binding =
+            HumanMachinePair::new(vec![], vec!["node_1".to_string()], BindingType::Unspecified);
+
+        let config = NodeConfig::with_operator("Test".to_string(), binding);
+
+        // Has binding but no operators
+        assert!(config.has_operator());
+        assert!(!config.is_human_operated());
+        assert!(config.is_autonomous());
+        assert!(config.get_primary_operator().is_none());
+    }
+
+    #[test]
+    fn test_node_state_get_position_no_position() {
+        let mut state = NodeState::new((0.0, 0.0, 0.0));
+        state.position = None;
+
+        // Should return zeros when position is None
+        assert_eq!(state.get_position(), (0.0, 0.0, 0.0));
+    }
+
+    #[test]
+    fn test_node_state_invalid_health_defaults_to_unspecified() {
+        let mut state = NodeState::new((0.0, 0.0, 0.0));
+
+        // Set invalid health value
+        state.health = 999;
+
+        assert_eq!(state.get_health(), HealthStatus::Unspecified);
+    }
+
+    #[test]
+    fn test_node_state_invalid_phase_defaults_to_discovery() {
+        let mut state = NodeState::new((0.0, 0.0, 0.0));
+
+        // Set invalid phase value
+        state.phase = 999;
+
+        assert_eq!(state.get_phase(), crate::traits::Phase::Discovery);
+    }
 }
