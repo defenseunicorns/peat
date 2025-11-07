@@ -128,11 +128,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create subscription for peer discovery
     // Peers only discover each other when they have common subscriptions
     println!("[{}] Creating subscription...", node_id);
-    let _subscription = ditto
-        .store()
-        .collection("baseline")?
-        .find_all()
-        .subscribe();
+    let _subscription = ditto.store().collection("baseline")?.find_all().subscribe();
     println!("[{}] ✓ Subscription created", node_id);
 
     // Start sync

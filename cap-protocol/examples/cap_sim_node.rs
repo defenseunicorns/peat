@@ -48,7 +48,9 @@
 //! - (None required - uses local storage only)
 
 use cap_protocol::sync::ditto::DittoBackend;
-use cap_protocol::sync::{BackendConfig, ChangeEvent, DataSyncBackend, Document, Query, TransportConfig, Value};
+use cap_protocol::sync::{
+    BackendConfig, ChangeEvent, DataSyncBackend, Document, Query, TransportConfig, Value,
+};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -185,7 +187,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("[{}] Backend: {}", node_id, backend_type);
     println!("[{}] Node Type: {}", node_id, node_type);
     println!("[{}] Update Rate: {}ms", node_id, update_rate_ms);
-    println!("[{}] CAP Filtering: {}", node_id, if cap_filter_enabled { "ENABLED (differential updates)" } else { "DISABLED (full replication)" });
+    println!(
+        "[{}] CAP Filtering: {}",
+        node_id,
+        if cap_filter_enabled {
+            "ENABLED (differential updates)"
+        } else {
+            "DISABLED (full replication)"
+        }
+    );
 
     if let Some(port) = tcp_listen_port {
         println!("[{}] TCP: Will listen on port {}", node_id, port);
@@ -213,7 +223,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let subscription_query = if cap_filter_enabled {
         // Differential mode: Only subscribe to documents authorized for this node type
         // Use Custom DQL query for array contains check
-        println!("[{}]   → Using CAP-filtered query for role: {}", node_id, node_type);
+        println!(
+            "[{}]   → Using CAP-filtered query for role: {}",
+            node_id, node_type
+        );
         Query::Custom(format!(
             "public == true OR CONTAINS(authorized_roles, '{}')",
             node_type
@@ -223,7 +236,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("[{}]   → Using full replication (Query::All)", node_id);
         Query::All
     };
-    let _subscription = sync_engine.subscribe("sim_poc", &subscription_query).await?;
+    let _subscription = sync_engine
+        .subscribe("sim_poc", &subscription_query)
+        .await?;
     println!("[{}] ✓ Sync subscription created", node_id);
 
     // Start sync (on the same sync_engine instance)
@@ -372,11 +387,20 @@ async fn writer_mode(
 
         // Create document fields
         let mut fields = HashMap::new();
-        fields.insert("message".to_string(), Value::String(message_content.clone()));
+        fields.insert(
+            "message".to_string(),
+            Value::String(message_content.clone()),
+        );
         fields.insert("timestamp_us".to_string(), serde_json::json!(timestamp_us));
         fields.insert("created_by".to_string(), Value::String(node_id.to_string()));
-        fields.insert("node_type".to_string(), Value::String(node_type.to_string()));
-        fields.insert("message_number".to_string(), serde_json::json!(message_number));
+        fields.insert(
+            "node_type".to_string(),
+            Value::String(node_type.to_string()),
+        );
+        fields.insert(
+            "message_number".to_string(),
+            serde_json::json!(message_number),
+        );
 
         let document = Document::with_id(doc_id.clone(), fields.clone());
 
@@ -431,10 +455,19 @@ async fn writer_mode(
         "message".to_string(),
         Value::String("Hello from CAP Simulation!".to_string()),
     );
-    test_fields.insert("timestamp_us".to_string(), serde_json::json!(test_timestamp_us));
+    test_fields.insert(
+        "timestamp_us".to_string(),
+        serde_json::json!(test_timestamp_us),
+    );
     test_fields.insert("ack_required".to_string(), Value::Bool(true));
-    test_fields.insert("acked_by".to_string(), serde_json::json!(Vec::<String>::new()));
-    test_fields.insert("expected_acks".to_string(), serde_json::json!(expected_acks));
+    test_fields.insert(
+        "acked_by".to_string(),
+        serde_json::json!(Vec::<String>::new()),
+    );
+    test_fields.insert(
+        "expected_acks".to_string(),
+        serde_json::json!(expected_acks),
+    );
 
     let test_doc = Document::with_id("sim_test_001".to_string(), test_fields);
     backend.document_store().upsert("sim_poc", test_doc).await?;
@@ -446,7 +479,10 @@ async fn writer_mode(
         timestamp_us: test_timestamp_us,
     });
 
-    println!("[{}] ✓ Test document created, waiting for {} acknowledgments...", node_id, expected_acks);
+    println!(
+        "[{}] ✓ Test document created, waiting for {} acknowledgments...",
+        node_id, expected_acks
+    );
 
     // Create observer for the test document to watch for acks
     let ack_query = Query::Eq {
@@ -467,10 +503,8 @@ async fn writer_mode(
         }
 
         // Wait for next change event
-        let event = tokio::time::timeout(
-            Duration::from_millis(100),
-            ack_stream.receiver.recv()
-        ).await;
+        let event =
+            tokio::time::timeout(Duration::from_millis(100), ack_stream.receiver.recv()).await;
 
         match event {
             Ok(Some(change_event)) => {
@@ -492,7 +526,10 @@ async fn writer_mode(
                         let ack_count = acked_by.len();
 
                         if ack_count > 0 {
-                            println!("[{}] Received {} acknowledgments so far...", node_id, ack_count);
+                            println!(
+                                "[{}] Received {} acknowledgments so far...",
+                                node_id, ack_count
+                            );
                         }
 
                         if ack_count >= expected_acks {
@@ -566,10 +603,8 @@ async fn reader_mode(
         }
 
         // Wait for next change event with timeout
-        let event = tokio::time::timeout(
-            Duration::from_millis(100),
-            change_stream.receiver.recv()
-        ).await;
+        let event =
+            tokio::time::timeout(Duration::from_millis(100), change_stream.receiver.recv()).await;
 
         match event {
             Ok(Some(change_event)) => {
@@ -577,12 +612,26 @@ async fn reader_mode(
                     ChangeEvent::Initial { documents } => {
                         // Process initial snapshot
                         for doc in documents {
-                            process_document(&doc, node_id, backend, &mut received_updates, &mut test_doc_received).await?;
+                            process_document(
+                                &doc,
+                                node_id,
+                                backend,
+                                &mut received_updates,
+                                &mut test_doc_received,
+                            )
+                            .await?;
                         }
                     }
                     ChangeEvent::Updated { document, .. } => {
                         // Process document update
-                        process_document(&document, node_id, backend, &mut received_updates, &mut test_doc_received).await?;
+                        process_document(
+                            &document,
+                            node_id,
+                            backend,
+                            &mut received_updates,
+                            &mut test_doc_received,
+                        )
+                        .await?;
 
                         // Continue running to maintain connection for ack pattern
                         // Readers should stay alive until the test timeout
@@ -643,8 +692,10 @@ async fn process_document(
             if !received_updates.contains(&msg_num) {
                 received_updates.insert(msg_num);
 
-                println!("[{}] ✓ Periodic update #{} received (latency: {:.3}ms)",
-                         node_id, msg_num, latency_ms);
+                println!(
+                    "[{}] ✓ Periodic update #{} received (latency: {:.3}ms)",
+                    node_id, msg_num, latency_ms
+                );
 
                 // Log per-update latency metrics
                 log_metrics(&MetricsEvent::DocumentReceived {
@@ -662,7 +713,10 @@ async fn process_document(
     else if doc_id == "sim_test_001" && !*test_doc_received {
         *test_doc_received = true;
 
-        println!("[{}] ✓ Test document received (latency: {:.3}ms)", node_id, latency_ms);
+        println!(
+            "[{}] ✓ Test document received (latency: {:.3}ms)",
+            node_id, latency_ms
+        );
 
         // Verify content
         if let Some(Value::String(message)) = doc.get("message") {
@@ -682,7 +736,10 @@ async fn process_document(
                 // Check if acknowledgment is required
                 if let Some(Value::Bool(ack_required)) = doc.get("ack_required") {
                     if *ack_required {
-                        println!("[{}] Acknowledgment required - updating document...", node_id);
+                        println!(
+                            "[{}] Acknowledgment required - updating document...",
+                            node_id
+                        );
 
                         // Query the current document to get the latest acked_by array
                         let query = Query::Eq {
@@ -693,17 +750,18 @@ async fn process_document(
 
                         if let Some(current_doc) = docs.first() {
                             // Get current acked_by array
-                            let mut acked_by: Vec<String> = if let Some(acked) = current_doc.get("acked_by") {
-                                if let Some(arr) = acked.as_array() {
-                                    arr.iter()
-                                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                                        .collect()
+                            let mut acked_by: Vec<String> =
+                                if let Some(acked) = current_doc.get("acked_by") {
+                                    if let Some(arr) = acked.as_array() {
+                                        arr.iter()
+                                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                            .collect()
+                                    } else {
+                                        Vec::new()
+                                    }
                                 } else {
                                     Vec::new()
-                                }
-                            } else {
-                                Vec::new()
-                            };
+                                };
 
                             // Add this node if not already in the list
                             if !acked_by.contains(&node_id.to_string()) {
@@ -714,7 +772,8 @@ async fn process_document(
                                 for (k, v) in current_doc.fields.iter() {
                                     updated_fields.insert(k.clone(), v.clone());
                                 }
-                                updated_fields.insert("acked_by".to_string(), serde_json::json!(acked_by));
+                                updated_fields
+                                    .insert("acked_by".to_string(), serde_json::json!(acked_by));
 
                                 let updated_doc = Document {
                                     id: Some("sim_test_001".to_string()),
@@ -723,10 +782,16 @@ async fn process_document(
                                 };
 
                                 // Update the document
-                                backend.document_store().upsert("sim_poc", updated_doc).await?;
+                                backend
+                                    .document_store()
+                                    .upsert("sim_poc", updated_doc)
+                                    .await?;
 
-                                println!("[{}] ✓ Acknowledgment sent (acked_by count: {})",
-                                         node_id, acked_by.len());
+                                println!(
+                                    "[{}] ✓ Acknowledgment sent (acked_by count: {})",
+                                    node_id,
+                                    acked_by.len()
+                                );
 
                                 // Log acknowledgment metrics
                                 log_metrics(&MetricsEvent::DocumentAcknowledged {

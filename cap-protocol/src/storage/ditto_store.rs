@@ -337,7 +337,10 @@ impl DittoStore {
         debug!("Upserting document into collection: {}", collection);
 
         // Use DQL v2 API with ON ID CONFLICT DO UPDATE for proper upsert behavior
-        let dql_query = format!("INSERT INTO {} DOCUMENTS (:doc) ON ID CONFLICT DO UPDATE", collection);
+        let dql_query = format!(
+            "INSERT INTO {} DOCUMENTS (:doc) ON ID CONFLICT DO UPDATE",
+            collection
+        );
 
         let query_result = self
             .ditto
