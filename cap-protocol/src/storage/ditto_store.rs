@@ -171,9 +171,18 @@ impl DittoStore {
                 }
 
                 // Configure TCP client connection if specified
-                if let Some(ref address) = config.tcp_connect_address {
-                    transport_config.connect.tcp_servers.insert(address.clone());
-                    debug!("TCP client will connect to: {}", address);
+                // Support comma-separated list of addresses for multi-peer connectivity
+                if let Some(ref addresses) = config.tcp_connect_address {
+                    for address in addresses.split(',') {
+                        let address = address.trim();
+                        if !address.is_empty() {
+                            transport_config
+                                .connect
+                                .tcp_servers
+                                .insert(address.to_string());
+                            debug!("TCP client will connect to: {}", address);
+                        }
+                    }
                 }
             } else {
                 // No explicit TCP - use mDNS/LAN for peer discovery
@@ -327,8 +336,11 @@ impl DittoStore {
     pub async fn upsert(&self, collection: &str, document: serde_json::Value) -> Result<String> {
         debug!("Upserting document into collection: {}", collection);
 
-        // Use DQL v2 API - INSERT handles both insert and update (upsert behavior)
-        let dql_query = format!("INSERT INTO {} DOCUMENTS (:doc)", collection);
+        // Use DQL v2 API with ON ID CONFLICT DO UPDATE for proper upsert behavior
+        let dql_query = format!(
+            "INSERT INTO {} DOCUMENTS (:doc) ON ID CONFLICT DO UPDATE",
+            collection
+        );
 
         let query_result = self
             .ditto
