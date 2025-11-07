@@ -25,6 +25,7 @@ use cap_protocol::hierarchy::{
 };
 use cap_protocol::models::cell::{CellConfig, CellState};
 use cap_protocol::models::zone::{ZoneConfig, ZoneState};
+use cap_protocol::models::zone::{ZoneConfigExt, ZoneStateExt};
 use cap_protocol::models::{
     Capability, CapabilityExt, CapabilityType, CellConfigExt, CellStateExt,
 };

@@ -9,35 +9,30 @@
 //! - Cell membership (OR-Set)
 //! - Zone coordinator assignment (LWW-Register)
 //! - Capability aggregation (G-Set)
+//!
+//! ## Protobuf Integration
+//!
+//! This module uses protobuf types from `cap_schema::zone::v1` for multi-transport
+//! support and cross-language compatibility. Extension traits provide CRDT semantics
+//! and helper methods on top of the protobuf types.
 
 use crate::models::{Capability, CapabilityExt};
-use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Zone configuration (immutable properties)
+// Re-export protobuf types
+pub use cap_schema::zone::v1::{ZoneConfig, ZoneState, ZoneStats};
+
+/// Extension trait for ZoneConfig helper methods
 ///
 /// # Example
 /// ```
-/// use cap_protocol::models::zone::ZoneConfig;
+/// use cap_protocol::models::zone::{ZoneConfig, ZoneConfigExt};
 ///
 /// let config = ZoneConfig::new("zone_north".to_string(), 10);
 /// assert_eq!(config.max_cells, 10);
 /// assert_eq!(config.min_cells, 2);
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ZoneConfig {
-    /// Unique zone identifier
-    pub id: String,
-    /// Maximum number of cells in this zone
-    pub max_cells: usize,
-    /// Minimum number of cells required for valid zone
-    pub min_cells: usize,
-    /// Creation timestamp
-    pub created_at: u64,
-}
-
-impl ZoneConfig {
+pub trait ZoneConfigExt {
     /// Create a new zone configuration
     ///
     /// # Arguments
@@ -46,32 +41,39 @@ impl ZoneConfig {
     ///
     /// # Example
     /// ```
-    /// use cap_protocol::models::zone::ZoneConfig;
+    /// use cap_protocol::models::zone::{ZoneConfig, ZoneConfigExt};
     ///
     /// let config = ZoneConfig::new("zone_alpha".to_string(), 8);
     /// ```
-    pub fn new(id: String, max_cells: usize) -> Self {
-        let created_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+    fn new(id: String, max_cells: u32) -> Self;
 
+    /// Create configuration with custom minimum cells
+    fn with_min_cells(self, min_cells: u32) -> Self;
+}
+
+impl ZoneConfigExt for ZoneConfig {
+    fn new(id: String, max_cells: u32) -> Self {
         Self {
             id,
             max_cells,
             min_cells: 2, // Default minimum
-            created_at,
+            created_at: Some(cap_schema::common::v1::Timestamp {
+                seconds: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+                nanos: 0,
+            }),
         }
     }
 
-    /// Create configuration with custom minimum cells
-    pub fn with_min_cells(mut self, min_cells: usize) -> Self {
+    fn with_min_cells(mut self, min_cells: u32) -> Self {
         self.min_cells = min_cells;
         self
     }
 }
 
-/// Zone runtime state (CRDT-based)
+/// Extension trait for ZoneState with CRDT operations
 ///
 /// Uses multiple CRDT types for distributed consistency:
 /// - Commander: LWW-Register (Last-Write-Wins)
@@ -80,7 +82,7 @@ impl ZoneConfig {
 ///
 /// # Example
 /// ```
-/// use cap_protocol::models::zone::{ZoneConfig, ZoneState};
+/// use cap_protocol::models::zone::{ZoneConfig, ZoneConfigExt, ZoneState, ZoneStateExt};
 ///
 /// let config = ZoneConfig::new("zone_1".to_string(), 10);
 /// let mut zone = ZoneState::new(config);
@@ -89,47 +91,20 @@ impl ZoneConfig {
 /// zone.add_cell("cell_alpha".to_string());
 /// zone.add_cell("cell_beta".to_string());
 ///
-/// assert_eq!(zone.cells.len(), 2);
+/// assert_eq!(zone.cell_count(), 2);
 /// assert!(zone.is_valid()); // Meets minimum cells
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ZoneState {
-    /// Zone configuration
-    pub config: ZoneConfig,
-    /// Zone coordinator node ID (LWW-Register)
-    pub coordinator_id: Option<String>,
-    /// Cell membership (OR-Set)
-    pub cells: HashSet<String>,
-    /// Aggregated capabilities from all cells (G-Set)
-    pub aggregated_capabilities: Vec<Capability>,
-    /// Timestamp for LWW conflict resolution
-    pub timestamp: u64,
-}
-
-impl ZoneState {
+pub trait ZoneStateExt {
     /// Create a new zone state from configuration
     ///
     /// # Example
     /// ```
-    /// use cap_protocol::models::zone::{ZoneConfig, ZoneState};
+    /// use cap_protocol::models::zone::{ZoneConfig, ZoneConfigExt, ZoneState, ZoneStateExt};
     ///
     /// let config = ZoneConfig::new("zone_north".to_string(), 5);
     /// let zone = ZoneState::new(config);
     /// ```
-    pub fn new(config: ZoneConfig) -> Self {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
-        Self {
-            config,
-            coordinator_id: None,
-            cells: HashSet::new(),
-            aggregated_capabilities: Vec::new(),
-            timestamp,
-        }
-    }
+    fn new(config: ZoneConfig) -> Self;
 
     /// Add a cell to the zone (OR-Set add operation)
     ///
@@ -137,7 +112,7 @@ impl ZoneState {
     ///
     /// # Example
     /// ```
-    /// use cap_protocol::models::zone::{ZoneConfig, ZoneState};
+    /// use cap_protocol::models::zone::{ZoneConfig, ZoneConfigExt, ZoneState, ZoneStateExt};
     ///
     /// let config = ZoneConfig::new("zone_1".to_string(), 3);
     /// let mut zone = ZoneState::new(config);
@@ -145,30 +120,12 @@ impl ZoneState {
     /// assert!(zone.add_cell("cell_1".to_string()));
     /// assert!(!zone.add_cell("cell_1".to_string())); // Already present
     /// ```
-    pub fn add_cell(&mut self, cell_id: String) -> bool {
-        if self.is_full() {
-            return false;
-        }
-
-        if self.cells.insert(cell_id) {
-            self.update_timestamp();
-            true
-        } else {
-            false
-        }
-    }
+    fn add_cell(&mut self, cell_id: String) -> bool;
 
     /// Remove a cell from the zone (OR-Set remove operation)
     ///
     /// Returns `true` if cell was removed, `false` if not present.
-    pub fn remove_cell(&mut self, cell_id: &str) -> bool {
-        if self.cells.remove(cell_id) {
-            self.update_timestamp();
-            true
-        } else {
-            false
-        }
-    }
+    fn remove_cell(&mut self, cell_id: &str) -> bool;
 
     /// Set the zone coordinator (LWW-Register operation)
     ///
@@ -180,61 +137,27 @@ impl ZoneState {
     ///
     /// # Returns
     /// `true` if assignment was applied, `false` if rejected due to older timestamp
-    pub fn set_coordinator(&mut self, coordinator_id: String, timestamp: u64) -> bool {
-        if timestamp < self.timestamp {
-            return false;
-        }
-
-        self.coordinator_id = Some(coordinator_id);
-        self.timestamp = timestamp;
-        true
-    }
+    fn set_coordinator(&mut self, coordinator_id: String, timestamp: u64) -> bool;
 
     /// Remove the zone coordinator (LWW-Register deletion)
-    pub fn remove_coordinator(&mut self, timestamp: u64) -> bool {
-        if timestamp < self.timestamp {
-            return false;
-        }
-
-        self.coordinator_id = None;
-        self.timestamp = timestamp;
-        true
-    }
+    fn remove_coordinator(&mut self, timestamp: u64) -> bool;
 
     /// Add an aggregated capability (G-Set add operation)
     ///
     /// Capabilities are grow-only - once added, they cannot be removed.
-    pub fn add_capability(&mut self, capability: Capability) {
-        // Check if capability already exists
-        if !self
-            .aggregated_capabilities
-            .iter()
-            .any(|c| c.get_capability_type() == capability.get_capability_type())
-        {
-            self.aggregated_capabilities.push(capability);
-            self.update_timestamp();
-        }
-    }
+    fn add_capability(&mut self, capability: Capability);
 
     /// Check if zone meets minimum cell requirement
-    pub fn is_valid(&self) -> bool {
-        self.cells.len() >= self.config.min_cells
-    }
+    fn is_valid(&self) -> bool;
 
     /// Check if zone is at maximum capacity
-    pub fn is_full(&self) -> bool {
-        self.cells.len() >= self.config.max_cells
-    }
+    fn is_full(&self) -> bool;
 
     /// Get the number of cells in this zone
-    pub fn cell_count(&self) -> usize {
-        self.cells.len()
-    }
+    fn cell_count(&self) -> usize;
 
     /// Check if a specific cell is a member of this zone
-    pub fn contains_cell(&self, cell_id: &str) -> bool {
-        self.cells.contains(cell_id)
-    }
+    fn contains_cell(&self, cell_id: &str) -> bool;
 
     /// Merge another zone state into this one (CRDT merge)
     ///
@@ -245,24 +168,147 @@ impl ZoneState {
     ///
     /// # Panics
     /// Panics if attempting to merge zones with different IDs
-    pub fn merge(&mut self, other: &ZoneState) {
-        assert_eq!(
-            self.config.id, other.config.id,
-            "Cannot merge zones with different IDs"
-        );
+    fn merge(&mut self, other: &ZoneState);
+
+    /// Update timestamp to current time
+    fn update_timestamp(&mut self);
+
+    /// Get zone statistics
+    fn stats(&self) -> ZoneStats;
+}
+
+impl ZoneStateExt for ZoneState {
+    fn new(config: ZoneConfig) -> Self {
+        Self {
+            config: Some(config),
+            coordinator_id: None,
+            cells: Vec::new(),
+            aggregated_capabilities: Vec::new(),
+            timestamp: Some(cap_schema::common::v1::Timestamp {
+                seconds: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+                nanos: 0,
+            }),
+        }
+    }
+
+    fn add_cell(&mut self, cell_id: String) -> bool {
+        if self.is_full() {
+            return false;
+        }
+
+        // Check if already present (protobuf uses Vec instead of HashSet)
+        if self.cells.iter().any(|id| id == &cell_id) {
+            return false;
+        }
+
+        self.cells.push(cell_id);
+        self.update_timestamp();
+        true
+    }
+
+    fn remove_cell(&mut self, cell_id: &str) -> bool {
+        if let Some(pos) = self.cells.iter().position(|id| id == cell_id) {
+            self.cells.remove(pos);
+            self.update_timestamp();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn set_coordinator(&mut self, coordinator_id: String, timestamp: u64) -> bool {
+        let current_ts = self.timestamp.as_ref().map(|t| t.seconds).unwrap_or(0);
+
+        if timestamp < current_ts {
+            return false;
+        }
+
+        self.coordinator_id = Some(coordinator_id);
+        self.timestamp = Some(cap_schema::common::v1::Timestamp {
+            seconds: timestamp,
+            nanos: 0,
+        });
+        true
+    }
+
+    fn remove_coordinator(&mut self, timestamp: u64) -> bool {
+        let current_ts = self.timestamp.as_ref().map(|t| t.seconds).unwrap_or(0);
+
+        if timestamp < current_ts {
+            return false;
+        }
+
+        self.coordinator_id = None;
+        self.timestamp = Some(cap_schema::common::v1::Timestamp {
+            seconds: timestamp,
+            nanos: 0,
+        });
+        true
+    }
+
+    fn add_capability(&mut self, capability: Capability) {
+        // Check if capability already exists (by type)
+        if !self
+            .aggregated_capabilities
+            .iter()
+            .any(|c| c.get_capability_type() == capability.get_capability_type())
+        {
+            self.aggregated_capabilities.push(capability);
+            self.update_timestamp();
+        }
+    }
+
+    fn is_valid(&self) -> bool {
+        if let Some(ref config) = self.config {
+            self.cells.len() >= config.min_cells as usize
+        } else {
+            false
+        }
+    }
+
+    fn is_full(&self) -> bool {
+        if let Some(ref config) = self.config {
+            self.cells.len() >= config.max_cells as usize
+        } else {
+            false
+        }
+    }
+
+    fn cell_count(&self) -> usize {
+        self.cells.len()
+    }
+
+    fn contains_cell(&self, cell_id: &str) -> bool {
+        self.cells.iter().any(|id| id == cell_id)
+    }
+
+    fn merge(&mut self, other: &ZoneState) {
+        // Verify we're merging the same zone
+        let self_id = self.config.as_ref().map(|c| &c.id);
+        let other_id = other.config.as_ref().map(|c| &c.id);
+
+        assert_eq!(self_id, other_id, "Cannot merge zones with different IDs");
 
         // LWW-Register merge for coordinator
-        if other.timestamp > self.timestamp {
+        let self_ts = self.timestamp.as_ref().map(|t| t.seconds).unwrap_or(0);
+        let other_ts = other.timestamp.as_ref().map(|t| t.seconds).unwrap_or(0);
+
+        if other_ts > self_ts {
             self.coordinator_id = other.coordinator_id.clone();
             self.timestamp = other.timestamp;
         }
 
-        // OR-Set merge for cells
+        // OR-Set merge for cells (union, avoiding duplicates)
         for cell_id in &other.cells {
-            self.cells.insert(cell_id.clone());
+            if !self.cells.iter().any(|id| id == cell_id) {
+                self.cells.push(cell_id.clone());
+            }
         }
 
-        // G-Set merge for capabilities
+        // G-Set merge for capabilities (union by type)
         for capability in &other.aggregated_capabilities {
             if !self
                 .aggregated_capabilities
@@ -274,42 +320,39 @@ impl ZoneState {
         }
     }
 
-    /// Update timestamp to current time
     fn update_timestamp(&mut self) {
-        self.timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.timestamp = Some(cap_schema::common::v1::Timestamp {
+            seconds: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            nanos: 0,
+        });
     }
 
-    /// Get zone statistics
-    pub fn stats(&self) -> ZoneStats {
+    fn stats(&self) -> ZoneStats {
+        let zone_id = self
+            .config
+            .as_ref()
+            .map(|c| c.id.clone())
+            .unwrap_or_default();
+
         ZoneStats {
-            zone_id: self.config.id.clone(),
-            cell_count: self.cells.len(),
-            coordinator: self.coordinator_id.clone(),
-            capability_count: self.aggregated_capabilities.len(),
+            zone_id,
+            cell_count: self.cells.len() as u32,
+            total_nodes: 0, // This would need to be calculated from actual cell data
+            unique_capability_count: self.aggregated_capabilities.len() as u32,
             is_valid: self.is_valid(),
             is_full: self.is_full(),
+            calculated_at: Some(cap_schema::common::v1::Timestamp {
+                seconds: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+                nanos: 0,
+            }),
         }
     }
-}
-
-/// Statistics about a zone's current state
-#[derive(Debug, Clone)]
-pub struct ZoneStats {
-    /// Zone identifier
-    pub zone_id: String,
-    /// Number of cells in zone
-    pub cell_count: usize,
-    /// Current coordinator (if any)
-    pub coordinator: Option<String>,
-    /// Number of aggregated capabilities
-    pub capability_count: usize,
-    /// Whether zone meets minimum requirements
-    pub is_valid: bool,
-    /// Whether zone is at capacity
-    pub is_full: bool,
 }
 
 #[cfg(test)]
@@ -336,7 +379,7 @@ mod tests {
         let config = ZoneConfig::new("zone_1".to_string(), 5);
         let zone = ZoneState::new(config);
 
-        assert_eq!(zone.config.id, "zone_1");
+        assert_eq!(zone.config.as_ref().unwrap().id, "zone_1");
         assert_eq!(zone.cells.len(), 0);
         assert!(zone.coordinator_id.is_none());
         assert!(!zone.is_valid()); // Not enough cells
@@ -403,7 +446,7 @@ mod tests {
         let config = ZoneConfig::new("zone_1".to_string(), 5);
         let mut zone = ZoneState::new(config);
 
-        let initial_ts = zone.timestamp;
+        let initial_ts = zone.timestamp.as_ref().unwrap().seconds;
         let ts1 = initial_ts + 100;
         assert!(zone.set_coordinator("node_1".to_string(), ts1));
         assert_eq!(zone.coordinator_id, Some("node_1".to_string()));
@@ -422,7 +465,7 @@ mod tests {
         let config = ZoneConfig::new("zone_1".to_string(), 5);
         let mut zone = ZoneState::new(config);
 
-        let initial_ts = zone.timestamp;
+        let initial_ts = zone.timestamp.as_ref().unwrap().seconds;
         zone.set_coordinator("node_1".to_string(), initial_ts + 100);
 
         // Old timestamp should be rejected
@@ -479,7 +522,7 @@ mod tests {
         let config1 = ZoneConfig::new("zone_1".to_string(), 10);
         let mut zone1 = ZoneState::new(config1);
 
-        let initial_ts = zone1.timestamp;
+        let initial_ts = zone1.timestamp.as_ref().unwrap().seconds;
 
         zone1.add_cell("cell_1".to_string());
         zone1.add_cell("cell_2".to_string());
@@ -551,7 +594,7 @@ mod tests {
         let config = ZoneConfig::new("zone_test".to_string(), 5).with_min_cells(2);
         let mut zone = ZoneState::new(config);
 
-        let initial_ts = zone.timestamp;
+        let initial_ts = zone.timestamp.as_ref().unwrap().seconds;
 
         zone.add_cell("cell_1".to_string());
         zone.add_cell("cell_2".to_string());
@@ -560,7 +603,6 @@ mod tests {
         let stats = zone.stats();
         assert_eq!(stats.zone_id, "zone_test");
         assert_eq!(stats.cell_count, 2);
-        assert_eq!(stats.coordinator, Some("node_1".to_string()));
         assert!(stats.is_valid);
         assert!(!stats.is_full);
     }

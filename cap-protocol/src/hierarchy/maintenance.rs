@@ -401,13 +401,23 @@ impl HierarchyMaintainer {
         if cell_count < self.min_zone_cells {
             debug!(
                 "Zone {} needs cells: {} < {} min",
-                zone.config.id, cell_count, self.min_zone_cells
+                zone.config
+                    .as_ref()
+                    .map(|c| c.id.as_str())
+                    .unwrap_or("unknown"),
+                cell_count,
+                self.min_zone_cells
             );
             true
         } else if cell_count > self.max_zone_cells {
             debug!(
                 "Zone {} has too many cells: {} > {} max",
-                zone.config.id, cell_count, self.max_zone_cells
+                zone.config
+                    .as_ref()
+                    .map(|c| c.id.as_str())
+                    .unwrap_or("unknown"),
+                cell_count,
+                self.max_zone_cells
             );
             true
         } else {
@@ -610,6 +620,8 @@ impl<B: crate::sync::DataSyncBackend> RebalancingCoordinator<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::cell::{CellConfigExt, CellStateExt};
+    use crate::models::zone::{ZoneConfig, ZoneConfigExt, ZoneStateExt};
     use crate::models::{Capability, CapabilityExt};
 
     fn create_test_cell(id: &str, member_count: usize, max_size: usize) -> CellState {
@@ -829,22 +841,22 @@ mod tests {
     fn test_needs_zone_rebalance() {
         let maintainer = HierarchyMaintainer::new(3, 10, 2, 8);
 
-        let config =
-            crate::models::zone::ZoneConfig::new("zone_1".to_string(), 8).with_min_cells(2);
+        let config = ZoneConfig::new("zone_1".to_string(), 10).with_min_cells(2);
         let mut zone = ZoneState::new(config);
 
         // Too few cells
-        zone.cells.insert("cell_1".to_string());
+        zone.add_cell("cell_1".to_string());
         assert!(maintainer.needs_zone_rebalance(&zone));
 
         // Just right
-        zone.cells.insert("cell_2".to_string());
+        zone.add_cell("cell_2".to_string());
         assert!(!maintainer.needs_zone_rebalance(&zone));
 
-        // Too many cells
-        for i in 3..=10 {
-            zone.cells.insert(format!("cell_{}", i));
+        // Too many cells - add up to 9 cells total (more than max_zone_cells of 8)
+        for i in 3..=9 {
+            zone.add_cell(format!("cell_{}", i));
         }
+        assert_eq!(zone.cell_count(), 9);
         assert!(maintainer.needs_zone_rebalance(&zone));
     }
 
