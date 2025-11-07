@@ -263,8 +263,8 @@ impl CellCoordinator {
 mod tests {
     use super::*;
     use crate::models::{
-        AuthorityLevel, Capability, CapabilityExt, CapabilityType, HumanMachinePair, Operator,
-        OperatorRank,
+        AuthorityLevel, Capability, CapabilityExt, CapabilityType, HumanMachinePair,
+        HumanMachinePairExt, NodeConfigExt, NodeStateExt, Operator, OperatorExt, OperatorRank,
     };
 
     fn create_test_member(

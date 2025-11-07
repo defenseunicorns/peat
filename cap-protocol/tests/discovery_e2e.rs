@@ -12,7 +12,7 @@ use cap_protocol::discovery::geographic::{GeographicBeacon, GeographicDiscovery,
 use cap_protocol::discovery::GeoCoordinate;
 use cap_protocol::models::capability::{Capability, CapabilityType};
 use cap_protocol::models::node::NodeConfig;
-use cap_protocol::models::CapabilityExt;
+use cap_protocol::models::{CapabilityExt, NodeConfigExt};
 use cap_protocol::testing::e2e_harness::E2EHarness;
 use std::time::Duration;
 use tokio::time::sleep;

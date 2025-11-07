@@ -19,7 +19,8 @@
 //! - Hybrid confidence scoring (technical capability + human authority)
 
 use crate::models::{
-    AuthorityLevel, CapabilityExt, CapabilityType, HumanMachinePair, NodeConfig, NodeState,
+    AuthorityLevel, CapabilityExt, CapabilityType, HumanMachinePair, HumanMachinePairExt,
+    NodeConfig, NodeState, NodeStateExt,
 };
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
@@ -68,11 +69,11 @@ impl AggregatedCapability {
         capability_type: CapabilityType,
         max_authority: Option<AuthorityLevel>,
     ) -> bool {
-        // Mission-critical capabilities require oversight unless DirectControl authority present
+        // Mission-critical capabilities require oversight unless Commander authority present
         match capability_type {
             CapabilityType::Payload => {
-                // Weapons require DirectControl authority or oversight
-                !matches!(max_authority, Some(AuthorityLevel::DirectControl))
+                // Weapons require Commander authority or oversight
+                !matches!(max_authority, Some(AuthorityLevel::Commander))
             }
             CapabilityType::Communication => {
                 // Critical comms require at least Commander authority
@@ -98,11 +99,11 @@ impl AggregatedCapability {
         // Reduce confidence if oversight required but no high authority present
         if self.requires_oversight {
             match self.max_authority {
-                Some(AuthorityLevel::DirectControl) => confidence *= 1.0, // No penalty
-                Some(AuthorityLevel::Commander) => confidence *= 0.85,    // Slight penalty
-                Some(AuthorityLevel::Supervisor) => confidence *= 0.7,    // Moderate penalty
-                Some(AuthorityLevel::Advisor) => confidence *= 0.6,       // Significant penalty
-                Some(AuthorityLevel::Observer) => confidence *= 0.6,      // Significant penalty
+                Some(AuthorityLevel::Commander) => confidence *= 1.0, // No penalty
+                Some(AuthorityLevel::Supervisor) => confidence *= 0.85, // Slight penalty
+                Some(AuthorityLevel::Advisor) => confidence *= 0.7,   // Moderate penalty
+                Some(AuthorityLevel::Observer) => confidence *= 0.6,  // Significant penalty
+                Some(AuthorityLevel::Unspecified) => confidence *= 0.5, // Major penalty
                 None => confidence *= 0.5, // Major penalty for autonomous-only
             }
         }
@@ -193,11 +194,11 @@ impl CapabilityAggregator {
         let max_authority = contributors.iter().filter_map(|(_, _, auth)| *auth).max();
 
         let authority_bonus = match max_authority {
-            Some(AuthorityLevel::DirectControl) => 0.10,
-            Some(AuthorityLevel::Commander) => 0.05,
-            Some(AuthorityLevel::Supervisor) => 0.03,
-            Some(AuthorityLevel::Advisor) => 0.01,
+            Some(AuthorityLevel::Commander) => 0.10,
+            Some(AuthorityLevel::Supervisor) => 0.05,
+            Some(AuthorityLevel::Advisor) => 0.03,
             Some(AuthorityLevel::Observer) => 0.0,
+            Some(AuthorityLevel::Unspecified) => 0.0,
             None => 0.0,
         };
 
@@ -215,7 +216,7 @@ impl CapabilityAggregator {
 
     /// Get the maximum authority level from a human-machine pair
     fn get_max_authority(binding: &HumanMachinePair) -> Option<AuthorityLevel> {
-        binding.operators.iter().map(|op| op.authority).max()
+        binding.max_authority()
     }
 
     /// Calculate squad readiness score based on aggregated capabilities
@@ -280,7 +281,10 @@ impl CapabilityAggregator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{Capability, HealthStatus, Operator, OperatorRank};
+    use crate::models::{
+        Capability, HealthStatus, HumanMachinePairExt, NodeConfigExt, NodeStateExt, Operator,
+        OperatorExt, OperatorRank,
+    };
 
     fn create_test_platform(
         id: &str,
@@ -358,7 +362,7 @@ mod tests {
             "op1".to_string(),
             "John Doe".to_string(),
             OperatorRank::E5,
-            AuthorityLevel::DirectControl,
+            AuthorityLevel::Commander,
             "19D".to_string(),
         );
 
@@ -367,10 +371,7 @@ mod tests {
         let result = CapabilityAggregator::aggregate_capabilities(&[p1]).unwrap();
 
         let payload_cap = result.get(&CapabilityType::Payload).unwrap();
-        assert_eq!(
-            payload_cap.max_authority,
-            Some(AuthorityLevel::DirectControl)
-        );
+        assert_eq!(payload_cap.max_authority, Some(AuthorityLevel::Commander));
 
         // Base: 0.7, Authority bonus: 0.10 = 0.80
         assert!((payload_cap.confidence - 0.80).abs() < 0.01);
@@ -389,7 +390,7 @@ mod tests {
             "op1".to_string(),
             "Jane Smith".to_string(),
             OperatorRank::E6,
-            AuthorityLevel::DirectControl,
+            AuthorityLevel::Commander,
             "11B".to_string(),
         );
         let p2 = create_test_platform("p2", vec![(CapabilityType::Payload, 0.9)], Some(operator));
@@ -404,7 +405,7 @@ mod tests {
             "op1".to_string(),
             "Bob Johnson".to_string(),
             OperatorRank::E5,
-            AuthorityLevel::DirectControl,
+            AuthorityLevel::Commander,
             "11B".to_string(),
         );
 
@@ -443,7 +444,7 @@ mod tests {
             "op1".to_string(),
             "Charlie Davis".to_string(),
             OperatorRank::E5,
-            AuthorityLevel::DirectControl,
+            AuthorityLevel::Commander,
             "11B".to_string(),
         );
 
@@ -508,7 +509,7 @@ mod tests {
         let mut platform = create_test_platform("p1", vec![(CapabilityType::Sensor, 0.9)], None);
 
         // Set platform to degraded state
-        platform.1.health = HealthStatus::Degraded;
+        platform.1.health = HealthStatus::Degraded as i32;
 
         let result = CapabilityAggregator::aggregate_capabilities(&[platform]).unwrap();
 
@@ -517,7 +518,7 @@ mod tests {
 
         // Critical nodes are still operational (only Failed is non-operational)
         let mut platform2 = create_test_platform("p2", vec![(CapabilityType::Sensor, 0.9)], None);
-        platform2.1.health = HealthStatus::Critical;
+        platform2.1.health = HealthStatus::Critical as i32;
 
         let result2 = CapabilityAggregator::aggregate_capabilities(&[platform2]).unwrap();
 
@@ -526,7 +527,7 @@ mod tests {
 
         // Now test with Failed status (truly non-operational)
         let mut platform3 = create_test_platform("p3", vec![(CapabilityType::Sensor, 0.9)], None);
-        platform3.1.health = HealthStatus::Failed;
+        platform3.1.health = HealthStatus::Failed as i32;
 
         let result3 = CapabilityAggregator::aggregate_capabilities(&[platform3]).unwrap();
 
@@ -556,11 +557,11 @@ mod tests {
     fn test_all_platforms_non_operational() {
         // Edge case: All nodes failed/non-operational
         let mut platform1 = create_test_platform("p1", vec![(CapabilityType::Sensor, 0.9)], None);
-        platform1.1.health = HealthStatus::Failed;
+        platform1.1.health = HealthStatus::Failed as i32;
 
         let mut platform2 =
             create_test_platform("p2", vec![(CapabilityType::Communication, 0.8)], None);
-        platform2.1.health = HealthStatus::Failed;
+        platform2.1.health = HealthStatus::Failed as i32;
 
         let result = CapabilityAggregator::aggregate_capabilities(&[platform1, platform2]).unwrap();
 

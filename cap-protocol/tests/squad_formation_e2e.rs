@@ -22,7 +22,7 @@
 
 use cap_protocol::models::cell::{CellConfig, CellState};
 use cap_protocol::models::node::NodeConfig;
-use cap_protocol::models::{Capability, CapabilityExt, CapabilityType};
+use cap_protocol::models::{Capability, CapabilityExt, CapabilityType, NodeConfigExt};
 use cap_protocol::storage::{CellStore, NodeStore};
 use cap_protocol::sync::ditto::DittoBackend;
 use cap_protocol::testing::E2EHarness;

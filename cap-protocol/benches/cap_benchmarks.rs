@@ -17,7 +17,7 @@ use cap_protocol::discovery::geographic::{GeographicBeacon, GeographicDiscovery}
 use cap_protocol::discovery::GeoCoordinate;
 use cap_protocol::models::capability::{Capability, CapabilityExt, CapabilityType};
 use cap_protocol::models::cell::{CellConfig, CellState};
-use cap_protocol::models::node::NodeConfig;
+use cap_protocol::models::node::{NodeConfig, NodeConfigExt};
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::collections::HashSet;
 

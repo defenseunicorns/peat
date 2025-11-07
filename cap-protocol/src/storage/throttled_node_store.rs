@@ -21,7 +21,7 @@ use tracing::{debug, info, instrument, warn};
 /// # Example
 /// ```no_run
 /// use cap_protocol::storage::{NodeStore, ThrottledNodeStore};
-/// use cap_protocol::models::node::NodeState;
+/// use cap_protocol::models::node::{NodeState, NodeStateExt};
 /// use cap_protocol::sync::ditto::DittoBackend;
 /// use std::time::Duration;
 /// use std::sync::Arc;
@@ -180,6 +180,7 @@ pub struct ThrottleStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::node::NodeStateExt;
     use crate::sync::ditto::DittoBackend;
     use crate::sync::{BackendConfig, TransportConfig};
 

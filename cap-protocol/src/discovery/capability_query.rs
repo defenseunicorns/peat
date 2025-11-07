@@ -354,6 +354,7 @@ impl CapabilityStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::{CapabilityExt, NodeConfigExt};
 
     fn create_test_capability(id: &str, cap_type: CapabilityType, confidence: f32) -> Capability {
         Capability::new(

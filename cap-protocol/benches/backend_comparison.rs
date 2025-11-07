@@ -16,7 +16,7 @@
 
 use cap_protocol::models::capability::{Capability, CapabilityExt, CapabilityType};
 use cap_protocol::models::cell::{CellConfig, CellState};
-use cap_protocol::models::node::NodeConfig;
+use cap_protocol::models::node::{NodeConfig, NodeConfigExt};
 use cap_protocol::sync::automerge::AutomergeBackend;
 use cap_protocol::sync::{BackendConfig, DataSyncBackend, Document, TransportConfig, Value};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
