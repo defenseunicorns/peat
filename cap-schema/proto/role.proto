@@ -1,0 +1,135 @@
+// Tactical role definitions for CAP Protocol
+// Version: 1.0.0
+
+syntax = "proto3";
+
+package cap.role.v1;
+
+import "common.proto";
+import "capability.proto";
+
+// Tactical role that a node can fill within a cell
+enum CellRole {
+  CELL_ROLE_UNSPECIFIED = 0;
+  CELL_ROLE_LEADER = 1;    // Cell leader - coordinates operations
+  CELL_ROLE_SENSOR = 2;    // Primary sensor/scout - reconnaissance
+  CELL_ROLE_COMPUTE = 3;   // Compute node - data processing
+  CELL_ROLE_RELAY = 4;     // Communications relay - extends range
+  CELL_ROLE_STRIKE = 5;    // Strike platform - primary weapons
+  CELL_ROLE_SUPPORT = 6;   // Support platform - logistics/medical
+  CELL_ROLE_FOLLOWER = 7;  // General follower - no specialized role
+}
+
+// Role capabilities (required and preferred)
+message RoleCapabilities {
+  // The role
+  CellRole role = 1;
+
+  // Required capability types for this role
+  repeated capability.v1.CapabilityType required_capabilities = 2;
+
+  // Preferred capability types (improve scoring but not required)
+  repeated capability.v1.CapabilityType preferred_capabilities = 3;
+
+  // Relevant Military Occupational Specialties (MOS codes)
+  repeated string relevant_mos = 4;
+
+  // Human-readable role description
+  string description = 5;
+}
+
+// Role assignment for a node
+message RoleAssignment {
+  // Node ID
+  string node_id = 1;
+
+  // Assigned role
+  CellRole assigned_role = 2;
+
+  // Role fitness score (0.0 - 1.0)
+  float fitness_score = 3;
+
+  // Timestamp when role was assigned
+  common.v1.Timestamp assigned_at = 4;
+
+  // Reason for assignment (optional explanation)
+  optional string assignment_reason = 5;
+}
+
+// Role scoring factors
+message RoleScoringFactors {
+  // Capability match score (0.0 - 1.0)
+  float capability_score = 1;
+
+  // Operator MOS match score (0.0 - 1.0)
+  float mos_score = 2;
+
+  // Platform health score (0.0 - 1.0)
+  float health_score = 3;
+
+  // Fuel/endurance score (0.0 - 1.0)
+  float endurance_score = 4;
+
+  // Position/proximity score (0.0 - 1.0, optional)
+  optional float position_score = 5;
+
+  // Overall combined score (weighted average)
+  float overall_score = 6;
+
+  // Score calculation metadata
+  string calculation_method = 7;
+}
+
+// Role assignment request
+message RoleAssignmentRequest {
+  // Cell ID
+  string cell_id = 1;
+
+  // Node IDs to assign roles to
+  repeated string node_ids = 2;
+
+  // Preferred roles (optional hints)
+  map<string, CellRole> preferred_roles = 3;
+
+  // Timestamp of request
+  common.v1.Timestamp requested_at = 4;
+}
+
+// Role assignment response
+message RoleAssignmentResponse {
+  // Cell ID
+  string cell_id = 1;
+
+  // Assigned roles for each node
+  repeated RoleAssignment assignments = 2;
+
+  // Whether all roles were assigned successfully
+  bool success = 3;
+
+  // Unassigned nodes (if any)
+  repeated string unassigned_nodes = 4;
+
+  // Scoring details for transparency
+  map<string, RoleScoringFactors> scoring_details = 5;
+}
+
+// Role change event
+message RoleChangeEvent {
+  // Cell ID
+  string cell_id = 1;
+
+  // Node ID whose role changed
+  string node_id = 2;
+
+  // Previous role
+  CellRole previous_role = 3;
+
+  // New role
+  CellRole new_role = 4;
+
+  // Reason for change
+  string change_reason = 5;
+
+  // Timestamp of change
+  common.v1.Timestamp changed_at = 6;
+}

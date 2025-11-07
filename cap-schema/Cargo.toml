@@ -1,0 +1,35 @@
+[package]
+name = "cap-schema"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Protobuf serialization
+prost = "0.13"
+prost-types = "0.13"
+
+# Async runtime
+tokio = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Utilities
+uuid = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+
+[build-dependencies]
+prost-build = "0.13"
+tonic-build = "0.12"
+
+[dev-dependencies]
+anyhow = { workspace = true }
+
+[features]
+# Enable gRPC service generation for transport adapters
+grpc = []

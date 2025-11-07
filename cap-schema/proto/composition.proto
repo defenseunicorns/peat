@@ -1,0 +1,117 @@
+// Composition rule definitions for CAP Protocol
+// Version: 1.0.0
+
+syntax = "proto3";
+
+package cap.composition.v1;
+
+import "common.proto";
+import "capability.proto";
+
+// Composition rule types (from ADR-004 and E6 experiments)
+enum CompositionRuleType {
+  COMPOSITION_RULE_TYPE_UNSPECIFIED = 0;
+  COMPOSITION_RULE_TYPE_ADDITIVE = 1;      // Simple aggregation (e.g., multi-sensor fusion)
+  COMPOSITION_RULE_TYPE_EMERGENT = 2;      // New capability emerges (e.g., BLOS relay)
+  COMPOSITION_RULE_TYPE_REDUNDANT = 3;     // Backup/failover (e.g., redundant GPS)
+  COMPOSITION_RULE_TYPE_CONSTRAINT = 4;    // Constraint satisfaction (e.g., min/max members)
+}
+
+// Composition rule definition
+message CompositionRule {
+  // Unique rule identifier
+  string id = 1;
+
+  // Rule name
+  string name = 2;
+
+  // Rule type
+  CompositionRuleType rule_type = 3;
+
+  // Input capabilities required
+  repeated capability.v1.CapabilityType input_capabilities = 4;
+
+  // Output capability produced (for emergent rules)
+  optional capability.v1.Capability output_capability = 5;
+
+  // Minimum number of inputs required
+  uint32 min_inputs = 6;
+
+  // Maximum number of inputs allowed
+  optional uint32 max_inputs = 7;
+
+  // Confidence calculation method
+  enum ConfidenceMethod {
+    CONFIDENCE_METHOD_UNSPECIFIED = 0;
+    CONFIDENCE_METHOD_MIN = 1;        // Minimum of all inputs
+    CONFIDENCE_METHOD_MAX = 2;        // Maximum of all inputs
+    CONFIDENCE_METHOD_AVERAGE = 3;    // Average of all inputs
+    CONFIDENCE_METHOD_PRODUCT = 4;    // Product of all inputs
+    CONFIDENCE_METHOD_CUSTOM = 5;     // Custom calculation (defined in metadata)
+  }
+
+  ConfidenceMethod confidence_method = 8;
+
+  // Rule metadata (JSON-encoded for flexibility)
+  string metadata_json = 9;
+
+  // Rule priority (higher = more important)
+  uint32 priority = 10;
+
+  // Whether this rule is active
+  bool enabled = 11;
+
+  // Timestamp when rule was defined
+  common.v1.Timestamp created_at = 12;
+}
+
+// Composition result after applying rules
+message CompositionResult {
+  // Cell ID this composition applies to
+  string cell_id = 1;
+
+  // Applied rules
+  repeated CompositionRule applied_rules = 2;
+
+  // Input capabilities from cell members
+  repeated capability.v1.Capability input_capabilities = 3;
+
+  // Output capabilities (including emergent)
+  repeated capability.v1.Capability output_capabilities = 4;
+
+  // Overall composition confidence
+  float composition_confidence = 5;
+
+  // Timestamp of composition
+  common.v1.Timestamp composed_at = 6;
+
+  // Whether composition satisfies all constraints
+  bool valid = 7;
+
+  // Validation errors (if any)
+  repeated string validation_errors = 8;
+}
+
+// Composition rule application request
+message ApplyCompositionRequest {
+  // Cell ID to apply rules to
+  string cell_id = 1;
+
+  // Rules to apply (if empty, apply all enabled rules)
+  repeated string rule_ids = 2;
+
+  // Input capabilities (from cell members)
+  repeated capability.v1.Capability input_capabilities = 3;
+}
+
+// Composition rule application response
+message ApplyCompositionResponse {
+  // Composition result
+  CompositionResult result = 1;
+
+  // Success indicator
+  bool success = 2;
+
+  // Error message (if not successful)
+  optional string error_message = 3;
+}
