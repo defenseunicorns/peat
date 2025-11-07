@@ -4,6 +4,7 @@ members = [
     "cap-schema",
     "cap-protocol",
     "cap-transport",
+    "cap-persistence",
     "cap-sim"
 ]
 
