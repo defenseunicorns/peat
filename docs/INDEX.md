@@ -31,6 +31,7 @@ In-depth technical analysis and design explorations.
 | [CAP_Architecture_EventStreaming_vs_DeltaSync.md](CAP_Architecture_EventStreaming_vs_DeltaSync.md) | Event Streaming vs Delta Sync | Evaluates synchronization approaches for distributed state |
 | [human-machine-teaming-design.md](human-machine-teaming-design.md) | Human-Machine Teaming | Design for human-in-the-loop authority and cell composition |
 | [Ditto-SDK-Integration-Notes.md](Ditto-SDK-Integration-Notes.md) | Ditto SDK Integration | Integration notes and patterns for Ditto CRDT mesh |
+| [E8_PROTOBUF_MIGRATION_HANDOFF.md](E8_PROTOBUF_MIGRATION_HANDOFF.md) | Protobuf Migration Guide | E8 simulation team handoff for ADR-012 Phase 5 changes |
 
 ## Project Planning
 
@@ -75,11 +76,12 @@ Comprehensive testing strategy and implementation guides.
 
 ### By Topic
 
-- **Architecture**: ADR-001, ADR-002, ADR-004, ARCHITECTURE-DECISION-SUMMARY.md
+- **Architecture**: ADR-001, ADR-002, ADR-004, ADR-012, ARCHITECTURE-DECISION-SUMMARY.md
 - **Synchronization**: CAP_Architecture_EventStreaming_vs_DeltaSync.md, Ditto-SDK-Integration-Notes.md
 - **Human-Machine Teaming**: ADR-004, human-machine-teaming-design.md
 - **Testing**: TESTING_STRATEGY.md, e2e-cell-formation.md
 - **Project Management**: CAP-POC-Project-Plan.md
+- **Simulation**: E8_PROTOBUF_MIGRATION_HANDOFF.md, E8_PHASE1_SQUAD_TOPOLOGY.md, E8_TOPOLOGY_MODES.md
 
 ## Documentation Conventions
 
@@ -129,6 +131,7 @@ cap/
 - **...how Ditto integration works**: See [Ditto-SDK-Integration-Notes.md](Ditto-SDK-Integration-Notes.md)
 - **...human-machine teaming**: Read [ADR-004](adr/004-human-machine-cell-composition.md)
 - **...cell formation E2E tests**: See [e2e-cell-formation.md](../cap-protocol/docs/testing/e2e-cell-formation.md)
+- **...protobuf migration for simulation**: See [E8_PROTOBUF_MIGRATION_HANDOFF.md](E8_PROTOBUF_MIGRATION_HANDOFF.md)
 
 ### "I'm working on..."
 
@@ -158,6 +161,6 @@ When making significant changes:
 
 ---
 
-**Last Updated**: 2025-10-31
+**Last Updated**: 2025-11-07
 **Maintained By**: CAP Protocol Team
 **Questions?**: Check DEVELOPMENT.md for contribution guidelines
