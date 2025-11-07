@@ -35,6 +35,29 @@ test_mode() {
     local deploy_time=$(($(date +%s) - start_time))
     echo "[$(date +%T)] Deployment complete in ${deploy_time}s"
 
+    # Measure baseline bandwidth using iperf3
+    echo "[$(date +%T)] Measuring baseline bandwidth with iperf3..."
+    local bandwidth_mbps="0"
+    local first_container=$(docker ps --filter "name=clab-cap-" --format "{{.Names}}" | head -1)
+    local second_container=$(docker ps --filter "name=clab-cap-" --format "{{.Names}}" | head -2 | tail -1)
+
+    if [ -n "$first_container" ] && [ -n "$second_container" ]; then
+        # Start iperf3 server in background
+        docker exec -d "$first_container" iperf3 -s -1 > /dev/null 2>&1
+        sleep 1
+
+        # Run iperf3 client and extract bandwidth
+        bandwidth_result=$(docker exec "$second_container" iperf3 -c "$first_container" -t 3 -J 2>/dev/null || echo "{}")
+        bandwidth_mbps=$(echo "$bandwidth_result" | jq -r '.end.sum_received.bits_per_second // 0' 2>/dev/null | awk '{printf "%.2f", $1/1000000}')
+
+        if [ "$bandwidth_mbps" == "0" ] || [ -z "$bandwidth_mbps" ]; then
+            bandwidth_mbps="N/A"
+            echo "  Warning: Could not measure bandwidth"
+        else
+            echo "  Baseline bandwidth: ${bandwidth_mbps} Mbps"
+        fi
+    fi
+
     # Wait for initialization
     echo "[$(date +%T)] Waiting for node initialization (15s)..."
     sleep 15
@@ -65,23 +88,53 @@ test_mode() {
         echo "  $container: $peer_count incoming connections"
     done > "$RESULTS_DIR/${mode_name}_peer_connections.txt"
 
-    # Capture full logs from sample nodes
-    echo "[$(date +%T)] Capturing sample node logs..."
-    for container in $(docker ps --filter "name=clab-cap-" --format "{{.Names}}" | head -3); do
-        docker logs "$container" > "$RESULTS_DIR/${mode_name}_${container##*-}.log" 2>&1
+    # Capture full logs from ALL nodes for metrics analysis
+    echo "[$(date +%T)] Capturing all container logs..."
+    local log_files=""
+    for container in $(docker ps --filter "name=clab-cap-" --format "{{.Names}}"); do
+        local log_file="$RESULTS_DIR/${mode_name}_${container##*-}.log"
+        docker logs "$container" > "$log_file" 2>&1
+        log_files="$log_files $log_file"
     done
+
+    # Analyze metrics using Python script
+    echo "[$(date +%T)] Analyzing performance metrics..."
+    local metrics_json="$RESULTS_DIR/${mode_name}_metrics.json"
+    if python3 "$SCRIPT_DIR/analyze_metrics.py" $log_files > "$metrics_json" 2>/dev/null; then
+        echo "  ✓ Metrics analysis complete"
+
+        # Extract key metrics for summary
+        local convergence_ms=$(jq -r '.convergence.convergence_time_ms // 0' "$metrics_json" 2>/dev/null | awk '{printf "%.2f", $1}')
+        local latency_mean=$(jq -r '.latency.mean // 0' "$metrics_json" 2>/dev/null | awk '{printf "%.2f", $1}')
+        local latency_p90=$(jq -r '.latency.p90 // 0' "$metrics_json" 2>/dev/null | awk '{printf "%.2f", $1}')
+        local latency_p99=$(jq -r '.latency.p99 // 0' "$metrics_json" 2>/dev/null | awk '{printf "%.2f", $1}')
+
+        echo "  Convergence time: ${convergence_ms}ms"
+        echo "  Latency: mean=${latency_mean}ms, p90=${latency_p90}ms, p99=${latency_p99}ms"
+    else
+        echo "  Warning: Metrics analysis failed"
+        convergence_ms="N/A"
+        latency_mean="N/A"
+        latency_p90="N/A"
+        latency_p99="N/A"
+    fi
 
     # Calculate test duration
     local total_time=$(($(date +%s) - start_time))
     echo "[$(date +%T)] Test complete in ${total_time}s"
 
-    # Save summary
+    # Save summary with quantitative metrics
     cat > "$RESULTS_DIR/${mode_name}_summary.txt" <<EOF
 Mode: $mode_name
 Topology: $topology_file
 Deploy Time: ${deploy_time}s
 Total Test Time: ${total_time}s
 Nodes Deployed: $node_count
+Bandwidth: ${bandwidth_mbps} Mbps
+Convergence Time: ${convergence_ms}ms
+Latency Mean: ${latency_mean}ms
+Latency P90: ${latency_p90}ms
+Latency P99: ${latency_p99}ms
 Timestamp: $(date)
 EOF
 
@@ -168,6 +221,21 @@ cat >> "$RESULTS_DIR/SUMMARY.md" <<EOF
 | Total Test Time | $(grep "Total Test Time:" "$RESULTS_DIR/mode1-client-server_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Total Test Time:" "$RESULTS_DIR/mode2-hub-spoke_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Total Test Time:" "$RESULTS_DIR/mode3-dynamic-mesh_summary.txt" | cut -d: -f2 | tr -d ' ') |
 | Nodes Deployed | $(grep "Nodes Deployed:" "$RESULTS_DIR/mode1-client-server_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Nodes Deployed:" "$RESULTS_DIR/mode2-hub-spoke_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Nodes Deployed:" "$RESULTS_DIR/mode3-dynamic-mesh_summary.txt" | cut -d: -f2 | tr -d ' ') |
 | Sync Success | $(grep -c "✓.*SYNCED" "$RESULTS_DIR/mode1-client-server_sync_status.txt")/12 | $(grep -c "✓.*SYNCED" "$RESULTS_DIR/mode2-hub-spoke_sync_status.txt")/12 | $(grep -c "✓.*SYNCED" "$RESULTS_DIR/mode3-dynamic-mesh_sync_status.txt")/12 |
+
+### Network Performance
+
+| Metric | Mode 1 | Mode 2 | Mode 3 |
+|--------|--------|--------|--------|
+| Baseline Bandwidth | $(grep "Bandwidth:" "$RESULTS_DIR/mode1-client-server_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Bandwidth:" "$RESULTS_DIR/mode2-hub-spoke_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Bandwidth:" "$RESULTS_DIR/mode3-dynamic-mesh_summary.txt" | cut -d: -f2 | tr -d ' ') |
+| Convergence Time | $(grep "Convergence Time:" "$RESULTS_DIR/mode1-client-server_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Convergence Time:" "$RESULTS_DIR/mode2-hub-spoke_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Convergence Time:" "$RESULTS_DIR/mode3-dynamic-mesh_summary.txt" | cut -d: -f2 | tr -d ' ') |
+
+### Latency Distribution
+
+| Metric | Mode 1 | Mode 2 | Mode 3 |
+|--------|--------|--------|--------|
+| Mean Latency | $(grep "Latency Mean:" "$RESULTS_DIR/mode1-client-server_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Latency Mean:" "$RESULTS_DIR/mode2-hub-spoke_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Latency Mean:" "$RESULTS_DIR/mode3-dynamic-mesh_summary.txt" | cut -d: -f2 | tr -d ' ') |
+| P90 Latency | $(grep "Latency P90:" "$RESULTS_DIR/mode1-client-server_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Latency P90:" "$RESULTS_DIR/mode2-hub-spoke_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Latency P90:" "$RESULTS_DIR/mode3-dynamic-mesh_summary.txt" | cut -d: -f2 | tr -d ' ') |
+| P99 Latency | $(grep "Latency P99:" "$RESULTS_DIR/mode1-client-server_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Latency P99:" "$RESULTS_DIR/mode2-hub-spoke_summary.txt" | cut -d: -f2 | tr -d ' ') | $(grep "Latency P99:" "$RESULTS_DIR/mode3-dynamic-mesh_summary.txt" | cut -d: -f2 | tr -d ' ') |
 
 ### Connection Analysis
 

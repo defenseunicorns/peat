@@ -51,7 +51,7 @@ use cap_protocol::sync::ditto::DittoBackend;
 use cap_protocol::sync::{BackendConfig, DataSyncBackend, Document, Query, TransportConfig, Value};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::time::sleep;
 
 /// Test document structure
@@ -59,7 +59,26 @@ use tokio::time::sleep;
 struct TestDoc {
     id: String,
     message: String,
-    timestamp: u64,
+    timestamp: u64,  // Unix timestamp in microseconds
+}
+
+/// Metrics event for JSON logging
+#[derive(Debug, serde::Serialize)]
+#[serde(tag = "event_type")]
+enum MetricsEvent {
+    DocumentInserted {
+        node_id: String,
+        doc_id: String,
+        timestamp_us: u128,  // Unix timestamp in microseconds
+    },
+    DocumentReceived {
+        node_id: String,
+        doc_id: String,
+        inserted_at_us: u128,  // From document
+        received_at_us: u128,  // Local time
+        latency_us: u128,      // Difference
+        latency_ms: f64,
+    },
 }
 
 #[tokio::main]
@@ -179,6 +198,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
+/// Get current Unix timestamp in microseconds
+fn now_micros() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_micros()
+}
+
+/// Log metrics event as JSON to stderr (for parsing)
+fn log_metrics(event: &MetricsEvent) {
+    if let Ok(json) = serde_json::to_string(event) {
+        eprintln!("METRICS: {}", json);
+    }
+}
+
 /// Create a backend instance based on type
 fn create_backend(
     backend_type: &str,
@@ -252,13 +286,15 @@ async fn writer_mode(
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("[{}] === WRITER MODE ===", node_id);
 
+    // Capture high-precision timestamp
+    let timestamp_us = now_micros();
+    let doc_id = "sim_test_001".to_string();
+
     // Create test document
     let doc = TestDoc {
-        id: "sim_test_001".to_string(),
+        id: doc_id.clone(),
         message: "Hello from CAP Simulation!".to_string(),
-        timestamp: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)?
-            .as_secs(),
+        timestamp: timestamp_us as u64,  // Store timestamp in microseconds
     };
 
     println!("[{}] Creating test document: {:?}", node_id, doc);
@@ -266,7 +302,7 @@ async fn writer_mode(
     // Convert to Document
     let mut fields = HashMap::new();
     fields.insert("message".to_string(), Value::String(doc.message.clone()));
-    fields.insert("timestamp".to_string(), Value::Number(doc.timestamp.into()));
+    fields.insert("timestamp_us".to_string(), serde_json::json!(timestamp_us));
     fields.insert("created_by".to_string(), Value::String(node_id.to_string()));
 
     let document = Document::with_id(doc.id, fields);
@@ -275,6 +311,13 @@ async fn writer_mode(
     backend.document_store().upsert("sim_poc", document).await?;
 
     println!("[{}] ✓ Document inserted", node_id);
+
+    // Log metrics for analysis
+    log_metrics(&MetricsEvent::DocumentInserted {
+        node_id: node_id.to_string(),
+        doc_id: doc_id.clone(),
+        timestamp_us,
+    });
 
     // Wait for sync to propagate
     println!("[{}] Waiting for sync propagation (10s)...", node_id);
@@ -314,13 +357,51 @@ async fn reader_mode(
         let docs = backend.document_store().query("sim_poc", &query).await?;
 
         if let Some(doc) = docs.first() {
+            // Capture received timestamp immediately
+            let received_at_us = now_micros();
             println!("[{}] ✓ Document received!", node_id);
+
+            // Extract insert timestamp from document
+            let inserted_at_us = if let Some(ts_value) = doc.get("timestamp_us") {
+                if let Some(ts) = ts_value.as_u64() {
+                    ts as u128
+                } else if let Some(ts) = ts_value.as_i64() {
+                    ts as u128
+                } else {
+                    eprintln!("[{}] ⚠ Warning: timestamp_us is not a number", node_id);
+                    0
+                }
+            } else {
+                eprintln!("[{}] ⚠ Warning: No timestamp_us found in document", node_id);
+                0
+            };
+
+            // Calculate latency
+            let latency_us = if inserted_at_us > 0 {
+                received_at_us.saturating_sub(inserted_at_us)
+            } else {
+                0
+            };
+            let latency_ms = latency_us as f64 / 1000.0;
 
             // Verify document contents
             if let Some(Value::String(message)) = doc.get("message") {
                 println!("[{}] Message: {}", node_id, message);
+                println!("[{}] Latency: {:.3}ms", node_id, latency_ms);
+
                 if message == "Hello from CAP Simulation!" {
                     println!("[{}] ✓ Document content verified", node_id);
+
+                    // Log metrics for analysis
+                    log_metrics(&MetricsEvent::DocumentReceived {
+                        node_id: node_id.to_string(),
+                        doc_id: "sim_test_001".to_string(),
+                        inserted_at_us,
+                        received_at_us,
+                        latency_us,
+                        latency_ms,
+                    });
+
                     return Ok(());
                 }
             }
