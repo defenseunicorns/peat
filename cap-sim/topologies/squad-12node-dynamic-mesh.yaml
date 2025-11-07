@@ -27,7 +27,7 @@ topology:
         PLATFORM_TYPE: soldier
         MODE: writer
         TCP_LISTEN: "12345"
-        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:123410,soldier-7:123411,soldier-8:123412,soldier-9:123413,ugv-1:12354,uav-1:12355,uav-2:12356"
+        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:12350,soldier-7:12351,soldier-8:12352,soldier-9:12353,ugv-1:12354,uav-1:12355,uav-2:12356"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
@@ -41,7 +41,7 @@ topology:
         PLATFORM_TYPE: soldier
         MODE: reader
         TCP_LISTEN: "12346"
-        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:123410,soldier-7:123411,soldier-8:123412,soldier-9:123413,ugv-1:12354,uav-1:12355,uav-2:12356"
+        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:12350,soldier-7:12351,soldier-8:12352,soldier-9:12353,ugv-1:12354,uav-1:12355,uav-2:12356"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
@@ -55,7 +55,7 @@ topology:
         PLATFORM_TYPE: soldier
         MODE: reader
         TCP_LISTEN: "12347"
-        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:123410,soldier-7:123411,soldier-8:123412,soldier-9:123413,ugv-1:12354,uav-1:12355,uav-2:12356"
+        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:12350,soldier-7:12351,soldier-8:12352,soldier-9:12353,ugv-1:12354,uav-1:12355,uav-2:12356"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
@@ -69,7 +69,7 @@ topology:
         PLATFORM_TYPE: soldier
         MODE: reader
         TCP_LISTEN: "12348"
-        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:123410,soldier-7:123411,soldier-8:123412,soldier-9:123413,ugv-1:12354,uav-1:12355,uav-2:12356"
+        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:12350,soldier-7:12351,soldier-8:12352,soldier-9:12353,ugv-1:12354,uav-1:12355,uav-2:12356"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
@@ -83,7 +83,7 @@ topology:
         PLATFORM_TYPE: soldier
         MODE: reader
         TCP_LISTEN: "12349"
-        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:123410,soldier-7:123411,soldier-8:123412,soldier-9:123413,ugv-1:12354,uav-1:12355,uav-2:12356"
+        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:12350,soldier-7:12351,soldier-8:12352,soldier-9:12353,ugv-1:12354,uav-1:12355,uav-2:12356"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
@@ -97,7 +97,7 @@ topology:
         PLATFORM_TYPE: soldier
         MODE: reader
         TCP_LISTEN: "12350"
-        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:123410,soldier-7:123411,soldier-8:123412,soldier-9:123413,ugv-1:12354,uav-1:12355,uav-2:12356"
+        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:12350,soldier-7:12351,soldier-8:12352,soldier-9:12353,ugv-1:12354,uav-1:12355,uav-2:12356"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
@@ -111,7 +111,7 @@ topology:
         PLATFORM_TYPE: soldier
         MODE: reader
         TCP_LISTEN: "12351"
-        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:123410,soldier-7:123411,soldier-8:123412,soldier-9:123413,ugv-1:12354,uav-1:12355,uav-2:12356"
+        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:12350,soldier-7:12351,soldier-8:12352,soldier-9:12353,ugv-1:12354,uav-1:12355,uav-2:12356"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
@@ -125,7 +125,7 @@ topology:
         PLATFORM_TYPE: soldier
         MODE: reader
         TCP_LISTEN: "12352"
-        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:123410,soldier-7:123411,soldier-8:123412,soldier-9:123413,ugv-1:12354,uav-1:12355,uav-2:12356"
+        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:12350,soldier-7:12351,soldier-8:12352,soldier-9:12353,ugv-1:12354,uav-1:12355,uav-2:12356"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
@@ -139,7 +139,7 @@ topology:
         PLATFORM_TYPE: soldier
         MODE: reader
         TCP_LISTEN: "12353"
-        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:123410,soldier-7:123411,soldier-8:123412,soldier-9:123413,ugv-1:12354,uav-1:12355,uav-2:12356"
+        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:12350,soldier-7:12351,soldier-8:12352,soldier-9:12353,ugv-1:12354,uav-1:12355,uav-2:12356"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
@@ -153,7 +153,7 @@ topology:
         PLATFORM_TYPE: ugv
         MODE: reader
         TCP_LISTEN: "12354"
-        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:123410,soldier-7:123411,soldier-8:123412,soldier-9:123413,ugv-1:12354,uav-1:12355,uav-2:12356"
+        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:12350,soldier-7:12351,soldier-8:12352,soldier-9:12353,ugv-1:12354,uav-1:12355,uav-2:12356"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
@@ -167,7 +167,7 @@ topology:
         PLATFORM_TYPE: uav
         MODE: reader
         TCP_LISTEN: "12355"
-        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:123410,soldier-7:123411,soldier-8:123412,soldier-9:123413,ugv-1:12354,uav-1:12355,uav-2:12356"
+        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:12350,soldier-7:12351,soldier-8:12352,soldier-9:12353,ugv-1:12354,uav-1:12355,uav-2:12356"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
@@ -181,7 +181,7 @@ topology:
         PLATFORM_TYPE: uav
         MODE: reader
         TCP_LISTEN: "12356"
-        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:123410,soldier-7:123411,soldier-8:123412,soldier-9:123413,ugv-1:12354,uav-1:12355,uav-2:12356"
+        TCP_CONNECT: "soldier-1:12345,soldier-2:12346,soldier-3:12347,soldier-4:12348,soldier-5:12349,soldier-6:12350,soldier-7:12351,soldier-8:12352,soldier-9:12353,ugv-1:12354,uav-1:12355,uav-2:12356"
         DITTO_APP_ID: ${DITTO_APP_ID}
         DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
         DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}

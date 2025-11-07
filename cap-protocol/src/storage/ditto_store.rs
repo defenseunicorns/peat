@@ -171,9 +171,15 @@ impl DittoStore {
                 }
 
                 // Configure TCP client connection if specified
-                if let Some(ref address) = config.tcp_connect_address {
-                    transport_config.connect.tcp_servers.insert(address.clone());
-                    debug!("TCP client will connect to: {}", address);
+                // Support comma-separated list of addresses for multi-peer connectivity
+                if let Some(ref addresses) = config.tcp_connect_address {
+                    for address in addresses.split(',') {
+                        let address = address.trim();
+                        if !address.is_empty() {
+                            transport_config.connect.tcp_servers.insert(address.to_string());
+                            debug!("TCP client will connect to: {}", address);
+                        }
+                    }
                 }
             } else {
                 // No explicit TCP - use mDNS/LAN for peer discovery

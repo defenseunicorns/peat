@@ -239,7 +239,7 @@ def generate_mode3_dynamic_mesh():
     """Mode 3: All nodes know all peers, Ditto forms mesh dynamically"""
 
     # Build peer list (all nodes)
-    all_peers = [f"soldier-{i}:1234{4+i}" for i in range(1, 10)]
+    all_peers = [f"soldier-{i}:{12344 + i}" for i in range(1, 10)]
     all_peers.extend(["ugv-1:12354", "uav-1:12355", "uav-2:12356"])
     peer_string = ",".join(all_peers)
 
