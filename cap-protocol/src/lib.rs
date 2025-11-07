@@ -8,7 +8,6 @@
 //! - **Three-phase protocol**: Discovery, Cell Formation, Hierarchical Operations
 //! - **CRDT-based state**: Eventual consistency via Ditto SDK
 //! - **Capability composition**: Additive, emergent, redundant, and constraint-based patterns
-//! - **Differential updates**: Bandwidth-efficient delta propagation
 //!
 //! ## Architecture
 //!
@@ -22,7 +21,6 @@
 
 pub mod cell;
 pub mod composition;
-pub mod delta;
 pub mod discovery;
 pub mod error;
 pub mod hierarchy;
