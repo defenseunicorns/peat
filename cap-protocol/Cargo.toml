@@ -7,6 +7,9 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+# CAP dependencies
+cap-schema = { path = "../cap-schema" }
+
 dittolive-ditto = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }

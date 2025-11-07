@@ -10,9 +10,10 @@
 
 use crate::composition::rules::{CompositionContext, CompositionResult, CompositionRule};
 use crate::models::capability::{Capability, CapabilityType};
+use crate::models::CapabilityExt;
 use crate::Result;
 use async_trait::async_trait;
-use serde_json::json;
+use serde_json::{json, Value};
 
 /// Rule for determining team speed constraint
 ///
@@ -50,8 +51,11 @@ impl CompositionRule for TeamSpeedConstraintRule {
         let mobility_count = capabilities
             .iter()
             .filter(|c| {
-                c.capability_type == CapabilityType::Mobility
-                    && c.metadata.get("max_speed").is_some()
+                c.get_capability_type() == CapabilityType::Mobility
+                    && serde_json::from_str::<Value>(&c.metadata_json)
+                        .ok()
+                        .and_then(|v| v.get("max_speed").cloned())
+                        .is_some()
             })
             .count();
 
@@ -66,8 +70,11 @@ impl CompositionRule for TeamSpeedConstraintRule {
         let mobility_caps: Vec<&Capability> = capabilities
             .iter()
             .filter(|c| {
-                c.capability_type == CapabilityType::Mobility
-                    && c.metadata.get("max_speed").is_some()
+                c.get_capability_type() == CapabilityType::Mobility
+                    && serde_json::from_str::<Value>(&c.metadata_json)
+                        .ok()
+                        .and_then(|v| v.get("max_speed").cloned())
+                        .is_some()
             })
             .collect();
 
@@ -78,7 +85,11 @@ impl CompositionRule for TeamSpeedConstraintRule {
         // Find minimum speed (slowest member)
         let speeds: Vec<f64> = mobility_caps
             .iter()
-            .filter_map(|c| c.metadata.get("max_speed").and_then(|v| v.as_f64()))
+            .filter_map(|c| {
+                serde_json::from_str::<Value>(&c.metadata_json)
+                    .ok()
+                    .and_then(|v| v.get("max_speed").and_then(|s| s.as_f64()))
+            })
             .collect();
 
         let team_speed = speeds.iter().cloned().fold(f64::INFINITY, f64::min);
@@ -87,15 +98,13 @@ impl CompositionRule for TeamSpeedConstraintRule {
         let slowest = mobility_caps
             .iter()
             .min_by(|a, b| {
-                let speed_a = a
-                    .metadata
-                    .get("max_speed")
-                    .and_then(|v| v.as_f64())
+                let speed_a = serde_json::from_str::<Value>(&a.metadata_json)
+                    .ok()
+                    .and_then(|v| v.get("max_speed").and_then(|s| s.as_f64()))
                     .unwrap_or(0.0);
-                let speed_b = b
-                    .metadata
-                    .get("max_speed")
-                    .and_then(|v| v.as_f64())
+                let speed_b = serde_json::from_str::<Value>(&b.metadata_json)
+                    .ok()
+                    .and_then(|v| v.get("max_speed").and_then(|s| s.as_f64()))
                     .unwrap_or(0.0);
                 speed_a.partial_cmp(&speed_b).unwrap()
             })
@@ -104,21 +113,22 @@ impl CompositionRule for TeamSpeedConstraintRule {
         // Confidence is based on slowest member's confidence
         let team_confidence = slowest.confidence;
 
-        let composed = Capability {
-            id: format!("constraint_team_speed_{}", uuid::Uuid::new_v4()),
-            name: "Team Speed".to_string(),
-            capability_type: CapabilityType::Emergent,
-            confidence: team_confidence,
-            metadata: json!({
-                "composition_type": "constraint",
-                "pattern": "team_speed",
-                "team_speed": team_speed,
-                "platform_count": mobility_caps.len(),
-                "limiting_platform": slowest.id,
-                "individual_speeds": speeds,
-                "description": "Team movement speed constrained by slowest member"
-            }),
-        };
+        let mut composed = Capability::new(
+            format!("constraint_team_speed_{}", uuid::Uuid::new_v4()),
+            "Team Speed".to_string(),
+            CapabilityType::Emergent,
+            team_confidence,
+        );
+        composed.metadata_json = serde_json::to_string(&json!({
+            "composition_type": "constraint",
+            "pattern": "team_speed",
+            "team_speed": team_speed,
+            "platform_count": mobility_caps.len(),
+            "limiting_platform": slowest.id,
+            "individual_speeds": speeds,
+            "description": "Team movement speed constrained by slowest member"
+        }))
+        .unwrap_or_default();
 
         let contributor_ids: Vec<String> = mobility_caps.iter().map(|c| c.id.clone()).collect();
 
@@ -169,8 +179,11 @@ impl CompositionRule for CommunicationRangeConstraintRule {
         let comm_count = capabilities
             .iter()
             .filter(|c| {
-                c.capability_type == CapabilityType::Communication
-                    && c.metadata.get("range").is_some()
+                c.get_capability_type() == CapabilityType::Communication
+                    && serde_json::from_str::<Value>(&c.metadata_json)
+                        .ok()
+                        .and_then(|v| v.get("range").cloned())
+                        .is_some()
             })
             .count();
 
@@ -185,8 +198,11 @@ impl CompositionRule for CommunicationRangeConstraintRule {
         let comm_caps: Vec<&Capability> = capabilities
             .iter()
             .filter(|c| {
-                c.capability_type == CapabilityType::Communication
-                    && c.metadata.get("range").is_some()
+                c.get_capability_type() == CapabilityType::Communication
+                    && serde_json::from_str::<Value>(&c.metadata_json)
+                        .ok()
+                        .and_then(|v| v.get("range").cloned())
+                        .is_some()
             })
             .collect();
 
@@ -197,7 +213,11 @@ impl CompositionRule for CommunicationRangeConstraintRule {
         // Get communication ranges
         let ranges: Vec<f64> = comm_caps
             .iter()
-            .filter_map(|c| c.metadata.get("range").and_then(|v| v.as_f64()))
+            .filter_map(|c| {
+                serde_json::from_str::<Value>(&c.metadata_json)
+                    .ok()
+                    .and_then(|v| v.get("range").and_then(|r| r.as_f64()))
+            })
             .collect();
 
         // Determine effective range based on mesh capability
@@ -216,15 +236,13 @@ impl CompositionRule for CommunicationRangeConstraintRule {
             comm_caps
                 .iter()
                 .max_by(|a, b| {
-                    let range_a = a
-                        .metadata
-                        .get("range")
-                        .and_then(|v| v.as_f64())
+                    let range_a = serde_json::from_str::<Value>(&a.metadata_json)
+                        .ok()
+                        .and_then(|v| v.get("range").and_then(|r| r.as_f64()))
                         .unwrap_or(0.0);
-                    let range_b = b
-                        .metadata
-                        .get("range")
-                        .and_then(|v| v.as_f64())
+                    let range_b = serde_json::from_str::<Value>(&b.metadata_json)
+                        .ok()
+                        .and_then(|v| v.get("range").and_then(|r| r.as_f64()))
                         .unwrap_or(0.0);
                     range_a.partial_cmp(&range_b).unwrap()
                 })
@@ -233,15 +251,13 @@ impl CompositionRule for CommunicationRangeConstraintRule {
             comm_caps
                 .iter()
                 .min_by(|a, b| {
-                    let range_a = a
-                        .metadata
-                        .get("range")
-                        .and_then(|v| v.as_f64())
+                    let range_a = serde_json::from_str::<Value>(&a.metadata_json)
+                        .ok()
+                        .and_then(|v| v.get("range").and_then(|r| r.as_f64()))
                         .unwrap_or(0.0);
-                    let range_b = b
-                        .metadata
-                        .get("range")
-                        .and_then(|v| v.as_f64())
+                    let range_b = serde_json::from_str::<Value>(&b.metadata_json)
+                        .ok()
+                        .and_then(|v| v.get("range").and_then(|r| r.as_f64()))
                         .unwrap_or(0.0);
                     range_a.partial_cmp(&range_b).unwrap()
                 })
@@ -252,27 +268,28 @@ impl CompositionRule for CommunicationRangeConstraintRule {
         let avg_confidence: f32 =
             comm_caps.iter().map(|c| c.confidence).sum::<f32>() / comm_caps.len() as f32;
 
-        let composed = Capability {
-            id: format!("constraint_comm_range_{}", uuid::Uuid::new_v4()),
-            name: "Team Communication Range".to_string(),
-            capability_type: CapabilityType::Emergent,
-            confidence: avg_confidence,
-            metadata: json!({
-                "composition_type": "constraint",
-                "pattern": "communication_range",
-                "effective_range": effective_range,
-                "mesh_enabled": self.has_mesh,
-                "limiting_factor": limiting_factor,
-                "limiting_node": limiting_node.id,
-                "node_count": comm_caps.len(),
-                "individual_ranges": ranges,
-                "description": if self.has_mesh {
-                    "Extended range through mesh networking"
-                } else {
-                    "Range constrained by weakest link"
-                }
-            }),
-        };
+        let mut composed = Capability::new(
+            format!("constraint_comm_range_{}", uuid::Uuid::new_v4()),
+            "Team Communication Range".to_string(),
+            CapabilityType::Emergent,
+            avg_confidence,
+        );
+        composed.metadata_json = serde_json::to_string(&json!({
+            "composition_type": "constraint",
+            "pattern": "communication_range",
+            "effective_range": effective_range,
+            "mesh_enabled": self.has_mesh,
+            "limiting_factor": limiting_factor,
+            "limiting_node": limiting_node.id,
+            "node_count": comm_caps.len(),
+            "individual_ranges": ranges,
+            "description": if self.has_mesh {
+                "Extended range through mesh networking"
+            } else {
+                "Range constrained by weakest link"
+            }
+        }))
+        .unwrap_or_default();
 
         let contributor_ids: Vec<String> = comm_caps.iter().map(|c| c.id.clone()).collect();
 
@@ -316,7 +333,12 @@ impl CompositionRule for MissionDurationConstraintRule {
     fn applies_to(&self, capabilities: &[Capability]) -> bool {
         let platforms_with_endurance = capabilities
             .iter()
-            .filter(|c| c.metadata.get("endurance_minutes").is_some())
+            .filter(|c| {
+                serde_json::from_str::<Value>(&c.metadata_json)
+                    .ok()
+                    .and_then(|v| v.get("endurance_minutes").cloned())
+                    .is_some()
+            })
             .count();
 
         platforms_with_endurance >= self.min_platforms
@@ -329,7 +351,12 @@ impl CompositionRule for MissionDurationConstraintRule {
     ) -> Result<CompositionResult> {
         let platforms: Vec<&Capability> = capabilities
             .iter()
-            .filter(|c| c.metadata.get("endurance_minutes").is_some())
+            .filter(|c| {
+                serde_json::from_str::<Value>(&c.metadata_json)
+                    .ok()
+                    .and_then(|v| v.get("endurance_minutes").cloned())
+                    .is_some()
+            })
             .collect();
 
         if platforms.len() < self.min_platforms {
@@ -339,7 +366,11 @@ impl CompositionRule for MissionDurationConstraintRule {
         // Get endurance values
         let endurances: Vec<f64> = platforms
             .iter()
-            .filter_map(|c| c.metadata.get("endurance_minutes").and_then(|v| v.as_f64()))
+            .filter_map(|c| {
+                serde_json::from_str::<Value>(&c.metadata_json)
+                    .ok()
+                    .and_then(|v| v.get("endurance_minutes").and_then(|e| e.as_f64()))
+            })
             .collect();
 
         // Mission duration is limited by shortest endurance
@@ -349,15 +380,13 @@ impl CompositionRule for MissionDurationConstraintRule {
         let limiting_platform = platforms
             .iter()
             .min_by(|a, b| {
-                let endurance_a = a
-                    .metadata
-                    .get("endurance_minutes")
-                    .and_then(|v| v.as_f64())
+                let endurance_a = serde_json::from_str::<Value>(&a.metadata_json)
+                    .ok()
+                    .and_then(|v| v.get("endurance_minutes").and_then(|e| e.as_f64()))
                     .unwrap_or(0.0);
-                let endurance_b = b
-                    .metadata
-                    .get("endurance_minutes")
-                    .and_then(|v| v.as_f64())
+                let endurance_b = serde_json::from_str::<Value>(&b.metadata_json)
+                    .ok()
+                    .and_then(|v| v.get("endurance_minutes").and_then(|e| e.as_f64()))
                     .unwrap_or(0.0);
                 endurance_a.partial_cmp(&endurance_b).unwrap()
             })
@@ -366,21 +395,22 @@ impl CompositionRule for MissionDurationConstraintRule {
         // Confidence based on limiting platform
         let mission_confidence = limiting_platform.confidence;
 
-        let composed = Capability {
-            id: format!("constraint_mission_duration_{}", uuid::Uuid::new_v4()),
-            name: "Team Mission Duration".to_string(),
-            capability_type: CapabilityType::Emergent,
-            confidence: mission_confidence,
-            metadata: json!({
-                "composition_type": "constraint",
-                "pattern": "mission_duration",
-                "mission_duration_minutes": mission_duration,
-                "platform_count": platforms.len(),
-                "limiting_platform": limiting_platform.id,
-                "individual_endurances": endurances,
-                "description": "Mission duration constrained by shortest endurance"
-            }),
-        };
+        let mut composed = Capability::new(
+            format!("constraint_mission_duration_{}", uuid::Uuid::new_v4()),
+            "Team Mission Duration".to_string(),
+            CapabilityType::Emergent,
+            mission_confidence,
+        );
+        composed.metadata_json = serde_json::to_string(&json!({
+            "composition_type": "constraint",
+            "pattern": "mission_duration",
+            "mission_duration_minutes": mission_duration,
+            "platform_count": platforms.len(),
+            "limiting_platform": limiting_platform.id,
+            "individual_endurances": endurances,
+            "description": "Mission duration constrained by shortest endurance"
+        }))
+        .unwrap_or_default();
 
         let contributor_ids: Vec<String> = platforms.iter().map(|c| c.id.clone()).collect();
 
@@ -398,21 +428,23 @@ mod tests {
     async fn test_team_speed_constraint() {
         let rule = TeamSpeedConstraintRule::default();
 
-        let fast_platform = Capability {
-            id: "fast1".to_string(),
-            name: "Fast Drone".to_string(),
-            capability_type: CapabilityType::Mobility,
-            confidence: 0.9,
-            metadata: json!({"max_speed": 20.0}), // 20 m/s
-        };
+        let mut fast_platform = Capability::new(
+            "fast1".to_string(),
+            "Fast Drone".to_string(),
+            CapabilityType::Mobility,
+            0.9,
+        );
+        fast_platform.metadata_json =
+            serde_json::to_string(&json!({"max_speed": 20.0})).unwrap_or_default();
 
-        let slow_platform = Capability {
-            id: "slow1".to_string(),
-            name: "Slow Ground Vehicle".to_string(),
-            capability_type: CapabilityType::Mobility,
-            confidence: 0.85,
-            metadata: json!({"max_speed": 5.0}), // 5 m/s
-        };
+        let mut slow_platform = Capability::new(
+            "slow1".to_string(),
+            "Slow Ground Vehicle".to_string(),
+            CapabilityType::Mobility,
+            0.85,
+        );
+        slow_platform.metadata_json =
+            serde_json::to_string(&json!({"max_speed": 5.0})).unwrap_or_default();
 
         let caps = vec![fast_platform, slow_platform];
         let context = CompositionContext::new(vec!["node1".to_string(), "node2".to_string()]);
@@ -425,11 +457,9 @@ mod tests {
         let composed = &result.composed_capabilities[0];
         assert_eq!(composed.name, "Team Speed");
         // Team speed should be limited by slowest member (5.0 m/s)
-        assert_eq!(composed.metadata["team_speed"].as_f64().unwrap(), 5.0);
-        assert_eq!(
-            composed.metadata["limiting_platform"].as_str().unwrap(),
-            "slow1"
-        );
+        let metadata: Value = serde_json::from_str(&composed.metadata_json).unwrap();
+        assert_eq!(metadata["team_speed"].as_f64().unwrap(), 5.0);
+        assert_eq!(metadata["limiting_platform"].as_str().unwrap(), "slow1");
         // Confidence should match slowest member
         assert_eq!(composed.confidence, 0.85);
     }
@@ -438,21 +468,23 @@ mod tests {
     async fn test_communication_range_without_mesh() {
         let rule = CommunicationRangeConstraintRule::new(2, false); // No mesh
 
-        let long_range = Capability {
-            id: "comm1".to_string(),
-            name: "Long Range Radio".to_string(),
-            capability_type: CapabilityType::Communication,
-            confidence: 0.9,
-            metadata: json!({"range": 1000.0}), // 1km
-        };
+        let mut long_range = Capability::new(
+            "comm1".to_string(),
+            "Long Range Radio".to_string(),
+            CapabilityType::Communication,
+            0.9,
+        );
+        long_range.metadata_json =
+            serde_json::to_string(&json!({"range": 1000.0})).unwrap_or_default();
 
-        let short_range = Capability {
-            id: "comm2".to_string(),
-            name: "Short Range Radio".to_string(),
-            capability_type: CapabilityType::Communication,
-            confidence: 0.85,
-            metadata: json!({"range": 200.0}), // 200m
-        };
+        let mut short_range = Capability::new(
+            "comm2".to_string(),
+            "Short Range Radio".to_string(),
+            CapabilityType::Communication,
+            0.85,
+        );
+        short_range.metadata_json =
+            serde_json::to_string(&json!({"range": 200.0})).unwrap_or_default();
 
         let caps = vec![long_range, short_range];
         let context = CompositionContext::new(vec!["node1".to_string(), "node2".to_string()]);
@@ -462,36 +494,33 @@ mod tests {
 
         let composed = &result.composed_capabilities[0];
         // Without mesh, range is limited by weakest link (200m)
-        assert_eq!(
-            composed.metadata["effective_range"].as_f64().unwrap(),
-            200.0
-        );
-        assert!(!composed.metadata["mesh_enabled"].as_bool().unwrap());
-        assert_eq!(
-            composed.metadata["limiting_node"].as_str().unwrap(),
-            "comm2"
-        );
+        let metadata: Value = serde_json::from_str(&composed.metadata_json).unwrap();
+        assert_eq!(metadata["effective_range"].as_f64().unwrap(), 200.0);
+        assert!(!metadata["mesh_enabled"].as_bool().unwrap());
+        assert_eq!(metadata["limiting_node"].as_str().unwrap(), "comm2");
     }
 
     #[tokio::test]
     async fn test_communication_range_with_mesh() {
         let rule = CommunicationRangeConstraintRule::new(2, true); // With mesh
 
-        let long_range = Capability {
-            id: "comm1".to_string(),
-            name: "Long Range Radio".to_string(),
-            capability_type: CapabilityType::Communication,
-            confidence: 0.9,
-            metadata: json!({"range": 1000.0}),
-        };
+        let mut long_range = Capability::new(
+            "comm1".to_string(),
+            "Long Range Radio".to_string(),
+            CapabilityType::Communication,
+            0.9,
+        );
+        long_range.metadata_json =
+            serde_json::to_string(&json!({"range": 1000.0})).unwrap_or_default();
 
-        let short_range = Capability {
-            id: "comm2".to_string(),
-            name: "Short Range Radio".to_string(),
-            capability_type: CapabilityType::Communication,
-            confidence: 0.85,
-            metadata: json!({"range": 200.0}),
-        };
+        let mut short_range = Capability::new(
+            "comm2".to_string(),
+            "Short Range Radio".to_string(),
+            CapabilityType::Communication,
+            0.85,
+        );
+        short_range.metadata_json =
+            serde_json::to_string(&json!({"range": 200.0})).unwrap_or_default();
 
         let caps = vec![long_range, short_range];
         let context = CompositionContext::new(vec!["node1".to_string(), "node2".to_string()]);
@@ -501,36 +530,33 @@ mod tests {
 
         let composed = &result.composed_capabilities[0];
         // With mesh, can use maximum range (1000m)
-        assert_eq!(
-            composed.metadata["effective_range"].as_f64().unwrap(),
-            1000.0
-        );
-        assert!(composed.metadata["mesh_enabled"].as_bool().unwrap());
-        assert_eq!(
-            composed.metadata["limiting_node"].as_str().unwrap(),
-            "comm1"
-        );
+        let metadata: Value = serde_json::from_str(&composed.metadata_json).unwrap();
+        assert_eq!(metadata["effective_range"].as_f64().unwrap(), 1000.0);
+        assert!(metadata["mesh_enabled"].as_bool().unwrap());
+        assert_eq!(metadata["limiting_node"].as_str().unwrap(), "comm1");
     }
 
     #[tokio::test]
     async fn test_mission_duration_constraint() {
         let rule = MissionDurationConstraintRule::default();
 
-        let long_endurance = Capability {
-            id: "platform1".to_string(),
-            name: "Fixed-Wing UAV".to_string(),
-            capability_type: CapabilityType::Mobility,
-            confidence: 0.95,
-            metadata: json!({"endurance_minutes": 120.0}), // 2 hours
-        };
+        let mut long_endurance = Capability::new(
+            "platform1".to_string(),
+            "Fixed-Wing UAV".to_string(),
+            CapabilityType::Mobility,
+            0.95,
+        );
+        long_endurance.metadata_json =
+            serde_json::to_string(&json!({"endurance_minutes": 120.0})).unwrap_or_default(); // 2 hours
 
-        let short_endurance = Capability {
-            id: "platform2".to_string(),
-            name: "Quadcopter".to_string(),
-            capability_type: CapabilityType::Mobility,
-            confidence: 0.8,
-            metadata: json!({"endurance_minutes": 25.0}), // 25 minutes
-        };
+        let mut short_endurance = Capability::new(
+            "platform2".to_string(),
+            "Quadcopter".to_string(),
+            CapabilityType::Mobility,
+            0.8,
+        );
+        short_endurance.metadata_json =
+            serde_json::to_string(&json!({"endurance_minutes": 25.0})).unwrap_or_default(); // 25 minutes
 
         let caps = vec![long_endurance, short_endurance];
         let context = CompositionContext::new(vec!["node1".to_string(), "node2".to_string()]);
@@ -543,16 +569,9 @@ mod tests {
         let composed = &result.composed_capabilities[0];
         assert_eq!(composed.name, "Team Mission Duration");
         // Mission duration limited by shortest endurance (25 minutes)
-        assert_eq!(
-            composed.metadata["mission_duration_minutes"]
-                .as_f64()
-                .unwrap(),
-            25.0
-        );
-        assert_eq!(
-            composed.metadata["limiting_platform"].as_str().unwrap(),
-            "platform2"
-        );
+        let metadata: Value = serde_json::from_str(&composed.metadata_json).unwrap();
+        assert_eq!(metadata["mission_duration_minutes"].as_f64().unwrap(), 25.0);
+        assert_eq!(metadata["limiting_platform"].as_str().unwrap(), "platform2");
         // Confidence matches limiting platform
         assert_eq!(composed.confidence, 0.8);
     }
@@ -564,13 +583,15 @@ mod tests {
         let duration_rule = MissionDurationConstraintRule::default();
 
         // Single platform
-        let single_platform = Capability {
-            id: "platform1".to_string(),
-            name: "Solo Platform".to_string(),
-            capability_type: CapabilityType::Mobility,
-            confidence: 0.9,
-            metadata: json!({"max_speed": 10.0, "endurance_minutes": 60.0}),
-        };
+        let mut single_platform = Capability::new(
+            "platform1".to_string(),
+            "Solo Platform".to_string(),
+            CapabilityType::Mobility,
+            0.9,
+        );
+        single_platform.metadata_json =
+            serde_json::to_string(&json!({"max_speed": 10.0, "endurance_minutes": 60.0}))
+                .unwrap_or_default();
 
         let caps = vec![single_platform];
 
@@ -590,12 +611,16 @@ mod tests {
             ("slow", 8.0, 0.85),
         ]
         .into_iter()
-        .map(|(name, speed, confidence)| Capability {
-            id: format!("platform_{}", name),
-            name: name.to_string(),
-            capability_type: CapabilityType::Mobility,
-            confidence,
-            metadata: json!({"max_speed": speed}),
+        .map(|(name, speed, confidence)| {
+            let mut cap = Capability::new(
+                format!("platform_{}", name),
+                name.to_string(),
+                CapabilityType::Mobility,
+                confidence,
+            );
+            cap.metadata_json =
+                serde_json::to_string(&json!({"max_speed": speed})).unwrap_or_default();
+            cap
         })
         .collect();
 
@@ -610,29 +635,32 @@ mod tests {
 
         let composed = &result.composed_capabilities[0];
         // Team speed constrained by slowest (8.0)
-        assert_eq!(composed.metadata["team_speed"].as_f64().unwrap(), 8.0);
-        assert_eq!(composed.metadata["platform_count"].as_u64().unwrap(), 3);
+        let metadata: Value = serde_json::from_str(&composed.metadata_json).unwrap();
+        assert_eq!(metadata["team_speed"].as_f64().unwrap(), 8.0);
+        assert_eq!(metadata["platform_count"].as_u64().unwrap(), 3);
     }
 
     #[tokio::test]
     async fn test_constraint_metadata_accuracy() {
         let rule = TeamSpeedConstraintRule::default();
 
-        let platform1 = Capability {
-            id: "p1".to_string(),
-            name: "Platform 1".to_string(),
-            capability_type: CapabilityType::Mobility,
-            confidence: 0.9,
-            metadata: json!({"max_speed": 12.5}),
-        };
+        let mut platform1 = Capability::new(
+            "p1".to_string(),
+            "Platform 1".to_string(),
+            CapabilityType::Mobility,
+            0.9,
+        );
+        platform1.metadata_json =
+            serde_json::to_string(&json!({"max_speed": 12.5})).unwrap_or_default();
 
-        let platform2 = Capability {
-            id: "p2".to_string(),
-            name: "Platform 2".to_string(),
-            capability_type: CapabilityType::Mobility,
-            confidence: 0.85,
-            metadata: json!({"max_speed": 18.3}),
-        };
+        let mut platform2 = Capability::new(
+            "p2".to_string(),
+            "Platform 2".to_string(),
+            CapabilityType::Mobility,
+            0.85,
+        );
+        platform2.metadata_json =
+            serde_json::to_string(&json!({"max_speed": 18.3})).unwrap_or_default();
 
         let caps = vec![platform1, platform2];
         let context = CompositionContext::new(vec!["node1".to_string(), "node2".to_string()]);
@@ -641,7 +669,8 @@ mod tests {
         let composed = &result.composed_capabilities[0];
 
         // Check that all individual speeds are recorded
-        let individual_speeds = composed.metadata["individual_speeds"].as_array().unwrap();
+        let metadata: Value = serde_json::from_str(&composed.metadata_json).unwrap();
+        let individual_speeds = metadata["individual_speeds"].as_array().unwrap();
         assert_eq!(individual_speeds.len(), 2);
         assert!(individual_speeds.contains(&json!(12.5)));
         assert!(individual_speeds.contains(&json!(18.3)));
