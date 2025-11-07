@@ -176,7 +176,10 @@ impl DittoStore {
                     for address in addresses.split(',') {
                         let address = address.trim();
                         if !address.is_empty() {
-                            transport_config.connect.tcp_servers.insert(address.to_string());
+                            transport_config
+                                .connect
+                                .tcp_servers
+                                .insert(address.to_string());
                             debug!("TCP client will connect to: {}", address);
                         }
                     }

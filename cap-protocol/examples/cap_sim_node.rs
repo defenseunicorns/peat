@@ -59,7 +59,7 @@ use tokio::time::sleep;
 struct TestDoc {
     id: String,
     message: String,
-    timestamp: u64,  // Unix timestamp in microseconds
+    timestamp: u64, // Unix timestamp in microseconds
 }
 
 /// Metrics event for JSON logging
@@ -69,14 +69,14 @@ enum MetricsEvent {
     DocumentInserted {
         node_id: String,
         doc_id: String,
-        timestamp_us: u128,  // Unix timestamp in microseconds
+        timestamp_us: u128, // Unix timestamp in microseconds
     },
     DocumentReceived {
         node_id: String,
         doc_id: String,
-        inserted_at_us: u128,  // From document
-        received_at_us: u128,  // Local time
-        latency_us: u128,      // Difference
+        inserted_at_us: u128, // From document
+        received_at_us: u128, // Local time
+        latency_us: u128,     // Difference
         latency_ms: f64,
     },
 }
@@ -294,7 +294,7 @@ async fn writer_mode(
     let doc = TestDoc {
         id: doc_id.clone(),
         message: "Hello from CAP Simulation!".to_string(),
-        timestamp: timestamp_us as u64,  // Store timestamp in microseconds
+        timestamp: timestamp_us as u64, // Store timestamp in microseconds
     };
 
     println!("[{}] Creating test document: {:?}", node_id, doc);
