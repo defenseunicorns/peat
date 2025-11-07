@@ -56,7 +56,8 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::time::sleep;
 
-/// Test document structure
+/// Test document structure (currently unused - documents are created dynamically)
+#[allow(dead_code)]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct TestDoc {
     id: String,
@@ -494,7 +495,6 @@ async fn writer_mode(
     // Wait for all acknowledgments with timeout
     let ack_timeout = Duration::from_secs(30);
     let ack_start = Instant::now();
-    let mut all_acks_received = false;
 
     loop {
         if ack_start.elapsed() > ack_timeout {
@@ -551,8 +551,7 @@ async fn writer_mode(
                                 ack_count,
                             });
 
-                            all_acks_received = true;
-                            break;
+                            return Ok(());
                         }
                     }
                 }
@@ -565,12 +564,6 @@ async fn writer_mode(
                 continue;
             }
         }
-    }
-
-    if all_acks_received {
-        Ok(())
-    } else {
-        Err("Failed to receive all acknowledgments".into())
     }
 }
 
