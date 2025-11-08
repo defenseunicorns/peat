@@ -30,6 +30,11 @@ help:
 	@echo "  sim-inspect                - Inspect running topologies"
 	@echo "  sim-destroy                - Destroy running topology"
 	@echo "  sim-clean                  - Destroy all and clean up artifacts"
+	@echo ""
+	@echo "E8 Testing & Analysis:"
+	@echo "  e8-baseline-comparison     - Run three-way baseline comparison ⭐"
+	@echo "  e8-performance-tests       - Run full E8 performance test suite"
+	@echo "  e8-compare-results DIR=x   - Generate comparison report"
 
 # Clean build artifacts and Ditto directories
 clean: clean-ditto
@@ -172,16 +177,17 @@ sim-clean: sim-destroy
 	@cd cap-sim && rm -rf topologies/clab-* || true
 	@echo "✅ Simulation cleanup complete"
 
-# E8 Performance Test Suite (Three-Way Comparison)
-# Runs 36 tests across 3 configurations: Ditto Baseline, CAP Full, CAP Differential
-# Estimated time: 35-40 minutes
+# E8 Performance Test Suite (Three-Way Comparison with Bandwidth Constraints)
+# Runs 32 tests across 3 configurations: Traditional IoT, CAP Full, CAP Differential
+# Estimated time: 30-35 minutes
 e8-performance-tests:
 	@echo "╔════════════════════════════════════════════════════════════╗"
 	@echo "║   E8 Performance Test Suite - Three-Way Comparison        ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@echo ""
-	@echo "This will run 36 tests and take approximately 35-40 minutes"
-	@echo "Tests: 3 configs × 4 bandwidths × 3 topologies"
+	@echo "This will run 32 tests and take approximately 30-35 minutes"
+	@echo "Tests: Traditional (8) + CAP Full (12) + CAP Differential (12)"
+	@echo "Bandwidths: 100Mbps, 10Mbps, 1Mbps, 256Kbps"
 	@echo ""
 	@cd cap-sim && ./run-e8-performance-suite.sh
 
@@ -194,3 +200,22 @@ e8-compare-results:
 	fi
 	@echo "Generating three-way comparison report for $(DIR)..."
 	@echo "TODO: Implement comparison script"
+
+# Three-Way Baseline Comparison: Traditional IoT vs CAP Full vs CAP Differential
+# Tests identical topologies (2-node, 12-node client-server, 12-node hub-spoke)
+# Estimated time: ~5 minutes
+e8-baseline-comparison:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Three-Way Baseline Comparison                            ║"
+	@echo "║  Traditional IoT vs CAP Full vs CAP Differential          ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "This will run the complete baseline comparison matrix:"
+	@echo "  1. Traditional IoT Baseline (NO CRDT, periodic full messages)"
+	@echo "  2. CAP Full Replication (CRDT without filtering)"
+	@echo "  3. CAP Differential Filtering (CRDT + capability filtering)"
+	@echo ""
+	@echo "Tests: 3 architectures × 3 topologies = 9 test scenarios"
+	@echo "Estimated time: ~5 minutes"
+	@echo ""
+	@cd cap-sim && ./run-baseline-comparison.sh

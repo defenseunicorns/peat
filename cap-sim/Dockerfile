@@ -25,9 +25,10 @@ WORKDIR /app
 # Copy entire workspace
 COPY . .
 
-# Build BOTH binaries for comparison testing
+# Build ALL THREE binaries for comparison testing
 RUN cargo build --release --example cap_sim_node
 RUN cargo build --release --example ditto_baseline
+RUN cargo build --release --example traditional_baseline
 
 # Create runtime directory for Ditto persistence
 RUN mkdir -p /data/ditto
