@@ -1,43 +1,43 @@
-///! Traditional IoT Baseline - Event-Driven Full State Messaging
-///!
-///! This is a NON-CRDT baseline implementation for comparing CAP Protocol performance
-///! against traditional IoT architectures.
-///!
-///! # Architecture
-///!
-///! - **NO CRDT**: No delta-state sync, no automatic convergence
-///! - **Periodic Transmission**: Full state messages sent at configurable frequency
-///! - **Last-Write-Wins**: Receiver overwrites state with latest message
-///! - **Simple TCP**: Client-server or hub-spoke topology (no mesh to avoid n-squared)
-///!
-///! # Purpose
-///!
-///! Provides baseline for three-way architectural comparison:
-///! 1. Traditional IoT Baseline (this) - Full messages, periodic
-///! 2. CAP Full Replication - CRDT delta sync, Query::All
-///! 3. CAP Differential Filtering - CRDT delta sync, capability-filtered
-///!
-///! # Command Line Arguments
-///!
-///! --node-id <id>              Node identifier (e.g., "soldier-1", "soldier-2")
-///! --mode <mode>               "server" or "client"
-///! --listen <addr>             Server mode: Listen address (e.g., "0.0.0.0:12345")
-///! --connect <addr>            Client mode: Server address (e.g., "soldier-1:12345")
-///! --update-frequency <secs>   Transmission period in seconds (default: 5)
-///! --num-documents <n>         Number of documents to create (default: 1)
-///! --node-type <type>          Node type for metrics (e.g., "soldier", "uav")
-///!
-///! # Example Usage
-///!
-///! Server (writer):
-///! ```bash
-///! traditional_baseline --node-id soldier-1 --mode server --listen 0.0.0.0:12345 --update-frequency 5
-///! ```
-///!
-///! Client (reader):
-///! ```bash
-///! traditional_baseline --node-id soldier-2 --mode client --connect soldier-1:12345 --update-frequency 5
-///! ```
+//! Traditional IoT Baseline - Event-Driven Full State Messaging
+//!
+//! This is a NON-CRDT baseline implementation for comparing CAP Protocol performance
+//! against traditional IoT architectures.
+//!
+//! # Architecture
+//!
+//! - **NO CRDT**: No delta-state sync, no automatic convergence
+//! - **Periodic Transmission**: Full state messages sent at configurable frequency
+//! - **Last-Write-Wins**: Receiver overwrites state with latest message
+//! - **Simple TCP**: Client-server or hub-spoke topology (no mesh to avoid n-squared)
+//!
+//! # Purpose
+//!
+//! Provides baseline for three-way architectural comparison:
+//! 1. Traditional IoT Baseline (this) - Full messages, periodic
+//! 2. CAP Full Replication - CRDT delta sync, Query::All
+//! 3. CAP Differential Filtering - CRDT delta sync, capability-filtered
+//!
+//! # Command Line Arguments
+//!
+//! --node-id <id>              Node identifier (e.g., "soldier-1", "soldier-2")
+//! --mode <mode>               "server" or "client"
+//! --listen <addr>             Server mode: Listen address (e.g., "0.0.0.0:12345")
+//! --connect <addr>            Client mode: Server address (e.g., "soldier-1:12345")
+//! --update-frequency <secs>   Transmission period in seconds (default: 5)
+//! --num-documents <n>         Number of documents to create (default: 1)
+//! --node-type <type>          Node type for metrics (e.g., "soldier", "uav")
+//!
+//! # Example Usage
+//!
+//! Server (writer):
+//! ```bash
+//! traditional_baseline --node-id soldier-1 --mode server --listen 0.0.0.0:12345 --update-frequency 5
+//! ```
+//!
+//! Client (reader):
+//! ```bash
+//! traditional_baseline --node-id soldier-2 --mode client --connect soldier-1:12345 --update-frequency 5
+//! ```
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -338,13 +338,13 @@ async fn run_server(
         for (i, client) in clients_lock.iter_mut().enumerate() {
             // Send message length first (4 bytes)
             let len_bytes = (serialized.len() as u32).to_be_bytes();
-            if let Err(_) = client.write_all(&len_bytes).await {
+            if client.write_all(&len_bytes).await.is_err() {
                 disconnected_indices.push(i);
                 continue;
             }
 
             // Send message data
-            if let Err(_) = client.write_all(&serialized).await {
+            if client.write_all(&serialized).await.is_err() {
                 disconnected_indices.push(i);
                 continue;
             }
