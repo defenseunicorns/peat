@@ -38,7 +38,6 @@
 ///! ```bash
 ///! traditional_baseline --node-id soldier-2 --mode client --connect soldier-1:12345 --update-frequency 5
 ///! ```
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -178,7 +177,8 @@ impl NodeState {
             .unwrap()
             .as_micros();
 
-        let documents: Vec<SimpleDocument> = self.documents.read().await.values().cloned().collect();
+        let documents: Vec<SimpleDocument> =
+            self.documents.read().await.values().cloned().collect();
         let seq = self.next_sequence_number().await;
 
         FullStateMessage {
@@ -477,7 +477,10 @@ async fn run_client(
             let mut message: FullStateMessage = match serde_json::from_slice(&buffer) {
                 Ok(msg) => msg,
                 Err(e) => {
-                    eprintln!("[{}] Error deserializing message: {}", state_clone.node_id, e);
+                    eprintln!(
+                        "[{}] Error deserializing message: {}",
+                        state_clone.node_id, e
+                    );
                     continue;
                 }
             };
