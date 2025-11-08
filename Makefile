@@ -177,16 +177,17 @@ sim-clean: sim-destroy
 	@cd cap-sim && rm -rf topologies/clab-* || true
 	@echo "✅ Simulation cleanup complete"
 
-# E8 Performance Test Suite (Three-Way Comparison)
-# Runs 36 tests across 3 configurations: Ditto Baseline, CAP Full, CAP Differential
-# Estimated time: 35-40 minutes
+# E8 Performance Test Suite (Three-Way Comparison with Bandwidth Constraints)
+# Runs 32 tests across 3 configurations: Traditional IoT, CAP Full, CAP Differential
+# Estimated time: 30-35 minutes
 e8-performance-tests:
 	@echo "╔════════════════════════════════════════════════════════════╗"
 	@echo "║   E8 Performance Test Suite - Three-Way Comparison        ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@echo ""
-	@echo "This will run 36 tests and take approximately 35-40 minutes"
-	@echo "Tests: 3 configs × 4 bandwidths × 3 topologies"
+	@echo "This will run 32 tests and take approximately 30-35 minutes"
+	@echo "Tests: Traditional (8) + CAP Full (12) + CAP Differential (12)"
+	@echo "Bandwidths: 100Mbps, 10Mbps, 1Mbps, 256Kbps"
 	@echo ""
 	@cd cap-sim && ./run-e8-performance-suite.sh
 

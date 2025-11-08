@@ -2,16 +2,17 @@
 # E8 Performance Test Suite - Three-Way Comparison
 #
 # Runs comprehensive performance tests across:
-# 1. Ditto Baseline (pure CRDT, no CAP)
-# 2. CAP Full Replication (CAP overhead, n-squared data)
-# 3. CAP Differential (CAP with filtered replication)
+# 1. Traditional IoT Baseline (NO CRDT, periodic full messages)
+# 2. CAP Full Replication (CRDT without capability filtering)
+# 3. CAP Differential (CRDT with capability filtering)
 #
 # Each configuration tested across:
 # - 4 bandwidth levels: 100Mbps, 10Mbps, 1Mbps, 256Kbps
-# - 3 topology modes: Client-Server, Hub-Spoke, Dynamic Mesh
-# Total: 36 tests (3 configs × 12 combinations)
+# - Traditional: 2 topology modes (Client-Server, Hub-Spoke)
+# - CAP: 3 topology modes (Client-Server, Hub-Spoke, Dynamic Mesh)
+# Total: 32 tests (8 traditional + 12 CAP Full + 12 CAP Differential)
 #
-# Estimated time: ~35-40 minutes total
+# Estimated time: ~30-35 minutes total
 
 set -e
 
@@ -40,27 +41,28 @@ mkdir -p "$MASTER_RESULTS_DIR"
 echo "📁 Results will be saved to: $MASTER_RESULTS_DIR"
 echo ""
 
-# Test 1: Ditto Baseline (pure CRDT)
+# Test 1: Traditional IoT Baseline (NO CRDT)
 echo "═══════════════════════════════════════════════════════════"
-echo "Test Suite 1/3: Ditto Baseline (Pure CRDT, No CAP)"
+echo "Test Suite 1/3: Traditional IoT Baseline (NO CRDT)"
 echo "═══════════════════════════════════════════════════════════"
-echo "Configuration: USE_BASELINE=true"
-echo "Binary: ditto_baseline"
-echo "Estimated time: ~12 minutes"
+echo "Configuration: USE_TRADITIONAL=true"
+echo "Binary: traditional_baseline"
+echo "Architecture: Periodic full-state messaging"
+echo "Estimated time: ~10 minutes"
 echo ""
 
-if [ -f "./test-bandwidth-baseline.sh" ]; then
-    echo "▶ Starting Ditto Baseline tests..."
-    ./test-bandwidth-baseline.sh 2>&1 | tee "$MASTER_RESULTS_DIR/1-ditto-baseline.log"
+if [ -f "./test-bandwidth-traditional.sh" ]; then
+    echo "▶ Starting Traditional IoT Baseline tests..."
+    ./test-bandwidth-traditional.sh 2>&1 | tee "$MASTER_RESULTS_DIR/1-traditional-iot-baseline.log"
 
     # Move results into master directory
-    BASELINE_DIR=$(ls -dt test-results-baseline-* | head -1)
+    BASELINE_DIR=$(ls -dt test-results-traditional-bandwidth-* | head -1)
     if [ -n "$BASELINE_DIR" ]; then
-        mv "$BASELINE_DIR" "$MASTER_RESULTS_DIR/1-ditto-baseline"
-        echo "✓ Ditto Baseline tests complete"
+        mv "$BASELINE_DIR" "$MASTER_RESULTS_DIR/1-traditional-iot-baseline"
+        echo "✓ Traditional IoT Baseline tests complete"
     fi
 else
-    echo "⚠️  Warning: test-bandwidth-baseline.sh not found, skipping"
+    echo "⚠️  Warning: test-bandwidth-traditional.sh not found, skipping"
 fi
 
 echo ""
@@ -143,12 +145,12 @@ echo ""
 echo "📊 Results Summary:"
 echo "   Master Directory: $MASTER_RESULTS_DIR/"
 echo ""
-echo "   1. Ditto Baseline:        $MASTER_RESULTS_DIR/1-ditto-baseline/"
+echo "   1. Traditional IoT:       $MASTER_RESULTS_DIR/1-traditional-iot-baseline/"
 echo "   2. CAP Full Replication:  $MASTER_RESULTS_DIR/2-cap-full-replication/"
 echo "   3. CAP Differential:      $MASTER_RESULTS_DIR/3-cap-differential/"
 echo ""
 echo "📈 View individual summaries:"
-echo "   cat $MASTER_RESULTS_DIR/1-ditto-baseline/COMPREHENSIVE_SUMMARY.md"
+echo "   cat $MASTER_RESULTS_DIR/1-traditional-iot-baseline/COMPREHENSIVE_SUMMARY.md"
 echo "   cat $MASTER_RESULTS_DIR/2-cap-full-replication/COMPREHENSIVE_SUMMARY.md"
 echo "   cat $MASTER_RESULTS_DIR/3-cap-differential/COMPREHENSIVE_SUMMARY.md"
 echo ""
