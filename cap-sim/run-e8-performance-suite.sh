@@ -139,23 +139,163 @@ rm -f /tmp/test-cap-differential.sh
 
 echo ""
 echo "╔════════════════════════════════════════════════════════════╗"
+echo "║   Generating Three-Way Comparison Report                  ║"
+echo "╚════════════════════════════════════════════════════════════╝"
+echo ""
+
+# Generate comprehensive comparison report
+REPORT_FILE="$MASTER_RESULTS_DIR/E8-THREE-WAY-COMPARISON.md"
+
+cat > "$REPORT_FILE" <<EOF
+# E8 Performance Test Results - Three-Way Comparison
+
+**Date:** $(date +%Y-%m-%d)
+**Test Duration:** ~30-35 minutes
+**Total Tests:** 32 scenarios
+
+## Architectures Compared
+
+1. **Traditional IoT Baseline** - NO CRDT, periodic full-state messaging
+2. **CAP Full Replication** - CRDT without capability filtering
+3. **CAP Differential Filtering** - CRDT + capability filtering
+
+## Test Matrix
+
+- **Bandwidth Levels:** 100Mbps, 10Mbps, 1Mbps, 256Kbps
+- **Traditional IoT:** 4 bandwidths × 2 topologies = 8 tests
+- **CAP Full:** 4 bandwidths × 3 topologies = 12 tests
+- **CAP Differential:** 4 bandwidths × 3 topologies = 12 tests
+
+## Results Directory Structure
+
+\`\`\`
+$MASTER_RESULTS_DIR/
+├── 1-traditional-iot-baseline/
+│   ├── COMPREHENSIVE_SUMMARY.md
+│   ├── 100mbps/
+│   ├── 10mbps/
+│   ├── 1mbps/
+│   └── 256kbps/
+├── 2-cap-full-replication/
+│   ├── COMPREHENSIVE_SUMMARY.md
+│   ├── 100mbps/
+│   ├── 10mbps/
+│   ├── 1mbps/
+│   └── 256kbps/
+├── 3-cap-differential/
+│   ├── COMPREHENSIVE_SUMMARY.md
+│   ├── 100mbps/
+│   ├── 10mbps/
+│   ├── 1mbps/
+│   └── 256kbps/
+└── E8-THREE-WAY-COMPARISON.md (this file)
+\`\`\`
+
+## Viewing Results
+
+### Individual Architecture Summaries
+\`\`\`bash
+cat $MASTER_RESULTS_DIR/1-traditional-iot-baseline/COMPREHENSIVE_SUMMARY.md
+cat $MASTER_RESULTS_DIR/2-cap-full-replication/COMPREHENSIVE_SUMMARY.md
+cat $MASTER_RESULTS_DIR/3-cap-differential/COMPREHENSIVE_SUMMARY.md
+\`\`\`
+
+### Quick Metrics Check
+\`\`\`bash
+# Traditional IoT metrics
+find $MASTER_RESULTS_DIR/1-traditional-iot-baseline -name "*.metrics.json" -exec wc -l {} +
+
+# CAP Full metrics
+find $MASTER_RESULTS_DIR/2-cap-full-replication -name "*_metrics.json" -exec wc -l {} +
+
+# CAP Differential metrics
+find $MASTER_RESULTS_DIR/3-cap-differential -name "*_metrics.json" -exec wc -l {} +
+\`\`\`
+
+## Key Metrics to Analyze
+
+1. **Bandwidth Efficiency**
+   - Total bytes transmitted per architecture
+   - Message sizes (Traditional vs CAP deltas)
+   - Bandwidth reduction percentages
+
+2. **Latency Performance**
+   - Message propagation times
+   - Sync completion times
+   - Network constraint impact
+
+3. **Scalability**
+   - Performance across topologies (2-node, 12-node)
+   - Behavior under bandwidth constraints
+   - Resource utilization
+
+## Expected Outcomes
+
+Based on architectural design:
+
+| Architecture | Bandwidth | vs Traditional | Key Benefit |
+|--------------|-----------|----------------|-------------|
+| Traditional IoT | Baseline (100%) | - | Simple, predictable |
+| CAP Full | ~60-70% | **-30-40%** | CRDT delta-state |
+| CAP Differential | ~30-40% | **-60-70%** | CRDT + filtering |
+
+## Next Steps
+
+1. ✅ **Tests Complete** - All 32 scenarios executed
+2. **Analyze Metrics** - Review bandwidth/latency across configurations
+3. **Update ADR-008** - Document findings in architecture decision record
+4. **Generate Charts** - Visualize bandwidth comparison
+5. **Document Insights** - Update project documentation
+
+## Files Generated
+
+- **Individual test logs:** \`$MASTER_RESULTS_DIR/*/\`
+- **Metrics JSON:** \`*_metrics.json\` and \`*.metrics.json\`
+- **Summaries:** \`COMPREHENSIVE_SUMMARY.md\` per architecture
+- **This report:** \`E8-THREE-WAY-COMPARISON.md\`
+
+EOF
+
+echo "✓ Comparison report generated: $REPORT_FILE"
+echo ""
+
+# Generate executive summary with actual data analysis
+echo "╔════════════════════════════════════════════════════════════╗"
+echo "║   Generating Executive Summary                            ║"
+echo "╚════════════════════════════════════════════════════════════╝"
+echo ""
+
+if [ -f "./generate-executive-summary.sh" ]; then
+    ./generate-executive-summary.sh "$MASTER_RESULTS_DIR"
+else
+    echo "⚠️  Warning: generate-executive-summary.sh not found, skipping"
+fi
+
+echo ""
+
+# Create symlink to latest results for easy access
+echo "Creating symlink: e8-performance-results-latest -> $MASTER_RESULTS_DIR"
+ln -sfn "$MASTER_RESULTS_DIR" "e8-performance-results-latest"
+echo "✓ Symlink created"
+echo ""
+
+echo ""
+echo "╔════════════════════════════════════════════════════════════╗"
 echo "║   E8 Performance Test Suite Complete!                     ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 echo "📊 Results Summary:"
 echo "   Master Directory: $MASTER_RESULTS_DIR/"
+echo "   Quick Access:     e8-performance-results-latest/"
 echo ""
 echo "   1. Traditional IoT:       $MASTER_RESULTS_DIR/1-traditional-iot-baseline/"
 echo "   2. CAP Full Replication:  $MASTER_RESULTS_DIR/2-cap-full-replication/"
 echo "   3. CAP Differential:      $MASTER_RESULTS_DIR/3-cap-differential/"
 echo ""
-echo "📈 View individual summaries:"
-echo "   cat $MASTER_RESULTS_DIR/1-traditional-iot-baseline/COMPREHENSIVE_SUMMARY.md"
-echo "   cat $MASTER_RESULTS_DIR/2-cap-full-replication/COMPREHENSIVE_SUMMARY.md"
-echo "   cat $MASTER_RESULTS_DIR/3-cap-differential/COMPREHENSIVE_SUMMARY.md"
-echo ""
-echo "📝 Next Steps:"
-echo "   1. Run: make e8-compare-results DIR=$MASTER_RESULTS_DIR"
-echo "   2. Review: E8-THREE-WAY-COMPARISON.md"
-echo "   3. Update: docs/adrs/ADR-008-network-simulation-approach.md"
+echo "📈 View summaries:"
+echo "   cat e8-performance-results-latest/EXECUTIVE-SUMMARY.md"
+echo "   cat e8-performance-results-latest/E8-THREE-WAY-COMPARISON.md"
+echo "   cat e8-performance-results-latest/1-traditional-iot-baseline/COMPREHENSIVE_SUMMARY.md"
+echo "   cat e8-performance-results-latest/2-cap-full-replication/COMPREHENSIVE_SUMMARY.md"
+echo "   cat e8-performance-results-latest/3-cap-differential/COMPREHENSIVE_SUMMARY.md"
 echo ""

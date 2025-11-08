@@ -69,7 +69,8 @@ clear_bandwidth_constraints() {
     local containers=$(docker ps --filter "name=clab-${lab_name}-" --format "{{.Names}}")
 
     for container in $containers; do
-        containerlab tools netem delete -n "$container" -i eth0 2>/dev/null || true
+        # Use timeout to prevent hanging on netem delete
+        timeout 5 containerlab tools netem delete -n "$container" -i eth0 2>/dev/null || true
     done
 }
 
@@ -99,7 +100,8 @@ for bw_name in "100mbps" "10mbps" "1mbps" "256kbps"; do
 
         # Deploy topology
         echo "[$(date +%T)] Deploying topology..."
-        containerlab destroy --all --cleanup > /dev/null 2>&1 || true
+        # Clean up any existing deployment of this specific topology
+        containerlab destroy -t "$topology_file" --cleanup > /dev/null 2>&1 || true
         sleep 2
 
         deploy_start=$(date +%s)
@@ -219,8 +221,11 @@ EOF
 
         # Clean up
         echo "[$(date +%T)] Cleaning up..."
-        clear_bandwidth_constraints "$lab_name"
-        containerlab destroy --all --cleanup > /dev/null 2>&1 || true
+        # Note: No need to clear netem constraints - destroying container cleans network namespace
+        containerlab destroy -t "$topology_file" --cleanup > /dev/null 2>&1 || {
+            echo "[$(date +%T)] Destroy failed, forcing cleanup..."
+            docker rm -f $(docker ps -a -q --filter "name=clab-${lab_name}-" 2>/dev/null) 2>/dev/null || true
+        }
         sleep 2
 
         echo ""

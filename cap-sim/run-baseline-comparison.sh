@@ -35,6 +35,34 @@ set -a
 source .env
 set +a
 
+# Robust cleanup function with timeout and fallback
+cleanup_topology() {
+    local topology_file=$1
+
+    # Extract topology name from file
+    local topology_name=$(grep "^name:" "$topology_file" | awk '{print $2}')
+
+    echo -e "${YELLOW}Destroying topology...${NC}"
+
+    # Try containerlab destroy with 30 second timeout
+    if timeout 30 containerlab destroy -t "$topology_file" --cleanup 2>/dev/null; then
+        return 0
+    fi
+
+    # If timeout or failure, force cleanup containers
+    echo -e "${YELLOW}⚠️  Containerlab destroy timed out, forcing cleanup...${NC}"
+
+    # Get all containers for this topology
+    local containers=$(docker ps -a --filter "name=clab-${topology_name}-" --format "{{.Names}}")
+
+    if [ -n "$containers" ]; then
+        echo "$containers" | xargs -r docker rm -f > /dev/null 2>&1 || true
+    fi
+
+    # Clean up network if it exists
+    docker network rm "clab-${topology_name}" 2>/dev/null || true
+}
+
 # Function to run a single test configuration
 run_test() {
     local arch=$1
@@ -110,9 +138,8 @@ with open('$deploy_file', 'w') as f:
     # Extract metrics
     grep "METRICS:" "$log_file" > "$RESULTS_DIR/${test_name}-metrics.json" 2>/dev/null || echo "No metrics found" > "$RESULTS_DIR/${test_name}-metrics.json"
 
-    # Cleanup
-    echo -e "${YELLOW}Destroying topology...${NC}"
-    containerlab destroy -t "$deploy_file" --cleanup
+    # Cleanup with timeout protection
+    cleanup_topology "$deploy_file"
 
     # Remove temporary file if created
     if [ "$deploy_file" != "$topology_file" ]; then

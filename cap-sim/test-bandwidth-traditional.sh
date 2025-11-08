@@ -70,8 +70,39 @@ clear_bandwidth_constraints() {
     local containers=$(docker ps --filter "name=clab-${lab_name}-" --format "{{.Names}}")
 
     for container in $containers; do
-        containerlab tools netem delete -n "$container" -i eth0 2>/dev/null || true
+        # Use timeout to prevent hanging on netem delete
+        timeout 5 containerlab tools netem delete -n "$container" -i eth0 2>/dev/null || true
     done
+}
+
+# Robust cleanup function with timeout and fallback
+cleanup_topology() {
+    local topology_file=$1
+    local topology_name=$2
+
+    echo "  Destroying topology..."
+
+    # Try containerlab destroy with 30 second timeout
+    if timeout 30 containerlab destroy -t "$topology_file" --cleanup > /dev/null 2>&1; then
+        echo "  ✓ Topology destroyed cleanly"
+        return 0
+    fi
+
+    # If timeout or failure, force cleanup containers
+    echo "  ⚠️  Containerlab destroy timed out, forcing cleanup..."
+
+    # Get all containers for this topology
+    local containers=$(docker ps -a --filter "name=clab-${topology_name}-" --format "{{.Names}}")
+
+    if [ -n "$containers" ]; then
+        echo "  Force removing containers..."
+        echo "$containers" | xargs -r docker rm -f > /dev/null 2>&1 || true
+    fi
+
+    # Clean up network if it exists
+    docker network rm "clab-${topology_name}" 2>/dev/null || true
+
+    echo "  ✓ Forced cleanup complete"
 }
 
 # Test each bandwidth configuration
@@ -127,12 +158,12 @@ for bw_name in "100mbps" "10mbps" "1mbps" "256kbps"; do
         # Extract metrics
         grep "METRICS:" "$BW_RESULTS_DIR/${mode_name}.log" > "$BW_RESULTS_DIR/${mode_name}.metrics.json" 2>/dev/null || echo "No metrics found" > "$BW_RESULTS_DIR/${mode_name}.metrics.json"
 
-        # Clear bandwidth constraints
-        clear_bandwidth_constraints "$topology_name"
-
-        # Destroy topology
+        # Destroy topology (network namespace cleanup is automatic)
         echo "  Destroying topology..."
-        containerlab destroy -t "$topology_file" --cleanup > /dev/null 2>&1
+        containerlab destroy -t "$topology_file" --cleanup > /dev/null 2>&1 || {
+            echo "  Destroy failed, forcing cleanup..."
+            docker rm -f $(docker ps -a -q --filter "name=clab-${topology_name}-" 2>/dev/null) 2>/dev/null || true
+        }
 
         end_time=$(date +%s)
         duration=$((end_time - start_time))
