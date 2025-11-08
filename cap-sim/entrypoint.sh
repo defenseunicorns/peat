@@ -8,20 +8,25 @@ echo "[${NODE_ID}] CAP Protocol Simulation Node starting"
 echo "[${NODE_ID}] Mode: ${MODE}"
 echo "[${NODE_ID}] Container IP: $(hostname -I)"
 
-# Check required environment variables
-if [ -z "$DITTO_APP_ID" ]; then
-    echo "[${NODE_ID}] ERROR: DITTO_APP_ID not set"
-    exit 1
-fi
+# Check if we're using traditional baseline (no Ditto required)
+USE_TRADITIONAL=${USE_TRADITIONAL:-false}
 
-if [ -z "$DITTO_OFFLINE_TOKEN" ]; then
-    echo "[${NODE_ID}] ERROR: DITTO_OFFLINE_TOKEN not set"
-    exit 1
-fi
+# Check required environment variables (skip for traditional baseline)
+if [ "$USE_TRADITIONAL" != "true" ]; then
+    if [ -z "$DITTO_APP_ID" ]; then
+        echo "[${NODE_ID}] ERROR: DITTO_APP_ID not set"
+        exit 1
+    fi
 
-if [ -z "$DITTO_SHARED_KEY" ]; then
-    echo "[${NODE_ID}] ERROR: DITTO_SHARED_KEY not set"
-    exit 1
+    if [ -z "$DITTO_OFFLINE_TOKEN" ]; then
+        echo "[${NODE_ID}] ERROR: DITTO_OFFLINE_TOKEN not set"
+        exit 1
+    fi
+
+    if [ -z "$DITTO_SHARED_KEY" ]; then
+        echo "[${NODE_ID}] ERROR: DITTO_SHARED_KEY not set"
+        exit 1
+    fi
 fi
 
 # Parse TCP configuration from environment
@@ -30,12 +35,16 @@ fi
 # BACKEND: sync backend type (default: ditto)
 # NODE_TYPE: Type of node (soldier, uav, ugv) - for traffic analysis
 # UPDATE_RATE_MS: Update frequency in milliseconds for writer nodes
-# USE_BASELINE: If "true", use shadow_poc (baseline Ditto) instead of cap_sim_node
+# USE_BASELINE: If "true", use ditto_baseline (CRDT without CAP)
+# USE_TRADITIONAL: If "true", use traditional_baseline (NO CRDT, periodic full messages)
+# UPDATE_FREQUENCY_SECS: For traditional_baseline - period in seconds (default: 5)
 
 USE_BASELINE=${USE_BASELINE:-false}
+USE_TRADITIONAL=${USE_TRADITIONAL:-false}
 BACKEND=${BACKEND:-ditto}
 NODE_TYPE=${NODE_TYPE:-unknown}
 UPDATE_RATE_MS=${UPDATE_RATE_MS:-5000}
+UPDATE_FREQUENCY_SECS=${UPDATE_FREQUENCY_SECS:-5}
 CAP_FILTER_ENABLED=${CAP_FILTER_ENABLED:-false}
 
 ARGS="--node-id ${NODE_ID} --mode ${MODE} --backend ${BACKEND} --node-type ${NODE_TYPE} --update-rate-ms ${UPDATE_RATE_MS}"
@@ -63,9 +72,28 @@ export DITTO_APP_ID
 export DITTO_OFFLINE_TOKEN
 export DITTO_SHARED_KEY
 
-# Run the simulation node (trait-based with DQL v2 or baseline)
-if [ "$USE_BASELINE" = "true" ]; then
-    echo "[${NODE_ID}] Running BASELINE (ditto_baseline - raw Ditto without CAP)"
+# Run the simulation node
+if [ "$USE_TRADITIONAL" = "true" ]; then
+    echo "[${NODE_ID}] Running TRADITIONAL BASELINE (traditional_baseline - NO CRDT, periodic full messages)"
+    # traditional_baseline uses server/client mode instead of writer/reader
+    if [ "$MODE" = "writer" ]; then
+        TRAD_MODE="server"
+    else
+        TRAD_MODE="client"
+    fi
+
+    TRAD_ARGS="--node-id ${NODE_ID} --mode ${TRAD_MODE} --node-type ${NODE_TYPE} --update-frequency ${UPDATE_FREQUENCY_SECS}"
+
+    if [ -n "$TCP_LISTEN" ]; then
+        TRAD_ARGS="$TRAD_ARGS --listen 0.0.0.0:${TCP_LISTEN}"
+    fi
+    if [ -n "$TCP_CONNECT" ]; then
+        TRAD_ARGS="$TRAD_ARGS --connect ${TCP_CONNECT}"
+    fi
+
+    exec /app/target/release/examples/traditional_baseline $TRAD_ARGS
+elif [ "$USE_BASELINE" = "true" ]; then
+    echo "[${NODE_ID}] Running DITTO BASELINE (ditto_baseline - CRDT without CAP)"
     # ditto_baseline doesn't support all the args, only basic ones
     BASELINE_ARGS="--node-id ${NODE_ID} --mode ${MODE}"
     if [ -n "$TCP_LISTEN" ]; then

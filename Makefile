@@ -30,6 +30,11 @@ help:
 	@echo "  sim-inspect                - Inspect running topologies"
 	@echo "  sim-destroy                - Destroy running topology"
 	@echo "  sim-clean                  - Destroy all and clean up artifacts"
+	@echo ""
+	@echo "E8 Testing & Analysis:"
+	@echo "  e8-baseline-comparison     - Run three-way baseline comparison ⭐"
+	@echo "  e8-performance-tests       - Run full E8 performance test suite"
+	@echo "  e8-compare-results DIR=x   - Generate comparison report"
 
 # Clean build artifacts and Ditto directories
 clean: clean-ditto
@@ -194,3 +199,22 @@ e8-compare-results:
 	fi
 	@echo "Generating three-way comparison report for $(DIR)..."
 	@echo "TODO: Implement comparison script"
+
+# Three-Way Baseline Comparison: Traditional IoT vs CAP Full vs CAP Differential
+# Tests identical topologies (2-node, 12-node client-server, 12-node hub-spoke)
+# Estimated time: ~5 minutes
+e8-baseline-comparison:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Three-Way Baseline Comparison                            ║"
+	@echo "║  Traditional IoT vs CAP Full vs CAP Differential          ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "This will run the complete baseline comparison matrix:"
+	@echo "  1. Traditional IoT Baseline (NO CRDT, periodic full messages)"
+	@echo "  2. CAP Full Replication (CRDT without filtering)"
+	@echo "  3. CAP Differential Filtering (CRDT + capability filtering)"
+	@echo ""
+	@echo "Tests: 3 architectures × 3 topologies = 9 test scenarios"
+	@echo "Estimated time: ~5 minutes"
+	@echo ""
+	@cd cap-sim && ./run-baseline-comparison.sh
