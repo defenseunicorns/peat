@@ -241,7 +241,7 @@ echo "======================================"
 
 SUMMARY_FILE="$RESULTS_BASE_DIR/COMPREHENSIVE_SUMMARY.md"
 
-cat > "$SUMMARY_FILE" <<'EOF'
+cat > "$SUMMARY_FILE" <<EOF
 # E8 Bandwidth Constraint Testing - Comprehensive Results
 
 **Test Date:** $(date)

@@ -23,14 +23,90 @@ echo "║   E8 Performance Test Suite - Three-Way Comparison        ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 
-# Check Docker image is built
+# ============================================
+# Pre-flight Checks
+# ============================================
+
+echo "🔍 Running pre-flight checks..."
+echo ""
+
+ERRORS=0
+WARNINGS=0
+
+# Check Docker
+if ! command -v docker &> /dev/null; then
+    echo "❌ Error: docker not installed"
+    ERRORS=$((ERRORS + 1))
+else
+    echo "✓ Docker installed"
+fi
+
+# Check Docker image
 if ! docker image inspect cap-sim-node:latest >/dev/null 2>&1; then
     echo "❌ Error: cap-sim-node:latest not found"
     echo "   Run: cd .. && make sim-build"
+    ERRORS=$((ERRORS + 1))
+else
+    echo "✓ Docker image: cap-sim-node:latest"
+fi
+
+# Check ContainerLab
+if ! command -v containerlab &> /dev/null; then
+    echo "❌ Error: containerlab not installed"
+    ERRORS=$((ERRORS + 1))
+else
+    containerlab_version=$(containerlab version 2>&1 | head -1 || echo "unknown")
+    echo "✓ ContainerLab: $containerlab_version"
+fi
+
+# Check Python
+if ! command -v python3 &> /dev/null; then
+    echo "⚠️  Warning: python3 not found (metrics analysis may fail)"
+    WARNINGS=$((WARNINGS + 1))
+else
+    echo "✓ Python 3 installed"
+fi
+
+# Check jq
+if ! command -v jq &> /dev/null; then
+    echo "⚠️  Warning: jq not installed (metrics parsing may be limited)"
+    WARNINGS=$((WARNINGS + 1))
+else
+    echo "✓ jq installed"
+fi
+
+# Check disk space (need ~100MB for results)
+available_mb=$(df -m . | tail -1 | awk '{print $4}')
+if [ "$available_mb" -lt 100 ]; then
+    echo "⚠️  Warning: Low disk space (${available_mb}MB available, recommend 100MB+)"
+    WARNINGS=$((WARNINGS + 1))
+else
+    echo "✓ Disk space: ${available_mb}MB available"
+fi
+
+# Check environment variables for CAP tests
+if [ -z "$DITTO_APP_ID" ]; then
+    echo "⚠️  Warning: DITTO_APP_ID not set (load from .env if available)"
+    WARNINGS=$((WARNINGS + 1))
+else
+    echo "✓ DITTO_APP_ID configured"
+fi
+
+echo ""
+
+# Exit if critical errors
+if [ $ERRORS -gt 0 ]; then
+    echo "❌ Pre-flight checks failed with $ERRORS error(s)"
     exit 1
 fi
 
-echo "✓ Docker image found: cap-sim-node:latest"
+if [ $WARNINGS -gt 0 ]; then
+    echo "⚠️  Pre-flight checks passed with $WARNINGS warning(s)"
+    echo "   Tests will proceed but some features may not work"
+else
+    echo "✅ All pre-flight checks passed"
+fi
+
 echo ""
 
 # Create master results directory
