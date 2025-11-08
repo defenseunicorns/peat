@@ -1,0 +1,208 @@
+# ContainerLab Topology: 12-Node Squad - Traditional IoT Baseline (Hub-Spoke)
+#
+# Purpose: Traditional IoT architecture with hierarchical topology
+# Architecture: Squad leader → Team leaders → Team members
+# Note: In this implementation, all nodes still connect to squad leader (star)
+#       True multi-hop relay would require additional implementation
+# Transmission: Full state messages every 5 seconds
+#
+# Network: Hierarchical star (potential for future relay implementation)
+# Use: containerlab deploy -t topologies/traditional-squad-hub-spoke.yaml
+
+name: traditional-squad-hub-spoke
+
+topology:
+  nodes:
+    soldier-1:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: soldier-1
+        ROLE: squad_leader
+        PLATFORM_TYPE: soldier
+        MODE: writer
+        TCP_LISTEN: "12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "5"
+        NODE_TYPE: server
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+      ports:
+        - "12345:12345"
+
+    soldier-6:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: soldier-6
+        ROLE: team_leader
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "soldier-1:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    soldier-2:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: soldier-2
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "soldier-1:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    soldier-3:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: soldier-3
+        ROLE: grenadier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "soldier-1:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    soldier-4:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: soldier-4
+        ROLE: automatic_rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "soldier-1:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    soldier-5:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: soldier-5
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "soldier-1:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    soldier-7:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: soldier-7
+        ROLE: grenadier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "soldier-1:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    soldier-8:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: soldier-8
+        ROLE: automatic_rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "soldier-1:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    soldier-9:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: soldier-9
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "soldier-1:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    ugv-1:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: ugv-1
+        ROLE: resupply_isr
+        PLATFORM_TYPE: ugv
+        MODE: reader
+        TCP_CONNECT: "soldier-1:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    uav-1:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: uav-1
+        ROLE: reconnaissance
+        PLATFORM_TYPE: uav
+        MODE: reader
+        TCP_CONNECT: "soldier-1:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    uav-2:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: uav-2
+        ROLE: reconnaissance
+        PLATFORM_TYPE: uav
+        MODE: reader
+        TCP_CONNECT: "soldier-1:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}

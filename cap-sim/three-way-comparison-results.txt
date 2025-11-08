@@ -1,0 +1,61 @@
+================================================================================
+THREE-WAY ARCHITECTURAL COMPARISON
+================================================================================
+
+✓ Loaded 294 metrics from Traditional IoT Baseline
+
+────────────────────────────────────────────────────────────────────────────────
+1. TRADITIONAL IoT BASELINE (NO CRDT)
+────────────────────────────────────────────────────────────────────────────────
+Architecture: Event-driven periodic full-state messaging
+Data Model:   Full messages (no deltas, no CRDT)
+Sync:         Last-write-wins
+
+Bandwidth Metrics:
+  • Total messages sent: 179
+  • Total bytes transmitted: 56,381 bytes
+  • Average message size: 315.0 bytes
+  • Active nodes: 14
+
+Latency Metrics:
+  • Measurements: 115
+  • Average latency: 2.24 ms
+  • Min/Max latency: 0.09 / 36.30 ms
+
+────────────────────────────────────────────────────────────────────────────────
+COMPARISON NOTES
+────────────────────────────────────────────────────────────────────────────────
+
+Traditional IoT Baseline demonstrates:
+  ✓ Simple implementation (no CRDT overhead)
+  ✓ Periodic full-state transmission
+  ✓ No automatic convergence
+  ✓ No capability-based filtering
+
+Expected results when compared to CAP Protocol:
+
+  1. CRDT Overhead (Traditional → CAP Full):
+     • CAP Full should show ~20-40% bandwidth reduction via delta-state CRDTs
+     • Automatic conflict resolution and eventual consistency
+     • More complex implementation
+
+  2. CAP Filtering Benefit (CAP Full → CAP Differential):
+     • CAP Differential should show additional ~30-50% reduction
+     • Role-based authorization reduces unnecessary data transmission
+     • Same CRDT benefits plus capability filtering
+
+  3. Net Architectural Advantage (Traditional → CAP Differential):
+     • Combined benefit: ~50-70% bandwidth reduction
+     • Automatic convergence + security + efficiency
+
+────────────────────────────────────────────────────────────────────────────────
+2. CAP FULL REPLICATION (CRDT without filtering)
+────────────────────────────────────────────────────────────────────────────────
+Traceback (most recent call last):
+  File "/home/kit/Code/revolve/cap/cap-sim/analyze-three-way-comparison.py", line 210, in <module>
+    main()
+  File "/home/kit/Code/revolve/cap/cap-sim/analyze-three-way-comparison.py", line 207, in main
+    generate_comparison_report(traditional_file, cap_full_file, cap_differential_file)
+  File "/home/kit/Code/revolve/cap/cap-sim/analyze-three-way-comparison.py", line 139, in generate_comparison_report
+    print(f"  • Messages: {cap_full_bw['total_messages']}")
+KeyError: 'total_messages'
