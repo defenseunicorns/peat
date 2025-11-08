@@ -18,6 +18,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Enable derive for common traits
     config.type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]");
 
+    // Enable proto3 optional fields
+    config.protoc_arg("--experimental_allow_proto3_optional");
+
     // Generate code
     config.compile_protos(&proto_files, &["proto/"])?;
 
