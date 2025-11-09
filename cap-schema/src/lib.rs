@@ -107,6 +107,12 @@ pub mod cap {
             include!(concat!(env!("OUT_DIR"), "/cap.hierarchy.v1.rs"));
         }
     }
+
+    pub mod command {
+        pub mod v1 {
+            include!(concat!(env!("OUT_DIR"), "/cap.command.v1.rs"));
+        }
+    }
 }
 
 // Re-export for convenience
