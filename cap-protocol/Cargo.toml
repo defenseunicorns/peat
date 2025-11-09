@@ -24,6 +24,8 @@ dotenvy = { workspace = true }
 chrono = { workspace = true }
 geohash = "0.13"
 tempfile = "3.13"
+base64 = "0.22"
+prost = "0.13"
 
 # CRDT Backends (E8 Evaluation - ADR-007)
 automerge = { version = "0.7.1", optional = true }  # Automerge CRDT library for evaluation
