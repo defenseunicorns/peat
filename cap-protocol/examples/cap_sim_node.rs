@@ -53,8 +53,16 @@ use cap_protocol::sync::{
 };
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::time::sleep;
+
+// Mode 4: Hierarchical aggregation imports
+#[allow(unused_imports)]
+use cap_protocol::hierarchy::StateAggregator;
+#[allow(unused_imports)]
+use cap_protocol::models::{NodeConfig, NodeState};
+use cap_protocol::storage::DittoStore;
 
 /// Test document structure (currently unused - documents are created dynamically)
 #[allow(dead_code)]
@@ -103,6 +111,106 @@ enum MetricsEvent {
         round_trip_latency_ms: f64,
         ack_count: usize,
     },
+}
+
+/// Squad leader aggregation loop (Mode 4)
+///
+/// Periodically aggregates member NodeStates into SquadSummary and publishes to Ditto
+async fn squad_leader_aggregation_loop(
+    _store: Arc<DittoStore>,
+    squad_id: String,
+    node_id: String,
+    member_ids: Vec<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("[{}] Started squad leader aggregation for {}", node_id, squad_id);
+    println!("[{}] Squad members: {:?}", node_id, member_ids);
+
+    loop {
+        // TODO: Implement actual member state retrieval and aggregation
+        // Collect member states from DittoStore
+        // let mut member_states = Vec::new();
+        //
+        // for member_id in &member_ids {
+        //     // Get NodeState and NodeConfig for each member
+        //     if let Ok(Some(state)) = store.get_node_state(member_id).await {
+        //         // Create a minimal NodeConfig for the member
+        //         let config = NodeConfig { node_id: member_id.clone(), ..Default::default() };
+        //         member_states.push((config, state));
+        //     }
+        // }
+        //
+        // if !member_states.is_empty() {
+        //     // Aggregate into SquadSummary
+        //     match StateAggregator::aggregate_squad(&squad_id, &node_id, member_states) {
+        //         Ok(squad_summary) => {
+        //             // Publish to squad_summaries collection
+        //             if let Err(e) = store.upsert_squad_summary(&squad_id, &squad_summary).await {
+        //                 eprintln!("[{}] Failed to upsert squad summary: {}", node_id, e);
+        //             } else {
+        //                 println!(
+        //                     "[{}] ✓ Aggregated squad {} ({} members)",
+        //                     node_id, squad_id, squad_summary.member_count
+        //                 );
+        //             }
+        //         }
+        //         Err(e) => {
+        //             eprintln!("[{}] Failed to aggregate squad: {}", node_id, e);
+        //         }
+        //     }
+        // }
+
+        println!("[{}] [Squad Leader] Aggregation cycle (members: {})", node_id, member_ids.len());
+
+        // Wait 5 seconds before next aggregation
+        sleep(Duration::from_secs(5)).await;
+    }
+}
+
+/// Platoon leader aggregation loop (Mode 4)
+///
+/// Periodically aggregates SquadSummaries into PlatoonSummary and publishes to Ditto
+async fn platoon_leader_aggregation_loop(
+    store: Arc<DittoStore>,
+    platoon_id: String,
+    node_id: String,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("[{}] Started platoon leader aggregation for {}", node_id, platoon_id);
+
+    let squad_ids = vec!["squad-alpha", "squad-bravo", "squad-charlie"];
+
+    loop {
+        // Collect squad summaries from DittoStore
+        let mut squad_summaries = Vec::new();
+
+        for squad_id in &squad_ids {
+            if let Ok(Some(summary)) = store.get_squad_summary(squad_id).await {
+                squad_summaries.push(summary);
+            }
+        }
+
+        if squad_summaries.len() == 3 {
+            // Aggregate into PlatoonSummary
+            match StateAggregator::aggregate_platoon(&platoon_id, &node_id, squad_summaries) {
+                Ok(platoon_summary) => {
+                    // Publish to platoon_summaries collection
+                    if let Err(e) = store.upsert_platoon_summary(&platoon_id, &platoon_summary).await {
+                        eprintln!("[{}] Failed to upsert platoon summary: {}", node_id, e);
+                    } else {
+                        println!(
+                            "[{}] ✓ Aggregated platoon {} ({} squads, {} total members)",
+                            node_id, platoon_id, platoon_summary.squad_count, platoon_summary.total_member_count
+                        );
+                    }
+                }
+                Err(e) => {
+                    eprintln!("[{}] Failed to aggregate platoon: {}", node_id, e);
+                }
+            }
+        }
+
+        // Wait 5 seconds before next aggregation
+        sleep(Duration::from_secs(5)).await;
+    }
 }
 
 #[tokio::main]
@@ -177,6 +285,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         cap_filter_enabled = val.to_lowercase() == "true" || val == "1";
     }
 
+    // Check for MODE environment variable (Mode 4: hierarchical aggregation)
+    let hierarchical_mode = std::env::var("MODE")
+        .unwrap_or_else(|_| String::new())
+        .to_lowercase() == "hierarchical";
+
     let node_id = node_id.expect("--node-id required");
     let mode = mode.expect("--mode required");
     let backend_type = backend_type.unwrap_or_else(|| "ditto".to_string());
@@ -197,6 +310,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "DISABLED (full replication)"
         }
     );
+
+    if hierarchical_mode {
+        println!("[{}] MODE 4: Hierarchical aggregation enabled", node_id);
+    }
 
     if let Some(port) = tcp_listen_port {
         println!("[{}] TCP: Will listen on port {}", node_id, port);
@@ -222,16 +339,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Use capability-filtered query if CAP filtering is enabled
     println!("[{}] Creating sync subscription...", node_id);
     let subscription_query = if cap_filter_enabled {
-        // Differential mode: Only subscribe to documents authorized for this node type
-        // Use Custom DQL query for array contains check
-        println!(
-            "[{}]   → Using CAP-filtered query for role: {}",
-            node_id, node_type
-        );
-        Query::Custom(format!(
-            "public == true OR CONTAINS(authorized_roles, '{}')",
-            node_type
-        ))
+        if hierarchical_mode && std::env::var("ROLE").unwrap_or_default() == "platoon_leader" {
+            // Platoon leaders ONLY subscribe to squad_summaries, not individual NodeStates
+            println!("[{}]   → Subscribing to squad_summaries (hierarchical mode)", node_id);
+            Query::Custom("collection_name == 'squad_summaries'".to_string())
+        } else {
+            // Existing CAP-filtered query for soldiers and squad leaders
+            println!("[{}]   → Using CAP-filtered query for role: {}", node_id, node_type);
+            Query::Custom(format!(
+                "public == true OR CONTAINS(authorized_roles, '{}')",
+                node_type
+            ))
+        }
     } else {
         // Full replication mode: Subscribe to all documents (current behavior)
         println!("[{}]   → Using full replication (Query::All)", node_id);
@@ -248,6 +367,98 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     sync_engine.start_sync().await?;
     println!("[{}] ✓ Sync started", node_id);
 
+    // Step 4: Spawn aggregation tasks based on ROLE if in hierarchical mode
+    if hierarchical_mode {
+        let role = std::env::var("ROLE").unwrap_or_default();
+
+        match role.as_str() {
+            "squad_leader" => {
+                println!("[{}] Spawning squad leader aggregation task...", node_id);
+
+                let squad_id = std::env::var("SQUAD_ID")
+                    .unwrap_or_else(|_| "squad-unknown".to_string());
+                let squad_members_str = std::env::var("SQUAD_MEMBERS")
+                    .unwrap_or_else(|_| String::new());
+                let member_ids: Vec<String> = squad_members_str
+                    .split(',')
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.trim().to_string())
+                    .collect();
+
+                // Get DittoStore from backend
+                if let Some(ditto_backend) = backend.as_any().downcast_ref::<DittoBackend>() {
+                    match ditto_backend.get_ditto_store() {
+                        Ok(ditto_store) => {
+                            let store_clone = Arc::clone(&ditto_store);
+                            let node_id_clone = node_id.clone();
+
+                            println!(
+                                "[{}] → Squad: {}, Members: {:?}",
+                                node_id, squad_id, member_ids
+                            );
+
+                            tokio::spawn(async move {
+                                if let Err(e) = squad_leader_aggregation_loop(
+                                    store_clone,
+                                    squad_id,
+                                    node_id_clone.clone(),
+                                    member_ids,
+                                ).await {
+                                    eprintln!("[{}] Squad leader aggregation error: {}", node_id_clone, e);
+                                }
+                            });
+
+                            println!("[{}] ✓ Squad leader aggregation task spawned", node_id);
+                        }
+                        Err(e) => {
+                            eprintln!("[{}] ✗ Failed to get DittoStore: {}", node_id, e);
+                        }
+                    }
+                } else {
+                    eprintln!("[{}] ✗ Cannot spawn squad leader task: backend is not DittoBackend", node_id);
+                }
+            }
+            "platoon_leader" => {
+                println!("[{}] Spawning platoon leader aggregation task...", node_id);
+
+                let platoon_id = std::env::var("PLATOON_ID")
+                    .unwrap_or_else(|_| "platoon-1".to_string());
+
+                // Get DittoStore from backend
+                if let Some(ditto_backend) = backend.as_any().downcast_ref::<DittoBackend>() {
+                    match ditto_backend.get_ditto_store() {
+                        Ok(ditto_store) => {
+                            let store_clone = Arc::clone(&ditto_store);
+                            let node_id_clone = node_id.clone();
+
+                            println!("[{}] → Platoon: {}", node_id, platoon_id);
+
+                            tokio::spawn(async move {
+                                if let Err(e) = platoon_leader_aggregation_loop(
+                                    store_clone,
+                                    platoon_id,
+                                    node_id_clone.clone(),
+                                ).await {
+                                    eprintln!("[{}] Platoon leader aggregation error: {}", node_id_clone, e);
+                                }
+                            });
+
+                            println!("[{}] ✓ Platoon leader aggregation task spawned", node_id);
+                        }
+                        Err(e) => {
+                            eprintln!("[{}] ✗ Failed to get DittoStore: {}", node_id, e);
+                        }
+                    }
+                } else {
+                    eprintln!("[{}] ✗ Cannot spawn platoon leader task: backend is not DittoBackend", node_id);
+                }
+            }
+            _ => {
+                println!("[{}] No aggregation task needed for role: {}", node_id, role);
+            }
+        }
+    }
+
     // Wait a moment for peer discovery
     println!("[{}] Waiting for peer discovery (5s)...", node_id);
     sleep(Duration::from_secs(5)).await;
@@ -256,6 +467,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let result = match mode.as_str() {
         "writer" => writer_mode(&*backend, &node_id, &node_type, update_rate_ms).await,
         "reader" => reader_mode(&*backend, &node_id).await,
+        "hierarchical" => {
+            // In hierarchical mode, leaders aggregate data but also act as writers
+            writer_mode(&*backend, &node_id, &node_type, update_rate_ms).await
+        }
         _ => {
             eprintln!("[{}] ✗ Invalid mode: {}", node_id, mode);
             std::process::exit(1);
