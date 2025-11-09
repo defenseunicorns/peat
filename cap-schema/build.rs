@@ -11,6 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "proto/zone.proto",
         "proto/role.proto",
         "proto/hierarchy.proto",
+        "proto/command.proto",
     ];
 
     // Configure prost to generate Rust code from .proto files
