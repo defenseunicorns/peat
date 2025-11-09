@@ -137,6 +137,10 @@ impl DataSyncBackend for DittoBackend {
             version: env!("CARGO_PKG_VERSION").to_string(),
         }
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl Clone for DittoBackend {
