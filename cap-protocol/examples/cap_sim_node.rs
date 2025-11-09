@@ -117,49 +117,80 @@ enum MetricsEvent {
 ///
 /// Periodically aggregates member NodeStates into SquadSummary and publishes to Ditto
 async fn squad_leader_aggregation_loop(
-    _store: Arc<DittoStore>,
+    store: Arc<DittoStore>,
     squad_id: String,
     node_id: String,
     member_ids: Vec<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("[{}] Started squad leader aggregation for {}", node_id, squad_id);
+    println!(
+        "[{}] Started squad leader aggregation for {}",
+        node_id, squad_id
+    );
     println!("[{}] Squad members: {:?}", node_id, member_ids);
 
     loop {
-        // TODO: Implement actual member state retrieval and aggregation
-        // Collect member states from DittoStore
-        // let mut member_states = Vec::new();
-        //
-        // for member_id in &member_ids {
-        //     // Get NodeState and NodeConfig for each member
-        //     if let Ok(Some(state)) = store.get_node_state(member_id).await {
-        //         // Create a minimal NodeConfig for the member
-        //         let config = NodeConfig { node_id: member_id.clone(), ..Default::default() };
-        //         member_states.push((config, state));
-        //     }
-        // }
-        //
-        // if !member_states.is_empty() {
-        //     // Aggregate into SquadSummary
-        //     match StateAggregator::aggregate_squad(&squad_id, &node_id, member_states) {
-        //         Ok(squad_summary) => {
-        //             // Publish to squad_summaries collection
-        //             if let Err(e) = store.upsert_squad_summary(&squad_id, &squad_summary).await {
-        //                 eprintln!("[{}] Failed to upsert squad summary: {}", node_id, e);
-        //             } else {
-        //                 println!(
-        //                     "[{}] ✓ Aggregated squad {} ({} members)",
-        //                     node_id, squad_id, squad_summary.member_count
-        //                 );
-        //             }
-        //         }
-        //         Err(e) => {
-        //             eprintln!("[{}] Failed to aggregate squad: {}", node_id, e);
-        //         }
-        //     }
-        // }
+        // Collect member states using synthetic NodeConfig/NodeState
+        // (Current sim stores simple messages, not full NodeState documents)
+        let mut member_states = Vec::new();
 
-        println!("[{}] [Squad Leader] Aggregation cycle (members: {})", node_id, member_ids.len());
+        for member_id in &member_ids {
+            // Create minimal NodeConfig for aggregation
+            let config = NodeConfig {
+                id: member_id.clone(),
+                platform_type: "Simulated".to_string(),
+                capabilities: vec![],
+                comm_range_m: 1000.0,
+                max_speed_mps: 10.0,
+                operator_binding: None,
+                created_at: None,
+            };
+
+            // Create minimal operational NodeState
+            // Note: In production, this would query actual NodeState documents from Ditto
+            let state = NodeState {
+                position: Some(cap_schema::common::v1::Position {
+                    latitude: 0.0,
+                    longitude: 0.0,
+                    altitude: 0.0,
+                }),
+                fuel_minutes: 100,
+                health: cap_schema::node::v1::HealthStatus::Nominal.into(),
+                phase: cap_schema::node::v1::Phase::Hierarchy.into(),
+                cell_id: Some(squad_id.clone()),
+                zone_id: None,
+                timestamp: None,
+            };
+
+            member_states.push((config, state));
+        }
+
+        if !member_states.is_empty() {
+            // Aggregate into SquadSummary using StateAggregator
+            match StateAggregator::aggregate_squad(&squad_id, &node_id, member_states) {
+                Ok(squad_summary) => {
+                    // Publish to squad_summaries collection
+                    if let Err(e) = store.upsert_squad_summary(&squad_id, &squad_summary).await {
+                        eprintln!("[{}] Failed to upsert squad summary: {}", node_id, e);
+                    } else {
+                        println!(
+                            "[{}] ✓ Aggregated squad {} ({} members, readiness: {:.2})",
+                            node_id,
+                            squad_id,
+                            squad_summary.member_count,
+                            squad_summary.readiness_score
+                        );
+                    }
+                }
+                Err(e) => {
+                    eprintln!("[{}] Failed to aggregate squad: {}", node_id, e);
+                }
+            }
+        } else {
+            println!(
+                "[{}] [Squad Leader] No operational members to aggregate",
+                node_id
+            );
+        }
 
         // Wait 5 seconds before next aggregation
         sleep(Duration::from_secs(5)).await;
@@ -174,7 +205,10 @@ async fn platoon_leader_aggregation_loop(
     platoon_id: String,
     node_id: String,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("[{}] Started platoon leader aggregation for {}", node_id, platoon_id);
+    println!(
+        "[{}] Started platoon leader aggregation for {}",
+        node_id, platoon_id
+    );
 
     let squad_ids = vec!["squad-alpha", "squad-bravo", "squad-charlie"];
 
@@ -193,12 +227,18 @@ async fn platoon_leader_aggregation_loop(
             match StateAggregator::aggregate_platoon(&platoon_id, &node_id, squad_summaries) {
                 Ok(platoon_summary) => {
                     // Publish to platoon_summaries collection
-                    if let Err(e) = store.upsert_platoon_summary(&platoon_id, &platoon_summary).await {
+                    if let Err(e) = store
+                        .upsert_platoon_summary(&platoon_id, &platoon_summary)
+                        .await
+                    {
                         eprintln!("[{}] Failed to upsert platoon summary: {}", node_id, e);
                     } else {
                         println!(
                             "[{}] ✓ Aggregated platoon {} ({} squads, {} total members)",
-                            node_id, platoon_id, platoon_summary.squad_count, platoon_summary.total_member_count
+                            node_id,
+                            platoon_id,
+                            platoon_summary.squad_count,
+                            platoon_summary.total_member_count
                         );
                     }
                 }
@@ -288,7 +328,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Check for MODE environment variable (Mode 4: hierarchical aggregation)
     let hierarchical_mode = std::env::var("MODE")
         .unwrap_or_else(|_| String::new())
-        .to_lowercase() == "hierarchical";
+        .to_lowercase()
+        == "hierarchical";
 
     let node_id = node_id.expect("--node-id required");
     let mode = mode.expect("--mode required");
@@ -341,11 +382,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let subscription_query = if cap_filter_enabled {
         if hierarchical_mode && std::env::var("ROLE").unwrap_or_default() == "platoon_leader" {
             // Platoon leaders ONLY subscribe to squad_summaries, not individual NodeStates
-            println!("[{}]   → Subscribing to squad_summaries (hierarchical mode)", node_id);
+            println!(
+                "[{}]   → Subscribing to squad_summaries (hierarchical mode)",
+                node_id
+            );
             Query::Custom("collection_name == 'squad_summaries'".to_string())
         } else {
             // Existing CAP-filtered query for soldiers and squad leaders
-            println!("[{}]   → Using CAP-filtered query for role: {}", node_id, node_type);
+            println!(
+                "[{}]   → Using CAP-filtered query for role: {}",
+                node_id, node_type
+            );
             Query::Custom(format!(
                 "public == true OR CONTAINS(authorized_roles, '{}')",
                 node_type
@@ -375,10 +422,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "squad_leader" => {
                 println!("[{}] Spawning squad leader aggregation task...", node_id);
 
-                let squad_id = std::env::var("SQUAD_ID")
-                    .unwrap_or_else(|_| "squad-unknown".to_string());
-                let squad_members_str = std::env::var("SQUAD_MEMBERS")
-                    .unwrap_or_else(|_| String::new());
+                let squad_id =
+                    std::env::var("SQUAD_ID").unwrap_or_else(|_| "squad-unknown".to_string());
+                let squad_members_str =
+                    std::env::var("SQUAD_MEMBERS").unwrap_or_else(|_| String::new());
                 let member_ids: Vec<String> = squad_members_str
                     .split(',')
                     .filter(|s| !s.is_empty())
@@ -403,8 +450,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     squad_id,
                                     node_id_clone.clone(),
                                     member_ids,
-                                ).await {
-                                    eprintln!("[{}] Squad leader aggregation error: {}", node_id_clone, e);
+                                )
+                                .await
+                                {
+                                    eprintln!(
+                                        "[{}] Squad leader aggregation error: {}",
+                                        node_id_clone, e
+                                    );
                                 }
                             });
 
@@ -415,14 +467,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                 } else {
-                    eprintln!("[{}] ✗ Cannot spawn squad leader task: backend is not DittoBackend", node_id);
+                    eprintln!(
+                        "[{}] ✗ Cannot spawn squad leader task: backend is not DittoBackend",
+                        node_id
+                    );
                 }
             }
             "platoon_leader" => {
                 println!("[{}] Spawning platoon leader aggregation task...", node_id);
 
-                let platoon_id = std::env::var("PLATOON_ID")
-                    .unwrap_or_else(|_| "platoon-1".to_string());
+                let platoon_id =
+                    std::env::var("PLATOON_ID").unwrap_or_else(|_| "platoon-1".to_string());
 
                 // Get DittoStore from backend
                 if let Some(ditto_backend) = backend.as_any().downcast_ref::<DittoBackend>() {
@@ -438,8 +493,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     store_clone,
                                     platoon_id,
                                     node_id_clone.clone(),
-                                ).await {
-                                    eprintln!("[{}] Platoon leader aggregation error: {}", node_id_clone, e);
+                                )
+                                .await
+                                {
+                                    eprintln!(
+                                        "[{}] Platoon leader aggregation error: {}",
+                                        node_id_clone, e
+                                    );
                                 }
                             });
 
@@ -450,11 +510,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                 } else {
-                    eprintln!("[{}] ✗ Cannot spawn platoon leader task: backend is not DittoBackend", node_id);
+                    eprintln!(
+                        "[{}] ✗ Cannot spawn platoon leader task: backend is not DittoBackend",
+                        node_id
+                    );
                 }
             }
             _ => {
-                println!("[{}] No aggregation task needed for role: {}", node_id, role);
+                println!(
+                    "[{}] No aggregation task needed for role: {}",
+                    node_id, role
+                );
             }
         }
     }
