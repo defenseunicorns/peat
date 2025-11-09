@@ -8,6 +8,7 @@ pub mod maintenance;
 pub mod router;
 pub mod routing_cache;
 pub mod routing_table;
+pub mod state_aggregation;
 pub mod zone_coordinator;
 
 pub use flow_control::{
@@ -20,4 +21,5 @@ pub use maintenance::{
 pub use router::{HierarchicalRouter, RouterStats};
 pub use routing_cache::{CacheStats, RoutingCache};
 pub use routing_table::{RoutingTable, RoutingTableStats};
+pub use state_aggregation::StateAggregator;
 pub use zone_coordinator::{ZoneCoordinator, ZoneFormationStatus, ZoneMetrics};

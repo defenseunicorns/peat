@@ -1,0 +1,208 @@
+// Hierarchical aggregation summaries for CAP Protocol
+// Version: 1.0.0
+//
+// This schema defines aggregated state summaries for hierarchical formations.
+// Supports multi-tier military hierarchy (squad → platoon → company).
+
+syntax = "proto3";
+
+package cap.hierarchy.v1;
+
+import "common.proto";
+import "capability.proto";
+import "node.proto";
+
+// Squad-level aggregated state summary
+//
+// Represents the aggregated state of a squad (typically 8 nodes):
+// - 1 Squad Leader
+// - 5-7 Squad Members (soldiers/platforms)
+// - 0-2 Robotic assets (UAV/UGV)
+//
+// This summary is published by squad leaders for consumption by platoon leaders.
+// It reduces 8 individual NodeState messages to 1 aggregated summary.
+message SquadSummary {
+  // Squad identifier (matches cell_id in NodeState)
+  string squad_id = 1;
+
+  // Squad leader node ID
+  string leader_id = 2;
+
+  // Member node IDs (for reference, not full state)
+  repeated string member_ids = 3;
+
+  // Total member count
+  uint32 member_count = 4;
+
+  // Aggregated Position (centroid of member positions)
+  common.v1.Position position_centroid = 5;
+
+  // Average fuel remaining across squad (minutes)
+  float avg_fuel_minutes = 6;
+
+  // Worst health status in squad (min of all members)
+  // Uses LWW semantics - worst health wins for tactical awareness
+  node.v1.HealthStatus worst_health = 7;
+
+  // Operational member count (health >= DEGRADED)
+  uint32 operational_count = 8;
+
+  // Aggregated capabilities (from CapabilityAggregator)
+  // These are cell-level emergent capabilities, not individual platform capabilities
+  repeated capability.v1.Capability aggregated_capabilities = 9;
+
+  // Squad readiness score (0.0-1.0)
+  // Computed by CapabilityAggregator.calculate_readiness_score()
+  float readiness_score = 10;
+
+  // Squad bounding box (for spatial queries)
+  BoundingBox bounding_box = 11;
+
+  // Last aggregation timestamp
+  common.v1.Timestamp aggregated_at = 12;
+}
+
+// Platoon-level aggregated state summary
+//
+// Represents the aggregated state of a platoon (typically 24 nodes organized as 3 squads):
+// - 1 Platoon Leader
+// - 3 Squad Leaders (each with SquadSummary)
+//
+// This summary is published by platoon leaders for consumption by company commanders.
+// It reduces 3 SquadSummary messages to 1 platoon-level summary.
+message PlatoonSummary {
+  // Platoon identifier
+  string platoon_id = 1;
+
+  // Platoon leader node ID
+  string leader_id = 2;
+
+  // Squad IDs in this platoon
+  repeated string squad_ids = 3;
+
+  // Total squad count
+  uint32 squad_count = 4;
+
+  // Total member count across all squads
+  uint32 total_member_count = 5;
+
+  // Aggregated position (centroid of squad centroids)
+  common.v1.Position position_centroid = 6;
+
+  // Average fuel across all squads (minutes)
+  float avg_fuel_minutes = 7;
+
+  // Worst health status across all squads
+  node.v1.HealthStatus worst_health = 8;
+
+  // Total operational member count
+  uint32 operational_count = 9;
+
+  // Platoon-level aggregated capabilities
+  // Composition of squad-level capabilities
+  repeated capability.v1.Capability aggregated_capabilities = 10;
+
+  // Platoon readiness score (0.0-1.0)
+  // Weighted average of squad readiness scores
+  float readiness_score = 11;
+
+  // Platoon bounding box
+  BoundingBox bounding_box = 12;
+
+  // Last aggregation timestamp
+  common.v1.Timestamp aggregated_at = 13;
+}
+
+// Company-level aggregated state summary
+//
+// Represents the aggregated state of a company (typically 96 nodes organized as 4 platoons):
+// - 1 Company Commander
+// - 4 Platoon Leaders (each with PlatoonSummary)
+//
+// This enables battalion-level commanders to see company-level summaries without
+// processing 96 individual node states or 12 squad summaries.
+message CompanySummary {
+  // Company identifier
+  string company_id = 1;
+
+  // Company commander node ID
+  string leader_id = 2;
+
+  // Platoon IDs in this company
+  repeated string platoon_ids = 3;
+
+  // Total platoon count
+  uint32 platoon_count = 4;
+
+  // Total member count across all platoons
+  uint32 total_member_count = 5;
+
+  // Aggregated position (centroid of platoon centroids)
+  common.v1.Position position_centroid = 6;
+
+  // Average fuel across all platoons (minutes)
+  float avg_fuel_minutes = 7;
+
+  // Worst health status across all platoons
+  node.v1.HealthStatus worst_health = 8;
+
+  // Total operational member count
+  uint32 operational_count = 9;
+
+  // Company-level aggregated capabilities
+  repeated capability.v1.Capability aggregated_capabilities = 10;
+
+  // Company readiness score (0.0-1.0)
+  float readiness_score = 11;
+
+  // Company bounding box
+  BoundingBox bounding_box = 12;
+
+  // Last aggregation timestamp
+  common.v1.Timestamp aggregated_at = 13;
+}
+
+// Spatial bounding box for formation
+//
+// Defines the geographic extent of a formation (squad/platoon/company).
+// Useful for spatial queries and tactical situational awareness.
+message BoundingBox {
+  // Southwest corner (minimum lat/lon)
+  common.v1.Position southwest = 1;
+
+  // Northeast corner (maximum lat/lon)
+  common.v1.Position northeast = 2;
+
+  // Maximum altitude in formation
+  float max_altitude = 3;
+
+  // Minimum altitude in formation
+  float min_altitude = 4;
+
+  // Approximate radius in meters (from centroid to furthest member)
+  float radius_m = 5;
+}
+
+// Aggregation metadata
+//
+// Provides context about how an aggregation was performed.
+// Useful for debugging and understanding data staleness.
+message AggregationMetadata {
+  // Number of source documents aggregated
+  uint32 source_count = 1;
+
+  // Number of sources excluded (e.g., non-operational nodes)
+  uint32 excluded_count = 2;
+
+  // Aggregation method used
+  string aggregation_method = 3;
+
+  // Timestamp when aggregation was performed
+  common.v1.Timestamp performed_at = 4;
+
+  // Oldest source document timestamp (for staleness detection)
+  common.v1.Timestamp oldest_source = 5;
+
+  // Newest source document timestamp
+  common.v1.Timestamp newest_source = 6;
+}
