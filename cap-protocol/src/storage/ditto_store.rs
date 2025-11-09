@@ -831,7 +831,8 @@ mod tests {
     use tokio::time::sleep;
 
     /// Helper function to create a test DittoStore with credentials
-    async fn create_test_store(test_name: &str) -> DittoStore {
+    /// Returns (DittoStore, TempDir) - the TempDir must be kept alive for the duration of the test
+    async fn create_test_store(test_name: &str) -> (DittoStore, tempfile::TempDir) {
         dotenvy::dotenv().ok();
 
         let app_id = std::env::var("DITTO_APP_ID")
@@ -869,7 +870,7 @@ mod tests {
 
         let store = DittoStore::new(config).expect("Failed to create Ditto store");
         store.start_sync().expect("Failed to start sync");
-        store
+        (store, temp_dir)
     }
 
     #[tokio::test]
@@ -1463,7 +1464,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_command_upsert_and_retrieve() {
-        let store = create_test_store("test_command_upsert").await;
+        let (store, _temp_dir) = create_test_store("test_command_upsert").await;
 
         use cap_schema::command::v1::{command_target::Scope, CommandTarget, HierarchicalCommand};
 
@@ -1517,7 +1518,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_command_acknowledgment_upsert_and_query() {
-        let store = create_test_store("test_command_ack").await;
+        let (store, _temp_dir) = create_test_store("test_command_ack").await;
 
         use cap_schema::command::v1::{AckStatus, CommandAcknowledgment};
         use cap_schema::common::v1::Timestamp;
