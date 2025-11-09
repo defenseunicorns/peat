@@ -1,0 +1,414 @@
+# MODE 4 (CAP Hierarchical): This topology has CAP_FILTER_ENABLED=true + MODE=hierarchical for hierarchical aggregation
+# ContainerLab Topology: 24-Node Platoon - Client-Server Mode
+#
+# Purpose: Phase 3A - Hierarchical aggregation test (95% bandwidth reduction)
+# Architecture: All nodes connect to platoon-leader (star topology)
+# Scale: 2× squad (12 → 24 nodes)
+#
+# Structure:
+#   Platoon Leader (1) - Aggregates 3 SquadSummaries → 1 PlatoonSummary
+#   ├── Squad Alpha Leader (1) + 6 members - Aggregates 7 NodeStates → 1 SquadSummary
+#   ├── Squad Bravo Leader (1) + 6 members - Aggregates 7 NodeStates → 1 SquadSummary
+#   └── Squad Charlie Leader (1) + 6 members - Aggregates 7 NodeStates → 1 SquadSummary
+#   Total: 1 platoon leader + 21 squad members = 24 nodes
+#   Expected: 27 total ops (24 NodeStates + 3 SquadSummaries) vs 576 in Mode 2
+#
+# Network: All nodes → platoon-leader (central aggregation)
+
+name: cap-platoon-mode4-client-server
+
+topology:
+  nodes:
+    # Platoon Leader (central server, all nodes connect here)
+    platoon-leader:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: platoon-leader
+        ROLE: platoon_leader
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: hierarchical
+        PLATOON_ID: "platoon-1"
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+      ports:
+        - "12345:12345"
+
+    # Squad Alpha (7 members)
+    squad-alpha-leader:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: squad-alpha-leader
+        ROLE: squad_leader
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: hierarchical
+        SQUAD_ID: "squad-alpha"
+        TCP_LISTEN: "12346"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    alpha-soldier-1:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: alpha-soldier-1
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12347"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    alpha-soldier-2:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: alpha-soldier-2
+        ROLE: grenadier
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12348"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    alpha-soldier-3:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: alpha-soldier-3
+        ROLE: automatic_rifleman
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12349"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    alpha-soldier-4:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: alpha-soldier-4
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12350"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    alpha-uav-1:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: alpha-uav-1
+        ROLE: reconnaissance
+        PLATFORM_TYPE: uav
+        NODE_TYPE: uav
+        MODE: reader
+        TCP_LISTEN: "12351"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    alpha-ugv-1:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: alpha-ugv-1
+        ROLE: resupply_isr
+        PLATFORM_TYPE: ugv
+        NODE_TYPE: ugv
+        MODE: reader
+        TCP_LISTEN: "12352"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    # Squad Bravo (8 members: 1 leader + 4 soldiers + 1 UAV + 1 UGV + 1 team leader)
+    squad-bravo-leader:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: squad-bravo-leader
+        ROLE: squad_leader
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: hierarchical
+        SQUAD_ID: "squad-bravo"
+        TCP_LISTEN: "12353"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    bravo-soldier-1:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: bravo-soldier-1
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12354"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    bravo-soldier-2:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: bravo-soldier-2
+        ROLE: grenadier
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12355"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    bravo-soldier-3:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: bravo-soldier-3
+        ROLE: automatic_rifleman
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12356"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    bravo-soldier-4:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: bravo-soldier-4
+        ROLE: team_leader
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12357"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    bravo-soldier-5:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: bravo-soldier-5
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12358"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    bravo-uav-1:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: bravo-uav-1
+        ROLE: reconnaissance
+        PLATFORM_TYPE: uav
+        NODE_TYPE: uav
+        MODE: reader
+        TCP_LISTEN: "12359"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    bravo-ugv-1:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: bravo-ugv-1
+        ROLE: resupply_isr
+        PLATFORM_TYPE: ugv
+        NODE_TYPE: ugv
+        MODE: reader
+        TCP_LISTEN: "12360"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    # Squad Charlie (8 members)
+    squad-charlie-leader:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: squad-charlie-leader
+        ROLE: squad_leader
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: hierarchical
+        SQUAD_ID: "squad-charlie"
+        TCP_LISTEN: "12361"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    charlie-soldier-1:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: charlie-soldier-1
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12362"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    charlie-soldier-2:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: charlie-soldier-2
+        ROLE: grenadier
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12363"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    charlie-soldier-3:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: charlie-soldier-3
+        ROLE: automatic_rifleman
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12364"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    charlie-soldier-4:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: charlie-soldier-4
+        ROLE: team_leader
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12365"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    charlie-soldier-5:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: charlie-soldier-5
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12366"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    charlie-uav-1:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: charlie-uav-1
+        ROLE: reconnaissance
+        PLATFORM_TYPE: uav
+        NODE_TYPE: uav
+        MODE: reader
+        TCP_LISTEN: "12367"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
+
+    charlie-ugv-1:
+      kind: linux
+      image: cap-sim-node:latest
+      env:
+        NODE_ID: charlie-ugv-1
+        ROLE: resupply_isr
+        PLATFORM_TYPE: ugv
+        NODE_TYPE: ugv
+        MODE: reader
+        TCP_LISTEN: "12368"
+        TCP_CONNECT: "platoon-leader:12345"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        CAP_FILTER_ENABLED: "true"
