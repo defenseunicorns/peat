@@ -38,8 +38,10 @@
 
 use crate::sync::ditto::DittoBackend;
 use crate::{Error, Result};
+use base64::Engine;
 use dittolive_ditto::prelude::*;
 use dittolive_ditto::AppId;
+use prost::Message;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{debug, error, info, instrument, warn};
@@ -444,6 +446,183 @@ impl DittoStore {
             .peer_key_string
             .clone()
     }
+
+    // Hierarchical Summary Storage (E11.2)
+    //
+    // These methods enable Mode 3 (CAP Differential) testing by providing
+    // storage for SquadSummary and PlatoonSummary aggregations.
+
+    /// Store a SquadSummary in the squad_summaries collection
+    ///
+    /// # Arguments
+    ///
+    /// * `squad_id` - Unique squad identifier (used as document _id)
+    /// * `summary` - SquadSummary protobuf message
+    ///
+    /// # Returns
+    ///
+    /// Document ID (same as squad_id)
+    #[instrument(skip(self, summary), fields(squad_id))]
+    pub async fn upsert_squad_summary(
+        &self,
+        squad_id: &str,
+        summary: &cap_schema::hierarchy::v1::SquadSummary,
+    ) -> Result<String> {
+        // Encode protobuf to bytes
+        let bytes = summary.encode_to_vec();
+
+        // Convert to base64 for storage (Ditto stores binary as base64 strings)
+        let base64_data = base64::engine::general_purpose::STANDARD.encode(&bytes);
+
+        // Create JSON document with _id and binary data
+        let doc = serde_json::json!({
+            "_id": squad_id,
+            "squad_id": summary.squad_id,
+            "leader_id": summary.leader_id,
+            "member_count": summary.member_count,
+            "data": base64_data,
+            "type": "squad_summary"
+        });
+
+        self.upsert("squad_summaries", doc).await
+    }
+
+    /// Retrieve a SquadSummary from the squad_summaries collection
+    ///
+    /// # Arguments
+    ///
+    /// * `squad_id` - Unique squad identifier
+    ///
+    /// # Returns
+    ///
+    /// Some(SquadSummary) if found, None if not found
+    #[instrument(skip(self), fields(squad_id))]
+    pub async fn get_squad_summary(
+        &self,
+        squad_id: &str,
+    ) -> Result<Option<cap_schema::hierarchy::v1::SquadSummary>> {
+        let results = self
+            .query("squad_summaries", &format!("_id == '{}'", squad_id))
+            .await?;
+
+        if results.is_empty() {
+            return Ok(None);
+        }
+
+        let doc = &results[0];
+        let base64_data = doc["data"].as_str().ok_or_else(|| {
+            Error::storage_error(
+                "Missing data field",
+                "get_squad_summary",
+                Some(squad_id.to_string()),
+            )
+        })?;
+
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(base64_data)
+            .map_err(|e| {
+                Error::storage_error(
+                    format!("Base64 decode failed: {}", e),
+                    "get_squad_summary",
+                    Some(squad_id.to_string()),
+                )
+            })?;
+
+        let summary = cap_schema::hierarchy::v1::SquadSummary::decode(&bytes[..]).map_err(|e| {
+            Error::storage_error(
+                format!("Protobuf decode failed: {}", e),
+                "get_squad_summary",
+                Some(squad_id.to_string()),
+            )
+        })?;
+
+        Ok(Some(summary))
+    }
+
+    /// Store a PlatoonSummary in the platoon_summaries collection
+    ///
+    /// # Arguments
+    ///
+    /// * `platoon_id` - Unique platoon identifier (used as document _id)
+    /// * `summary` - PlatoonSummary protobuf message
+    ///
+    /// # Returns
+    ///
+    /// Document ID (same as platoon_id)
+    #[instrument(skip(self, summary), fields(platoon_id))]
+    pub async fn upsert_platoon_summary(
+        &self,
+        platoon_id: &str,
+        summary: &cap_schema::hierarchy::v1::PlatoonSummary,
+    ) -> Result<String> {
+        let bytes = summary.encode_to_vec();
+        let base64_data = base64::engine::general_purpose::STANDARD.encode(&bytes);
+
+        let doc = serde_json::json!({
+            "_id": platoon_id,
+            "platoon_id": summary.platoon_id,
+            "leader_id": summary.leader_id,
+            "squad_count": summary.squad_count,
+            "total_member_count": summary.total_member_count,
+            "data": base64_data,
+            "type": "platoon_summary"
+        });
+
+        self.upsert("platoon_summaries", doc).await
+    }
+
+    /// Retrieve a PlatoonSummary from the platoon_summaries collection
+    ///
+    /// # Arguments
+    ///
+    /// * `platoon_id` - Unique platoon identifier
+    ///
+    /// # Returns
+    ///
+    /// Some(PlatoonSummary) if found, None if not found
+    #[instrument(skip(self), fields(platoon_id))]
+    pub async fn get_platoon_summary(
+        &self,
+        platoon_id: &str,
+    ) -> Result<Option<cap_schema::hierarchy::v1::PlatoonSummary>> {
+        let results = self
+            .query("platoon_summaries", &format!("_id == '{}'", platoon_id))
+            .await?;
+
+        if results.is_empty() {
+            return Ok(None);
+        }
+
+        let doc = &results[0];
+        let base64_data = doc["data"].as_str().ok_or_else(|| {
+            Error::storage_error(
+                "Missing data field",
+                "get_platoon_summary",
+                Some(platoon_id.to_string()),
+            )
+        })?;
+
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(base64_data)
+            .map_err(|e| {
+                Error::storage_error(
+                    format!("Base64 decode failed: {}", e),
+                    "get_platoon_summary",
+                    Some(platoon_id.to_string()),
+                )
+            })?;
+
+        let summary =
+            cap_schema::hierarchy::v1::PlatoonSummary::decode(&bytes[..]).map_err(|e| {
+                Error::storage_error(
+                    format!("Protobuf decode failed: {}", e),
+                    "get_platoon_summary",
+                    Some(platoon_id.to_string()),
+                )
+            })?;
+
+        Ok(Some(summary))
+    }
 }
 
 impl Clone for DittoStore {
@@ -844,5 +1023,231 @@ mod tests {
             (store1, store2),
         )
         .await;
+    }
+
+    #[tokio::test]
+    async fn test_squad_summary_storage() {
+        use cap_schema::common::v1::{Position, Timestamp};
+        use cap_schema::hierarchy::v1::{BoundingBox, SquadSummary};
+        use cap_schema::node::v1::HealthStatus;
+
+        dotenvy::dotenv().ok();
+
+        let app_id = std::env::var("DITTO_APP_ID").ok().and_then(|v| {
+            let trimmed = v.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        });
+        let shared_key = std::env::var("DITTO_SHARED_KEY").ok().and_then(|v| {
+            let trimmed = v.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        });
+
+        if app_id.is_none() || shared_key.is_none() {
+            eprintln!("Skipping test: Ditto credentials not available");
+            return;
+        }
+
+        let temp_dir = tempdir().expect("Failed to create temp dir");
+        let config = DittoConfig {
+            app_id: app_id.unwrap(),
+            persistence_dir: temp_dir.path().to_path_buf(),
+            shared_key: shared_key.unwrap(),
+            tcp_listen_port: None,
+            tcp_connect_address: None,
+        };
+
+        let store = DittoStore::new(config).expect("Failed to create Ditto store");
+        store.start_sync().expect("Failed to start sync");
+
+        // Create test SquadSummary
+        let squad_summary = SquadSummary {
+            squad_id: "squad-alpha".to_string(),
+            leader_id: "node-1".to_string(),
+            member_ids: vec!["node-1".to_string(), "node-2".to_string()],
+            member_count: 2,
+            position_centroid: Some(Position {
+                latitude: 37.7749,
+                longitude: -122.4194,
+                altitude: 100.0,
+            }),
+            avg_fuel_minutes: 120.0,
+            worst_health: HealthStatus::Nominal as i32,
+            operational_count: 2,
+            aggregated_capabilities: vec![],
+            readiness_score: 0.95,
+            bounding_box: Some(BoundingBox {
+                southwest: Some(Position {
+                    latitude: 37.7740,
+                    longitude: -122.4203,
+                    altitude: 90.0,
+                }),
+                northeast: Some(Position {
+                    latitude: 37.7758,
+                    longitude: -122.4185,
+                    altitude: 110.0,
+                }),
+                max_altitude: 110.0,
+                min_altitude: 90.0,
+                radius_m: 500.0,
+            }),
+            aggregated_at: Some(Timestamp {
+                seconds: 1234567890,
+                nanos: 0,
+            }),
+        };
+
+        // Test upsert
+        let doc_id = store
+            .upsert_squad_summary("squad-alpha", &squad_summary)
+            .await
+            .expect("Failed to upsert squad summary");
+        assert_eq!(doc_id, "squad-alpha");
+
+        // Test retrieval
+        let retrieved = store
+            .get_squad_summary("squad-alpha")
+            .await
+            .expect("Failed to get squad summary");
+
+        assert!(retrieved.is_some());
+        let retrieved = retrieved.unwrap();
+        assert_eq!(retrieved.squad_id, "squad-alpha");
+        assert_eq!(retrieved.leader_id, "node-1");
+        assert_eq!(retrieved.member_count, 2);
+        assert_eq!(retrieved.operational_count, 2);
+        assert!((retrieved.avg_fuel_minutes - 120.0).abs() < 0.001);
+
+        // Test non-existent retrieval
+        let not_found = store
+            .get_squad_summary("squad-nonexistent")
+            .await
+            .expect("Query should succeed");
+        assert!(not_found.is_none());
+
+        store.stop_sync();
+        drop(store);
+        sleep(Duration::from_millis(100)).await;
+    }
+
+    #[tokio::test]
+    async fn test_platoon_summary_storage() {
+        use cap_schema::common::v1::{Position, Timestamp};
+        use cap_schema::hierarchy::v1::{BoundingBox, PlatoonSummary};
+        use cap_schema::node::v1::HealthStatus;
+
+        dotenvy::dotenv().ok();
+
+        let app_id = std::env::var("DITTO_APP_ID").ok().and_then(|v| {
+            let trimmed = v.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        });
+        let shared_key = std::env::var("DITTO_SHARED_KEY").ok().and_then(|v| {
+            let trimmed = v.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        });
+
+        if app_id.is_none() || shared_key.is_none() {
+            eprintln!("Skipping test: Ditto credentials not available");
+            return;
+        }
+
+        let temp_dir = tempdir().expect("Failed to create temp dir");
+        let config = DittoConfig {
+            app_id: app_id.unwrap(),
+            persistence_dir: temp_dir.path().to_path_buf(),
+            shared_key: shared_key.unwrap(),
+            tcp_listen_port: None,
+            tcp_connect_address: None,
+        };
+
+        let store = DittoStore::new(config).expect("Failed to create Ditto store");
+        store.start_sync().expect("Failed to start sync");
+
+        // Create test PlatoonSummary
+        let platoon_summary = PlatoonSummary {
+            platoon_id: "platoon-1".to_string(),
+            leader_id: "node-1".to_string(),
+            squad_ids: vec!["squad-alpha".to_string(), "squad-bravo".to_string()],
+            squad_count: 2,
+            total_member_count: 16,
+            position_centroid: Some(Position {
+                latitude: 37.7749,
+                longitude: -122.4194,
+                altitude: 100.0,
+            }),
+            avg_fuel_minutes: 110.0,
+            worst_health: HealthStatus::Nominal as i32,
+            operational_count: 14,
+            aggregated_capabilities: vec![],
+            readiness_score: 0.90,
+            bounding_box: Some(BoundingBox {
+                southwest: Some(Position {
+                    latitude: 37.7700,
+                    longitude: -122.4250,
+                    altitude: 80.0,
+                }),
+                northeast: Some(Position {
+                    latitude: 37.7800,
+                    longitude: -122.4150,
+                    altitude: 120.0,
+                }),
+                max_altitude: 120.0,
+                min_altitude: 80.0,
+                radius_m: 1000.0,
+            }),
+            aggregated_at: Some(Timestamp {
+                seconds: 1234567890,
+                nanos: 0,
+            }),
+        };
+
+        // Test upsert
+        let doc_id = store
+            .upsert_platoon_summary("platoon-1", &platoon_summary)
+            .await
+            .expect("Failed to upsert platoon summary");
+        assert_eq!(doc_id, "platoon-1");
+
+        // Test retrieval
+        let retrieved = store
+            .get_platoon_summary("platoon-1")
+            .await
+            .expect("Failed to get platoon summary");
+
+        assert!(retrieved.is_some());
+        let retrieved = retrieved.unwrap();
+        assert_eq!(retrieved.platoon_id, "platoon-1");
+        assert_eq!(retrieved.leader_id, "node-1");
+        assert_eq!(retrieved.squad_count, 2);
+        assert_eq!(retrieved.total_member_count, 16);
+        assert_eq!(retrieved.operational_count, 14);
+        assert!((retrieved.avg_fuel_minutes - 110.0).abs() < 0.001);
+
+        // Test non-existent retrieval
+        let not_found = store
+            .get_platoon_summary("platoon-nonexistent")
+            .await
+            .expect("Query should succeed");
+        assert!(not_found.is_none());
+
+        store.stop_sync();
+        drop(store);
+        sleep(Duration::from_millis(100)).await;
     }
 }
