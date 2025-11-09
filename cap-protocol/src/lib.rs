@@ -20,6 +20,7 @@
 //! ```
 
 pub mod cell;
+pub mod command; // Bidirectional command coordination
 pub mod composition;
 pub mod discovery;
 pub mod error;
