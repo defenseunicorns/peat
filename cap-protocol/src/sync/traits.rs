@@ -221,6 +221,12 @@ pub trait DataSyncBackend: Send + Sync {
             version: "0.0.0".to_string(),
         }
     }
+
+    /// Get backend as Any for downcasting to concrete types
+    ///
+    /// Allows accessing backend-specific functionality not exposed through the trait.
+    /// Used primarily for testing and advanced scenarios.
+    fn as_any(&self) -> &dyn std::any::Any;
 }
 
 /// Information about a backend implementation
