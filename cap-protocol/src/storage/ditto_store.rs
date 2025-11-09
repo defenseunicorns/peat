@@ -623,6 +623,174 @@ impl DittoStore {
 
         Ok(Some(summary))
     }
+
+    /// Upsert a HierarchicalCommand to the hierarchical_commands collection
+    ///
+    /// # Arguments
+    ///
+    /// * `command_id` - Unique command identifier (used as document ID)
+    /// * `command` - The hierarchical command to store
+    ///
+    /// # Returns
+    ///
+    /// Document ID on success
+    #[instrument(skip(self, command), fields(command_id))]
+    pub async fn upsert_command(
+        &self,
+        command_id: &str,
+        command: &cap_schema::command::v1::HierarchicalCommand,
+    ) -> Result<String> {
+        let bytes = command.encode_to_vec();
+        let base64_data = base64::engine::general_purpose::STANDARD.encode(&bytes);
+
+        let doc = serde_json::json!({
+            "_id": command_id,
+            "command_id": command.command_id,
+            "originator_id": command.originator_id,
+            "priority": command.priority,
+            "data": base64_data,
+            "type": "hierarchical_command"
+        });
+
+        self.upsert("hierarchical_commands", doc).await
+    }
+
+    /// Retrieve a HierarchicalCommand from the hierarchical_commands collection
+    ///
+    /// # Arguments
+    ///
+    /// * `command_id` - Unique command identifier
+    ///
+    /// # Returns
+    ///
+    /// Some(HierarchicalCommand) if found, None if not found
+    #[instrument(skip(self), fields(command_id))]
+    pub async fn get_command(
+        &self,
+        command_id: &str,
+    ) -> Result<Option<cap_schema::command::v1::HierarchicalCommand>> {
+        let results = self
+            .query("hierarchical_commands", &format!("_id == '{}'", command_id))
+            .await?;
+
+        if results.is_empty() {
+            return Ok(None);
+        }
+
+        let doc = &results[0];
+        let base64_data = doc["data"].as_str().ok_or_else(|| {
+            Error::storage_error(
+                "Missing data field",
+                "get_command",
+                Some(command_id.to_string()),
+            )
+        })?;
+
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(base64_data)
+            .map_err(|e| {
+                Error::storage_error(
+                    format!("Base64 decode failed: {}", e),
+                    "get_command",
+                    Some(command_id.to_string()),
+                )
+            })?;
+
+        let command =
+            cap_schema::command::v1::HierarchicalCommand::decode(&bytes[..]).map_err(|e| {
+                Error::storage_error(
+                    format!("Protobuf decode failed: {}", e),
+                    "get_command",
+                    Some(command_id.to_string()),
+                )
+            })?;
+
+        Ok(Some(command))
+    }
+
+    /// Upsert a CommandAcknowledgment to the command_acknowledgments collection
+    ///
+    /// # Arguments
+    ///
+    /// * `ack_id` - Unique acknowledgment identifier (command_id + node_id)
+    /// * `ack` - The command acknowledgment to store
+    ///
+    /// # Returns
+    ///
+    /// Document ID on success
+    #[instrument(skip(self, ack), fields(ack_id))]
+    pub async fn upsert_command_ack(
+        &self,
+        ack_id: &str,
+        ack: &cap_schema::command::v1::CommandAcknowledgment,
+    ) -> Result<String> {
+        let bytes = ack.encode_to_vec();
+        let base64_data = base64::engine::general_purpose::STANDARD.encode(&bytes);
+
+        let doc = serde_json::json!({
+            "_id": ack_id,
+            "command_id": ack.command_id,
+            "node_id": ack.node_id,
+            "status": ack.status,
+            "data": base64_data,
+            "type": "command_acknowledgment"
+        });
+
+        self.upsert("command_acknowledgments", doc).await
+    }
+
+    /// Query all acknowledgments for a specific command
+    ///
+    /// # Arguments
+    ///
+    /// * `command_id` - Command identifier to query acknowledgments for
+    ///
+    /// # Returns
+    ///
+    /// Vector of CommandAcknowledgment messages
+    #[instrument(skip(self), fields(command_id))]
+    pub async fn query_command_acks(
+        &self,
+        command_id: &str,
+    ) -> Result<Vec<cap_schema::command::v1::CommandAcknowledgment>> {
+        let results = self
+            .query(
+                "command_acknowledgments",
+                &format!("command_id == '{}'", command_id),
+            )
+            .await?;
+
+        let mut acks = Vec::new();
+        for doc in results {
+            let base64_data = doc["data"].as_str().ok_or_else(|| {
+                Error::storage_error("Missing data field", "query_command_acks", None)
+            })?;
+
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(base64_data)
+                .map_err(|e| {
+                    Error::storage_error(
+                        format!("Base64 decode failed: {}", e),
+                        "query_command_acks",
+                        None,
+                    )
+                })?;
+
+            let ack = cap_schema::command::v1::CommandAcknowledgment::decode(&bytes[..]).map_err(
+                |e| {
+                    Error::storage_error(
+                        format!("Protobuf decode failed: {}", e),
+                        "query_command_acks",
+                        None,
+                    )
+                },
+            )?;
+
+            acks.push(ack);
+        }
+
+        Ok(acks)
+    }
 }
 
 impl Clone for DittoStore {
@@ -661,6 +829,48 @@ mod tests {
     use std::time::Duration;
     use tempfile::tempdir;
     use tokio::time::sleep;
+
+    /// Helper function to create a test DittoStore with credentials
+    async fn create_test_store(test_name: &str) -> DittoStore {
+        dotenvy::dotenv().ok();
+
+        let app_id = std::env::var("DITTO_APP_ID")
+            .ok()
+            .and_then(|v| {
+                let trimmed = v.trim();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(trimmed.to_string())
+                }
+            })
+            .expect("DITTO_APP_ID required for test");
+
+        let shared_key = std::env::var("DITTO_SHARED_KEY")
+            .ok()
+            .and_then(|v| {
+                let trimmed = v.trim();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(trimmed.to_string())
+                }
+            })
+            .expect("DITTO_SHARED_KEY required for test");
+
+        let temp_dir = tempdir().expect("Failed to create temp dir");
+        let config = DittoConfig {
+            app_id,
+            persistence_dir: temp_dir.path().join(test_name),
+            shared_key,
+            tcp_listen_port: None,
+            tcp_connect_address: None,
+        };
+
+        let store = DittoStore::new(config).expect("Failed to create Ditto store");
+        store.start_sync().expect("Failed to start sync");
+        store
+    }
 
     #[tokio::test]
     async fn test_ditto_initialization() {
@@ -1245,6 +1455,150 @@ mod tests {
             .await
             .expect("Query should succeed");
         assert!(not_found.is_none());
+
+        store.stop_sync();
+        drop(store);
+        sleep(Duration::from_millis(100)).await;
+    }
+
+    #[tokio::test]
+    async fn test_command_upsert_and_retrieve() {
+        let store = create_test_store("test_command_upsert").await;
+
+        use cap_schema::command::v1::{command_target::Scope, CommandTarget, HierarchicalCommand};
+
+        // Create a test command
+        let command = HierarchicalCommand {
+            command_id: "cmd-001".to_string(),
+            originator_id: "node-leader".to_string(),
+            target: Some(CommandTarget {
+                scope: Scope::Squad as i32,
+                target_ids: vec!["squad-alpha".to_string()],
+            }),
+            priority: 3,              // IMMEDIATE
+            acknowledgment_policy: 4, // BOTH
+            buffer_policy: 1,         // BUFFER_AND_RETRY
+            conflict_policy: 2,       // HIGHEST_PRIORITY_WINS
+            leader_change_policy: 1,  // BUFFER_UNTIL_STABLE
+            ..Default::default()
+        };
+
+        // Test upsert
+        let doc_id = store
+            .upsert_command("cmd-001", &command)
+            .await
+            .expect("Failed to upsert command");
+        assert_eq!(doc_id, "cmd-001");
+
+        // Test retrieval
+        let retrieved = store
+            .get_command("cmd-001")
+            .await
+            .expect("Failed to get command");
+
+        assert!(retrieved.is_some());
+        let retrieved = retrieved.unwrap();
+        assert_eq!(retrieved.command_id, "cmd-001");
+        assert_eq!(retrieved.originator_id, "node-leader");
+        assert_eq!(retrieved.priority, 3);
+        assert_eq!(retrieved.acknowledgment_policy, 4);
+
+        // Test non-existent retrieval
+        let not_found = store
+            .get_command("cmd-nonexistent")
+            .await
+            .expect("Query should succeed");
+        assert!(not_found.is_none());
+
+        store.stop_sync();
+        drop(store);
+        sleep(Duration::from_millis(100)).await;
+    }
+
+    #[tokio::test]
+    async fn test_command_acknowledgment_upsert_and_query() {
+        let store = create_test_store("test_command_ack").await;
+
+        use cap_schema::command::v1::{AckStatus, CommandAcknowledgment};
+        use cap_schema::common::v1::Timestamp;
+
+        // Create test acknowledgments from multiple nodes
+        let ack1 = CommandAcknowledgment {
+            command_id: "cmd-001".to_string(),
+            node_id: "node-1".to_string(),
+            status: AckStatus::AckReceived as i32,
+            reason: None,
+            timestamp: Some(Timestamp {
+                seconds: 1234567890,
+                nanos: 0,
+            }),
+        };
+
+        let ack2 = CommandAcknowledgment {
+            command_id: "cmd-001".to_string(),
+            node_id: "node-2".to_string(),
+            status: AckStatus::AckCompleted as i32,
+            reason: None,
+            timestamp: Some(Timestamp {
+                seconds: 1234567895,
+                nanos: 0,
+            }),
+        };
+
+        let ack3 = CommandAcknowledgment {
+            command_id: "cmd-002".to_string(), // Different command
+            node_id: "node-1".to_string(),
+            status: AckStatus::AckReceived as i32,
+            reason: None,
+            timestamp: Some(Timestamp {
+                seconds: 1234567900,
+                nanos: 0,
+            }),
+        };
+
+        // Upsert acknowledgments
+        store
+            .upsert_command_ack("cmd-001-node-1", &ack1)
+            .await
+            .expect("Failed to upsert ack1");
+
+        store
+            .upsert_command_ack("cmd-001-node-2", &ack2)
+            .await
+            .expect("Failed to upsert ack2");
+
+        store
+            .upsert_command_ack("cmd-002-node-1", &ack3)
+            .await
+            .expect("Failed to upsert ack3");
+
+        // Query acknowledgments for cmd-001
+        let acks = store
+            .query_command_acks("cmd-001")
+            .await
+            .expect("Failed to query acks");
+
+        assert_eq!(acks.len(), 2);
+        let ack_node_ids: Vec<String> = acks.iter().map(|a| a.node_id.clone()).collect();
+        assert!(ack_node_ids.contains(&"node-1".to_string()));
+        assert!(ack_node_ids.contains(&"node-2".to_string()));
+
+        // Query acknowledgments for cmd-002
+        let acks2 = store
+            .query_command_acks("cmd-002")
+            .await
+            .expect("Failed to query acks for cmd-002");
+
+        assert_eq!(acks2.len(), 1);
+        assert_eq!(acks2[0].node_id, "node-1");
+        assert_eq!(acks2[0].status, AckStatus::AckReceived as i32);
+
+        // Query non-existent command
+        let no_acks = store
+            .query_command_acks("cmd-nonexistent")
+            .await
+            .expect("Query should succeed");
+        assert!(no_acks.is_empty());
 
         store.stop_sync();
         drop(store);
