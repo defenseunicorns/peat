@@ -223,24 +223,60 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("7. Zone leader collecting acknowledgments...\n");
 
-    // Wait for acks to propagate via Ditto
-    sleep(Duration::from_millis(500)).await;
+    // Option 1: Observer-Based (Recommended for Production)
+    // Use Ditto observers for event-driven notification
+    use tokio::sync::mpsc;
 
-    // Query acknowledgments from Ditto
+    let (tx, mut rx) = mpsc::unbounded_channel::<()>();
+
+    let observer_query = format!(
+        "SELECT * FROM command_acknowledgments WHERE command_id = '{}'",
+        command.command_id
+    );
+
+    let _observer =
+        store
+            .ditto()
+            .store()
+            .register_observer_v2(&observer_query, move |_result| {
+                let _ = tx.send(()); // Notify on any ack change
+            })?;
+
+    println!("   ✓ Observer registered for acknowledgment events");
+
+    let mut ack_count = 0;
+    let expected_acks = 2; // Expecting 2 nodes to acknowledge
+
+    while ack_count < expected_acks {
+        tokio::select! {
+            _ = rx.recv() => {
+                // Acknowledgment event received! Query the latest acks
+                let acks = store.query_command_acks(&command.command_id).await?;
+                ack_count = acks.len();
+
+                println!("   ✓ Acknowledgment event: {}/{} acks received", ack_count, expected_acks);
+
+                for ack in &acks {
+                    let status_str = match ack.status {
+                        1 => "RECEIVED",
+                        2 => "COMPLETED",
+                        3 => "FAILED",
+                        _ => "UNKNOWN",
+                    };
+                    println!("     - Node {}: {}", ack.node_id, status_str);
+                }
+            }
+            _ = tokio::time::sleep(Duration::from_secs(10)) => {
+                println!("   ⚠ Timeout waiting for acknowledgments");
+                break;
+            }
+        }
+    }
+
+    // Final query to ensure we have all acks
     let acks = store.query_command_acks(&command.command_id).await?;
 
-    println!("   ✓ Received {} acknowledgments:", acks.len());
-
-    for ack in &acks {
-        let status_str = match ack.status {
-            1 => "RECEIVED",
-            2 => "COMPLETED",
-            3 => "FAILED",
-            _ => "UNKNOWN",
-        };
-
-        println!("     - Node {}: {}", ack.node_id, status_str);
-    }
+    println!("\n   ✓ Final count: {} acknowledgments", acks.len());
 
     // ========================================
     // Summary

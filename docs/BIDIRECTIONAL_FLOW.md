@@ -247,6 +247,54 @@ let ack_sub = store.ditto()
 
 Without subscriptions, Ditto will not replicate the data across peers.
 
+## Observer-Based Event Notification
+
+For production use, leverage Ditto observers for event-driven notification instead of polling:
+
+```rust
+use tokio::sync::mpsc;
+
+// 1. Register sync subscription (required for sync AND observers)
+let ack_sub = store.ditto()
+    .sync()
+    .register_subscription_v2("SELECT * FROM command_acknowledgments WHERE command_id = 'cmd-001'")?;
+
+// 2. Create channel for observer events
+let (tx, mut rx) = mpsc::unbounded_channel();
+
+// 3. Register observer for acknowledgment changes
+let observer = store.ditto()
+    .store()
+    .register_observer_v2(
+        "SELECT * FROM command_acknowledgments WHERE command_id = 'cmd-001'",
+        move |result| {
+            // This closure fires whenever acks change
+            let _ = tx.send(());  // Notify waiting code
+        }
+    )?;
+
+// 4. Wait for ack events (no polling!)
+tokio::select! {
+    _ = rx.recv() => {
+        // Acknowledgment received! Query the latest acks
+        let acks = store.query_command_acks("cmd-001").await?;
+        println!("Received {} acknowledgments", acks.len());
+    }
+    _ = tokio::time::sleep(Duration::from_secs(30)) => {
+        println!("Timeout waiting for acknowledgments");
+    }
+}
+
+// Keep observer alive for duration of monitoring
+drop(observer);  // Cleanup when done
+```
+
+**Benefits of Observer Pattern:**
+- Event-driven (no CPU waste from polling)
+- Immediate notification when acks arrive
+- Deterministic testing (no arbitrary timeouts)
+- Follows CAP Protocol testing philosophy
+
 ## Example: Squad Mission Command
 
 ```rust
@@ -296,15 +344,15 @@ loop {
 
 ## Known Limitations
 
-1. **No observer-based notification**: Currently polls for acks. Future: Add Ditto observers for event-driven ack collection.
+1. **Manual subscription management**: Users must register subscriptions. Future: Auto-register in DittoStore.
 
-2. **Manual subscription management**: Users must register subscriptions. Future: Auto-register in DittoStore.
+2. **No conflict resolution enforcement**: Conflict policies defined but not enforced. Future: Implement policy engine.
 
-3. **No conflict resolution enforcement**: Conflict policies defined but not enforced. Future: Implement policy engine.
+3. **No command buffering**: Buffer policies defined but not enforced. Future: Implement buffer manager.
 
-4. **No command buffering**: Buffer policies defined but not enforced. Future: Implement buffer manager.
+4. **No timeout handling**: Commands don't timeout. Future: Add TTL and timeout mechanisms.
 
-5. **No timeout handling**: Commands don't timeout. Future: Add TTL and timeout mechanisms.
+**Note**: Observer-based notification is now documented (see Observer-Based Event Notification section above). The examples show polling for simplicity, but production code should use observers.
 
 ## Next Steps for Experiments Team
 
