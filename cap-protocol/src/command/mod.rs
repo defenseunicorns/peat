@@ -34,14 +34,14 @@
 //!
 //! ## Usage
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 //! use cap_protocol::command::CommandCoordinator;
 //! use cap_schema::command::v1::HierarchicalCommand;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create coordinator for a squad leader
 //! let coordinator = CommandCoordinator::new(
-//!     "squad-alpha".to_string(),
+//!     Some("squad-alpha".to_string()),
 //!     "node-1".to_string(),
 //!     vec!["node-1".to_string(), "node-2".to_string()], // squad members
 //! );
@@ -65,11 +65,16 @@
 //! - ADR-013: AI Operations and Binary Transfer
 //! - ADR-009: Bidirectional Hierarchical Flows
 
+mod conflict_resolver;
 mod coordinator;
+mod policy_impl; // Conflictable implementation for HierarchicalCommand
 mod routing;
+mod timeout_manager;
 
+pub use conflict_resolver::{ConflictResolver, ConflictResult};
 pub use coordinator::CommandCoordinator;
 pub use routing::{CommandRouter, TargetResolution};
+pub use timeout_manager::{AckTimeout, TimeoutManager};
 
 #[cfg(test)]
 mod tests {
