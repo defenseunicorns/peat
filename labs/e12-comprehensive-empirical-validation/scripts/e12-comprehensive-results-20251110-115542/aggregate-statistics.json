@@ -16,8 +16,8 @@
     "1mbps",
     "256kbps"
   ],
-  "bandwidth_reduction_min": -279.6207046612737,
-  "bandwidth_reduction_max": -240.83255319419322,
-  "bandwidth_reduction_avg": -260.96396396341385,
-  "bandwidth_reduction_median": -261.70129899909426
+  "bandwidth_reduction_min": -23.753737097712424,
+  "bandwidth_reduction_max": -7.60039072431189,
+  "bandwidth_reduction_avg": -15.253266847214341,
+  "bandwidth_reduction_median": -14.829469783416526
 }

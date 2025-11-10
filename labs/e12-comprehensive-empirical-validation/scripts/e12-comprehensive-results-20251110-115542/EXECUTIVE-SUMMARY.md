@@ -15,9 +15,9 @@
 
 ### Bandwidth Reduction (Traditional IoT → CAP Hierarchical)
 
-- **Range:** -279.6% - -240.8%
-- **Average:** -261.0%
-- **Median:** -261.7%
+- **Range:** -23.8% - -7.6%
+- **Average:** -15.3%
+- **Median:** -14.8%
 
 ## Claims Validation
 

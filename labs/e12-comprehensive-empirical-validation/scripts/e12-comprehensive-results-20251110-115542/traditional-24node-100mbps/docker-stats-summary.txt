@@ -2,105 +2,177 @@ Docker Network Statistics Summary
 ================================================================================
 
 Total Network I/O:
-  Input:  1,435,600 bytes (1.44 MB)
-  Output: 925,090 bytes (0.93 MB)
-  Total:  2,360,690 bytes (2.36 MB)
+  Input:  4,064,100 bytes (4.06 MB)
+  Output: 3,392,000 bytes (3.39 MB)
+  Total:  7,456,100 bytes (7.46 MB)
 
 Per-Node Breakdown:
 --------------------------------------------------------------------------------
-clab-cap-platoon-mode4-client-server-alpha-soldier-1:
-  Network: 52,400 bytes (↓42,300 ↑10,100)
-  CPU: 1.4%  Memory: 16.7 MB
 
-clab-cap-platoon-mode4-client-server-alpha-soldier-2:
-  Network: 47,900 bytes (↓38,200 ↑9,700)
-  CPU: 0.2%  Memory: 14.8 MB
+clab-traditional-platoon-24node-alpha-soldier-1:
+  Input:  84,100 bytes (0.08 MB)
+  Output: 69,300 bytes (0.07 MB)
+  Total:  153,400 bytes (0.15 MB)
+  CPU:    0.03%
+  Memory: 2,741,875 bytes (2.74 MB)
 
-clab-cap-platoon-mode4-client-server-alpha-soldier-3:
-  Network: 42,900 bytes (↓34,000 ↑8,900)
-  CPU: 0.2%  Memory: 14.4 MB
+clab-traditional-platoon-24node-alpha-soldier-2:
+  Input:  107,000 bytes (0.11 MB)
+  Output: 77,900 bytes (0.08 MB)
+  Total:  184,900 bytes (0.18 MB)
+  CPU:    0.03%
+  Memory: 2,695,250 bytes (2.70 MB)
 
-clab-cap-platoon-mode4-client-server-alpha-soldier-4:
-  Network: 48,300 bytes (↓38,800 ↑9,500)
-  CPU: 0.3%  Memory: 14.8 MB
+clab-traditional-platoon-24node-alpha-soldier-3:
+  Input:  109,000 bytes (0.11 MB)
+  Output: 77,900 bytes (0.08 MB)
+  Total:  186,900 bytes (0.19 MB)
+  CPU:    0.03%
+  Memory: 2,668,375 bytes (2.67 MB)
 
-clab-cap-platoon-mode4-client-server-alpha-uav-1:
-  Network: 47,370 bytes (↓38,000 ↑9,370)
-  CPU: 0.3%  Memory: 14.8 MB
+clab-traditional-platoon-24node-alpha-soldier-4:
+  Input:  90,200 bytes (0.09 MB)
+  Output: 60,100 bytes (0.06 MB)
+  Total:  150,300 bytes (0.15 MB)
+  CPU:    0.02%
+  Memory: 2,676,875 bytes (2.68 MB)
 
-clab-cap-platoon-mode4-client-server-alpha-ugv-1:
-  Network: 47,990 bytes (↓38,700 ↑9,290)
-  CPU: 0.3%  Memory: 14.3 MB
+clab-traditional-platoon-24node-alpha-uav-1:
+  Input:  109,000 bytes (0.11 MB)
+  Output: 77,500 bytes (0.08 MB)
+  Total:  186,500 bytes (0.19 MB)
+  CPU:    0.03%
+  Memory: 2,679,375 bytes (2.68 MB)
 
-clab-cap-platoon-mode4-client-server-bravo-soldier-1:
-  Network: 51,600 bytes (↓41,500 ↑10,100)
-  CPU: 1.8%  Memory: 17.0 MB
+clab-traditional-platoon-24node-alpha-ugv-1:
+  Input:  101,000 bytes (0.10 MB)
+  Output: 61,000 bytes (0.06 MB)
+  Total:  162,000 bytes (0.16 MB)
+  CPU:    0.03%
+  Memory: 2,668,375 bytes (2.67 MB)
 
-clab-cap-platoon-mode4-client-server-bravo-soldier-2:
-  Network: 45,910 bytes (↓36,800 ↑9,110)
-  CPU: 0.3%  Memory: 14.5 MB
+clab-traditional-platoon-24node-bravo-soldier-1:
+  Input:  106,000 bytes (0.11 MB)
+  Output: 78,000 bytes (0.08 MB)
+  Total:  184,000 bytes (0.18 MB)
+  CPU:    0.04%
+  Memory: 2,699,125 bytes (2.70 MB)
 
-clab-cap-platoon-mode4-client-server-bravo-soldier-3:
-  Network: 47,750 bytes (↓38,400 ↑9,350)
-  CPU: 0.2%  Memory: 14.5 MB
+clab-traditional-platoon-24node-bravo-soldier-2:
+  Input:  105,000 bytes (0.10 MB)
+  Output: 77,900 bytes (0.08 MB)
+  Total:  182,900 bytes (0.18 MB)
+  CPU:    0.04%
+  Memory: 2,707,125 bytes (2.71 MB)
 
-clab-cap-platoon-mode4-client-server-bravo-soldier-4:
-  Network: 48,020 bytes (↓38,800 ↑9,220)
-  CPU: 0.2%  Memory: 14.6 MB
+clab-traditional-platoon-24node-bravo-soldier-3:
+  Input:  107,000 bytes (0.11 MB)
+  Output: 78,000 bytes (0.08 MB)
+  Total:  185,000 bytes (0.18 MB)
+  CPU:    0.03%
+  Memory: 2,671,875 bytes (2.67 MB)
 
-clab-cap-platoon-mode4-client-server-bravo-soldier-5:
-  Network: 43,050 bytes (↓34,100 ↑8,950)
-  CPU: 0.3%  Memory: 14.9 MB
+clab-traditional-platoon-24node-bravo-soldier-4:
+  Input:  104,000 bytes (0.10 MB)
+  Output: 77,900 bytes (0.08 MB)
+  Total:  181,900 bytes (0.18 MB)
+  CPU:    0.04%
+  Memory: 2,671,875 bytes (2.67 MB)
 
-clab-cap-platoon-mode4-client-server-bravo-uav-1:
-  Network: 48,070 bytes (↓39,000 ↑9,070)
-  CPU: 0.3%  Memory: 14.7 MB
+clab-traditional-platoon-24node-bravo-soldier-5:
+  Input:  102,000 bytes (0.10 MB)
+  Output: 78,000 bytes (0.08 MB)
+  Total:  180,000 bytes (0.18 MB)
+  CPU:    0.04%
+  Memory: 2,663,875 bytes (2.66 MB)
 
-clab-cap-platoon-mode4-client-server-bravo-ugv-1:
-  Network: 48,540 bytes (↓39,200 ↑9,340)
-  CPU: 0.2%  Memory: 14.7 MB
+clab-traditional-platoon-24node-bravo-uav-1:
+  Input:  102,000 bytes (0.10 MB)
+  Output: 76,900 bytes (0.08 MB)
+  Total:  178,900 bytes (0.18 MB)
+  CPU:    0.04%
+  Memory: 2,723,500 bytes (2.72 MB)
 
-clab-cap-platoon-mode4-client-server-charlie-soldier-1:
-  Network: 47,330 bytes (↓37,800 ↑9,530)
-  CPU: 0.2%  Memory: 14.5 MB
+clab-traditional-platoon-24node-bravo-ugv-1:
+  Input:  108,000 bytes (0.11 MB)
+  Output: 77,500 bytes (0.08 MB)
+  Total:  185,500 bytes (0.19 MB)
+  CPU:    0.04%
+  Memory: 2,702,625 bytes (2.70 MB)
 
-clab-cap-platoon-mode4-client-server-charlie-soldier-2:
-  Network: 49,990 bytes (↓40,200 ↑9,790)
-  CPU: 0.3%  Memory: 14.5 MB
+clab-traditional-platoon-24node-charlie-soldier-1:
+  Input:  105,000 bytes (0.10 MB)
+  Output: 78,200 bytes (0.08 MB)
+  Total:  183,200 bytes (0.18 MB)
+  CPU:    0.04%
+  Memory: 2,695,125 bytes (2.70 MB)
 
-clab-cap-platoon-mode4-client-server-charlie-soldier-3:
-  Network: 50,550 bytes (↓40,800 ↑9,750)
-  CPU: 1.7%  Memory: 16.6 MB
+clab-traditional-platoon-24node-charlie-soldier-2:
+  Input:  108,000 bytes (0.11 MB)
+  Output: 78,200 bytes (0.08 MB)
+  Total:  186,200 bytes (0.19 MB)
+  CPU:    0.05%
+  Memory: 2,675,875 bytes (2.68 MB)
 
-clab-cap-platoon-mode4-client-server-charlie-soldier-4:
-  Network: 52,200 bytes (↓42,100 ↑10,100)
-  CPU: 1.6%  Memory: 17.3 MB
+clab-traditional-platoon-24node-charlie-soldier-3:
+  Input:  103,000 bytes (0.10 MB)
+  Output: 78,200 bytes (0.08 MB)
+  Total:  181,200 bytes (0.18 MB)
+  CPU:    0.04%
+  Memory: 2,702,625 bytes (2.70 MB)
 
-clab-cap-platoon-mode4-client-server-charlie-soldier-5:
-  Network: 52,900 bytes (↓42,500 ↑10,400)
-  CPU: 1.3%  Memory: 16.6 MB
+clab-traditional-platoon-24node-charlie-soldier-4:
+  Input:  104,000 bytes (0.10 MB)
+  Output: 78,200 bytes (0.08 MB)
+  Total:  182,200 bytes (0.18 MB)
+  CPU:    0.04%
+  Memory: 2,711,625 bytes (2.71 MB)
 
-clab-cap-platoon-mode4-client-server-charlie-uav-1:
-  Network: 42,980 bytes (↓33,900 ↑9,080)
-  CPU: 0.3%  Memory: 14.5 MB
+clab-traditional-platoon-24node-charlie-soldier-5:
+  Input:  92,600 bytes (0.09 MB)
+  Output: 68,100 bytes (0.07 MB)
+  Total:  160,700 bytes (0.16 MB)
+  CPU:    0.04%
+  Memory: 2,676,875 bytes (2.68 MB)
 
-clab-cap-platoon-mode4-client-server-charlie-ugv-1:
-  Network: 44,840 bytes (↓35,900 ↑8,940)
-  CPU: 0.3%  Memory: 14.8 MB
+clab-traditional-platoon-24node-charlie-uav-1:
+  Input:  107,000 bytes (0.11 MB)
+  Output: 77,700 bytes (0.08 MB)
+  Total:  184,700 bytes (0.18 MB)
+  CPU:    0.04%
+  Memory: 2,667,375 bytes (2.67 MB)
 
-clab-cap-platoon-mode4-client-server-platoon-leader:
-  Network: 1,114,000 bytes (↓425,000 ↑689,000)
-  CPU: 1.1%  Memory: 59.5 MB
+clab-traditional-platoon-24node-charlie-ugv-1:
+  Input:  84,200 bytes (0.08 MB)
+  Output: 69,000 bytes (0.07 MB)
+  Total:  153,200 bytes (0.15 MB)
+  CPU:    0.03%
+  Memory: 2,733,875 bytes (2.73 MB)
 
-clab-cap-platoon-mode4-client-server-squad-alpha-leader:
-  Network: 95,700 bytes (↓79,900 ↑15,800)
-  CPU: 1.3%  Memory: 16.7 MB
+clab-traditional-platoon-24node-platoon-leader:
+  Input:  1,730,000 bytes (1.73 MB)
+  Output: 1,670,000 bytes (1.67 MB)
+  Total:  3,400,000 bytes (3.40 MB)
+  CPU:    0.24%
+  Memory: 3,459,000 bytes (3.46 MB)
 
-clab-cap-platoon-mode4-client-server-squad-bravo-leader:
-  Network: 95,100 bytes (↓79,600 ↑15,500)
-  CPU: 1.4%  Memory: 15.6 MB
+clab-traditional-platoon-24node-squad-alpha-leader:
+  Input:  85,000 bytes (0.09 MB)
+  Output: 69,600 bytes (0.07 MB)
+  Total:  154,600 bytes (0.15 MB)
+  CPU:    0.04%
+  Memory: 2,675,875 bytes (2.68 MB)
 
-clab-cap-platoon-mode4-client-server-squad-charlie-leader:
-  Network: 95,300 bytes (↓80,100 ↑15,200)
-  CPU: 1.3%  Memory: 17.2 MB
+clab-traditional-platoon-24node-squad-bravo-leader:
+  Input:  103,000 bytes (0.10 MB)
+  Output: 78,400 bytes (0.08 MB)
+  Total:  181,400 bytes (0.18 MB)
+  CPU:    0.04%
+  Memory: 2,675,375 bytes (2.68 MB)
 
+clab-traditional-platoon-24node-squad-charlie-leader:
+  Input:  108,000 bytes (0.11 MB)
+  Output: 78,500 bytes (0.08 MB)
+  Total:  186,500 bytes (0.19 MB)
+  CPU:    0.04%
+  Memory: 2,702,625 bytes (2.70 MB)

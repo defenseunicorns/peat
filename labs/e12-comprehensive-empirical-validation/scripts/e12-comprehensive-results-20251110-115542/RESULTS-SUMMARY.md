@@ -39,7 +39,7 @@
 
 | Architecture | Network Bytes | App Bytes | Latency p50 | Latency p90 | Doc Receptions |
 |-------------|---------------|-----------|-------------|-------------|----------------|
-| traditional | 2,329,450 | 3,912 | 0.0ms | 0.0ms | 0 |
+| traditional | 7,473,300 | 0 | 0.0ms | 0.0ms | 0 |
 | cap-full | 8,160,000 | 3,912 | 138.4ms | 4960.2ms | 198 |
 | cap-hierarchical | 8,041,300 | 3,912 | 482.2ms | 4802.8ms | 195 |
 
@@ -47,7 +47,7 @@
 
 | Architecture | Network Bytes | App Bytes | Latency p50 | Latency p90 | Doc Receptions |
 |-------------|---------------|-----------|-------------|-------------|----------------|
-| traditional | 2,360,690 | 3,912 | 0.0ms | 0.0ms | 0 |
+| traditional | 7,456,100 | 0 | 0.0ms | 0.0ms | 0 |
 | cap-hierarchical | 8,046,000 | 3,912 | 319.0ms | 4845.6ms | 204 |
 | cap-full | 7,843,600 | 3,912 | 414.5ms | 4980.6ms | 207 |
 
@@ -55,7 +55,7 @@
 
 | Architecture | Network Bytes | App Bytes | Latency p50 | Latency p90 | Doc Receptions |
 |-------------|---------------|-----------|-------------|-------------|----------------|
-| traditional | 2,418,820 | 5,868 | 0.0ms | 0.0ms | 0 |
+| traditional | 7,392,100 | 0 | 0.0ms | 0.0ms | 0 |
 | cap-hierarchical | 9,148,000 | 5,868 | 474.1ms | 4951.0ms | 258 |
 | cap-full | 9,335,600 | 5,868 | 220.3ms | 4974.8ms | 246 |
 
@@ -63,7 +63,7 @@
 
 | Architecture | Network Bytes | App Bytes | Latency p50 | Latency p90 | Doc Receptions |
 |-------------|---------------|-----------|-------------|-------------|----------------|
-| traditional | 2,458,770 | 5,868 | 0.0ms | 0.0ms | 0 |
+| traditional | 7,666,700 | 0 | 0.0ms | 0.0ms | 0 |
 | cap-hierarchical | 9,334,000 | 5,868 | 175.6ms | 5120.8ms | 252 |
 | cap-full | 9,235,000 | 5,868 | 377.3ms | 5017.6ms | 255 |
 

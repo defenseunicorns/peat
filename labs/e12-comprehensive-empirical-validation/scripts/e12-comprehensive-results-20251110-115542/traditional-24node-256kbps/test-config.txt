@@ -1,6 +1,6 @@
-Architecture: traditional
-Scale: 24node
-Bandwidth: 256kbps
-Topology: platoon-24node-client-server-mode4.yaml
-Start Time: 2025-11-10T11:59:37-05:00
-End Time: 2025-11-10T12:01:52-05:00
+test_name: traditional-24node-256kbps
+topology_file: ../../../cap-sim/topologies/traditional-platoon-24node.yaml
+bandwidth: 256kbps
+duration: 60
+start_time: 2025-11-10T14:45:23-05:00
+end_time: 2025-11-10T14:46:35-05:00

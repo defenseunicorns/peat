@@ -1,20 +1,22 @@
-Test Metrics Summary
+Application Metrics Summary
 ================================================================================
 
-Message Counts:
-  Messages sent: 36
-  Messages received: 0
-  Documents inserted: 24
-  Documents received: 0
+Total Events: 6277
 
-Bandwidth:
-  Total bytes sent: 5,868 bytes (0.01 MB)
-  Average message size: 163.0 bytes
+Event Type Breakdown:
+  DocumentInserted: 2
+  DocumentReceived: 46
+  MessageReceived: 3041
+  MessageSent: 3188
 
-Replication:
-  Replication factor: 0.00x
-  (Each document received by 0.0 nodes on average)
+Sync Metrics:
+  Total Application Bytes: 2,104,002
+  Message Count: 6229
 
-Node Participation:
-  Unique senders: 4
-  Unique receivers: 0
+Latency Metrics:
+  Count: 3087
+  P50: 0.5 ms
+  P90: 20.2 ms
+  P99: 2001.2 ms
+
+Document Receptions: 46

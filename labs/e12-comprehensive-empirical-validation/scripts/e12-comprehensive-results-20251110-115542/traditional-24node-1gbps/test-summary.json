@@ -1,11 +1,20 @@
 {
-  "message_sent_count": 24,
-  "message_received_count": 0,
-  "document_inserted_count": 16,
-  "document_received_count": 0,
-  "total_bytes_sent": 3912,
-  "avg_message_size_bytes": 163.0,
-  "unique_senders": 4,
-  "unique_receivers": 0,
-  "replication_factor": 0.0
+  "total_events": 6441,
+  "event_type_counts": {
+    "MessageSent": 3269,
+    "MessageReceived": 3124,
+    "DocumentReceived": 46,
+    "DocumentInserted": 2
+  },
+  "sync_metrics": {
+    "total_app_bytes": 2159827,
+    "message_count": 6393
+  },
+  "latency_metrics": {
+    "count": 3170,
+    "p50_us": 496,
+    "p90_us": 1319,
+    "p99_us": 500537
+  },
+  "doc_receptions": 46
 }

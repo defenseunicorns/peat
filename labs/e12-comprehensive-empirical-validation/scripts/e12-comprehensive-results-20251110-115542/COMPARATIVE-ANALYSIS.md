@@ -9,7 +9,7 @@
 **Raw Metrics:**
 
 - **traditional**:
-  - Network: 2,329,450 bytes (2.33 MB)
+  - Network: 7,473,300 bytes (7.47 MB)
   - Latency: p50=0.0ms, p90=0.0ms
   - Doc Receptions: 0
 
@@ -23,14 +23,14 @@
   - Latency: p50=482.2ms, p90=4802.8ms
   - Doc Receptions: 195
 
-**Bandwidth Reduction:** -245.2% (Traditional → CAP Hierarchical)
+**Bandwidth Reduction:** -7.6% (Traditional → CAP Hierarchical)
 
 #### @ 100mbps:
 
 **Raw Metrics:**
 
 - **traditional**:
-  - Network: 2,360,690 bytes (2.36 MB)
+  - Network: 7,456,100 bytes (7.46 MB)
   - Latency: p50=0.0ms, p90=0.0ms
   - Doc Receptions: 0
 
@@ -44,14 +44,14 @@
   - Latency: p50=414.5ms, p90=4980.6ms
   - Doc Receptions: 207
 
-**Bandwidth Reduction:** -240.8% (Traditional → CAP Hierarchical)
+**Bandwidth Reduction:** -7.9% (Traditional → CAP Hierarchical)
 
 #### @ 1mbps:
 
 **Raw Metrics:**
 
 - **traditional**:
-  - Network: 2,418,820 bytes (2.42 MB)
+  - Network: 7,392,100 bytes (7.39 MB)
   - Latency: p50=0.0ms, p90=0.0ms
   - Doc Receptions: 0
 
@@ -65,14 +65,14 @@
   - Latency: p50=220.3ms, p90=4974.8ms
   - Doc Receptions: 246
 
-**Bandwidth Reduction:** -278.2% (Traditional → CAP Hierarchical)
+**Bandwidth Reduction:** -23.8% (Traditional → CAP Hierarchical)
 
 #### @ 256kbps:
 
 **Raw Metrics:**
 
 - **traditional**:
-  - Network: 2,458,770 bytes (2.46 MB)
+  - Network: 7,666,700 bytes (7.67 MB)
   - Latency: p50=0.0ms, p90=0.0ms
   - Doc Receptions: 0
 
@@ -86,4 +86,4 @@
   - Latency: p50=377.3ms, p90=5017.6ms
   - Doc Receptions: 255
 
-**Bandwidth Reduction:** -279.6% (Traditional → CAP Hierarchical)
+**Bandwidth Reduction:** -21.7% (Traditional → CAP Hierarchical)
