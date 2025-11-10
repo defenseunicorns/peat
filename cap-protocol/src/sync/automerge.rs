@@ -626,6 +626,10 @@ impl DataSyncBackend for AutomergeBackend {
         Arc::new(self.clone())
     }
 
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     async fn is_ready(&self) -> bool {
         *self.initialized.lock().unwrap()
     }

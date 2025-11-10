@@ -117,7 +117,7 @@ enum MetricsEvent {
 ///
 /// Periodically aggregates member NodeStates into SquadSummary and publishes to Ditto
 async fn squad_leader_aggregation_loop(
-    _store: Arc<DittoStore>,
+    store: Arc<DittoStore>,
     squad_id: String,
     node_id: String,
     member_ids: Vec<String>,
@@ -129,44 +129,68 @@ async fn squad_leader_aggregation_loop(
     println!("[{}] Squad members: {:?}", node_id, member_ids);
 
     loop {
-        // TODO: Implement actual member state retrieval and aggregation
-        // Collect member states from DittoStore
-        // let mut member_states = Vec::new();
-        //
-        // for member_id in &member_ids {
-        //     // Get NodeState and NodeConfig for each member
-        //     if let Ok(Some(state)) = store.get_node_state(member_id).await {
-        //         // Create a minimal NodeConfig for the member
-        //         let config = NodeConfig { node_id: member_id.clone(), ..Default::default() };
-        //         member_states.push((config, state));
-        //     }
-        // }
-        //
-        // if !member_states.is_empty() {
-        //     // Aggregate into SquadSummary
-        //     match StateAggregator::aggregate_squad(&squad_id, &node_id, member_states) {
-        //         Ok(squad_summary) => {
-        //             // Publish to squad_summaries collection
-        //             if let Err(e) = store.upsert_squad_summary(&squad_id, &squad_summary).await {
-        //                 eprintln!("[{}] Failed to upsert squad summary: {}", node_id, e);
-        //             } else {
-        //                 println!(
-        //                     "[{}] ✓ Aggregated squad {} ({} members)",
-        //                     node_id, squad_id, squad_summary.member_count
-        //                 );
-        //             }
-        //         }
-        //         Err(e) => {
-        //             eprintln!("[{}] Failed to aggregate squad: {}", node_id, e);
-        //         }
-        //     }
-        // }
+        // Collect member states using synthetic NodeConfig/NodeState
+        // (Current sim stores simple messages, not full NodeState documents)
+        let mut member_states = Vec::new();
 
-        println!(
-            "[{}] [Squad Leader] Aggregation cycle (members: {})",
-            node_id,
-            member_ids.len()
-        );
+        for member_id in &member_ids {
+            // Create minimal NodeConfig for aggregation
+            let config = NodeConfig {
+                id: member_id.clone(),
+                platform_type: "Simulated".to_string(),
+                capabilities: vec![],
+                comm_range_m: 1000.0,
+                max_speed_mps: 10.0,
+                operator_binding: None,
+                created_at: None,
+            };
+
+            // Create minimal operational NodeState
+            // Note: In production, this would query actual NodeState documents from Ditto
+            let state = NodeState {
+                position: Some(cap_schema::common::v1::Position {
+                    latitude: 0.0,
+                    longitude: 0.0,
+                    altitude: 0.0,
+                }),
+                fuel_minutes: 100,
+                health: cap_schema::node::v1::HealthStatus::Nominal.into(),
+                phase: cap_schema::node::v1::Phase::Hierarchy.into(),
+                cell_id: Some(squad_id.clone()),
+                zone_id: None,
+                timestamp: None,
+            };
+
+            member_states.push((config, state));
+        }
+
+        if !member_states.is_empty() {
+            // Aggregate into SquadSummary using StateAggregator
+            match StateAggregator::aggregate_squad(&squad_id, &node_id, member_states) {
+                Ok(squad_summary) => {
+                    // Publish to squad_summaries collection
+                    if let Err(e) = store.upsert_squad_summary(&squad_id, &squad_summary).await {
+                        eprintln!("[{}] Failed to upsert squad summary: {}", node_id, e);
+                    } else {
+                        println!(
+                            "[{}] ✓ Aggregated squad {} ({} members, readiness: {:.2})",
+                            node_id,
+                            squad_id,
+                            squad_summary.member_count,
+                            squad_summary.readiness_score
+                        );
+                    }
+                }
+                Err(e) => {
+                    eprintln!("[{}] Failed to aggregate squad: {}", node_id, e);
+                }
+            }
+        } else {
+            println!(
+                "[{}] [Squad Leader] No operational members to aggregate",
+                node_id
+            );
+        }
 
         // Wait 5 seconds before next aggregation
         sleep(Duration::from_secs(5)).await;
