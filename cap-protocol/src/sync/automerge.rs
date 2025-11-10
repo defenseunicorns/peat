@@ -640,10 +640,6 @@ impl DataSyncBackend for AutomergeBackend {
             version: "0.7.1".to_string(),
         }
     }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
 }
 
 #[cfg(test)]
