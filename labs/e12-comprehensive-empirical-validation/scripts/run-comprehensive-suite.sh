@@ -573,10 +573,10 @@ TEST_CONFIGS["traditional-12node-100mbps"]="../../../cap-sim/topologies/traditio
 TEST_CONFIGS["traditional-12node-1mbps"]="../../../cap-sim/topologies/traditional-squad-client-server.yaml"
 TEST_CONFIGS["traditional-12node-256kbps"]="../../../cap-sim/topologies/traditional-squad-client-server.yaml"
 
-TEST_CONFIGS["traditional-24node-1gbps"]="../../../cap-sim/topologies/platoon-24node-client-server-mode4.yaml"
-TEST_CONFIGS["traditional-24node-100mbps"]="../../../cap-sim/topologies/platoon-24node-client-server-mode4.yaml"
-TEST_CONFIGS["traditional-24node-1mbps"]="../../../cap-sim/topologies/platoon-24node-client-server-mode4.yaml"
-TEST_CONFIGS["traditional-24node-256kbps"]="../../../cap-sim/topologies/platoon-24node-client-server-mode4.yaml"
+TEST_CONFIGS["traditional-24node-1gbps"]="../../../cap-sim/topologies/traditional-platoon-24node.yaml"
+TEST_CONFIGS["traditional-24node-100mbps"]="../../../cap-sim/topologies/traditional-platoon-24node.yaml"
+TEST_CONFIGS["traditional-24node-1mbps"]="../../../cap-sim/topologies/traditional-platoon-24node.yaml"
+TEST_CONFIGS["traditional-24node-256kbps"]="../../../cap-sim/topologies/traditional-platoon-24node.yaml"
 
 # CAP Full Mesh configurations (no aggregation)
 TEST_CONFIGS["cap-full-12node-1gbps"]="../../../cap-sim/topologies/squad-12node-dynamic-mesh.yaml"

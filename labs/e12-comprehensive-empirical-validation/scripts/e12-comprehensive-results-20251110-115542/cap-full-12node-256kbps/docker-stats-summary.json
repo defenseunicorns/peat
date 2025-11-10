@@ -1,0 +1,86 @@
+{
+  "clab-cap-squad-dynamic-mesh-soldier-6": {
+    "net_input_bytes": 235000,
+    "net_output_bytes": 217000,
+    "net_total_bytes": 452000,
+    "avg_cpu_percent": 4.33,
+    "avg_mem_bytes": 31719166
+  },
+  "clab-cap-squad-dynamic-mesh-soldier-2": {
+    "net_input_bytes": 233000,
+    "net_output_bytes": 226000,
+    "net_total_bytes": 459000,
+    "avg_cpu_percent": 5.12,
+    "avg_mem_bytes": 31735833
+  },
+  "clab-cap-squad-dynamic-mesh-soldier-9": {
+    "net_input_bytes": 252000,
+    "net_output_bytes": 266000,
+    "net_total_bytes": 518000,
+    "avg_cpu_percent": 4.13,
+    "avg_mem_bytes": 32678333
+  },
+  "clab-cap-squad-dynamic-mesh-uav-1": {
+    "net_input_bytes": 243000,
+    "net_output_bytes": 210000,
+    "net_total_bytes": 453000,
+    "avg_cpu_percent": 4.08,
+    "avg_mem_bytes": 32373333
+  },
+  "clab-cap-squad-dynamic-mesh-ugv-1": {
+    "net_input_bytes": 229000,
+    "net_output_bytes": 229000,
+    "net_total_bytes": 458000,
+    "avg_cpu_percent": 4.19,
+    "avg_mem_bytes": 31879166
+  },
+  "clab-cap-squad-dynamic-mesh-soldier-7": {
+    "net_input_bytes": 247000,
+    "net_output_bytes": 201000,
+    "net_total_bytes": 448000,
+    "avg_cpu_percent": 4.16,
+    "avg_mem_bytes": 32645000
+  },
+  "clab-cap-squad-dynamic-mesh-soldier-4": {
+    "net_input_bytes": 231000,
+    "net_output_bytes": 225000,
+    "net_total_bytes": 456000,
+    "avg_cpu_percent": 4.34,
+    "avg_mem_bytes": 31734166
+  },
+  "clab-cap-squad-dynamic-mesh-soldier-5": {
+    "net_input_bytes": 241000,
+    "net_output_bytes": 204000,
+    "net_total_bytes": 445000,
+    "avg_cpu_percent": 3.59,
+    "avg_mem_bytes": 31982500
+  },
+  "clab-cap-squad-dynamic-mesh-soldier-1": {
+    "net_input_bytes": 406000,
+    "net_output_bytes": 382000,
+    "net_total_bytes": 788000,
+    "avg_cpu_percent": 4.33,
+    "avg_mem_bytes": 39542500
+  },
+  "clab-cap-squad-dynamic-mesh-soldier-3": {
+    "net_input_bytes": 240000,
+    "net_output_bytes": 220000,
+    "net_total_bytes": 460000,
+    "avg_cpu_percent": 5.19,
+    "avg_mem_bytes": 31425833
+  },
+  "clab-cap-squad-dynamic-mesh-soldier-8": {
+    "net_input_bytes": 238000,
+    "net_output_bytes": 213000,
+    "net_total_bytes": 451000,
+    "avg_cpu_percent": 4.38,
+    "avg_mem_bytes": 31448333
+  },
+  "clab-cap-squad-dynamic-mesh-uav-2": {
+    "net_input_bytes": 243000,
+    "net_output_bytes": 204000,
+    "net_total_bytes": 447000,
+    "avg_cpu_percent": 4.21,
+    "avg_mem_bytes": 32137500
+  }
+}
