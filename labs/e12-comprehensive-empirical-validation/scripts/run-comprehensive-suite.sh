@@ -493,7 +493,7 @@ Start Time: $(date --iso-8601=seconds)
 EOF
 
     # Deploy topology
-    deploy_topology "$topology_file" "../../.env" || {
+    deploy_topology "$topology_file" "../../../.env" || {
         log_error "Failed to deploy topology"
         return 1
     }
