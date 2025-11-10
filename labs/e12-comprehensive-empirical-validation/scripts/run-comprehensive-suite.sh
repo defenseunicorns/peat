@@ -146,10 +146,15 @@ for stats_file in sorted(stats_dir.glob("stats-*.json")):
 
                     def parse_bytes(s):
                         s = s.strip()
-                        multipliers = {"B": 1, "kB": 1e3, "MB": 1e6, "GB": 1e9}
-                        for suffix, mult in multipliers.items():
-                            if suffix in s:
-                                return float(s.replace(suffix, "")) * mult
+                        # Check longest suffixes first to avoid matching "B" in "kB"
+                        if "GB" in s:
+                            return float(s.replace("GB", "").replace("GiB", "")) * 1e9
+                        elif "MB" in s or "MiB" in s:
+                            return float(s.replace("MB", "").replace("MiB", "")) * 1e6
+                        elif "kB" in s or "KiB" in s or "KB" in s:
+                            return float(s.replace("kB", "").replace("KiB", "").replace("KB", "")) * 1e3
+                        elif "B" in s:
+                            return float(s.replace("B", ""))
                         return 0
 
                     node_stats[name]["net_input_bytes"].append(parse_bytes(input_str))
