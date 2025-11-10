@@ -305,7 +305,14 @@ deploy_topology() {
 
 destroy_topology() {
     log_info "Destroying topology..."
-    timeout 60 containerlab destroy --all --cleanup > /dev/null 2>&1 || true
+
+    # Force remove all containerlab containers directly
+    # This is faster and more reliable than `containerlab destroy`
+    docker ps -a --filter "name=clab-" --format "{{.Names}}" | xargs -r docker rm -f > /dev/null 2>&1 || true
+
+    # Give containers a moment to fully stop
+    sleep 1
+
     log_success "Topology destroyed"
 }
 
