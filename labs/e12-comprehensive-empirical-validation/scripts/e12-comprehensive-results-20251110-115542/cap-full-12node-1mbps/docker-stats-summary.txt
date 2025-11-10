@@ -1,0 +1,58 @@
+Docker Network Statistics Summary
+================================================================================
+
+Total Network I/O:
+  Input:  2,909,000 bytes (2.91 MB)
+  Output: 2,703,000 bytes (2.70 MB)
+  Total:  5,612,000 bytes (5.61 MB)
+
+Per-Node Breakdown:
+--------------------------------------------------------------------------------
+clab-cap-squad-dynamic-mesh-soldier-1:
+  Network: 784,000 bytes (↓398,000 ↑386,000)
+  CPU: 5.6%  Memory: 36.9 MB
+
+clab-cap-squad-dynamic-mesh-soldier-2:
+  Network: 434,000 bytes (↓229,000 ↑205,000)
+  CPU: 4.5%  Memory: 32.0 MB
+
+clab-cap-squad-dynamic-mesh-soldier-3:
+  Network: 425,000 bytes (↓222,000 ↑203,000)
+  CPU: 4.5%  Memory: 32.2 MB
+
+clab-cap-squad-dynamic-mesh-soldier-4:
+  Network: 531,000 bytes (↓247,000 ↑284,000)
+  CPU: 5.6%  Memory: 33.1 MB
+
+clab-cap-squad-dynamic-mesh-soldier-5:
+  Network: 436,000 bytes (↓226,000 ↑210,000)
+  CPU: 4.1%  Memory: 31.9 MB
+
+clab-cap-squad-dynamic-mesh-soldier-6:
+  Network: 429,000 bytes (↓227,000 ↑202,000)
+  CPU: 4.4%  Memory: 32.3 MB
+
+clab-cap-squad-dynamic-mesh-soldier-7:
+  Network: 417,000 bytes (↓228,000 ↑189,000)
+  CPU: 5.0%  Memory: 31.7 MB
+
+clab-cap-squad-dynamic-mesh-soldier-8:
+  Network: 442,000 bytes (↓234,000 ↑208,000)
+  CPU: 3.9%  Memory: 32.5 MB
+
+clab-cap-squad-dynamic-mesh-soldier-9:
+  Network: 419,000 bytes (↓227,000 ↑192,000)
+  CPU: 4.4%  Memory: 32.3 MB
+
+clab-cap-squad-dynamic-mesh-uav-1:
+  Network: 433,000 bytes (↓225,000 ↑208,000)
+  CPU: 4.4%  Memory: 32.2 MB
+
+clab-cap-squad-dynamic-mesh-uav-2:
+  Network: 430,000 bytes (↓230,000 ↑200,000)
+  CPU: 4.4%  Memory: 32.9 MB
+
+clab-cap-squad-dynamic-mesh-ugv-1:
+  Network: 432,000 bytes (↓216,000 ↑216,000)
+  CPU: 7.1%  Memory: 32.6 MB
+

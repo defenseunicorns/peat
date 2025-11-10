@@ -1,0 +1,6 @@
+Architecture: traditional
+Scale: 24node
+Bandwidth: 1gbps
+Topology: platoon-24node-client-server-mode4.yaml
+Start Time: 2025-11-10T09:20:09-05:00
+End Time: 2025-11-10T09:21:51-05:00

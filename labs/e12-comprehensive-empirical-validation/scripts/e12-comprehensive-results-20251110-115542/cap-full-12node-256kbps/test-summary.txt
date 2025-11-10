@@ -1,0 +1,28 @@
+Test Metrics Summary
+================================================================================
+
+Message Counts:
+  Messages sent: 9
+  Messages received: 0
+  Documents inserted: 6
+  Documents received: 176
+
+Bandwidth:
+  Total bytes sent: 1,314 bytes (0.00 MB)
+  Average message size: 146.0 bytes
+
+Latency:
+  Measurements: 110
+  Average: 534.60 ms
+  Median (p50): 16.56 ms
+  p90: 3187.60 ms
+  p99: 3396.95 ms
+  Range: 9.13 - 3416.63 ms
+
+Replication:
+  Replication factor: 29.33x
+  (Each document received by 29.3 nodes on average)
+
+Node Participation:
+  Unique senders: 1
+  Unique receivers: 11

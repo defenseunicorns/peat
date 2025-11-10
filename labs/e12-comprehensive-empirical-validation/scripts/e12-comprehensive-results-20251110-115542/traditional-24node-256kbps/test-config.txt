@@ -1,0 +1,6 @@
+test_name: traditional-24node-256kbps
+topology_file: ../../../cap-sim/topologies/traditional-platoon-24node.yaml
+bandwidth: 256kbps
+duration: 60
+start_time: 2025-11-10T14:45:23-05:00
+end_time: 2025-11-10T14:46:35-05:00
