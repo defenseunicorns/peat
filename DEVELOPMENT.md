@@ -59,10 +59,9 @@ cap/
 
 ## Getting Started
 
-### 1. Clone and Setup
+### 1. Setup
 
 ```bash
-git clone <repository-url>
 cd cap
 ```
 
@@ -117,12 +116,14 @@ cargo fmt --check && cargo clippy --all-targets --all-features -- -D warnings
 
 ## Development Workflow
 
-### Branch Strategy
+### Quality Assurance
 
-- `main` - Stable releases
-- `develop` - Integration branch for features
-- `feature/*` - Feature branches
-- `fix/*` - Bug fix branches
+All code changes require:
+
+1. Implement changes with comprehensive tests
+2. Ensure all tests pass: `cargo test`
+3. Check formatting: `cargo fmt --check`
+4. Run clippy: `cargo clippy --all-targets --all-features -- -D warnings`
 
 ### Commit Conventions
 
@@ -135,17 +136,6 @@ docs: Update README with setup instructions
 test: Add property tests for CRDT operations
 refactor: Simplify capability composition engine
 ```
-
-### Pull Request Process
-
-1. Create a feature branch from `develop`
-2. Implement changes with tests
-3. Ensure all tests pass: `cargo test`
-4. Check formatting: `cargo fmt --check`
-5. Run clippy: `cargo clippy`
-6. Create PR with description linking to issue
-7. Wait for CI to pass
-8. Request review from maintainers
 
 ## Testing Strategy
 
@@ -386,30 +376,26 @@ cargo doc --document-private-items
 
 ## Contributing
 
-See the project plan in `docs/CAP-POC-Project-Plan.md` for current priorities and roadmap.
-
-### Areas for Contribution
+### Areas for Development
 
 - Phase implementations (discovery, cell, hierarchical)
 - Composition rule patterns
 - Network simulation realism
-- Visualization improvements
 - Performance optimization
 - Documentation
 
 ## Resources
 
-- [Project Plan](docs/CAP-POC-Project-Plan.md)
-- [Architecture Decision Record](docs/ADR-001-CAP-Protocol-POC.md)
+- [Architecture Decision Records](docs/adr/) - Technical decision documentation
+- [Validation Results](docs/VALIDATION_RESULTS.md) - Experimental validation
 - [Ditto Documentation](https://docs.ditto.live/rust/)
 - [Rust Book](https://doc.rust-lang.org/book/)
 
-## Getting Help
+## Documentation
 
 - Review documentation in `docs/`
-- Check GitHub Issues
-- Ask questions in pull requests
-- Contact project maintainers
+- See `docs/INDEX.md` for complete documentation index
+- Architecture Decision Records in `docs/adr/`
 
 ## License
 
