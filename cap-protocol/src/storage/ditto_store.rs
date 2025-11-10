@@ -791,6 +791,274 @@ impl DittoStore {
 
         Ok(acks)
     }
+
+    // TTL and Data Lifecycle Operations
+    //
+    // These methods implement soft-delete patterns and EVICT strategies to manage
+    // document lifecycle in distributed environments. See docs/TTL_AND_DATA_LIFECYCLE_DESIGN.md
+    // for architectural rationale.
+
+    /// Soft-delete a document by setting _deleted flag
+    ///
+    /// This avoids husking (concurrent delete-update creating partially null documents)
+    /// on high-churn data like beacons and positions.
+    ///
+    /// # Arguments
+    ///
+    /// * `collection` - Collection name
+    /// * `doc_id` - Document ID to soft-delete
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// store.soft_delete("beacons", "beacon-123").await?;
+    /// ```
+    #[instrument(skip(self), fields(collection, doc_id))]
+    pub async fn soft_delete(&self, collection: &str, doc_id: &str) -> Result<()> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let dql_query = format!(
+            "UPDATE {} SET _deleted = true, _deleted_at = :now WHERE _id = :id",
+            collection
+        );
+
+        self.ditto
+            .store()
+            .execute_v2((dql_query, serde_json::json!({"id": doc_id, "now": now})))
+            .await
+            .map_err(|e| {
+                error!("Soft delete failed: {}", e);
+                Error::storage_error(
+                    format!("Soft delete failed on collection {}", collection),
+                    "soft_delete",
+                    Some(collection.to_string()),
+                )
+            })?;
+
+        debug!("Soft-deleted document {} in {}", doc_id, collection);
+        Ok(())
+    }
+
+    /// Clean up soft-deleted documents older than the specified TTL
+    ///
+    /// This performs hard deletion (tombstone creation) after soft-delete TTL expires.
+    ///
+    /// # Arguments
+    ///
+    /// * `collection` - Collection name
+    /// * `ttl_seconds` - Documents with _deleted_at older than this are hard-deleted
+    ///
+    /// # Returns
+    ///
+    /// Number of documents hard-deleted
+    #[instrument(skip(self), fields(collection, ttl_seconds))]
+    pub async fn cleanup_soft_deleted(&self, collection: &str, ttl_seconds: u64) -> Result<usize> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let cutoff = now - ttl_seconds;
+
+        // Query soft-deleted documents older than cutoff
+        let dql_query = format!(
+            "SELECT _id FROM {} WHERE _deleted == true AND _deleted_at < :cutoff",
+            collection
+        );
+
+        let results = self
+            .ditto
+            .store()
+            .execute_v2((dql_query, serde_json::json!({"cutoff": cutoff})))
+            .await
+            .map_err(|e| {
+                error!("Query soft-deleted failed: {}", e);
+                Error::storage_error(
+                    format!("Query soft-deleted failed on collection {}", collection),
+                    "cleanup_soft_deleted",
+                    Some(collection.to_string()),
+                )
+            })?;
+
+        let doc_ids: Vec<String> = results
+            .iter()
+            .filter_map(|item| {
+                let json_str = item.json_string();
+                serde_json::from_str::<serde_json::Value>(&json_str)
+                    .ok()
+                    .and_then(|v| v["_id"].as_str().map(|s| s.to_string()))
+            })
+            .collect();
+
+        let count = doc_ids.len();
+
+        // Hard delete each document (creates tombstones)
+        for doc_id in doc_ids {
+            let delete_query = format!("DELETE FROM {} WHERE _id = :id", collection);
+            self.ditto
+                .store()
+                .execute_v2((delete_query, serde_json::json!({"id": doc_id})))
+                .await
+                .map_err(|e| {
+                    error!("Hard delete failed: {}", e);
+                    Error::storage_error(
+                        format!("Hard delete failed on collection {}", collection),
+                        "cleanup_soft_deleted",
+                        Some(collection.to_string()),
+                    )
+                })?;
+        }
+
+        debug!(
+            "Cleaned up {} soft-deleted documents in {}",
+            count, collection
+        );
+        Ok(count)
+    }
+
+    /// Configure Ditto tombstone TTL at runtime using ALTER SYSTEM
+    ///
+    /// IMPORTANT: Never set Edge SDK TTL > Server TTL (Edge default: 7 days, Server default: 30 days)
+    ///
+    /// # Arguments
+    ///
+    /// * `tombstone_ttl_hours` - Hours until tombstones are reaped (168 = 7 days)
+    /// * `enabled` - Enable/disable automatic tombstone reaping
+    /// * `days_between_reaping` - How often to run reaping (default: 1 day)
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Configure tactical edge device: 7 day tombstone TTL
+    /// store.configure_tombstone_ttl(168, true, 1).await?;
+    /// ```
+    #[instrument(skip(self))]
+    pub async fn configure_tombstone_ttl(
+        &self,
+        tombstone_ttl_hours: u32,
+        enabled: bool,
+        days_between_reaping: u32,
+    ) -> Result<()> {
+        // Validate: Edge SDK should never exceed 7 days (168 hours)
+        if tombstone_ttl_hours > 168 {
+            warn!(
+                "Tombstone TTL {} hours exceeds recommended Edge SDK limit of 168 hours (7 days)",
+                tombstone_ttl_hours
+            );
+        }
+
+        let commands = vec![
+            format!("ALTER SYSTEM SET TOMBSTONE_TTL_ENABLED = {}", enabled),
+            format!(
+                "ALTER SYSTEM SET TOMBSTONE_TTL_HOURS = {}",
+                tombstone_ttl_hours
+            ),
+            format!(
+                "ALTER SYSTEM SET DAYS_BETWEEN_REAPING = {}",
+                days_between_reaping
+            ),
+        ];
+
+        for cmd in commands {
+            debug!("Executing: {}", cmd);
+            self.ditto
+                .store()
+                .execute_v2((cmd.clone(), serde_json::json!({})))
+                .await
+                .map_err(|e| {
+                    error!("ALTER SYSTEM command failed: {}", e);
+                    Error::storage_error(
+                        format!("Failed to configure tombstone TTL: {}", e),
+                        "configure_tombstone_ttl",
+                        None,
+                    )
+                })?;
+        }
+
+        info!(
+            "Configured tombstone TTL: {} hours, enabled={}, days_between_reaping={}",
+            tombstone_ttl_hours, enabled, days_between_reaping
+        );
+        Ok(())
+    }
+
+    /// EVICT oldest documents from a collection to free local storage
+    ///
+    /// EVICT removes documents locally only (no tombstone). They may re-sync from peers.
+    /// Use for edge devices with storage constraints.
+    ///
+    /// # Arguments
+    ///
+    /// * `collection` - Collection name
+    /// * `limit` - Maximum number of documents to evict
+    ///
+    /// # Returns
+    ///
+    /// Number of documents evicted
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Edge device storage management: keep only 100 most recent beacons
+    /// let evicted = store.evict_oldest("beacons", 50).await?;
+    /// ```
+    #[instrument(skip(self), fields(collection, limit))]
+    pub async fn evict_oldest(&self, collection: &str, limit: usize) -> Result<usize> {
+        // Query oldest documents (assuming _id or timestamp-based sorting)
+        let dql_query = format!(
+            "SELECT _id FROM {} ORDER BY _id ASC LIMIT {}",
+            collection, limit
+        );
+
+        let results = self
+            .ditto
+            .store()
+            .execute_v2((dql_query, serde_json::json!({})))
+            .await
+            .map_err(|e| {
+                error!("Query for eviction failed: {}", e);
+                Error::storage_error(
+                    format!("Query for eviction failed on collection {}", collection),
+                    "evict_oldest",
+                    Some(collection.to_string()),
+                )
+            })?;
+
+        let doc_ids: Vec<String> = results
+            .iter()
+            .filter_map(|item| {
+                let json_str = item.json_string();
+                serde_json::from_str::<serde_json::Value>(&json_str)
+                    .ok()
+                    .and_then(|v| v["_id"].as_str().map(|s| s.to_string()))
+            })
+            .collect();
+
+        let count = doc_ids.len();
+
+        // EVICT each document (local removal, no tombstone)
+        for doc_id in doc_ids {
+            let evict_query = format!("EVICT FROM {} WHERE _id = :id", collection);
+            self.ditto
+                .store()
+                .execute_v2((evict_query, serde_json::json!({"id": doc_id})))
+                .await
+                .map_err(|e| {
+                    error!("EVICT failed: {}", e);
+                    Error::storage_error(
+                        format!("EVICT failed on collection {}", collection),
+                        "evict_oldest",
+                        Some(collection.to_string()),
+                    )
+                })?;
+        }
+
+        debug!("Evicted {} oldest documents from {}", count, collection);
+        Ok(count)
+    }
 }
 
 impl Clone for DittoStore {
