@@ -1,0 +1,6 @@
+Architecture: cap
+Scale: hierarchical
+Bandwidth: 24node-100mbps
+Topology: platoon-24node-mesh-mode4.yaml
+Start Time: 2025-11-10T09:27:03-05:00
+End Time: 2025-11-10T09:28:45-05:00

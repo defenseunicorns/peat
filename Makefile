@@ -31,13 +31,14 @@ help:
 	@echo "  sim-destroy                - Destroy running topology"
 	@echo "  sim-clean                  - Destroy all and clean up artifacts"
 	@echo ""
-	@echo "E8/E11 Testing & Analysis:"
-	@echo "  e11-comprehensive-suite    - Test all modes × all bandwidths (16 tests, ~60min) ⭐⭐⭐"
-	@echo "  e11-all-modes-report       - Test all modes unconstrained + report"
-	@echo "  e11-mode4-bandwidth BW=x   - Test Mode 4 at specific bandwidth (1gbps/100mbps/1mbps/256kbps)"
-	@echo "  e8-baseline-comparison     - Run three-way baseline comparison"
-	@echo "  e8-performance-tests       - Run full E8 performance test suite"
-	@echo "  e8-compare-results DIR=x   - Generate comparison report"
+	@echo "Empirical Validation & Testing:"
+	@echo "  e12-comprehensive-validation - Full experimental validation (24 tests, ~3-4hrs) ⭐⭐⭐⭐"
+	@echo "  e12-validate                 - Validate E12 test harness infrastructure"
+	@echo "  e12-analyze DIR=x            - Analyze E12 results and generate reports"
+	@echo "  e11-comprehensive-suite      - Test all modes × all bandwidths (16 tests, ~60min)"
+	@echo "  e11-all-modes-report         - Test all modes unconstrained + report"
+	@echo "  e11-mode4-bandwidth BW=x     - Test Mode 4 at specific bandwidth"
+	@echo "  e8-baseline-comparison       - Three-way baseline comparison (Traditional/CAP Full/CAP Differential)"
 
 # Clean build artifacts and Ditto directories
 clean: clean-ditto
@@ -231,6 +232,58 @@ e11-all-modes-report:
 	@echo "Estimated time: ~5-6 minutes"
 	@echo ""
 	@cd cap-sim && ./test-all-modes-report.sh
+
+# E12 Comprehensive Empirical Validation
+# Complete experimental framework with dual metrics collection
+# Tests all architectures × scales × bandwidth constraints
+# Total: 24 test configurations (~3-4 hours)
+e12-comprehensive-validation:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  E12 Comprehensive Empirical Validation                   ║"
+	@echo "║  Rigorous proof of CAP Protocol advantages                ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "This will run complete experimental validation:"
+	@echo "  • 3 Architectures: Traditional IoT, CAP Full, CAP Hierarchical"
+	@echo "  • Multiple Scales: 2, 12, 24 nodes"
+	@echo "  • 4 Bandwidths: 1Gbps, 100Mbps, 1Mbps, 256Kbps"
+	@echo ""
+	@echo "Metrics Collected:"
+	@echo "  • Application-level: Messages, documents, latency (JSONL)"
+	@echo "  • Docker-level: Network bytes tx/rx, CPU, memory"
+	@echo ""
+	@echo "⚠️  WARNING: This will take approximately 3-4 hours"
+	@echo ""
+	@cd labs/e12-comprehensive-empirical-validation/scripts && ./run-comprehensive-suite.sh
+
+# E12 Validation Harness Test
+# Validates all E12 infrastructure components
+# Estimated time: ~3 minutes
+e12-validate:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  E12 Infrastructure Validation                            ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "Testing infrastructure components:"
+	@echo "  • Docker stats collection"
+	@echo "  • Topology deployment"
+	@echo "  • Bandwidth constraints"
+	@echo "  • Metrics extraction"
+	@echo "  • Analysis pipeline"
+	@echo ""
+	@cd labs/e12-comprehensive-empirical-validation/scripts && ./validate-harness.sh
+
+# E12 Analyze Results
+# Generate comparative analysis from test results
+# Usage: make e12-analyze DIR=<results-directory>
+e12-analyze:
+	@if [ -z "$(DIR)" ]; then \
+		echo "Usage: make e12-analyze DIR=<results-directory>"; \
+		echo "Example: make e12-analyze DIR=labs/e12-comprehensive-empirical-validation/e12-comprehensive-results-20251110-120000"; \
+		exit 1; \
+	fi
+	@echo "Generating comprehensive analysis for $(DIR)..."
+	@cd labs/e12-comprehensive-empirical-validation/scripts && python3 analyze-comprehensive-results.py ../$(DIR)
 
 # E8 Performance Test Suite (Three-Way Comparison with Bandwidth Constraints)
 # Runs 32 tests across 3 configurations: Traditional IoT, CAP Full, CAP Differential

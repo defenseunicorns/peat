@@ -1,0 +1,23 @@
+{
+  "total_tests": 24,
+  "architectures": [
+    "cap-full",
+    "cap-hierarchical",
+    "traditional"
+  ],
+  "scales": [
+    "12node",
+    "24node",
+    "2node"
+  ],
+  "bandwidths": [
+    "100mbps",
+    "1gbps",
+    "1mbps",
+    "256kbps"
+  ],
+  "bandwidth_reduction_min": -23.753737097712424,
+  "bandwidth_reduction_max": -7.60039072431189,
+  "bandwidth_reduction_avg": -15.253266847214341,
+  "bandwidth_reduction_median": -14.829469783416526
+}

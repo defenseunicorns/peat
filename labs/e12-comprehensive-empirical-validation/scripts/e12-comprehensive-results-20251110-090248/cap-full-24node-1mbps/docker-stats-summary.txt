@@ -1,0 +1,10 @@
+Docker Network Statistics Summary
+================================================================================
+
+Total Network I/O:
+  Input:  0 bytes (0.00 MB)
+  Output: 0 bytes (0.00 MB)
+  Total:  0 bytes (0.00 MB)
+
+Per-Node Breakdown:
+--------------------------------------------------------------------------------
