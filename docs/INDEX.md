@@ -51,7 +51,7 @@ In-depth technical analysis and design explorations.
 | [Ditto-SDK-Integration-Notes.md](Ditto-SDK-Integration-Notes.md) | Ditto SDK Integration | Integration notes and patterns for Ditto CRDT mesh |
 | [TTL_AND_DATA_LIFECYCLE_DESIGN.md](TTL_AND_DATA_LIFECYCLE_DESIGN.md) | TTL and Data Lifecycle (Ditto) | Ditto-specific implementation of ADR-016 lifecycle management |
 | [POLICY_ENGINE_CRDT_INTEGRATION.md](POLICY_ENGINE_CRDT_INTEGRATION.md) | Policy Engine & CRDT Integration | Optimistic Concurrency Control for policy enforcement with Ditto LWW semantics |
-| [E8_PROTOBUF_MIGRATION_HANDOFF.md](E8_PROTOBUF_MIGRATION_HANDOFF.md) | Protobuf Migration Guide | E8 simulation team handoff for ADR-012 Phase 5 changes |
+| [PROTOBUF_MIGRATION_GUIDE.md](PROTOBUF_MIGRATION_GUIDE.md) | Protobuf Migration Guide | Technical guide for ADR-012 protobuf migration |
 
 ## Project Planning
 
@@ -104,7 +104,7 @@ Comprehensive testing strategy and implementation guides.
 - **Policy Engine & Conflict Resolution**: POLICY_ENGINE_CRDT_INTEGRATION.md, POLICY_ENGINE_DESIGN.md, EXTENSIBLE_POLICY_ENGINE_DESIGN.md
 - **Human-Machine Teaming**: ADR-004, human-machine-teaming-design.md
 - **Testing**: TESTING_STRATEGY.md, e2e-cell-formation.md
-- **Simulation**: E8_PROTOBUF_MIGRATION_HANDOFF.md, E8_PHASE1_SQUAD_TOPOLOGY.md, E8_TOPOLOGY_MODES.md
+- **Simulation**: NETWORK_SIMULATOR_EVALUATION.md, NETWORK_TOPOLOGY_MODES.md, SQUAD_TOPOLOGY_VALIDATION.md
 
 ## Documentation Conventions
 
@@ -159,7 +159,7 @@ cap/
 - **...policy engine and conflict resolution**: See [POLICY_ENGINE_CRDT_INTEGRATION.md](POLICY_ENGINE_CRDT_INTEGRATION.md) for OCC approach with Ditto
 - **...human-machine teaming**: Read [ADR-004](adr/004-human-machine-cell-composition.md)
 - **...cell formation E2E tests**: See [e2e-cell-formation.md](../cap-protocol/docs/testing/e2e-cell-formation.md)
-- **...protobuf migration for simulation**: See [E8_PROTOBUF_MIGRATION_HANDOFF.md](E8_PROTOBUF_MIGRATION_HANDOFF.md)
+- **...protobuf migration**: See [PROTOBUF_MIGRATION_GUIDE.md](PROTOBUF_MIGRATION_GUIDE.md)
 
 ### "I'm working on..."
 
