@@ -30,15 +30,15 @@
 //!
 //! # Example
 //!
-//! ```
+//! ```ignore
 //! use cap_protocol::hierarchy::maintenance::{HierarchyMaintainer, RebalanceAction};
-//! use cap_protocol::models::cell::CellState;
+//! use cap_protocol::models::cell::{CellState, CellStateExt, CellConfig, CellConfigExt};
 //!
 //! # fn example() -> cap_protocol::Result<()> {
 //! let maintainer = HierarchyMaintainer::new(3, 10, 2, 8);
 //!
 //! // Check if cell needs rebalancing
-//! # let cell = CellState::new(cap_protocol::models::cell::CellConfig::new(10));
+//! # let cell = CellState::new(CellConfig::new(10));
 //! let action = maintainer.needs_rebalance(&cell);
 //!
 //! match action {

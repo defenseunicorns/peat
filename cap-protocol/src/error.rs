@@ -106,6 +106,14 @@ pub enum Error {
     /// Generic internal error
     #[error("Internal error: {0}")]
     Internal(String),
+
+    /// Invalid input provided
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
+
+    /// Command conflict detected
+    #[error("Command conflict detected: {0}")]
+    ConflictDetected(String),
 }
 
 impl Error {
