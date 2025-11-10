@@ -72,6 +72,12 @@ Scalable Distributed Coordination for Autonomous Systems
 - **Graduated human authority** for distributed autonomous control
 - **Production-ready** with 330+ tests, 100% sync success
 
+**The State:** 0-1 Startup
+- Bootstrapped, no capital investment, fully liquid
+- Rapidly evolving codebase with features, tests and laboratory experimentation
+- Ontology -> Schema -> Code
+- Abstractions for persistence, CRDT, and network functions
+
 ---
 
 <!-- _class: lead -->
@@ -85,12 +91,14 @@ Scalable Distributed Coordination for Autonomous Systems
 - Defense Innovation Unit Collaborative Operations in Denied (COD) program
 - **All-to-all communication saturates at 10-20 nodes**
 - O(n²) message complexity becomes unbearable
-- No solution for tactical edge networks (high latency, partitions)
+- No solution for tactical edge networks (high latency, partitions, disconnectivity/DDIL)
 
 ## Industry-Wide Challenge
 - IoT swarms: Can't coordinate beyond small groups
 - Robotics: Fleet coordination breaks down at scale
 - Defense: Squad-level autonomy requires 12+ nodes minimum
+- Cloud: Investments still tilting towards centralization
+- Edge: Pushing cloud tech outward is failing
 
 ---
 
@@ -284,7 +292,7 @@ CRDT eventual consistency alone doesn't provide enough control for safety-critic
 
 # Validation Methodology
 
-## Three-Tier Validation Strategy
+## Four-Tier Validation Strategy
 
 ### 1. Unit & Integration Tests (Development)
 - 330+ tests covering all protocol phases
@@ -292,89 +300,134 @@ CRDT eventual consistency alone doesn't provide enough control for safety-critic
 - Fast feedback loop (<1s per test)
 
 ### 2. ContainerLab Multi-Node Validation (System)
-- 12-node squad topology with real Docker networking
+- 12-24 node topologies with real Docker networking
 - Network constraints: 10-500ms latency, 0-5% packet loss
-- Three topology modes: client-server, hub-spoke, dynamic mesh
+- Four protocol modes tested across bandwidth constraints
 
-### 3. Network Topology Validation (Scale Testing)
-- Three topology modes: client-server, hub-spoke, dynamic mesh
-- Network constraint testing (latency, packet loss, bandwidth limits)
-- Validates hierarchical aggregation efficiency
+### 3. Comprehensive Bandwidth Testing (E11)
+- 16 test configurations (4 modes × 4 bandwidths)
+- Bandwidths: 1Gbps, 100Mbps, 1Mbps, 256Kbps tactical radio
+- Validates hierarchical aggregation efficiency (95%+ bandwidth reduction)
+
+### 4. Traditional IoT Baseline Validation (E12)
+- Empirical scaling study: 2-193 nodes
+- Measured O(n^1.69) super-linear scaling in traditional architectures
+- Single-machine testing up to 190+ nodes validated
 
 ---
 
-# ContainerLab Validation: 12-Node Squad
+# ContainerLab Validation: Multi-Node Testing
 
 ## Test Environment
-- 12 containerized CAP Protocol nodes
+- 12-24 containerized CAP Protocol nodes
 - Ditto SDK 4.12+ for real CRDT synchronization
 - Real Docker networking (not mocked/simulated)
 - Network constraints via Linux traffic control (tc)
 
-## Key Results
-- ✅ **100% synchronization success** across all topology modes
-- ✅ Protocol maintains consistency under 500ms latency
-- ✅ Graceful degradation under 5% packet loss
+## Key Results (E11 Comprehensive Bandwidth Testing)
+- ✅ **16 test configurations** across 4 modes and 4 bandwidths
+- ✅ **100% synchronization success** across all modes and bandwidths
+- ✅ **Mode 4 Hierarchical**: 95.3% bandwidth reduction validated
+- ✅ Protocol maintains functionality from gigabit ethernet to 256Kbps tactical radio
+- ✅ P2P latency: 13-242ms avg across all bandwidth constraints
 - ✅ Node discovery: <2s average
 - ✅ Cell formation: <5s for 4-node cells
-- ✅ Command propagation: <100ms per hierarchy level
 
-*Source: VALIDATION_RESULTS.md*
+*Source: test-bandwidth-suite-20251109-191705/BANDWIDTH_SUITE_REPORT.md*
 
 ---
 
 # ContainerLab Network Topology Modes
 
-## Three Validation Topologies
+## Four Validation Topologies
 
 **1. Client-Server** (Baseline)
 - All nodes connect to central server
 - Validates basic sync functionality
-- Fastest convergence (0.3s)
+- 12 nodes, latency: 13-38ms avg
 
 **2. Hub-Spoke** (Hierarchical Realistic)
 - Mimics military squad hierarchy
 - Squad leaders as hubs, members as spokes
-- Validates command flow and aggregation
+- 12 nodes, latency: 16-29ms avg
 
 **3. Dynamic Mesh** (Autonomous)
 - Nodes discover and form cells autonomously
 - Geographic self-organization
-- Validates Phase 1-3 protocol
+- 12 nodes, latency: 14-21ms avg
+
+**4. Hierarchical Aggregation** (Production)
+- 3 squads + platoon leader architecture
+- Squad leaders aggregate → Platoon leader aggregates
+- 24 nodes, latency: 133-242ms avg, **95.3% bandwidth reduction**
 
 ---
 
-# ContainerLab Results: 100% Success Across All Modes
+# Comprehensive Bandwidth Testing Results (E11)
 
-## Validation Metrics
+## Test Matrix: 4 Modes × 4 Bandwidths = 16 Configurations
 
-**Network Constraints Tested**:
-- Latency: 10ms - 500ms
-- Packet Loss: 0% - 5%
-- Bandwidth: 9.6Kbps - 1Mbps
+| Mode | 1Gbps | 100Mbps | 1Mbps | 256Kbps |
+|------|-------|---------|-------|---------|
+| **Mode 1** (Client-Server) | 15ms | 13ms | 38ms | 14ms |
+| **Mode 2** (Hub-Spoke) | 16ms | 29ms | 17ms | 16ms |
+| **Mode 3** (Dynamic Mesh) | 15ms | 21ms | 21ms | 14ms |
+| **Mode 4** (Hierarchical) | 206ms | 133ms | 243ms | 212ms |
 
-**Results**:
-- ✅ 100% synchronization success across all topology modes
-- ✅ Graceful degradation under 500ms latency, 5% packet loss
-- ✅ Bandwidth efficiency: 95%+ reduction vs full mesh broadcast
+*Values shown: Average latency across all nodes*
 
-**Interpretation**: Protocol maintains consistency under realistic tactical edge constraints
+**Key Findings**:
+- ✅ 100% synchronization success across all 16 configurations
+- ✅ Mode 4 achieves 95.3% bandwidth reduction through hierarchical aggregation
+- ✅ Protocol maintains functionality from gigabit to tactical radio bandwidths
 
 ---
 
-# Network Constraint Validation
+# Traditional IoT Scaling Study (E12)
 
-## Three Network Scenarios
+## Empirical Baseline: Traditional Full-State Replication
 
-| Scenario | Latency | Packet Loss | Bandwidth | Result |
-|----------|---------|-------------|-----------|--------|
-| **Ideal** | 10ms | 0% | 1Mbps | 100% sync, 0.3s convergence |
-| **Realistic** | 100ms | 1% | 256Kbps | 100% sync, 0.8s convergence |
-| **Degraded** | 500ms | 5% | 9.6Kbps | 100% sync, 2.1s convergence |
+**Test Configuration**:
+- Architecture: Periodic full-state messages (5-second cycle)
+- No differential sync, no CRDTs
+- Scales: 2, 12, 24, 48, 96, 193 nodes
+- Single-machine validation
 
-**Key Finding**: Protocol maintains 100% eventual consistency even under extreme network degradation
+**Measured Scaling Behavior**:
+- **O(n^1.69) super-linear scaling complexity**
+- 2 nodes: 0.06 MB/60s
+- 96 nodes: 37.94 MB/60s
+- 48x node increase → 682x traffic increase
 
-**Tactical Significance**: Suitable for tactical edge networks (SATCOM, tactical radios, LOS radios)
+**Division-Scale Projection (1,536 nodes)**:
+- **4.06 GB per minute** (67 MB/second sustained)
+- Impractical for bandwidth-constrained tactical networks
+
+---
+
+# Single-Machine Testing Achievement (E12)
+
+## Infrastructure Validation
+
+**Docker Image Optimization**:
+- Original size: 11.8 GB
+- Optimized size: 242 MB
+- **98% size reduction** (48.8x smaller)
+
+**Scale Validated**:
+- Successfully tested 193-node topology on single machine
+- Automated deployment, measurement, and teardown
+- 5-second interval Docker stats collection with per-node granularity
+
+**Resource Efficiency**:
+- ~46 GB RAM for 193 containers
+- vs ~2.3 TB unoptimized
+- Enables rapid battalion-scale iteration before distributed deployment
+
+**Testing Framework Capabilities**:
+- ContainerLab-based automated topology deployment
+- Comprehensive data processing and analysis pipeline
+- Validated across 6 scales: 2, 12, 24, 48, 96, 193 nodes
 
 ---
 
