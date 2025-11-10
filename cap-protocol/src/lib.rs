@@ -27,6 +27,7 @@ pub mod error;
 pub mod hierarchy;
 pub mod models;
 pub mod network;
+pub mod policy; // Generic policy engine for conflict resolution
 pub mod storage;
 pub mod sync; // Data synchronization abstraction layer
 pub mod testing;
