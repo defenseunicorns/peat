@@ -130,43 +130,43 @@ node_stats = defaultdict(lambda: {
 for stats_file in sorted(stats_dir.glob("stats-*.json")):
     try:
         with open(stats_file) as f:
-            stats = json.load(f)
+            # Stats files are JSONL format (one JSON object per line)
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
 
-        # Handle both single object and array of objects
-        if isinstance(stats, dict):
-            stats = [stats]
+                container = json.loads(line)
+                name = container.get("Name", "unknown")
 
-        for container in stats:
-            name = container.get("Name", "unknown")
+                # Parse network I/O (format: "1.23MB / 4.56MB")
+                net_io = container.get("NetIO", "0B / 0B")
+                if " / " in net_io:
+                    input_str, output_str = net_io.split(" / ")
 
-            # Parse network I/O (format: "1.23MB / 4.56MB")
-            net_io = container.get("NetIO", "0B / 0B")
-            if " / " in net_io:
-                input_str, output_str = net_io.split(" / ")
+                    def parse_bytes(s):
+                        s = s.strip()
+                        multipliers = {"B": 1, "kB": 1e3, "MB": 1e6, "GB": 1e9}
+                        for suffix, mult in multipliers.items():
+                            if suffix in s:
+                                return float(s.replace(suffix, "")) * mult
+                        return 0
 
-                def parse_bytes(s):
-                    s = s.strip()
-                    multipliers = {"B": 1, "kB": 1e3, "MB": 1e6, "GB": 1e9}
-                    for suffix, mult in multipliers.items():
-                        if suffix in s:
-                            return float(s.replace(suffix, "")) * mult
-                    return 0
+                    node_stats[name]["net_input_bytes"].append(parse_bytes(input_str))
+                    node_stats[name]["net_output_bytes"].append(parse_bytes(output_str))
 
-                node_stats[name]["net_input_bytes"].append(parse_bytes(input_str))
-                node_stats[name]["net_output_bytes"].append(parse_bytes(output_str))
+                # Parse CPU percentage (format: "12.34%")
+                cpu_str = container.get("CPUPerc", "0%").replace("%", "")
+                try:
+                    node_stats[name]["cpu_percent"].append(float(cpu_str))
+                except:
+                    pass
 
-            # Parse CPU percentage (format: "12.34%")
-            cpu_str = container.get("CPUPerc", "0%").replace("%", "")
-            try:
-                node_stats[name]["cpu_percent"].append(float(cpu_str))
-            except:
-                pass
-
-            # Parse memory usage (format: "123.4MiB / 456.7MiB")
-            mem_usage = container.get("MemUsage", "0B / 0B")
-            if " / " in mem_usage:
-                usage_str = mem_usage.split(" / ")[0].strip()
-                node_stats[name]["mem_usage_bytes"].append(parse_bytes(usage_str))
+                # Parse memory usage (format: "123.4MiB / 456.7MiB")
+                mem_usage = container.get("MemUsage", "0B / 0B")
+                if " / " in mem_usage:
+                    usage_str = mem_usage.split(" / ")[0].strip()
+                    node_stats[name]["mem_usage_bytes"].append(parse_bytes(usage_str))
 
     except Exception as e:
         continue
@@ -615,8 +615,21 @@ main() {
     for test_config in "${!TEST_CONFIGS[@]}"; do
         local topology_file="${TEST_CONFIGS[$test_config]}"
 
-        # Parse test configuration
-        IFS='-' read -r architecture scale bandwidth <<< "$test_config"
+        # Parse test configuration (handle multi-word architectures)
+        # Test names format: <architecture>-<scale>-<bandwidth>
+        # Examples: traditional-12node-256kbps, cap-full-12node-100mbps, cap-hierarchical-24node-1gbps
+
+        # Extract bandwidth (last component)
+        bandwidth="${test_config##*-}"
+
+        # Remove bandwidth to get: architecture-scale
+        remaining="${test_config%-*}"
+
+        # Extract scale (last component of remaining)
+        scale="${remaining##*-}"
+
+        # Extract architecture (everything before scale)
+        architecture="${remaining%-*}"
 
         echo -e "${YELLOW}[${test_number}/${total_tests}]${NC}"
 
