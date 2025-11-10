@@ -48,6 +48,7 @@ clean: clean-ditto
 clean-ditto:
 	@echo "Removing Ditto persistence directories..."
 	@find . -type d -name ".ditto*" -exec rm -rf {} + 2>/dev/null || true
+	@rm -rf /tmp/cap-persistence-test-* 2>/dev/null || true
 	@echo "Ditto directories cleaned"
 
 # Build all crates

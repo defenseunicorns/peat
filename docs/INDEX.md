@@ -19,6 +19,12 @@ ADRs document significant architectural decisions and their rationale.
 | [001](adr/001-cap-protocol-poc.md) | CAP Protocol POC | 2024-10-28 | Implemented |
 | [002](adr/002-beacon-storage-architecture.md) | Beacon Storage Architecture | 2024-10-29 | Implemented |
 | [004](adr/004-human-machine-cell-composition.md) | Human-Machine Cell Composition | 2024-10-30 | Implemented |
+| [011](adr/011-ditto-vs-automerge-iroh.md) | Ditto vs Automerge/Iroh Backend Abstraction | 2024-11-15 | Accepted |
+| [012](adr/012-schema-definition-protocol-extensibility.md) | Schema Definition and Protocol Extensibility | 2024-11-18 | Accepted |
+| [013](adr/013-distributed-software-ai-operations.md) | Distributed Software AI Operations | 2024-11-20 | Accepted |
+| [014](adr/014-distributed-coordination-primitives.md) | Distributed Coordination Primitives | 2024-12-15 | Accepted |
+| [015](adr/015-experimental-validation-hierarchical-aggregation.md) | Experimental Validation - Hierarchical Aggregation | 2024-12-20 | Accepted |
+| [016](adr/016-ttl-and-data-lifecycle-abstraction.md) | TTL and Data Lifecycle Abstraction | 2025-01-10 | Accepted |
 
 **Summary**: [ARCHITECTURE-DECISION-SUMMARY.md](ARCHITECTURE-DECISION-SUMMARY.md)
 
@@ -31,6 +37,7 @@ In-depth technical analysis and design explorations.
 | [CAP_Architecture_EventStreaming_vs_DeltaSync.md](CAP_Architecture_EventStreaming_vs_DeltaSync.md) | Event Streaming vs Delta Sync | Evaluates synchronization approaches for distributed state |
 | [human-machine-teaming-design.md](human-machine-teaming-design.md) | Human-Machine Teaming | Design for human-in-the-loop authority and cell composition |
 | [Ditto-SDK-Integration-Notes.md](Ditto-SDK-Integration-Notes.md) | Ditto SDK Integration | Integration notes and patterns for Ditto CRDT mesh |
+| [TTL_AND_DATA_LIFECYCLE_DESIGN.md](TTL_AND_DATA_LIFECYCLE_DESIGN.md) | TTL and Data Lifecycle (Ditto) | Ditto-specific implementation of ADR-016 lifecycle management |
 | [E8_PROTOBUF_MIGRATION_HANDOFF.md](E8_PROTOBUF_MIGRATION_HANDOFF.md) | Protobuf Migration Guide | E8 simulation team handoff for ADR-012 Phase 5 changes |
 
 ## Project Planning
@@ -76,8 +83,9 @@ Comprehensive testing strategy and implementation guides.
 
 ### By Topic
 
-- **Architecture**: ADR-001, ADR-002, ADR-004, ADR-012, ARCHITECTURE-DECISION-SUMMARY.md
+- **Architecture**: ADR-001, ADR-002, ADR-004, ADR-011, ADR-012, ADR-016, ARCHITECTURE-DECISION-SUMMARY.md
 - **Synchronization**: CAP_Architecture_EventStreaming_vs_DeltaSync.md, Ditto-SDK-Integration-Notes.md
+- **Data Lifecycle & TTL**: ADR-016, TTL_AND_DATA_LIFECYCLE_DESIGN.md
 - **Human-Machine Teaming**: ADR-004, human-machine-teaming-design.md
 - **Testing**: TESTING_STRATEGY.md, e2e-cell-formation.md
 - **Project Management**: CAP-POC-Project-Plan.md
@@ -129,6 +137,7 @@ cap/
 - **...why we made a specific decision**: Check [ADRs](adr/)
 - **...how to test**: Read [TESTING_STRATEGY.md](TESTING_STRATEGY.md)
 - **...how Ditto integration works**: See [Ditto-SDK-Integration-Notes.md](Ditto-SDK-Integration-Notes.md)
+- **...TTL and data lifecycle**: Start with [ADR-016](adr/016-ttl-and-data-lifecycle-abstraction.md) for abstraction, then [TTL_AND_DATA_LIFECYCLE_DESIGN.md](TTL_AND_DATA_LIFECYCLE_DESIGN.md) for Ditto specifics
 - **...human-machine teaming**: Read [ADR-004](adr/004-human-machine-cell-composition.md)
 - **...cell formation E2E tests**: See [e2e-cell-formation.md](../cap-protocol/docs/testing/e2e-cell-formation.md)
 - **...protobuf migration for simulation**: See [E8_PROTOBUF_MIGRATION_HANDOFF.md](E8_PROTOBUF_MIGRATION_HANDOFF.md)
