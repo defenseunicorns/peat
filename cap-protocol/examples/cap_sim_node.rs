@@ -805,6 +805,8 @@ async fn writer_mode(
             "message_number".to_string(),
             serde_json::json!(message_number),
         );
+        // Add CAP authorization field for hierarchical mode with CAP filtering
+        fields.insert("public".to_string(), Value::Bool(true));
 
         let document = Document::with_id(doc_id.clone(), fields.clone());
 
@@ -872,6 +874,8 @@ async fn writer_mode(
         "expected_acks".to_string(),
         serde_json::json!(expected_acks),
     );
+    // Add CAP authorization field for hierarchical mode with CAP filtering
+    test_fields.insert("public".to_string(), Value::Bool(true));
 
     let test_doc = Document::with_id("sim_test_001".to_string(), test_fields);
     backend.document_store().upsert("sim_poc", test_doc).await?;
