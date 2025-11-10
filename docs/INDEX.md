@@ -38,6 +38,7 @@ In-depth technical analysis and design explorations.
 | [human-machine-teaming-design.md](human-machine-teaming-design.md) | Human-Machine Teaming | Design for human-in-the-loop authority and cell composition |
 | [Ditto-SDK-Integration-Notes.md](Ditto-SDK-Integration-Notes.md) | Ditto SDK Integration | Integration notes and patterns for Ditto CRDT mesh |
 | [TTL_AND_DATA_LIFECYCLE_DESIGN.md](TTL_AND_DATA_LIFECYCLE_DESIGN.md) | TTL and Data Lifecycle (Ditto) | Ditto-specific implementation of ADR-016 lifecycle management |
+| [POLICY_ENGINE_CRDT_INTEGRATION.md](POLICY_ENGINE_CRDT_INTEGRATION.md) | Policy Engine & CRDT Integration | Optimistic Concurrency Control for policy enforcement with Ditto LWW semantics |
 | [E8_PROTOBUF_MIGRATION_HANDOFF.md](E8_PROTOBUF_MIGRATION_HANDOFF.md) | Protobuf Migration Guide | E8 simulation team handoff for ADR-012 Phase 5 changes |
 
 ## Project Planning
@@ -86,6 +87,7 @@ Comprehensive testing strategy and implementation guides.
 - **Architecture**: ADR-001, ADR-002, ADR-004, ADR-011, ADR-012, ADR-016, ARCHITECTURE-DECISION-SUMMARY.md
 - **Synchronization**: CAP_Architecture_EventStreaming_vs_DeltaSync.md, Ditto-SDK-Integration-Notes.md
 - **Data Lifecycle & TTL**: ADR-016, TTL_AND_DATA_LIFECYCLE_DESIGN.md
+- **Policy Engine & Conflict Resolution**: POLICY_ENGINE_CRDT_INTEGRATION.md, POLICY_ENGINE_DESIGN.md, EXTENSIBLE_POLICY_ENGINE_DESIGN.md
 - **Human-Machine Teaming**: ADR-004, human-machine-teaming-design.md
 - **Testing**: TESTING_STRATEGY.md, e2e-cell-formation.md
 - **Project Management**: CAP-POC-Project-Plan.md
@@ -138,6 +140,7 @@ cap/
 - **...how to test**: Read [TESTING_STRATEGY.md](TESTING_STRATEGY.md)
 - **...how Ditto integration works**: See [Ditto-SDK-Integration-Notes.md](Ditto-SDK-Integration-Notes.md)
 - **...TTL and data lifecycle**: Start with [ADR-016](adr/016-ttl-and-data-lifecycle-abstraction.md) for abstraction, then [TTL_AND_DATA_LIFECYCLE_DESIGN.md](TTL_AND_DATA_LIFECYCLE_DESIGN.md) for Ditto specifics
+- **...policy engine and conflict resolution**: See [POLICY_ENGINE_CRDT_INTEGRATION.md](POLICY_ENGINE_CRDT_INTEGRATION.md) for OCC approach with Ditto
 - **...human-machine teaming**: Read [ADR-004](adr/004-human-machine-cell-composition.md)
 - **...cell formation E2E tests**: See [e2e-cell-formation.md](../cap-protocol/docs/testing/e2e-cell-formation.md)
 - **...protobuf migration for simulation**: See [E8_PROTOBUF_MIGRATION_HANDOFF.md](E8_PROTOBUF_MIGRATION_HANDOFF.md)
