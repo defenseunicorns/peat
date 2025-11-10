@@ -1,5 +1,6 @@
 .PHONY: help clean clean-ditto build test test-e2e fmt clippy check all pre-commit ci
 .PHONY: sim-build sim-deploy-poc sim-deploy-squad sim-destroy sim-logs sim-clean
+.PHONY: docs-presentation
 
 # Default target
 help:
@@ -18,6 +19,9 @@ help:
 	@echo "  pre-commit   - Run all checks before committing (fmt + clippy + test)"
 	@echo "  ci           - Run full CI pipeline (fmt check + clippy + test)"
 	@echo "  all          - Clean, build, and run all checks"
+	@echo ""
+	@echo "Documentation:"
+	@echo "  docs-presentation - Build HTML presentation from markdown"
 	@echo ""
 	@echo "Network Simulation (E8 - requires Linux with ContainerLab):"
 	@echo "  sim-build                  - Build cap-sim-node Docker image"
@@ -274,3 +278,18 @@ e8-baseline-comparison:
 	@echo "Estimated time: ~5 minutes"
 	@echo ""
 	@cd cap-sim && ./run-baseline-comparison.sh
+
+# ============================================
+# Documentation
+# ============================================
+
+# Build HTML presentation from markdown
+docs-presentation:
+	@echo "Building HTML presentation..."
+	@if ! command -v marp &> /dev/null; then \
+		echo "❌ Error: marp-cli not found"; \
+		echo "Install with: npm install -g @marp-team/marp-cli"; \
+		exit 1; \
+	fi
+	@marp docs/CAP_PROTOCOL_TECHNOLOGY_DEEPDIVE.md --html --allow-local-files -o docs/CAP_PROTOCOL_TECHNOLOGY_DEEPDIVE.html
+	@echo "✅ Presentation built: docs/CAP_PROTOCOL_TECHNOLOGY_DEEPDIVE.html"
