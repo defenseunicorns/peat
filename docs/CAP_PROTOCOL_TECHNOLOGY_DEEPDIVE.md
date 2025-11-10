@@ -7,28 +7,44 @@ backgroundImage: url('https://marp.app/assets/hero-background.svg')
 header: 'CAP Protocol - Technology Deep Dive'
 style: |
   section {
-    font-size: 22px;
+    font-size: 18px;
+    padding: 40px 60px;
   }
   h1 {
-    font-size: 48px;
+    font-size: 42px;
+    margin-bottom: 0.3em;
   }
   h2 {
-    font-size: 36px;
+    font-size: 32px;
+    margin-bottom: 0.3em;
+    margin-top: 0.3em;
   }
   h3 {
-    font-size: 28px;
+    font-size: 24px;
+    margin-bottom: 0.2em;
+    margin-top: 0.2em;
   }
   table {
-    font-size: 18px;
+    font-size: 15px;
+    margin: 0.5em 0;
   }
   code {
-    font-size: 16px;
-  }
-  pre {
     font-size: 14px;
   }
+  pre {
+    font-size: 13px;
+    padding: 0.5em;
+    margin: 0.5em 0;
+  }
   li {
-    margin-bottom: 0.3em;
+    margin-bottom: 0.15em;
+    line-height: 1.3;
+  }
+  ul, ol {
+    margin: 0.3em 0;
+  }
+  p {
+    margin: 0.3em 0;
   }
 ---
 
