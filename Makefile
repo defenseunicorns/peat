@@ -31,8 +31,11 @@ help:
 	@echo "  sim-destroy                - Destroy running topology"
 	@echo "  sim-clean                  - Destroy all and clean up artifacts"
 	@echo ""
-	@echo "E8 Testing & Analysis:"
-	@echo "  e8-baseline-comparison     - Run three-way baseline comparison ⭐"
+	@echo "E8/E11 Testing & Analysis:"
+	@echo "  e11-comprehensive-suite    - Test all modes × all bandwidths (16 tests, ~60min) ⭐⭐⭐"
+	@echo "  e11-all-modes-report       - Test all modes unconstrained + report"
+	@echo "  e11-mode4-bandwidth BW=x   - Test Mode 4 at specific bandwidth (1gbps/100mbps/1mbps/256kbps)"
+	@echo "  e8-baseline-comparison     - Run three-way baseline comparison"
 	@echo "  e8-performance-tests       - Run full E8 performance test suite"
 	@echo "  e8-compare-results DIR=x   - Generate comparison report"
 
@@ -176,6 +179,57 @@ sim-clean: sim-destroy
 	@echo "Cleaning up ContainerLab artifacts..."
 	@cd cap-sim && rm -rf topologies/clab-* || true
 	@echo "✅ Simulation cleanup complete"
+
+# E11 All-Modes Validation: Test all CAP modes and generate comprehensive report
+# Tests Modes 1-4 with full experimental validation
+# Estimated time: ~5-6 minutes
+# E11 Comprehensive Test Suite: All modes × all bandwidths
+# Tests Modes 1-4 across 1Gbps, 100Mbps, 1Mbps, 256Kbps
+# Total: 16 test runs (~60 minutes)
+e11-comprehensive-suite:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  E11 Comprehensive Suite - All Modes × All Bandwidths     ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "This will run 16 tests (4 modes × 4 bandwidths):"
+	@echo "  • Modes: 1 (Client-Server), 2 (Hub-Spoke), 3 (Mesh), 4 (Hierarchical)"
+	@echo "  • Bandwidths: 1Gbps, 100Mbps, 1Mbps, 256Kbps"
+	@echo ""
+	@echo "⚠️  WARNING: This will take approximately 60 minutes"
+	@echo ""
+	@cd cap-sim && ./test-bandwidth-suite.sh
+
+# E11 Mode 4 Bandwidth Test: Test Mode 4 at specific bandwidth
+# Usage: make e11-mode4-bandwidth BW=256kbps
+# Options: 1gbps, 100mbps, 1mbps, 256kbps
+e11-mode4-bandwidth:
+	@if [ -z "$(BW)" ]; then \
+		echo "Error: BW parameter required"; \
+		echo "Usage: make e11-mode4-bandwidth BW=256kbps"; \
+		echo "Options: 1gbps, 100mbps, 1mbps, 256kbps"; \
+		exit 1; \
+	fi
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║    E11 Mode 4 Bandwidth Test - $(BW)                      ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@cd cap-sim && ./test-mode4-bandwidth.sh $(BW)
+
+# E11 All-Modes Validation: Test all modes unconstrained
+e11-all-modes-report:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║    E11 All-Modes Validation - Unconstrained Report        ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "This will test all CAP modes (unconstrained) and generate a report:"
+	@echo "  • Mode 1: Client-Server (12 nodes)"
+	@echo "  • Mode 2: Hub-Spoke (12 nodes)"
+	@echo "  • Mode 3: Dynamic Mesh (12 nodes)"
+	@echo "  • Mode 4: Hierarchical Aggregation (24 nodes)"
+	@echo ""
+	@echo "Estimated time: ~5-6 minutes"
+	@echo ""
+	@cd cap-sim && ./test-all-modes-report.sh
 
 # E8 Performance Test Suite (Three-Way Comparison with Bandwidth Constraints)
 # Runs 32 tests across 3 configurations: Traditional IoT, CAP Full, CAP Differential

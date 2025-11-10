@@ -474,6 +474,12 @@ impl DittoStore {
         // Convert to base64 for storage (Ditto stores binary as base64 strings)
         let base64_data = base64::engine::general_purpose::STANDARD.encode(&bytes);
 
+        // Get current timestamp in microseconds for latency tracking
+        let timestamp_us = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as u64;
+
         // Create JSON document with _id and binary data
         let doc = serde_json::json!({
             "_id": squad_id,
@@ -481,10 +487,12 @@ impl DittoStore {
             "leader_id": summary.leader_id,
             "member_count": summary.member_count,
             "data": base64_data,
-            "type": "squad_summary"
+            "type": "squad_summary",
+            "collection_name": "squad_summaries",
+            "timestamp_us": timestamp_us
         });
 
-        self.upsert("squad_summaries", doc).await
+        self.upsert("sim_poc", doc).await
     }
 
     /// Retrieve a SquadSummary from the squad_summaries collection
@@ -502,7 +510,7 @@ impl DittoStore {
         squad_id: &str,
     ) -> Result<Option<cap_schema::hierarchy::v1::SquadSummary>> {
         let results = self
-            .query("squad_summaries", &format!("_id == '{}'", squad_id))
+            .query("sim_poc", &format!("_id == '{}'", squad_id))
             .await?;
 
         if results.is_empty() {
@@ -558,6 +566,12 @@ impl DittoStore {
         let bytes = summary.encode_to_vec();
         let base64_data = base64::engine::general_purpose::STANDARD.encode(&bytes);
 
+        // Get current timestamp in microseconds for latency tracking
+        let timestamp_us = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as u64;
+
         let doc = serde_json::json!({
             "_id": platoon_id,
             "platoon_id": summary.platoon_id,
@@ -565,7 +579,8 @@ impl DittoStore {
             "squad_count": summary.squad_count,
             "total_member_count": summary.total_member_count,
             "data": base64_data,
-            "type": "platoon_summary"
+            "type": "platoon_summary",
+            "timestamp_us": timestamp_us
         });
 
         self.upsert("platoon_summaries", doc).await
