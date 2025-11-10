@@ -300,7 +300,7 @@ deploy_topology() {
 
 destroy_topology() {
     log_info "Destroying topology..."
-    containerlab destroy --all --cleanup > /dev/null 2>&1 || true
+    timeout 60 containerlab destroy --all --cleanup > /dev/null 2>&1 || true
     log_success "Topology destroyed"
 }
 
