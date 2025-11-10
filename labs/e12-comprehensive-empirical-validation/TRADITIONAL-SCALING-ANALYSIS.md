@@ -86,31 +86,26 @@ Each Client → Server: Full state update
 
 This creates N*(N-1) communication patterns in aggregate, explaining the super-linear growth.
 
-## Comparison: CAP vs Traditional
+## Single-Machine Testing Capability
 
-At 24 nodes @ 1Gbps (60s test):
+The experimental infrastructure successfully validates scalability to **190+ nodes on a single machine**:
 
-| Architecture          | Traffic  | vs Traditional |
-|----------------------:|----------|---------------:|
-| Traditional IoT       | 7.47 MB  | baseline       |
-| CAP Full Replication  | 8.16 MB  | +9.2%          |
-| CAP Hierarchical      | 8.04 MB  | +7.6%          |
+- **Docker optimization**: Multi-stage build reduced image size from 11.8 GB → 242 MB (98% reduction)
+- **Resource efficiency**: 190+ node test consumes ~46 GB RAM vs ~2.3 TB with unoptimized images
+- **ContainerLab automation**: Automated deployment, stats collection, and teardown at battalion scale
+- **Measurement fidelity**: 5-second interval Docker stats capture with per-node granularity
 
-**Key Insight**: CAP's CRDT-based differential synchronization adds only 7-9% overhead while providing:
-- Decentralized architecture (no single point of failure)
-- Hierarchical aggregation (reduces bandwidth)
-- Eventually consistent state (offline operation)
-- Conflict-free updates (no coordination required)
+This single-machine capability enables rapid iteration and validation before distributed deployment.
 
 ## Conclusions
 
-1. **Hypothesis Validated**: Traditional IoT exhibits super-linear scaling (O(n^1.69)), confirming exponential-like growth
+1. **Hypothesis Validated**: Traditional IoT exhibits **super-linear scaling (O(n^1.69))** across 2-96 nodes, confirming it grows much faster than linearly with node count
 
-2. **Unsuitable for Scale**: At division scale, traditional architecture would generate 4 GB/minute, making it impractical for bandwidth-constrained tactical networks
+2. **Unsuitable for Large-Scale Deployment**: At division scale (1,536 nodes), traditional architecture would generate **4 GB/minute** of network traffic, making it impractical for bandwidth-constrained tactical networks
 
-3. **CAP Advantage**: Despite adding only 7-9% overhead at small scale, CAP's architectural benefits (decentralization, hierarchical aggregation, CRDT synchronization) make it far superior for large-scale deployments
+3. **Empirical Foundation Established**: Comprehensive baseline measurements across 6 scales (2, 12, 24, 48, 96, 193 nodes) provide concrete data for architectural comparisons
 
-4. **Scaling Transition**: The data shows traditional IoT behaves worst at small-to-medium scales (12-24 nodes), then stabilizes but remains super-linear
+4. **Testing Infrastructure Ready**: The experimental framework is validated for single-machine testing up to 190+ nodes and architected for large-scale distributed validation across multiple machines
 
 ## Methodology
 
@@ -126,12 +121,12 @@ At 24 nodes @ 1Gbps (60s test):
 
 **Results Directory:** `e12-comprehensive-results-20251110-115542/`
 
-## Recommendations
+## Next Steps
 
-1. **Avoid traditional IoT at scale**: The super-linear growth makes it unsuitable for networks beyond ~50 nodes
+1. **CAP Architecture Scaling Validation**: Execute comprehensive test suite across 24, 48, 96 node scales for both CAP Full (client-server) and CAP Hierarchical (Mode 4) architectures to empirically measure scaling behavior
 
-2. **Prefer hierarchical architectures**: CAP's Mode 4 hierarchical aggregation shows promise for reducing traffic
+2. **Comparative Scaling Analysis**: Compare measured scaling complexity between Traditional (O(n^1.69)), CAP Full, and CAP Hierarchical to validate whether CRDT-based synchronization and hierarchical aggregation provide scaling advantages
 
-3. **Further testing needed**: Run CAP scaling tests at 48 and 96 nodes to validate linear scaling hypothesis
+3. **Distributed Multi-Machine Testing**: Validate testing framework across multiple physical machines to enable division-scale (1,500+ node) empirical measurements
 
-4. **Bandwidth optimization**: Even CAP may need optimization for division-scale deployments at constrained bandwidths
+4. **Bandwidth Constraint Validation**: Test all architectures under realistic tactical network constraints (1 Mbps, 256 Kbps) at battalion and division scales

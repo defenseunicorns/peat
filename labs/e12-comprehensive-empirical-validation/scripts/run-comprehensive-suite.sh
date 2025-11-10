@@ -578,22 +578,31 @@ TEST_CONFIGS["traditional-24node-100mbps"]="../../../cap-sim/topologies/traditio
 TEST_CONFIGS["traditional-24node-1mbps"]="../../../cap-sim/topologies/traditional-platoon-24node.yaml"
 TEST_CONFIGS["traditional-24node-256kbps"]="../../../cap-sim/topologies/traditional-platoon-24node.yaml"
 
-# CAP Full Mesh configurations (no aggregation)
-TEST_CONFIGS["cap-full-12node-1gbps"]="../../../cap-sim/topologies/squad-12node-dynamic-mesh.yaml"
-TEST_CONFIGS["cap-full-12node-100mbps"]="../../../cap-sim/topologies/squad-12node-dynamic-mesh.yaml"
-TEST_CONFIGS["cap-full-12node-1mbps"]="../../../cap-sim/topologies/squad-12node-dynamic-mesh.yaml"
-TEST_CONFIGS["cap-full-12node-256kbps"]="../../../cap-sim/topologies/squad-12node-dynamic-mesh.yaml"
+TEST_CONFIGS["traditional-48node-1gbps"]="../../../cap-sim/topologies/traditional-battalion-48node.yaml"
+TEST_CONFIGS["traditional-96node-1gbps"]="../../../cap-sim/topologies/traditional-battalion-96node.yaml"
 
-TEST_CONFIGS["cap-full-24node-1gbps"]="../../../cap-sim/topologies/platoon-24node-mesh-mode4.yaml"
-TEST_CONFIGS["cap-full-24node-100mbps"]="../../../cap-sim/topologies/platoon-24node-mesh-mode4.yaml"
-TEST_CONFIGS["cap-full-24node-1mbps"]="../../../cap-sim/topologies/platoon-24node-mesh-mode4.yaml"
-TEST_CONFIGS["cap-full-24node-256kbps"]="../../../cap-sim/topologies/platoon-24node-mesh-mode4.yaml"
+# CAP Full configurations (CRDT but no hierarchy - flat client-server)
+TEST_CONFIGS["cap-full-12node-1gbps"]="../../../cap-sim/topologies/squad-12node-client-server.yaml"
+TEST_CONFIGS["cap-full-12node-100mbps"]="../../../cap-sim/topologies/squad-12node-client-server.yaml"
+TEST_CONFIGS["cap-full-12node-1mbps"]="../../../cap-sim/topologies/squad-12node-client-server.yaml"
+TEST_CONFIGS["cap-full-12node-256kbps"]="../../../cap-sim/topologies/squad-12node-client-server.yaml"
 
-# CAP Hierarchical configurations (with aggregation)
-TEST_CONFIGS["cap-hierarchical-24node-1gbps"]="../../../cap-sim/topologies/platoon-24node-mesh-mode4.yaml"
-TEST_CONFIGS["cap-hierarchical-24node-100mbps"]="../../../cap-sim/topologies/platoon-24node-mesh-mode4.yaml"
-TEST_CONFIGS["cap-hierarchical-24node-1mbps"]="../../../cap-sim/topologies/platoon-24node-mesh-mode4.yaml"
-TEST_CONFIGS["cap-hierarchical-24node-256kbps"]="../../../cap-sim/topologies/platoon-24node-mesh-mode4.yaml"
+TEST_CONFIGS["cap-full-24node-1gbps"]="../../../cap-sim/topologies/platoon-24node-client-server.yaml"
+TEST_CONFIGS["cap-full-24node-100mbps"]="../../../cap-sim/topologies/platoon-24node-client-server.yaml"
+TEST_CONFIGS["cap-full-24node-1mbps"]="../../../cap-sim/topologies/platoon-24node-client-server.yaml"
+TEST_CONFIGS["cap-full-24node-256kbps"]="../../../cap-sim/topologies/platoon-24node-client-server.yaml"
+
+TEST_CONFIGS["cap-full-48node-1gbps"]="../../../cap-sim/topologies/battalion-48node-client-server.yaml"
+TEST_CONFIGS["cap-full-96node-1gbps"]="../../../cap-sim/topologies/battalion-96node-client-server.yaml"
+
+# CAP Hierarchical configurations (CRDT + Mode 4 aggregation)
+TEST_CONFIGS["cap-hierarchical-24node-1gbps"]="../../../cap-sim/topologies/platoon-24node-client-server-mode4.yaml"
+TEST_CONFIGS["cap-hierarchical-24node-100mbps"]="../../../cap-sim/topologies/platoon-24node-client-server-mode4.yaml"
+TEST_CONFIGS["cap-hierarchical-24node-1mbps"]="../../../cap-sim/topologies/platoon-24node-client-server-mode4.yaml"
+TEST_CONFIGS["cap-hierarchical-24node-256kbps"]="../../../cap-sim/topologies/platoon-24node-client-server-mode4.yaml"
+
+TEST_CONFIGS["cap-hierarchical-48node-1gbps"]="../../../cap-sim/topologies/battalion-48node-client-server-mode4.yaml"
+TEST_CONFIGS["cap-hierarchical-96node-1gbps"]="../../../cap-sim/topologies/battalion-96node-client-server-mode4.yaml"
 
 ################################################################################
 # Main Execution

@@ -59,17 +59,12 @@ Overall: 48x node increase → 682x traffic increase
 
    At division scale, traditional IoT generates **67 MB/second sustained** - impractical for bandwidth-constrained tactical networks.
 
-4. **CAP Protocol Advantage**
-   - At 24 nodes @ 1Gbps:
-     - Traditional: 7.47 MB
-     - CAP Full: 8.16 MB (+9.2%)
-     - CAP Hierarchical: 8.04 MB (+7.6%)
-
-   CAP adds only 7-9% overhead while providing:
-   - Decentralized architecture (no single point of failure)
-   - Hierarchical aggregation
-   - CRDT-based differential synchronization
-   - Offline operation capability
+4. **Single-Machine Testing Validated**
+   - Successfully demonstrated 190+ node testing on single machine
+   - Docker image optimization: 11.8 GB → 242 MB (98% reduction)
+   - Resource efficiency: ~46 GB RAM for 190 nodes vs ~2.3 TB unoptimized
+   - Automated deployment, measurement, and teardown at battalion scale
+   - Testing infrastructure ready for large-scale distributed validation
 
 ## Technical Implementation
 
@@ -137,39 +132,42 @@ At 96 nodes:
 
 ## Conclusions
 
-1. **Traditional IoT Unsuitable at Scale**
-   - O(n^1.69) complexity confirmed empirically
-   - Division-scale projection: 4 GB/minute
+1. **Traditional IoT Unsuitable at Scale** ✓ Empirically Proven
+   - O(n^1.69) complexity confirmed across 2-96 nodes
+   - Division-scale projection: 4 GB/minute (67 MB/second sustained)
    - Single point of failure (central server)
-   - No offline operation capability
+   - Full-state replication creates N*(N-1) communication patterns
 
-2. **CAP Protocol Superior**
-   - Only 7-9% overhead at small scale
-   - Decentralized architecture
-   - Hierarchical aggregation reduces traffic
-   - CRDT enables offline operation
-   - Expected to scale better (needs testing at 48/96 nodes)
+2. **Testing Infrastructure Validated** ✓ Empirically Proven
+   - Single-machine capability: 190+ nodes on commodity hardware
+   - Docker optimization enables resource-efficient testing
+   - Automated measurement and data collection at battalion scale
+   - Framework ready for large-scale distributed deployment
 
-3. **Scaling Behavior Complex**
-   - Worst growth at small-to-medium scales (12-24 nodes)
-   - Stabilizes at larger scales but remains super-linear
-   - Multiple factors: connection overhead, state size, broadcast patterns
+3. **Scaling Behavior Characterized** ✓ Empirically Proven
+   - Non-uniform growth: worst at small-to-medium scales (12-24 nodes)
+   - Stabilizes at larger scales but remains super-linear overall
+   - Multiple factors identified: connection overhead, state size, broadcast patterns
+   - Comprehensive baseline established for architectural comparisons
 
-## Recommendations
+## Next Steps
 
-1. **Immediate:**
-   - Document findings in research paper
-   - Use these results to justify CAP architecture
+1. **CAP Architecture Empirical Validation:**
+   - Execute comprehensive test suite for CAP Full (client-server) and CAP Hierarchical (Mode 4)
+   - Measure scaling behavior at 24, 48, 96 node scales
+   - Compare empirical scaling complexity vs Traditional (O(n^1.69))
+   - Determine whether CRDT synchronization and hierarchical aggregation provide scaling advantages
 
-2. **Short-term:**
-   - Run CAP scaling tests at 48/96 nodes
-   - Validate CAP exhibits linear or sub-linear scaling
-   - Test CAP hierarchical mode at battalion scale
+2. **Distributed Multi-Machine Testing:**
+   - Validate testing framework across multiple physical machines
+   - Enable division-scale (1,500+ node) empirical measurements
+   - Test bandwidth-constrained scenarios at tactical network speeds
 
-3. **Long-term:**
-   - Explore bandwidth optimization techniques
-   - Test division-scale CAP deployment (1,536 nodes)
-   - Investigate adaptive update frequencies based on network conditions
+3. **Infrastructure Readiness:**
+   - Testing framework validated for single-machine battalion-scale testing (190+ nodes)
+   - All necessary topologies and test automation in place
+   - Docker optimization enables resource-efficient large-scale deployments
+   - Ready for comprehensive comparative analysis
 
 ## References
 
