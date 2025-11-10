@@ -522,7 +522,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut mode = "client".to_string();
     let mut listen_addr = "0.0.0.0:12345".to_string();
     let mut server_addr = "localhost:12345".to_string();
-    let mut update_frequency_secs = 5;
+    let mut update_frequency_secs = 5.0;
     let mut num_documents = 1;
     let mut node_type = "unknown".to_string();
 
@@ -546,7 +546,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 i += 2;
             }
             "--update-frequency" => {
-                update_frequency_secs = args[i + 1].parse().unwrap_or(5);
+                update_frequency_secs = args[i + 1].parse().unwrap_or(5.0);
                 i += 2;
             }
             "--num-documents" => {
@@ -561,7 +561,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let update_frequency = Duration::from_secs(update_frequency_secs);
+    let update_frequency = Duration::from_secs_f64(update_frequency_secs);
     let state = NodeState::new(node_id.clone(), node_type, update_frequency);
 
     println!("========================================");
