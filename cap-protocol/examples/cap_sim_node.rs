@@ -49,7 +49,8 @@
 
 use cap_protocol::sync::ditto::DittoBackend;
 use cap_protocol::sync::{
-    BackendConfig, ChangeEvent, DataSyncBackend, Document, Query, TransportConfig, Value,
+    BackendConfig, ChangeEvent, ChangeStream, DataSyncBackend, Document, Query, TransportConfig,
+    Value,
 };
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -199,8 +200,9 @@ async fn squad_leader_aggregation_loop(
 
 /// Platoon leader aggregation loop (Mode 4)
 ///
-/// Periodically aggregates SquadSummaries into PlatoonSummary and publishes to Ditto
+/// Event-driven aggregation triggered by squad summary updates via Ditto P2P mesh
 async fn platoon_leader_aggregation_loop(
+    mut change_stream: ChangeStream,
     store: Arc<DittoStore>,
     platoon_id: String,
     node_id: String,
@@ -209,47 +211,157 @@ async fn platoon_leader_aggregation_loop(
         "[{}] Started platoon leader aggregation for {}",
         node_id, platoon_id
     );
+    println!(
+        "[{}] Observing squad summary change stream for P2P latency measurement",
+        node_id
+    );
 
     let squad_ids = vec!["squad-alpha", "squad-bravo", "squad-charlie"];
 
-    loop {
-        // Collect squad summaries from DittoStore
-        let mut squad_summaries = Vec::new();
+    // Clone store for aggregation task
+    let store_clone = Arc::clone(&store);
+    let platoon_id_clone = platoon_id.clone();
+    let node_id_clone = node_id.clone();
+    let squad_ids_clone = squad_ids.clone();
 
-        for squad_id in &squad_ids {
-            if let Ok(Some(summary)) = store.get_squad_summary(squad_id).await {
-                squad_summaries.push(summary);
+    // Spawn periodic aggregation task
+    let aggregation_handle = tokio::spawn(async move {
+        loop {
+            // Collect latest squad summaries
+            let mut squad_summaries = Vec::new();
+
+            for squad_id in &squad_ids_clone {
+                if let Ok(Some(summary)) = store_clone.get_squad_summary(squad_id).await {
+                    squad_summaries.push(summary);
+                }
             }
-        }
 
-        if squad_summaries.len() == 3 {
-            // Aggregate into PlatoonSummary
-            match StateAggregator::aggregate_platoon(&platoon_id, &node_id, squad_summaries) {
-                Ok(platoon_summary) => {
-                    // Publish to platoon_summaries collection
-                    if let Err(e) = store
-                        .upsert_platoon_summary(&platoon_id, &platoon_summary)
-                        .await
-                    {
-                        eprintln!("[{}] Failed to upsert platoon summary: {}", node_id, e);
-                    } else {
-                        println!(
-                            "[{}] ✓ Aggregated platoon {} ({} squads, {} total members)",
-                            node_id,
-                            platoon_id,
-                            platoon_summary.squad_count,
-                            platoon_summary.total_member_count
-                        );
+            if squad_summaries.len() == 3 {
+                // Aggregate into PlatoonSummary
+                match StateAggregator::aggregate_platoon(
+                    &platoon_id_clone,
+                    &node_id_clone,
+                    squad_summaries,
+                ) {
+                    Ok(platoon_summary) => {
+                        // Publish to platoon_summaries collection
+                        if let Err(e) = store_clone
+                            .upsert_platoon_summary(&platoon_id_clone, &platoon_summary)
+                            .await
+                        {
+                            eprintln!(
+                                "[{}] Failed to upsert platoon summary: {}",
+                                node_id_clone, e
+                            );
+                        } else {
+                            println!(
+                                "[{}] ✓ Aggregated platoon {} ({} squads, {} total members)",
+                                node_id_clone,
+                                platoon_id_clone,
+                                platoon_summary.squad_count,
+                                platoon_summary.total_member_count
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[{}] Failed to aggregate platoon: {}", node_id_clone, e);
                     }
                 }
-                Err(e) => {
-                    eprintln!("[{}] Failed to aggregate platoon: {}", node_id, e);
+            }
+
+            // Aggregate every 5 seconds using latest data
+            sleep(Duration::from_secs(5)).await;
+        }
+    });
+
+    // Listen for squad summary changes via P2P mesh (for latency measurement)
+    loop {
+        // Wait for next change event with timeout
+        let event =
+            tokio::time::timeout(Duration::from_millis(500), change_stream.receiver.recv()).await;
+
+        match event {
+            Ok(Some(change_event)) => {
+                match change_event {
+                    ChangeEvent::Initial { documents } => {
+                        // Process initial snapshot
+                        for doc in documents {
+                            let received_at_us = now_micros();
+                            if let Some(doc_id) = &doc.id {
+                                if doc_id.starts_with("squad-") {
+                                    // Extract timestamp for latency calculation
+                                    if let Some(ts_value) = doc.get("timestamp_us") {
+                                        let inserted_at_us = ts_value.as_u64().unwrap_or(0) as u128;
+                                        if inserted_at_us > 0 {
+                                            let latency_us =
+                                                received_at_us.saturating_sub(inserted_at_us);
+                                            let latency_ms = latency_us as f64 / 1000.0;
+
+                                            println!(
+                                                "[{}] ✓ Squad summary received (initial): {} (latency: {:.3}ms)",
+                                                node_id, doc_id, latency_ms
+                                            );
+
+                                            log_metrics(&MetricsEvent::DocumentReceived {
+                                                node_id: node_id.to_string(),
+                                                doc_id: doc_id.to_string(),
+                                                inserted_at_us,
+                                                received_at_us,
+                                                latency_us,
+                                                latency_ms,
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    ChangeEvent::Updated { document, .. } => {
+                        // Process document update (this is where P2P propagation is measured)
+                        let received_at_us = now_micros();
+                        if let Some(doc_id) = &document.id {
+                            if doc_id.starts_with("squad-") {
+                                // Extract timestamp for latency calculation
+                                if let Some(ts_value) = document.get("timestamp_us") {
+                                    let inserted_at_us = ts_value.as_u64().unwrap_or(0) as u128;
+                                    if inserted_at_us > 0 {
+                                        let latency_us =
+                                            received_at_us.saturating_sub(inserted_at_us);
+                                        let latency_ms = latency_us as f64 / 1000.0;
+
+                                        println!(
+                                            "[{}] ✓ Squad summary received: {} (latency: {:.3}ms)",
+                                            node_id, doc_id, latency_ms
+                                        );
+
+                                        log_metrics(&MetricsEvent::DocumentReceived {
+                                            node_id: node_id.to_string(),
+                                            doc_id: doc_id.to_string(),
+                                            inserted_at_us,
+                                            received_at_us,
+                                            latency_us,
+                                            latency_ms,
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    ChangeEvent::Removed { .. } => {
+                        // Ignore removals
+                    }
                 }
             }
+            Ok(None) => {
+                // Channel closed
+                aggregation_handle.abort();
+                return Err("Change stream closed unexpectedly".into());
+            }
+            Err(_) => {
+                // Timeout waiting for event - continue loop
+                continue;
+            }
         }
-
-        // Wait 5 seconds before next aggregation
-        sleep(Duration::from_secs(5)).await;
     }
 }
 
@@ -479,10 +591,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let platoon_id =
                     std::env::var("PLATOON_ID").unwrap_or_else(|_| "platoon-1".to_string());
 
+                // Create observer for squad summaries arriving via P2P mesh
+                let change_stream_result = backend.document_store().observe(
+                    "sim_poc",
+                    &Query::Custom("collection_name == 'squad_summaries'".to_string()),
+                );
+
                 // Get DittoStore from backend
                 if let Some(ditto_backend) = backend.as_any().downcast_ref::<DittoBackend>() {
-                    match ditto_backend.get_ditto_store() {
-                        Ok(ditto_store) => {
+                    match (ditto_backend.get_ditto_store(), change_stream_result) {
+                        (Ok(ditto_store), Ok(change_stream)) => {
                             let store_clone = Arc::clone(&ditto_store);
                             let node_id_clone = node_id.clone();
 
@@ -490,6 +608,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                             tokio::spawn(async move {
                                 if let Err(e) = platoon_leader_aggregation_loop(
+                                    change_stream,
                                     store_clone,
                                     platoon_id,
                                     node_id_clone.clone(),
@@ -505,8 +624,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                             println!("[{}] ✓ Platoon leader aggregation task spawned", node_id);
                         }
-                        Err(e) => {
+                        (Err(e), _) => {
                             eprintln!("[{}] ✗ Failed to get DittoStore: {}", node_id, e);
+                        }
+                        (_, Err(e)) => {
+                            eprintln!("[{}] ✗ Failed to create change stream: {}", node_id, e);
                         }
                     }
                 } else {
@@ -1081,6 +1203,23 @@ async fn process_document(
                 }
             }
         }
+    }
+    // Check if this is a squad summary document (Mode 4 hierarchical)
+    else if doc_id.starts_with("squad-") {
+        println!(
+            "[{}] ✓ Squad summary received: {} (latency: {:.3}ms)",
+            node_id, doc_id, latency_ms
+        );
+
+        // Log squad summary reception metrics
+        log_metrics(&MetricsEvent::DocumentReceived {
+            node_id: node_id.to_string(),
+            doc_id: doc_id.to_string(),
+            inserted_at_us,
+            received_at_us,
+            latency_us,
+            latency_ms,
+        });
     }
 
     Ok(())
