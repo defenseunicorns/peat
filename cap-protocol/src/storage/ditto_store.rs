@@ -807,6 +807,184 @@ impl DittoStore {
         Ok(acks)
     }
 
+    // Policy Engine Operations (Optimistic Concurrency Control)
+    //
+    // These methods implement conditional updates to enforce conflict resolution policies
+    // BEFORE Ditto's CRDT merge. See docs/POLICY_ENGINE_CRDT_INTEGRATION.md for details.
+
+    /// Conditional update for command with policy enforcement (Optimistic Concurrency Control)
+    ///
+    /// Uses WHERE clause to check policy-relevant attributes BEFORE allowing update.
+    /// This ensures policy enforcement happens before Ditto's CRDT merge.
+    ///
+    /// # Arguments
+    ///
+    /// * `command` - The command to upsert
+    /// * `policy` - The conflict policy to enforce
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(true)` - Update succeeded (policy check passed)
+    /// * `Ok(false)` - Update rejected (existing command wins per policy)
+    /// * `Err(_)` - Query execution failed
+    ///
+    /// # Policy Enforcement
+    ///
+    /// Different policies use different WHERE clauses:
+    ///
+    /// - `LastWriteWins`: `issued_at < :new_time` - Only update if new timestamp is newer
+    /// - `HighestPriorityWins`: `priority < :new_priority OR (priority = :new_priority AND issued_at < :new_time)`
+    /// - `HighestAuthorityWins`: Checks originator_id prefix (zone- > platoon-/squad- > node-)
+    /// - `RejectConflict`: `false` - Never update existing documents
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let command = HierarchicalCommand { priority: 5, ... };
+    /// let success = store.conditional_update_command(&command, ConflictPolicy::HighestPriorityWins).await?;
+    ///
+    /// if !success {
+    ///     // Existing command has higher priority, new command rejected
+    ///     return Err(Error::ConflictDetected("Higher priority command exists"));
+    /// }
+    /// ```
+    #[instrument(skip(self, command), fields(command_id = %command.command_id, policy = ?policy))]
+    pub async fn conditional_update_command(
+        &self,
+        command: &cap_schema::command::v1::HierarchicalCommand,
+        policy: cap_schema::command::v1::ConflictPolicy,
+    ) -> Result<bool> {
+        let (where_clause, mut params) = self.build_policy_where_clause(command, policy)?;
+
+        // Encode command data
+        let bytes = command.encode_to_vec();
+        let base64_data = base64::engine::general_purpose::STANDARD.encode(&bytes);
+
+        // Add common params
+        params["_id"] = serde_json::json!(command.command_id);
+        params["command_id"] = serde_json::json!(command.command_id);
+        params["originator_id"] = serde_json::json!(command.originator_id);
+        params["priority"] = serde_json::json!(command.priority);
+        params["data"] = serde_json::json!(base64_data);
+        params["type"] = serde_json::json!("hierarchical_command");
+        params["last_modified"] = serde_json::json!(std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs());
+
+        let query = format!(
+            "UPDATE hierarchical_commands
+             SET command_id = :command_id,
+                 originator_id = :originator_id,
+                 priority = :priority,
+                 data = :data,
+                 type = :type,
+                 last_modified = :last_modified
+             WHERE _id = :_id AND ({})",
+            where_clause
+        );
+
+        debug!("Executing conditional update with WHERE: {}", where_clause);
+
+        let result = self
+            .ditto
+            .store()
+            .execute_v2((query, params))
+            .await
+            .map_err(|e| {
+                error!("Conditional update failed: {}", e);
+                Error::storage_error(
+                    format!("Conditional update failed: {}", e),
+                    "conditional_update_command",
+                    Some("hierarchical_commands".to_string()),
+                )
+            })?;
+
+        // Check if any documents were mutated
+        let success = !result.mutated_document_ids().is_empty();
+
+        if !success {
+            debug!(
+                "Conditional update rejected for command {} - existing command wins per policy {:?}",
+                command.command_id, policy
+            );
+        } else {
+            info!(
+                "Conditional update succeeded for command {} with policy {:?}",
+                command.command_id, policy
+            );
+        }
+
+        Ok(success)
+    }
+
+    /// Build WHERE clause and params for policy-based conditional update
+    fn build_policy_where_clause(
+        &self,
+        command: &cap_schema::command::v1::HierarchicalCommand,
+        policy: cap_schema::command::v1::ConflictPolicy,
+    ) -> Result<(String, serde_json::Value)> {
+        use cap_schema::command::v1::ConflictPolicy;
+
+        let mut params = serde_json::json!({});
+
+        let issued_at_secs = command.issued_at.as_ref().map(|t| t.seconds).unwrap_or(0);
+
+        let where_clause = match policy {
+            ConflictPolicy::HighestPriorityWins => {
+                // Only update if new priority is higher, OR equal priority with newer timestamp
+                params["new_priority"] = serde_json::json!(command.priority);
+                params["new_time"] = serde_json::json!(issued_at_secs);
+
+                "(priority < :new_priority OR (priority = :new_priority AND issued_at < :new_time))"
+                    .to_string()
+            }
+
+            ConflictPolicy::HighestAuthorityWins => {
+                // Derive authority level from originator_id
+                // zone- = 3 (highest), platoon-/squad- = 2, other = 1
+                if command.originator_id.starts_with("zone-") {
+                    // Zone-level authority: can override anything
+                    "true".to_string()
+                } else if command.originator_id.starts_with("platoon-")
+                    || command.originator_id.starts_with("squad-")
+                {
+                    // Platoon/Squad level: can override node-level, but not zone-level
+                    "NOT (originator_id LIKE 'zone-%')".to_string()
+                } else {
+                    // Node-level: can only override other node-level
+                    "(NOT (originator_id LIKE 'zone-%')) AND (NOT (originator_id LIKE 'platoon-%')) AND (NOT (originator_id LIKE 'squad-%'))".to_string()
+                }
+            }
+
+            ConflictPolicy::LastWriteWins => {
+                // Only update if new timestamp is newer
+                params["new_time"] = serde_json::json!(issued_at_secs);
+                "issued_at < :new_time".to_string()
+            }
+
+            ConflictPolicy::MergeCompatible => {
+                // TODO: Implement actual compatibility checking
+                // For now, allow all updates
+                warn!("MergeCompatible policy not fully implemented, allowing all updates");
+                "true".to_string()
+            }
+
+            ConflictPolicy::RejectConflict => {
+                // Never update existing documents - always reject
+                "false".to_string()
+            }
+
+            ConflictPolicy::Unspecified => {
+                return Err(Error::InvalidInput(
+                    "Conflict policy must be specified for conditional update".to_string(),
+                ));
+            }
+        };
+
+        Ok((where_clause, params))
+    }
+
     // TTL and Data Lifecycle Operations
     //
     // These methods implement soft-delete patterns and EVICT strategies to manage
