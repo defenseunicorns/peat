@@ -2,13 +2,16 @@
 //!
 //! Manages command lifecycle: issuance, routing, acknowledgment, and status tracking.
 
+use crate::command::conflict_resolver::{ConflictResolver, ConflictResult};
 use crate::command::routing::{CommandRouter, TargetResolution};
+use crate::command::timeout_manager::TimeoutManager;
 use crate::Result;
 use cap_schema::command::v1::{
-    AckStatus, CommandAcknowledgment, CommandStatus, HierarchicalCommand,
+    AckStatus, CommandAcknowledgment, CommandStatus, ConflictPolicy, HierarchicalCommand,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::RwLock;
 
 /// Coordinates hierarchical command dissemination
@@ -27,6 +30,12 @@ pub struct CommandCoordinator {
 
     /// Command execution status
     command_status: Arc<RwLock<HashMap<String, CommandStatus>>>,
+
+    /// Conflict resolution engine
+    conflict_resolver: Arc<ConflictResolver>,
+
+    /// Timeout management
+    timeout_manager: Arc<TimeoutManager>,
 }
 
 impl CommandCoordinator {
@@ -40,6 +49,8 @@ impl CommandCoordinator {
             active_commands: Arc::new(RwLock::new(HashMap::new())),
             acknowledgments: Arc::new(RwLock::new(HashMap::new())),
             command_status: Arc::new(RwLock::new(HashMap::new())),
+            conflict_resolver: Arc::new(ConflictResolver::new()),
+            timeout_manager: Arc::new(TimeoutManager::new()),
         }
     }
 
@@ -52,13 +63,50 @@ impl CommandCoordinator {
             command.priority
         );
 
-        // Store in active commands
+        // 1. Check for conflicts
+        let conflict_result = self.conflict_resolver.check_conflict(&command).await;
+        if let ConflictResult::Conflict(existing) = conflict_result {
+            let policy = ConflictPolicy::try_from(command.conflict_policy)
+                .unwrap_or(ConflictPolicy::HighestPriorityWins);
+
+            tracing::debug!(
+                "[{}] Conflict detected for command {}, resolving with policy {:?}",
+                self.node_id,
+                command.command_id,
+                policy
+            );
+
+            let mut all_commands = existing;
+            all_commands.push(command.clone());
+
+            let resolved = self.conflict_resolver.resolve(all_commands, policy)?;
+
+            if resolved.command_id != command.command_id {
+                tracing::warn!(
+                    "[{}] Command {} rejected due to conflict (winner: {})",
+                    self.node_id,
+                    command.command_id,
+                    resolved.command_id
+                );
+                return Err(crate::Error::Internal(
+                    "Command rejected by conflict resolution policy".to_string(),
+                ));
+            }
+        }
+
+        // 2. Register for expiration tracking
+        self.timeout_manager.register_expiration(&command).await?;
+
+        // 3. Register with conflict resolver
+        self.conflict_resolver.register_command(&command).await?;
+
+        // 4. Store in active commands
         self.active_commands
             .write()
             .await
             .insert(command.command_id.clone(), command.clone());
 
-        // Create initial status
+        // 5. Create initial status
         let status = CommandStatus {
             command_id: command.command_id.clone(),
             state: 1, // PENDING
@@ -77,7 +125,22 @@ impl CommandCoordinator {
             .await
             .insert(command.command_id.clone(), status);
 
-        // Route command to targets
+        // 6. Setup acknowledgment timeout if required
+        if self.requires_acknowledgment(&command) {
+            let targets = {
+                let resolution = self.router.resolve_target(&command);
+                self.router.get_routing_targets(&resolution)
+            };
+
+            if !targets.is_empty() {
+                let ack_timeout = Duration::from_secs(30); // TODO: Make configurable
+                self.timeout_manager
+                    .register_ack_timeout(command.command_id.clone(), targets, ack_timeout)
+                    .await?;
+            }
+        }
+
+        // 7. Route command to targets
         self.route_command(&command).await?;
 
         Ok(())
@@ -238,6 +301,24 @@ impl CommandCoordinator {
             .write()
             .await
             .insert((command.command_id.clone(), self.node_id.clone()), ack);
+
+        // Record acknowledgment in timeout manager
+        let all_received = self
+            .timeout_manager
+            .record_ack(&command.command_id, &self.node_id)
+            .await;
+
+        if all_received {
+            tracing::debug!(
+                "[{}] All acknowledgments received for command {}",
+                self.node_id,
+                command.command_id
+            );
+            // Clean up timeout tracking
+            self.timeout_manager
+                .unregister_ack_timeout(&command.command_id)
+                .await?;
+        }
 
         // In a real implementation, this would publish to Ditto
         // TODO: Publish acknowledgment to hierarchical_commands_acks collection
