@@ -668,9 +668,9 @@ main() {
     log_info "Results saved to: ${RESULTS_DIR}"
 
     echo ""
-    echo "Next steps:"
-    echo "  1. Analyze results: python3 scripts/analyze-comprehensive-results.py ${RESULTS_DIR}"
-    echo "  2. Generate report: cd ${RESULTS_DIR} && cat COMPREHENSIVE-REPORT.md"
+    echo "Next steps (from repo root):"
+    echo "  1. Analyze results: python3 labs/e12-comprehensive-empirical-validation/scripts/analyze-comprehensive-results.py labs/e12-comprehensive-empirical-validation/scripts/${RESULTS_DIR}"
+    echo "  2. Generate report: cd labs/e12-comprehensive-empirical-validation/scripts/${RESULTS_DIR} && cat COMPREHENSIVE-REPORT.md"
 }
 
 # Execute main function
