@@ -1,0 +1,11 @@
+{
+  "message_sent_count": 333,
+  "message_received_count": 0,
+  "document_inserted_count": 227,
+  "document_received_count": 0,
+  "total_bytes_sent": 59854,
+  "avg_message_size_bytes": 179.74174174174175,
+  "unique_senders": 53,
+  "unique_receivers": 0,
+  "replication_factor": 0.0
+}

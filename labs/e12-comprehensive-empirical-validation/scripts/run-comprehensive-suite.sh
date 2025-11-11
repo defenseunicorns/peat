@@ -581,25 +581,28 @@ TEST_CONFIGS["traditional-24node-256kbps"]="../../../cap-sim/topologies/traditio
 TEST_CONFIGS["traditional-48node-1gbps"]="../../../cap-sim/topologies/traditional-battalion-48node.yaml"
 TEST_CONFIGS["traditional-96node-1gbps"]="../../../cap-sim/topologies/traditional-battalion-96node.yaml"
 
-# CAP Full configurations (CRDT but no hierarchy - flat client-server)
-TEST_CONFIGS["cap-full-12node-1gbps"]="../../../cap-sim/topologies/squad-12node-client-server.yaml"
-TEST_CONFIGS["cap-full-12node-100mbps"]="../../../cap-sim/topologies/squad-12node-client-server.yaml"
-TEST_CONFIGS["cap-full-12node-1mbps"]="../../../cap-sim/topologies/squad-12node-client-server.yaml"
-TEST_CONFIGS["cap-full-12node-256kbps"]="../../../cap-sim/topologies/squad-12node-client-server.yaml"
+# CAP Full configurations (CRDT P2P Mesh - no hierarchy, viable only at small scale)
+# Note: True P2P mesh only practical at small scales (≤24 nodes)
+# Full mesh at 48 nodes = 1,128 connections (architecturally unrealistic)
+TEST_CONFIGS["cap-full-12node-1gbps"]="../../../cap-sim/topologies/squad-12node-dynamic-mesh.yaml"
+TEST_CONFIGS["cap-full-12node-100mbps"]="../../../cap-sim/topologies/squad-12node-dynamic-mesh.yaml"
+TEST_CONFIGS["cap-full-12node-1mbps"]="../../../cap-sim/topologies/squad-12node-dynamic-mesh.yaml"
+TEST_CONFIGS["cap-full-12node-256kbps"]="../../../cap-sim/topologies/squad-12node-dynamic-mesh.yaml"
 
-TEST_CONFIGS["cap-full-24node-1gbps"]="../../../cap-sim/topologies/platoon-24node-client-server.yaml"
-TEST_CONFIGS["cap-full-24node-100mbps"]="../../../cap-sim/topologies/platoon-24node-client-server.yaml"
-TEST_CONFIGS["cap-full-24node-1mbps"]="../../../cap-sim/topologies/platoon-24node-client-server.yaml"
-TEST_CONFIGS["cap-full-24node-256kbps"]="../../../cap-sim/topologies/platoon-24node-client-server.yaml"
+TEST_CONFIGS["cap-full-24node-1gbps"]="../../../cap-sim/topologies/platoon-24node-dynamic-mesh.yaml"
+TEST_CONFIGS["cap-full-24node-100mbps"]="../../../cap-sim/topologies/platoon-24node-dynamic-mesh.yaml"
+TEST_CONFIGS["cap-full-24node-1mbps"]="../../../cap-sim/topologies/platoon-24node-dynamic-mesh.yaml"
+TEST_CONFIGS["cap-full-24node-256kbps"]="../../../cap-sim/topologies/platoon-24node-dynamic-mesh.yaml"
 
-TEST_CONFIGS["cap-full-48node-1gbps"]="../../../cap-sim/topologies/battalion-48node-client-server.yaml"
-TEST_CONFIGS["cap-full-96node-1gbps"]="../../../cap-sim/topologies/battalion-96node-client-server.yaml"
+# CAP Full removed at 48/96 nodes - full mesh not architecturally viable at scale
+# CAP Hierarchical is the correct approach for larger networks
 
-# CAP Hierarchical configurations (CRDT + Mode 4 aggregation)
-TEST_CONFIGS["cap-hierarchical-24node-1gbps"]="../../../cap-sim/topologies/platoon-24node-client-server-mode4.yaml"
-TEST_CONFIGS["cap-hierarchical-24node-100mbps"]="../../../cap-sim/topologies/platoon-24node-client-server-mode4.yaml"
-TEST_CONFIGS["cap-hierarchical-24node-1mbps"]="../../../cap-sim/topologies/platoon-24node-client-server-mode4.yaml"
-TEST_CONFIGS["cap-hierarchical-24node-256kbps"]="../../../cap-sim/topologies/platoon-24node-client-server-mode4.yaml"
+# CAP Hierarchical configurations (CRDT + Mode 4 hierarchical aggregation on mesh)
+# Uses hierarchical tree topology with P2P connections at each level
+TEST_CONFIGS["cap-hierarchical-24node-1gbps"]="../../../cap-sim/topologies/platoon-24node-mesh-mode4.yaml"
+TEST_CONFIGS["cap-hierarchical-24node-100mbps"]="../../../cap-sim/topologies/platoon-24node-mesh-mode4.yaml"
+TEST_CONFIGS["cap-hierarchical-24node-1mbps"]="../../../cap-sim/topologies/platoon-24node-mesh-mode4.yaml"
+TEST_CONFIGS["cap-hierarchical-24node-256kbps"]="../../../cap-sim/topologies/platoon-24node-mesh-mode4.yaml"
 
 TEST_CONFIGS["cap-hierarchical-48node-1gbps"]="../../../cap-sim/topologies/battalion-48node-client-server-mode4.yaml"
 TEST_CONFIGS["cap-hierarchical-96node-1gbps"]="../../../cap-sim/topologies/battalion-96node-client-server-mode4.yaml"
@@ -612,12 +615,20 @@ main() {
     log_section "E12 Comprehensive Empirical Validation"
 
     echo "Test Matrix:"
-    echo "  • Architectures: Traditional IoT, CAP Full Mesh, CAP Hierarchical"
-    echo "  • Scales: 2, 12, 24 nodes"
+    echo "  • Architectures:"
+    echo "    - Traditional IoT: Centralized client-server (baseline)"
+    echo "    - CAP Full P2P Mesh: CRDTs on full mesh (12-24 nodes only)"
+    echo "    - CAP Hierarchical: CRDTs + Mode 4 aggregation on hierarchical mesh"
+    echo "  • Scales:"
+    echo "    - Small: 2, 12, 24 nodes (all architectures)"
+    echo "    - Large: 48, 96 nodes (Traditional + CAP Hierarchical only)"
     echo "  • Bandwidths: 1Gbps, 100Mbps, 1Mbps, 256Kbps"
     echo ""
     echo "Total Tests: ${#TEST_CONFIGS[@]}"
     echo "Results Directory: ${RESULTS_DIR}"
+    echo ""
+    echo "Note: CAP Full removed at 48/96 nodes - full mesh not viable at scale"
+    echo "      (48 nodes = 1,128 peer connections, architecturally unrealistic)"
     echo ""
     echo "Metrics Collected:"
     echo "  • Application-level metrics (JSONL)"
