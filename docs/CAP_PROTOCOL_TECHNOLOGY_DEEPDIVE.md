@@ -115,6 +115,19 @@ Scalable Distributed Coordination for Autonomous Systems
 
 ---
 
+# CRDTs Have a Problem
+
+ - CRDTs will never match raw TCP socket latency - Differential sync engines have inherent overhead for conflict-free replication vs
+  direct message passing
+  - Convergence induces latency - The "eventual" in eventual consistency means sync propagation takes time, especially in multi-hop P2P
+   topologies
+  - Value proposition is CAP theorem trade-offs - Accept higher latency for partition tolerance, eventual availability, and
+  offline-first operation that traditional client-server can't provide
+  - Hierarchical P2P enables scale-out - While individual sync may be slower, architecture can handle network partitions and scale
+  horizontally where centralized approaches fail
+
+---
+
 <!-- _class: lead -->
 # Part 2: Core Innovations
 
@@ -447,6 +460,209 @@ CRDT eventual consistency alone doesn't provide enough control for safety-critic
 - ✅ Zero API breaking changes
 - ✅ Performance neutral or +5% (protobuf efficiency)
 - ✅ Schema extensibility validated
+
+---
+
+# Systems Integration & Interoperability
+
+## The Integration Challenge
+
+**Problem**: Modern military operations require integrating:
+- **Greenfield systems**: New autonomous platforms (UGVs, UAVs, UUVs)
+- **Brownfield systems**: Legacy C2, sensors, communications
+- **Commercial robotics**: ROS-based drones, ground robots
+- **Existing doctrine**: TTPs, command structures, approval workflows
+
+**CAP Solution**: Protocol-agnostic integration layer that transforms at interfaces
+
+---
+
+# Greenfield vs Brownfield Integration
+
+## Greenfield Systems (New Autonomous Platforms)
+
+**Integration Approach**: Native CAP protocol implementation
+
+| System Type | Integration Method | CAP Benefits |
+|-------------|-------------------|--------------|
+| **New UAVs/UGVs** | Native CAP client | Full capability advertisement, autonomous cell formation |
+| **AI-enabled sensors** | CAP SDK integration | Real-time data sharing, distributed coordination |
+| **Next-gen robotics** | Built with CAP from day 1 | Zero translation overhead, native CRDT sync |
+
+**Example**: New quadcopter swarm designed with CAP protocol
+```rust
+let cap_node = CapNode::new(NodeCapabilities {
+    role: Role::Scout,
+    sensors: vec![Sensor::EO, Sensor::IR],
+    mobility: MobilityType::Aerial { max_altitude: 500 },
+});
+cap_node.advertise_capabilities();
+cap_node.join_nearest_cell();
+```
+
+---
+
+# Brownfield Integration Patterns
+
+## Legacy C2 Systems Integration
+
+**Challenge**: Existing C2 systems use centralized architectures (ATAK, AFATDS, DCGS)
+
+**CAP Integration Strategy**:
+
+### 1. Gateway Translation Layer
+```
+Legacy C2 (ATAK/AFATDS)
+    ↓ (Link16/VMF)
+CAP Gateway Node
+    ↓ (CRDT documents)
+CAP Mesh Network (Autonomous Platforms)
+```
+
+**Gateway Functions**:
+- Translates legacy messages → CAP capability documents
+- Aggregates CAP state → C2 common operating picture
+- Enforces authority levels (human-in-loop for legacy systems)
+- Maintains audit trail for compliance
+
+---
+
+# C2 Integration: Doctrine Preservation
+
+## Maintaining Existing TTPs
+
+**Key Principle**: CAP adapts to doctrine, not vice versa
+
+### Command Authority Mapping
+
+| Legacy C2 Role | CAP Authority Level | Integration |
+|----------------|---------------------|-------------|
+| **Battalion Commander** | MANUAL | All autonomous actions require explicit approval |
+| **Company Commander** | MONITORED | Approval required for fires, movement |
+| **Platoon Leader** | COLLABORATIVE | Collaborate on target selection |
+| **Squad Leader** | SUPERVISED | Observe autonomous recommendations |
+| **Team Member** | SUPERVISED | Observe sensor feeds, status |
+
+**Implementation**:
+- CAP gateway receives commander's authority level setting
+- Propagates through CRDT to all autonomous platforms
+- Platforms enforce locally during network partitions
+- Audit trail flows back to C2 for accountability
+
+---
+
+# Commercial Robotics Integration (ROS/ROS2)
+
+## ROS-to-CAP Bridge
+
+**Problem**: Commercial drones/robots use Robot Operating System (ROS)
+- Topic-based pub/sub messaging
+- Centralized roscore (single point of failure)
+- No native support for partitioned operations
+
+**CAP Bridge Architecture**:
+```
+ROS Node (Drone autopilot)
+    ↓ /mavros topics
+ROS-CAP Bridge
+    ↓ Capability documents
+CAP Mesh Network
+```
+
+### Bridge Functions
+
+**Outbound (ROS → CAP)**:
+- `/mavros/state` → CAP Node heartbeat
+- `/mavros/global_position` → CAP Zone awareness
+- `/camera/image` → CAP Sensor data capability
+
+**Inbound (CAP → ROS)**:
+- CAP coordination commands → `/mavros/setpoint_position`
+- CAP authority level → Flight controller safety constraints
+- CAP cell membership → ROS namespace allocation
+
+---
+
+# Interface Transformation Strategy
+
+## Multi-Layer Integration
+
+CAP enables transformation at **every interface layer**:
+
+### 1. Data Layer
+- **Transform**: Sensor feeds → Capability documents
+- **Benefit**: Heterogeneous sensors appear uniform to consumers
+
+### 2. Coordination Layer
+- **Transform**: C2 orders → Distributed claims/coordination primitives
+- **Benefit**: Centralized commands work in partitioned networks
+
+### 3. Authority Layer
+- **Transform**: Doctrine-based ROE → CAP authority levels
+- **Benefit**: Human oversight preserved across legacy/modern systems
+
+### 4. Network Layer
+- **Transform**: Link16/SATCOM → P2P CRDT mesh
+- **Benefit**: Protocols interoperate without central infrastructure
+
+---
+
+# Real-World Integration Example
+
+## Scenario: Integrate Commercial DJI Drones into Army Squad
+
+**Existing Setup**:
+- Squad uses ATAK on Android tablets (C2)
+- DJI drones run proprietary firmware
+- No coordination between drones and ground units
+
+**With CAP Integration**:
+
+```
+┌─────────────┐
+│ ATAK Tablet │ (Legacy C2)
+└──────┬──────┘
+       │ TAK Protocol
+   ┌───▼────┐
+   │ Gateway│ (Raspberry Pi w/ CAP SDK)
+   └───┬────┘
+       │ CRDT Mesh
+   ┌───▼────┐     ┌─────────┐
+   │ UGV    │────►│ DJI UAV │ (w/ CAP bridge)
+   └────────┘     └─────────┘
+       │               │
+   ┌───▼───┐       ┌───▼───┐
+   │Soldier│       │Soldier│ (w/ CAP-enabled radios)
+   └───────┘       └───────┘
+```
+
+**Integration Points**:
+1. ATAK → CAP Gateway: TAK protocol translated to CAP documents
+2. DJI → CAP Bridge: DJI SDK calls wrapped in CAP client
+3. Radios: Native CAP protocol (greenfield)
+
+**Result**: Commercial drones coordinate with military units using existing C2
+
+---
+
+# Integration Benefits Summary
+
+## Interoperability Advantages
+
+| Benefit | Impact |
+|---------|--------|
+| **Doctrine Preservation** | Existing TTPs, command structures, ROE remain unchanged |
+| **Gradual Adoption** | Mix legacy and modern systems during transition |
+| **Vendor Neutrality** | Any drone/robot can integrate (not locked to single vendor) |
+| **Future-Proof** | New platforms integrate without rearchitecting C2 |
+| **Partition Tolerance** | Systems coordinate even when gateway offline |
+
+## Economic Advantages
+
+- **Reuse existing C2 investments**: No need to replace ATAK, AFATDS, etc.
+- **Commercial robotics leverage**: Use $1K DJI drones, not $100K mil-spec
+- **Incremental deployment**: Start with gateway + few platforms, scale up
+- **Training reduction**: Soldiers use familiar C2 interfaces
 
 ---
 
