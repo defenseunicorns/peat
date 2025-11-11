@@ -1,0 +1,106 @@
+Docker Network Statistics Summary
+================================================================================
+
+Total Network I/O:
+  Input:  1,494,300 bytes (1.49 MB)
+  Output: 753,900 bytes (0.75 MB)
+  Total:  2,248,200 bytes (2.25 MB)
+
+Per-Node Breakdown:
+--------------------------------------------------------------------------------
+clab-traditional-platoon-24node-alpha-soldier-1:
+  Network: 68,700 bytes (↓51,500 ↑17,200)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-alpha-soldier-2:
+  Network: 62,800 bytes (↓45,800 ↑17,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-alpha-soldier-3:
+  Network: 65,200 bytes (↓47,900 ↑17,300)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-alpha-soldier-4:
+  Network: 67,700 bytes (↓50,600 ↑17,100)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-alpha-uav-1:
+  Network: 68,800 bytes (↓51,700 ↑17,100)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-alpha-ugv-1:
+  Network: 57,300 bytes (↓43,300 ↑14,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-bravo-soldier-1:
+  Network: 67,400 bytes (↓50,200 ↑17,200)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-bravo-soldier-2:
+  Network: 67,600 bytes (↓50,400 ↑17,200)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-bravo-soldier-3:
+  Network: 69,600 bytes (↓52,400 ↑17,200)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-bravo-soldier-4:
+  Network: 60,500 bytes (↓43,200 ↑17,300)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-bravo-soldier-5:
+  Network: 67,100 bytes (↓49,900 ↑17,200)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-bravo-uav-1:
+  Network: 64,300 bytes (↓47,200 ↑17,100)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-bravo-ugv-1:
+  Network: 61,200 bytes (↓44,000 ↑17,200)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-charlie-soldier-1:
+  Network: 69,700 bytes (↓52,400 ↑17,300)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-charlie-soldier-2:
+  Network: 65,700 bytes (↓48,400 ↑17,300)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-charlie-soldier-3:
+  Network: 63,100 bytes (↓46,100 ↑17,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-charlie-soldier-4:
+  Network: 66,700 bytes (↓49,400 ↑17,300)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-charlie-soldier-5:
+  Network: 68,000 bytes (↓50,700 ↑17,300)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-charlie-uav-1:
+  Network: 64,800 bytes (↓47,500 ↑17,300)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-charlie-ugv-1:
+  Network: 64,200 bytes (↓47,000 ↑17,200)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-platoon-leader:
+  Network: 744,000 bytes (↓383,000 ↑361,000)
+  CPU: 0.0%  Memory: 2.9 MB
+
+clab-traditional-platoon-24node-squad-alpha-leader:
+  Network: 66,200 bytes (↓48,900 ↑17,300)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-squad-bravo-leader:
+  Network: 66,000 bytes (↓48,600 ↑17,400)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-platoon-24node-squad-charlie-leader:
+  Network: 61,600 bytes (↓44,200 ↑17,400)
+  CPU: 0.0%  Memory: 2.7 MB
+

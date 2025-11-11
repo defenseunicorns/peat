@@ -987,7 +987,8 @@ async fn reader_mode(
 
     // Track which periodic updates we've received
     let mut received_updates = HashSet::new();
-    let mut test_doc_received = false;
+    // Track unique test document insertions by timestamp to prevent duplicate logging
+    let mut test_doc_timestamps = HashSet::new();
 
     let timeout = Duration::from_secs(20);
     let start = Instant::now();
@@ -996,7 +997,7 @@ async fn reader_mode(
     loop {
         // Check timeout
         if start.elapsed() > timeout {
-            if !test_doc_received {
+            if test_doc_timestamps.is_empty() {
                 return Err("Timeout: Test document not received".into());
             }
             break;
@@ -1017,7 +1018,7 @@ async fn reader_mode(
                                 node_id,
                                 backend,
                                 &mut received_updates,
-                                &mut test_doc_received,
+                                &mut test_doc_timestamps,
                             )
                             .await?;
                         }
@@ -1029,7 +1030,7 @@ async fn reader_mode(
                             node_id,
                             backend,
                             &mut received_updates,
-                            &mut test_doc_received,
+                            &mut test_doc_timestamps,
                         )
                         .await?;
 
@@ -1061,7 +1062,7 @@ async fn process_document(
     node_id: &str,
     backend: &dyn DataSyncBackend,
     received_updates: &mut HashSet<u64>,
-    test_doc_received: &mut bool,
+    test_doc_timestamps: &mut HashSet<u128>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let received_at_us = now_micros();
 
@@ -1083,7 +1084,7 @@ async fn process_document(
     let latency_ms = latency_us as f64 / 1000.0;
 
     // Check if this is a periodic update document
-    if doc_id.starts_with("sim_doc_soldier") {
+    if doc_id.starts_with("sim_doc_") {
         // Extract message number to track unique updates
         if let Some(msg_num_value) = doc.get("message_number") {
             let msg_num = msg_num_value.as_u64().unwrap_or(0);
@@ -1110,97 +1111,100 @@ async fn process_document(
         }
     }
     // Check if this is the test document
-    else if doc_id == "sim_test_001" && !*test_doc_received {
-        *test_doc_received = true;
+    else if doc_id == "sim_test_001" {
+        // Only log if this is a new insertion we haven't seen (prevents duplicate logging on re-insertions)
+        if inserted_at_us > 0 && !test_doc_timestamps.contains(&inserted_at_us) {
+            test_doc_timestamps.insert(inserted_at_us);
 
-        println!(
-            "[{}] ✓ Test document received (latency: {:.3}ms)",
-            node_id, latency_ms
-        );
+            println!(
+                "[{}] ✓ Test document received (latency: {:.3}ms)",
+                node_id, latency_ms
+            );
 
-        // Verify content
-        if let Some(Value::String(message)) = doc.get("message") {
-            if message == "Hello from CAP Simulation!" {
-                println!("[{}] ✓ Document content verified", node_id);
+            // Verify content
+            if let Some(Value::String(message)) = doc.get("message") {
+                if message == "Hello from CAP Simulation!" {
+                    println!("[{}] ✓ Document content verified", node_id);
 
-                // Log test document metrics
-                log_metrics(&MetricsEvent::DocumentReceived {
-                    node_id: node_id.to_string(),
-                    doc_id: "sim_test_001".to_string(),
-                    inserted_at_us,
-                    received_at_us,
-                    latency_us,
-                    latency_ms,
-                });
+                    // Log test document metrics
+                    log_metrics(&MetricsEvent::DocumentReceived {
+                        node_id: node_id.to_string(),
+                        doc_id: "sim_test_001".to_string(),
+                        inserted_at_us,
+                        received_at_us,
+                        latency_us,
+                        latency_ms,
+                    });
 
-                // Check if acknowledgment is required
-                if let Some(Value::Bool(ack_required)) = doc.get("ack_required") {
-                    if *ack_required {
-                        println!(
-                            "[{}] Acknowledgment required - updating document...",
-                            node_id
-                        );
+                    // Check if acknowledgment is required
+                    if let Some(Value::Bool(ack_required)) = doc.get("ack_required") {
+                        if *ack_required {
+                            println!(
+                                "[{}] Acknowledgment required - updating document...",
+                                node_id
+                            );
 
-                        // Query the current document to get the latest acked_by array
-                        let query = Query::Eq {
-                            field: "_id".to_string(),
-                            value: Value::String("sim_test_001".to_string()),
-                        };
-                        let docs = backend.document_store().query("sim_poc", &query).await?;
+                            // Query the current document to get the latest acked_by array
+                            let query = Query::Eq {
+                                field: "_id".to_string(),
+                                value: Value::String("sim_test_001".to_string()),
+                            };
+                            let docs = backend.document_store().query("sim_poc", &query).await?;
 
-                        if let Some(current_doc) = docs.first() {
-                            // Get current acked_by array
-                            let mut acked_by: Vec<String> =
-                                if let Some(acked) = current_doc.get("acked_by") {
-                                    if let Some(arr) = acked.as_array() {
-                                        arr.iter()
-                                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                                            .collect()
+                            if let Some(current_doc) = docs.first() {
+                                // Get current acked_by array
+                                let mut acked_by: Vec<String> =
+                                    if let Some(acked) = current_doc.get("acked_by") {
+                                        if let Some(arr) = acked.as_array() {
+                                            arr.iter()
+                                                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                                .collect()
+                                        } else {
+                                            Vec::new()
+                                        }
                                     } else {
                                         Vec::new()
+                                    };
+
+                                // Add this node if not already in the list
+                                if !acked_by.contains(&node_id.to_string()) {
+                                    acked_by.push(node_id.to_string());
+
+                                    // Create updated document with new acked_by array
+                                    let mut updated_fields = HashMap::new();
+                                    for (k, v) in current_doc.fields.iter() {
+                                        updated_fields.insert(k.clone(), v.clone());
                                     }
+                                    updated_fields
+                                        .insert("acked_by".to_string(), serde_json::json!(acked_by));
+
+                                    let updated_doc = Document {
+                                        id: Some("sim_test_001".to_string()),
+                                        fields: updated_fields,
+                                        updated_at: current_doc.updated_at,
+                                    };
+
+                                    // Update the document
+                                    backend
+                                        .document_store()
+                                        .upsert("sim_poc", updated_doc)
+                                        .await?;
+
+                                    println!(
+                                        "[{}] ✓ Acknowledgment sent (acked_by count: {})",
+                                        node_id,
+                                        acked_by.len()
+                                    );
+
+                                    // Log acknowledgment metrics
+                                    log_metrics(&MetricsEvent::DocumentAcknowledged {
+                                        node_id: node_id.to_string(),
+                                        doc_id: "sim_test_001".to_string(),
+                                        timestamp_us: now_micros(),
+                                    });
                                 } else {
-                                    Vec::new()
-                                };
-
-                            // Add this node if not already in the list
-                            if !acked_by.contains(&node_id.to_string()) {
-                                acked_by.push(node_id.to_string());
-
-                                // Create updated document with new acked_by array
-                                let mut updated_fields = HashMap::new();
-                                for (k, v) in current_doc.fields.iter() {
-                                    updated_fields.insert(k.clone(), v.clone());
+                                    println!("[{}] Already acknowledged this document", node_id);
                                 }
-                                updated_fields
-                                    .insert("acked_by".to_string(), serde_json::json!(acked_by));
-
-                                let updated_doc = Document {
-                                    id: Some("sim_test_001".to_string()),
-                                    fields: updated_fields,
-                                    updated_at: current_doc.updated_at,
-                                };
-
-                                // Update the document
-                                backend
-                                    .document_store()
-                                    .upsert("sim_poc", updated_doc)
-                                    .await?;
-
-                                println!(
-                                    "[{}] ✓ Acknowledgment sent (acked_by count: {})",
-                                    node_id,
-                                    acked_by.len()
-                                );
-
-                                // Log acknowledgment metrics
-                                log_metrics(&MetricsEvent::DocumentAcknowledged {
-                                    node_id: node_id.to_string(),
-                                    doc_id: "sim_test_001".to_string(),
-                                    timestamp_us: now_micros(),
-                                });
-                            } else {
-                                println!("[{}] Already acknowledged this document", node_id);
                             }
                         }
                     }

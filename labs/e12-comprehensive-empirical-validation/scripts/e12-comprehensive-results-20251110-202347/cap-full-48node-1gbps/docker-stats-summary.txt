@@ -1,0 +1,206 @@
+Docker Network Statistics Summary
+================================================================================
+
+Total Network I/O:
+  Input:  6,420,700 bytes (6.42 MB)
+  Output: 3,121,399 bytes (3.12 MB)
+  Total:  9,542,099 bytes (9.54 MB)
+
+Per-Node Breakdown:
+--------------------------------------------------------------------------------
+clab-cap-battalion-48node-battalion-hq:
+  Network: 2,882,000 bytes (↓832,000 ↑2,049,999)
+  CPU: 14.8%  Memory: 86.2 MB
+
+clab-cap-battalion-48node-soldier-1:
+  Network: 130,400 bytes (↓110,000 ↑20,400)
+  CPU: 0.3%  Memory: 19.8 MB
+
+clab-cap-battalion-48node-soldier-10:
+  Network: 125,300 bytes (↓105,000 ↑20,300)
+  CPU: 0.3%  Memory: 19.8 MB
+
+clab-cap-battalion-48node-soldier-11:
+  Network: 131,000 bytes (↓111,000 ↑20,000)
+  CPU: 0.3%  Memory: 19.7 MB
+
+clab-cap-battalion-48node-soldier-12:
+  Network: 150,200 bytes (↓126,000 ↑24,200)
+  CPU: 0.5%  Memory: 19.3 MB
+
+clab-cap-battalion-48node-soldier-13:
+  Network: 147,100 bytes (↓125,000 ↑22,100)
+  CPU: 0.7%  Memory: 19.7 MB
+
+clab-cap-battalion-48node-soldier-14:
+  Network: 141,300 bytes (↓118,000 ↑23,300)
+  CPU: 0.6%  Memory: 20.3 MB
+
+clab-cap-battalion-48node-soldier-15:
+  Network: 149,200 bytes (↓126,000 ↑23,200)
+  CPU: 0.7%  Memory: 19.2 MB
+
+clab-cap-battalion-48node-soldier-16:
+  Network: 148,800 bytes (↓125,000 ↑23,800)
+  CPU: 0.5%  Memory: 18.9 MB
+
+clab-cap-battalion-48node-soldier-17:
+  Network: 123,500 bytes (↓104,000 ↑19,500)
+  CPU: 0.3%  Memory: 17.6 MB
+
+clab-cap-battalion-48node-soldier-18:
+  Network: 123,200 bytes (↓104,000 ↑19,200)
+  CPU: 0.4%  Memory: 18.4 MB
+
+clab-cap-battalion-48node-soldier-19:
+  Network: 148,000 bytes (↓124,000 ↑24,000)
+  CPU: 0.4%  Memory: 19.8 MB
+
+clab-cap-battalion-48node-soldier-2:
+  Network: 141,100 bytes (↓117,000 ↑24,100)
+  CPU: 0.5%  Memory: 19.9 MB
+
+clab-cap-battalion-48node-soldier-20:
+  Network: 150,200 bytes (↓126,000 ↑24,200)
+  CPU: 0.4%  Memory: 20.1 MB
+
+clab-cap-battalion-48node-soldier-21:
+  Network: 137,100 bytes (↓115,000 ↑22,100)
+  CPU: 0.3%  Memory: 17.7 MB
+
+clab-cap-battalion-48node-soldier-22:
+  Network: 140,100 bytes (↓118,000 ↑22,100)
+  CPU: 0.4%  Memory: 19.9 MB
+
+clab-cap-battalion-48node-soldier-23:
+  Network: 127,800 bytes (↓107,000 ↑20,800)
+  CPU: 0.4%  Memory: 19.5 MB
+
+clab-cap-battalion-48node-soldier-24:
+  Network: 147,400 bytes (↓124,000 ↑23,400)
+  CPU: 0.3%  Memory: 20.0 MB
+
+clab-cap-battalion-48node-soldier-25:
+  Network: 130,000 bytes (↓109,000 ↑21,000)
+  CPU: 0.3%  Memory: 19.7 MB
+
+clab-cap-battalion-48node-soldier-26:
+  Network: 145,000 bytes (↓121,000 ↑24,000)
+  CPU: 0.3%  Memory: 20.1 MB
+
+clab-cap-battalion-48node-soldier-27:
+  Network: 124,100 bytes (↓105,000 ↑19,100)
+  CPU: 0.3%  Memory: 19.3 MB
+
+clab-cap-battalion-48node-soldier-28:
+  Network: 145,700 bytes (↓122,000 ↑23,700)
+  CPU: 0.4%  Memory: 19.8 MB
+
+clab-cap-battalion-48node-soldier-29:
+  Network: 135,200 bytes (↓114,000 ↑21,200)
+  CPU: 0.3%  Memory: 19.5 MB
+
+clab-cap-battalion-48node-soldier-3:
+  Network: 148,600 bytes (↓126,000 ↑22,600)
+  CPU: 0.4%  Memory: 20.0 MB
+
+clab-cap-battalion-48node-soldier-30:
+  Network: 146,500 bytes (↓122,000 ↑24,500)
+  CPU: 0.3%  Memory: 20.3 MB
+
+clab-cap-battalion-48node-soldier-31:
+  Network: 139,600 bytes (↓117,000 ↑22,600)
+  CPU: 0.5%  Memory: 20.9 MB
+
+clab-cap-battalion-48node-soldier-32:
+  Network: 145,200 bytes (↓121,000 ↑24,200)
+  CPU: 0.4%  Memory: 19.6 MB
+
+clab-cap-battalion-48node-soldier-33:
+  Network: 148,500 bytes (↓124,000 ↑24,500)
+  CPU: 0.4%  Memory: 20.3 MB
+
+clab-cap-battalion-48node-soldier-34:
+  Network: 143,000 bytes (↓120,000 ↑23,000)
+  CPU: 0.3%  Memory: 20.0 MB
+
+clab-cap-battalion-48node-soldier-35:
+  Network: 148,200 bytes (↓124,000 ↑24,200)
+  CPU: 0.4%  Memory: 20.4 MB
+
+clab-cap-battalion-48node-soldier-36:
+  Network: 128,900 bytes (↓108,000 ↑20,900)
+  CPU: 0.3%  Memory: 20.1 MB
+
+clab-cap-battalion-48node-soldier-37:
+  Network: 137,500 bytes (↓114,000 ↑23,500)
+  CPU: 0.5%  Memory: 20.4 MB
+
+clab-cap-battalion-48node-soldier-38:
+  Network: 145,100 bytes (↓122,000 ↑23,100)
+  CPU: 0.3%  Memory: 20.2 MB
+
+clab-cap-battalion-48node-soldier-39:
+  Network: 149,000 bytes (↓126,000 ↑23,000)
+  CPU: 0.4%  Memory: 20.2 MB
+
+clab-cap-battalion-48node-soldier-4:
+  Network: 136,600 bytes (↓114,000 ↑22,600)
+  CPU: 2.9%  Memory: 19.6 MB
+
+clab-cap-battalion-48node-soldier-40:
+  Network: 144,500 bytes (↓121,000 ↑23,500)
+  CPU: 0.3%  Memory: 20.3 MB
+
+clab-cap-battalion-48node-soldier-41:
+  Network: 126,300 bytes (↓106,000 ↑20,300)
+  CPU: 0.3%  Memory: 19.1 MB
+
+clab-cap-battalion-48node-soldier-42:
+  Network: 123,500 bytes (↓103,000 ↑20,500)
+  CPU: 0.7%  Memory: 20.1 MB
+
+clab-cap-battalion-48node-soldier-43:
+  Network: 146,000 bytes (↓123,000 ↑23,000)
+  CPU: 0.3%  Memory: 19.9 MB
+
+clab-cap-battalion-48node-soldier-44:
+  Network: 143,800 bytes (↓121,000 ↑22,800)
+  CPU: 0.4%  Memory: 18.9 MB
+
+clab-cap-battalion-48node-soldier-45:
+  Network: 133,700 bytes (↓112,000 ↑21,700)
+  CPU: 0.5%  Memory: 19.7 MB
+
+clab-cap-battalion-48node-soldier-46:
+  Network: 140,300 bytes (↓117,000 ↑23,300)
+  CPU: 0.3%  Memory: 19.9 MB
+
+clab-cap-battalion-48node-soldier-47:
+  Network: 139,500 bytes (↓117,000 ↑22,500)
+  CPU: 0.5%  Memory: 20.6 MB
+
+clab-cap-battalion-48node-soldier-48:
+  Network: 133,500 bytes (↓113,000 ↑20,500)
+  CPU: 0.3%  Memory: 19.9 MB
+
+clab-cap-battalion-48node-soldier-5:
+  Network: 142,700 bytes (↓120,000 ↑22,700)
+  CPU: 0.4%  Memory: 20.6 MB
+
+clab-cap-battalion-48node-soldier-6:
+  Network: 119,100 bytes (↓99,700 ↑19,400)
+  CPU: 0.3%  Memory: 18.3 MB
+
+clab-cap-battalion-48node-soldier-7:
+  Network: 147,400 bytes (↓124,000 ↑23,400)
+  CPU: 0.3%  Memory: 18.5 MB
+
+clab-cap-battalion-48node-soldier-8:
+  Network: 124,000 bytes (↓103,000 ↑21,000)
+  CPU: 0.3%  Memory: 18.9 MB
+
+clab-cap-battalion-48node-soldier-9:
+  Network: 137,400 bytes (↓115,000 ↑22,400)
+  CPU: 0.3%  Memory: 20.0 MB
+

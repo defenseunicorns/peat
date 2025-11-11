@@ -1,0 +1,6 @@
+Architecture: traditional
+Scale: 24node
+Bandwidth: 1gbps
+Topology: traditional-platoon-24node.yaml
+Start Time: 2025-11-10T17:16:22-05:00
+End Time: 2025-11-10T17:18:04-05:00

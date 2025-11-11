@@ -1,0 +1,58 @@
+Docker Network Statistics Summary
+================================================================================
+
+Total Network I/O:
+  Input:  574,200 bytes (0.57 MB)
+  Output: 341,500 bytes (0.34 MB)
+  Total:  915,700 bytes (0.92 MB)
+
+Per-Node Breakdown:
+--------------------------------------------------------------------------------
+clab-traditional-squad-client-server-soldier-1:
+  Network: 343,000 bytes (↓178,000 ↑165,000)
+  CPU: 0.0%  Memory: 2.8 MB
+
+clab-traditional-squad-client-server-soldier-2:
+  Network: 54,300 bytes (↓37,700 ↑16,600)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-squad-client-server-soldier-3:
+  Network: 55,000 bytes (↓38,200 ↑16,800)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-squad-client-server-soldier-4:
+  Network: 48,300 bytes (↓33,400 ↑14,900)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-squad-client-server-soldier-5:
+  Network: 52,300 bytes (↓35,700 ↑16,600)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-squad-client-server-soldier-6:
+  Network: 55,400 bytes (↓38,700 ↑16,700)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-squad-client-server-soldier-7:
+  Network: 54,500 bytes (↓37,700 ↑16,800)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-squad-client-server-soldier-8:
+  Network: 53,700 bytes (↓37,000 ↑16,700)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-squad-client-server-soldier-9:
+  Network: 48,100 bytes (↓33,200 ↑14,900)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-squad-client-server-uav-1:
+  Network: 45,900 bytes (↓32,400 ↑13,500)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-squad-client-server-uav-2:
+  Network: 51,800 bytes (↓35,500 ↑16,300)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-squad-client-server-ugv-1:
+  Network: 53,400 bytes (↓36,700 ↑16,700)
+  CPU: 0.0%  Memory: 2.7 MB
+
