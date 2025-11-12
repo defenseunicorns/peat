@@ -60,7 +60,9 @@ CAP Protocol needs a production-grade embedded storage layer to persist Automerg
 
 **Description**: LSM-tree based key-value store from Facebook/Meta, used in production by hundreds of companies.
 
-**Rust Bindings**: [`rust-rocksdb`](https://github.com/rust-rocksdb/rust-rocksdb) - Well-maintained, 1.5K+ stars
+**Rust Bindings**: [`rust-rocksdb`](https://github.com/rust-rocksdb/rust-rocksdb) - Official bindings, 2.1K+ stars, 199 contributors
+
+**⚠️ Note**: Use the **official** rust-rocksdb from the rust-rocksdb organization, NOT third-party forks. The official version is actively maintained (v0.24.0, August 2025), has wide adoption, and is appropriate for safety-critical systems.
 
 #### Pros
 - ✅ **Battle-tested**: Billions of devices (WhatsApp, LinkedIn, Facebook)
