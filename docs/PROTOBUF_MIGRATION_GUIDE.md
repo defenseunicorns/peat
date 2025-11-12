@@ -1,6 +1,6 @@
-# E8 Integration Overview: Protobuf Migration
+# Protobuf Migration Guide
 
-**Visual Guide** for understanding what changed and how to integrate.
+**Technical Guide** for understanding the protobuf migration (ADR-012) and how to integrate.
 
 ---
 
