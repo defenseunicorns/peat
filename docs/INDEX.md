@@ -2,13 +2,25 @@
 
 > **Navigation Guide**: All documentation for the CAP Protocol project, organized by category and purpose.
 
+## 🔍 For IP Due Diligence Reviewers
+
+**Start Here**:
+1. [**IP_OVERVIEW.md**](IP_OVERVIEW.md) - Comprehensive IP overview for technical evaluation
+2. [**VALIDATION_RESULTS.md**](VALIDATION_RESULTS.md) - Experimental validation summary
+3. [**patents/**](patents/) - Patent strategy and technical disclosures
+
+**Key Technical Documents**:
+- [Architecture Decision Records](adr/) - 16 ADRs documenting all major technical decisions
+- [TESTING_STRATEGY.md](TESTING_STRATEGY.md) - Quality assurance approach
+- [DEVELOPMENT.md](../DEVELOPMENT.md) - Development guide and code quality practices
+
 ## Quick Start
 
 | Document | Purpose | Audience |
 |----------|---------|----------|
+| [**IP_OVERVIEW.md**](IP_OVERVIEW.md) | **Comprehensive IP overview** | **IP evaluators** |
 | [README.md](../README.md) | Project overview and getting started | All users |
-| [DEVELOPMENT.md](../DEVELOPMENT.md) | Development setup and workflow | Contributors |
-| [Codex.md](../Codex.md) | AI assistant context and guidelines | AI assistants |
+| [DEVELOPMENT.md](../DEVELOPMENT.md) | Development setup and workflow | Technical evaluators |
 
 ## Architecture Decision Records (ADRs)
 
@@ -39,7 +51,7 @@ In-depth technical analysis and design explorations.
 | [Ditto-SDK-Integration-Notes.md](Ditto-SDK-Integration-Notes.md) | Ditto SDK Integration | Integration notes and patterns for Ditto CRDT mesh |
 | [TTL_AND_DATA_LIFECYCLE_DESIGN.md](TTL_AND_DATA_LIFECYCLE_DESIGN.md) | TTL and Data Lifecycle (Ditto) | Ditto-specific implementation of ADR-016 lifecycle management |
 | [POLICY_ENGINE_CRDT_INTEGRATION.md](POLICY_ENGINE_CRDT_INTEGRATION.md) | Policy Engine & CRDT Integration | Optimistic Concurrency Control for policy enforcement with Ditto LWW semantics |
-| [E8_PROTOBUF_MIGRATION_HANDOFF.md](E8_PROTOBUF_MIGRATION_HANDOFF.md) | Protobuf Migration Guide | E8 simulation team handoff for ADR-012 Phase 5 changes |
+| [PROTOBUF_MIGRATION_GUIDE.md](PROTOBUF_MIGRATION_GUIDE.md) | Protobuf Migration Guide | Technical guide for ADR-012 protobuf migration |
 
 ## Project Planning
 
@@ -76,22 +88,23 @@ Comprehensive testing strategy and implementation guides.
 
 ### By Audience
 
-- **New Contributors**: README.md → DEVELOPMENT.md → ADRs
-- **AI Assistants**: Codex.md → INDEX.md → ADRs
+- **IP Evaluators**: IP_OVERVIEW.md → VALIDATION_RESULTS.md → patents/ → ADRs
+- **Technical Due Diligence**: IP_OVERVIEW.md → ADRs → TESTING_STRATEGY.md → DEVELOPMENT.md
 - **Architects**: ADRs → Technical Design Docs → TESTING_STRATEGY.md
 - **Developers**: DEVELOPMENT.md → TESTING_STRATEGY.md → Module docs
 - **QA/Testing**: TESTING_STRATEGY.md → E2E test docs
 
 ### By Topic
 
+- **IP & Patents**: IP_OVERVIEW.md, patents/, VALIDATION_RESULTS.md
 - **Architecture**: ADR-001, ADR-002, ADR-004, ADR-011, ADR-012, ADR-016, ARCHITECTURE-DECISION-SUMMARY.md
+- **Validation**: VALIDATION_RESULTS.md, ADR-015
 - **Synchronization**: CAP_Architecture_EventStreaming_vs_DeltaSync.md, Ditto-SDK-Integration-Notes.md
 - **Data Lifecycle & TTL**: ADR-016, TTL_AND_DATA_LIFECYCLE_DESIGN.md
 - **Policy Engine & Conflict Resolution**: POLICY_ENGINE_CRDT_INTEGRATION.md, POLICY_ENGINE_DESIGN.md, EXTENSIBLE_POLICY_ENGINE_DESIGN.md
 - **Human-Machine Teaming**: ADR-004, human-machine-teaming-design.md
 - **Testing**: TESTING_STRATEGY.md, e2e-cell-formation.md
-- **Project Management**: CAP-POC-Project-Plan.md
-- **Simulation**: E8_PROTOBUF_MIGRATION_HANDOFF.md, E8_PHASE1_SQUAD_TOPOLOGY.md, E8_TOPOLOGY_MODES.md
+- **Simulation**: NETWORK_SIMULATOR_EVALUATION.md, NETWORK_TOPOLOGY_MODES.md, SQUAD_TOPOLOGY_VALIDATION.md
 
 ## Documentation Conventions
 
@@ -135,6 +148,9 @@ cap/
 
 ### "I need to understand..."
 
+- **...the intellectual property and innovations**: Start with [IP_OVERVIEW.md](IP_OVERVIEW.md)
+- **...validation and testing results**: Read [VALIDATION_RESULTS.md](VALIDATION_RESULTS.md)
+- **...patent strategy**: See [patents/](patents/) directory
 - **...the overall architecture**: Start with [ARCHITECTURE-DECISION-SUMMARY.md](ARCHITECTURE-DECISION-SUMMARY.md)
 - **...why we made a specific decision**: Check [ADRs](adr/)
 - **...how to test**: Read [TESTING_STRATEGY.md](TESTING_STRATEGY.md)
@@ -143,7 +159,7 @@ cap/
 - **...policy engine and conflict resolution**: See [POLICY_ENGINE_CRDT_INTEGRATION.md](POLICY_ENGINE_CRDT_INTEGRATION.md) for OCC approach with Ditto
 - **...human-machine teaming**: Read [ADR-004](adr/004-human-machine-cell-composition.md)
 - **...cell formation E2E tests**: See [e2e-cell-formation.md](../cap-protocol/docs/testing/e2e-cell-formation.md)
-- **...protobuf migration for simulation**: See [E8_PROTOBUF_MIGRATION_HANDOFF.md](E8_PROTOBUF_MIGRATION_HANDOFF.md)
+- **...protobuf migration**: See [PROTOBUF_MIGRATION_GUIDE.md](PROTOBUF_MIGRATION_GUIDE.md)
 
 ### "I'm working on..."
 

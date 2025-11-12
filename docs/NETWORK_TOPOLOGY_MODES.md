@@ -1,12 +1,11 @@
-# E8 Network Simulation: Topology Modes
+# Network Topology Modes
 
-**Status**: Design Document
-**Date**: 2025-11-06
-**Issue**: #52 Phase 1
+**Status**: Validated
+**Date**: November 2024
 
 ## Overview
 
-E8 network simulation supports three topology modes to validate different aspects of the CAP protocol:
+CAP Protocol network validation supports three topology modes to validate different aspects of hierarchical coordination:
 
 1. **Client-Server**: Simple validation (all → central server)
 2. **Hub-Spoke**: Realistic hierarchical structure (orchestrated static)
