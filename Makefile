@@ -1,6 +1,6 @@
 .PHONY: help clean clean-ditto build test test-e2e fmt clippy check all pre-commit ci
 .PHONY: sim-build sim-deploy-poc sim-deploy-squad sim-destroy sim-logs sim-clean
-.PHONY: docs-presentation
+.PHONY: docs-presentation docs-presentation-pdf
 
 # Default target
 help:
@@ -21,7 +21,8 @@ help:
 	@echo "  all          - Clean, build, and run all checks"
 	@echo ""
 	@echo "Documentation:"
-	@echo "  docs-presentation - Build HTML presentation from markdown"
+	@echo "  docs-presentation     - Build HTML presentation from markdown"
+	@echo "  docs-presentation-pdf - Build PDF presentation from markdown"
 	@echo ""
 	@echo "Network Simulation (E8 - requires Linux with ContainerLab):"
 	@echo "  sim-build                  - Build cap-sim-node Docker image"
@@ -346,3 +347,15 @@ docs-presentation:
 	fi
 	@marp docs/CAP_PROTOCOL_TECHNOLOGY_DEEPDIVE.md --html --allow-local-files -o docs/CAP_PROTOCOL_TECHNOLOGY_DEEPDIVE.html
 	@echo "✅ Presentation built: docs/CAP_PROTOCOL_TECHNOLOGY_DEEPDIVE.html"
+
+# Build PDF presentation from markdown
+docs-presentation-pdf:
+	@echo "Building PDF presentation..."
+	@if ! command -v marp &> /dev/null; then \
+		echo "❌ Error: marp-cli not found"; \
+		echo "Install with: npm install -g @marp-team/marp-cli"; \
+		exit 1; \
+	fi
+	@echo "Note: PDF generation requires Chromium/Chrome to be installed"
+	@marp docs/CAP_PROTOCOL_TECHNOLOGY_DEEPDIVE.md --pdf --allow-local-files -o docs/CAP_PROTOCOL_TECHNOLOGY_DEEPDIVE.pdf
+	@echo "✅ Presentation built: docs/CAP_PROTOCOL_TECHNOLOGY_DEEPDIVE.pdf"

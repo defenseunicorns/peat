@@ -4,7 +4,8 @@ theme: default
 paginate: true
 backgroundColor: #fff
 backgroundImage: url('https://marp.app/assets/hero-background.svg')
-header: 'CAP Protocol - Technology Deep Dive'
+header: 'CAP Protocol - Technology Deep Dive | **COMPETITION SENSITIVE**'
+footer: '© 2025 revolve. All Rights Reserved. | **COMPETITION SENSITIVE**'
 style: |
   section {
     font-size: 18px;
@@ -45,6 +46,14 @@ style: |
   }
   p {
     margin: 0.3em 0;
+  }
+  header {
+    font-size: 11px;
+    color: #666;
+  }
+  footer {
+    font-size: 10px;
+    color: #666;
   }
 ---
 
