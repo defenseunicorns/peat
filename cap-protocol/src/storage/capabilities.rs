@@ -1,14 +1,22 @@
 //! Storage backend capability traits
 //!
-//! This module defines **optional capabilities** that storage backends may provide.
-//! CAP Protocol supports multiple backend implementations to enable both:
-//! - **Commercial deployments** using Ditto SDK (managed CRDT service)
-//! - **Open-source deployments** using Automerge + Iroh + RocksDB
+//! This module defines **optional capabilities** that complete storage backends may provide.
+//!
+//! # What is a Backend?
+//!
+//! A **backend is a complete, integrated solution** for storage, synchronization, and persistence:
+//!
+//! - **DittoBackend**: Ditto's proprietary CRDT storage + built-in P2P mesh + multi-transport
+//! - **AutomergeIrohBackend**: Automerge CRDTs + RocksDB persistence + Iroh QUIC + custom mesh (ADR-017)
+//! - **SimpleBackend**: RocksDB only (no CRDT, no sync, just local K/V storage)
+//!
+//! Backends are **not** individual components like "just Automerge" or "just Iroh". Each backend
+//! integrates multiple technologies into a cohesive solution.
 //!
 //! # Architecture Philosophy
 //!
 //! Rather than forcing all backends into a one-size-fits-all trait, we use
-//! **capability traits** to expose backend-specific features:
+//! **capability traits** to expose what each complete backend can do:
 //!
 //! ```text
 //! ┌─────────────────────────────────────────────────────────┐
@@ -22,27 +30,32 @@
 //! │ • flush() - Persistence guarantee                       │
 //! └─────────────────┬───────────────────────────────────────┘
 //!                   │
-//!        ┌──────────┴──────────┬──────────────┐
-//!        ▼                     ▼              ▼
-//! ┌─────────────┐      ┌──────────────┐  ┌─────────────┐
-//! │DittoBackend │      │AutomergeBack │  │RocksDbBack  │
-//! │             │      │end           │  │end          │
-//! │+ CrdtCapable│      │+ CrdtCapable │  │(basic only) │
-//! │+ SyncCapable│      │              │  │             │
-//! └─────────────┘      └──────────────┘  └─────────────┘
-//!        ▲                     ▲
-//!        │                     │
-//!   Ditto P2P          Iroh Transport
-//!   (built-in)         (external)
+//!        ┌──────────┴──────────────────┬─────────────┐
+//!        ▼                             ▼             ▼
+//! ┌─────────────────┐      ┌─────────────────────┐  ┌──────────┐
+//! │ DittoBackend    │      │ AutomergeIrohBackend│  │ Simple   │
+//! │ =============== │      │ ===================  │  │ Backend  │
+//! │ • Ditto CRDT    │      │ • Automerge CRDTs   │  │ ======== │
+//! │ • Ditto P2P     │      │ • RocksDB persist   │  │ • RocksDB│
+//! │ • Multi-trans   │      │ • Iroh QUIC         │  │   only   │
+//! │                 │      │ • Custom mesh       │  │          │
+//! │ + CrdtCapable   │      │   (ADR-017)         │  │          │
+//! │ + SyncCapable   │      │                     │  │          │
+//! │                 │      │ + CrdtCapable       │  │          │
+//! │                 │      │ + SyncCapable       │  │          │
+//! └─────────────────┘      └─────────────────────┘  └──────────┘
+//!   (one complete           (one complete OSS        (minimal
+//!    commercial              stack, not separate      backend)
+//!    solution)               pieces)
 //! ```
 //!
 //! # Backend Comparison
 //!
-//! | Backend       | CRDT | Sync      | License       | Use Case                    |
-//! |---------------|------|-----------|---------------|-----------------------------|
-//! | **Ditto**     | ✅   | Built-in  | Proprietary   | Managed service, rapid dev  |
-//! | **Automerge** | ✅   | Via Iroh  | MIT           | OSS, self-hosted, sovereign |
-//! | **RocksDB**   | ❌   | N/A       | Apache 2.0    | Testing, simple deployments |
+//! | Backend                | Components                          | CRDT | Sync | License    | Use Case                 |
+//! |------------------------|-------------------------------------|------|------|------------|--------------------------|
+//! | **DittoBackend**       | Ditto SDK (all-in-one)              | ✅   | ✅   | Proprietary| Managed service          |
+//! | **AutomergeIrohBackend**| Automerge + RocksDB + Iroh + mesh  | ✅   | ✅   | MIT/Apache | OSS, self-hosted         |
+//! | **SimpleBackend**      | RocksDB only                        | ❌   | ❌   | Apache 2.0 | Testing, local storage   |
 //!
 //! # Capability Traits
 //!
@@ -61,29 +74,35 @@
 //! - Protobuf messages must have `#[derive(Serialize, Deserialize)]`
 //! - Backend must support structured storage (JSON for Ditto, Automerge doc for Automerge)
 //!
-//! **Example:**
+//! **Example (DittoBackend):**
 //! ```ignore
 //! use cap_protocol::storage::{DittoBackend, CrdtCapable};
 //! use cap_schema::hierarchy::v1::SquadSummary;
 //!
 //! let backend = DittoBackend::new(store);
-//!
-//! // Get typed collection with CRDT benefits
 //! let squads: Arc<dyn TypedCollection<SquadSummary>> =
 //!     backend.typed_collection("squads");
-//!
-//! // Upsert with full JSON expansion
 //! squads.upsert("squad-1", &summary)?;
-//! // → Ditto stores as: {"squad_id": "squad-1", "member_ids": [...], ...}
-//! // → Field-level CRDT merging enabled
+//! // → Ditto stores as JSON, enables CRDT merging
+//! ```
+//!
+//! **Example (AutomergeIrohBackend):**
+//! ```ignore
+//! use cap_protocol::storage::{AutomergeIrohBackend, CrdtCapable};
+//!
+//! let backend = AutomergeIrohBackend::new(config);
+//! let squads: Arc<dyn TypedCollection<SquadSummary>> =
+//!     backend.typed_collection("squads");
+//! squads.upsert("squad-1", &summary)?;
+//! // → Automerge stores as CRDT document, persists to RocksDB, syncs via Iroh
 //! ```
 //!
 //! ## SyncCapable - Built-in Replication
 //!
 //! Backends that implement `SyncCapable` have built-in P2P synchronization.
 //!
-//! **Ditto**: Built-in mesh networking with Bluetooth, WiFi-Direct, TCP/IP
-//! **Automerge**: Requires external transport layer (Iroh)
+//! **DittoBackend**: Built-in mesh networking with Bluetooth, WiFi-Direct, TCP/IP
+//! **AutomergeIrohBackend**: Integrated with Iroh QUIC transport + custom mesh (ADR-017)
 //!
 //! # Decision Guide
 //!
@@ -112,17 +131,21 @@
 //! CAP Protocol provides a **fully open-source implementation** using:
 //!
 //! ```text
-//! ┌──────────────────────────────────────────────────┐
-//! │ CAP Protocol (Apache 2.0)                        │
-//! ├──────────────────────────────────────────────────┤
-//! │ AutomergeBackend (implements StorageBackend)     │
-//! │   └─ CrdtCapable: Yes (via Automerge CRDTs)     │
-//! │   └─ SyncCapable: No (use Iroh separately)      │
-//! ├──────────────────────────────────────────────────┤
-//! │ Automerge (MIT) - CRDT engine                    │
-//! │ RocksDB (Apache 2.0) - Persistence layer         │
-//! │ Iroh (Apache 2.0/MIT) - QUIC transport           │
-//! └──────────────────────────────────────────────────┘
+//! ┌──────────────────────────────────────────────────────────┐
+//! │ CAP Protocol (Apache 2.0)                                │
+//! ├──────────────────────────────────────────────────────────┤
+//! │ AutomergeIrohBackend (complete OSS backend)              │
+//! │   Components:                                            │
+//! │   • Automerge (MIT) - CRDT engine                        │
+//! │   • RocksDB (Apache 2.0) - Persistence layer             │
+//! │   • Iroh (Apache 2.0/MIT) - QUIC transport               │
+//! │   • Custom P2P mesh (ADR-017) - Discovery & topology     │
+//! │                                                          │
+//! │   Capabilities:                                          │
+//! │   └─ StorageBackend: Yes (required)                      │
+//! │   └─ CrdtCapable: Yes (via Automerge CRDTs)              │
+//! │   └─ SyncCapable: Yes (via Iroh + custom mesh)           │
+//! └──────────────────────────────────────────────────────────┘
 //! ```
 //!
 //! This ensures:
@@ -214,8 +237,8 @@ where
 /// # Implementations
 ///
 /// - ✅ `DittoBackend` - JSON expansion with Ditto CRDTs
-/// - ✅ `AutomergeBackend` - Native Automerge documents
-/// - ❌ `RocksDbBackend` - Blob storage, no CRDT support
+/// - ✅ `AutomergeIrohBackend` - Native Automerge documents with RocksDB persistence
+/// - ❌ `SimpleBackend` - Blob storage, no CRDT support
 pub trait CrdtCapable: Send + Sync {
     /// Create a typed collection for CRDT-optimized storage
     ///
@@ -233,14 +256,13 @@ pub trait CrdtCapable: Send + Sync {
 
 /// Sync capability trait - Backend has built-in replication
 ///
-/// Some backends (like Ditto) provide built-in P2P synchronization that needs
-/// lifecycle management. Others (like Automerge) use external transport layers.
+/// Complete backends that provide integrated P2P synchronization implement this trait.
 ///
 /// # Implementations
 ///
 /// - ✅ `DittoBackend` - Built-in Bluetooth/WiFi/TCP mesh
-/// - ❌ `AutomergeBackend` - Uses Iroh for transport (separate layer)
-/// - ❌ `RocksDbBackend` - Local storage only
+/// - ✅ `AutomergeIrohBackend` - Integrated Iroh QUIC transport with custom mesh (ADR-017)
+/// - ❌ `SimpleBackend` - Local storage only, no synchronization
 pub trait SyncCapable: Send + Sync {
     /// Start background synchronization
     ///
