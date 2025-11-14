@@ -58,23 +58,39 @@
 
 ## Implementation Phases
 
-### Phase 1: Storage Layer (Week 1-2)
+### Phase 1: Storage Layer (Week 1-2) ✅ **COMPLETE**
 **Goal**: Persist Automerge documents to RocksDB
 
-**Tasks**:
-1. Create `AutomergeStore` wrapper around RocksDB
-2. Implement document save/load with Automerge serialization
-3. Add Collection abstraction (like DittoStore collections)
-4. Support typed operations via serde (protobuf → JSON → Automerge)
+**Status**: ✅ Completed 2025-11-14
+
+**Completed Tasks**:
+1. ✅ Created `AutomergeStore` wrapper around RocksDB with LRU cache
+2. ✅ Implemented document save/load with Automerge binary serialization
+3. ✅ Added Collection abstraction with namespace isolation (prefix-based)
+4. ✅ Implemented `AutomergeBackend` with full `StorageBackend` trait
+5. ⏭ Deferred to Phase 2: Typed operations (protobuf → JSON → Automerge)
 
 **Key Files**:
-- `cap-protocol/src/storage/automerge_store.rs` (new)
-- `cap-protocol/src/storage/automerge_backend.rs` (new)
+- `cap-protocol/src/storage/automerge_store.rs` (239 lines, 6 tests)
+- `cap-protocol/src/storage/automerge_backend.rs` (239 lines, 5 tests)
+- `cap-protocol/Cargo.toml` (dependencies: iroh, rocksdb, lru)
 
-**Success Criteria**:
-- ✅ Can save/load Automerge documents to RocksDB
-- ✅ Collection API matches DittoStore pattern
-- ✅ Unit tests for CRUD operations
+**Success Criteria**: ✅ All Met
+- ✅ Can save/load Automerge documents to RocksDB (binary format)
+- ✅ Collection API matches DittoStore pattern (StorageBackend trait)
+- ✅ Unit tests for CRUD operations (11 tests total, all passing)
+
+**Implementation Details**:
+- Storage: RocksDB with 64MB write buffer, 512 max open files
+- Caching: LRU cache (1000 documents) for hot document access
+- Collections: Namespace isolation via key prefixing ("cells:cell-1")
+- Thread Safety: Arc-based ownership for concurrent access
+- Current Strategy: Stores raw bytes in Automerge docs (Phase 2 adds protobuf conversion)
+
+**Commits**:
+- 79d5e5b: Phase 1 foundation (AutomergeStore + dependencies)
+- 3f6238d: Collection abstraction (6 tests)
+- e29d9c2: AutomergeBackend with StorageBackend trait (5 tests)
 
 ### Phase 2: CRDT Integration (Week 2-3)
 **Goal**: Implement CrdtCapable trait for field-level merging
