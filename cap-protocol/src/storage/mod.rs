@@ -21,6 +21,8 @@ pub mod automerge_backend;
 pub mod automerge_conversion;
 #[cfg(feature = "automerge-backend")]
 pub mod automerge_store;
+#[cfg(feature = "automerge-backend")]
+pub mod automerge_sync;
 
 pub use cell_store::CellStore;
 pub use ditto_store::DittoStore;
@@ -32,6 +34,8 @@ pub use ttl::{EvictionStrategy, OfflineRetentionPolicy, TtlConfig};
 pub use automerge_backend::AutomergeBackend;
 #[cfg(feature = "automerge-backend")]
 pub use automerge_store::AutomergeStore;
+#[cfg(feature = "automerge-backend")]
+pub use automerge_sync::AutomergeSyncCoordinator;
 
 // Trait abstractions (E11.2)
 pub use backend::{create_storage_backend, StorageConfig};
