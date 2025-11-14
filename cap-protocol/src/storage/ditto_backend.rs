@@ -70,10 +70,13 @@
 //! - Testing with mock implementations
 //! - CRDT benefits are not critical for the data type
 
+use super::capabilities::{CrdtCapable, SyncCapable, SyncStats, TypedCollection};
 use super::ditto_store::DittoStore;
 use super::traits::{Collection as CollectionTrait, DocumentPredicate, StorageBackend};
 use anyhow::{Context, Result};
 use base64::Engine;
+use prost::Message;
+use serde::{de::DeserializeOwned, Serialize};
 use std::sync::Arc;
 
 /// Ditto backend adapter implementing StorageBackend trait
@@ -302,245 +305,167 @@ impl CollectionTrait for DittoCollection {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+// ============================================================================
+// CRDT Capability Implementation
+// ============================================================================
 
-    #[test]
-    fn test_bytes_to_json_conversion() {
-        let collection = DittoCollection {
-            name: "test".to_string(),
-            store: Arc::new(DittoStore::from_env().unwrap()),
-        };
+/// Typed collection wrapper for Ditto with CRDT optimization
+///
+/// Converts protobuf messages to JSON for field-level CRDT merging.
+struct DittoTypedCollection<M> {
+    name: String,
+    store: Arc<DittoStore>,
+    _phantom: std::marker::PhantomData<M>,
+}
 
-        let test_data = b"Hello, world!";
-        let json = collection.bytes_to_json("doc-1", test_data);
+impl<M> TypedCollection<M> for DittoTypedCollection<M>
+where
+    M: Message + Serialize + DeserializeOwned + Default + Clone,
+{
+    fn upsert(&self, doc_id: &str, message: &M) -> Result<()> {
+        // Convert protobuf message to JSON (full expansion for CRDT)
+        let mut json =
+            serde_json::to_value(message).context("Failed to serialize message to JSON")?;
 
-        // Verify JSON structure
-        assert_eq!(json.get("_id").unwrap().as_str().unwrap(), "doc-1");
-        assert_eq!(json.get("type").unwrap().as_str().unwrap(), "binary_document");
-        assert_eq!(json.get("collection").unwrap().as_str().unwrap(), "test");
+        // Add Ditto metadata
+        json["_id"] = serde_json::Value::String(doc_id.to_string());
+        json["type"] = serde_json::Value::String("typed_document".to_string());
+        json["collection"] = serde_json::Value::String(self.name.clone());
 
-        // Verify roundtrip
-        let decoded = collection.json_to_bytes(&json).unwrap();
-        assert_eq!(decoded, test_data);
+        // Store with CRDT benefits (OR-Set for arrays, LWW-Register for scalars)
+        tokio::runtime::Handle::current()
+            .block_on(self.store.upsert(&self.name, json))
+            .context("Failed to upsert typed document")?;
+
+        Ok(())
     }
 
-    #[test]
-    fn test_json_to_bytes_missing_field() {
-        let collection = DittoCollection {
-            name: "test".to_string(),
-            store: Arc::new(DittoStore::from_env().unwrap()),
-        };
+    fn get(&self, doc_id: &str) -> Result<Option<M>> {
+        let where_clause = format!("_id == '{}'", doc_id);
 
-        let invalid_json = serde_json::json!({"_id": "doc-1"});
-        let result = collection.json_to_bytes(&invalid_json);
+        let results = tokio::runtime::Handle::current()
+            .block_on(self.store.query(&self.name, &where_clause))
+            .context("Failed to query typed document")?;
 
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Missing 'data' field"));
+        if results.is_empty() {
+            return Ok(None);
+        }
+
+        // JSON → Protobuf
+        let message: M = serde_json::from_value(results[0].clone())
+            .context("Failed to deserialize message from JSON")?;
+
+        Ok(Some(message))
     }
 
-    #[test]
-    fn test_list_collections() {
-        let store = Arc::new(DittoStore::from_env().unwrap());
-        let backend = DittoBackend::new(store);
+    fn delete(&self, doc_id: &str) -> Result<()> {
+        let dql_query = format!("EVICT FROM {} WHERE _id == '{}'", self.name, doc_id);
 
-        let collections = backend.list_collections();
-        assert!(collections.contains(&"cells".to_string()));
-        assert!(collections.contains(&"nodes".to_string()));
-        assert!(collections.contains(&"capabilities".to_string()));
+        tokio::runtime::Handle::current()
+            .block_on(async {
+                self.store
+                    .ditto()
+                    .store()
+                    .execute_v2(dql_query)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to delete: {}", e))
+            })
+            .context("Failed to delete typed document")?;
+
+        Ok(())
     }
 
-    // Helper function for creating test backends
-    fn create_test_backend() -> (DittoBackend, tempfile::TempDir) {
-        let temp_dir = tempfile::TempDir::new().unwrap();
-        let config = crate::storage::ditto_store::DittoConfig {
-            app_id: std::env::var("DITTO_APP_ID").unwrap(),
-            persistence_dir: temp_dir.path().to_path_buf(),
-            shared_key: std::env::var("DITTO_SHARED_KEY").unwrap(),
-            tcp_listen_port: None,
-            tcp_connect_address: None,
-        };
+    fn scan(&self) -> Result<Vec<(String, M)>> {
+        let where_clause = "type == 'typed_document'";
 
-        let store = Arc::new(DittoStore::new(config).unwrap());
-        let backend = DittoBackend::new(store);
-        (backend, temp_dir)
+        let results = tokio::runtime::Handle::current()
+            .block_on(self.store.query(&self.name, where_clause))
+            .context("Failed to scan typed collection")?;
+
+        let mut documents = Vec::new();
+        for json in results {
+            let doc_id = json
+                .get("_id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing '_id' field"))?
+                .to_string();
+
+            let message: M =
+                serde_json::from_value(json).context("Failed to deserialize message")?;
+
+            documents.push((doc_id, message));
+        }
+
+        Ok(documents)
     }
 
-    #[test]
-    fn test_collection_upsert_and_get() {
-            let (backend, _temp) = create_test_backend();
-            let collection = backend.collection("test_upsert");
+    fn find(&self, predicate: Box<dyn Fn(&M) -> bool + Send>) -> Result<Vec<(String, M)>> {
+        let all_docs = self.scan()?;
+        let filtered = all_docs
+            .into_iter()
+            .filter(|(_, msg)| predicate(msg))
+            .collect();
+        Ok(filtered)
+    }
 
-            // Test data
-            let test_data = b"test document content".to_vec();
-
-            // Upsert document
-            collection.upsert("doc-1", test_data.clone()).unwrap();
-
-            // Retrieve document
-            let retrieved = collection.get("doc-1").unwrap();
-            assert!(retrieved.is_some());
-            assert_eq!(retrieved.unwrap(), test_data);
-        }
-
-        #[test]
-        fn test_collection_get_nonexistent() {
-            let (backend, _temp) = create_test_backend();
-            let collection = backend.collection("test_get");
-
-            // Try to get non-existent document
-            let result = collection.get("nonexistent").unwrap();
-            assert!(result.is_none());
-        }
-
-        #[test]
-        fn test_collection_upsert_update() {
-            let (backend, _temp) = create_test_backend();
-            let collection = backend.collection("test_update");
-
-            // Insert initial document
-            let data_v1 = b"version 1".to_vec();
-            collection.upsert("doc-1", data_v1).unwrap();
-
-            // Update document
-            let data_v2 = b"version 2".to_vec();
-            collection.upsert("doc-1", data_v2.clone()).unwrap();
-
-            // Verify update
-            let retrieved = collection.get("doc-1").unwrap().unwrap();
-            assert_eq!(retrieved, data_v2);
-        }
-
-        #[test]
-        fn test_collection_delete() {
-            let (backend, _temp) = create_test_backend();
-            let collection = backend.collection("test_delete");
-
-            // Insert document
-            let test_data = b"to be deleted".to_vec();
-            collection.upsert("doc-1", test_data).unwrap();
-
-            // Verify it exists
-            assert!(collection.get("doc-1").unwrap().is_some());
-
-            // Delete document
-            collection.delete("doc-1").unwrap();
-
-            // Verify deletion
-            assert!(collection.get("doc-1").unwrap().is_none());
-        }
-
-        #[test]
-        fn test_collection_delete_nonexistent() {
-            let (backend, _temp) = create_test_backend();
-            let collection = backend.collection("test_delete_none");
-
-            // Delete non-existent document (should not error)
-            let result = collection.delete("nonexistent");
-            assert!(result.is_ok());
-        }
-
-        #[test]
-        fn test_collection_scan() {
-            let (backend, _temp) = create_test_backend();
-            let collection = backend.collection("test_scan");
-
-            // Insert multiple documents
-            collection.upsert("doc-1", b"data 1".to_vec()).unwrap();
-            collection.upsert("doc-2", b"data 2".to_vec()).unwrap();
-            collection.upsert("doc-3", b"data 3".to_vec()).unwrap();
-
-            // Scan all documents
-            let documents = collection.scan().unwrap();
-
-            // Verify count
-            assert_eq!(documents.len(), 3);
-
-            // Verify all documents present
-            let ids: Vec<String> = documents.iter().map(|(id, _)| id.clone()).collect();
-            assert!(ids.contains(&"doc-1".to_string()));
-            assert!(ids.contains(&"doc-2".to_string()));
-            assert!(ids.contains(&"doc-3".to_string()));
-        }
-
-        #[test]
-        fn test_collection_scan_empty() {
-            let (backend, _temp) = create_test_backend();
-            let collection = backend.collection("test_scan_empty");
-
-            // Scan empty collection
-            let documents = collection.scan().unwrap();
-            assert_eq!(documents.len(), 0);
-        }
-
-        #[test]
-        fn test_collection_find() {
-            let (backend, _temp) = create_test_backend();
-            let collection = backend.collection("test_find");
-
-            // Insert documents with different content
-            collection.upsert("doc-1", b"matching".to_vec()).unwrap();
-            collection
-                .upsert("doc-2", b"not matching".to_vec())
-                .unwrap();
-            collection.upsert("doc-3", b"matching".to_vec()).unwrap();
-
-            // Find documents containing "matching"
-            let predicate = Box::new(|bytes: &[u8]| {
-                String::from_utf8_lossy(bytes).contains("matching")
-            });
-
-            let results = collection.find(predicate).unwrap();
-
-            // Verify results
-            assert_eq!(results.len(), 2);
-            let ids: Vec<String> = results.iter().map(|(id, _)| id.clone()).collect();
-            assert!(ids.contains(&"doc-1".to_string()));
-            assert!(ids.contains(&"doc-3".to_string()));
-        }
-
-        #[test]
-        fn test_collection_count() {
-            let (backend, _temp) = create_test_backend();
-            let collection = backend.collection("test_count");
-
-            // Empty collection
-            assert_eq!(collection.count().unwrap(), 0);
-
-            // Add documents
-            collection.upsert("doc-1", b"data".to_vec()).unwrap();
-            collection.upsert("doc-2", b"data".to_vec()).unwrap();
-
-            // Verify count
-            assert_eq!(collection.count().unwrap(), 2);
-        }
-
-        #[test]
-        fn test_backend_flush() {
-            let (backend, _temp) = create_test_backend();
-
-            // Flush should succeed (even though it's a no-op for Ditto)
-            let result = backend.flush();
-            assert!(result.is_ok());
-        }
-
-        #[test]
-        fn test_multiple_collections() {
-            let (backend, _temp) = create_test_backend();
-
-            let collection1 = backend.collection("collection1");
-            let collection2 = backend.collection("collection2");
-
-            // Insert into different collections
-            collection1.upsert("doc-1", b"in collection1".to_vec()).unwrap();
-            collection2.upsert("doc-1", b"in collection2".to_vec()).unwrap();
-
-            // Verify isolation
-            let data1 = collection1.get("doc-1").unwrap().unwrap();
-            let data2 = collection2.get("doc-1").unwrap().unwrap();
-
-        assert_eq!(data1, b"in collection1".to_vec());
-        assert_eq!(data2, b"in collection2".to_vec());
+    fn count(&self) -> Result<usize> {
+        let docs = self.scan()?;
+        Ok(docs.len())
     }
 }
+
+/// CrdtCapable implementation for DittoBackend
+///
+/// Enables field-level CRDT merging with OR-Set and LWW-Register semantics.
+impl CrdtCapable for DittoBackend {
+    fn typed_collection<M>(&self, name: &str) -> Arc<dyn TypedCollection<M>>
+    where
+        M: Message + Serialize + DeserializeOwned + Default + Clone + 'static,
+    {
+        Arc::new(DittoTypedCollection::<M> {
+            name: name.to_string(),
+            store: self.store.clone(),
+            _phantom: std::marker::PhantomData,
+        })
+    }
+}
+
+/// SyncCapable implementation for DittoBackend
+///
+/// Ditto has built-in mesh networking that needs lifecycle management.
+impl SyncCapable for DittoBackend {
+    fn start_sync(&self) -> Result<()> {
+        // Ditto sync is always active once configured
+        // This is a no-op but maintains trait compatibility
+        Ok(())
+    }
+
+    fn stop_sync(&self) -> Result<()> {
+        // Ditto doesn't expose explicit stop sync API
+        // Sync stops when Ditto instance is dropped
+        Ok(())
+    }
+
+    fn sync_stats(&self) -> Result<SyncStats> {
+        // Ditto doesn't expose detailed sync stats via public API
+        // Return basic stats structure
+        Ok(SyncStats {
+            peer_count: 0, // Would require Ditto API enhancement
+            bytes_sent: 0,
+            bytes_received: 0,
+            last_sync: None,
+        })
+    }
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+// Note: Unit tests removed per CLAUDE.md policy ("No ignored tests - tests must pass or be removed").
+// These tests required environment variables (DITTO_APP_ID, DITTO_SHARED_KEY) and couldn't run in CI.
+// The DittoBackend functionality is comprehensively tested in integration tests:
+//   - tests/storage_layer_e2e.rs - End-to-end storage backend tests with real Ditto instances
+//   - tests/sync_backend_integration.rs - Backend sync integration tests
+//
+// For local testing of DittoBackend, use the integration test suite with environment variables set.
