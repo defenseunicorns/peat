@@ -350,4 +350,197 @@ mod tests {
         assert!(collections.contains(&"nodes".to_string()));
         assert!(collections.contains(&"capabilities".to_string()));
     }
+
+    // Helper function for creating test backends
+    fn create_test_backend() -> (DittoBackend, tempfile::TempDir) {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let config = crate::storage::ditto_store::DittoConfig {
+            app_id: std::env::var("DITTO_APP_ID").unwrap(),
+            persistence_dir: temp_dir.path().to_path_buf(),
+            shared_key: std::env::var("DITTO_SHARED_KEY").unwrap(),
+            tcp_listen_port: None,
+            tcp_connect_address: None,
+        };
+
+        let store = Arc::new(DittoStore::new(config).unwrap());
+        let backend = DittoBackend::new(store);
+        (backend, temp_dir)
+    }
+
+    #[test]
+    fn test_collection_upsert_and_get() {
+            let (backend, _temp) = create_test_backend();
+            let collection = backend.collection("test_upsert");
+
+            // Test data
+            let test_data = b"test document content".to_vec();
+
+            // Upsert document
+            collection.upsert("doc-1", test_data.clone()).unwrap();
+
+            // Retrieve document
+            let retrieved = collection.get("doc-1").unwrap();
+            assert!(retrieved.is_some());
+            assert_eq!(retrieved.unwrap(), test_data);
+        }
+
+        #[test]
+        fn test_collection_get_nonexistent() {
+            let (backend, _temp) = create_test_backend();
+            let collection = backend.collection("test_get");
+
+            // Try to get non-existent document
+            let result = collection.get("nonexistent").unwrap();
+            assert!(result.is_none());
+        }
+
+        #[test]
+        fn test_collection_upsert_update() {
+            let (backend, _temp) = create_test_backend();
+            let collection = backend.collection("test_update");
+
+            // Insert initial document
+            let data_v1 = b"version 1".to_vec();
+            collection.upsert("doc-1", data_v1).unwrap();
+
+            // Update document
+            let data_v2 = b"version 2".to_vec();
+            collection.upsert("doc-1", data_v2.clone()).unwrap();
+
+            // Verify update
+            let retrieved = collection.get("doc-1").unwrap().unwrap();
+            assert_eq!(retrieved, data_v2);
+        }
+
+        #[test]
+        fn test_collection_delete() {
+            let (backend, _temp) = create_test_backend();
+            let collection = backend.collection("test_delete");
+
+            // Insert document
+            let test_data = b"to be deleted".to_vec();
+            collection.upsert("doc-1", test_data).unwrap();
+
+            // Verify it exists
+            assert!(collection.get("doc-1").unwrap().is_some());
+
+            // Delete document
+            collection.delete("doc-1").unwrap();
+
+            // Verify deletion
+            assert!(collection.get("doc-1").unwrap().is_none());
+        }
+
+        #[test]
+        fn test_collection_delete_nonexistent() {
+            let (backend, _temp) = create_test_backend();
+            let collection = backend.collection("test_delete_none");
+
+            // Delete non-existent document (should not error)
+            let result = collection.delete("nonexistent");
+            assert!(result.is_ok());
+        }
+
+        #[test]
+        fn test_collection_scan() {
+            let (backend, _temp) = create_test_backend();
+            let collection = backend.collection("test_scan");
+
+            // Insert multiple documents
+            collection.upsert("doc-1", b"data 1".to_vec()).unwrap();
+            collection.upsert("doc-2", b"data 2".to_vec()).unwrap();
+            collection.upsert("doc-3", b"data 3".to_vec()).unwrap();
+
+            // Scan all documents
+            let documents = collection.scan().unwrap();
+
+            // Verify count
+            assert_eq!(documents.len(), 3);
+
+            // Verify all documents present
+            let ids: Vec<String> = documents.iter().map(|(id, _)| id.clone()).collect();
+            assert!(ids.contains(&"doc-1".to_string()));
+            assert!(ids.contains(&"doc-2".to_string()));
+            assert!(ids.contains(&"doc-3".to_string()));
+        }
+
+        #[test]
+        fn test_collection_scan_empty() {
+            let (backend, _temp) = create_test_backend();
+            let collection = backend.collection("test_scan_empty");
+
+            // Scan empty collection
+            let documents = collection.scan().unwrap();
+            assert_eq!(documents.len(), 0);
+        }
+
+        #[test]
+        fn test_collection_find() {
+            let (backend, _temp) = create_test_backend();
+            let collection = backend.collection("test_find");
+
+            // Insert documents with different content
+            collection.upsert("doc-1", b"matching".to_vec()).unwrap();
+            collection
+                .upsert("doc-2", b"not matching".to_vec())
+                .unwrap();
+            collection.upsert("doc-3", b"matching".to_vec()).unwrap();
+
+            // Find documents containing "matching"
+            let predicate = Box::new(|bytes: &[u8]| {
+                String::from_utf8_lossy(bytes).contains("matching")
+            });
+
+            let results = collection.find(predicate).unwrap();
+
+            // Verify results
+            assert_eq!(results.len(), 2);
+            let ids: Vec<String> = results.iter().map(|(id, _)| id.clone()).collect();
+            assert!(ids.contains(&"doc-1".to_string()));
+            assert!(ids.contains(&"doc-3".to_string()));
+        }
+
+        #[test]
+        fn test_collection_count() {
+            let (backend, _temp) = create_test_backend();
+            let collection = backend.collection("test_count");
+
+            // Empty collection
+            assert_eq!(collection.count().unwrap(), 0);
+
+            // Add documents
+            collection.upsert("doc-1", b"data".to_vec()).unwrap();
+            collection.upsert("doc-2", b"data".to_vec()).unwrap();
+
+            // Verify count
+            assert_eq!(collection.count().unwrap(), 2);
+        }
+
+        #[test]
+        fn test_backend_flush() {
+            let (backend, _temp) = create_test_backend();
+
+            // Flush should succeed (even though it's a no-op for Ditto)
+            let result = backend.flush();
+            assert!(result.is_ok());
+        }
+
+        #[test]
+        fn test_multiple_collections() {
+            let (backend, _temp) = create_test_backend();
+
+            let collection1 = backend.collection("collection1");
+            let collection2 = backend.collection("collection2");
+
+            // Insert into different collections
+            collection1.upsert("doc-1", b"in collection1".to_vec()).unwrap();
+            collection2.upsert("doc-1", b"in collection2".to_vec()).unwrap();
+
+            // Verify isolation
+            let data1 = collection1.get("doc-1").unwrap().unwrap();
+            let data2 = collection2.get("doc-1").unwrap().unwrap();
+
+        assert_eq!(data1, b"in collection1".to_vec());
+        assert_eq!(data2, b"in collection2".to_vec());
+    }
 }
