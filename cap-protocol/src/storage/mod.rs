@@ -16,6 +16,8 @@ pub mod throttled_node_store;
 pub mod ttl;
 
 #[cfg(feature = "automerge-backend")]
+pub mod automerge_backend;
+#[cfg(feature = "automerge-backend")]
 pub mod automerge_conversion;
 #[cfg(feature = "automerge-backend")]
 pub mod automerge_store;
@@ -26,6 +28,8 @@ pub use node_store::NodeStore;
 pub use throttled_node_store::{ThrottleStats, ThrottledNodeStore};
 pub use ttl::{EvictionStrategy, OfflineRetentionPolicy, TtlConfig};
 
+#[cfg(feature = "automerge-backend")]
+pub use automerge_backend::AutomergeBackend;
 #[cfg(feature = "automerge-backend")]
 pub use automerge_store::AutomergeStore;
 
