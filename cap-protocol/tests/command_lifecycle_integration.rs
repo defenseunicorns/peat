@@ -16,7 +16,6 @@ use cap_schema::command::v1::{
     command_target::Scope, AckStatus, CommandAcknowledgment, CommandTarget, HierarchicalCommand,
 };
 use std::time::Duration;
-use tempfile::tempdir;
 use tokio::time::sleep;
 
 /// Helper to create a test DittoStore
@@ -47,10 +46,14 @@ async fn create_test_store(test_name: &str) -> DittoStore {
         })
         .expect("DITTO_SHARED_KEY required for test");
 
-    let temp_dir = tempdir().expect("Failed to create temp dir");
+    let persistence_dir =
+        std::path::PathBuf::from(format!("/tmp/cap-persistence-test-{}", test_name));
+    // Clean up any existing directory from previous failed runs
+    let _ = std::fs::remove_dir_all(&persistence_dir);
+
     let config = DittoConfig {
         app_id,
-        persistence_dir: temp_dir.path().join(test_name),
+        persistence_dir,
         shared_key,
         tcp_listen_port: None,
         tcp_connect_address: None,

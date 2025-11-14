@@ -1,7 +1,7 @@
-# E8 Network Simulator Comparison
+# Network Simulator Evaluation
 
-**Date**: 2025-11-05
-**Purpose**: Evaluate alternatives to raw Linux namespaces for E8 network simulation
+**Date**: November 2024
+**Purpose**: Evaluate network simulation alternatives for CAP Protocol validation
 **Context**: Shadow network simulator proved incompatible with Ditto SDK
 
 ---

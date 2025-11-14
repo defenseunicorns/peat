@@ -117,7 +117,7 @@ This directory contains technical disclosure documents for provisional patent ap
 - [ ] Update `PATENT_STRATEGY.md` with filing dates and application numbers
 - [ ] Update `../PATENT_PLEDGE.md` with application numbers and effective date
 - [ ] Publish Patent Pledge on website and GitHub
-- [ ] Open-source automerge-edge (now protected by provisional + pledge)
+- [ ] Open-source CAP Protocol (now protected by provisional + pledge)
 - [ ] Add "Patent Pending" + link to pledge in README files
 
 ### Timeline
@@ -125,7 +125,7 @@ This directory contains technical disclosure documents for provisional patent ap
 | Event | Date | Action |
 |-------|------|--------|
 | **Week 1** | This week | File provisionals (DIY or attorney) |
-| **Week 2** | After filing | Open-source automerge-edge |
+| **Week 2** | After filing | Open-source CAP Protocol |
 | **Month 1-12** | Throughout year | Collect evidence for utility decision |
 | **Month 11** | Oct 2025 | Schedule decision meeting |
 | **Month 12** | Nov 2025 | Decide: Convert to utility or abandon |
@@ -221,9 +221,9 @@ After filing provisionals, you can:
 
 1. **Review technical disclosures** (both provisional documents)
 2. **Decide filing approach** (DIY vs attorney)
-3. **File provisionals this week** (establishes priority date)
+3. **File provisionals** (establishes priority date)
 4. **Save filing receipts** (proof of priority date)
-5. **Open-source automerge-edge** (now protected)
+5. **Open-source CAP Protocol** (now protected)
 6. **Update PATENT_STRATEGY.md** with filing details
 
 ## Questions?
