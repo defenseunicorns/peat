@@ -2,7 +2,11 @@
 
 // Core trait abstractions (ADR-011 E11.2)
 pub mod backend;
+pub mod capabilities;
 pub mod traits;
+
+// Backend implementations (E11.2)
+pub mod ditto_backend;
 
 // Existing implementations
 pub mod cell_store;
@@ -27,6 +31,8 @@ pub use automerge_store::AutomergeStore;
 
 // Trait abstractions (E11.2)
 pub use backend::{create_storage_backend, StorageConfig};
+pub use capabilities::{CrdtCapable, SyncCapable, SyncStats, TypedCollection};
+pub use ditto_backend::DittoBackend;
 pub use traits::{Collection, DocumentPredicate, StorageBackend};
 
 // Legacy compatibility aliases
