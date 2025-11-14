@@ -1,5 +1,10 @@
 //! Storage abstractions and implementations
 
+// Core trait abstractions (ADR-011 E11.2)
+pub mod backend;
+pub mod traits;
+
+// Existing implementations
 pub mod cell_store;
 pub mod ditto_store;
 pub mod node_store;
@@ -19,6 +24,10 @@ pub use ttl::{EvictionStrategy, OfflineRetentionPolicy, TtlConfig};
 
 #[cfg(feature = "automerge-backend")]
 pub use automerge_store::AutomergeStore;
+
+// Trait abstractions (E11.2)
+pub use backend::{create_storage_backend, StorageConfig};
+pub use traits::{Collection, DocumentPredicate, StorageBackend};
 
 // Legacy compatibility aliases
 pub use cell_store::CellStore as SquadStore;
