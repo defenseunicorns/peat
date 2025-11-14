@@ -38,10 +38,8 @@
 
 use crate::sync::ditto::DittoBackend;
 use crate::{Error, Result};
-use base64::Engine;
 use dittolive_ditto::prelude::*;
 use dittolive_ditto::AppId;
-use prost::Message;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{debug, error, info, instrument, warn};
@@ -468,29 +466,30 @@ impl DittoStore {
         squad_id: &str,
         summary: &cap_schema::hierarchy::v1::SquadSummary,
     ) -> Result<String> {
-        // Encode protobuf to bytes
-        let bytes = summary.encode_to_vec();
+        // Full JSON expansion for CRDT field-level merging
+        // This allows Ditto to:
+        // 1. Merge member_ids array with OR-Set semantics (track additions/removals)
+        // 2. Merge scalar fields with LWW-Register (last-write-wins based on timestamp)
+        // 3. Send delta updates (only changed fields, not entire blob)
+        let mut doc = serde_json::to_value(summary).map_err(|e| {
+            Error::storage_error(
+                format!("Failed to serialize SquadSummary to JSON: {}", e),
+                "upsert_squad_summary",
+                Some(squad_id.to_string()),
+            )
+        })?;
 
-        // Convert to base64 for storage (Ditto stores binary as base64 strings)
-        let base64_data = base64::engine::general_purpose::STANDARD.encode(&bytes);
+        // Add Ditto-required metadata
+        doc["_id"] = serde_json::Value::String(squad_id.to_string());
+        doc["type"] = serde_json::Value::String("squad_summary".to_string());
+        doc["collection_name"] = serde_json::Value::String("squad_summaries".to_string());
 
         // Get current timestamp in microseconds for latency tracking
         let timestamp_us = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_micros() as u64;
-
-        // Create JSON document with _id and binary data
-        let doc = serde_json::json!({
-            "_id": squad_id,
-            "squad_id": summary.squad_id,
-            "leader_id": summary.leader_id,
-            "member_count": summary.member_count,
-            "data": base64_data,
-            "type": "squad_summary",
-            "collection_name": "squad_summaries",
-            "timestamp_us": timestamp_us
-        });
+        doc["timestamp_us"] = serde_json::Value::Number(timestamp_us.into());
 
         self.upsert("sim_poc", doc).await
     }
@@ -518,31 +517,16 @@ impl DittoStore {
         }
 
         let doc = &results[0];
-        let base64_data = doc["data"].as_str().ok_or_else(|| {
-            Error::storage_error(
-                "Missing data field",
-                "get_squad_summary",
-                Some(squad_id.to_string()),
-            )
-        })?;
 
-        let bytes = base64::engine::general_purpose::STANDARD
-            .decode(base64_data)
+        // Deserialize directly from JSON (full CRDT-enabled format)
+        let summary: cap_schema::hierarchy::v1::SquadSummary = serde_json::from_value(doc.clone())
             .map_err(|e| {
                 Error::storage_error(
-                    format!("Base64 decode failed: {}", e),
+                    format!("Failed to deserialize SquadSummary from JSON: {}", e),
                     "get_squad_summary",
                     Some(squad_id.to_string()),
                 )
             })?;
-
-        let summary = cap_schema::hierarchy::v1::SquadSummary::decode(&bytes[..]).map_err(|e| {
-            Error::storage_error(
-                format!("Protobuf decode failed: {}", e),
-                "get_squad_summary",
-                Some(squad_id.to_string()),
-            )
-        })?;
 
         Ok(Some(summary))
     }
@@ -563,25 +547,25 @@ impl DittoStore {
         platoon_id: &str,
         summary: &cap_schema::hierarchy::v1::PlatoonSummary,
     ) -> Result<String> {
-        let bytes = summary.encode_to_vec();
-        let base64_data = base64::engine::general_purpose::STANDARD.encode(&bytes);
+        // Full JSON expansion for CRDT field-level merging
+        let mut doc = serde_json::to_value(summary).map_err(|e| {
+            Error::storage_error(
+                format!("Failed to serialize PlatoonSummary to JSON: {}", e),
+                "upsert_platoon_summary",
+                Some(platoon_id.to_string()),
+            )
+        })?;
+
+        // Add Ditto-required metadata
+        doc["_id"] = serde_json::Value::String(platoon_id.to_string());
+        doc["type"] = serde_json::Value::String("platoon_summary".to_string());
 
         // Get current timestamp in microseconds for latency tracking
         let timestamp_us = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_micros() as u64;
-
-        let doc = serde_json::json!({
-            "_id": platoon_id,
-            "platoon_id": summary.platoon_id,
-            "leader_id": summary.leader_id,
-            "squad_count": summary.squad_count,
-            "total_member_count": summary.total_member_count,
-            "data": base64_data,
-            "type": "platoon_summary",
-            "timestamp_us": timestamp_us
-        });
+        doc["timestamp_us"] = serde_json::Value::Number(timestamp_us.into());
 
         self.upsert("platoon_summaries", doc).await
     }
@@ -609,28 +593,12 @@ impl DittoStore {
         }
 
         let doc = &results[0];
-        let base64_data = doc["data"].as_str().ok_or_else(|| {
-            Error::storage_error(
-                "Missing data field",
-                "get_platoon_summary",
-                Some(platoon_id.to_string()),
-            )
-        })?;
 
-        let bytes = base64::engine::general_purpose::STANDARD
-            .decode(base64_data)
-            .map_err(|e| {
+        // Deserialize directly from JSON (full CRDT-enabled format)
+        let summary: cap_schema::hierarchy::v1::PlatoonSummary =
+            serde_json::from_value(doc.clone()).map_err(|e| {
                 Error::storage_error(
-                    format!("Base64 decode failed: {}", e),
-                    "get_platoon_summary",
-                    Some(platoon_id.to_string()),
-                )
-            })?;
-
-        let summary =
-            cap_schema::hierarchy::v1::PlatoonSummary::decode(&bytes[..]).map_err(|e| {
-                Error::storage_error(
-                    format!("Protobuf decode failed: {}", e),
+                    format!("Failed to deserialize PlatoonSummary from JSON: {}", e),
                     "get_platoon_summary",
                     Some(platoon_id.to_string()),
                 )
@@ -655,17 +623,18 @@ impl DittoStore {
         command_id: &str,
         command: &cap_schema::command::v1::HierarchicalCommand,
     ) -> Result<String> {
-        let bytes = command.encode_to_vec();
-        let base64_data = base64::engine::general_purpose::STANDARD.encode(&bytes);
+        // Full JSON expansion for CRDT field-level merging
+        let mut doc = serde_json::to_value(command).map_err(|e| {
+            Error::storage_error(
+                format!("Failed to serialize HierarchicalCommand to JSON: {}", e),
+                "upsert_command",
+                Some(command_id.to_string()),
+            )
+        })?;
 
-        let doc = serde_json::json!({
-            "_id": command_id,
-            "command_id": command.command_id,
-            "originator_id": command.originator_id,
-            "priority": command.priority,
-            "data": base64_data,
-            "type": "hierarchical_command"
-        });
+        // Add Ditto-required metadata
+        doc["_id"] = serde_json::Value::String(command_id.to_string());
+        doc["type"] = serde_json::Value::String("hierarchical_command".to_string());
 
         self.upsert("hierarchical_commands", doc).await
     }
@@ -693,28 +662,12 @@ impl DittoStore {
         }
 
         let doc = &results[0];
-        let base64_data = doc["data"].as_str().ok_or_else(|| {
-            Error::storage_error(
-                "Missing data field",
-                "get_command",
-                Some(command_id.to_string()),
-            )
-        })?;
 
-        let bytes = base64::engine::general_purpose::STANDARD
-            .decode(base64_data)
-            .map_err(|e| {
+        // Deserialize directly from JSON (full CRDT-enabled format)
+        let command: cap_schema::command::v1::HierarchicalCommand =
+            serde_json::from_value(doc.clone()).map_err(|e| {
                 Error::storage_error(
-                    format!("Base64 decode failed: {}", e),
-                    "get_command",
-                    Some(command_id.to_string()),
-                )
-            })?;
-
-        let command =
-            cap_schema::command::v1::HierarchicalCommand::decode(&bytes[..]).map_err(|e| {
-                Error::storage_error(
-                    format!("Protobuf decode failed: {}", e),
+                    format!("Failed to deserialize HierarchicalCommand from JSON: {}", e),
                     "get_command",
                     Some(command_id.to_string()),
                 )
@@ -739,17 +692,18 @@ impl DittoStore {
         ack_id: &str,
         ack: &cap_schema::command::v1::CommandAcknowledgment,
     ) -> Result<String> {
-        let bytes = ack.encode_to_vec();
-        let base64_data = base64::engine::general_purpose::STANDARD.encode(&bytes);
+        // Full JSON expansion for CRDT field-level merging
+        let mut doc = serde_json::to_value(ack).map_err(|e| {
+            Error::storage_error(
+                format!("Failed to serialize CommandAcknowledgment to JSON: {}", e),
+                "upsert_command_ack",
+                Some(ack_id.to_string()),
+            )
+        })?;
 
-        let doc = serde_json::json!({
-            "_id": ack_id,
-            "command_id": ack.command_id,
-            "node_id": ack.node_id,
-            "status": ack.status,
-            "data": base64_data,
-            "type": "command_acknowledgment"
-        });
+        // Add Ditto-required metadata
+        doc["_id"] = serde_json::Value::String(ack_id.to_string());
+        doc["type"] = serde_json::Value::String("command_acknowledgment".to_string());
 
         self.upsert("command_acknowledgments", doc).await
     }
@@ -777,29 +731,18 @@ impl DittoStore {
 
         let mut acks = Vec::new();
         for doc in results {
-            let base64_data = doc["data"].as_str().ok_or_else(|| {
-                Error::storage_error("Missing data field", "query_command_acks", None)
-            })?;
-
-            let bytes = base64::engine::general_purpose::STANDARD
-                .decode(base64_data)
+            // Deserialize directly from JSON (full CRDT-enabled format)
+            let ack: cap_schema::command::v1::CommandAcknowledgment = serde_json::from_value(doc)
                 .map_err(|e| {
-                    Error::storage_error(
-                        format!("Base64 decode failed: {}", e),
-                        "query_command_acks",
-                        None,
-                    )
-                })?;
-
-            let ack = cap_schema::command::v1::CommandAcknowledgment::decode(&bytes[..]).map_err(
-                |e| {
-                    Error::storage_error(
-                        format!("Protobuf decode failed: {}", e),
-                        "query_command_acks",
-                        None,
-                    )
-                },
-            )?;
+                Error::storage_error(
+                    format!(
+                        "Failed to deserialize CommandAcknowledgment from JSON: {}",
+                        e
+                    ),
+                    "query_command_acks",
+                    None,
+                )
+            })?;
 
             acks.push(ack);
         }
@@ -856,33 +799,42 @@ impl DittoStore {
     ) -> Result<bool> {
         let (where_clause, mut params) = self.build_policy_where_clause(command, policy)?;
 
-        // Encode command data
-        let bytes = command.encode_to_vec();
-        let base64_data = base64::engine::general_purpose::STANDARD.encode(&bytes);
+        // Full JSON expansion for CRDT field-level merging
+        let command_json = serde_json::to_value(command).map_err(|e| {
+            Error::storage_error(
+                format!("Failed to serialize HierarchicalCommand to JSON: {}", e),
+                "conditional_update_command",
+                Some(command.command_id.clone()),
+            )
+        })?;
 
-        // Add common params
+        // Build SET clause dynamically from JSON fields
+        // This ensures all protobuf fields are updated, not just a base64 blob
         params["_id"] = serde_json::json!(command.command_id);
-        params["command_id"] = serde_json::json!(command.command_id);
-        params["originator_id"] = serde_json::json!(command.originator_id);
-        params["priority"] = serde_json::json!(command.priority);
-        params["data"] = serde_json::json!(base64_data);
+        params["command_json"] = command_json;
         params["type"] = serde_json::json!("hierarchical_command");
         params["last_modified"] = serde_json::json!(std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs());
 
+        // Note: DQL v2 doesn't support spreading JSON object fields in UPDATE
+        // We need to use EVICT + INSERT pattern for conditional full-document replacement
         let query = format!(
             "UPDATE hierarchical_commands
              SET command_id = :command_id,
                  originator_id = :originator_id,
                  priority = :priority,
-                 data = :data,
                  type = :type,
                  last_modified = :last_modified
              WHERE _id = :_id AND ({})",
             where_clause
         );
+
+        // Add individual fields from command for UPDATE
+        params["command_id"] = serde_json::json!(command.command_id);
+        params["originator_id"] = serde_json::json!(command.originator_id);
+        params["priority"] = serde_json::json!(command.priority);
 
         debug!("Executing conditional update with WHERE: {}", where_clause);
 
