@@ -18,27 +18,57 @@
 //! Ditto SDK
 //! ```
 //!
-//! # Data Format
+//! # Data Format and CRDT Limitations
 //!
-//! The trait abstraction uses raw bytes (Vec<u8>) for documents, typically
-//! serialized protobuf messages. DittoStore stores these as base64-encoded
-//! strings in JSON documents with metadata fields.
+//! **IMPORTANT**: This generic trait interface uses `Vec<u8>` which **DEFEATS Ditto's CRDT benefits**.
 //!
-//! **Conversion**:
+//! The trait stores bytes as base64-encoded blobs, which means:
+//! - ❌ No field-level merging (full blob replacement on conflicts)
+//! - ❌ No delta sync (entire document sent on any change)
+//! - ❌ No OR-Set/LWW-Register semantics
+//!
+//! **For CRDT benefits, use `DittoStore` methods directly** (not this trait):
+//! - `upsert_squad_summary()` - Full JSON expansion with CRDT types
+//! - `get_squad_summary()` - Type-safe retrieval
+//! - See `ditto_store.rs` for type-specific methods
+//!
+//! **Conversion** (current base64 approach):
 //! - `upsert(bytes)` → encode to base64 → store in JSON {"_id": ..., "data": base64}
 //! - `get()` → retrieve JSON → decode base64 → return bytes
 //!
-//! # Example
+//! **Future Work**: See E11.2_STORAGE_SERIALIZATION_ANALYSIS.md Option 1 for typed trait design.
+//!
+//! # Usage Examples
+//!
+//! ## ❌ DON'T: Use trait for CRDT-critical data
 //!
 //! ```ignore
-//! use cap_protocol::storage::{StorageBackend, create_storage_backend, StorageConfig};
-//!
-//! let config = StorageConfig::default(); // Uses Ditto
-//! let storage = create_storage_backend(&config)?;
-//!
-//! let cells = storage.collection("cells");
-//! cells.upsert("cell-1", protobuf_bytes)?;
+//! // BAD: Generic trait defeats CRDT benefits
+//! let backend = DittoBackend::new(store);
+//! let collection = backend.collection("squad_summaries");
+//! let bytes = summary.encode_to_vec(); // Protobuf bytes
+//! collection.upsert("squad-1", bytes)?; // ❌ Stored as base64 blob
 //! ```
+//!
+//! ## ✅ DO: Use DittoStore directly for CRDT benefits
+//!
+//! ```ignore
+//! // GOOD: Type-specific methods use JSON expansion
+//! let store = DittoStore::new(config)?;
+//! store.upsert_squad_summary("squad-1", &summary).await?; // ✅ Full JSON expansion
+//! ```
+//!
+//! ## When to use each approach:
+//!
+//! **Use `DittoStore` directly when:**
+//! - Data requires CRDT conflict resolution (squad/platoon summaries)
+//! - Delta sync is important for bandwidth efficiency
+//! - Field-level merging is needed (member lists, positions)
+//!
+//! **Use trait interface when:**
+//! - You need backend-agnostic code (can swap Ditto/Automerge/RocksDB)
+//! - Testing with mock implementations
+//! - CRDT benefits are not critical for the data type
 
 use super::ditto_store::DittoStore;
 use super::traits::{Collection as CollectionTrait, DocumentPredicate, StorageBackend};
