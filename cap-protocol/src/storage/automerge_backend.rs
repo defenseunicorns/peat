@@ -60,13 +60,23 @@
 //! | Backend-agnostic API | ✅                   | ✅                         | ✅                         |
 
 #[cfg(feature = "automerge-backend")]
+use super::automerge_conversion::{automerge_to_message, message_to_automerge};
+#[cfg(feature = "automerge-backend")]
 use super::automerge_store::AutomergeStore;
+#[cfg(feature = "automerge-backend")]
+use super::capabilities::{CrdtCapable, TypedCollection};
 #[cfg(feature = "automerge-backend")]
 use super::traits::{Collection, StorageBackend};
 #[cfg(feature = "automerge-backend")]
 use anyhow::Result;
 #[cfg(feature = "automerge-backend")]
+use prost::Message as ProstMessage;
+#[cfg(feature = "automerge-backend")]
+use serde::{de::DeserializeOwned, Serialize};
+#[cfg(feature = "automerge-backend")]
 use std::collections::HashMap;
+#[cfg(feature = "automerge-backend")]
+use std::marker::PhantomData;
 #[cfg(feature = "automerge-backend")]
 use std::sync::{Arc, RwLock};
 
@@ -161,6 +171,101 @@ impl StorageBackend for AutomergeBackend {
     }
 }
 
+/// Typed collection for Automerge backend with CRDT semantics
+///
+/// Stores protobuf messages as Automerge CRDT documents with field-level merging.
+#[cfg(feature = "automerge-backend")]
+pub struct AutomergeTypedCollection<M> {
+    store: Arc<AutomergeStore>,
+    prefix: String,
+    _phantom: PhantomData<M>,
+}
+
+#[cfg(feature = "automerge-backend")]
+impl<M> AutomergeTypedCollection<M>
+where
+    M: ProstMessage + Serialize + DeserializeOwned + Default + Clone,
+{
+    fn new(store: Arc<AutomergeStore>, collection_name: &str) -> Self {
+        Self {
+            store,
+            prefix: format!("{}:", collection_name),
+            _phantom: PhantomData,
+        }
+    }
+
+    fn prefixed_key(&self, doc_id: &str) -> String {
+        format!("{}{}", self.prefix, doc_id)
+    }
+
+    fn strip_prefix<'a>(&self, key: &'a str) -> Option<&'a str> {
+        key.strip_prefix(&self.prefix)
+    }
+}
+
+#[cfg(feature = "automerge-backend")]
+impl<M> TypedCollection<M> for AutomergeTypedCollection<M>
+where
+    M: ProstMessage + Serialize + DeserializeOwned + Default + Clone,
+{
+    fn upsert(&self, doc_id: &str, message: &M) -> Result<()> {
+        // Convert message to Automerge document with CRDT semantics
+        let doc = message_to_automerge(message)?;
+        self.store.put(&self.prefixed_key(doc_id), &doc)
+    }
+
+    fn get(&self, doc_id: &str) -> Result<Option<M>> {
+        match self.store.get(&self.prefixed_key(doc_id))? {
+            Some(doc) => {
+                let message = automerge_to_message(&doc)?;
+                Ok(Some(message))
+            }
+            None => Ok(None),
+        }
+    }
+
+    fn delete(&self, doc_id: &str) -> Result<()> {
+        self.store.delete(&self.prefixed_key(doc_id))
+    }
+
+    fn scan(&self) -> Result<Vec<(String, M)>> {
+        let docs = self.store.scan_prefix(&self.prefix)?;
+        let mut results = Vec::new();
+
+        for (key, doc) in docs {
+            if let Some(doc_id) = self.strip_prefix(&key) {
+                let message = automerge_to_message(&doc)?;
+                results.push((doc_id.to_string(), message));
+            }
+        }
+
+        Ok(results)
+    }
+
+    fn find(&self, predicate: Box<dyn Fn(&M) -> bool + Send>) -> Result<Vec<(String, M)>> {
+        let all_docs = self.scan()?;
+        Ok(all_docs
+            .into_iter()
+            .filter(|(_, msg)| predicate(msg))
+            .collect())
+    }
+
+    fn count(&self) -> Result<usize> {
+        Ok(self.scan()?.len())
+    }
+}
+
+/// Implement CrdtCapable trait to provide typed collections with CRDT semantics
+#[cfg(feature = "automerge-backend")]
+impl CrdtCapable for AutomergeBackend {
+    fn typed_collection<M>(&self, name: &str) -> Arc<dyn TypedCollection<M>>
+    where
+        M: ProstMessage + Serialize + DeserializeOwned + Default + Clone + 'static,
+    {
+        Arc::new(AutomergeTypedCollection::new(Arc::clone(&self.store), name))
+    }
+}
+
 #[cfg(all(test, feature = "automerge-backend"))]
 mod tests {
     use super::*;
@@ -231,5 +336,133 @@ mod tests {
 
         // Close should succeed
         assert!(backend.close().is_ok());
+    }
+
+    // Phase 2: CRDT Integration Tests
+    use cap_schema::common::v1::Position;
+    use cap_schema::node::v1::NodeState;
+
+    #[test]
+    fn test_typed_collection_crdt_upsert_get() {
+        use crate::storage::capabilities::CrdtCapable;
+
+        let (backend, _temp) = create_test_backend();
+        let nodes: Arc<dyn TypedCollection<NodeState>> = backend.typed_collection("nodes");
+
+        let node = NodeState {
+            position: Some(Position {
+                latitude: 37.7749,
+                longitude: -122.4194,
+                altitude: 100.0,
+            }),
+            fuel_minutes: 60,
+            health: 1,
+            phase: 1,
+            cell_id: Some("cell-1".to_string()),
+            zone_id: None,
+            timestamp: None,
+        };
+
+        nodes.upsert("node-1", &node).unwrap();
+        let retrieved = nodes.get("node-1").unwrap().unwrap();
+
+        assert_eq!(retrieved.fuel_minutes, 60);
+        assert_eq!(retrieved.cell_id, Some("cell-1".to_string()));
+        assert!(retrieved.position.is_some());
+    }
+
+    #[test]
+    fn test_typed_collection_crdt_scan() {
+        use crate::storage::capabilities::CrdtCapable;
+
+        let (backend, _temp) = create_test_backend();
+        let nodes: Arc<dyn TypedCollection<NodeState>> = backend.typed_collection("nodes");
+
+        let node1 = NodeState {
+            fuel_minutes: 60,
+            health: 1,
+            phase: 1,
+            cell_id: Some("cell-1".to_string()),
+            ..Default::default()
+        };
+
+        let node2 = NodeState {
+            fuel_minutes: 45,
+            health: 1,
+            phase: 2,
+            cell_id: Some("cell-2".to_string()),
+            ..Default::default()
+        };
+
+        nodes.upsert("node-1", &node1).unwrap();
+        nodes.upsert("node-2", &node2).unwrap();
+
+        let results = nodes.scan().unwrap();
+        assert_eq!(results.len(), 2);
+
+        let ids: Vec<String> = results.iter().map(|(id, _)| id.clone()).collect();
+        assert!(ids.contains(&"node-1".to_string()));
+        assert!(ids.contains(&"node-2".to_string()));
+    }
+
+    #[test]
+    fn test_typed_collection_crdt_find_with_predicate() {
+        use crate::storage::capabilities::CrdtCapable;
+
+        let (backend, _temp) = create_test_backend();
+        let nodes: Arc<dyn TypedCollection<NodeState>> = backend.typed_collection("nodes");
+
+        let node1 = NodeState {
+            fuel_minutes: 60,
+            health: 1,
+            phase: 1,
+            cell_id: Some("cell-1".to_string()),
+            ..Default::default()
+        };
+
+        let node2 = NodeState {
+            fuel_minutes: 30,
+            health: 1,
+            phase: 1,
+            cell_id: Some("cell-1".to_string()),
+            ..Default::default()
+        };
+
+        let node3 = NodeState {
+            fuel_minutes: 45,
+            health: 1,
+            phase: 1,
+            cell_id: Some("cell-2".to_string()),
+            ..Default::default()
+        };
+
+        nodes.upsert("node-1", &node1).unwrap();
+        nodes.upsert("node-2", &node2).unwrap();
+        nodes.upsert("node-3", &node3).unwrap();
+
+        // Find nodes with low fuel
+        let low_fuel_nodes = nodes.find(Box::new(|node| node.fuel_minutes < 40)).unwrap();
+
+        assert_eq!(low_fuel_nodes.len(), 1);
+        assert_eq!(low_fuel_nodes[0].1.fuel_minutes, 30);
+    }
+
+    #[test]
+    fn test_typed_collection_delete() {
+        use crate::storage::capabilities::CrdtCapable;
+
+        let (backend, _temp) = create_test_backend();
+        let nodes: Arc<dyn TypedCollection<NodeState>> = backend.typed_collection("nodes");
+
+        let node = NodeState {
+            fuel_minutes: 60,
+            ..Default::default()
+        };
+
+        nodes.upsert("node-1", &node).unwrap();
+        assert!(nodes.get("node-1").unwrap().is_some());
+
+        nodes.delete("node-1").unwrap();
+        assert!(nodes.get("node-1").unwrap().is_none());
     }
 }

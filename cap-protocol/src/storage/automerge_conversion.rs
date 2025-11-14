@@ -23,6 +23,8 @@ use cap_schema::cell::v1::CellState;
 #[cfg(feature = "automerge-backend")]
 use cap_schema::node::v1::{NodeConfig, NodeState};
 #[cfg(feature = "automerge-backend")]
+use serde::{de::DeserializeOwned, Serialize};
+#[cfg(feature = "automerge-backend")]
 use serde_json;
 
 /// Convert CellState protobuf to Automerge document
@@ -111,6 +113,41 @@ pub fn automerge_to_node_state(doc: &Automerge) -> Result<NodeState> {
     let node: NodeState = serde_json::from_value(json)
         .map_err(|e| anyhow::anyhow!("Failed to deserialize JSON to NodeState: {}", e))?;
     Ok(node)
+}
+
+/// Generic: Convert any serializable message to Automerge document
+///
+/// This is the generic version used by TypedCollection<M>.
+/// Works with any type that implements Serialize.
+#[cfg(feature = "automerge-backend")]
+pub fn message_to_automerge<M: Serialize>(message: &M) -> Result<Automerge> {
+    let json = serde_json::to_value(message)
+        .map_err(|e| anyhow::anyhow!("Failed to serialize message to JSON: {}", e))?;
+
+    let mut doc = Automerge::new();
+
+    match doc.transact(|tx| {
+        populate_from_json(tx, ROOT, &json)?;
+        Ok::<(), automerge::AutomergeError>(())
+    }) {
+        Ok(_) => Ok(doc),
+        Err(e) => Err(anyhow::anyhow!(
+            "Failed to populate Automerge document: {:?}",
+            e
+        )),
+    }
+}
+
+/// Generic: Convert Automerge document to any deserializable message
+///
+/// This is the generic version used by TypedCollection<M>.
+/// Works with any type that implements DeserializeOwned.
+#[cfg(feature = "automerge-backend")]
+pub fn automerge_to_message<M: DeserializeOwned>(doc: &Automerge) -> Result<M> {
+    let json = extract_to_json(doc, ROOT)?;
+    let message: M = serde_json::from_value(json)
+        .map_err(|e| anyhow::anyhow!("Failed to deserialize JSON to message: {}", e))?;
+    Ok(message)
 }
 
 /// Helper: Populate Automerge object from JSON value
