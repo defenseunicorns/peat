@@ -86,10 +86,14 @@ enum MetricsEvent {
     DocumentReceived {
         node_id: String,
         doc_id: String,
-        inserted_at_us: u128, // From document
-        received_at_us: u128, // Local time
-        latency_us: u128,     // Difference
+        created_at_us: u128,      // When document was first created
+        last_modified_us: u128,   // When document was last updated
+        received_at_us: u128,     // When we received it
+        latency_us: u128,         // Propagation time
         latency_ms: f64,
+        version: u64,             // Document version
+        is_first_reception: bool, // true = creation sync, false = update/recovery sync
+        latency_type: String,     // "creation", "update", or "recovery"
     },
     MessageSent {
         node_id: String,
@@ -289,28 +293,49 @@ async fn platoon_leader_aggregation_loop(
                             let received_at_us = now_micros();
                             if let Some(doc_id) = &doc.id {
                                 if doc_id.starts_with("squad-") {
-                                    // Extract timestamp for latency calculation
-                                    if let Some(ts_value) = doc.get("timestamp_us") {
-                                        let inserted_at_us = ts_value.as_u64().unwrap_or(0) as u128;
-                                        if inserted_at_us > 0 {
-                                            let latency_us =
-                                                received_at_us.saturating_sub(inserted_at_us);
-                                            let latency_ms = latency_us as f64 / 1000.0;
+                                    // Extract timestamps with proper delta sync semantics
+                                    let created_at_us = if let Some(ts) = doc.get("created_at_us") {
+                                        ts.as_u64().unwrap_or(0) as u128
+                                    } else if let Some(ts) = doc.get("timestamp_us") {
+                                        ts.as_u64().unwrap_or(0) as u128
+                                    } else {
+                                        0
+                                    };
 
-                                            println!(
-                                                "[{}] ✓ Squad summary received (initial): {} (latency: {:.3}ms)",
-                                                node_id, doc_id, latency_ms
-                                            );
+                                    let last_modified_us = if let Some(ts) = doc.get("last_modified_us") {
+                                        ts.as_u64().unwrap_or(0) as u128
+                                    } else {
+                                        created_at_us
+                                    };
 
-                                            log_metrics(&MetricsEvent::DocumentReceived {
-                                                node_id: node_id.to_string(),
-                                                doc_id: doc_id.to_string(),
-                                                inserted_at_us,
-                                                received_at_us,
-                                                latency_us,
-                                                latency_ms,
-                                            });
-                                        }
+                                    let version = if let Some(v) = doc.get("version") {
+                                        v.as_u64().unwrap_or(1)
+                                    } else {
+                                        1
+                                    };
+
+                                    if created_at_us > 0 {
+                                        // This is Initial event, so it's always first reception
+                                        let latency_us = received_at_us.saturating_sub(created_at_us);
+                                        let latency_ms = latency_us as f64 / 1000.0;
+
+                                        println!(
+                                            "[{}] ✓ Squad summary received (initial): {} (latency: {:.3}ms)",
+                                            node_id, doc_id, latency_ms
+                                        );
+
+                                        log_metrics(&MetricsEvent::DocumentReceived {
+                                            node_id: node_id.to_string(),
+                                            doc_id: doc_id.to_string(),
+                                            created_at_us,
+                                            last_modified_us,
+                                            received_at_us,
+                                            latency_us,
+                                            latency_ms,
+                                            version,
+                                            is_first_reception: true,  // Initial event is always first reception
+                                            latency_type: "creation".to_string(),
+                                        });
                                     }
                                 }
                             }
@@ -321,28 +346,49 @@ async fn platoon_leader_aggregation_loop(
                         let received_at_us = now_micros();
                         if let Some(doc_id) = &document.id {
                             if doc_id.starts_with("squad-") {
-                                // Extract timestamp for latency calculation
-                                if let Some(ts_value) = document.get("timestamp_us") {
-                                    let inserted_at_us = ts_value.as_u64().unwrap_or(0) as u128;
-                                    if inserted_at_us > 0 {
-                                        let latency_us =
-                                            received_at_us.saturating_sub(inserted_at_us);
-                                        let latency_ms = latency_us as f64 / 1000.0;
+                                // Extract timestamps with proper delta sync semantics
+                                let created_at_us = if let Some(ts) = document.get("created_at_us") {
+                                    ts.as_u64().unwrap_or(0) as u128
+                                } else if let Some(ts) = document.get("timestamp_us") {
+                                    ts.as_u64().unwrap_or(0) as u128
+                                } else {
+                                    0
+                                };
 
-                                        println!(
-                                            "[{}] ✓ Squad summary received: {} (latency: {:.3}ms)",
-                                            node_id, doc_id, latency_ms
-                                        );
+                                let last_modified_us = if let Some(ts) = document.get("last_modified_us") {
+                                    ts.as_u64().unwrap_or(0) as u128
+                                } else {
+                                    created_at_us
+                                };
 
-                                        log_metrics(&MetricsEvent::DocumentReceived {
-                                            node_id: node_id.to_string(),
-                                            doc_id: doc_id.to_string(),
-                                            inserted_at_us,
-                                            received_at_us,
-                                            latency_us,
-                                            latency_ms,
-                                        });
-                                    }
+                                let version = if let Some(v) = document.get("version") {
+                                    v.as_u64().unwrap_or(1)
+                                } else {
+                                    1
+                                };
+
+                                if created_at_us > 0 {
+                                    // Assume update since this is ChangeEvent::Updated
+                                    let latency_us = received_at_us.saturating_sub(last_modified_us);
+                                    let latency_ms = latency_us as f64 / 1000.0;
+
+                                    println!(
+                                        "[{}] ✓ Squad summary received: {} (latency: {:.3}ms)",
+                                        node_id, doc_id, latency_ms
+                                    );
+
+                                    log_metrics(&MetricsEvent::DocumentReceived {
+                                        node_id: node_id.to_string(),
+                                        doc_id: doc_id.to_string(),
+                                        created_at_us,
+                                        last_modified_us,
+                                        received_at_us,
+                                        latency_us,
+                                        latency_ms,
+                                        version,
+                                        is_first_reception: false,  // This is an update event
+                                        latency_type: "update".to_string(),
+                                    });
                                 }
                             }
                         }
@@ -1069,18 +1115,48 @@ async fn process_document(
     // Extract document ID
     let doc_id = doc.id.as_ref().ok_or("Document missing ID")?;
 
-    // Extract timestamp
-    let inserted_at_us = if let Some(ts_value) = doc.get("timestamp_us") {
-        ts_value.as_u64().unwrap_or(0) as u128
+    // Extract timestamps with proper delta sync semantics
+    let created_at_us = if let Some(ts) = doc.get("created_at_us") {
+        ts.as_u64().unwrap_or(0) as u128
     } else {
-        0
+        // Fallback to old timestamp_us for backwards compatibility
+        if let Some(ts) = doc.get("timestamp_us") {
+            ts.as_u64().unwrap_or(0) as u128
+        } else {
+            0
+        }
     };
 
-    let latency_us = if inserted_at_us > 0 {
-        received_at_us.saturating_sub(inserted_at_us)
+    let last_modified_us = if let Some(ts) = doc.get("last_modified_us") {
+        ts.as_u64().unwrap_or(0) as u128
     } else {
-        0
+        created_at_us // Fallback
     };
+
+    let version = if let Some(v) = doc.get("version") {
+        v.as_u64().unwrap_or(1)
+    } else {
+        1
+    };
+
+    // Track which documents we've seen to distinguish first reception from updates
+    let is_first_reception = !test_doc_timestamps.contains(&created_at_us);
+
+    // Calculate appropriate latency based on context
+    let (latency_us, latency_type) = if is_first_reception {
+        // First reception: measure from creation
+        (
+            received_at_us.saturating_sub(created_at_us),
+            "creation".to_string(),
+        )
+    } else {
+        // Subsequent reception (update or recovery): measure from last modification
+        (
+            received_at_us.saturating_sub(last_modified_us),
+            "update".to_string(),
+        )
+    };
+
     let latency_ms = latency_us as f64 / 1000.0;
 
     // Check if this is a periodic update document
@@ -1102,10 +1178,14 @@ async fn process_document(
                 log_metrics(&MetricsEvent::DocumentReceived {
                     node_id: node_id.to_string(),
                     doc_id: format!("{}_msg{}", doc_id, msg_num),
-                    inserted_at_us,
+                    created_at_us,
+                    last_modified_us,
                     received_at_us,
                     latency_us,
                     latency_ms,
+                    version,
+                    is_first_reception,
+                    latency_type: latency_type.clone(),
                 });
             }
         }
@@ -1113,8 +1193,8 @@ async fn process_document(
     // Check if this is the test document
     else if doc_id == "sim_test_001" {
         // Only log if this is a new insertion we haven't seen (prevents duplicate logging on re-insertions)
-        if inserted_at_us > 0 && !test_doc_timestamps.contains(&inserted_at_us) {
-            test_doc_timestamps.insert(inserted_at_us);
+        if created_at_us > 0 && !test_doc_timestamps.contains(&created_at_us) {
+            test_doc_timestamps.insert(created_at_us);
 
             println!(
                 "[{}] ✓ Test document received (latency: {:.3}ms)",
@@ -1130,10 +1210,14 @@ async fn process_document(
                     log_metrics(&MetricsEvent::DocumentReceived {
                         node_id: node_id.to_string(),
                         doc_id: "sim_test_001".to_string(),
-                        inserted_at_us,
+                        created_at_us,
+                        last_modified_us,
                         received_at_us,
                         latency_us,
                         latency_ms,
+                        version,
+                        is_first_reception,
+                        latency_type: latency_type.clone(),
                     });
 
                     // Check if acknowledgment is required
@@ -1223,10 +1307,14 @@ async fn process_document(
         log_metrics(&MetricsEvent::DocumentReceived {
             node_id: node_id.to_string(),
             doc_id: doc_id.to_string(),
-            inserted_at_us,
+            created_at_us,
+            last_modified_us,
             received_at_us,
             latency_us,
             latency_ms,
+            version,
+            is_first_reception,
+            latency_type: latency_type.clone(),
         });
     }
 
