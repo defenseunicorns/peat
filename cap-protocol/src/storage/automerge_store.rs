@@ -16,15 +16,25 @@ use std::num::NonZeroUsize;
 use std::path::Path;
 #[cfg(feature = "automerge-backend")]
 use std::sync::{Arc, RwLock};
+#[cfg(feature = "automerge-backend")]
+use tokio::sync::mpsc;
 
 #[cfg(feature = "automerge-backend")]
 use anyhow::{Context, Result};
 
 /// Storage layer for Automerge documents with RocksDB persistence
+///
+/// # Change Notifications (Phase 6.3)
+///
+/// The store emits change notifications when documents are modified via `put()`.
+/// Subscribers can listen for these notifications to trigger automatic sync.
 #[cfg(feature = "automerge-backend")]
 pub struct AutomergeStore {
     db: Arc<DB>,
     cache: Arc<RwLock<LruCache<String, Automerge>>>,
+    /// Channel for notifying of document changes (Phase 6.3)
+    change_tx: mpsc::UnboundedSender<String>,
+    change_rx: Arc<RwLock<Option<mpsc::UnboundedReceiver<String>>>>,
 }
 
 #[cfg(feature = "automerge-backend")]
@@ -39,13 +49,23 @@ impl AutomergeStore {
         let db = DB::open(&opts, path).context("Failed to open RocksDB")?;
         let cache = LruCache::new(NonZeroUsize::new(1000).unwrap());
 
+        // Create change notification channel
+        let (change_tx, change_rx) = mpsc::unbounded_channel();
+
         Ok(Self {
             db: Arc::new(db),
             cache: Arc::new(RwLock::new(cache)),
+            change_tx,
+            change_rx: Arc::new(RwLock::new(Some(change_rx))),
         })
     }
 
     /// Save an Automerge document
+    ///
+    /// # Change Notifications (Phase 6.3)
+    ///
+    /// This method emits a change notification after successfully persisting the document.
+    /// Subscribers will receive the document key to trigger automatic sync.
     pub fn put(&self, key: &str, doc: &Automerge) -> Result<()> {
         let bytes = doc.save();
         self.db
@@ -56,6 +76,10 @@ impl AutomergeStore {
             .write()
             .unwrap()
             .put(key.to_string(), doc.clone());
+
+        // Notify subscribers of the change (Phase 6.3)
+        // Ignore send errors - if no one is listening, that's fine
+        let _ = self.change_tx.send(key.to_string());
 
         Ok(())
     }
@@ -116,6 +140,25 @@ impl AutomergeStore {
     /// Count total documents
     pub fn count(&self) -> usize {
         self.db.iterator(IteratorMode::Start).count()
+    }
+
+    /// Subscribe to document change notifications (Phase 6.3)
+    ///
+    /// Returns a receiver that will receive document keys whenever documents are modified.
+    /// This can only be called once - subsequent calls will return None.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let store = AutomergeStore::open("./data")?;
+    /// if let Some(mut rx) = store.subscribe_to_changes() {
+    ///     while let Some(doc_key) = rx.recv().await {
+    ///         println!("Document changed: {}", doc_key);
+    ///     }
+    /// }
+    /// ```
+    pub fn subscribe_to_changes(&self) -> Option<mpsc::UnboundedReceiver<String>> {
+        self.change_rx.write().unwrap().take()
     }
 
     /// Get a collection handle for a specific namespace

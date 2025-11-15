@@ -167,10 +167,7 @@ async fn test_document_sync_two_nodes() {
     nodes1.upsert("node-1", &node_state).unwrap();
     println!("  ✓ Document created on Node 1");
 
-    println!("  4. Waiting for sync to Node 2...");
-
-    // TODO Phase 6.2: This will fail - no automatic sync propagation yet
-    // Expected: Need background task to detect changes and sync
+    println!("  4. Waiting for automatic sync to Node 2...");
 
     // Poll for document on backend2
     let mut synced = false;

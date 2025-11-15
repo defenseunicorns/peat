@@ -51,8 +51,8 @@ use std::collections::HashMap;
 #[cfg(feature = "automerge-backend")]
 use std::sync::{Arc, RwLock};
 #[cfg(feature = "automerge-backend")]
-#[allow(unused_imports)] // Used in receive_sync_message_from_stream via trait
-use tokio::io::AsyncReadExt;
+#[allow(unused_imports)] // Used in sync message send/receive methods
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 /// Coordinator for Automerge document synchronization over Iroh
 ///
@@ -109,8 +109,9 @@ impl AutomergeSyncCoordinator {
         // Store updated sync state
         self.update_sync_state(doc_key, peer_id, sync_state);
 
-        // Send message to peer
-        self.send_sync_message(peer_id, &message).await?;
+        // Send message to peer with document key
+        self.send_sync_message_for_doc(peer_id, doc_key, &message)
+            .await?;
 
         Ok(())
     }
@@ -147,8 +148,9 @@ impl AutomergeSyncCoordinator {
             // Store updated sync state
             self.update_sync_state(doc_key, peer_id, sync_state);
 
-            // Send response to peer
-            self.send_sync_message(peer_id, &response).await?;
+            // Send response to peer with document key
+            self.send_sync_message_for_doc(peer_id, doc_key, &response)
+                .await?;
         } else {
             // Store sync state even if no response needed
             self.update_sync_state(doc_key, peer_id, sync_state);
@@ -159,8 +161,13 @@ impl AutomergeSyncCoordinator {
 
     /// Send a sync message to a peer over Iroh stream
     ///
-    /// Wire format: [4 bytes: length][N bytes: encoded message]
-    async fn send_sync_message(&self, peer_id: EndpointId, message: &SyncMessage) -> Result<()> {
+    /// Wire format: [2 bytes: doc_key length][N bytes: doc_key UTF-8][4 bytes: message length][M bytes: encoded message]
+    async fn send_sync_message_for_doc(
+        &self,
+        peer_id: EndpointId,
+        doc_key: &str,
+        message: &SyncMessage,
+    ) -> Result<()> {
         // Get connection to peer
         let conn = self
             .transport
@@ -173,12 +180,26 @@ impl AutomergeSyncCoordinator {
             .await
             .context("Failed to open bidirectional stream")?;
 
+        // Encode doc_key as UTF-8 bytes
+        let doc_key_bytes = doc_key.as_bytes();
+        let doc_key_len = doc_key_bytes.len() as u16;
+
+        // Write doc_key length prefix (2 bytes, big-endian)
+        send.write_all(&doc_key_len.to_be_bytes())
+            .await
+            .context("Failed to write doc_key length")?;
+
+        // Write doc_key
+        send.write_all(doc_key_bytes)
+            .await
+            .context("Failed to write doc_key")?;
+
         // Encode the sync message (clone since encode() takes ownership)
         let encoded = message.clone().encode();
 
-        // Write length prefix (4 bytes, big-endian)
-        let length = encoded.len() as u32;
-        send.write_all(&length.to_be_bytes())
+        // Write message length prefix (4 bytes, big-endian)
+        let message_len = encoded.len() as u32;
+        send.write_all(&message_len.to_be_bytes())
             .await
             .context("Failed to write message length")?;
 
@@ -195,20 +216,35 @@ impl AutomergeSyncCoordinator {
 
     /// Receive a sync message from a peer over Iroh stream
     ///
-    /// Wire format: [4 bytes: length][N bytes: encoded message]
+    /// Wire format: [2 bytes: doc_key length][N bytes: doc_key UTF-8][4 bytes: message length][M bytes: encoded message]
     async fn receive_sync_message_from_stream(
         &self,
         mut recv: iroh::endpoint::RecvStream,
-    ) -> Result<SyncMessage> {
-        // Read length prefix (4 bytes, big-endian)
-        let mut length_bytes = [0u8; 4];
-        recv.read_exact(&mut length_bytes)
+    ) -> Result<(String, SyncMessage)> {
+        // Read doc_key length prefix (2 bytes, big-endian)
+        let mut doc_key_len_bytes = [0u8; 2];
+        recv.read_exact(&mut doc_key_len_bytes)
+            .await
+            .context("Failed to read doc_key length")?;
+        let doc_key_len = u16::from_be_bytes(doc_key_len_bytes) as usize;
+
+        // Read doc_key
+        let mut doc_key_bytes = vec![0u8; doc_key_len];
+        recv.read_exact(&mut doc_key_bytes)
+            .await
+            .context("Failed to read doc_key")?;
+        let doc_key =
+            String::from_utf8(doc_key_bytes).context("Failed to parse doc_key as UTF-8")?;
+
+        // Read message length prefix (4 bytes, big-endian)
+        let mut message_len_bytes = [0u8; 4];
+        recv.read_exact(&mut message_len_bytes)
             .await
             .context("Failed to read message length")?;
-        let length = u32::from_be_bytes(length_bytes) as usize;
+        let message_len = u32::from_be_bytes(message_len_bytes) as usize;
 
         // Read the message
-        let mut buffer = vec![0u8; length];
+        let mut buffer = vec![0u8; message_len];
         recv.read_exact(&mut buffer)
             .await
             .context("Failed to read message")?;
@@ -216,7 +252,7 @@ impl AutomergeSyncCoordinator {
         // Decode the sync message
         let message = SyncMessage::decode(&buffer).context("Failed to decode sync message")?;
 
-        Ok(message)
+        Ok((doc_key, message))
     }
 
     /// Get or create sync state for a peer
@@ -239,6 +275,38 @@ impl AutomergeSyncCoordinator {
             .insert(peer_id, state);
     }
 
+    /// Sync a specific document with a peer
+    ///
+    /// This initiates sync for a single document with a peer.
+    /// Use this when a document has been created or modified.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_key` - The document identifier (e.g., "nodes:node-1")
+    /// * `peer_id` - The EndpointId of the peer to sync with
+    pub async fn sync_document_with_peer(&self, doc_key: &str, peer_id: EndpointId) -> Result<()> {
+        self.initiate_sync(doc_key, peer_id).await
+    }
+
+    /// Sync a document with all connected peers
+    ///
+    /// This initiates sync for a single document with all currently connected peers.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_key` - The document identifier (e.g., "nodes:node-1")
+    pub async fn sync_document_with_all_peers(&self, doc_key: &str) -> Result<()> {
+        let peer_ids = self.transport.connected_peers();
+
+        for peer_id in peer_ids {
+            if let Err(e) = self.sync_document_with_peer(doc_key, peer_id).await {
+                tracing::warn!("Failed to sync {} with peer {:?}: {}", doc_key, peer_id, e);
+            }
+        }
+
+        Ok(())
+    }
+
     /// Handle an incoming sync connection from a peer
     ///
     /// This is called when a peer initiates sync with us.
@@ -251,15 +319,12 @@ impl AutomergeSyncCoordinator {
             .await
             .context("Failed to accept bidirectional stream")?;
 
-        // Receive the sync message
-        let message = self.receive_sync_message_from_stream(recv).await?;
-
-        // TODO: Need to include doc_key in the message somehow
-        // For now, this is a placeholder - Phase 5 will add proper multiplexing
-        let doc_key = "default";
+        // Receive the sync message (now includes doc_key in wire format)
+        let (doc_key, message) = self.receive_sync_message_from_stream(recv).await?;
 
         // Process the message
-        self.receive_sync_message(doc_key, peer_id, message).await?;
+        self.receive_sync_message(&doc_key, peer_id, message)
+            .await?;
 
         Ok(())
     }
