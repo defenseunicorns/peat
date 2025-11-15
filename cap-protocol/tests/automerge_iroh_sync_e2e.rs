@@ -20,50 +20,71 @@
 
 #![cfg(feature = "automerge-backend")]
 
-use cap_protocol::network::IrohTransport;
+use cap_protocol::network::{IrohTransport, PeerInfo};
 use cap_protocol::storage::capabilities::{CrdtCapable, SyncCapable, TypedCollection};
 use cap_protocol::storage::{AutomergeBackend, AutomergeStore};
 use cap_schema::node::v1::NodeState;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
 
-/// Helper to create a test backend with transport
-async fn create_test_backend() -> (AutomergeBackend, Arc<IrohTransport>, TempDir) {
+/// Helper to create a test backend with transport bound to specific address
+async fn create_test_backend(
+    bind_addr: SocketAddr,
+) -> (AutomergeBackend, Arc<IrohTransport>, TempDir) {
     let temp_dir = TempDir::new().unwrap();
     let store = Arc::new(AutomergeStore::open(temp_dir.path()).unwrap());
-    let transport = Arc::new(IrohTransport::new().await.unwrap());
+    let transport = Arc::new(IrohTransport::bind(bind_addr).await.unwrap());
     let backend = AutomergeBackend::with_transport(store, Arc::clone(&transport));
 
     (backend, transport, temp_dir)
 }
 
+/// Helper to create a PeerInfo from an IrohTransport
+fn create_peer_info(name: &str, transport: &IrohTransport, addr: SocketAddr) -> PeerInfo {
+    let endpoint_id = transport.endpoint_id();
+    let node_id_hex = hex::encode(endpoint_id.as_bytes());
+
+    PeerInfo {
+        name: name.to_string(),
+        node_id: node_id_hex,
+        addresses: vec![addr.to_string()],
+        relay_url: None,
+    }
+}
+
 /// Test 1: Basic Two-Node Connection
 ///
-/// Validates that two Iroh nodes can establish a QUIC connection.
+/// Validates that two Iroh nodes can establish a QUIC connection using static peer config.
 ///
-/// **Phase 6 Requirements Discovered:**
-/// - Need peer addressing/discovery mechanism
-/// - Need connection establishment helper
-/// - Need connection status verification
+/// **Phase 6.1: Static Peer Configuration**
+/// - Uses localhost bind addresses
+/// - Creates PeerInfo for direct addressing
+/// - Uses connect_peer() for connection
 #[tokio::test]
 async fn test_two_nodes_connect() {
-    println!("=== E2E: Two Nodes Connect ===");
+    println!("=== E2E: Two Nodes Connect (Static Config) ===");
 
-    let (backend1, transport1, _temp1) = create_test_backend().await;
-    let (backend2, transport2, _temp2) = create_test_backend().await;
+    // Bind to specific localhost addresses
+    let addr1: SocketAddr = "127.0.0.1:19001".parse().unwrap();
+    let addr2: SocketAddr = "127.0.0.1:19002".parse().unwrap();
+
+    let (backend1, transport1, _temp1) = create_test_backend(addr1).await;
+    let (backend2, transport2, _temp2) = create_test_backend(addr2).await;
 
     println!("  Node 1 ID: {:?}", transport1.endpoint_id());
+    println!("  Node 1 Addr: {}", addr1);
     println!("  Node 2 ID: {:?}", transport2.endpoint_id());
+    println!("  Node 2 Addr: {}", addr2);
 
-    // Get node 2's endpoint address for connection
-    let node2_addr = transport2.endpoint_addr();
+    // Create PeerInfo for node 2
+    let node2_peer = create_peer_info("node-2", &transport2, addr2);
 
-    println!("  1. Node 1 connecting to Node 2...");
+    println!("  1. Node 1 connecting to Node 2 via static config...");
 
-    // TODO Phase 6: This will fail - we need to implement peer connection
-    // Expected error: No direct addresses available, no relay configured
-    let connection_result = transport1.connect(node2_addr).await;
+    // Connect using PeerInfo
+    let connection_result = transport1.connect_peer(&node2_peer).await;
 
     match connection_result {
         Ok(_conn) => {
@@ -72,11 +93,13 @@ async fn test_two_nodes_connect() {
         }
         Err(e) => {
             println!("  ✗ Connection failed: {}", e);
-            println!("  → Phase 6 TODO: Need relay server or direct addressing");
+            println!("  → Phase 6.1 TODO: May need accept task on Node 2");
+            println!("  → Phase 6.1 TODO: Debug why direct addressing isn't working");
+            // Don't panic yet - we need to investigate further
         }
     }
 
-    // Even if connection fails, verify backends are initialized correctly
+    // Verify backends are initialized correctly
     assert!(backend1.sync_stats().is_ok());
     assert!(backend2.sync_stats().is_ok());
 }
@@ -93,8 +116,12 @@ async fn test_two_nodes_connect() {
 async fn test_document_sync_two_nodes() {
     println!("=== E2E: Document Sync Between Two Nodes ===");
 
-    let (backend1, transport1, _temp1) = create_test_backend().await;
-    let (backend2, transport2, _temp2) = create_test_backend().await;
+    // Bind to specific localhost addresses
+    let addr1: SocketAddr = "127.0.0.1:19003".parse().unwrap();
+    let addr2: SocketAddr = "127.0.0.1:19004".parse().unwrap();
+
+    let (backend1, transport1, _temp1) = create_test_backend(addr1).await;
+    let (backend2, transport2, _temp2) = create_test_backend(addr2).await;
 
     // Create typed collections
     let nodes1: Arc<dyn TypedCollection<NodeState>> = backend1.typed_collection("nodes");
@@ -106,15 +133,15 @@ async fn test_document_sync_two_nodes() {
     backend1.start_sync().unwrap();
     backend2.start_sync().unwrap();
 
-    println!("  2. Attempting peer connection...");
+    println!("  2. Connecting peers via static config...");
 
-    // Connect nodes
-    let node2_addr = transport2.endpoint_addr();
-    let connection_result = transport1.connect(node2_addr).await;
+    // Create PeerInfo and connect
+    let node2_peer = create_peer_info("node-2", &transport2, addr2);
+    let connection_result = transport1.connect_peer(&node2_peer).await;
 
     if connection_result.is_err() {
         println!("  ✗ Connection failed - skipping sync test");
-        println!("  → Phase 6 TODO: Need working peer connection");
+        println!("  → Phase 6.1 TODO: Debug connection issue");
         return;
     }
 
@@ -135,7 +162,7 @@ async fn test_document_sync_two_nodes() {
 
     println!("  4. Waiting for sync to Node 2...");
 
-    // TODO Phase 6: This will fail - no automatic sync propagation yet
+    // TODO Phase 6.2: This will fail - no automatic sync propagation yet
     // Expected: Need background task to detect changes and sync
 
     // Poll for document on backend2
@@ -153,8 +180,8 @@ async fn test_document_sync_two_nodes() {
 
     if !synced {
         println!("  ✗ Document did not sync");
-        println!("  → Phase 6 TODO: Need background sync task");
-        println!("  → Phase 6 TODO: Need change detection mechanism");
+        println!("  → Phase 6.2 TODO: Need background sync task");
+        println!("  → Phase 6.2 TODO: Need change detection mechanism");
     }
 
     // Cleanup
@@ -173,8 +200,12 @@ async fn test_document_sync_two_nodes() {
 async fn test_bidirectional_sync() {
     println!("=== E2E: Bidirectional Sync ===");
 
-    let (backend1, transport1, _temp1) = create_test_backend().await;
-    let (backend2, transport2, _temp2) = create_test_backend().await;
+    // Bind to specific localhost addresses
+    let addr1: SocketAddr = "127.0.0.1:19005".parse().unwrap();
+    let addr2: SocketAddr = "127.0.0.1:19006".parse().unwrap();
+
+    let (backend1, transport1, _temp1) = create_test_backend(addr1).await;
+    let (backend2, transport2, _temp2) = create_test_backend(addr2).await;
 
     let nodes1: Arc<dyn TypedCollection<NodeState>> = backend1.typed_collection("nodes");
     let nodes2: Arc<dyn TypedCollection<NodeState>> = backend2.typed_collection("nodes");
@@ -183,9 +214,9 @@ async fn test_bidirectional_sync() {
     backend1.start_sync().unwrap();
     backend2.start_sync().unwrap();
 
-    // Connect
-    let node2_addr = transport2.endpoint_addr();
-    if transport1.connect(node2_addr).await.is_err() {
+    // Connect via static config
+    let node2_peer = create_peer_info("node-2", &transport2, addr2);
+    if transport1.connect_peer(&node2_peer).await.is_err() {
         println!("  ✗ Connection failed - skipping test");
         return;
     }
@@ -236,8 +267,12 @@ async fn test_bidirectional_sync() {
 async fn test_concurrent_updates_merge() {
     println!("=== E2E: CRDT Conflict Resolution ===");
 
-    let (backend1, transport1, _temp1) = create_test_backend().await;
-    let (backend2, transport2, _temp2) = create_test_backend().await;
+    // Bind to specific localhost addresses
+    let addr1: SocketAddr = "127.0.0.1:19007".parse().unwrap();
+    let addr2: SocketAddr = "127.0.0.1:19008".parse().unwrap();
+
+    let (backend1, transport1, _temp1) = create_test_backend(addr1).await;
+    let (backend2, transport2, _temp2) = create_test_backend(addr2).await;
 
     let nodes1: Arc<dyn TypedCollection<NodeState>> = backend1.typed_collection("nodes");
     let nodes2: Arc<dyn TypedCollection<NodeState>> = backend2.typed_collection("nodes");
@@ -245,8 +280,8 @@ async fn test_concurrent_updates_merge() {
     backend1.start_sync().unwrap();
     backend2.start_sync().unwrap();
 
-    let node2_addr = transport2.endpoint_addr();
-    if transport1.connect(node2_addr).await.is_err() {
+    let node2_peer = create_peer_info("node-2", &transport2, addr2);
+    if transport1.connect_peer(&node2_peer).await.is_err() {
         println!("  ✗ Connection failed - skipping test");
         return;
     }
@@ -312,8 +347,12 @@ async fn test_concurrent_updates_merge() {
 async fn test_sync_stats_tracking() {
     println!("=== E2E: Sync Stats Tracking ===");
 
-    let (backend1, transport1, _temp1) = create_test_backend().await;
-    let (backend2, transport2, _temp2) = create_test_backend().await;
+    // Bind to specific localhost addresses
+    let addr1: SocketAddr = "127.0.0.1:19009".parse().unwrap();
+    let addr2: SocketAddr = "127.0.0.1:19010".parse().unwrap();
+
+    let (backend1, transport1, _temp1) = create_test_backend(addr1).await;
+    let (backend2, transport2, _temp2) = create_test_backend(addr2).await;
 
     backend1.start_sync().unwrap();
     backend2.start_sync().unwrap();
@@ -323,17 +362,17 @@ async fn test_sync_stats_tracking() {
     assert_eq!(initial_stats1.bytes_sent, 0);
     assert_eq!(initial_stats1.bytes_received, 0);
 
-    let node2_addr = transport2.endpoint_addr();
-    if transport1.connect(node2_addr).await.is_ok() {
+    let node2_peer = create_peer_info("node-2", &transport2, addr2);
+    if transport1.connect_peer(&node2_peer).await.is_ok() {
         println!("  ✓ Connected");
 
         let stats_after_connect = backend1.sync_stats().unwrap();
         println!("  Peer count: {}", stats_after_connect.peer_count);
         assert_eq!(stats_after_connect.peer_count, 1);
 
-        // TODO Phase 6: After actual sync, verify byte counters
-        println!("  → Phase 6 TODO: Track bytes sent/received");
-        println!("  → Phase 6 TODO: Track last sync timestamp");
+        // TODO Phase 6.2: After actual sync, verify byte counters
+        println!("  → Phase 6.2 TODO: Track bytes sent/received");
+        println!("  → Phase 6.2 TODO: Track last sync timestamp");
     } else {
         println!("  ✗ Connection failed");
     }
