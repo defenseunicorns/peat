@@ -30,9 +30,16 @@ prost = "0.13"
 # CRDT Backends (E8 Evaluation - ADR-007)
 automerge = { version = "0.7.1", optional = true }  # Automerge CRDT library for evaluation
 
+# AutomergeIrohBackend dependencies (ADR-011)
+iroh = { version = "0.95", optional = true }  # QUIC-based P2P networking
+rocksdb = { version = "0.22", optional = true }  # Persistent storage
+lru = { version = "0.12", optional = true }  # LRU cache for hot documents
+toml = { version = "0.8", optional = true }  # Static peer configuration
+hex = { version = "0.4", optional = true }  # Hex encoding for PublicKeys
+
 [features]
 default = []
-automerge-backend = ["automerge"]
+automerge-backend = ["automerge", "iroh", "rocksdb", "lru", "toml", "hex"]
 
 [dev-dependencies]
 proptest = { workspace = true }
