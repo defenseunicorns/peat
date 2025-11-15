@@ -17,6 +17,8 @@
 //! - Automatic change propagation
 
 #[cfg(feature = "automerge-backend")]
+use super::peer_config::PeerInfo;
+#[cfg(feature = "automerge-backend")]
 use anyhow::{Context, Result};
 #[cfg(feature = "automerge-backend")]
 use iroh::endpoint::{Connection, Endpoint};
@@ -24,6 +26,8 @@ use iroh::endpoint::{Connection, Endpoint};
 use iroh::{EndpointAddr, EndpointId};
 #[cfg(feature = "automerge-backend")]
 use std::collections::HashMap;
+#[cfg(feature = "automerge-backend")]
+use std::net::SocketAddr;
 #[cfg(feature = "automerge-backend")]
 use std::sync::{Arc, RwLock};
 
@@ -44,7 +48,7 @@ pub struct IrohTransport {
 
 #[cfg(feature = "automerge-backend")]
 impl IrohTransport {
-    /// Create a new Iroh transport
+    /// Create a new Iroh transport (binds to any available port)
     ///
     /// # Example
     ///
@@ -64,6 +68,38 @@ impl IrohTransport {
         })
     }
 
+    /// Create a new Iroh transport bound to a specific address
+    ///
+    /// # Arguments
+    ///
+    /// * `bind_addr` - Socket address to bind to (e.g., "127.0.0.1:9000")
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let addr = "127.0.0.1:9000".parse()?;
+    /// let transport = IrohTransport::bind(addr).await?;
+    /// ```
+    pub async fn bind(bind_addr: SocketAddr) -> Result<Self> {
+        // Convert SocketAddr to SocketAddrV4 if it's IPv4
+        let bind_addr_v4 = match bind_addr {
+            SocketAddr::V4(addr) => addr,
+            SocketAddr::V6(_) => anyhow::bail!("Only IPv4 addresses supported for now"),
+        };
+
+        let endpoint = Endpoint::builder()
+            .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
+            .bind_addr_v4(bind_addr_v4)
+            .bind()
+            .await
+            .context("Failed to create Iroh endpoint with bind address")?;
+
+        Ok(Self {
+            endpoint,
+            connections: Arc::new(RwLock::new(HashMap::new())),
+        })
+    }
+
     /// Get the local endpoint ID
     pub fn endpoint_id(&self) -> EndpointId {
         self.endpoint.id()
@@ -74,7 +110,7 @@ impl IrohTransport {
         self.endpoint.addr()
     }
 
-    /// Connect to a peer
+    /// Connect to a peer using EndpointAddr
     ///
     /// # Arguments
     ///
@@ -99,6 +135,36 @@ impl IrohTransport {
             .insert(endpoint_id, conn.clone());
 
         Ok(conn)
+    }
+
+    /// Connect to a peer using PeerInfo from static configuration
+    ///
+    /// # Arguments
+    ///
+    /// * `peer` - PeerInfo with node_id and direct addresses
+    ///
+    /// # Returns
+    ///
+    /// Connection to the peer
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let peer = config.get_peer("node-1").unwrap();
+    /// let conn = transport.connect_peer(peer).await?;
+    /// ```
+    pub async fn connect_peer(&self, peer: &PeerInfo) -> Result<Connection> {
+        let endpoint_id = peer.endpoint_id()?;
+        let socket_addrs = peer.socket_addrs()?;
+
+        // Create EndpointAddr with direct addresses
+        // Note: with_ip_addr adds direct addresses one at a time
+        let mut addr = EndpointAddr::new(endpoint_id);
+        for socket_addr in socket_addrs {
+            addr = addr.with_ip_addr(socket_addr);
+        }
+
+        self.connect(addr).await
     }
 
     /// Accept an incoming connection

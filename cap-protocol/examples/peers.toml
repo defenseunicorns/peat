@@ -1,0 +1,45 @@
+# Static Peer Configuration for Automerge+Iroh Backend
+#
+# This file defines a static mesh of peers that should connect to each other.
+# Each peer is identified by:
+# - node_id: Iroh PublicKey (EndpointId) in hex format
+# - addresses: List of direct addresses (IP:port) or relay URLs
+
+# Local node configuration (optional - can be auto-detected)
+[local]
+# Bind address for this node (0.0.0.0:0 for any interface, random port)
+bind_address = "127.0.0.1:9000"
+
+# Optional: Override node ID (otherwise uses generated keypair)
+# node_id = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+
+# Static peer definitions
+[[peers]]
+name = "node-1"
+node_id = "6eb2a534751444f1353b29aa307c78c1f72acfbb06bb8696103dfeede1f4f854"
+addresses = [
+    "127.0.0.1:9001",
+]
+
+[[peers]]
+name = "node-2"
+node_id = "b654917328aea8ccfae00463d63642eb4904bd276fecb4caf94dd740a76b5567"
+addresses = [
+    "127.0.0.1:9002",
+]
+
+[[peers]]
+name = "node-3"
+node_id = "2a462572243915ce03133d5d04a4972aa04694000476c588d11666ab3d7ef93b"
+addresses = [
+    "127.0.0.1:9003",
+    # Can include multiple addresses for redundancy
+    # "192.168.1.100:9003",
+]
+
+# Example with relay URL (for future Phase 7)
+# [[peers]]
+# name = "remote-node"
+# node_id = "f322c63754d2cfd7d20251ad86a8a8e89f8c9589247f106e12d2c208f2792a9b"
+# addresses = []
+# relay_url = "https://relay.example.com"
