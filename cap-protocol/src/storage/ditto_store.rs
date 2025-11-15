@@ -492,21 +492,24 @@ impl DittoStore {
 
         // Track both creation and last modification for proper delta sync metrics
         // Check if document already exists to preserve created_at_us
-        let (created_at_us, version) = if let Ok(docs) = self.query(
-            "sim_poc",
-            &format!("_id == '{}'", squad_id),
-        ).await {
+        let (created_at_us, version) = if let Ok(docs) = self
+            .query("sim_poc", &format!("_id == '{}'", squad_id))
+            .await
+        {
             if let Some(existing_doc) = docs.get(0) {
                 // Document exists - preserve creation time, increment version
-                let existing_created_at = existing_doc.get("created_at_us")
+                let existing_created_at = existing_doc
+                    .get("created_at_us")
                     .and_then(|v| v.as_u64())
                     .unwrap_or_else(|| {
                         // Fallback to timestamp_us for backwards compatibility
-                        existing_doc.get("timestamp_us")
+                        existing_doc
+                            .get("timestamp_us")
                             .and_then(|v| v.as_u64())
                             .unwrap_or(timestamp_us)
                     });
-                let existing_version = existing_doc.get("version")
+                let existing_version = existing_doc
+                    .get("version")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(1);
                 (existing_created_at, existing_version + 1)

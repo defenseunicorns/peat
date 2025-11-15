@@ -86,10 +86,10 @@ enum MetricsEvent {
     DocumentReceived {
         node_id: String,
         doc_id: String,
-        created_at_us: u128,      // When document was first created
-        last_modified_us: u128,   // When document was last updated
-        received_at_us: u128,     // When we received it
-        latency_us: u128,         // Propagation time
+        created_at_us: u128,    // When document was first created
+        last_modified_us: u128, // When document was last updated
+        received_at_us: u128,   // When we received it
+        latency_us: u128,       // Propagation time
         latency_ms: f64,
         version: u64,             // Document version
         is_first_reception: bool, // true = creation sync, false = update/recovery sync
@@ -302,11 +302,12 @@ async fn platoon_leader_aggregation_loop(
                                         0
                                     };
 
-                                    let last_modified_us = if let Some(ts) = doc.get("last_modified_us") {
-                                        ts.as_u64().unwrap_or(0) as u128
-                                    } else {
-                                        created_at_us
-                                    };
+                                    let last_modified_us =
+                                        if let Some(ts) = doc.get("last_modified_us") {
+                                            ts.as_u64().unwrap_or(0) as u128
+                                        } else {
+                                            created_at_us
+                                        };
 
                                     let version = if let Some(v) = doc.get("version") {
                                         v.as_u64().unwrap_or(1)
@@ -316,7 +317,8 @@ async fn platoon_leader_aggregation_loop(
 
                                     if created_at_us > 0 {
                                         // This is Initial event, so it's always first reception
-                                        let latency_us = received_at_us.saturating_sub(created_at_us);
+                                        let latency_us =
+                                            received_at_us.saturating_sub(created_at_us);
                                         let latency_ms = latency_us as f64 / 1000.0;
 
                                         println!(
@@ -333,7 +335,7 @@ async fn platoon_leader_aggregation_loop(
                                             latency_us,
                                             latency_ms,
                                             version,
-                                            is_first_reception: true,  // Initial event is always first reception
+                                            is_first_reception: true, // Initial event is always first reception
                                             latency_type: "creation".to_string(),
                                         });
                                     }
@@ -347,7 +349,8 @@ async fn platoon_leader_aggregation_loop(
                         if let Some(doc_id) = &document.id {
                             if doc_id.starts_with("squad-") {
                                 // Extract timestamps with proper delta sync semantics
-                                let created_at_us = if let Some(ts) = document.get("created_at_us") {
+                                let created_at_us = if let Some(ts) = document.get("created_at_us")
+                                {
                                     ts.as_u64().unwrap_or(0) as u128
                                 } else if let Some(ts) = document.get("timestamp_us") {
                                     ts.as_u64().unwrap_or(0) as u128
@@ -355,11 +358,12 @@ async fn platoon_leader_aggregation_loop(
                                     0
                                 };
 
-                                let last_modified_us = if let Some(ts) = document.get("last_modified_us") {
-                                    ts.as_u64().unwrap_or(0) as u128
-                                } else {
-                                    created_at_us
-                                };
+                                let last_modified_us =
+                                    if let Some(ts) = document.get("last_modified_us") {
+                                        ts.as_u64().unwrap_or(0) as u128
+                                    } else {
+                                        created_at_us
+                                    };
 
                                 let version = if let Some(v) = document.get("version") {
                                     v.as_u64().unwrap_or(1)
@@ -369,7 +373,8 @@ async fn platoon_leader_aggregation_loop(
 
                                 if created_at_us > 0 {
                                     // Assume update since this is ChangeEvent::Updated
-                                    let latency_us = received_at_us.saturating_sub(last_modified_us);
+                                    let latency_us =
+                                        received_at_us.saturating_sub(last_modified_us);
                                     let latency_ms = latency_us as f64 / 1000.0;
 
                                     println!(
@@ -386,7 +391,7 @@ async fn platoon_leader_aggregation_loop(
                                         latency_us,
                                         latency_ms,
                                         version,
-                                        is_first_reception: false,  // This is an update event
+                                        is_first_reception: false, // This is an update event
                                         latency_type: "update".to_string(),
                                     });
                                 }
@@ -1259,8 +1264,10 @@ async fn process_document(
                                     for (k, v) in current_doc.fields.iter() {
                                         updated_fields.insert(k.clone(), v.clone());
                                     }
-                                    updated_fields
-                                        .insert("acked_by".to_string(), serde_json::json!(acked_by));
+                                    updated_fields.insert(
+                                        "acked_by".to_string(),
+                                        serde_json::json!(acked_by),
+                                    );
 
                                     let updated_doc = Document {
                                         id: Some("sim_test_001".to_string()),
