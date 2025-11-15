@@ -29,7 +29,11 @@ use std::collections::HashMap;
 #[cfg(feature = "automerge-backend")]
 use std::net::SocketAddr;
 #[cfg(feature = "automerge-backend")]
+use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(feature = "automerge-backend")]
 use std::sync::{Arc, RwLock};
+#[cfg(feature = "automerge-backend")]
+use tokio::task::JoinHandle;
 
 /// ALPN protocol identifier for CAP Protocol Automerge sync
 #[cfg(feature = "automerge-backend")]
@@ -44,6 +48,10 @@ pub struct IrohTransport {
     endpoint: Endpoint,
     /// Active peer connections
     connections: Arc<RwLock<HashMap<EndpointId, Connection>>>,
+    /// Accept loop state
+    accept_running: Arc<AtomicBool>,
+    /// Accept loop task handle
+    accept_task: Arc<RwLock<Option<JoinHandle<()>>>>,
 }
 
 #[cfg(feature = "automerge-backend")]
@@ -65,6 +73,8 @@ impl IrohTransport {
         Ok(Self {
             endpoint,
             connections: Arc::new(RwLock::new(HashMap::new())),
+            accept_running: Arc::new(AtomicBool::new(false)),
+            accept_task: Arc::new(RwLock::new(None)),
         })
     }
 
@@ -97,6 +107,8 @@ impl IrohTransport {
         Ok(Self {
             endpoint,
             connections: Arc::new(RwLock::new(HashMap::new())),
+            accept_running: Arc::new(AtomicBool::new(false)),
+            accept_task: Arc::new(RwLock::new(None)),
         })
     }
 
@@ -216,8 +228,74 @@ impl IrohTransport {
         self.connections.read().unwrap().keys().copied().collect()
     }
 
+    /// Start the accept loop to receive incoming connections
+    ///
+    /// Spawns a background task that continuously accepts incoming connections.
+    /// Connections are automatically stored in the connections map.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// transport.start_accept_loop();
+    /// ```
+    pub fn start_accept_loop(self: &Arc<Self>) -> Result<()> {
+        // Check if already running
+        if self
+            .accept_running
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::Relaxed)
+            .is_err()
+        {
+            anyhow::bail!("Accept loop already running");
+        }
+
+        let transport = Arc::clone(self);
+        let accept_running = Arc::clone(&self.accept_running);
+
+        let task = tokio::spawn(async move {
+            while accept_running.load(Ordering::Relaxed) {
+                match transport.accept().await {
+                    Ok(conn) => {
+                        tracing::debug!("Accepted connection from: {:?}", conn.remote_id());
+                    }
+                    Err(e) => {
+                        // Accept loop stopped or endpoint closed
+                        tracing::debug!("Accept loop ended: {}", e);
+                        break;
+                    }
+                }
+            }
+            tracing::debug!("Accept loop stopped");
+        });
+
+        *self.accept_task.write().unwrap() = Some(task);
+
+        Ok(())
+    }
+
+    /// Stop the accept loop
+    ///
+    /// Stops accepting new incoming connections. Existing connections remain active.
+    pub fn stop_accept_loop(&self) -> Result<()> {
+        if !self.accept_running.swap(false, Ordering::SeqCst) {
+            anyhow::bail!("Accept loop is not running");
+        }
+
+        // Task will stop on next accept() call or timeout
+        Ok(())
+    }
+
+    /// Check if accept loop is running
+    pub fn is_accept_loop_running(&self) -> bool {
+        self.accept_running.load(Ordering::Relaxed)
+    }
+
     /// Close the transport and all connections
     pub async fn close(self) -> Result<()> {
+        // Stop accept loop if running
+        if self.accept_running.load(Ordering::Relaxed) {
+            let _ = self.stop_accept_loop();
+        }
+
         // Close all connections
         for (_endpoint_id, conn) in self.connections.write().unwrap().drain() {
             conn.close(0u32.into(), b"shutdown");

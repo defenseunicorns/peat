@@ -78,6 +78,13 @@ async fn test_two_nodes_connect() {
     println!("  Node 2 ID: {:?}", transport2.endpoint_id());
     println!("  Node 2 Addr: {}", addr2);
 
+    // Start accept loop on Node 2
+    println!("  Starting accept loop on Node 2...");
+    transport2.start_accept_loop().unwrap();
+
+    // Give accept loop a moment to start
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
     // Create PeerInfo for node 2
     let node2_peer = create_peer_info("node-2", &transport2, addr2);
 
