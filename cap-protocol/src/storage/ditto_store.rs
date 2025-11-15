@@ -496,7 +496,7 @@ impl DittoStore {
             .query("sim_poc", &format!("_id == '{}'", squad_id))
             .await
         {
-            if let Some(existing_doc) = docs.get(0) {
+            if let Some(existing_doc) = docs.first() {
                 // Document exists - preserve creation time, increment version
                 let existing_created_at = existing_doc
                     .get("created_at_us")
