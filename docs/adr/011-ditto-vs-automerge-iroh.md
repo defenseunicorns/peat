@@ -35,6 +35,96 @@ Initial analysis (ADR-007) assumed simplified Ethernet-only networking. **Real t
 
 **These requirements fundamentally change the networking architecture decision.**
 
+### Backend Architecture Design
+
+**Important Conceptual Clarification**: A "backend" in CAP Protocol is a **complete, integrated solution** for storage, synchronization, and persistence - not individual components.
+
+#### What is a Backend?
+
+A backend is the complete stack that provides:
+- **CRDT Storage**: Structured data with conflict resolution
+- **Persistence Layer**: Durable storage to disk
+- **Network Transport**: P2P communication protocol
+- **Mesh Coordination**: Discovery, topology, routing
+
+#### Complete Backend Solutions
+
+**DittoBackend** (Commercial Solution):
+```text
+┌────────────────────────────────────┐
+│ DittoBackend                       │
+│ ================================== │
+│ • Ditto CRDT Engine (proprietary)  │
+│ • Built-in RocksDB persistence     │
+│ • Multi-transport P2P              │
+│   (Bluetooth, WiFi, TCP)           │
+│ • Automatic discovery & mesh       │
+└────────────────────────────────────┘
+```
+
+**AutomergeIrohBackend** (Open Source Solution):
+```text
+┌────────────────────────────────────┐
+│ AutomergeIrohBackend               │
+│ ================================== │
+│ • Automerge CRDT Engine (MIT)      │
+│ • RocksDB persistence (Apache 2.0) │
+│ • Iroh QUIC transport (Apache 2.0) │
+│ • Custom P2P mesh (ADR-017)        │
+└────────────────────────────────────┘
+```
+
+**SimpleBackend** (Testing/Minimal):
+```text
+┌────────────────────────────────────┐
+│ SimpleBackend                      │
+│ ================================== │
+│ • RocksDB only (Apache 2.0)        │
+│ • No CRDT, no sync                 │
+│ • Local K/V storage only           │
+└────────────────────────────────────┘
+```
+
+#### Capability-Based Architecture
+
+Rather than forcing all backends into one interface, CAP Protocol uses **optional capability traits**:
+
+```rust
+// Required for all backends
+pub trait StorageBackend {
+    fn collection(&self, name: &str) -> Arc<dyn Collection>;
+    fn flush(&self) -> Result<()>;
+}
+
+// Optional: Backend provides CRDT field-level merging
+pub trait CrdtCapable: Send + Sync {
+    fn typed_collection<M>(&self, name: &str) -> Arc<dyn TypedCollection<M>>;
+}
+
+// Optional: Backend provides integrated P2P sync
+pub trait SyncCapable: Send + Sync {
+    fn start_sync(&self) -> Result<()>;
+    fn stop_sync(&self) -> Result<()>;
+}
+```
+
+#### Backend Comparison
+
+| Backend | CRDT | Sync | License | Components |
+|---------|------|------|---------|------------|
+| **DittoBackend** | ✅ | ✅ | Proprietary | Ditto SDK (all-in-one) |
+| **AutomergeIrohBackend** | ✅ | ✅ | Apache/MIT | Automerge + RocksDB + Iroh + mesh |
+| **SimpleBackend** | ❌ | ❌ | Apache 2.0 | RocksDB only |
+
+**Key Insight**: Components like "Automerge", "RocksDB", "Iroh" are NOT individual backends. They are components that together form the **AutomergeIrohBackend** - a complete integrated solution comparable to **DittoBackend**.
+
+This architecture enables:
+- ✅ **Backend choice**: Users select complete solution based on needs
+- ✅ **OSS deployment path**: AutomergeIrohBackend provides fully open alternative
+- ✅ **No vendor lock-in**: Multiple complete backend options
+- ✅ **Capability discovery**: Code can check what backend supports
+- ✅ **Future extensibility**: New complete backends can be added
+
 ### Technical Discovery: QUIC vs TCP for Tactical
 
 **TCP Limitations on Multi-Path Tactical**:

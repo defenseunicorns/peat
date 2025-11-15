@@ -18,32 +18,65 @@
 //! Ditto SDK
 //! ```
 //!
-//! # Data Format
+//! # Data Format and CRDT Limitations
 //!
-//! The trait abstraction uses raw bytes (Vec<u8>) for documents, typically
-//! serialized protobuf messages. DittoStore stores these as base64-encoded
-//! strings in JSON documents with metadata fields.
+//! **IMPORTANT**: This generic trait interface uses `Vec<u8>` which **DEFEATS Ditto's CRDT benefits**.
 //!
-//! **Conversion**:
+//! The trait stores bytes as base64-encoded blobs, which means:
+//! - ❌ No field-level merging (full blob replacement on conflicts)
+//! - ❌ No delta sync (entire document sent on any change)
+//! - ❌ No OR-Set/LWW-Register semantics
+//!
+//! **For CRDT benefits, use `DittoStore` methods directly** (not this trait):
+//! - `upsert_squad_summary()` - Full JSON expansion with CRDT types
+//! - `get_squad_summary()` - Type-safe retrieval
+//! - See `ditto_store.rs` for type-specific methods
+//!
+//! **Conversion** (current base64 approach):
 //! - `upsert(bytes)` → encode to base64 → store in JSON {"_id": ..., "data": base64}
 //! - `get()` → retrieve JSON → decode base64 → return bytes
 //!
-//! # Example
+//! **Future Work**: See E11.2_STORAGE_SERIALIZATION_ANALYSIS.md Option 1 for typed trait design.
+//!
+//! # Usage Examples
+//!
+//! ## ❌ DON'T: Use trait for CRDT-critical data
 //!
 //! ```ignore
-//! use cap_protocol::storage::{StorageBackend, create_storage_backend, StorageConfig};
-//!
-//! let config = StorageConfig::default(); // Uses Ditto
-//! let storage = create_storage_backend(&config)?;
-//!
-//! let cells = storage.collection("cells");
-//! cells.upsert("cell-1", protobuf_bytes)?;
+//! // BAD: Generic trait defeats CRDT benefits
+//! let backend = DittoBackend::new(store);
+//! let collection = backend.collection("squad_summaries");
+//! let bytes = summary.encode_to_vec(); // Protobuf bytes
+//! collection.upsert("squad-1", bytes)?; // ❌ Stored as base64 blob
 //! ```
+//!
+//! ## ✅ DO: Use DittoStore directly for CRDT benefits
+//!
+//! ```ignore
+//! // GOOD: Type-specific methods use JSON expansion
+//! let store = DittoStore::new(config)?;
+//! store.upsert_squad_summary("squad-1", &summary).await?; // ✅ Full JSON expansion
+//! ```
+//!
+//! ## When to use each approach:
+//!
+//! **Use `DittoStore` directly when:**
+//! - Data requires CRDT conflict resolution (squad/platoon summaries)
+//! - Delta sync is important for bandwidth efficiency
+//! - Field-level merging is needed (member lists, positions)
+//!
+//! **Use trait interface when:**
+//! - You need backend-agnostic code (can swap Ditto/Automerge/RocksDB)
+//! - Testing with mock implementations
+//! - CRDT benefits are not critical for the data type
 
+use super::capabilities::{CrdtCapable, SyncCapable, SyncStats, TypedCollection};
 use super::ditto_store::DittoStore;
 use super::traits::{Collection as CollectionTrait, DocumentPredicate, StorageBackend};
 use anyhow::{Context, Result};
 use base64::Engine;
+use prost::Message;
+use serde::{de::DeserializeOwned, Serialize};
 use std::sync::Arc;
 
 /// Ditto backend adapter implementing StorageBackend trait
@@ -272,52 +305,167 @@ impl CollectionTrait for DittoCollection {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+// ============================================================================
+// CRDT Capability Implementation
+// ============================================================================
 
-    #[test]
-    fn test_bytes_to_json_conversion() {
-        let collection = DittoCollection {
-            name: "test".to_string(),
-            store: Arc::new(DittoStore::from_env().unwrap()),
-        };
+/// Typed collection wrapper for Ditto with CRDT optimization
+///
+/// Converts protobuf messages to JSON for field-level CRDT merging.
+struct DittoTypedCollection<M> {
+    name: String,
+    store: Arc<DittoStore>,
+    _phantom: std::marker::PhantomData<M>,
+}
 
-        let test_data = b"Hello, world!";
-        let json = collection.bytes_to_json("doc-1", test_data);
+impl<M> TypedCollection<M> for DittoTypedCollection<M>
+where
+    M: Message + Serialize + DeserializeOwned + Default + Clone,
+{
+    fn upsert(&self, doc_id: &str, message: &M) -> Result<()> {
+        // Convert protobuf message to JSON (full expansion for CRDT)
+        let mut json =
+            serde_json::to_value(message).context("Failed to serialize message to JSON")?;
 
-        // Verify JSON structure
-        assert_eq!(json.get("_id").unwrap().as_str().unwrap(), "doc-1");
-        assert_eq!(json.get("type").unwrap().as_str().unwrap(), "binary_document");
-        assert_eq!(json.get("collection").unwrap().as_str().unwrap(), "test");
+        // Add Ditto metadata
+        json["_id"] = serde_json::Value::String(doc_id.to_string());
+        json["type"] = serde_json::Value::String("typed_document".to_string());
+        json["collection"] = serde_json::Value::String(self.name.clone());
 
-        // Verify roundtrip
-        let decoded = collection.json_to_bytes(&json).unwrap();
-        assert_eq!(decoded, test_data);
+        // Store with CRDT benefits (OR-Set for arrays, LWW-Register for scalars)
+        tokio::runtime::Handle::current()
+            .block_on(self.store.upsert(&self.name, json))
+            .context("Failed to upsert typed document")?;
+
+        Ok(())
     }
 
-    #[test]
-    fn test_json_to_bytes_missing_field() {
-        let collection = DittoCollection {
-            name: "test".to_string(),
-            store: Arc::new(DittoStore::from_env().unwrap()),
-        };
+    fn get(&self, doc_id: &str) -> Result<Option<M>> {
+        let where_clause = format!("_id == '{}'", doc_id);
 
-        let invalid_json = serde_json::json!({"_id": "doc-1"});
-        let result = collection.json_to_bytes(&invalid_json);
+        let results = tokio::runtime::Handle::current()
+            .block_on(self.store.query(&self.name, &where_clause))
+            .context("Failed to query typed document")?;
 
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Missing 'data' field"));
+        if results.is_empty() {
+            return Ok(None);
+        }
+
+        // JSON → Protobuf
+        let message: M = serde_json::from_value(results[0].clone())
+            .context("Failed to deserialize message from JSON")?;
+
+        Ok(Some(message))
     }
 
-    #[test]
-    fn test_list_collections() {
-        let store = Arc::new(DittoStore::from_env().unwrap());
-        let backend = DittoBackend::new(store);
+    fn delete(&self, doc_id: &str) -> Result<()> {
+        let dql_query = format!("EVICT FROM {} WHERE _id == '{}'", self.name, doc_id);
 
-        let collections = backend.list_collections();
-        assert!(collections.contains(&"cells".to_string()));
-        assert!(collections.contains(&"nodes".to_string()));
-        assert!(collections.contains(&"capabilities".to_string()));
+        tokio::runtime::Handle::current()
+            .block_on(async {
+                self.store
+                    .ditto()
+                    .store()
+                    .execute_v2(dql_query)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to delete: {}", e))
+            })
+            .context("Failed to delete typed document")?;
+
+        Ok(())
+    }
+
+    fn scan(&self) -> Result<Vec<(String, M)>> {
+        let where_clause = "type == 'typed_document'";
+
+        let results = tokio::runtime::Handle::current()
+            .block_on(self.store.query(&self.name, where_clause))
+            .context("Failed to scan typed collection")?;
+
+        let mut documents = Vec::new();
+        for json in results {
+            let doc_id = json
+                .get("_id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing '_id' field"))?
+                .to_string();
+
+            let message: M =
+                serde_json::from_value(json).context("Failed to deserialize message")?;
+
+            documents.push((doc_id, message));
+        }
+
+        Ok(documents)
+    }
+
+    fn find(&self, predicate: Box<dyn Fn(&M) -> bool + Send>) -> Result<Vec<(String, M)>> {
+        let all_docs = self.scan()?;
+        let filtered = all_docs
+            .into_iter()
+            .filter(|(_, msg)| predicate(msg))
+            .collect();
+        Ok(filtered)
+    }
+
+    fn count(&self) -> Result<usize> {
+        let docs = self.scan()?;
+        Ok(docs.len())
     }
 }
+
+/// CrdtCapable implementation for DittoBackend
+///
+/// Enables field-level CRDT merging with OR-Set and LWW-Register semantics.
+impl CrdtCapable for DittoBackend {
+    fn typed_collection<M>(&self, name: &str) -> Arc<dyn TypedCollection<M>>
+    where
+        M: Message + Serialize + DeserializeOwned + Default + Clone + 'static,
+    {
+        Arc::new(DittoTypedCollection::<M> {
+            name: name.to_string(),
+            store: self.store.clone(),
+            _phantom: std::marker::PhantomData,
+        })
+    }
+}
+
+/// SyncCapable implementation for DittoBackend
+///
+/// Ditto has built-in mesh networking that needs lifecycle management.
+impl SyncCapable for DittoBackend {
+    fn start_sync(&self) -> Result<()> {
+        // Ditto sync is always active once configured
+        // This is a no-op but maintains trait compatibility
+        Ok(())
+    }
+
+    fn stop_sync(&self) -> Result<()> {
+        // Ditto doesn't expose explicit stop sync API
+        // Sync stops when Ditto instance is dropped
+        Ok(())
+    }
+
+    fn sync_stats(&self) -> Result<SyncStats> {
+        // Ditto doesn't expose detailed sync stats via public API
+        // Return basic stats structure
+        Ok(SyncStats {
+            peer_count: 0, // Would require Ditto API enhancement
+            bytes_sent: 0,
+            bytes_received: 0,
+            last_sync: None,
+        })
+    }
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+// Note: Unit tests removed per CLAUDE.md policy ("No ignored tests - tests must pass or be removed").
+// These tests required environment variables (DITTO_APP_ID, DITTO_SHARED_KEY) and couldn't run in CI.
+// The DittoBackend functionality is comprehensively tested in integration tests:
+//   - tests/storage_layer_e2e.rs - End-to-end storage backend tests with real Ditto instances
+//   - tests/sync_backend_integration.rs - Backend sync integration tests
+//
+// For local testing of DittoBackend, use the integration test suite with environment variables set.

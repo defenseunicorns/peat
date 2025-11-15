@@ -2,7 +2,11 @@
 
 // Core trait abstractions (ADR-011 E11.2)
 pub mod backend;
+pub mod capabilities;
 pub mod traits;
+
+// Backend implementations (E11.2)
+pub mod ditto_backend;
 
 // Existing implementations
 pub mod cell_store;
@@ -12,9 +16,13 @@ pub mod throttled_node_store;
 pub mod ttl;
 
 #[cfg(feature = "automerge-backend")]
+pub mod automerge_backend;
+#[cfg(feature = "automerge-backend")]
 pub mod automerge_conversion;
 #[cfg(feature = "automerge-backend")]
 pub mod automerge_store;
+#[cfg(feature = "automerge-backend")]
+pub mod automerge_sync;
 
 pub use cell_store::CellStore;
 pub use ditto_store::DittoStore;
@@ -23,10 +31,16 @@ pub use throttled_node_store::{ThrottleStats, ThrottledNodeStore};
 pub use ttl::{EvictionStrategy, OfflineRetentionPolicy, TtlConfig};
 
 #[cfg(feature = "automerge-backend")]
+pub use automerge_backend::AutomergeBackend;
+#[cfg(feature = "automerge-backend")]
 pub use automerge_store::AutomergeStore;
+#[cfg(feature = "automerge-backend")]
+pub use automerge_sync::AutomergeSyncCoordinator;
 
 // Trait abstractions (E11.2)
 pub use backend::{create_storage_backend, StorageConfig};
+pub use capabilities::{CrdtCapable, SyncCapable, SyncStats, TypedCollection};
+pub use ditto_backend::DittoBackend;
 pub use traits::{Collection, DocumentPredicate, StorageBackend};
 
 // Legacy compatibility aliases
