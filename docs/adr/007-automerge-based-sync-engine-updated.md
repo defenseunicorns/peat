@@ -31,7 +31,7 @@ This ADR proposes evaluating **both Automerge and Loro** as CRDT backend options
 
 **Government Off-The-Shelf (GOTS) Opportunity**
 
-An open-source, Automerge-based sync engine positions CAP Protocol as **Government Off-The-Shelf (GOTS)** software, providing critical advantages:
+An open-source, Automerge-based sync engine positions HIVE Protocol as **Government Off-The-Shelf (GOTS)** software, providing critical advantages:
 
 1. **Open Architecture Compliance**
    - Aligns with DoD's **Modular Open Systems Approach (MOSA)**
@@ -40,7 +40,7 @@ An open-source, Automerge-based sync engine positions CAP Protocol as **Governme
    - Facilitates competition and innovation in tactical autonomous systems
 
 2. **NATO Standardization Path**
-   - **STANAG Candidate**: CAP Protocol + automerge-edge could become a NATO standard for autonomous platform coordination
+   - **STANAG Candidate**: HIVE Protocol + automerge-edge could become a NATO standard for autonomous platform coordination
    - **Interoperability**: Allied forces can adopt without licensing barriers
    - **Multi-National Development**: NATO members can contribute improvements
    - **Coalition Operations**: Shared technology base for combined operations
@@ -81,7 +81,7 @@ Historical examples of successful defense technology standardization:
 3. **ATDL-1/VMF (STANAG 5500)** - Variable message format for tactical messaging
 4. **ASTERIX (STANAG 4761)** - Air traffic surveillance data format
 
-**CAP Protocol + automerge-edge** could become the **STANAG for autonomous platform coordination**, analogous to how Link 16 standardized data sharing between manned platforms.
+**HIVE Protocol + automerge-edge** could become the **STANAG for autonomous platform coordination**, analogous to how Link 16 standardized data sharing between manned platforms.
 
 ### Open Architecture Alignment
 
@@ -300,7 +300,7 @@ Open-source approach enables broader innovation ecosystem:
 
 **Proposed Timeline**:
 
-1. **Year 1: Demonstrate in CAP Protocol**
+1. **Year 1: Demonstrate in HIVE Protocol**
    - Prove capability in US tactical autonomous systems
    - Publish performance benchmarks and test results
    - Present at DoD and NATO conferences
@@ -734,7 +734,7 @@ criterion_main!(benches);
 
 **Path Forward**:
 1. Remove non-selected backend code
-2. Build `cap-protocol-core` on winning backend
+2. Build `hive-protocol-core` on winning backend
 3. Integrate with CellStore/NodeStore
 4. Update E2E tests
 5. Remove all Ditto dependencies
@@ -1438,16 +1438,16 @@ impl Collection {
 }
 ```
 
-## CAP Protocol Integration
+## HIVE Protocol Integration
 
-CAP Protocol uses `automerge-edge` as a library:
+HIVE Protocol uses `automerge-edge` as a library:
 
 ```rust
-// In cap-protocol/Cargo.toml
+// In hive-protocol/Cargo.toml
 [dependencies]
 automerge-edge = { version = "0.1", features = ["security", "priority-sync"] }
 
-// In cap-protocol/src/storage/mod.rs
+// In hive-protocol/src/storage/mod.rs
 use automerge_edge::{Repository, Collection};
 
 pub struct CellStore {
@@ -1502,7 +1502,7 @@ Tasks:
 
 ### Phase 2: Feature Parity with Ditto (Weeks 9-16)
 
-**Goal**: Match capabilities currently used by CAP Protocol
+**Goal**: Match capabilities currently used by HIVE Protocol
 
 Tasks:
 - [ ] Collection queries (find, find_one, update)
@@ -1522,7 +1522,7 @@ Tasks:
 - [ ] Encrypted storage
 - [ ] **Milestone**: Secure sync with authenticated peers
 
-### Phase 4: Replace Ditto in CAP Protocol (Weeks 21-24)
+### Phase 4: Replace Ditto in HIVE Protocol (Weeks 21-24)
 
 **Goal**: Complete migration
 
@@ -1532,7 +1532,7 @@ Tasks:
 - [ ] Update E2E tests
 - [ ] Remove Ditto dependency
 - [ ] Performance benchmarks (vs Ditto baseline)
-- [ ] **Milestone**: CAP Protocol fully operational without Ditto
+- [ ] **Milestone**: HIVE Protocol fully operational without Ditto
 
 ### Phase 5: Publish and Promote (Weeks 25+)
 
@@ -1566,7 +1566,7 @@ Tasks:
 ### Ecosystem Benefits
 
 1. **Fills Gap**: Automerge lacks networking/discovery
-2. **General Purpose**: Useful beyond CAP Protocol
+2. **General Purpose**: Useful beyond HIVE Protocol
 3. **Production Ready**: Unlike many CRDT research projects
 4. **Modern Rust**: Idiomatic, async, type-safe
 5. **Open Source**: Apache-2.0 or MIT license
@@ -1611,7 +1611,7 @@ Tasks:
 2. **Performance Equivalent**: Within 20% of Ditto on key metrics
 3. **Test Coverage**: 80%+ coverage, all E2E tests passing
 4. **Documentation**: Complete API docs and tutorials
-5. **Zero Ditto Dependency**: CAP Protocol compiles without Ditto
+5. **Zero Ditto Dependency**: HIVE Protocol compiles without Ditto
 6. **Reusability**: At least one example of non-CAP usage
 
 ## References
@@ -1624,7 +1624,7 @@ Tasks:
 - [Loro Documentation](https://loro.dev/docs) - API reference and guides
 - [CRDT Benchmarks](https://github.com/dmonad/crdt-benchmarks) - Performance comparisons
 
-**CAP Protocol:**
+**HIVE Protocol:**
 - [CAP_Rust_Implementation_Plan.md](../CAP_Rust_Implementation_Plan.md) - Detailed design
 - [ADR-006](006-security-authentication-authorization.md) - Security integration
 - [ADR-009](009-bidirectional-hierarchical-flows.md) - Hierarchical communication
@@ -1758,7 +1758,7 @@ Tasks:
    - Update ADR-007 with final choice
    - Remove non-selected backend code
    - Update architecture diagrams
-   - Plan integration with CAP Protocol
+   - Plan integration with HIVE Protocol
 
 ### Short-term - Post-E8 (Weeks 3-12)
 
@@ -1823,7 +1823,7 @@ Tasks:
 ### Long-term - Standardization (1-3 Years)
 
 1. **NATO STANAG Path** (Years 1-2)
-   - Demonstrate in CAP Protocol deployments
+   - Demonstrate in HIVE Protocol deployments
    - Conduct multi-national trials
    - Gather feedback from allied systems
    - Publish technical specification
@@ -1889,7 +1889,7 @@ Tasks:
    - Recommendation: **Apache-2.0** (DoD-friendly, NATO-compatible, patent protection)
 
 7. **Should we target crates.io publication from day one?**
-   - Or keep private until proven in CAP Protocol?
+   - Or keep private until proven in HIVE Protocol?
    - Recommendation: **Public from day one**:
      - Builds community early
      - Attracts contributors
@@ -1917,7 +1917,7 @@ Tasks:
     - Too early risks premature specification
     - Too late misses opportunity for input
     - Recommendation: **Year 2** after:
-      - Proving capability in CAP Protocol
+      - Proving capability in HIVE Protocol
       - Gathering performance data
       - Before architecture solidifies
       - When ready for multi-national trials
@@ -1927,7 +1927,7 @@ Tasks:
     - CAP-specific features in separate layer
     - Recommendation:
       - Keep sync engine pure and general-purpose
-      - Build `cap-protocol-core` on top with CAP-specific logic
+      - Build `hive-protocol-core` on top with CAP-specific logic
       - Hierarchical operations as CAP module, not sync engine feature
       - Enables broader adoption beyond CAP
 
@@ -1952,7 +1952,7 @@ Tasks:
 
 ### The Decision Framework
 
-**What We're Deciding**: Choose between Automerge and Loro as the CRDT foundation for CAP Protocol's sync engine.
+**What We're Deciding**: Choose between Automerge and Loro as the CRDT foundation for HIVE Protocol's sync engine.
 
 **Why This Matters**: 
 - Eliminates Ditto licensing constraints (both options)
@@ -1999,7 +1999,7 @@ Tasks:
 - ✅ Team alignment on selection
 
 **Long-term Success**:
-- ✅ CAP Protocol operational without Ditto
+- ✅ HIVE Protocol operational without Ditto
 - ✅ Performance meets tactical requirements
 - ✅ DoD/NATO certification achievable
 - ✅ Community adoption and contributions
@@ -2178,13 +2178,13 @@ See `docs/E9-NETWORK-TRANSPORT-LAYER-PLAN.md` for full details:
    - **Verdict**: Resource cost outweighs licensing concern at this stage
 
 4. **Licensing Constraint is Future Problem**
-   - CAP Protocol is pre-production (no deployments yet)
+   - HIVE Protocol is pre-production (no deployments yet)
    - Ditto licensing negotiable for government/defense use
    - NATO STANAG timeline is 12-24 months out
    - Abstraction layer makes future swap feasible
    - **Verdict**: Defer licensing decision until closer to production deployment
 
-5. **Focus on CAP Protocol Innovation**
+5. **Focus on HIVE Protocol Innovation**
    - CAP's value is in hierarchical capability composition, not CRDT implementation
    - Building network stack diverts from core research
    - Ditto enables faster iteration on cell formation logic
@@ -2201,7 +2201,7 @@ See `docs/E9-NETWORK-TRANSPORT-LAYER-PLAN.md` for full details:
 ### Updated Strategy
 
 **Immediate (Next 3 months)**:
-- ✅ Continue with Ditto for all CAP Protocol development
+- ✅ Continue with Ditto for all HIVE Protocol development
 - ✅ Focus on hierarchical composition rules (E6, E7)
 - ✅ Validate cell formation logic with E2E tests
 - ✅ Document Ditto-specific assumptions for future portability
@@ -2239,9 +2239,9 @@ The AutomergeBackend implementation (commit 94b7f10) is preserved in the reposit
 - Starting point if E9 is needed later
 
 **Key files**:
-- `cap-protocol/src/sync/automerge.rs` - Full backend implementation
-- `cap-protocol/tests/automerge_backend_integration.rs` - Integration tests
-- `cap-protocol/benches/backend_comparison.rs` - Performance benchmarks
+- `hive-protocol/src/sync/automerge.rs` - Full backend implementation
+- `hive-protocol/tests/automerge_backend_integration.rs` - Integration tests
+- `hive-protocol/benches/backend_comparison.rs` - Performance benchmarks
 - `docs/E9-NETWORK-TRANSPORT-LAYER-PLAN.md` - Network layer implementation plan
 
 ---

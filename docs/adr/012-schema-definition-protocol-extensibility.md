@@ -28,7 +28,7 @@ The feedback revealed a fundamental separation of concerns:
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │      cap-schema (Foundational Library)                │  │
+│  │      hive-schema (Foundational Library)                │  │
 │  │  • Message schemas (Protobuf/Avro/JSON Schema)        │  │
 │  │  • Ontology definitions (capabilities, cells, etc)    │  │
 │  │  • Validation rules                                   │  │
@@ -44,7 +44,7 @@ The feedback revealed a fundamental separation of concerns:
 │  └──────────────────────────────────────────────────────┘  │
 │                           ↓ uses                             │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │      cap-transport (Protocol Adapters)                │  │
+│  │      hive-transport (Protocol Adapters)                │  │
 │  │  • HTTP/WebSocket adapter                             │  │
 │  │  • gRPC adapter                                       │  │
 │  │  • ROS2 DDS adapter                                   │  │
@@ -116,7 +116,7 @@ The current ADR-005 (Data Sync Abstraction Layer) proposes abstracting sync back
 
 We will **separate schema definition, ontology, and protocol extensibility into distinct architectural layers**, creating three new foundational crates:
 
-### 1. `cap-schema` - Schema Definition Library
+### 1. `hive-schema` - Schema Definition Library
 
 **Purpose**: Define CAP message schemas and ontology in a standard, code-generatable format
 
@@ -136,7 +136,7 @@ We will **separate schema definition, ontology, and protocol extensibility into 
 
 **Structure**:
 ```
-cap-schema/
+hive-schema/
 ├── proto/
 │   ├── core.proto           # Core message types (Position, Timestamp, UUID)
 │   ├── platform.proto       # Platform state, capabilities, beacons
@@ -394,7 +394,7 @@ protoc --cpp_out=./cpp proto/*.proto
 protoc --java_out=./java proto/*.proto
 ```
 
-### 2. `cap-transport` - Protocol Adapter Abstraction
+### 2. `hive-transport` - Protocol Adapter Abstraction
 
 **Purpose**: Define standard interfaces for protocol adapters and implement concrete transports
 
@@ -402,7 +402,7 @@ protoc --java_out=./java proto/*.proto
 
 **Core Abstraction**:
 ```rust
-// cap-transport/src/lib.rs
+// hive-transport/src/lib.rs
 
 use cap_schema::platform::v1::PlatformBeacon;
 use async_trait::async_trait;
@@ -492,7 +492,7 @@ pub enum MulticastScope {
 **Transport Implementations**:
 
 ```rust
-// cap-transport/src/adapters/http_websocket.rs
+// hive-transport/src/adapters/http_websocket.rs
 
 use axum::{Router, routing::post};
 use tokio_tungstenite::WebSocketStream;
@@ -577,7 +577,7 @@ impl HttpWebSocketTransport {
 ```
 
 ```rust
-// cap-transport/src/adapters/grpc.rs
+// hive-transport/src/adapters/grpc.rs
 
 use tonic::{transport::Server, Request, Response, Status};
 
@@ -588,7 +588,7 @@ pub struct GrpcTransport {
     client_pool: Arc<RwLock<HashMap<String, PlatformServiceClient>>>,
 }
 
-// gRPC service definitions in cap-schema/proto/service.proto
+// gRPC service definitions in hive-schema/proto/service.proto
 // service PlatformService {
 //   rpc SendBeacon(PlatformBeacon) returns (SendReceipt);
 //   rpc StreamBeacons(StreamRequest) returns (stream PlatformBeacon);
@@ -654,7 +654,7 @@ impl MessageTransport for GrpcTransport {
 ```
 
 ```rust
-// cap-transport/src/adapters/ros2.rs
+// hive-transport/src/adapters/ros2.rs
 
 use rclrs::{Node, Publisher, Subscription};
 use rosidl_runtime_rs::Message as RosMessage;
@@ -762,14 +762,14 @@ impl Ros2Transport {
 }
 ```
 
-### 3. `cap-persistence` - Storage Abstraction
+### 3. `hive-persistence` - Storage Abstraction
 
 **Purpose**: Define standard interfaces for accessing the data persistence layer, allowing external systems to interact with CAP's data store
 
 **Architecture**: Trait-based abstraction with multiple backend implementations
 
 ```rust
-// cap-persistence/src/lib.rs
+// hive-persistence/src/lib.rs
 
 use cap_schema::platform::v1::PlatformBeacon;
 use cap_schema::cell::v1::CellState;
@@ -844,7 +844,7 @@ impl Query {
 
 **Storage Backends**:
 ```rust
-// cap-persistence/src/backends/
+// hive-persistence/src/backends/
 
 pub mod automerge;   // CRDT-based sync store
 pub mod ditto;       // Ditto SDK wrapper
@@ -856,7 +856,7 @@ pub mod redis;       // In-memory cache/pub-sub
 
 **External Access Interface**:
 ```rust
-// cap-persistence/src/external_api.rs
+// hive-persistence/src/external_api.rs
 
 /// External API for non-CAP systems to access CAP data
 pub struct ExternalApi {
@@ -1146,9 +1146,9 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 │  ADR-012: Schema Definition & Protocol Extensibility            │
 │  ↓ (defines WHAT messages look like)                            │
 │  │                                                               │
-│  ├─→ cap-schema (protobuf definitions)                          │
-│  ├─→ cap-transport (HTTP/gRPC/ROS2 adapters)                    │
-│  └─→ cap-persistence (storage interfaces)                       │
+│  ├─→ hive-schema (protobuf definitions)                          │
+│  ├─→ hive-transport (HTTP/gRPC/ROS2 adapters)                    │
+│  └─→ hive-persistence (storage interfaces)                       │
 │                                                                  │
 │                         ↓ used by                                │
 │                                                                  │
@@ -1157,7 +1157,7 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 │  │                                                               │
 │  ├─→ Automerge CRDT layer                                       │
 │  ├─→ Iroh networking layer (QUIC transport)                     │
-│  └─→ Implements cap-persistence traits                          │
+│  └─→ Implements hive-persistence traits                          │
 │                                                                  │
 │                         ↓ used by                                │
 │                                                                  │
@@ -1209,7 +1209,7 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 
 ### Phase 0: Schema Definition (Weeks 1-2) - **HIGHEST PRIORITY**
 
-**Goal**: Create `cap-schema` crate with core message definitions
+**Goal**: Create `hive-schema` crate with core message definitions
 
 **Tasks**:
 1. Define protobuf schemas for core messages:
@@ -1234,20 +1234,20 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
    - Migration guide from current JSON schemas
 
 **Success Criteria**:
-- [ ] `cap-schema` crate compiles and passes all tests
+- [ ] `hive-schema` crate compiles and passes all tests
 - [ ] Can generate bindings for Rust, Python, JavaScript
 - [ ] Validation catches common errors
 - [ ] Documentation complete
 
 ### Phase 1: Transport Abstraction (Weeks 3-4)
 
-**Goal**: Create `cap-transport` crate with HTTP/WebSocket adapter
+**Goal**: Create `hive-transport` crate with HTTP/WebSocket adapter
 
 **Tasks**:
 1. Define `MessageTransport` trait
 2. Implement `HttpWebSocketTransport` adapter
 3. Add message routing and pub-sub logic
-4. Integration tests with `cap-schema` messages
+4. Integration tests with `hive-schema` messages
 
 **Success Criteria**:
 - [ ] Can send/receive CAP messages over HTTP/WebSocket
@@ -1256,7 +1256,7 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 
 ### Phase 2: Persistence Abstraction (Weeks 5-6)
 
-**Goal**: Create `cap-persistence` crate with external API
+**Goal**: Create `hive-persistence` crate with external API
 
 **Tasks**:
 1. Define `DataStore` trait
@@ -1291,11 +1291,11 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 
 ### Phase 4: CAP Core Refactoring (Weeks 11-14)
 
-**Goal**: Refactor `cap-protocol` crate to use new abstractions
+**Goal**: Refactor `hive-protocol` crate to use new abstractions
 
 **Tasks**:
-1. Replace inline schemas with `cap-schema`
-2. Replace direct Ditto/Automerge calls with `cap-persistence` traits
+1. Replace inline schemas with `hive-schema`
+2. Replace direct Ditto/Automerge calls with `hive-persistence` traits
 3. Add transport selection logic
 4. Update all tests
 
@@ -1326,7 +1326,7 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 1. **Schema Clarity**: Message schemas are first-class artifacts, not buried in code
 2. **Type Safety**: Code generation prevents schema drift across languages
 3. **Extensibility**: New transports can be added without modifying core protocol
-4. **Integration**: External systems can adopt CAP messages without CAP protocol
+4. **Integration**: External systems can adopt CAP messages without HIVE protocol
 5. **Tooling**: Standard schema enables validation, visualization, debugging tools
 6. **Multi-Language**: Python, JavaScript, Java, C++ can all use CAP messages natively
 7. **Versioning**: Protobuf supports schema evolution with backward compatibility
@@ -1422,9 +1422,9 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 ## Success Metrics
 
 1. **Schema Adoption**:
-   - [ ] All CAP messages defined in `cap-schema`
+   - [ ] All CAP messages defined in `hive-schema`
    - [ ] Code generation works for 3+ languages
-   - [ ] Zero manual serialization code in `cap-protocol`
+   - [ ] Zero manual serialization code in `hive-protocol`
 
 2. **Transport Extensibility**:
    - [ ] 3+ transport implementations (HTTP/WS, gRPC, ROS2)
@@ -1487,7 +1487,7 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
    - Validate Protobuf selection
    - Confirm ROS2 integration requirements
 
-2. **Prototype `cap-schema` with core messages** (1 week)
+2. **Prototype `hive-schema` with core messages** (1 week)
    - Implement Phase 0 (Schema Definition)
    - Generate Rust, Python, JavaScript bindings
    - Validate with simple examples
@@ -1510,12 +1510,12 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 ### After ADR-012 Phase 0 Complete
 
 6. **Begin ADR-011 (Automerge + Iroh) implementation**
-   - Use cap-schema messages as Automerge document structure
-   - Implement cap-persistence traits
+   - Use hive-schema messages as Automerge document structure
+   - Implement hive-persistence traits
    - Integrate with Iroh networking
 
 7. **Update ADR-005 implementation plan** 
-   - Reframe as backend abstraction within cap-persistence
+   - Reframe as backend abstraction within hive-persistence
    - Not top-level protocol interface
 
 ---

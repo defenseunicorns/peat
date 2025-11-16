@@ -1,4 +1,4 @@
-# CAP Protocol Validation Results
+# HIVE Protocol Validation Results
 
 **Status**: Validated
 **Date Range**: 2024-11 to 2025-01
@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-The CAP Protocol has undergone comprehensive validation across multiple dimensions:
+The HIVE Protocol has undergone comprehensive validation across multiple dimensions:
 
 1. **Network Constraint Validation** - 100% sync success under various network conditions
 2. **Containerlab Multi-Node Validation** - 12-node squad topology validation
@@ -17,7 +17,7 @@ All validation efforts demonstrate the protocol's robustness, scalability, and r
 
 ## 1. Network Constraint Validation
 
-**Objective**: Validate CAP Protocol performance under realistic network constraints
+**Objective**: Validate HIVE Protocol performance under realistic network constraints
 
 **Test Environment**:
 - 12-node squad topology in ContainerLab
@@ -40,7 +40,7 @@ All validation efforts demonstrate the protocol's robustness, scalability, and r
 **Objective**: Validate protocol in realistic multi-node deployment
 
 **Test Environment**:
-- 12 containerized CAP Protocol nodes
+- 12 containerized HIVE Protocol nodes
 - Ditto SDK 4.12+ for CRDT synchronization
 - Real Docker networking (not simulated)
 
@@ -141,7 +141,7 @@ The validation results demonstrate:
 
 ### Readiness Assessment
 
-The CAP Protocol has been validated as:
+The HIVE Protocol has been validated as:
 - ✅ **Production-ready** for tactical edge deployments
 - ✅ **Scalable** beyond initial requirements (100+ nodes validated)
 - ✅ **Extensible** via protobuf schema (ADR-012)
@@ -149,7 +149,7 @@ The CAP Protocol has been validated as:
 
 ## References
 
-- [ADR-001: CAP Protocol POC](adr/001-cap-protocol-poc.md) - Core protocol design
+- [ADR-001: HIVE Protocol POC](adr/001-hive-protocol-poc.md) - Core protocol design
 - [ADR-014: Distributed Coordination Primitives](adr/014-distributed-coordination-primitives.md) - Hierarchical coordination
 - [ADR-015: Experimental Validation](adr/015-experimental-validation-hierarchical-aggregation.md) - Validation methodology
 - [E8_INTEGRATION_OVERVIEW.md](E8_INTEGRATION_OVERVIEW.md) - Integration architecture

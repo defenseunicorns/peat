@@ -25,7 +25,7 @@ help:
 	@echo "  docs-presentation-pdf - Build PDF presentation from markdown"
 	@echo ""
 	@echo "Network Simulation (E8 - requires Linux with ContainerLab):"
-	@echo "  sim-build                  - Build cap-sim-node Docker image"
+	@echo "  sim-build                  - Build hive-sim-node Docker image"
 	@echo "  sim-deploy-poc             - Deploy 2-node POC topology"
 	@echo "  sim-deploy-squad-simple    - Deploy squad (Mode 1: Client-Server)"
 	@echo "  sim-deploy-squad-hierarchical - Deploy squad (Mode 2: Hub-Spoke)"
@@ -54,7 +54,7 @@ clean: clean-ditto
 clean-ditto:
 	@echo "Removing Ditto persistence directories..."
 	@find . -type d -name ".ditto*" -exec rm -rf {} + 2>/dev/null || true
-	@rm -rf /tmp/cap-persistence-test-* 2>/dev/null || true
+	@rm -rf /tmp/hive-persistence-test-* 2>/dev/null || true
 	@echo "Ditto directories cleaned"
 
 # Build all crates
@@ -79,7 +79,7 @@ test-e2e: clean-ditto
 		echo "⚠️  Warning: .env file not found. Ditto tests may be skipped."; \
 		echo "   Create .env with DITTO_APP_ID, DITTO_OFFLINE_TOKEN, DITTO_SHARED_KEY"; \
 	fi
-	cd cap-protocol && export $$(grep -v '^#' ../.env | xargs) && cargo test --test squad_formation_e2e -- --nocapture
+	cd hive-protocol && export $$(grep -v '^#' ../.env | xargs) && cargo test --test squad_formation_e2e -- --nocapture
 
 # Format all code
 fmt:
@@ -135,30 +135,30 @@ all: clean build check
 # E8 Network Simulation (ContainerLab)
 # ============================================
 
-# Build cap-sim-node Docker image
+# Build hive-sim-node Docker image
 sim-build:
-	@echo "Building cap-sim-node Docker image..."
-	@docker build -f cap-sim/Dockerfile -t cap-sim-node:latest .
+	@echo "Building hive-sim-node Docker image..."
+	@docker build -f hive-sim/Dockerfile -t hive-sim-node:latest .
 
 # Deploy 2-node POC
 sim-deploy-poc:
 	@echo "Deploying 2-node POC topology..."
-	@bash -c 'set -a && source .env && set +a && cd cap-sim && containerlab deploy -t topologies/poc-2node.yaml'
+	@bash -c 'set -a && source .env && set +a && cd hive-sim && containerlab deploy -t topologies/poc-2node.yaml'
 
 # Deploy 12-node squad (Mode 1: Client-Server)
 sim-deploy-squad-simple:
 	@echo "Deploying 12-node squad (Mode 1: Client-Server)..."
-	@bash -c 'set -a && source .env && set +a && cd cap-sim && containerlab deploy -t topologies/squad-12node-client-server.yaml'
+	@bash -c 'set -a && source .env && set +a && cd hive-sim && containerlab deploy -t topologies/squad-12node-client-server.yaml'
 
 # Deploy 12-node squad (Mode 2: Hub-Spoke)
 sim-deploy-squad-hierarchical:
 	@echo "Deploying 12-node squad (Mode 2: Hub-Spoke - Hierarchical)..."
-	@bash -c 'set -a && source .env && set +a && cd cap-sim && containerlab deploy -t topologies/squad-12node-hub-spoke.yaml'
+	@bash -c 'set -a && source .env && set +a && cd hive-sim && containerlab deploy -t topologies/squad-12node-hub-spoke.yaml'
 
 # Deploy 12-node squad (Mode 3: Dynamic Mesh)
 sim-deploy-squad-dynamic:
 	@echo "Deploying 12-node squad (Mode 3: Dynamic Mesh)..."
-	@bash -c 'set -a && source .env && set +a && cd cap-sim && containerlab deploy -t topologies/squad-12node-dynamic-mesh.yaml'
+	@bash -c 'set -a && source .env && set +a && cd hive-sim && containerlab deploy -t topologies/squad-12node-dynamic-mesh.yaml'
 
 # Deploy 12-node squad (alias for Mode 3 - recommended)
 sim-deploy-squad: sim-deploy-squad-dynamic
@@ -184,7 +184,7 @@ sim-destroy:
 # Clean up all simulation artifacts
 sim-clean: sim-destroy
 	@echo "Cleaning up ContainerLab artifacts..."
-	@cd cap-sim && rm -rf topologies/clab-* || true
+	@cd hive-sim && rm -rf topologies/clab-* || true
 	@echo "✅ Simulation cleanup complete"
 
 # E11 All-Modes Validation: Test all CAP modes and generate comprehensive report
@@ -204,7 +204,7 @@ e11-comprehensive-suite:
 	@echo ""
 	@echo "⚠️  WARNING: This will take approximately 60 minutes"
 	@echo ""
-	@cd cap-sim && ./test-bandwidth-suite.sh
+	@cd hive-sim && ./test-bandwidth-suite.sh
 
 # E11 Mode 4 Bandwidth Test: Test Mode 4 at specific bandwidth
 # Usage: make e11-mode4-bandwidth BW=256kbps
@@ -220,7 +220,7 @@ e11-mode4-bandwidth:
 	@echo "║    E11 Mode 4 Bandwidth Test - $(BW)                      ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@echo ""
-	@cd cap-sim && ./test-mode4-bandwidth.sh $(BW)
+	@cd hive-sim && ./test-mode4-bandwidth.sh $(BW)
 
 # E11 All-Modes Validation: Test all modes unconstrained
 e11-all-modes-report:
@@ -236,7 +236,7 @@ e11-all-modes-report:
 	@echo ""
 	@echo "Estimated time: ~5-6 minutes"
 	@echo ""
-	@cd cap-sim && ./test-all-modes-report.sh
+	@cd hive-sim && ./test-all-modes-report.sh
 
 # E12 Comprehensive Empirical Validation
 # Complete experimental framework with dual metrics collection
@@ -302,13 +302,13 @@ e8-performance-tests:
 	@echo "Tests: Traditional (8) + CAP Full (12) + CAP Differential (12)"
 	@echo "Bandwidths: 100Mbps, 10Mbps, 1Mbps, 256Kbps"
 	@echo ""
-	@cd cap-sim && ./run-e8-performance-suite.sh
+	@cd hive-sim && ./run-e8-performance-suite.sh
 
 # Compare E8 performance results and generate analysis report
 e8-compare-results:
 	@if [ -z "$(DIR)" ]; then \
 		echo "Usage: make e8-compare-results DIR=<results-directory>"; \
-		echo "Example: make e8-compare-results DIR=cap-sim/e8-performance-results-20251107-140000"; \
+		echo "Example: make e8-compare-results DIR=hive-sim/e8-performance-results-20251107-140000"; \
 		exit 1; \
 	fi
 	@echo "Generating three-way comparison report for $(DIR)..."
@@ -331,7 +331,7 @@ e8-baseline-comparison:
 	@echo "Tests: 3 architectures × 3 topologies = 9 test scenarios"
 	@echo "Estimated time: ~5 minutes"
 	@echo ""
-	@cd cap-sim && ./run-baseline-comparison.sh
+	@cd hive-sim && ./run-baseline-comparison.sh
 
 # ============================================
 # Documentation

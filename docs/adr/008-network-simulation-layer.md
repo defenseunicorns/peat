@@ -7,7 +7,7 @@
 
 ## Context and Problem Statement
 
-We have implemented the CAP protocol's core synchronization mechanisms using Ditto (E1-E6) and a differential updates framework (E7). Before optimizing the integration between our protocol-level delta operations and Ditto's document model, we need to:
+We have implemented the HIVE protocol's core synchronization mechanisms using Ditto (E1-E6) and a differential updates framework (E7). Before optimizing the integration between our protocol-level delta operations and Ditto's document model, we need to:
 
 1. **Establish baseline metrics** for current Ditto performance under realistic network conditions
 2. **Validate protocol behavior** across varying network quality (9.6Kbps - 1Mbps, 100ms - 5s latency)
@@ -164,7 +164,7 @@ Shadow provides the best balance of realism, scalability, and ease of use for E8
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
-│                    cap-sim Binary                             │
+│                    hive-sim Binary                             │
 │  - CLI for running simulations                                │
 │  - Generates Shadow YAML configs (Army company structure)     │
 │  - Invokes Shadow simulator                                   │
@@ -199,7 +199,7 @@ Shadow provides the best balance of realism, scalability, and ease of use for E8
 │ Virtual Host  │  │  Virtual Host   │  │ Virtual  │  │ Virtual  │
 │ soldier_1     │  │  soldier_2      │  │ ugv_1    │  │ uav_1    │
 │ ┌───────────┐ │  │ ┌─────────────┐ │  │          │  │          │
-│ │cap-sim-node│ │  │ │cap-sim-node │ │  │   ...    │  │   ...    │
+│ │hive-sim-node│ │  │ │hive-sim-node │ │  │   ...    │  │   ...    │
 │ │+ Ditto    │ │  │ │+ Ditto      │ │  │          │  │  (112    │
 │ │+ CAP      │ │  │ │+ CAP        │ │  │          │  │   total) │
 │ └───────────┘ │  │ └─────────────┘ │  │          │  │          │
@@ -224,8 +224,8 @@ Shadow provides the best balance of realism, scalability, and ease of use for E8
 ```
 
 **Key Components:**
-- **cap-sim:** Generates Shadow YAML, invokes `shadow`, collects metrics
-- **Shadow:** Runs unmodified cap-sim-node binaries with syscall interception
+- **hive-sim:** Generates Shadow YAML, invokes `shadow`, collects metrics
+- **Shadow:** Runs unmodified hive-sim-node binaries with syscall interception
 - **Virtual Hosts:** Each node thinks it's on a real network
 - **Simulated Network:** Graph-based topology with precise network characteristics
 - **No root required:** Shadow runs as regular user
@@ -259,11 +259,11 @@ impl SimulationHarness {
 ```
 
 #### 2. SimulatedNode
-**Purpose:** Represents a single CAP protocol node with Ditto sync
+**Purpose:** Represents a single HIVE protocol node with Ditto sync
 
 **Responsibilities:**
 - Wraps real Ditto store instance
-- Implements CAP protocol logic (discovery, cell formation)
+- Implements HIVE protocol logic (discovery, cell formation)
 - Tracks node-local metrics (bandwidth, message count)
 - Respects network constraints from NetworkSimulator
 
@@ -438,7 +438,7 @@ impl MetricsCollector {
 
 **Tasks:**
 - Implement Shadow YAML generator for scenarios
-- Build `cap-sim-node` binary (CAP protocol + Ditto)
+- Build `hive-sim-node` binary (HIVE protocol + Ditto)
 - Create simple scenario: Squad formation (12 nodes)
 - Run under Shadow, collect metrics
 
@@ -658,7 +658,7 @@ impl MetricsCollector {
 - Extend with network constraint capabilities
 - Maintain observer-based sync validation approach
 
-### cap-sim Binary
+### hive-sim Binary
 - CLI interface for running scenarios
 - Configuration files for network profiles
 - Output formats: JSON (CI), text (human), CSV (analysis)
@@ -708,7 +708,7 @@ done
 ```bash
 # Launch a single node inside namespace
 sudo ip netns exec capsim-node1 \
-  /path/to/cap-sim-node \
+  /path/to/hive-sim-node \
   --node-id soldier-1-1 \
   --role soldier \
   --capabilities sensor,comms
@@ -730,7 +730,7 @@ sudo ip link del br-capsim 2>/dev/null || true
 
 ### Network Profiles by Echelon
 ```rust
-// cap-sim/src/network_profiles.rs
+// hive-sim/src/network_profiles.rs
 pub struct NetworkProfile {
     pub bandwidth_kbps: u32,
     pub latency_ms: u32,
@@ -816,14 +816,14 @@ impl NetworkProfile {
    - **Action:** Experiment with sync intervals, batch sizes
 
 4. **Metrics Storage:** Where do we store historical simulation results?
-   - **Recommendation:** JSON files in `cap-sim/results/`, gitignore large files
+   - **Recommendation:** JSON files in `hive-sim/results/`, gitignore large files
 
 ## References
 
-- ADR-001: CAP Protocol POC Architecture (network requirements)
+- ADR-001: HIVE Protocol POC Architecture (network requirements)
 - ADR-002: Beacon Storage Architecture (Ditto integration patterns)
-- E7 Baseline Tests: `cap-protocol/tests/baseline_ditto_bandwidth_e2e.rs`
-- E2E Harness: `cap-protocol/src/testing/e2e_harness.rs`
+- E7 Baseline Tests: `hive-protocol/tests/baseline_ditto_bandwidth_e2e.rs`
+- E2E Harness: `hive-protocol/src/testing/e2e_harness.rs`
 - Testing Strategy: `docs/TESTING_STRATEGY.md`
 
 ## Success Criteria

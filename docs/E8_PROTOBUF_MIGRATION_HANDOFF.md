@@ -6,7 +6,7 @@
 
 ## Overview
 
-The `main` branch now includes a **complete protobuf migration** (ADR-012 Phase 5) that affects how you interact with CAP protocol models in the simulation environment. This document provides everything you need to update your simulation code.
+The `main` branch now includes a **complete protobuf migration** (ADR-012 Phase 5) that affects how you interact with HIVE protocol models in the simulation environment. This document provides everything you need to update your simulation code.
 
 ---
 
@@ -57,7 +57,7 @@ cell.add_member("soldier-1".to_string());
 **Add Extension Traits** to your imports:
 
 ```rust
-// cap-sim/src/node.rs (example)
+// hive-sim/src/node.rs (example)
 
 // Before
 use cap_protocol::models::{CellConfig, CellState, NodeConfig};
@@ -191,7 +191,7 @@ Extension traits provide convenience methods that hide protobuf complexity:
 | `cell.members.is_empty()` | `cell.is_empty()` |
 | `cell.config.id` | `cell.get_id().unwrap_or("<unknown>")` |
 
-**Full list of methods**: See extension trait definitions in `cap-protocol/src/models/`.
+**Full list of methods**: See extension trait definitions in `hive-protocol/src/models/`.
 
 ---
 
@@ -393,7 +393,7 @@ fn main() {
 
 ### 1. Run Unit Tests
 ```bash
-cd cap-protocol
+cd hive-protocol
 cargo test
 ```
 
@@ -401,7 +401,7 @@ cargo test
 
 ### 2. Run E2E Tests
 ```bash
-cd cap-protocol
+cd hive-protocol
 make test-e2e
 ```
 
@@ -412,7 +412,7 @@ make test-e2e
 Before deploying to ContainerLab, test your simulation code:
 
 ```bash
-cd cap-sim
+cd hive-sim
 cargo build --release
 ./target/release/cap_sim_node
 ```
@@ -422,7 +422,7 @@ cargo build --release
 ### 4. Deploy ContainerLab Topology
 
 ```bash
-cd cap-sim
+cd hive-sim
 sudo containerlab deploy -t topologies/squad-12node.yaml --env-file ../.env
 ```
 
@@ -433,16 +433,16 @@ sudo containerlab deploy -t topologies/squad-12node.yaml --env-file ../.env
 ## Documentation References
 
 ### Extension Trait Definitions
-- **Cell**: `cap-protocol/src/models/cell/mod.rs`
-- **Node**: `cap-protocol/src/models/node.rs`
-- **Zone**: `cap-protocol/src/models/zone.rs`
-- **Capability**: `cap-protocol/src/models/capability.rs`
-- **Operator**: `cap-protocol/src/models/operator.rs`
+- **Cell**: `hive-protocol/src/models/cell/mod.rs`
+- **Node**: `hive-protocol/src/models/node.rs`
+- **Zone**: `hive-protocol/src/models/zone.rs`
+- **Capability**: `hive-protocol/src/models/capability.rs`
+- **Operator**: `hive-protocol/src/models/operator.rs`
 
 ### Integration Tests
-- **Cross-model**: `cap-protocol/tests/models_integration.rs`
-- **Cell E2E**: `cap-protocol/tests/hierarchy_e2e.rs`
-- **Load testing**: `cap-protocol/tests/load_testing_e2e.rs`
+- **Cross-model**: `hive-protocol/tests/models_integration.rs`
+- **Cell E2E**: `hive-protocol/tests/hierarchy_e2e.rs`
+- **Load testing**: `hive-protocol/tests/load_testing_e2e.rs`
 
 ### Architecture Decisions
 - **ADR-012**: Schema-Driven Development (protobuf migration)
@@ -454,7 +454,7 @@ sudo containerlab deploy -t topologies/squad-12node.yaml --env-file ../.env
 ## Migration Steps for E8 Team
 
 ### Phase 1: Update Core Simulation Code (Week 1)
-1. ✅ Update `cap-sim/src/node.rs` imports
+1. ✅ Update `hive-sim/src/node.rs` imports
 2. ✅ Replace direct struct construction with extension traits
 3. ✅ Update member/capability operations
 4. ✅ Run local tests
@@ -492,8 +492,8 @@ sudo containerlab deploy -t topologies/squad-12node.yaml --env-file ../.env
 ### Q: Will Ditto sync still work?
 **A**: Yes! Protobuf types serialize to Ditto collections exactly the same way. The `DittoStore` integration is unchanged.
 
-### Q: What happens to my custom structs in `cap-sim`?
-**A**: If you have custom structs (e.g., `SimulationConfig`), you can keep them. Only CAP protocol models (Node, Cell, Zone) have changed.
+### Q: What happens to my custom structs in `hive-sim`?
+**A**: If you have custom structs (e.g., `SimulationConfig`), you can keep them. Only HIVE protocol models (Node, Cell, Zone) have changed.
 
 ### Q: Do I need to update ContainerLab YAML files?
 **A**: No! Topology YAML files are unchanged. Only the Rust code that creates/manipulates models needs updating.
@@ -506,8 +506,8 @@ sudo containerlab deploy -t topologies/squad-12node.yaml --env-file ../.env
 ## Support
 
 ### Questions?
-- **Slack**: `#cap-protocol` channel
-- **GitHub Issues**: [kitplummer/cap/issues](https://github.com/kitplummer/cap/issues)
+- **Slack**: `#hive-protocol` channel
+- **GitHub Issues**: [kitplummer/hive/issues](https://github.com/kitplummer/hive/issues)
 - **Docs**: [docs/INDEX.md](../docs/INDEX.md)
 
 ### Found a Bug?
@@ -518,7 +518,7 @@ Open an issue with:
 
 ### Need Help Migrating?
 Tag `@protobuf-migration-team` in Slack with:
-- File path (e.g., `cap-sim/src/node.rs`)
+- File path (e.g., `hive-sim/src/node.rs`)
 - Code you're trying to migrate
 - Error message (if any)
 
@@ -526,7 +526,7 @@ Tag `@protobuf-migration-team` in Slack with:
 
 ## Summary
 
-**What changed**: CAP protocol models are now protobuf types with extension traits.
+**What changed**: HIVE protocol models are now protobuf types with extension traits.
 
 **What you need to do**:
 1. Import extension traits

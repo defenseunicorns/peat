@@ -1,0 +1,44 @@
+[package]
+name = "hive-persistence"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors = ["Kit Plummer <kitplummer@gmail.com>"]
+description = "Storage abstraction layer for CAP Protocol data persistence"
+repository = "https://github.com/kitplummer/cap"
+
+[dependencies]
+# CAP dependencies
+hive-schema = { path = "../hive-schema" }
+hive-protocol = { path = "../hive-protocol" }
+
+# Async runtime
+tokio = { workspace = true, features = ["full"] }
+async-trait = "0.1"
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+prost = "0.13"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Logging
+tracing = "0.1"
+
+# HTTP server (for external API)
+axum = { version = "0.7", features = ["macros"], optional = true }
+tower = { version = "0.4", optional = true }
+tower-http = { version = "0.5", features = ["cors", "trace", "timeout"], optional = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+reqwest = { version = "0.12", features = ["json"] }
+tracing-subscriber = { workspace = true }
+dotenvy = { workspace = true }
+
+[features]
+default = ["external-api"]
+external-api = ["axum", "tower", "tower-http"]

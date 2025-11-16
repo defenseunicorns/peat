@@ -1,4 +1,4 @@
-# CAP Protocol - Patent Strategy
+# HIVE Protocol - Patent Strategy
 
 **Status**: Proposed
 **Date**: 2025-11-04
@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-**Recommendation**: File 2 provisional patent applications immediately (within 1 week) covering CAP Protocol's core innovations, then open-source the automerge-edge infrastructure.
+**Recommendation**: File 2 provisional patent applications immediately (within 1 week) covering HIVE Protocol's core innovations, then open-source the automerge-edge infrastructure.
 
 - **Cost**: $260 (DIY provisionals) or $4K-$6K (with attorney)
 - **Timeline**: File this week, then open-source freely
@@ -181,7 +181,7 @@ This provides:
 
 **Actions**:
 - Open-source automerge-edge on GitHub (Apache-2.0 license)
-- Release CAP Protocol documentation
+- Release HIVE Protocol documentation
 - Publish technical papers/blog posts
 - Present at conferences
 
@@ -365,7 +365,7 @@ Abandon provisionals if **all** of these are true:
 ### Week 2
 
 - [ ] Open-source automerge-edge on GitHub (now protected)
-- [ ] Update CAP Protocol documentation
+- [ ] Update HIVE Protocol documentation
 - [ ] Optionally add "patent pending" notices
 
 ### Months 1-12
@@ -407,8 +407,8 @@ Abandon provisionals if **all** of these are true:
 - [ADR-004: Human-Machine Cell Composition](adr/004-human-machine-cell-composition.md)
 - [ADR-007: Automerge-Based Sync Engine](adr/007-automerge-based-sync-engine.md)
 - [Human-Machine Teaming Design](human-machine-teaming-design.md)
-- [E6.1: Composition Rule Framework](../cap-protocol/src/cell/composition.rs)
-- [E6.2: Additive Composition Rules](../cap-protocol/src/cell/additive_composition.rs)
+- [E6.1: Composition Rule Framework](../hive-protocol/src/cell/composition.rs)
+- [E6.2: Additive Composition Rules](../hive-protocol/src/cell/additive_composition.rs)
 
 ## Approval
 

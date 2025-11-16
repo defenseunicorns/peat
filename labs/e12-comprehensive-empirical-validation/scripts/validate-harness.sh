@@ -93,7 +93,7 @@ check_prerequisites() {
     fi
 
     # Check topology file
-    if [ -f "../../../cap-sim/topologies/traditional-2node.yaml" ]; then
+    if [ -f "../../../hive-sim/topologies/traditional-2node.yaml" ]; then
         log_success "Test topology available"
     else
         log_error "Test topology not found"
@@ -158,7 +158,7 @@ test_topology_deployment() {
     set +a
 
     log_info "Deploying 2-node test topology..."
-    cd ../../../cap-sim
+    cd ../../../hive-sim
     containerlab deploy --reconfigure -t topologies/traditional-2node.yaml > /dev/null 2>&1
     cd - > /dev/null
 
@@ -198,7 +198,7 @@ test_bandwidth_constraints() {
     source ../../../.env
     set +a
 
-    cd ../../../cap-sim
+    cd ../../../hive-sim
     containerlab deploy --reconfigure -t topologies/traditional-2node.yaml > /dev/null 2>&1
     cd - > /dev/null
 
@@ -240,7 +240,7 @@ test_log_collection() {
     source ../../../.env
     set +a
 
-    cd ../../../cap-sim
+    cd ../../../hive-sim
     containerlab deploy --reconfigure -t topologies/traditional-2node.yaml > /dev/null 2>&1
     cd - > /dev/null
 
@@ -375,7 +375,7 @@ run_pilot_test() {
 
     # Deploy
     log_info "Deploying topology..."
-    cd ../../../cap-sim
+    cd ../../../hive-sim
     containerlab deploy --reconfigure -t topologies/traditional-2node.yaml > /dev/null 2>&1
     cd - > /dev/null
 
