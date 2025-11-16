@@ -1,0 +1,430 @@
+Docker Network Statistics Summary
+================================================================================
+
+Total Network I/O:
+  Input:  22,832,000 bytes (22.83 MB)
+  Output: 11,605,000 bytes (11.61 MB)
+  Total:  34,437,000 bytes (34.44 MB)
+
+Per-Node Breakdown:
+--------------------------------------------------------------------------------
+clab-cap-battalion-96node-mode4-battalion-hq:
+  Network: 1,188,000 bytes (↓485,000 ↑703,000)
+  CPU: 19.4%  Memory: 40.9 MB
+
+clab-cap-battalion-96node-mode4-platoon-1-leader:
+  Network: 1,285,000 bytes (↓419,000 ↑866,000)
+  CPU: 23.2%  Memory: 47.1 MB
+
+clab-cap-battalion-96node-mode4-platoon-1-soldier-1:
+  Network: 160,100 bytes (↓134,000 ↑26,100)
+  CPU: 3.7%  Memory: 20.8 MB
+
+clab-cap-battalion-96node-mode4-platoon-1-soldier-10:
+  Network: 201,500 bytes (↓178,000 ↑23,500)
+  CPU: 2.9%  Memory: 19.9 MB
+
+clab-cap-battalion-96node-mode4-platoon-1-soldier-11:
+  Network: 171,900 bytes (↓145,000 ↑26,900)
+  CPU: 3.0%  Memory: 22.2 MB
+
+clab-cap-battalion-96node-mode4-platoon-1-soldier-12:
+  Network: 197,800 bytes (↓171,000 ↑26,800)
+  CPU: 3.4%  Memory: 20.9 MB
+
+clab-cap-battalion-96node-mode4-platoon-1-soldier-2:
+  Network: 243,100 bytes (↓216,000 ↑27,100)
+  CPU: 3.0%  Memory: 21.2 MB
+
+clab-cap-battalion-96node-mode4-platoon-1-soldier-3:
+  Network: 198,700 bytes (↓172,000 ↑26,700)
+  CPU: 3.3%  Memory: 20.8 MB
+
+clab-cap-battalion-96node-mode4-platoon-1-soldier-4:
+  Network: 188,300 bytes (↓160,000 ↑28,300)
+  CPU: 5.6%  Memory: 21.4 MB
+
+clab-cap-battalion-96node-mode4-platoon-1-soldier-5:
+  Network: 194,200 bytes (↓168,000 ↑26,200)
+  CPU: 3.1%  Memory: 20.8 MB
+
+clab-cap-battalion-96node-mode4-platoon-1-soldier-6:
+  Network: 247,700 bytes (↓220,000 ↑27,700)
+  CPU: 3.0%  Memory: 22.3 MB
+
+clab-cap-battalion-96node-mode4-platoon-1-soldier-7:
+  Network: 196,900 bytes (↓170,000 ↑26,900)
+  CPU: 3.1%  Memory: 21.1 MB
+
+clab-cap-battalion-96node-mode4-platoon-1-soldier-8:
+  Network: 203,200 bytes (↓180,000 ↑23,200)
+  CPU: 3.3%  Memory: 19.5 MB
+
+clab-cap-battalion-96node-mode4-platoon-1-soldier-9:
+  Network: 175,800 bytes (↓151,000 ↑24,800)
+  CPU: 3.3%  Memory: 20.3 MB
+
+clab-cap-battalion-96node-mode4-platoon-2-leader:
+  Network: 1,627,000 bytes (↓567,000 ↑1,060,000)
+  CPU: 25.4%  Memory: 47.5 MB
+
+clab-cap-battalion-96node-mode4-platoon-2-soldier-1:
+  Network: 181,400 bytes (↓156,000 ↑25,400)
+  CPU: 4.0%  Memory: 21.4 MB
+
+clab-cap-battalion-96node-mode4-platoon-2-soldier-10:
+  Network: 229,600 bytes (↓201,000 ↑28,600)
+  CPU: 4.2%  Memory: 21.9 MB
+
+clab-cap-battalion-96node-mode4-platoon-2-soldier-11:
+  Network: 258,300 bytes (↓227,000 ↑31,300)
+  CPU: 3.6%  Memory: 22.4 MB
+
+clab-cap-battalion-96node-mode4-platoon-2-soldier-12:
+  Network: 201,900 bytes (↓175,000 ↑26,900)
+  CPU: 3.9%  Memory: 22.4 MB
+
+clab-cap-battalion-96node-mode4-platoon-2-soldier-2:
+  Network: 263,000 bytes (↓232,000 ↑31,000)
+  CPU: 4.1%  Memory: 20.8 MB
+
+clab-cap-battalion-96node-mode4-platoon-2-soldier-3:
+  Network: 228,900 bytes (↓200,000 ↑28,900)
+  CPU: 4.0%  Memory: 22.4 MB
+
+clab-cap-battalion-96node-mode4-platoon-2-soldier-4:
+  Network: 210,600 bytes (↓183,000 ↑27,600)
+  CPU: 4.0%  Memory: 21.7 MB
+
+clab-cap-battalion-96node-mode4-platoon-2-soldier-5:
+  Network: 223,100 bytes (↓195,000 ↑28,100)
+  CPU: 4.0%  Memory: 22.2 MB
+
+clab-cap-battalion-96node-mode4-platoon-2-soldier-6:
+  Network: 264,500 bytes (↓233,000 ↑31,500)
+  CPU: 3.6%  Memory: 22.1 MB
+
+clab-cap-battalion-96node-mode4-platoon-2-soldier-7:
+  Network: 254,700 bytes (↓224,000 ↑30,700)
+  CPU: 1.8%  Memory: 18.2 MB
+
+clab-cap-battalion-96node-mode4-platoon-2-soldier-8:
+  Network: 200,000 bytes (↓173,000 ↑27,000)
+  CPU: 3.9%  Memory: 21.2 MB
+
+clab-cap-battalion-96node-mode4-platoon-2-soldier-9:
+  Network: 226,500 bytes (↓198,000 ↑28,500)
+  CPU: 4.2%  Memory: 21.5 MB
+
+clab-cap-battalion-96node-mode4-platoon-3-leader:
+  Network: 1,512,000 bytes (↓519,000 ↑993,000)
+  CPU: 25.9%  Memory: 50.7 MB
+
+clab-cap-battalion-96node-mode4-platoon-3-soldier-1:
+  Network: 239,500 bytes (↓214,000 ↑25,500)
+  CPU: 1.9%  Memory: 18.4 MB
+
+clab-cap-battalion-96node-mode4-platoon-3-soldier-10:
+  Network: 164,300 bytes (↓137,000 ↑27,300)
+  CPU: 5.6%  Memory: 21.1 MB
+
+clab-cap-battalion-96node-mode4-platoon-3-soldier-11:
+  Network: 239,800 bytes (↓208,000 ↑31,800)
+  CPU: 5.3%  Memory: 22.3 MB
+
+clab-cap-battalion-96node-mode4-platoon-3-soldier-12:
+  Network: 233,100 bytes (↓208,000 ↑25,100)
+  CPU: 2.0%  Memory: 20.9 MB
+
+clab-cap-battalion-96node-mode4-platoon-3-soldier-2:
+  Network: 227,500 bytes (↓202,000 ↑25,500)
+  CPU: 2.1%  Memory: 20.1 MB
+
+clab-cap-battalion-96node-mode4-platoon-3-soldier-3:
+  Network: 247,200 bytes (↓219,000 ↑28,200)
+  CPU: 4.0%  Memory: 22.8 MB
+
+clab-cap-battalion-96node-mode4-platoon-3-soldier-4:
+  Network: 243,000 bytes (↓211,000 ↑32,000)
+  CPU: 5.3%  Memory: 21.7 MB
+
+clab-cap-battalion-96node-mode4-platoon-3-soldier-5:
+  Network: 237,300 bytes (↓206,000 ↑31,300)
+  CPU: 5.3%  Memory: 21.9 MB
+
+clab-cap-battalion-96node-mode4-platoon-3-soldier-6:
+  Network: 229,700 bytes (↓199,000 ↑30,700)
+  CPU: 5.4%  Memory: 22.0 MB
+
+clab-cap-battalion-96node-mode4-platoon-3-soldier-7:
+  Network: 222,900 bytes (↓192,000 ↑30,900)
+  CPU: 5.2%  Memory: 21.7 MB
+
+clab-cap-battalion-96node-mode4-platoon-3-soldier-8:
+  Network: 187,600 bytes (↓159,000 ↑28,600)
+  CPU: 5.1%  Memory: 21.4 MB
+
+clab-cap-battalion-96node-mode4-platoon-3-soldier-9:
+  Network: 203,800 bytes (↓174,000 ↑29,800)
+  CPU: 5.3%  Memory: 21.4 MB
+
+clab-cap-battalion-96node-mode4-platoon-4-leader:
+  Network: 1,443,000 bytes (↓479,000 ↑964,000)
+  CPU: 29.7%  Memory: 48.5 MB
+
+clab-cap-battalion-96node-mode4-platoon-4-soldier-1:
+  Network: 205,400 bytes (↓178,000 ↑27,400)
+  CPU: 4.2%  Memory: 21.1 MB
+
+clab-cap-battalion-96node-mode4-platoon-4-soldier-10:
+  Network: 187,700 bytes (↓159,000 ↑28,700)
+  CPU: 5.5%  Memory: 21.6 MB
+
+clab-cap-battalion-96node-mode4-platoon-4-soldier-11:
+  Network: 211,800 bytes (↓184,000 ↑27,800)
+  CPU: 4.5%  Memory: 21.8 MB
+
+clab-cap-battalion-96node-mode4-platoon-4-soldier-12:
+  Network: 204,300 bytes (↓175,000 ↑29,300)
+  CPU: 5.4%  Memory: 21.6 MB
+
+clab-cap-battalion-96node-mode4-platoon-4-soldier-2:
+  Network: 222,100 bytes (↓194,000 ↑28,100)
+  CPU: 6.1%  Memory: 21.4 MB
+
+clab-cap-battalion-96node-mode4-platoon-4-soldier-3:
+  Network: 155,000 bytes (↓129,000 ↑26,000)
+  CPU: 3.1%  Memory: 22.1 MB
+
+clab-cap-battalion-96node-mode4-platoon-4-soldier-4:
+  Network: 203,200 bytes (↓174,000 ↑29,200)
+  CPU: 5.7%  Memory: 21.6 MB
+
+clab-cap-battalion-96node-mode4-platoon-4-soldier-5:
+  Network: 223,100 bytes (↓197,000 ↑26,100)
+  CPU: 3.2%  Memory: 21.1 MB
+
+clab-cap-battalion-96node-mode4-platoon-4-soldier-6:
+  Network: 176,200 bytes (↓148,000 ↑28,200)
+  CPU: 5.7%  Memory: 21.6 MB
+
+clab-cap-battalion-96node-mode4-platoon-4-soldier-7:
+  Network: 179,500 bytes (↓151,000 ↑28,500)
+  CPU: 5.6%  Memory: 22.1 MB
+
+clab-cap-battalion-96node-mode4-platoon-4-soldier-8:
+  Network: 233,700 bytes (↓204,000 ↑29,700)
+  CPU: 5.7%  Memory: 21.9 MB
+
+clab-cap-battalion-96node-mode4-platoon-4-soldier-9:
+  Network: 211,900 bytes (↓184,000 ↑27,900)
+  CPU: 4.7%  Memory: 22.1 MB
+
+clab-cap-battalion-96node-mode4-platoon-5-leader:
+  Network: 1,824,000 bytes (↓634,000 ↑1,190,000)
+  CPU: 25.8%  Memory: 56.3 MB
+
+clab-cap-battalion-96node-mode4-platoon-5-soldier-1:
+  Network: 202,600 bytes (↓173,000 ↑29,600)
+  CPU: 5.5%  Memory: 22.8 MB
+
+clab-cap-battalion-96node-mode4-platoon-5-soldier-10:
+  Network: 246,900 bytes (↓215,000 ↑31,900)
+  CPU: 5.5%  Memory: 21.6 MB
+
+clab-cap-battalion-96node-mode4-platoon-5-soldier-11:
+  Network: 182,400 bytes (↓154,000 ↑28,400)
+  CPU: 3.4%  Memory: 21.4 MB
+
+clab-cap-battalion-96node-mode4-platoon-5-soldier-12:
+  Network: 233,300 bytes (↓202,000 ↑31,300)
+  CPU: 5.3%  Memory: 21.8 MB
+
+clab-cap-battalion-96node-mode4-platoon-5-soldier-2:
+  Network: 179,500 bytes (↓151,000 ↑28,500)
+  CPU: 5.7%  Memory: 22.2 MB
+
+clab-cap-battalion-96node-mode4-platoon-5-soldier-3:
+  Network: 263,400 bytes (↓232,000 ↑31,400)
+  CPU: 3.7%  Memory: 20.3 MB
+
+clab-cap-battalion-96node-mode4-platoon-5-soldier-4:
+  Network: 162,600 bytes (↓135,000 ↑27,600)
+  CPU: 6.2%  Memory: 21.2 MB
+
+clab-cap-battalion-96node-mode4-platoon-5-soldier-5:
+  Network: 272,000 bytes (↓239,000 ↑33,000)
+  CPU: 4.2%  Memory: 21.9 MB
+
+clab-cap-battalion-96node-mode4-platoon-5-soldier-6:
+  Network: 275,600 bytes (↓239,000 ↑36,600)
+  CPU: 5.2%  Memory: 22.2 MB
+
+clab-cap-battalion-96node-mode4-platoon-5-soldier-7:
+  Network: 274,800 bytes (↓238,000 ↑36,800)
+  CPU: 3.3%  Memory: 18.6 MB
+
+clab-cap-battalion-96node-mode4-platoon-5-soldier-8:
+  Network: 191,600 bytes (↓163,000 ↑28,600)
+  CPU: 5.3%  Memory: 22.1 MB
+
+clab-cap-battalion-96node-mode4-platoon-5-soldier-9:
+  Network: 215,000 bytes (↓185,000 ↑30,000)
+  CPU: 5.2%  Memory: 21.6 MB
+
+clab-cap-battalion-96node-mode4-platoon-6-leader:
+  Network: 1,604,000 bytes (↓554,000 ↑1,050,000)
+  CPU: 30.7%  Memory: 53.2 MB
+
+clab-cap-battalion-96node-mode4-platoon-6-soldier-1:
+  Network: 259,700 bytes (↓227,000 ↑32,700)
+  CPU: 5.2%  Memory: 21.9 MB
+
+clab-cap-battalion-96node-mode4-platoon-6-soldier-10:
+  Network: 260,300 bytes (↓229,000 ↑31,300)
+  CPU: 5.1%  Memory: 21.6 MB
+
+clab-cap-battalion-96node-mode4-platoon-6-soldier-11:
+  Network: 241,500 bytes (↓210,000 ↑31,500)
+  CPU: 5.5%  Memory: 21.9 MB
+
+clab-cap-battalion-96node-mode4-platoon-6-soldier-12:
+  Network: 243,600 bytes (↓216,000 ↑27,600)
+  CPU: 3.1%  Memory: 21.1 MB
+
+clab-cap-battalion-96node-mode4-platoon-6-soldier-2:
+  Network: 166,600 bytes (↓139,000 ↑27,600)
+  CPU: 3.1%  Memory: 19.6 MB
+
+clab-cap-battalion-96node-mode4-platoon-6-soldier-3:
+  Network: 175,500 bytes (↓147,000 ↑28,500)
+  CPU: 5.5%  Memory: 22.1 MB
+
+clab-cap-battalion-96node-mode4-platoon-6-soldier-4:
+  Network: 243,900 bytes (↓215,000 ↑28,900)
+  CPU: 4.8%  Memory: 21.9 MB
+
+clab-cap-battalion-96node-mode4-platoon-6-soldier-5:
+  Network: 248,200 bytes (↓216,000 ↑32,200)
+  CPU: 5.1%  Memory: 22.2 MB
+
+clab-cap-battalion-96node-mode4-platoon-6-soldier-6:
+  Network: 252,000 bytes (↓218,000 ↑34,000)
+  CPU: 5.5%  Memory: 22.9 MB
+
+clab-cap-battalion-96node-mode4-platoon-6-soldier-7:
+  Network: 250,100 bytes (↓223,000 ↑27,100)
+  CPU: 3.4%  Memory: 18.9 MB
+
+clab-cap-battalion-96node-mode4-platoon-6-soldier-8:
+  Network: 189,600 bytes (↓160,000 ↑29,600)
+  CPU: 5.5%  Memory: 21.0 MB
+
+clab-cap-battalion-96node-mode4-platoon-6-soldier-9:
+  Network: 173,600 bytes (↓145,000 ↑28,600)
+  CPU: 5.9%  Memory: 22.0 MB
+
+clab-cap-battalion-96node-mode4-platoon-7-leader:
+  Network: 1,403,000 bytes (↓460,000 ↑943,000)
+  CPU: 29.7%  Memory: 49.0 MB
+
+clab-cap-battalion-96node-mode4-platoon-7-soldier-1:
+  Network: 222,000 bytes (↓194,000 ↑28,000)
+  CPU: 6.0%  Memory: 21.6 MB
+
+clab-cap-battalion-96node-mode4-platoon-7-soldier-10:
+  Network: 253,600 bytes (↓221,000 ↑32,600)
+  CPU: 3.2%  Memory: 18.9 MB
+
+clab-cap-battalion-96node-mode4-platoon-7-soldier-11:
+  Network: 200,400 bytes (↓174,000 ↑26,400)
+  CPU: 3.3%  Memory: 21.1 MB
+
+clab-cap-battalion-96node-mode4-platoon-7-soldier-12:
+  Network: 189,500 bytes (↓162,000 ↑27,500)
+  CPU: 3.2%  Memory: 21.9 MB
+
+clab-cap-battalion-96node-mode4-platoon-7-soldier-2:
+  Network: 203,800 bytes (↓175,000 ↑28,800)
+  CPU: 5.5%  Memory: 21.6 MB
+
+clab-cap-battalion-96node-mode4-platoon-7-soldier-3:
+  Network: 261,500 bytes (↓231,000 ↑30,500)
+  CPU: 4.3%  Memory: 19.3 MB
+
+clab-cap-battalion-96node-mode4-platoon-7-soldier-4:
+  Network: 260,000 bytes (↓227,000 ↑33,000)
+  CPU: 5.1%  Memory: 22.8 MB
+
+clab-cap-battalion-96node-mode4-platoon-7-soldier-5:
+  Network: 204,700 bytes (↓178,000 ↑26,700)
+  CPU: 4.4%  Memory: 21.8 MB
+
+clab-cap-battalion-96node-mode4-platoon-7-soldier-6:
+  Network: 218,000 bytes (↓190,000 ↑28,000)
+  CPU: 5.8%  Memory: 22.7 MB
+
+clab-cap-battalion-96node-mode4-platoon-7-soldier-7:
+  Network: 215,800 bytes (↓191,000 ↑24,800)
+  CPU: 3.3%  Memory: 20.8 MB
+
+clab-cap-battalion-96node-mode4-platoon-7-soldier-8:
+  Network: 195,100 bytes (↓167,000 ↑28,100)
+  CPU: 5.8%  Memory: 21.8 MB
+
+clab-cap-battalion-96node-mode4-platoon-7-soldier-9:
+  Network: 189,600 bytes (↓162,000 ↑27,600)
+  CPU: 5.7%  Memory: 22.1 MB
+
+clab-cap-battalion-96node-mode4-platoon-8-leader:
+  Network: 1,602,000 bytes (↓542,000 ↑1,060,000)
+  CPU: 28.6%  Memory: 51.9 MB
+
+clab-cap-battalion-96node-mode4-platoon-8-soldier-1:
+  Network: 212,600 bytes (↓182,000 ↑30,600)
+  CPU: 5.2%  Memory: 20.8 MB
+
+clab-cap-battalion-96node-mode4-platoon-8-soldier-10:
+  Network: 203,000 bytes (↓173,000 ↑30,000)
+  CPU: 5.5%  Memory: 21.9 MB
+
+clab-cap-battalion-96node-mode4-platoon-8-soldier-11:
+  Network: 239,300 bytes (↓214,000 ↑25,300)
+  CPU: 3.5%  Memory: 21.7 MB
+
+clab-cap-battalion-96node-mode4-platoon-8-soldier-12:
+  Network: 241,900 bytes (↓210,000 ↑31,900)
+  CPU: 5.2%  Memory: 21.6 MB
+
+clab-cap-battalion-96node-mode4-platoon-8-soldier-2:
+  Network: 235,700 bytes (↓204,000 ↑31,700)
+  CPU: 5.4%  Memory: 22.3 MB
+
+clab-cap-battalion-96node-mode4-platoon-8-soldier-3:
+  Network: 230,400 bytes (↓199,000 ↑31,400)
+  CPU: 5.2%  Memory: 21.4 MB
+
+clab-cap-battalion-96node-mode4-platoon-8-soldier-4:
+  Network: 237,000 bytes (↓212,000 ↑25,000)
+  CPU: 3.4%  Memory: 21.1 MB
+
+clab-cap-battalion-96node-mode4-platoon-8-soldier-5:
+  Network: 211,100 bytes (↓181,000 ↑30,100)
+  CPU: 5.2%  Memory: 21.4 MB
+
+clab-cap-battalion-96node-mode4-platoon-8-soldier-6:
+  Network: 225,900 bytes (↓195,000 ↑30,900)
+  CPU: 5.2%  Memory: 22.6 MB
+
+clab-cap-battalion-96node-mode4-platoon-8-soldier-7:
+  Network: 235,500 bytes (↓204,000 ↑31,500)
+  CPU: 5.2%  Memory: 21.7 MB
+
+clab-cap-battalion-96node-mode4-platoon-8-soldier-8:
+  Network: 264,900 bytes (↓234,000 ↑30,900)
+  CPU: 4.9%  Memory: 21.9 MB
+
+clab-cap-battalion-96node-mode4-platoon-8-soldier-9:
+  Network: 182,100 bytes (↓154,000 ↑28,100)
+  CPU: 5.4%  Memory: 21.2 MB
+

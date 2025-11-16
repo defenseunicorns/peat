@@ -1,0 +1,6 @@
+Architecture: traditional
+Scale: 12node
+Bandwidth: 100mbps
+Topology: traditional-squad-client-server.yaml
+Start Time: 2025-11-10T20:49:35-05:00
+End Time: 2025-11-10T20:51:16-05:00

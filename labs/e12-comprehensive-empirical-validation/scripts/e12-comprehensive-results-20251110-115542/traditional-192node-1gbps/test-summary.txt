@@ -1,0 +1,22 @@
+Application Metrics Summary
+================================================================================
+
+Total Events: 53558
+
+Event Type Breakdown:
+  DocumentInserted: 2
+  DocumentReceived: 384
+  MessageReceived: 26450
+  MessageSent: 26722
+
+Sync Metrics:
+  Total Application Bytes: 17,530,898
+  Message Count: 53172
+
+Latency Metrics:
+  Count: 26834
+  P50: 2.8 ms
+  P90: 5.3 ms
+  P99: 2003.4 ms
+
+Document Receptions: 384

@@ -1,0 +1,106 @@
+Docker Network Statistics Summary
+================================================================================
+
+Total Network I/O:
+  Input:  1,860,799 bytes (1.86 MB)
+  Output: 1,036,200 bytes (1.04 MB)
+  Total:  2,896,999 bytes (2.90 MB)
+
+Per-Node Breakdown:
+--------------------------------------------------------------------------------
+clab-cap-platoon-client-server-alpha-soldier-1:
+  Network: 87,100 bytes (↓68,200 ↑18,900)
+  CPU: 0.6%  Memory: 15.9 MB
+
+clab-cap-platoon-client-server-alpha-soldier-2:
+  Network: 87,200 bytes (↓68,400 ↑18,800)
+  CPU: 0.6%  Memory: 16.2 MB
+
+clab-cap-platoon-client-server-alpha-soldier-3:
+  Network: 85,000 bytes (↓66,400 ↑18,600)
+  CPU: 2.0%  Memory: 18.1 MB
+
+clab-cap-platoon-client-server-alpha-soldier-4:
+  Network: 85,500 bytes (↓67,200 ↑18,300)
+  CPU: 2.2%  Memory: 18.5 MB
+
+clab-cap-platoon-client-server-alpha-uav-1:
+  Network: 83,600 bytes (↓64,800 ↑18,800)
+  CPU: 2.1%  Memory: 17.8 MB
+
+clab-cap-platoon-client-server-alpha-ugv-1:
+  Network: 79,900 bytes (↓61,900 ↑18,000)
+  CPU: 2.6%  Memory: 17.9 MB
+
+clab-cap-platoon-client-server-bravo-soldier-1:
+  Network: 80,400 bytes (↓62,200 ↑18,200)
+  CPU: 2.5%  Memory: 18.1 MB
+
+clab-cap-platoon-client-server-bravo-soldier-2:
+  Network: 78,600 bytes (↓60,400 ↑18,200)
+  CPU: 2.2%  Memory: 17.8 MB
+
+clab-cap-platoon-client-server-bravo-soldier-3:
+  Network: 87,000 bytes (↓68,100 ↑18,900)
+  CPU: 0.6%  Memory: 16.3 MB
+
+clab-cap-platoon-client-server-bravo-soldier-4:
+  Network: 84,500 bytes (↓65,400 ↑19,100)
+  CPU: 2.2%  Memory: 18.4 MB
+
+clab-cap-platoon-client-server-bravo-soldier-5:
+  Network: 87,500 bytes (↓69,100 ↑18,400)
+  CPU: 0.5%  Memory: 16.6 MB
+
+clab-cap-platoon-client-server-bravo-uav-1:
+  Network: 83,600 bytes (↓64,800 ↑18,800)
+  CPU: 2.1%  Memory: 18.1 MB
+
+clab-cap-platoon-client-server-bravo-ugv-1:
+  Network: 88,300 bytes (↓69,700 ↑18,600)
+  CPU: 0.7%  Memory: 16.1 MB
+
+clab-cap-platoon-client-server-charlie-soldier-1:
+  Network: 85,100 bytes (↓66,500 ↑18,600)
+  CPU: 2.3%  Memory: 18.1 MB
+
+clab-cap-platoon-client-server-charlie-soldier-2:
+  Network: 83,800 bytes (↓65,500 ↑18,300)
+  CPU: 2.0%  Memory: 17.7 MB
+
+clab-cap-platoon-client-server-charlie-soldier-3:
+  Network: 81,700 bytes (↓63,300 ↑18,400)
+  CPU: 2.1%  Memory: 17.9 MB
+
+clab-cap-platoon-client-server-charlie-soldier-4:
+  Network: 83,900 bytes (↓65,300 ↑18,600)
+  CPU: 0.7%  Memory: 16.2 MB
+
+clab-cap-platoon-client-server-charlie-soldier-5:
+  Network: 85,400 bytes (↓67,000 ↑18,400)
+  CPU: 2.1%  Memory: 18.1 MB
+
+clab-cap-platoon-client-server-charlie-uav-1:
+  Network: 81,700 bytes (↓62,900 ↑18,800)
+  CPU: 2.5%  Memory: 18.2 MB
+
+clab-cap-platoon-client-server-charlie-ugv-1:
+  Network: 85,400 bytes (↓67,000 ↑18,400)
+  CPU: 2.0%  Memory: 18.0 MB
+
+clab-cap-platoon-client-server-platoon-leader:
+  Network: 958,000 bytes (↓349,000 ↑609,000)
+  CPU: 27.2%  Memory: 54.1 MB
+
+clab-cap-platoon-client-server-squad-alpha-leader:
+  Network: 88,100 bytes (↓69,400 ↑18,700)
+  CPU: 0.6%  Memory: 16.2 MB
+
+clab-cap-platoon-client-server-squad-bravo-leader:
+  Network: 81,800 bytes (↓63,200 ↑18,600)
+  CPU: 0.7%  Memory: 17.9 MB
+
+clab-cap-platoon-client-server-squad-charlie-leader:
+  Network: 83,900 bytes (↓65,099 ↑18,800)
+  CPU: 2.5%  Memory: 17.8 MB
+

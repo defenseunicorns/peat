@@ -1,0 +1,674 @@
+{
+  "clab-traditional-battalion-96node-p3-soldier-3": {
+    "net_input_bytes": 197000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 317000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2711250
+  },
+  "clab-traditional-battalion-96node-p2-soldier-8": {
+    "net_input_bytes": 195000,
+    "net_output_bytes": 118000,
+    "net_total_bytes": 313000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2676000
+  },
+  "clab-traditional-battalion-96node-p1-soldier-19": {
+    "net_input_bytes": 197000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 317000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2672000
+  },
+  "clab-traditional-battalion-96node-p4-soldier-2": {
+    "net_input_bytes": 199000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 319000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2680000
+  },
+  "clab-traditional-battalion-96node-p2-soldier-21": {
+    "net_input_bytes": 199000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 319000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2672000
+  },
+  "clab-traditional-battalion-96node-p2-soldier-14": {
+    "net_input_bytes": 203000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 323000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2707250
+  },
+  "clab-traditional-battalion-96node-p3-soldier-22": {
+    "net_input_bytes": 202000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 322000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2668500
+  },
+  "clab-traditional-battalion-96node-p2-soldier-23": {
+    "net_input_bytes": 206000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 326000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2672500
+  },
+  "clab-traditional-battalion-96node-p3-soldier-19": {
+    "net_input_bytes": 204000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 324000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2668000
+  },
+  "clab-traditional-battalion-96node-p2-soldier-11": {
+    "net_input_bytes": 204000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 324000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2676000
+  },
+  "clab-traditional-battalion-96node-p4-soldier-13": {
+    "net_input_bytes": 204000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 324000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2672000
+  },
+  "clab-traditional-battalion-96node-p3-soldier-4": {
+    "net_input_bytes": 207000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 327000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2676500
+  },
+  "clab-traditional-battalion-96node-p1-soldier-7": {
+    "net_input_bytes": 208000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 328000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2665000
+  },
+  "clab-traditional-battalion-96node-p1-soldier-10": {
+    "net_input_bytes": 210000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 330000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2680500
+  },
+  "clab-traditional-battalion-96node-p1-soldier-21": {
+    "net_input_bytes": 198000,
+    "net_output_bytes": 94300,
+    "net_total_bytes": 292300,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2676000
+  },
+  "clab-traditional-battalion-96node-battalion-hq": {
+    "net_input_bytes": 11000000,
+    "net_output_bytes": 10900000,
+    "net_total_bytes": 21900000,
+    "avg_cpu_percent": 0.81,
+    "avg_mem_bytes": 8905500
+  },
+  "clab-traditional-battalion-96node-p4-soldier-19": {
+    "net_input_bytes": 209000,
+    "net_output_bytes": 118000,
+    "net_total_bytes": 327000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2664000
+  },
+  "clab-traditional-battalion-96node-p1-soldier-15": {
+    "net_input_bytes": 211000,
+    "net_output_bytes": 118000,
+    "net_total_bytes": 329000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2676000
+  },
+  "clab-traditional-battalion-96node-p1-soldier-3": {
+    "net_input_bytes": 186000,
+    "net_output_bytes": 105000,
+    "net_total_bytes": 291000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2680500
+  },
+  "clab-traditional-battalion-96node-p4-soldier-6": {
+    "net_input_bytes": 214000,
+    "net_output_bytes": 118000,
+    "net_total_bytes": 332000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2676500
+  },
+  "clab-traditional-battalion-96node-p4-soldier-1": {
+    "net_input_bytes": 216000,
+    "net_output_bytes": 118000,
+    "net_total_bytes": 334000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2668500
+  },
+  "clab-traditional-battalion-96node-p1-soldier-24": {
+    "net_input_bytes": 216000,
+    "net_output_bytes": 118000,
+    "net_total_bytes": 334000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2668500
+  },
+  "clab-traditional-battalion-96node-p2-soldier-10": {
+    "net_input_bytes": 217000,
+    "net_output_bytes": 118000,
+    "net_total_bytes": 335000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2668000
+  },
+  "clab-traditional-battalion-96node-p3-soldier-8": {
+    "net_input_bytes": 218000,
+    "net_output_bytes": 118000,
+    "net_total_bytes": 336000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2664500
+  },
+  "clab-traditional-battalion-96node-p1-soldier-12": {
+    "net_input_bytes": 218000,
+    "net_output_bytes": 118000,
+    "net_total_bytes": 336000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2668500
+  },
+  "clab-traditional-battalion-96node-p3-soldier-2": {
+    "net_input_bytes": 219000,
+    "net_output_bytes": 118000,
+    "net_total_bytes": 337000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2676500
+  },
+  "clab-traditional-battalion-96node-p4-soldier-17": {
+    "net_input_bytes": 221000,
+    "net_output_bytes": 118000,
+    "net_total_bytes": 339000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2699250
+  },
+  "clab-traditional-battalion-96node-p4-soldier-21": {
+    "net_input_bytes": 221000,
+    "net_output_bytes": 118000,
+    "net_total_bytes": 339000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2672000
+  },
+  "clab-traditional-battalion-96node-p4-soldier-14": {
+    "net_input_bytes": 223000,
+    "net_output_bytes": 118000,
+    "net_total_bytes": 341000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2672500
+  },
+  "clab-traditional-battalion-96node-p1-soldier-14": {
+    "net_input_bytes": 223000,
+    "net_output_bytes": 118000,
+    "net_total_bytes": 341000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2664000
+  },
+  "clab-traditional-battalion-96node-p4-soldier-12": {
+    "net_input_bytes": 225000,
+    "net_output_bytes": 118000,
+    "net_total_bytes": 343000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2672000
+  },
+  "clab-traditional-battalion-96node-p1-soldier-5": {
+    "net_input_bytes": 225000,
+    "net_output_bytes": 118000,
+    "net_total_bytes": 343000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2703250
+  },
+  "clab-traditional-battalion-96node-p2-soldier-18": {
+    "net_input_bytes": 226000,
+    "net_output_bytes": 119000,
+    "net_total_bytes": 345000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2669000
+  },
+  "clab-traditional-battalion-96node-p2-soldier-17": {
+    "net_input_bytes": 226000,
+    "net_output_bytes": 118000,
+    "net_total_bytes": 344000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2680000
+  },
+  "clab-traditional-battalion-96node-p1-soldier-1": {
+    "net_input_bytes": 214000,
+    "net_output_bytes": 93200,
+    "net_total_bytes": 307200,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2676500
+  },
+  "clab-traditional-battalion-96node-p2-soldier-16": {
+    "net_input_bytes": 215000,
+    "net_output_bytes": 93400,
+    "net_total_bytes": 308400,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2680500
+  },
+  "clab-traditional-battalion-96node-p4-soldier-16": {
+    "net_input_bytes": 215000,
+    "net_output_bytes": 93400,
+    "net_total_bytes": 308400,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2677000
+  },
+  "clab-traditional-battalion-96node-p3-soldier-14": {
+    "net_input_bytes": 204000,
+    "net_output_bytes": 106000,
+    "net_total_bytes": 310000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2672500
+  },
+  "clab-traditional-battalion-96node-p3-soldier-17": {
+    "net_input_bytes": 230000,
+    "net_output_bytes": 119000,
+    "net_total_bytes": 349000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2672000
+  },
+  "clab-traditional-battalion-96node-p1-soldier-22": {
+    "net_input_bytes": 231000,
+    "net_output_bytes": 119000,
+    "net_total_bytes": 350000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2676500
+  },
+  "clab-traditional-battalion-96node-p1-soldier-16": {
+    "net_input_bytes": 232000,
+    "net_output_bytes": 119000,
+    "net_total_bytes": 351000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2672500
+  },
+  "clab-traditional-battalion-96node-p3-soldier-12": {
+    "net_input_bytes": 232000,
+    "net_output_bytes": 119000,
+    "net_total_bytes": 351000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2677000
+  },
+  "clab-traditional-battalion-96node-p2-soldier-19": {
+    "net_input_bytes": 234000,
+    "net_output_bytes": 119000,
+    "net_total_bytes": 353000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2668500
+  },
+  "clab-traditional-battalion-96node-p3-soldier-15": {
+    "net_input_bytes": 233000,
+    "net_output_bytes": 119000,
+    "net_total_bytes": 352000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2676500
+  },
+  "clab-traditional-battalion-96node-p2-soldier-9": {
+    "net_input_bytes": 233000,
+    "net_output_bytes": 119000,
+    "net_total_bytes": 352000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2698750
+  },
+  "clab-traditional-battalion-96node-p2-soldier-12": {
+    "net_input_bytes": 235000,
+    "net_output_bytes": 119000,
+    "net_total_bytes": 354000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2676000
+  },
+  "clab-traditional-battalion-96node-p3-soldier-1": {
+    "net_input_bytes": 235000,
+    "net_output_bytes": 119000,
+    "net_total_bytes": 354000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2672500
+  },
+  "clab-traditional-battalion-96node-p4-soldier-22": {
+    "net_input_bytes": 236000,
+    "net_output_bytes": 119000,
+    "net_total_bytes": 355000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2664000
+  },
+  "clab-traditional-battalion-96node-p3-soldier-7": {
+    "net_input_bytes": 236000,
+    "net_output_bytes": 119000,
+    "net_total_bytes": 355000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2672000
+  },
+  "clab-traditional-battalion-96node-p2-soldier-7": {
+    "net_input_bytes": 238000,
+    "net_output_bytes": 119000,
+    "net_total_bytes": 357000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2661000
+  },
+  "clab-traditional-battalion-96node-p2-soldier-15": {
+    "net_input_bytes": 237000,
+    "net_output_bytes": 119000,
+    "net_total_bytes": 356000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2664500
+  },
+  "clab-traditional-battalion-96node-p2-soldier-24": {
+    "net_input_bytes": 238000,
+    "net_output_bytes": 119000,
+    "net_total_bytes": 357000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2668500
+  },
+  "clab-traditional-battalion-96node-p3-soldier-16": {
+    "net_input_bytes": 239000,
+    "net_output_bytes": 119000,
+    "net_total_bytes": 358000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2664500
+  },
+  "clab-traditional-battalion-96node-p3-soldier-13": {
+    "net_input_bytes": 239000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 359000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2703750
+  },
+  "clab-traditional-battalion-96node-p4-soldier-3": {
+    "net_input_bytes": 225000,
+    "net_output_bytes": 112000,
+    "net_total_bytes": 337000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2668000
+  },
+  "clab-traditional-battalion-96node-p1-soldier-6": {
+    "net_input_bytes": 227000,
+    "net_output_bytes": 93600,
+    "net_total_bytes": 320600,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2660500
+  },
+  "clab-traditional-battalion-96node-p3-soldier-20": {
+    "net_input_bytes": 227000,
+    "net_output_bytes": 93800,
+    "net_total_bytes": 320800,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2668000
+  },
+  "clab-traditional-battalion-96node-p3-soldier-21": {
+    "net_input_bytes": 239000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 359000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2680500
+  },
+  "clab-traditional-battalion-96node-p3-soldier-23": {
+    "net_input_bytes": 243000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 363000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2668500
+  },
+  "clab-traditional-battalion-96node-p4-soldier-9": {
+    "net_input_bytes": 243000,
+    "net_output_bytes": 119000,
+    "net_total_bytes": 362000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2656500
+  },
+  "clab-traditional-battalion-96node-p2-soldier-20": {
+    "net_input_bytes": 244000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 364000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2664500
+  },
+  "clab-traditional-battalion-96node-p3-soldier-11": {
+    "net_input_bytes": 244000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 364000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2676000
+  },
+  "clab-traditional-battalion-96node-p1-soldier-8": {
+    "net_input_bytes": 253000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 373000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2660500
+  },
+  "clab-traditional-battalion-96node-p2-soldier-22": {
+    "net_input_bytes": 244000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 364000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2668000
+  },
+  "clab-traditional-battalion-96node-p2-soldier-1": {
+    "net_input_bytes": 253000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 373000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2676000
+  },
+  "clab-traditional-battalion-96node-p4-soldier-11": {
+    "net_input_bytes": 245000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 365000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2668000
+  },
+  "clab-traditional-battalion-96node-p3-soldier-6": {
+    "net_input_bytes": 256000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 376000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2676500
+  },
+  "clab-traditional-battalion-96node-p1-soldier-9": {
+    "net_input_bytes": 255000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 375000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2672500
+  },
+  "clab-traditional-battalion-96node-p3-soldier-24": {
+    "net_input_bytes": 255000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 375000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2676000
+  },
+  "clab-traditional-battalion-96node-p2-soldier-4": {
+    "net_input_bytes": 256000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 376000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2664500
+  },
+  "clab-traditional-battalion-96node-p4-soldier-15": {
+    "net_input_bytes": 256000,
+    "net_output_bytes": 121000,
+    "net_total_bytes": 377000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2673000
+  },
+  "clab-traditional-battalion-96node-p2-soldier-13": {
+    "net_input_bytes": 255000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 375000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2668000
+  },
+  "clab-traditional-battalion-96node-p1-soldier-23": {
+    "net_input_bytes": 257000,
+    "net_output_bytes": 121000,
+    "net_total_bytes": 378000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2661000
+  },
+  "clab-traditional-battalion-96node-p1-soldier-17": {
+    "net_input_bytes": 249000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 369000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2699250
+  },
+  "clab-traditional-battalion-96node-p1-soldier-4": {
+    "net_input_bytes": 252000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 372000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2668500
+  },
+  "clab-traditional-battalion-96node-p3-soldier-18": {
+    "net_input_bytes": 246000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 366000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2702750
+  },
+  "clab-traditional-battalion-96node-p1-soldier-18": {
+    "net_input_bytes": 252000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 372000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2664500
+  },
+  "clab-traditional-battalion-96node-p1-soldier-13": {
+    "net_input_bytes": 225000,
+    "net_output_bytes": 107000,
+    "net_total_bytes": 332000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2665000
+  },
+  "clab-traditional-battalion-96node-p4-soldier-20": {
+    "net_input_bytes": 247000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 367000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2676000
+  },
+  "clab-traditional-battalion-96node-p4-soldier-5": {
+    "net_input_bytes": 248000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 368000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2664000
+  },
+  "clab-traditional-battalion-96node-p2-soldier-2": {
+    "net_input_bytes": 248000,
+    "net_output_bytes": 119000,
+    "net_total_bytes": 367000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2699750
+  },
+  "clab-traditional-battalion-96node-p4-soldier-8": {
+    "net_input_bytes": 248000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 368000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2665500
+  },
+  "clab-traditional-battalion-96node-p3-soldier-5": {
+    "net_input_bytes": 253000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 373000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2672000
+  },
+  "clab-traditional-battalion-96node-p3-soldier-10": {
+    "net_input_bytes": 225000,
+    "net_output_bytes": 107000,
+    "net_total_bytes": 332000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2714750
+  },
+  "clab-traditional-battalion-96node-p4-soldier-10": {
+    "net_input_bytes": 245000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 365000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2668500
+  },
+  "clab-traditional-battalion-96node-p4-soldier-23": {
+    "net_input_bytes": 249000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 369000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2672000
+  },
+  "clab-traditional-battalion-96node-p4-soldier-4": {
+    "net_input_bytes": 244000,
+    "net_output_bytes": 94600,
+    "net_total_bytes": 338600,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2669000
+  },
+  "clab-traditional-battalion-96node-p2-soldier-3": {
+    "net_input_bytes": 230000,
+    "net_output_bytes": 106000,
+    "net_total_bytes": 336000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2676000
+  },
+  "clab-traditional-battalion-96node-p1-soldier-2": {
+    "net_input_bytes": 254000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 374000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2668500
+  },
+  "clab-traditional-battalion-96node-p4-soldier-7": {
+    "net_input_bytes": 254000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 374000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2668500
+  },
+  "clab-traditional-battalion-96node-p1-soldier-11": {
+    "net_input_bytes": 255000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 375000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2672500
+  },
+  "clab-traditional-battalion-96node-p2-soldier-6": {
+    "net_input_bytes": 246000,
+    "net_output_bytes": 119000,
+    "net_total_bytes": 365000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2668000
+  },
+  "clab-traditional-battalion-96node-p2-soldier-5": {
+    "net_input_bytes": 237000,
+    "net_output_bytes": 94200,
+    "net_total_bytes": 331200,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2665000
+  },
+  "clab-traditional-battalion-96node-p1-soldier-20": {
+    "net_input_bytes": 248000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 368000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2664500
+  },
+  "clab-traditional-battalion-96node-p4-soldier-18": {
+    "net_input_bytes": 253000,
+    "net_output_bytes": 120000,
+    "net_total_bytes": 373000,
+    "avg_cpu_percent": 0.03,
+    "avg_mem_bytes": 2672000
+  },
+  "clab-traditional-battalion-96node-p3-soldier-9": {
+    "net_input_bytes": 230000,
+    "net_output_bytes": 106000,
+    "net_total_bytes": 336000,
+    "avg_cpu_percent": 0.02,
+    "avg_mem_bytes": 2710750
+  }
+}
