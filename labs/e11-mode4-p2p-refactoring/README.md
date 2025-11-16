@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-This lab validates the Mode 4 (Hierarchical Aggregation) P2P refactoring and comprehensive bandwidth testing across all CAP protocol modes. The refactoring moved Mode 4 from a client-server polling architecture to a pure P2P mesh with event-driven aggregation.
+This lab validates the Mode 4 (Hierarchical Aggregation) P2P refactoring and comprehensive bandwidth testing across all HIVE protocol modes. The refactoring moved Mode 4 from a client-server polling architecture to a pure P2P mesh with event-driven aggregation.
 
 ### Key Results
 
@@ -106,30 +106,30 @@ Squad Members (6-7 per squad)
 
 ### Files Modified
 
-1. **`cap-protocol/examples/cap_sim_node.rs`**
+1. **`hive-protocol/examples/cap_sim_node.rs`**
    - Added `ChangeStream` to platoon leader aggregation
    - Spawned dual tasks: periodic aggregation + change stream listener
    - Added P2P latency measurement for squad summaries
    - Event-driven aggregation instead of polling
 
-2. **`cap-protocol/src/storage/ditto_store.rs`**
+2. **`hive-protocol/src/storage/ditto_store.rs`**
    - Added `timestamp_us` field to squad summaries for latency tracking
    - Timestamps used to measure P2P propagation time
 
 ### Files Created
 
-1. **`cap-sim/topologies/platoon-24node-mesh-mode4.yaml`**
+1. **`hive-sim/topologies/platoon-24node-mesh-mode4.yaml`**
    - P2P mesh topology for Mode 4
    - Two-level architecture: squad mesh + leadership mesh
    - 24 nodes: 1 platoon leader + 3 squad leaders + 20 members
 
-2. **`cap-sim/test-bandwidth-suite.sh`**
+2. **`hive-sim/test-bandwidth-suite.sh`**
    - Comprehensive test suite (16 tests)
    - All modes × all bandwidths (1Gbps, 100Mbps, 1Mbps, 256Kbps)
    - Automated bandwidth constraint application
    - Report generation
 
-3. **`cap-sim/test-mode4-bandwidth.sh`**
+3. **`hive-sim/test-mode4-bandwidth.sh`**
    - Parameterized Mode 4 bandwidth test
    - Usage: `./test-mode4-bandwidth.sh [1gbps|100mbps|1mbps|256kbps]`
 
@@ -184,7 +184,7 @@ This demonstrates that hierarchical aggregation reduces bandwidth usage by over 
 
 ### Single Mode 4 Bandwidth Test
 ```bash
-cd cap-sim
+cd hive-sim
 ./test-mode4-bandwidth.sh 256kbps
 ```
 
@@ -192,7 +192,7 @@ cd cap-sim
 ```bash
 make e11-comprehensive-suite
 # or directly:
-cd cap-sim && ./test-bandwidth-suite.sh
+cd hive-sim && ./test-bandwidth-suite.sh
 ```
 
 ### Prerequisites

@@ -1,4 +1,4 @@
-# CAP Protocol - Intellectual Property Overview
+# HIVE Protocol - Intellectual Property Overview
 
 **Prepared For**: Technical Due Diligence Review
 **Date**: January 2025
@@ -55,7 +55,7 @@ The **Capability Aggregation Protocol (CAP)** is a novel distributed coordinatio
 - Additive, emergent, redundant, and constraint-based composition patterns
 
 **References**:
-- [ADR-001: CAP Protocol POC](adr/001-cap-protocol-poc.md)
+- [ADR-001: HIVE Protocol POC](adr/001-hive-protocol-poc.md)
 - [ADR-015: Experimental Validation](adr/015-experimental-validation-hierarchical-aggregation.md)
 - [VALIDATION_RESULTS.md](VALIDATION_RESULTS.md)
 
@@ -175,7 +175,7 @@ Coordination Layer
 
 ## Patent Strategy
 
-The CAP Protocol has **two provisional patent applications** covering the core innovations:
+The HIVE Protocol has **two provisional patent applications** covering the core innovations:
 
 ### Provisional 1: Hierarchical Capability Composition
 **Filed**: [Status from patent docs]
@@ -266,7 +266,7 @@ The patent strategy includes a **Patent Pledge** that explicitly protects:
 
 ```
 cap/
-├── cap-protocol/          # Core protocol library
+├── hive-protocol/          # Core protocol library
 │   ├── src/
 │   │   ├── discovery/     # Phase 1: Bootstrap
 │   │   ├── cell/         # Phase 2: Cell Formation
@@ -277,19 +277,19 @@ cap/
 │   │   ├── storage/       # Ditto CRDT integration
 │   │   └── testing/       # E2E test harness
 │   └── tests/             # Integration & E2E tests
-├── cap-schema/            # Protocol Buffers definitions
-├── cap-persistence/       # TTL & data lifecycle management
-├── cap-transport/         # Network transport abstraction
-├── cap-sim/              # Reference simulator application
+├── hive-schema/            # Protocol Buffers definitions
+├── hive-persistence/       # TTL & data lifecycle management
+├── hive-transport/         # Network transport abstraction
+├── hive-sim/              # Reference simulator application
 └── docs/                  # Architecture & design documentation
 ```
 
 ### Key Modules
 
-- **cap-protocol**: Core CAP protocol implementation (17K+ lines Rust)
-- **cap-schema**: Protobuf schema definitions for all core types
-- **cap-persistence**: TTL and data lifecycle abstraction (ADR-016)
-- **cap-transport**: Multi-backend transport layer (Ditto, future: Automerge/Iroh)
+- **hive-protocol**: Core HIVE protocol implementation (17K+ lines Rust)
+- **hive-schema**: Protobuf schema definitions for all core types
+- **hive-persistence**: TTL and data lifecycle abstraction (ADR-016)
+- **hive-transport**: Multi-backend transport layer (Ditto, future: Automerge/Iroh)
 
 ### Code Quality
 
@@ -340,7 +340,7 @@ cap/
 Complete technical decision documentation in [docs/adr/](adr/):
 
 **Key ADRs for IP Evaluation**:
-- [ADR-001](adr/001-cap-protocol-poc.md): CAP Protocol POC Architecture
+- [ADR-001](adr/001-hive-protocol-poc.md): HIVE Protocol POC Architecture
 - [ADR-004](adr/004-human-machine-cell-composition.md): Human-Machine Cell Composition
 - [ADR-014](adr/014-distributed-coordination-primitives.md): Distributed Coordination Primitives
 - [ADR-015](adr/015-experimental-validation-hierarchical-aggregation.md): Experimental Validation

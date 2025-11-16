@@ -1,0 +1,1449 @@
+# ContainerLab Topology: 96-Node Battalion - Traditional IoT Baseline
+# Architecture: All nodes connect to central server (star topology)
+# Transmission: Full state messages every 0.5 seconds (2Hz)
+
+name: traditional-battalion-96node
+topology:
+  nodes:
+    battalion-hq:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: battalion-hq
+        ROLE: battalion_commander
+        PLATFORM_TYPE: soldier
+        MODE: writer
+        TCP_LISTEN: '12345'
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: server
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+      ports:
+      - 12345:12345
+    p1-soldier-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-1
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-2:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-2
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-3:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-3
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-4:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-4
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-5:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-5
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-6:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-6
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-7:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-7
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-8:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-8
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-9:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-9
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-10:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-10
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-11:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-11
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-12:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-12
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-13:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-13
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-14:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-14
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-15:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-15
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-16:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-16
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-17:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-17
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-18:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-18
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-19:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-19
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-20:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-20
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-21:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-21
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-22:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-22
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-23:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-23
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p1-soldier-24:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p1-soldier-24
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-1
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-2:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-2
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-3:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-3
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-4:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-4
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-5:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-5
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-6:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-6
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-7:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-7
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-8:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-8
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-9:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-9
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-10:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-10
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-11:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-11
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-12:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-12
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-13:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-13
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-14:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-14
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-15:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-15
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-16:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-16
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-17:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-17
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-18:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-18
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-19:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-19
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-20:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-20
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-21:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-21
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-22:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-22
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-23:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-23
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p2-soldier-24:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p2-soldier-24
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-1
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-2:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-2
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-3:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-3
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-4:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-4
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-5:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-5
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-6:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-6
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-7:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-7
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-8:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-8
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-9:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-9
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-10:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-10
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-11:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-11
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-12:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-12
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-13:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-13
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-14:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-14
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-15:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-15
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-16:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-16
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-17:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-17
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-18:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-18
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-19:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-19
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-20:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-20
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-21:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-21
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-22:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-22
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-23:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-23
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p3-soldier-24:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p3-soldier-24
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-1
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-2:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-2
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-3:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-3
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-4:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-4
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-5:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-5
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-6:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-6
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-7:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-7
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-8:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-8
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-9:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-9
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-10:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-10
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-11:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-11
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-12:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-12
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-13:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-13
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-14:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-14
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-15:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-15
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-16:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-16
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-17:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-17
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-18:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-18
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-19:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-19
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-20:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-20
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-21:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-21
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-22:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-22
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+    p4-soldier-23:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: p4-soldier-23
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}

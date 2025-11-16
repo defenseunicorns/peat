@@ -4,7 +4,7 @@
 **Date**: 2025-11-14  
 **Authors**: Kit Plummer, Codex  
 **Supersedes**: None  
-**Relates To**: ADR-001 (CAP Protocol POC), ADR-002 (Beacon Storage), ADR-011 (Automerge + Iroh), ADR-013 (Distributed Software & AI Ops)
+**Relates To**: ADR-001 (HIVE Protocol POC), ADR-002 (Beacon Storage), ADR-011 (Automerge + Iroh), ADR-013 (Distributed Software & AI Ops)
 
 ---
 
@@ -1570,7 +1570,7 @@ async fn test_network_partition() {
 3. [Containerlab Documentation](https://containerlab.dev)
 4. [mdns-sd Crate](https://crates.io/crates/mdns-sd)
 5. [Geohash Algorithm](https://en.wikipedia.org/wiki/Geohash)
-6. ADR-001: CAP Protocol POC Architecture
+6. ADR-001: HIVE Protocol POC Architecture
 7. ADR-002: Beacon Storage Architecture
 8. ADR-011: CRDT + Networking Stack Selection
 9. ADR-013: Distributed Software & AI Operations

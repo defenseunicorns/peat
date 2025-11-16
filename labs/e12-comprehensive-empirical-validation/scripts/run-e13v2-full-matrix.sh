@@ -70,7 +70,7 @@ fi
 echo "Results: ${RESULTS_DIR}"
 echo ""
 
-cd /home/kit/Code/revolve/cap/cap-sim
+cd /home/kit/Code/revolve/hive/hive-sim
 
 # Source environment variables for Ditto credentials
 log_info "Loading Ditto credentials from .env"
@@ -214,7 +214,7 @@ echo "  2. Compare P90 latencies across scales"
 echo "  3. Identify where connection limits become beneficial"
 echo ""
 echo "Analysis command:"
-echo "  cd /home/kit/Code/revolve/cap/labs/e12-comprehensive-empirical-validation/scripts"
+echo "  cd /home/kit/Code/revolve/hive/labs/e12-comprehensive-empirical-validation/scripts"
 echo "  python3 analyze-e13v2.py ${RESULTS_DIR}"
 echo ""
 

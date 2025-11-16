@@ -1,4 +1,4 @@
-# Shadow Network Simulator - Evaluation for CAP Protocol E8
+# Shadow Network Simulator - Evaluation for HIVE Protocol E8
 
 **Date:** 2025-11-04
 **Context:** Evaluating Shadow as alternative to Linux namespaces for E8 network simulation
@@ -58,14 +58,14 @@ hosts:
   soldier_1:
     network_node_id: 0
     processes:
-      - path: ./target/release/cap-sim-node
+      - path: ./target/release/hive-sim-node
         args: "--node-id soldier-1 --role soldier --capabilities sensor,comms"
         start_time: 1s
 
   soldier_2:
     network_node_id: 0
     processes:
-      - path: ./target/release/cap-sim-node
+      - path: ./target/release/hive-sim-node
         args: "--node-id soldier-2 --role soldier --capabilities sensor,comms"
         start_time: 1s
 
@@ -75,7 +75,7 @@ hosts:
   ugv_1:
     network_node_id: 0
     processes:
-      - path: ./target/release/cap-sim-node
+      - path: ./target/release/hive-sim-node
         args: "--node-id ugv-1 --role robot --capabilities resupply,isr"
         start_time: 2s
 
@@ -83,14 +83,14 @@ hosts:
   uav_1:
     network_node_id: 0
     processes:
-      - path: ./target/release/cap-sim-node
+      - path: ./target/release/hive-sim-node
         args: "--node-id uav-1 --role drone --capabilities aerial_recon"
         start_time: 3s
 
   uav_2:
     network_node_id: 0
     processes:
-      - path: ./target/release/cap-sim-node
+      - path: ./target/release/hive-sim-node
         args: "--node-id uav-2 --role drone --capabilities aerial_recon"
         start_time: 3s
 ```
@@ -125,7 +125,7 @@ network:
       ]
 ```
 
-## Advantages for CAP Protocol E8
+## Advantages for HIVE Protocol E8
 
 ### 1. Deterministic, Reproducible Testing
 - **Same seed = identical simulation** every time
@@ -229,7 +229,7 @@ Shadow's network model may not perfectly match tactical radio behavior.
 - **Network profiles:** Same bandwidth/latency values, just in YAML
 - **6 scenarios:** Same tactical scenarios
 - **Metrics:** Same measurement goals
-- **cap-sim binary:** Generates Shadow YAML, runs simulations, collects metrics
+- **hive-sim binary:** Generates Shadow YAML, runs simulations, collects metrics
 
 ## Next Steps
 
@@ -249,7 +249,7 @@ Shadow's network model may not perfectly match tactical radio behavior.
 ## Example: Full Scenario Config Structure
 
 ```yaml
-# cap-sim/scenarios/squad-formation.yaml
+# hive-sim/scenarios/squad-formation.yaml
 general:
   stop_time: 5 min
   seed: 42

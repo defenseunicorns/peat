@@ -71,8 +71,8 @@ Overall: 48x node increase → 682x traffic increase
 ### Files Created
 
 **Topologies:**
-- `cap-sim/topologies/traditional-battalion-48node.yaml` - 48-node battalion topology
-- `cap-sim/topologies/traditional-battalion-96node.yaml` - 96-node battalion topology
+- `hive-sim/topologies/traditional-battalion-48node.yaml` - 48-node battalion topology
+- `hive-sim/topologies/traditional-battalion-96node.yaml` - 96-node battalion topology
 
 **Test Scripts:**
 - `labs/e12/.../scripts/run-battalion-scaling.sh` - Streamlined 48/96 node test executor
@@ -85,12 +85,12 @@ Overall: 48x node increase → 682x traffic increase
 
 ### Code Modifications
 
-**cap-protocol/examples/traditional_baseline.rs:**
+**hive-protocol/examples/traditional_baseline.rs:**
 - Added support for fractional seconds in update frequency
 - Changed `Duration::from_secs()` to `Duration::from_secs_f64()`
 - Updated type from `i32` to `f64` for update_frequency_secs
 
-**cap-sim/topologies/traditional-platoon-24node.yaml:**
+**hive-sim/topologies/traditional-platoon-24node.yaml:**
 - Updated all nodes: `UPDATE_FREQUENCY_SECS: "0.5"` (was "5")
 
 ### Data Quality

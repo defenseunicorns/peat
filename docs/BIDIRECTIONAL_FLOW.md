@@ -6,7 +6,7 @@
 
 ## Overview
 
-The CAP Protocol now supports **full-duplex bidirectional hierarchical flow**, enabling both downward command dissemination and upward status aggregation through the same hierarchy.
+The HIVE Protocol now supports **full-duplex bidirectional hierarchical flow**, enabling both downward command dissemination and upward status aggregation through the same hierarchy.
 
 ```text
 ┌────────────────────────────────────────────────┐
@@ -49,17 +49,17 @@ The CAP Protocol now supports **full-duplex bidirectional hierarchical flow**, e
 
 ### Components
 
-1. **CommandRouter** (`cap-protocol/src/command/routing.rs`)
+1. **CommandRouter** (`hive-protocol/src/command/routing.rs`)
    - Target resolution (Individual, Squad, Platoon, Broadcast)
    - Determines if node should execute or route command
    - Returns subordinate targets for routing
 
-2. **CommandCoordinator** (`cap-protocol/src/command/coordinator.rs`)
+2. **CommandCoordinator** (`hive-protocol/src/command/coordinator.rs`)
    - Command lifecycle management (issue, receive, execute)
    - Acknowledgment generation and tracking
    - Status monitoring
 
-3. **DittoStore** (`cap-protocol/src/storage/ditto_store.rs`)
+3. **DittoStore** (`hive-protocol/src/storage/ditto_store.rs`)
    - Command persistence (`upsert_command`, `get_command`)
    - Acknowledgment persistence (`upsert_command_ack`, `query_command_acks`)
    - CRDT sync via Ditto collections
@@ -293,7 +293,7 @@ drop(observer);  // Cleanup when done
 - Event-driven (no CPU waste from polling)
 - Immediate notification when acks arrive
 - Deterministic testing (no arbitrary timeouts)
-- Follows CAP Protocol testing philosophy
+- Follows HIVE Protocol testing philosophy
 
 ## Example: Squad Mission Command
 
@@ -366,8 +366,8 @@ loop {
 
 - [ADR-014: Distributed Coordination Primitives](../docs/adr/014-distributed-coordination-primitives.md)
 - [ADR-009: Bidirectional Hierarchical Flows](../docs/adr/009-bidirectional-hierarchical-flows.md)
-- [Command Module Documentation](../cap-protocol/src/command/mod.rs)
-- [E2E Test Documentation](../cap-protocol/tests/bidirectional_flow_e2e.rs)
+- [Command Module Documentation](../hive-protocol/src/command/mod.rs)
+- [E2E Test Documentation](../hive-protocol/tests/bidirectional_flow_e2e.rs)
 
 ## Support
 

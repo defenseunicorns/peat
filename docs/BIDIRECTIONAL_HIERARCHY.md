@@ -4,13 +4,13 @@
 
 ### Design Philosophy: Policy-Based Flexibility
 
-**CAP Protocol provides the mechanism, integrators provide the policy.**
+**HIVE Protocol provides the mechanism, integrators provide the policy.**
 
 This design enables bidirectional hierarchical flow (both upward status aggregation and downward command dissemination) through a **policy-based flexible architecture**. Rather than hard-coding operational behaviors, the protocol defines **policy enumerations** in the schema that integrators configure per-command based on their specific tactical requirements.
 
 ### Core Principle
 
-> **"cap-schema and cap-protocol should provide the kind of flexibility that enables integrators to create best practices for different scenarios"**
+> **"hive-schema and hive-protocol should provide the kind of flexibility that enables integrators to create best practices for different scenarios"**
 
 #### Four Policy Dimensions
 
@@ -79,7 +79,7 @@ let status_broadcast = CommandBuilder::routine_broadcast()
 **Three Layers of Abstraction**:
 
 1. **Schema Layer** (`command.proto`): Defines policy enumerations and command structure
-2. **Protocol Layer** (`cap-protocol`): Implements policy enforcement and routing logic
+2. **Protocol Layer** (`hive-protocol`): Implements policy enforcement and routing logic
 3. **Integration Layer** (integrator code): Selects policies based on operational requirements
 
 **This separation enables**:
@@ -122,7 +122,7 @@ let status_broadcast = CommandBuilder::routine_broadcast()
 
 ## Problem Statement
 
-**Current Limitation**: CAP Protocol's hierarchical aggregation only supports **upward flow** (bottom-up state summarization for situational awareness).
+**Current Limitation**: HIVE Protocol's hierarchical aggregation only supports **upward flow** (bottom-up state summarization for situational awareness).
 
 **Missing Capability**: **Downward flow** (top-down command dissemination for command & control).
 
@@ -605,7 +605,7 @@ impl HierarchicalRouter {
 
 ### Integration with Existing Router
 
-The existing `Router` (in `cap-protocol/src/hierarchy/router.rs`) handles **upward routing** (squad → platoon → company).
+The existing `Router` (in `hive-protocol/src/hierarchy/router.rs`) handles **upward routing** (squad → platoon → company).
 
 We need to extend it with **downward routing**:
 
@@ -715,7 +715,7 @@ impl DittoStore {
 
 1. **Create `command.proto`** with hierarchical command messages
 2. **Generate Rust bindings** via prost
-3. **Add to `cap-schema` crate**
+3. **Add to `hive-schema` crate**
 4. **Update documentation**
 
 ### Phase 2: Routing Infrastructure (2 weeks)
@@ -789,7 +789,7 @@ impl DittoStore {
 
 ## Policy-Based Flexibility
 
-CAP Protocol provides **flexible policies** rather than hard-coded behaviors, allowing integrators to configure the protocol based on their specific requirements.
+HIVE Protocol provides **flexible policies** rather than hard-coded behaviors, allowing integrators to configure the protocol based on their specific requirements.
 
 ### Configurable Policies (via Schema Enumerations)
 
@@ -883,7 +883,7 @@ enum LeaderChangePolicy {
 
 ### Best Practice Policy Presets
 
-CAP Protocol can provide **recommended policy combinations** for common scenarios:
+HIVE Protocol can provide **recommended policy combinations** for common scenarios:
 
 #### Preset 1: Mission-Critical Order
 ```rust
@@ -1030,10 +1030,10 @@ let intel_update = CommandBuilder::tactical_update()
 
 ### Policy Enforcement at Runtime
 
-CAP Protocol implementation will enforce these policies:
+HIVE Protocol implementation will enforce these policies:
 
 ```rust
-// cap-protocol/src/hierarchy/command_router.rs
+// hive-protocol/src/hierarchy/command_router.rs
 
 impl CommandRouter {
     async fn route_command(&self, cmd: HierarchicalCommand) -> Result<()> {
@@ -1102,7 +1102,7 @@ impl CommandRouter {
 This design provides **maximum flexibility** while maintaining **clear semantics**:
 
 1. **Schema defines the vocabulary** - Policy enums in `command.proto`
-2. **Protocol implements the semantics** - cap-protocol enforces policies
+2. **Protocol implements the semantics** - hive-protocol enforces policies
 3. **Integrators configure behavior** - Choose policies per command
 4. **Best practices as presets** - Recommended combinations for common scenarios
 
@@ -1113,14 +1113,14 @@ This design provides **maximum flexibility** while maintaining **clear semantics
 - Easy to add new policies without breaking existing code
 - Clear documentation of behavioral expectations
 
-**This is exactly the kind of flexibility cap-schema and cap-protocol should provide.**
+**This is exactly the kind of flexibility hive-schema and hive-protocol should provide.**
 
 ## References
 
-- `cap-protocol/src/hierarchy/router.rs` - Current upward routing
-- `cap-protocol/src/hierarchy/routing_table.rs` - Routing table implementation
-- `cap-protocol/src/cell/messaging.rs` - Message bus and priority handling
-- `cap-schema/proto/hierarchy.proto` - Current hierarchical summaries
+- `hive-protocol/src/hierarchy/router.rs` - Current upward routing
+- `hive-protocol/src/hierarchy/routing_table.rs` - Routing table implementation
+- `hive-protocol/src/cell/messaging.rs` - Message bus and priority handling
+- `hive-schema/proto/hierarchy.proto` - Current hierarchical summaries
 
 ---
 

@@ -10,7 +10,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  cap-sim/src/node.rs (Simulation Code)              │
+│  hive-sim/src/node.rs (Simulation Code)              │
 │                                                      │
 │  use cap_protocol::models::{                        │
 │      CellConfig,   // Hand-written Rust struct     │
@@ -29,7 +29,7 @@
                         │
                         ↓
         ┌───────────────────────────────┐
-        │  cap-protocol/src/models/     │
+        │  hive-protocol/src/models/     │
         │                                │
         │  pub struct CellConfig {      │
         │      pub id: String,          │
@@ -47,7 +47,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  cap-sim/src/node.rs (Simulation Code)              │
+│  hive-sim/src/node.rs (Simulation Code)              │
 │                                                      │
 │  use cap_protocol::models::{                        │
 │      CellConfig,      // Protobuf-generated        │
@@ -69,7 +69,7 @@
                         │
                         ↓
         ┌───────────────────────────────────────────┐
-        │  cap-schema/protos/cell/v1/cell.proto     │
+        │  hive-schema/protos/cell/v1/cell.proto     │
         │                                            │
         │  message CellConfig {                     │
         │      string id = 1;                       │
@@ -80,7 +80,7 @@
                         │
                         ↓ (prost generates)
         ┌───────────────────────────────────────────┐
-        │  cap-schema/src/generated/cell_v1.rs      │
+        │  hive-schema/src/generated/cell_v1.rs      │
         │                                            │
         │  pub struct CellConfig {                  │
         │      pub id: String,                      │
@@ -92,7 +92,7 @@
                         │
                         ↓ (extension traits add methods)
         ┌───────────────────────────────────────────┐
-        │  cap-protocol/src/models/cell/mod.rs      │
+        │  hive-protocol/src/models/cell/mod.rs      │
         │                                            │
         │  pub use cap_schema::cell::v1::CellConfig;│
         │                                            │
@@ -367,7 +367,7 @@ fn test_protobuf_serialization_roundtrip() {
 
 soldier-1:
   kind: linux
-  image: cap-sim-node:latest
+  image: hive-sim-node:latest
   env:
     NODE_ID: soldier-1
     ROLE: squad_leader
@@ -376,7 +376,7 @@ soldier-1:
     # All environment variables work as-is!
 ```
 
-**Only change**: The Rust code inside the `cap-sim-node` container needs to use extension traits.
+**Only change**: The Rust code inside the `hive-sim-node` container needs to use extension traits.
 
 ---
 
@@ -410,8 +410,8 @@ soldier-1:
 git checkout main
 git pull origin main
 
-# 2. Update cap-sim code
-cd cap-sim
+# 2. Update hive-sim code
+cd hive-sim
 # ... make changes per handoff doc ...
 
 # 3. Build and test locally
@@ -443,7 +443,7 @@ sudo containerlab inspect -t topologies/squad-12node.yaml
 
 ```bash
 # 1. Generate 112-node topology
-python3 cap-sim/generate-topologies.py --size company
+python3 hive-sim/generate-topologies.py --size company
 
 # 2. Deploy
 sudo containerlab deploy -t topologies/company-112node.yaml --env-file .env

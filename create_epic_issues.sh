@@ -229,7 +229,7 @@ gh issue create --title "[E10] Testing & Validation" \
 See docs/CAP-POC-Project-Plan.md for detailed story descriptions."
 
 echo ""
-echo "Created 10 Epic issues. View them at: https://github.com/kitplummer/cap/issues"
+echo "Created 10 Epic issues. View them at: https://github.com/kitplummer/hive/issues"
 echo ""
 echo "Next steps:"
 echo "1. Create labels (epic, story, priority:p0, priority:p1, priority:p2)"

@@ -1,0 +1,48 @@
+[package]
+name = "hive-protocol"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# CAP dependencies
+hive-schema = { path = "../hive-schema" }
+
+dittolive-ditto = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dotenvy = { workspace = true }
+chrono = { workspace = true }
+geohash = "0.13"
+tempfile = "3.13"
+base64 = "0.22"
+prost = "0.13"
+
+# CRDT Backends (E8 Evaluation - ADR-007)
+automerge = { version = "0.7.1", optional = true }  # Automerge CRDT library for evaluation
+
+# AutomergeIrohBackend dependencies (ADR-011)
+iroh = { version = "0.95", optional = true }  # QUIC-based P2P networking
+rocksdb = { version = "0.22", optional = true }  # Persistent storage
+lru = { version = "0.12", optional = true }  # LRU cache for hot documents
+toml = { version = "0.8", optional = true }  # Static peer configuration
+hex = { version = "0.4", optional = true }  # Hex encoding for PublicKeys
+
+[features]
+default = []
+automerge-backend = ["automerge", "iroh", "rocksdb", "lru", "toml", "hex"]
+
+[dev-dependencies]
+proptest = { workspace = true }
+criterion = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }
+tempfile = "3.13"

@@ -4,11 +4,11 @@
 **Date**: 2025-01-10
 **Authors**: Kit (with Codex)
 **Supersedes**: None
-**Related ADRs**: [ADR-001](001-cap-protocol-poc.md) (CRDT-based state), [ADR-002](002-beacon-storage-architecture.md) (Ditto storage), [ADR-011](011-ditto-vs-automerge-iroh.md) (Backend abstraction)
+**Related ADRs**: [ADR-001](001-hive-protocol-poc.md) (CRDT-based state), [ADR-002](002-beacon-storage-architecture.md) (Ditto storage), [ADR-011](011-ditto-vs-automerge-iroh.md) (Backend abstraction)
 
 ## Context
 
-CAP Protocol operates in disconnected tactical edge environments where nodes may be offline for hours or days. Managing document lifecycle in these environments presents fundamental challenges rooted in the CAP theorem:
+HIVE Protocol operates in disconnected tactical edge environments where nodes may be offline for hours or days. Managing document lifecycle in these environments presents fundamental challenges rooted in the CAP theorem:
 
 ### The Distributed Deletion Problem
 
@@ -256,7 +256,7 @@ Applications using this abstraction MUST monitor:
 ## References
 
 - [TTL and Data Lifecycle Design](../TTL_AND_DATA_LIFECYCLE_DESIGN.md) - Ditto-specific implementation details
-- [ADR-001: CAP Protocol POC](001-cap-protocol-poc.md) - CRDT-based state management decision
+- [ADR-001: HIVE Protocol POC](001-hive-protocol-poc.md) - CRDT-based state management decision
 - [ADR-002: Beacon Storage Architecture](002-beacon-storage-architecture.md) - Ditto storage patterns
 - [ADR-011: Ditto vs Automerge/Iroh](011-ditto-vs-automerge-iroh.md) - Backend abstraction requirements
 - [Ditto DELETE vs EVICT](https://docs.ditto.live/sdk/latest/crud/delete) - Ditto deletion semantics

@@ -1,6 +1,6 @@
-# CAP Protocol Documentation Index
+# HIVE Protocol Documentation Index
 
-> **Navigation Guide**: All documentation for the CAP Protocol project, organized by category and purpose.
+> **Navigation Guide**: All documentation for the HIVE Protocol project, organized by category and purpose.
 
 ## 🔍 For IP Due Diligence Reviewers
 
@@ -28,7 +28,7 @@ ADRs document significant architectural decisions and their rationale.
 
 | ADR | Title | Date | Status |
 |-----|-------|------|--------|
-| [001](adr/001-cap-protocol-poc.md) | CAP Protocol POC | 2024-10-28 | Implemented |
+| [001](adr/001-hive-protocol-poc.md) | HIVE Protocol POC | 2024-10-28 | Implemented |
 | [002](adr/002-beacon-storage-architecture.md) | Beacon Storage Architecture | 2024-10-29 | Implemented |
 | [004](adr/004-human-machine-cell-composition.md) | Human-Machine Cell Composition | 2024-10-30 | Implemented |
 | [011](adr/011-ditto-vs-automerge-iroh.md) | Ditto vs Automerge/Iroh Backend Abstraction | 2024-11-15 | Accepted |
@@ -66,7 +66,7 @@ Comprehensive testing strategy and implementation guides.
 | Document | Scope | Purpose |
 |----------|-------|---------|
 | [TESTING_STRATEGY.md](TESTING_STRATEGY.md) | Workspace-wide | Testing philosophy, pyramid, and E2E requirements |
-| [cap-protocol/docs/testing/e2e-cell-formation.md](../cap-protocol/docs/testing/e2e-cell-formation.md) | Cell Formation E2E | Detailed E2E test scenarios and matrix |
+| [hive-protocol/docs/testing/e2e-cell-formation.md](../hive-protocol/docs/testing/e2e-cell-formation.md) | Cell Formation E2E | Detailed E2E test scenarios and matrix |
 
 ### Key Testing Concepts
 
@@ -78,11 +78,11 @@ Comprehensive testing strategy and implementation guides.
 
 ## Codebase Documentation
 
-### CAP Protocol Core (`cap-protocol/`)
+### HIVE Protocol Core (`hive-protocol/`)
 
 | Module | Documentation |
 |--------|---------------|
-| Testing | [cap-protocol/docs/testing/](../cap-protocol/docs/testing/) |
+| Testing | [hive-protocol/docs/testing/](../hive-protocol/docs/testing/) |
 
 ## Documentation Categories
 
@@ -123,7 +123,7 @@ cap/
 │   │   ├── 002-*.md
 │   │   └── 004-*.md
 │   └── [technical docs]       # Design documents, plans
-└── cap-protocol/
+└── hive-protocol/
     └── docs/
         └── testing/           # Module-specific test docs
 ```
@@ -158,7 +158,7 @@ cap/
 - **...TTL and data lifecycle**: Start with [ADR-016](adr/016-ttl-and-data-lifecycle-abstraction.md) for abstraction, then [TTL_AND_DATA_LIFECYCLE_DESIGN.md](TTL_AND_DATA_LIFECYCLE_DESIGN.md) for Ditto specifics
 - **...policy engine and conflict resolution**: See [POLICY_ENGINE_CRDT_INTEGRATION.md](POLICY_ENGINE_CRDT_INTEGRATION.md) for OCC approach with Ditto
 - **...human-machine teaming**: Read [ADR-004](adr/004-human-machine-cell-composition.md)
-- **...cell formation E2E tests**: See [e2e-cell-formation.md](../cap-protocol/docs/testing/e2e-cell-formation.md)
+- **...cell formation E2E tests**: See [e2e-cell-formation.md](../hive-protocol/docs/testing/e2e-cell-formation.md)
 - **...protobuf migration**: See [PROTOBUF_MIGRATION_GUIDE.md](PROTOBUF_MIGRATION_GUIDE.md)
 
 ### "I'm working on..."
@@ -190,5 +190,5 @@ When making significant changes:
 ---
 
 **Last Updated**: 2025-11-07
-**Maintained By**: CAP Protocol Team
+**Maintained By**: HIVE Protocol Team
 **Questions?**: Check DEVELOPMENT.md for contribution guidelines

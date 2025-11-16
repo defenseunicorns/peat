@@ -1,4 +1,4 @@
-# CAP Protocol Patent Strategy - Executive Summary
+# HIVE Protocol Patent Strategy - Executive Summary
 
 **Date**: November 2024 - January 2025
 **Status**: Patent Documentation Complete
@@ -15,7 +15,7 @@ This gives us defensive protection while addressing NATO/academic concerns about
 
 ## The Opportunity
 
-CAP Protocol has **two core innovations** that are patentable:
+HIVE Protocol has **two core innovations** that are patentable:
 
 1. **Hierarchical Capability Composition**: How autonomous systems compose capabilities in hierarchies (squads, platoons) with O(n log n) efficiency using CRDTs
 2. **Graduated Human Authority Control**: Five-level human oversight system (FULL_AUTO → MANUAL) that works in distributed, partition-prone networks
@@ -167,7 +167,7 @@ These innovations solve real problems for DoD autonomous systems and have commer
 ## Decision Criteria
 
 ### File Provisionals NOW If:
-- ✅ We believe CAP Protocol has commercial value
+- ✅ We believe HIVE Protocol has commercial value
 - ✅ We're ready to open-source in next 1-2 weeks
 - ✅ We have $260-$6K budget (depending on DIY vs attorney)
 - ✅ We're committed to defensive use only
@@ -208,7 +208,7 @@ These innovations solve real problems for DoD autonomous systems and have commer
 2. Decide: DIY ($260) or hire attorney ($4K-$6K)
 3. File with USPTO this week
 4. Publish Patent Pledge
-5. Open-source CAP Protocol
+5. Open-source HIVE Protocol
 
 ---
 

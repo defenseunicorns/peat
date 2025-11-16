@@ -6,7 +6,7 @@
 
 ## Overview
 
-This document captures findings from integrating the Ditto Rust SDK for CRDT-based state management in the CAP protocol.
+This document captures findings from integrating the Ditto Rust SDK for CRDT-based state management in the HIVE protocol.
 
 ## Setup
 
@@ -196,7 +196,7 @@ With SharedKey identity, Ditto automatically discovers and syncs with peers usin
 
 2. **Create simplified wrapper**
    - Abstract away Ditto complexity
-   - Provide clean API for CAP protocol needs
+   - Provide clean API for HIVE protocol needs
    - Handle error conversion properly
 
 3. **Implement test scenarios**
@@ -215,7 +215,7 @@ With SharedKey identity, Ditto automatically discovers and syncs with peers usin
    - Validate CRDT convergence time
 
 3. **Error Handling**
-   - Map Ditto errors to CAP protocol errors
+   - Map Ditto errors to HIVE protocol errors
    - Handle network failures gracefully
    - Implement retry logic
 

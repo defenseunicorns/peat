@@ -204,7 +204,7 @@ Before running the full suite, execute a single test manually to verify end-to-e
 
 ```bash
 # Deploy traditional 2-node
-cd cap-sim
+cd hive-sim
 containerlab deploy --reconfigure -t topologies/traditional-2node.yaml
 
 # Wait 60s
@@ -266,7 +266,7 @@ All critical components of the E12 comprehensive test harness have been validate
 
 **Recommendation:** Proceed with full test suite execution.
 
-The infrastructure is solid and ready to prove CAP Protocol's empirical advantages.
+The infrastructure is solid and ready to prove HIVE Protocol's empirical advantages.
 
 ---
 
