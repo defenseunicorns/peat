@@ -1,0 +1,682 @@
+Docker Network Statistics Summary
+================================================================================
+
+Total Network I/O:
+  Input:  23,989,000 bytes (23.99 MB)
+  Output: 13,950,500 bytes (13.95 MB)
+  Total:  37,939,500 bytes (37.94 MB)
+
+Per-Node Breakdown:
+--------------------------------------------------------------------------------
+
+clab-traditional-battalion-96node-battalion-hq:
+  Input:  7,030,000 bytes (7.03 MB)
+  Output: 6,920,000 bytes (6.92 MB)
+  Total:  13,950,000 bytes (13.95 MB)
+  CPU:    0.75%
+  Memory: 5,880,375 bytes (5.88 MB)
+
+clab-traditional-battalion-96node-p1-soldier-1:
+  Input:  156,000 bytes (0.16 MB)
+  Output: 75,200 bytes (0.08 MB)
+  Total:  231,200 bytes (0.23 MB)
+  CPU:    0.03%
+  Memory: 2,679,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p1-soldier-10:
+  Input:  166,000 bytes (0.17 MB)
+  Output: 68,400 bytes (0.07 MB)
+  Total:  234,400 bytes (0.23 MB)
+  CPU:    0.02%
+  Memory: 2,679,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p1-soldier-11:
+  Input:  177,000 bytes (0.18 MB)
+  Output: 76,400 bytes (0.08 MB)
+  Total:  253,400 bytes (0.25 MB)
+  CPU:    0.03%
+  Memory: 2,687,375 bytes (2.69 MB)
+
+clab-traditional-battalion-96node-p1-soldier-12:
+  Input:  170,000 bytes (0.17 MB)
+  Output: 75,900 bytes (0.08 MB)
+  Total:  245,900 bytes (0.25 MB)
+  CPU:    0.03%
+  Memory: 2,683,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p1-soldier-13:
+  Input:  169,000 bytes (0.17 MB)
+  Output: 75,900 bytes (0.08 MB)
+  Total:  244,900 bytes (0.24 MB)
+  CPU:    0.03%
+  Memory: 2,667,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p1-soldier-14:
+  Input:  160,000 bytes (0.16 MB)
+  Output: 75,700 bytes (0.08 MB)
+  Total:  235,700 bytes (0.24 MB)
+  CPU:    0.03%
+  Memory: 2,675,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p1-soldier-15:
+  Input:  175,000 bytes (0.17 MB)
+  Output: 76,300 bytes (0.08 MB)
+  Total:  251,300 bytes (0.25 MB)
+  CPU:    0.03%
+  Memory: 2,667,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p1-soldier-16:
+  Input:  178,000 bytes (0.18 MB)
+  Output: 76,300 bytes (0.08 MB)
+  Total:  254,300 bytes (0.25 MB)
+  CPU:    0.03%
+  Memory: 2,679,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p1-soldier-17:
+  Input:  199,000 bytes (0.20 MB)
+  Output: 77,000 bytes (0.08 MB)
+  Total:  276,000 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,667,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p1-soldier-18:
+  Input:  184,000 bytes (0.18 MB)
+  Output: 76,500 bytes (0.08 MB)
+  Total:  260,500 bytes (0.26 MB)
+  CPU:    0.03%
+  Memory: 2,671,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p1-soldier-19:
+  Input:  149,000 bytes (0.15 MB)
+  Output: 75,300 bytes (0.08 MB)
+  Total:  224,300 bytes (0.22 MB)
+  CPU:    0.03%
+  Memory: 2,675,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p1-soldier-2:
+  Input:  192,000 bytes (0.19 MB)
+  Output: 76,800 bytes (0.08 MB)
+  Total:  268,800 bytes (0.27 MB)
+  CPU:    0.03%
+  Memory: 2,671,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p1-soldier-20:
+  Input:  206,000 bytes (0.21 MB)
+  Output: 75,700 bytes (0.08 MB)
+  Total:  281,700 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,675,875 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p1-soldier-21:
+  Input:  199,000 bytes (0.20 MB)
+  Output: 77,000 bytes (0.08 MB)
+  Total:  276,000 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,667,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p1-soldier-22:
+  Input:  170,000 bytes (0.17 MB)
+  Output: 75,800 bytes (0.08 MB)
+  Total:  245,800 bytes (0.25 MB)
+  CPU:    0.03%
+  Memory: 2,672,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p1-soldier-23:
+  Input:  197,000 bytes (0.20 MB)
+  Output: 61,100 bytes (0.06 MB)
+  Total:  258,100 bytes (0.26 MB)
+  CPU:    0.02%
+  Memory: 2,671,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p1-soldier-24:
+  Input:  189,000 bytes (0.19 MB)
+  Output: 76,500 bytes (0.08 MB)
+  Total:  265,500 bytes (0.27 MB)
+  CPU:    0.03%
+  Memory: 2,671,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p1-soldier-3:
+  Input:  193,000 bytes (0.19 MB)
+  Output: 76,900 bytes (0.08 MB)
+  Total:  269,900 bytes (0.27 MB)
+  CPU:    0.03%
+  Memory: 2,667,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p1-soldier-4:
+  Input:  129,000 bytes (0.13 MB)
+  Output: 67,200 bytes (0.07 MB)
+  Total:  196,200 bytes (0.20 MB)
+  CPU:    0.03%
+  Memory: 2,671,875 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p1-soldier-5:
+  Input:  197,000 bytes (0.20 MB)
+  Output: 60,900 bytes (0.06 MB)
+  Total:  257,900 bytes (0.26 MB)
+  CPU:    0.02%
+  Memory: 2,729,875 bytes (2.73 MB)
+
+clab-traditional-battalion-96node-p1-soldier-6:
+  Input:  186,000 bytes (0.19 MB)
+  Output: 60,500 bytes (0.06 MB)
+  Total:  246,500 bytes (0.25 MB)
+  CPU:    0.02%
+  Memory: 2,671,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p1-soldier-7:
+  Input:  167,000 bytes (0.17 MB)
+  Output: 75,700 bytes (0.08 MB)
+  Total:  242,700 bytes (0.24 MB)
+  CPU:    0.03%
+  Memory: 2,667,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p1-soldier-8:
+  Input:  185,000 bytes (0.18 MB)
+  Output: 76,400 bytes (0.08 MB)
+  Total:  261,400 bytes (0.26 MB)
+  CPU:    0.03%
+  Memory: 2,706,625 bytes (2.71 MB)
+
+clab-traditional-battalion-96node-p1-soldier-9:
+  Input:  128,000 bytes (0.13 MB)
+  Output: 67,100 bytes (0.07 MB)
+  Total:  195,100 bytes (0.20 MB)
+  CPU:    0.02%
+  Memory: 2,683,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p2-soldier-1:
+  Input:  151,000 bytes (0.15 MB)
+  Output: 75,200 bytes (0.08 MB)
+  Total:  226,200 bytes (0.23 MB)
+  CPU:    0.03%
+  Memory: 2,683,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p2-soldier-10:
+  Input:  172,000 bytes (0.17 MB)
+  Output: 75,800 bytes (0.08 MB)
+  Total:  247,800 bytes (0.25 MB)
+  CPU:    0.03%
+  Memory: 2,671,875 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p2-soldier-11:
+  Input:  184,000 bytes (0.18 MB)
+  Output: 76,400 bytes (0.08 MB)
+  Total:  260,400 bytes (0.26 MB)
+  CPU:    0.02%
+  Memory: 2,679,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p2-soldier-12:
+  Input:  203,000 bytes (0.20 MB)
+  Output: 77,600 bytes (0.08 MB)
+  Total:  280,600 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,675,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p2-soldier-13:
+  Input:  179,000 bytes (0.18 MB)
+  Output: 76,300 bytes (0.08 MB)
+  Total:  255,300 bytes (0.26 MB)
+  CPU:    0.03%
+  Memory: 2,675,875 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p2-soldier-14:
+  Input:  153,000 bytes (0.15 MB)
+  Output: 75,300 bytes (0.08 MB)
+  Total:  228,300 bytes (0.23 MB)
+  CPU:    0.03%
+  Memory: 2,687,375 bytes (2.69 MB)
+
+clab-traditional-battalion-96node-p2-soldier-15:
+  Input:  203,000 bytes (0.20 MB)
+  Output: 77,500 bytes (0.08 MB)
+  Total:  280,500 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,679,875 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p2-soldier-16:
+  Input:  201,000 bytes (0.20 MB)
+  Output: 77,100 bytes (0.08 MB)
+  Total:  278,100 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,675,875 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p2-soldier-17:
+  Input:  192,000 bytes (0.19 MB)
+  Output: 76,900 bytes (0.08 MB)
+  Total:  268,900 bytes (0.27 MB)
+  CPU:    0.03%
+  Memory: 2,675,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p2-soldier-18:
+  Input:  147,000 bytes (0.15 MB)
+  Output: 74,100 bytes (0.07 MB)
+  Total:  221,100 bytes (0.22 MB)
+  CPU:    0.03%
+  Memory: 2,668,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p2-soldier-19:
+  Input:  150,000 bytes (0.15 MB)
+  Output: 67,700 bytes (0.07 MB)
+  Total:  217,700 bytes (0.22 MB)
+  CPU:    0.02%
+  Memory: 2,694,750 bytes (2.69 MB)
+
+clab-traditional-battalion-96node-p2-soldier-2:
+  Input:  147,000 bytes (0.15 MB)
+  Output: 75,100 bytes (0.08 MB)
+  Total:  222,100 bytes (0.22 MB)
+  CPU:    0.03%
+  Memory: 2,675,875 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p2-soldier-20:
+  Input:  203,000 bytes (0.20 MB)
+  Output: 77,600 bytes (0.08 MB)
+  Total:  280,600 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,659,500 bytes (2.66 MB)
+
+clab-traditional-battalion-96node-p2-soldier-21:
+  Input:  149,000 bytes (0.15 MB)
+  Output: 67,700 bytes (0.07 MB)
+  Total:  216,700 bytes (0.22 MB)
+  CPU:    0.02%
+  Memory: 2,675,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p2-soldier-22:
+  Input:  188,000 bytes (0.19 MB)
+  Output: 76,500 bytes (0.08 MB)
+  Total:  264,500 bytes (0.26 MB)
+  CPU:    0.03%
+  Memory: 2,675,875 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p2-soldier-23:
+  Input:  202,000 bytes (0.20 MB)
+  Output: 77,600 bytes (0.08 MB)
+  Total:  279,600 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,687,875 bytes (2.69 MB)
+
+clab-traditional-battalion-96node-p2-soldier-24:
+  Input:  172,000 bytes (0.17 MB)
+  Output: 75,900 bytes (0.08 MB)
+  Total:  247,900 bytes (0.25 MB)
+  CPU:    0.03%
+  Memory: 2,671,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p2-soldier-3:
+  Input:  176,000 bytes (0.18 MB)
+  Output: 76,300 bytes (0.08 MB)
+  Total:  252,300 bytes (0.25 MB)
+  CPU:    0.03%
+  Memory: 2,679,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p2-soldier-4:
+  Input:  179,000 bytes (0.18 MB)
+  Output: 76,200 bytes (0.08 MB)
+  Total:  255,200 bytes (0.26 MB)
+  CPU:    0.03%
+  Memory: 2,694,750 bytes (2.69 MB)
+
+clab-traditional-battalion-96node-p2-soldier-5:
+  Input:  205,000 bytes (0.20 MB)
+  Output: 77,500 bytes (0.08 MB)
+  Total:  282,500 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,671,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p2-soldier-6:
+  Input:  135,000 bytes (0.14 MB)
+  Output: 59,100 bytes (0.06 MB)
+  Total:  194,100 bytes (0.19 MB)
+  CPU:    0.02%
+  Memory: 2,677,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p2-soldier-7:
+  Input:  173,000 bytes (0.17 MB)
+  Output: 60,000 bytes (0.06 MB)
+  Total:  233,000 bytes (0.23 MB)
+  CPU:    0.02%
+  Memory: 2,675,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p2-soldier-8:
+  Input:  155,000 bytes (0.15 MB)
+  Output: 75,100 bytes (0.08 MB)
+  Total:  230,100 bytes (0.23 MB)
+  CPU:    0.03%
+  Memory: 2,683,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p2-soldier-9:
+  Input:  190,000 bytes (0.19 MB)
+  Output: 76,400 bytes (0.08 MB)
+  Total:  266,400 bytes (0.27 MB)
+  CPU:    0.03%
+  Memory: 2,675,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p3-soldier-1:
+  Input:  128,000 bytes (0.13 MB)
+  Output: 67,100 bytes (0.07 MB)
+  Total:  195,100 bytes (0.20 MB)
+  CPU:    0.02%
+  Memory: 2,679,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p3-soldier-10:
+  Input:  197,000 bytes (0.20 MB)
+  Output: 77,100 bytes (0.08 MB)
+  Total:  274,100 bytes (0.27 MB)
+  CPU:    0.03%
+  Memory: 2,671,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p3-soldier-11:
+  Input:  175,000 bytes (0.17 MB)
+  Output: 76,400 bytes (0.08 MB)
+  Total:  251,400 bytes (0.25 MB)
+  CPU:    0.03%
+  Memory: 2,663,500 bytes (2.66 MB)
+
+clab-traditional-battalion-96node-p3-soldier-12:
+  Input:  164,000 bytes (0.16 MB)
+  Output: 75,800 bytes (0.08 MB)
+  Total:  239,800 bytes (0.24 MB)
+  CPU:    0.03%
+  Memory: 2,675,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p3-soldier-13:
+  Input:  159,000 bytes (0.16 MB)
+  Output: 75,800 bytes (0.08 MB)
+  Total:  234,800 bytes (0.23 MB)
+  CPU:    0.03%
+  Memory: 2,675,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p3-soldier-14:
+  Input:  133,000 bytes (0.13 MB)
+  Output: 59,200 bytes (0.06 MB)
+  Total:  192,200 bytes (0.19 MB)
+  CPU:    0.02%
+  Memory: 2,669,875 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p3-soldier-15:
+  Input:  163,000 bytes (0.16 MB)
+  Output: 75,800 bytes (0.08 MB)
+  Total:  238,800 bytes (0.24 MB)
+  CPU:    0.03%
+  Memory: 2,671,875 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p3-soldier-16:
+  Input:  193,000 bytes (0.19 MB)
+  Output: 76,900 bytes (0.08 MB)
+  Total:  269,900 bytes (0.27 MB)
+  CPU:    0.02%
+  Memory: 2,664,000 bytes (2.66 MB)
+
+clab-traditional-battalion-96node-p3-soldier-17:
+  Input:  206,000 bytes (0.21 MB)
+  Output: 75,800 bytes (0.08 MB)
+  Total:  281,800 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,667,875 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p3-soldier-18:
+  Input:  188,000 bytes (0.19 MB)
+  Output: 76,400 bytes (0.08 MB)
+  Total:  264,400 bytes (0.26 MB)
+  CPU:    0.03%
+  Memory: 2,675,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p3-soldier-19:
+  Input:  167,000 bytes (0.17 MB)
+  Output: 68,300 bytes (0.07 MB)
+  Total:  235,300 bytes (0.24 MB)
+  CPU:    0.02%
+  Memory: 2,671,875 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p3-soldier-2:
+  Input:  206,000 bytes (0.21 MB)
+  Output: 75,600 bytes (0.08 MB)
+  Total:  281,600 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,675,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p3-soldier-20:
+  Input:  191,000 bytes (0.19 MB)
+  Output: 77,000 bytes (0.08 MB)
+  Total:  268,000 bytes (0.27 MB)
+  CPU:    0.03%
+  Memory: 2,675,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p3-soldier-21:
+  Input:  174,000 bytes (0.17 MB)
+  Output: 76,400 bytes (0.08 MB)
+  Total:  250,400 bytes (0.25 MB)
+  CPU:    0.03%
+  Memory: 2,694,750 bytes (2.69 MB)
+
+clab-traditional-battalion-96node-p3-soldier-22:
+  Input:  160,000 bytes (0.16 MB)
+  Output: 75,800 bytes (0.08 MB)
+  Total:  235,800 bytes (0.24 MB)
+  CPU:    0.02%
+  Memory: 2,675,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p3-soldier-23:
+  Input:  171,000 bytes (0.17 MB)
+  Output: 75,900 bytes (0.08 MB)
+  Total:  246,900 bytes (0.25 MB)
+  CPU:    0.03%
+  Memory: 2,710,625 bytes (2.71 MB)
+
+clab-traditional-battalion-96node-p3-soldier-24:
+  Input:  202,000 bytes (0.20 MB)
+  Output: 77,500 bytes (0.08 MB)
+  Total:  279,500 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,675,875 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p3-soldier-3:
+  Input:  201,000 bytes (0.20 MB)
+  Output: 76,900 bytes (0.08 MB)
+  Total:  277,900 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,663,500 bytes (2.66 MB)
+
+clab-traditional-battalion-96node-p3-soldier-4:
+  Input:  191,000 bytes (0.19 MB)
+  Output: 76,800 bytes (0.08 MB)
+  Total:  267,800 bytes (0.27 MB)
+  CPU:    0.03%
+  Memory: 2,675,875 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p3-soldier-5:
+  Input:  200,000 bytes (0.20 MB)
+  Output: 77,000 bytes (0.08 MB)
+  Total:  277,000 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,683,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p3-soldier-6:
+  Input:  172,000 bytes (0.17 MB)
+  Output: 60,000 bytes (0.06 MB)
+  Total:  232,000 bytes (0.23 MB)
+  CPU:    0.02%
+  Memory: 2,672,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p3-soldier-7:
+  Input:  201,000 bytes (0.20 MB)
+  Output: 76,900 bytes (0.08 MB)
+  Total:  277,900 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,667,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p3-soldier-8:
+  Input:  153,000 bytes (0.15 MB)
+  Output: 75,100 bytes (0.08 MB)
+  Total:  228,100 bytes (0.23 MB)
+  CPU:    0.03%
+  Memory: 2,667,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p3-soldier-9:
+  Input:  190,000 bytes (0.19 MB)
+  Output: 76,300 bytes (0.08 MB)
+  Total:  266,300 bytes (0.27 MB)
+  CPU:    0.03%
+  Memory: 2,675,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p4-soldier-1:
+  Input:  134,000 bytes (0.13 MB)
+  Output: 59,000 bytes (0.06 MB)
+  Total:  193,000 bytes (0.19 MB)
+  CPU:    0.02%
+  Memory: 2,668,875 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p4-soldier-10:
+  Input:  173,000 bytes (0.17 MB)
+  Output: 75,800 bytes (0.08 MB)
+  Total:  248,800 bytes (0.25 MB)
+  CPU:    0.03%
+  Memory: 2,667,875 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p4-soldier-11:
+  Input:  205,000 bytes (0.20 MB)
+  Output: 75,700 bytes (0.08 MB)
+  Total:  280,700 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,671,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p4-soldier-12:
+  Input:  158,000 bytes (0.16 MB)
+  Output: 75,700 bytes (0.08 MB)
+  Total:  233,700 bytes (0.23 MB)
+  CPU:    0.03%
+  Memory: 2,671,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p4-soldier-13:
+  Input:  204,000 bytes (0.20 MB)
+  Output: 77,500 bytes (0.08 MB)
+  Total:  281,500 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,679,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p4-soldier-14:
+  Input:  198,000 bytes (0.20 MB)
+  Output: 77,100 bytes (0.08 MB)
+  Total:  275,100 bytes (0.28 MB)
+  CPU:    0.02%
+  Memory: 2,679,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p4-soldier-15:
+  Input:  162,000 bytes (0.16 MB)
+  Output: 75,700 bytes (0.08 MB)
+  Total:  237,700 bytes (0.24 MB)
+  CPU:    0.03%
+  Memory: 2,667,875 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p4-soldier-16:
+  Input:  186,000 bytes (0.19 MB)
+  Output: 76,400 bytes (0.08 MB)
+  Total:  262,400 bytes (0.26 MB)
+  CPU:    0.03%
+  Memory: 2,671,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p4-soldier-17:
+  Input:  187,000 bytes (0.19 MB)
+  Output: 76,400 bytes (0.08 MB)
+  Total:  263,400 bytes (0.26 MB)
+  CPU:    0.03%
+  Memory: 2,675,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p4-soldier-18:
+  Input:  186,000 bytes (0.19 MB)
+  Output: 60,600 bytes (0.06 MB)
+  Total:  246,600 bytes (0.25 MB)
+  CPU:    0.02%
+  Memory: 2,663,500 bytes (2.66 MB)
+
+clab-traditional-battalion-96node-p4-soldier-19:
+  Input:  192,000 bytes (0.19 MB)
+  Output: 77,000 bytes (0.08 MB)
+  Total:  269,000 bytes (0.27 MB)
+  CPU:    0.03%
+  Memory: 2,694,750 bytes (2.69 MB)
+
+clab-traditional-battalion-96node-p4-soldier-2:
+  Input:  207,000 bytes (0.21 MB)
+  Output: 75,600 bytes (0.08 MB)
+  Total:  282,600 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,663,875 bytes (2.66 MB)
+
+clab-traditional-battalion-96node-p4-soldier-20:
+  Input:  207,000 bytes (0.21 MB)
+  Output: 75,700 bytes (0.08 MB)
+  Total:  282,700 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,675,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p4-soldier-21:
+  Input:  179,000 bytes (0.18 MB)
+  Output: 68,900 bytes (0.07 MB)
+  Total:  247,900 bytes (0.25 MB)
+  CPU:    0.02%
+  Memory: 2,675,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p4-soldier-22:
+  Input:  205,000 bytes (0.20 MB)
+  Output: 75,400 bytes (0.08 MB)
+  Total:  280,400 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,671,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p4-soldier-23:
+  Input:  196,000 bytes (0.20 MB)
+  Output: 77,100 bytes (0.08 MB)
+  Total:  273,100 bytes (0.27 MB)
+  CPU:    0.02%
+  Memory: 2,675,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p4-soldier-3:
+  Input:  157,000 bytes (0.16 MB)
+  Output: 75,100 bytes (0.08 MB)
+  Total:  232,100 bytes (0.23 MB)
+  CPU:    0.03%
+  Memory: 2,663,875 bytes (2.66 MB)
+
+clab-traditional-battalion-96node-p4-soldier-4:
+  Input:  164,000 bytes (0.16 MB)
+  Output: 75,700 bytes (0.08 MB)
+  Total:  239,700 bytes (0.24 MB)
+  CPU:    0.03%
+  Memory: 2,667,375 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p4-soldier-5:
+  Input:  200,000 bytes (0.20 MB)
+  Output: 77,000 bytes (0.08 MB)
+  Total:  277,000 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,710,625 bytes (2.71 MB)
+
+clab-traditional-battalion-96node-p4-soldier-6:
+  Input:  197,000 bytes (0.20 MB)
+  Output: 77,000 bytes (0.08 MB)
+  Total:  274,000 bytes (0.27 MB)
+  CPU:    0.03%
+  Memory: 2,683,375 bytes (2.68 MB)
+
+clab-traditional-battalion-96node-p4-soldier-7:
+  Input:  155,000 bytes (0.15 MB)
+  Output: 75,200 bytes (0.08 MB)
+  Total:  230,200 bytes (0.23 MB)
+  CPU:    0.03%
+  Memory: 2,671,875 bytes (2.67 MB)
+
+clab-traditional-battalion-96node-p4-soldier-8:
+  Input:  204,000 bytes (0.20 MB)
+  Output: 75,400 bytes (0.08 MB)
+  Total:  279,400 bytes (0.28 MB)
+  CPU:    0.03%
+  Memory: 2,706,625 bytes (2.71 MB)
+
+clab-traditional-battalion-96node-p4-soldier-9:
+  Input:  188,000 bytes (0.19 MB)
+  Output: 76,300 bytes (0.08 MB)
+  Total:  264,300 bytes (0.26 MB)
+  CPU:    0.03%
+  Memory: 2,671,875 bytes (2.67 MB)

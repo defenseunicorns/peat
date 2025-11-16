@@ -1,0 +1,20 @@
+{
+  "total_events": 12571,
+  "event_type_counts": {
+    "DocumentInserted": 2,
+    "MessageSent": 6317,
+    "MessageReceived": 6158,
+    "DocumentReceived": 94
+  },
+  "sync_metrics": {
+    "total_app_bytes": 4148662,
+    "message_count": 12475
+  },
+  "latency_metrics": {
+    "count": 6252,
+    "p50_us": 968,
+    "p90_us": 10886,
+    "p99_us": 501524
+  },
+  "doc_receptions": 94
+}

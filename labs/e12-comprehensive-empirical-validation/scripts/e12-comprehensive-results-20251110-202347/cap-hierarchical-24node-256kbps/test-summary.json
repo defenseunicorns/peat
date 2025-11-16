@@ -1,0 +1,18 @@
+{
+  "message_sent_count": 36,
+  "message_received_count": 0,
+  "document_inserted_count": 24,
+  "document_received_count": 100,
+  "total_bytes_sent": 6372,
+  "avg_message_size_bytes": 177.0,
+  "latency_count": 20,
+  "latency_avg_ms": 17.232,
+  "latency_median_ms": 17.3985,
+  "latency_p90_ms": 19.536,
+  "latency_p99_ms": 19.563,
+  "latency_min_ms": 14.156,
+  "latency_max_ms": 19.563,
+  "unique_senders": 4,
+  "unique_receivers": 20,
+  "replication_factor": 4.166666666666667
+}

@@ -1,0 +1,394 @@
+Docker Network Statistics Summary
+================================================================================
+
+Total Network I/O:
+  Input:  32,868,000 bytes (32.87 MB)
+  Output: 21,948,500 bytes (21.95 MB)
+  Total:  54,816,500 bytes (54.82 MB)
+
+Per-Node Breakdown:
+--------------------------------------------------------------------------------
+clab-traditional-battalion-96node-battalion-hq:
+  Network: 21,900,000 bytes (↓11,000,000 ↑10,900,000)
+  CPU: 0.8%  Memory: 8.9 MB
+
+clab-traditional-battalion-96node-p1-soldier-1:
+  Network: 307,200 bytes (↓214,000 ↑93,200)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-10:
+  Network: 330,000 bytes (↓210,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-11:
+  Network: 375,000 bytes (↓255,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-12:
+  Network: 336,000 bytes (↓218,000 ↑118,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-13:
+  Network: 332,000 bytes (↓225,000 ↑107,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-14:
+  Network: 341,000 bytes (↓223,000 ↑118,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-15:
+  Network: 329,000 bytes (↓211,000 ↑118,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-16:
+  Network: 351,000 bytes (↓232,000 ↑119,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-17:
+  Network: 369,000 bytes (↓249,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-18:
+  Network: 372,000 bytes (↓252,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-19:
+  Network: 317,000 bytes (↓197,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-2:
+  Network: 374,000 bytes (↓254,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-20:
+  Network: 368,000 bytes (↓248,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-21:
+  Network: 292,300 bytes (↓198,000 ↑94,300)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-22:
+  Network: 350,000 bytes (↓231,000 ↑119,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-23:
+  Network: 378,000 bytes (↓257,000 ↑121,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-24:
+  Network: 334,000 bytes (↓216,000 ↑118,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-3:
+  Network: 291,000 bytes (↓186,000 ↑105,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-4:
+  Network: 372,000 bytes (↓252,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-5:
+  Network: 343,000 bytes (↓225,000 ↑118,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-6:
+  Network: 320,600 bytes (↓227,000 ↑93,600)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-7:
+  Network: 328,000 bytes (↓208,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-8:
+  Network: 373,000 bytes (↓253,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p1-soldier-9:
+  Network: 375,000 bytes (↓255,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-1:
+  Network: 373,000 bytes (↓253,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-10:
+  Network: 335,000 bytes (↓217,000 ↑118,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-11:
+  Network: 324,000 bytes (↓204,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-12:
+  Network: 354,000 bytes (↓235,000 ↑119,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-13:
+  Network: 375,000 bytes (↓255,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-14:
+  Network: 323,000 bytes (↓203,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-15:
+  Network: 356,000 bytes (↓237,000 ↑119,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-16:
+  Network: 308,400 bytes (↓215,000 ↑93,400)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-17:
+  Network: 344,000 bytes (↓226,000 ↑118,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-18:
+  Network: 345,000 bytes (↓226,000 ↑119,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-19:
+  Network: 353,000 bytes (↓234,000 ↑119,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-2:
+  Network: 367,000 bytes (↓248,000 ↑119,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-20:
+  Network: 364,000 bytes (↓244,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-21:
+  Network: 319,000 bytes (↓199,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-22:
+  Network: 364,000 bytes (↓244,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-23:
+  Network: 326,000 bytes (↓206,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-24:
+  Network: 357,000 bytes (↓238,000 ↑119,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-3:
+  Network: 336,000 bytes (↓230,000 ↑106,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-4:
+  Network: 376,000 bytes (↓256,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-5:
+  Network: 331,200 bytes (↓237,000 ↑94,200)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-6:
+  Network: 365,000 bytes (↓246,000 ↑119,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-7:
+  Network: 357,000 bytes (↓238,000 ↑119,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-8:
+  Network: 313,000 bytes (↓195,000 ↑118,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p2-soldier-9:
+  Network: 352,000 bytes (↓233,000 ↑119,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-1:
+  Network: 354,000 bytes (↓235,000 ↑119,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-10:
+  Network: 332,000 bytes (↓225,000 ↑107,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-11:
+  Network: 364,000 bytes (↓244,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-12:
+  Network: 351,000 bytes (↓232,000 ↑119,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-13:
+  Network: 359,000 bytes (↓239,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-14:
+  Network: 310,000 bytes (↓204,000 ↑106,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-15:
+  Network: 352,000 bytes (↓233,000 ↑119,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-16:
+  Network: 358,000 bytes (↓239,000 ↑119,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-17:
+  Network: 349,000 bytes (↓230,000 ↑119,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-18:
+  Network: 366,000 bytes (↓246,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-19:
+  Network: 324,000 bytes (↓204,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-2:
+  Network: 337,000 bytes (↓219,000 ↑118,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-20:
+  Network: 320,800 bytes (↓227,000 ↑93,800)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-21:
+  Network: 359,000 bytes (↓239,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-22:
+  Network: 322,000 bytes (↓202,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-23:
+  Network: 363,000 bytes (↓243,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-24:
+  Network: 375,000 bytes (↓255,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-3:
+  Network: 317,000 bytes (↓197,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-4:
+  Network: 327,000 bytes (↓207,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-5:
+  Network: 373,000 bytes (↓253,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-6:
+  Network: 376,000 bytes (↓256,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-7:
+  Network: 355,000 bytes (↓236,000 ↑119,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-8:
+  Network: 336,000 bytes (↓218,000 ↑118,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p3-soldier-9:
+  Network: 336,000 bytes (↓230,000 ↑106,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-1:
+  Network: 334,000 bytes (↓216,000 ↑118,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-10:
+  Network: 365,000 bytes (↓245,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-11:
+  Network: 365,000 bytes (↓245,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-12:
+  Network: 343,000 bytes (↓225,000 ↑118,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-13:
+  Network: 324,000 bytes (↓204,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-14:
+  Network: 341,000 bytes (↓223,000 ↑118,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-15:
+  Network: 377,000 bytes (↓256,000 ↑121,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-16:
+  Network: 308,400 bytes (↓215,000 ↑93,400)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-17:
+  Network: 339,000 bytes (↓221,000 ↑118,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-18:
+  Network: 373,000 bytes (↓253,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-19:
+  Network: 327,000 bytes (↓209,000 ↑118,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-2:
+  Network: 319,000 bytes (↓199,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-20:
+  Network: 367,000 bytes (↓247,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-21:
+  Network: 339,000 bytes (↓221,000 ↑118,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-22:
+  Network: 355,000 bytes (↓236,000 ↑119,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-23:
+  Network: 369,000 bytes (↓249,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-3:
+  Network: 337,000 bytes (↓225,000 ↑112,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-4:
+  Network: 338,600 bytes (↓244,000 ↑94,600)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-5:
+  Network: 368,000 bytes (↓248,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-6:
+  Network: 332,000 bytes (↓214,000 ↑118,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-7:
+  Network: 374,000 bytes (↓254,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-8:
+  Network: 368,000 bytes (↓248,000 ↑120,000)
+  CPU: 0.0%  Memory: 2.7 MB
+
+clab-traditional-battalion-96node-p4-soldier-9:
+  Network: 362,000 bytes (↓243,000 ↑119,000)
+  CPU: 0.0%  Memory: 2.7 MB
+

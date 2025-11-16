@@ -1,0 +1,16 @@
+{
+  "clab-traditional-baseline-2node-node1": {
+    "net_input_bytes": 15300,
+    "net_output_bytes": 12300,
+    "net_total_bytes": 27600,
+    "avg_cpu_percent": 0.0,
+    "avg_mem_bytes": 2609500
+  },
+  "clab-traditional-baseline-2node-node2": {
+    "net_input_bytes": 15500,
+    "net_output_bytes": 12500,
+    "net_total_bytes": 28000,
+    "avg_cpu_percent": 0.01,
+    "avg_mem_bytes": 2728000
+  }
+}

@@ -489,7 +489,44 @@ impl DittoStore {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_micros() as u64;
-        doc["timestamp_us"] = serde_json::Value::Number(timestamp_us.into());
+
+        // Track both creation and last modification for proper delta sync metrics
+        // Check if document already exists to preserve created_at_us
+        let (created_at_us, version) = if let Ok(docs) = self
+            .query("sim_poc", &format!("_id == '{}'", squad_id))
+            .await
+        {
+            if let Some(existing_doc) = docs.first() {
+                // Document exists - preserve creation time, increment version
+                let existing_created_at = existing_doc
+                    .get("created_at_us")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or_else(|| {
+                        // Fallback to timestamp_us for backwards compatibility
+                        existing_doc
+                            .get("timestamp_us")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(timestamp_us)
+                    });
+                let existing_version = existing_doc
+                    .get("version")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(1);
+                (existing_created_at, existing_version + 1)
+            } else {
+                // New document - set creation time and initial version
+                (timestamp_us, 1)
+            }
+        } else {
+            // Query failed or new document - set creation time and initial version
+            (timestamp_us, 1)
+        };
+
+        // Set all timestamp fields
+        doc["timestamp_us"] = serde_json::Value::Number(timestamp_us.into()); // Backwards compatibility
+        doc["created_at_us"] = serde_json::Value::Number(created_at_us.into());
+        doc["last_modified_us"] = serde_json::Value::Number(timestamp_us.into());
+        doc["version"] = serde_json::Value::Number(version.into());
 
         self.upsert("sim_poc", doc).await
     }

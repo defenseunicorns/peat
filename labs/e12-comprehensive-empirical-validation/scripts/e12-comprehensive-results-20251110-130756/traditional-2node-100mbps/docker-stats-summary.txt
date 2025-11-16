@@ -1,0 +1,18 @@
+Docker Network Statistics Summary
+================================================================================
+
+Total Network I/O:
+  Input:  30,400 bytes (0.03 MB)
+  Output: 24,500 bytes (0.02 MB)
+  Total:  54,900 bytes (0.05 MB)
+
+Per-Node Breakdown:
+--------------------------------------------------------------------------------
+clab-traditional-baseline-2node-node1:
+  Network: 27,700 bytes (↓15,500 ↑12,200)
+  CPU: 0.0%  Memory: 2.6 MB
+
+clab-traditional-baseline-2node-node2:
+  Network: 27,200 bytes (↓14,900 ↑12,300)
+  CPU: 0.0%  Memory: 2.7 MB
+
