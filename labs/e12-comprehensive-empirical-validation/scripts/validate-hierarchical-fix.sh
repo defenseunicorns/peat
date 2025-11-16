@@ -5,13 +5,13 @@ echo "=== CAP Hierarchical Fix Validation ==="
 echo "Testing: 24-node hierarchical topology with fix"
 echo ""
 
-# Source environment from cap-sim directory
-if [ -f ../../../cap-sim/.env ]; then
+# Source environment from hive-sim directory
+if [ -f ../../../hive-sim/.env ]; then
     set -a
-    source ../../../cap-sim/.env
+    source ../../../hive-sim/.env
     set +a
 else
-    echo "ERROR: No .env file found in cap-sim directory"
+    echo "ERROR: No .env file found in hive-sim directory"
     exit 1
 fi
 
@@ -23,7 +23,7 @@ echo ""
 
 # Deploy topology
 echo "Step 1: Deploying CAP Hierarchical topology..."
-TOPOLOGY="../../../cap-sim/topologies/platoon-24node-client-server-mode4.yaml"
+TOPOLOGY="../../../hive-sim/topologies/platoon-24node-client-server-mode4.yaml"
 
 containerlab deploy -t "$TOPOLOGY" --reconfigure 2>&1 | tee "$VALIDATION_DIR/deploy.log"
 

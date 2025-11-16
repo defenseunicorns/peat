@@ -1,4 +1,4 @@
-# Capabilities Aggregation Protocol (CAP)
+# Hierarchical Intelligence for Versatile Entities (HIVE)
 
 > "Let me give you a threshold that's easy to understand: when we can fly drones by command, not by pilot. When your drones can understand commander's intent—that, ladies and gentlemen, is the threshold for AI autonomy to help us."
 > — Brig. Gen. Travis McIntosh, on the Army's goal for autonomous drones
@@ -7,7 +7,7 @@ A hierarchical capability composition protocol using CRDTs for autonomous system
 
 ## Overview
 
-The CAP protocol enables scalable coordination of autonomous nodes through:
+The HIVE protocol enables scalable coordination of autonomous nodes through:
 
 - **Three-phase protocol**: Discovery → Cell Formation → Hierarchical Operations
 - **CRDT-based state**: Eventual consistency via Ditto SDK
@@ -26,7 +26,7 @@ The CAP protocol enables scalable coordination of autonomous nodes through:
 
 ```bash
 # Clone the repository
-git clone https://github.com/kitplummer/cap.git
+git clone https://github.com/kitplummer/hive.git
 cd cap
 
 # Build all crates
@@ -36,7 +36,7 @@ cargo build
 cargo test -- --test-threads=1
 
 # Run the simulator
-cargo run --bin cap-sim
+cargo run --bin hive-sim
 ```
 
 ### Development
@@ -63,7 +63,7 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed setup instructions, architectu
 
 ```
 cap/
-├── cap-protocol/          # Core protocol library
+├── hive-protocol/          # Core protocol library
 │   ├── src/
 │   │   ├── discovery/     # Phase 1: Bootstrap
 │   │   ├── cell/         # Phase 2: Cell Formation
@@ -76,7 +76,7 @@ cap/
 │   │   └── testing/       # E2E test harness
 │   ├── tests/             # Integration & E2E tests
 │   └── docs/testing/      # Test documentation
-├── cap-sim/               # Reference application & simulator
+├── hive-sim/               # Reference application & simulator
 │   └── src/main.rs
 ├── docs/                  # Architecture & project docs
 │   ├── INDEX.md           # Documentation index (start here)
@@ -105,7 +105,7 @@ This is a proof-of-concept implementation following a 12-week development plan. 
 - Epic 2: Implement CRDT-based data models
 - Epic 3: Begin discovery phase implementation
 
-See [GitHub Issues](https://github.com/kitplummer/cap/issues) for current work items.
+See [GitHub Issues](https://github.com/kitplummer/hive/issues) for current work items.
 
 ## Documentation
 
@@ -127,7 +127,7 @@ docs/
 ├── INDEX.md                    # Complete documentation index
 ├── TESTING_STRATEGY.md         # Testing philosophy (Unit, Integration, E2E)
 ├── adr/                        # Architecture Decision Records
-│   ├── 001-cap-protocol-poc.md
+│   ├── 001-hive-protocol-poc.md
 │   ├── 002-beacon-storage-architecture.md
 │   └── 004-human-machine-cell-composition.md
 └── [Technical Design Docs]     # Architecture explorations & integration notes

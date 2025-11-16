@@ -59,8 +59,8 @@ echo "╔═══════════════════════�
 echo "║  Battalion Scaling Tests (48 & 96 nodes)                  ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 
-run_test 48 "../../../cap-sim/topologies/traditional-battalion-48node.yaml"
-run_test 96 "../../../cap-sim/topologies/traditional-battalion-96node.yaml"
+run_test 48 "../../../hive-sim/topologies/traditional-battalion-48node.yaml"
+run_test 96 "../../../hive-sim/topologies/traditional-battalion-96node.yaml"
 
 echo ""
 echo "Post-processing..."

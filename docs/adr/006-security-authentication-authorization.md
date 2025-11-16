@@ -1,4 +1,4 @@
-# ADR-006: Security, Authentication, and Authorization for CAP Protocol
+# ADR-006: Security, Authentication, and Authorization for HIVE Protocol
 
 **Status**: Proposed
 **Date**: 2025-11-04
@@ -7,7 +7,7 @@
 
 ## Context
 
-CAP Protocol coordinates autonomous platforms in tactical military environments where security failures can result in:
+HIVE Protocol coordinates autonomous platforms in tactical military environments where security failures can result in:
 - **Loss of life** (compromised UAVs, corrupted mission data)
 - **Mission failure** (adversary disruption of coordination)
 - **Tactical disadvantage** (enemy intelligence gathering)
@@ -33,7 +33,7 @@ Current implementation has **no authentication or authorization**. All nodes tru
 
 ### Security Requirements
 
-CAP Protocol must provide:
+HIVE Protocol must provide:
 
 1. **Device Authentication** - Cryptographically verify device identity
 2. **User Authentication** - Verify human operator credentials (for C2 apps)
@@ -336,7 +336,7 @@ impl ApplicationAuthenticator {
 Control what each authenticated entity can do.
 
 ```rust
-/// Roles in CAP Protocol
+/// Roles in HIVE Protocol
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Role {
     /// Squad/cell leader - can command cell, set objectives
@@ -479,7 +479,7 @@ pub struct AuthorizationContext {
     pub cell_store: Arc<dyn CellStoreReader>,
 }
 
-/// Default authorization policy for CAP Protocol
+/// Default authorization policy for HIVE Protocol
 impl AuthorizationPolicy {
     pub fn default_policy() -> Self {
         let mut policy = AuthorizationPolicy::new();
@@ -523,7 +523,7 @@ impl AuthorizationPolicy {
 Encrypt all data in transit and at rest.
 
 ```rust
-/// Encryption manager for CAP Protocol
+/// Encryption manager for HIVE Protocol
 pub struct EncryptionManager {
     /// Device's encryption keypair
     keypair: EncryptionKeypair,
@@ -546,7 +546,7 @@ impl EncryptionManager {
         let shared_secret = self.keypair.dh_exchange(peer_pubkey)?;
 
         // 2. Derive symmetric key using HKDF
-        let symmetric_key = hkdf_derive(&shared_secret, b"cap-protocol-v1")?;
+        let symmetric_key = hkdf_derive(&shared_secret, b"hive-protocol-v1")?;
 
         // 3. Store key for this peer
         self.peer_keys.write().await.insert(*peer_id, symmetric_key.clone());
@@ -835,7 +835,7 @@ impl AuditLogger for FileAuditLogger {
 }
 ```
 
-## Integration with CAP Protocol Phases
+## Integration with HIVE Protocol Phases
 
 ### Phase 1: Discovery → Requires Device Authentication
 
@@ -974,7 +974,7 @@ if !user.has_clearance_for_level(HierarchyLevel::Platoon) {
 
 ## Compliance Considerations
 
-CAP Protocol security must align with:
+HIVE Protocol security must align with:
 
 - **NIST SP 800-53** - Security and Privacy Controls for Information Systems
 - **DoD 8500 Series** - Cybersecurity for DoD Information Systems

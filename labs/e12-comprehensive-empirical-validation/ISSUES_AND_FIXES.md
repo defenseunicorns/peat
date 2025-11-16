@@ -92,9 +92,9 @@ Implemented on 2025-11-16:
    - All hierarchical tests (24, 48, 96 nodes) now use proper mesh topologies
 
 **Files Modified:**
-- Created: `/home/kit/Code/revolve/cap/cap-sim/topologies/battalion-48node-mesh-mode4.yaml`
-- Created: `/home/kit/Code/revolve/cap/cap-sim/topologies/battalion-96node-mesh-mode4.yaml`
-- Modified: `/home/kit/Code/revolve/cap/labs/e12-comprehensive-empirical-validation/scripts/run-comprehensive-suite.sh` (lines 598-606)
+- Created: `/home/kit/Code/revolve/hive/hive-sim/topologies/battalion-48node-mesh-mode4.yaml`
+- Created: `/home/kit/Code/revolve/hive/hive-sim/topologies/battalion-96node-mesh-mode4.yaml`
+- Modified: `/home/kit/Code/revolve/hive/labs/e12-comprehensive-empirical-validation/scripts/run-comprehensive-suite.sh` (lines 598-606)
 
 ### Previous Fix Options (For Reference)
 
@@ -240,7 +240,7 @@ traditional-96node-1gbps: 19,898 messages
 **Hypothesis 4: Correct Behavior**
 - P2P mesh with CRDTs may actually send very few messages
 - Efficient delta synchronization may require minimal traffic
-- This could be a CAP protocol advantage, not a bug
+- This could be a HIVE protocol advantage, not a bug
 
 ### Investigation Steps
 
@@ -287,7 +287,7 @@ traditional-96node-1gbps: 19,898 messages
 - Add message type breakdown to summary
 
 **If Hypothesis 4 (Correct Behavior):**
-- Document as expected CAP protocol efficiency
+- Document as expected HIVE protocol efficiency
 - Add analysis comparing message overhead vs Traditional IoT
 - Highlight low-bandwidth advantage in report
 

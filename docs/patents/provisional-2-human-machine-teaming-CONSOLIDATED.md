@@ -105,9 +105,9 @@ The inventors acknowledge prior work in distributed autonomous systems coordinat
 - COD work focused on resilient peer-to-peer networking and mesh coordination
 - General autonomous systems expertise and domain knowledge gained through COD participation
 
-### Differentiation: CAP Protocol Innovations Beyond COD
+### Differentiation: HIVE Protocol Innovations Beyond COD
 
-The present invention (CAP Protocol) was developed independently at (r)evolve LLC (2024-2025) and differs substantially from COD:
+The present invention (HIVE Protocol) was developed independently at (r)evolve LLC (2024-2025) and differs substantially from COD:
 
 **COD Approach** (Prior Art):
 - Autonomous platforms coordinate without explicit human leadership model
@@ -127,7 +127,7 @@ The present invention (CAP Protocol) was developed independently at (r)evolve LL
 
 ### Independent Development
 
-CAP Protocol was developed independently at (r)evolve LLC using:
+HIVE Protocol was developed independently at (r)evolve LLC using:
 - DoD research on human-robot teaming
 - Published literature on cognitive load in multi-tasking scenarios
 - Military command structure (rank hierarchy)

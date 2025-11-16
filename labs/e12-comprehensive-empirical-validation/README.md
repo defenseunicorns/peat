@@ -1,4 +1,4 @@
-# E12: Comprehensive Empirical Validation of CAP Protocol
+# E12: Comprehensive Empirical Validation of HIVE Protocol
 
 **Status:** Infrastructure Complete - Ready for Execution
 **Date:** November 9, 2025
@@ -7,7 +7,7 @@
 
 ## Objective
 
-Provide **rigorous empirical proof** of CAP Protocol's architectural advantages through comprehensive testing across:
+Provide **rigorous empirical proof** of HIVE Protocol's architectural advantages through comprehensive testing across:
 - 3 Architectures (Traditional IoT, CAP Full Mesh, CAP Hierarchical)
 - Multiple Scales (2, 12, 24 nodes)
 - 4 Bandwidth Constraints (1Gbps, 100Mbps, 1Mbps, 256Kbps)
@@ -29,7 +29,7 @@ Traditional event-driven IoT architectures transmit complete messages on every u
 - Periodic polling introduces latency (0-5 seconds)
 - Centralized collection creates bottlenecks
 
-CAP Protocol uses:
+HIVE Protocol uses:
 - **Document model** with differential sync (only changes propagate)
 - **P2P mesh** for event-driven updates (sub-100ms latency)
 - **Hierarchical aggregation** for scalability (O(n log n) vs O(n²))

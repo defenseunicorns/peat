@@ -1,14 +1,14 @@
-# E12: Comprehensive Empirical Validation of CAP Protocol
+# E12: Comprehensive Empirical Validation of HIVE Protocol
 
 **Date:** November 9, 2025
 **Status:** Design Phase
-**Objective:** Empirically prove CAP Protocol's bandwidth and latency advantages over traditional IoT architectures
+**Objective:** Empirically prove HIVE Protocol's bandwidth and latency advantages over traditional IoT architectures
 
 ---
 
 ## Executive Summary
 
-This experiment provides **rigorous empirical proof** of CAP Protocol's architectural advantages by measuring:
+This experiment provides **rigorous empirical proof** of HIVE Protocol's architectural advantages by measuring:
 - **Bandwidth efficiency** from CRDT differential sync vs full message replication
 - **Latency improvement** from event-driven P2P mesh vs periodic centralized polling
 - **Scalability gains** from hierarchical aggregation vs n² full replication
