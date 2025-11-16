@@ -1,0 +1,170 @@
+{
+  "clab-cap-platoon-mode4-client-server-bravo-soldier-2": {
+    "net_input_bytes": 39900,
+    "net_output_bytes": 9880,
+    "net_total_bytes": 49780,
+    "avg_cpu_percent": 0.15,
+    "avg_mem_bytes": 15148333
+  },
+  "clab-cap-platoon-mode4-client-server-alpha-soldier-2": {
+    "net_input_bytes": 40000,
+    "net_output_bytes": 10000,
+    "net_total_bytes": 50000,
+    "avg_cpu_percent": 0.15,
+    "avg_mem_bytes": 14070833
+  },
+  "clab-cap-platoon-mode4-client-server-platoon-leader": {
+    "net_input_bytes": 429000,
+    "net_output_bytes": 697000,
+    "net_total_bytes": 1126000,
+    "avg_cpu_percent": 10.03,
+    "avg_mem_bytes": 59235250
+  },
+  "clab-cap-platoon-mode4-client-server-charlie-uav-1": {
+    "net_input_bytes": 38600,
+    "net_output_bytes": 9320,
+    "net_total_bytes": 47920,
+    "avg_cpu_percent": 1.31,
+    "avg_mem_bytes": 16600833
+  },
+  "clab-cap-platoon-mode4-client-server-charlie-soldier-2": {
+    "net_input_bytes": 41800,
+    "net_output_bytes": 10200,
+    "net_total_bytes": 52000,
+    "avg_cpu_percent": 0.2,
+    "avg_mem_bytes": 15141666
+  },
+  "clab-cap-platoon-mode4-client-server-bravo-soldier-4": {
+    "net_input_bytes": 39800,
+    "net_output_bytes": 9900,
+    "net_total_bytes": 49700,
+    "avg_cpu_percent": 0.15,
+    "avg_mem_bytes": 13864166
+  },
+  "clab-cap-platoon-mode4-client-server-alpha-uav-1": {
+    "net_input_bytes": 38100,
+    "net_output_bytes": 9420,
+    "net_total_bytes": 47520,
+    "avg_cpu_percent": 0.15,
+    "avg_mem_bytes": 14390250
+  },
+  "clab-cap-platoon-mode4-client-server-bravo-soldier-5": {
+    "net_input_bytes": 43400,
+    "net_output_bytes": 11000,
+    "net_total_bytes": 54400,
+    "avg_cpu_percent": 0.15,
+    "avg_mem_bytes": 15441666
+  },
+  "clab-cap-platoon-mode4-client-server-charlie-soldier-5": {
+    "net_input_bytes": 39000,
+    "net_output_bytes": 9450,
+    "net_total_bytes": 48450,
+    "avg_cpu_percent": 0.16,
+    "avg_mem_bytes": 15345000
+  },
+  "clab-cap-platoon-mode4-client-server-bravo-ugv-1": {
+    "net_input_bytes": 43400,
+    "net_output_bytes": 11000,
+    "net_total_bytes": 54400,
+    "avg_cpu_percent": 0.28,
+    "avg_mem_bytes": 15438000
+  },
+  "clab-cap-platoon-mode4-client-server-alpha-soldier-3": {
+    "net_input_bytes": 42800,
+    "net_output_bytes": 10700,
+    "net_total_bytes": 53500,
+    "avg_cpu_percent": 0.15,
+    "avg_mem_bytes": 15526666
+  },
+  "clab-cap-platoon-mode4-client-server-alpha-soldier-4": {
+    "net_input_bytes": 37900,
+    "net_output_bytes": 9130,
+    "net_total_bytes": 47030,
+    "avg_cpu_percent": 0.15,
+    "avg_mem_bytes": 14035833
+  },
+  "clab-cap-platoon-mode4-client-server-charlie-soldier-1": {
+    "net_input_bytes": 41500,
+    "net_output_bytes": 10200,
+    "net_total_bytes": 51700,
+    "avg_cpu_percent": 0.22,
+    "avg_mem_bytes": 15288333
+  },
+  "clab-cap-platoon-mode4-client-server-charlie-ugv-1": {
+    "net_input_bytes": 43600,
+    "net_output_bytes": 10700,
+    "net_total_bytes": 54300,
+    "avg_cpu_percent": 0.17,
+    "avg_mem_bytes": 15377500
+  },
+  "clab-cap-platoon-mode4-client-server-alpha-soldier-1": {
+    "net_input_bytes": 40400,
+    "net_output_bytes": 10200,
+    "net_total_bytes": 50600,
+    "avg_cpu_percent": 0.2,
+    "avg_mem_bytes": 14807833
+  },
+  "clab-cap-platoon-mode4-client-server-squad-alpha-leader": {
+    "net_input_bytes": 84200,
+    "net_output_bytes": 15800,
+    "net_total_bytes": 100000,
+    "avg_cpu_percent": 0.85,
+    "avg_mem_bytes": 16662500
+  },
+  "clab-cap-platoon-mode4-client-server-alpha-ugv-1": {
+    "net_input_bytes": 40400,
+    "net_output_bytes": 9170,
+    "net_total_bytes": 49570,
+    "avg_cpu_percent": 0.21,
+    "avg_mem_bytes": 15419166
+  },
+  "clab-cap-platoon-mode4-client-server-charlie-soldier-4": {
+    "net_input_bytes": 39900,
+    "net_output_bytes": 9830,
+    "net_total_bytes": 49730,
+    "avg_cpu_percent": 0.16,
+    "avg_mem_bytes": 15206666
+  },
+  "clab-cap-platoon-mode4-client-server-bravo-soldier-1": {
+    "net_input_bytes": 38500,
+    "net_output_bytes": 9140,
+    "net_total_bytes": 47640,
+    "avg_cpu_percent": 1.0,
+    "avg_mem_bytes": 15415416
+  },
+  "clab-cap-platoon-mode4-client-server-squad-charlie-leader": {
+    "net_input_bytes": 82000,
+    "net_output_bytes": 16300,
+    "net_total_bytes": 98300,
+    "avg_cpu_percent": 1.14,
+    "avg_mem_bytes": 16905833
+  },
+  "clab-cap-platoon-mode4-client-server-charlie-soldier-3": {
+    "net_input_bytes": 39300,
+    "net_output_bytes": 9880,
+    "net_total_bytes": 49180,
+    "avg_cpu_percent": 0.17,
+    "avg_mem_bytes": 14721666
+  },
+  "clab-cap-platoon-mode4-client-server-bravo-uav-1": {
+    "net_input_bytes": 37600,
+    "net_output_bytes": 9300,
+    "net_total_bytes": 46900,
+    "avg_cpu_percent": 0.15,
+    "avg_mem_bytes": 15277500
+  },
+  "clab-cap-platoon-mode4-client-server-squad-bravo-leader": {
+    "net_input_bytes": 85000,
+    "net_output_bytes": 19000,
+    "net_total_bytes": 104000,
+    "avg_cpu_percent": 0.84,
+    "avg_mem_bytes": 17080833
+  },
+  "clab-cap-platoon-mode4-client-server-bravo-soldier-3": {
+    "net_input_bytes": 43700,
+    "net_output_bytes": 11000,
+    "net_total_bytes": 54700,
+    "avg_cpu_percent": 0.26,
+    "avg_mem_bytes": 15342500
+  }
+}

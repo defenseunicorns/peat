@@ -1,0 +1,2 @@
+{"BlockIO":"0B / 0B","CPUPerc":"0.00%","Container":"clab-traditional-baseline-2node-node1","ID":"f1283b16995a","MemPerc":"0.00%","MemUsage":"2.598MiB / 124.9GiB","Name":"clab-traditional-baseline-2node-node1","NetIO":"10.6kB / 7.95kB","PIDs":"33"}
+{"BlockIO":"0B / 0B","CPUPerc":"0.00%","Container":"clab-traditional-baseline-2node-node2","ID":"7140439c94a2","MemPerc":"0.00%","MemUsage":"2.672MiB / 124.9GiB","Name":"clab-traditional-baseline-2node-node2","NetIO":"10.6kB / 7.39kB","PIDs":"33"}

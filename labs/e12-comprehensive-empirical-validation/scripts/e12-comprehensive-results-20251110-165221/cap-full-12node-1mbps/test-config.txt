@@ -1,0 +1,6 @@
+Architecture: cap-full
+Scale: 12node
+Bandwidth: 1mbps
+Topology: squad-12node-client-server.yaml
+Start Time: 2025-11-10T17:47:17-05:00
+End Time: 2025-11-10T17:49:29-05:00

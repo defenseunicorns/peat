@@ -1,0 +1,86 @@
+{
+  "clab-cap-squad-client-server-soldier-2": {
+    "net_input_bytes": 28700,
+    "net_output_bytes": 10800,
+    "net_total_bytes": 39500,
+    "avg_cpu_percent": 0.53,
+    "avg_mem_bytes": 16831666
+  },
+  "clab-cap-squad-client-server-soldier-4": {
+    "net_input_bytes": 26700,
+    "net_output_bytes": 10400,
+    "net_total_bytes": 37100,
+    "avg_cpu_percent": 0.47,
+    "avg_mem_bytes": 16605000
+  },
+  "clab-cap-squad-client-server-soldier-1": {
+    "net_input_bytes": 222000,
+    "net_output_bytes": 294000,
+    "net_total_bytes": 516000,
+    "avg_cpu_percent": 2.32,
+    "avg_mem_bytes": 35701666
+  },
+  "clab-cap-squad-client-server-soldier-9": {
+    "net_input_bytes": 30500,
+    "net_output_bytes": 11400,
+    "net_total_bytes": 41900,
+    "avg_cpu_percent": 0.49,
+    "avg_mem_bytes": 16679166
+  },
+  "clab-cap-squad-client-server-uav-2": {
+    "net_input_bytes": 29500,
+    "net_output_bytes": 11000,
+    "net_total_bytes": 40500,
+    "avg_cpu_percent": 0.54,
+    "avg_mem_bytes": 16550833
+  },
+  "clab-cap-squad-client-server-soldier-6": {
+    "net_input_bytes": 27000,
+    "net_output_bytes": 9760,
+    "net_total_bytes": 36760,
+    "avg_cpu_percent": 0.5,
+    "avg_mem_bytes": 16691666
+  },
+  "clab-cap-squad-client-server-soldier-5": {
+    "net_input_bytes": 31200,
+    "net_output_bytes": 11300,
+    "net_total_bytes": 42500,
+    "avg_cpu_percent": 0.51,
+    "avg_mem_bytes": 16839166
+  },
+  "clab-cap-squad-client-server-ugv-1": {
+    "net_input_bytes": 30000,
+    "net_output_bytes": 11300,
+    "net_total_bytes": 41300,
+    "avg_cpu_percent": 0.61,
+    "avg_mem_bytes": 16944166
+  },
+  "clab-cap-squad-client-server-soldier-8": {
+    "net_input_bytes": 29400,
+    "net_output_bytes": 10900,
+    "net_total_bytes": 40300,
+    "avg_cpu_percent": 0.87,
+    "avg_mem_bytes": 16865833
+  },
+  "clab-cap-squad-client-server-soldier-3": {
+    "net_input_bytes": 27500,
+    "net_output_bytes": 10400,
+    "net_total_bytes": 37900,
+    "avg_cpu_percent": 0.5,
+    "avg_mem_bytes": 16548333
+  },
+  "clab-cap-squad-client-server-uav-1": {
+    "net_input_bytes": 28200,
+    "net_output_bytes": 10200,
+    "net_total_bytes": 38400,
+    "avg_cpu_percent": 0.49,
+    "avg_mem_bytes": 16490833
+  },
+  "clab-cap-squad-client-server-soldier-7": {
+    "net_input_bytes": 31000,
+    "net_output_bytes": 10800,
+    "net_total_bytes": 41800,
+    "avg_cpu_percent": 0.54,
+    "avg_mem_bytes": 16569166
+  }
+}

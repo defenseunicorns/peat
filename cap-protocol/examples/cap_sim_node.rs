@@ -86,10 +86,14 @@ enum MetricsEvent {
     DocumentReceived {
         node_id: String,
         doc_id: String,
-        inserted_at_us: u128, // From document
-        received_at_us: u128, // Local time
-        latency_us: u128,     // Difference
+        created_at_us: u128,    // When document was first created
+        last_modified_us: u128, // When document was last updated
+        received_at_us: u128,   // When we received it
+        latency_us: u128,       // Propagation time
         latency_ms: f64,
+        version: u64,             // Document version
+        is_first_reception: bool, // true = creation sync, false = update/recovery sync
+        latency_type: String,     // "creation", "update", or "recovery"
     },
     MessageSent {
         node_id: String,
@@ -289,28 +293,51 @@ async fn platoon_leader_aggregation_loop(
                             let received_at_us = now_micros();
                             if let Some(doc_id) = &doc.id {
                                 if doc_id.starts_with("squad-") {
-                                    // Extract timestamp for latency calculation
-                                    if let Some(ts_value) = doc.get("timestamp_us") {
-                                        let inserted_at_us = ts_value.as_u64().unwrap_or(0) as u128;
-                                        if inserted_at_us > 0 {
-                                            let latency_us =
-                                                received_at_us.saturating_sub(inserted_at_us);
-                                            let latency_ms = latency_us as f64 / 1000.0;
+                                    // Extract timestamps with proper delta sync semantics
+                                    let created_at_us = if let Some(ts) = doc.get("created_at_us") {
+                                        ts.as_u64().unwrap_or(0) as u128
+                                    } else if let Some(ts) = doc.get("timestamp_us") {
+                                        ts.as_u64().unwrap_or(0) as u128
+                                    } else {
+                                        0
+                                    };
 
-                                            println!(
-                                                "[{}] ✓ Squad summary received (initial): {} (latency: {:.3}ms)",
-                                                node_id, doc_id, latency_ms
-                                            );
+                                    let last_modified_us =
+                                        if let Some(ts) = doc.get("last_modified_us") {
+                                            ts.as_u64().unwrap_or(0) as u128
+                                        } else {
+                                            created_at_us
+                                        };
 
-                                            log_metrics(&MetricsEvent::DocumentReceived {
-                                                node_id: node_id.to_string(),
-                                                doc_id: doc_id.to_string(),
-                                                inserted_at_us,
-                                                received_at_us,
-                                                latency_us,
-                                                latency_ms,
-                                            });
-                                        }
+                                    let version = if let Some(v) = doc.get("version") {
+                                        v.as_u64().unwrap_or(1)
+                                    } else {
+                                        1
+                                    };
+
+                                    if created_at_us > 0 {
+                                        // This is Initial event, so it's always first reception
+                                        let latency_us =
+                                            received_at_us.saturating_sub(created_at_us);
+                                        let latency_ms = latency_us as f64 / 1000.0;
+
+                                        println!(
+                                            "[{}] ✓ Squad summary received (initial): {} (latency: {:.3}ms)",
+                                            node_id, doc_id, latency_ms
+                                        );
+
+                                        log_metrics(&MetricsEvent::DocumentReceived {
+                                            node_id: node_id.to_string(),
+                                            doc_id: doc_id.to_string(),
+                                            created_at_us,
+                                            last_modified_us,
+                                            received_at_us,
+                                            latency_us,
+                                            latency_ms,
+                                            version,
+                                            is_first_reception: true, // Initial event is always first reception
+                                            latency_type: "creation".to_string(),
+                                        });
                                     }
                                 }
                             }
@@ -321,28 +348,52 @@ async fn platoon_leader_aggregation_loop(
                         let received_at_us = now_micros();
                         if let Some(doc_id) = &document.id {
                             if doc_id.starts_with("squad-") {
-                                // Extract timestamp for latency calculation
-                                if let Some(ts_value) = document.get("timestamp_us") {
-                                    let inserted_at_us = ts_value.as_u64().unwrap_or(0) as u128;
-                                    if inserted_at_us > 0 {
-                                        let latency_us =
-                                            received_at_us.saturating_sub(inserted_at_us);
-                                        let latency_ms = latency_us as f64 / 1000.0;
+                                // Extract timestamps with proper delta sync semantics
+                                let created_at_us = if let Some(ts) = document.get("created_at_us")
+                                {
+                                    ts.as_u64().unwrap_or(0) as u128
+                                } else if let Some(ts) = document.get("timestamp_us") {
+                                    ts.as_u64().unwrap_or(0) as u128
+                                } else {
+                                    0
+                                };
 
-                                        println!(
-                                            "[{}] ✓ Squad summary received: {} (latency: {:.3}ms)",
-                                            node_id, doc_id, latency_ms
-                                        );
+                                let last_modified_us =
+                                    if let Some(ts) = document.get("last_modified_us") {
+                                        ts.as_u64().unwrap_or(0) as u128
+                                    } else {
+                                        created_at_us
+                                    };
 
-                                        log_metrics(&MetricsEvent::DocumentReceived {
-                                            node_id: node_id.to_string(),
-                                            doc_id: doc_id.to_string(),
-                                            inserted_at_us,
-                                            received_at_us,
-                                            latency_us,
-                                            latency_ms,
-                                        });
-                                    }
+                                let version = if let Some(v) = document.get("version") {
+                                    v.as_u64().unwrap_or(1)
+                                } else {
+                                    1
+                                };
+
+                                if created_at_us > 0 {
+                                    // Assume update since this is ChangeEvent::Updated
+                                    let latency_us =
+                                        received_at_us.saturating_sub(last_modified_us);
+                                    let latency_ms = latency_us as f64 / 1000.0;
+
+                                    println!(
+                                        "[{}] ✓ Squad summary received: {} (latency: {:.3}ms)",
+                                        node_id, doc_id, latency_ms
+                                    );
+
+                                    log_metrics(&MetricsEvent::DocumentReceived {
+                                        node_id: node_id.to_string(),
+                                        doc_id: doc_id.to_string(),
+                                        created_at_us,
+                                        last_modified_us,
+                                        received_at_us,
+                                        latency_us,
+                                        latency_ms,
+                                        version,
+                                        is_first_reception: false, // This is an update event
+                                        latency_type: "update".to_string(),
+                                    });
                                 }
                             }
                         }
@@ -805,6 +856,8 @@ async fn writer_mode(
             "message_number".to_string(),
             serde_json::json!(message_number),
         );
+        // Add CAP authorization field for hierarchical mode with CAP filtering
+        fields.insert("public".to_string(), Value::Bool(true));
 
         let document = Document::with_id(doc_id.clone(), fields.clone());
 
@@ -872,6 +925,8 @@ async fn writer_mode(
         "expected_acks".to_string(),
         serde_json::json!(expected_acks),
     );
+    // Add CAP authorization field for hierarchical mode with CAP filtering
+    test_fields.insert("public".to_string(), Value::Bool(true));
 
     let test_doc = Document::with_id("sim_test_001".to_string(), test_fields);
     backend.document_store().upsert("sim_poc", test_doc).await?;
@@ -983,7 +1038,8 @@ async fn reader_mode(
 
     // Track which periodic updates we've received
     let mut received_updates = HashSet::new();
-    let mut test_doc_received = false;
+    // Track unique test document insertions by timestamp to prevent duplicate logging
+    let mut test_doc_timestamps = HashSet::new();
 
     let timeout = Duration::from_secs(20);
     let start = Instant::now();
@@ -992,7 +1048,7 @@ async fn reader_mode(
     loop {
         // Check timeout
         if start.elapsed() > timeout {
-            if !test_doc_received {
+            if test_doc_timestamps.is_empty() {
                 return Err("Timeout: Test document not received".into());
             }
             break;
@@ -1013,7 +1069,7 @@ async fn reader_mode(
                                 node_id,
                                 backend,
                                 &mut received_updates,
-                                &mut test_doc_received,
+                                &mut test_doc_timestamps,
                             )
                             .await?;
                         }
@@ -1025,7 +1081,7 @@ async fn reader_mode(
                             node_id,
                             backend,
                             &mut received_updates,
-                            &mut test_doc_received,
+                            &mut test_doc_timestamps,
                         )
                         .await?;
 
@@ -1057,29 +1113,59 @@ async fn process_document(
     node_id: &str,
     backend: &dyn DataSyncBackend,
     received_updates: &mut HashSet<u64>,
-    test_doc_received: &mut bool,
+    test_doc_timestamps: &mut HashSet<u128>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let received_at_us = now_micros();
 
     // Extract document ID
     let doc_id = doc.id.as_ref().ok_or("Document missing ID")?;
 
-    // Extract timestamp
-    let inserted_at_us = if let Some(ts_value) = doc.get("timestamp_us") {
-        ts_value.as_u64().unwrap_or(0) as u128
+    // Extract timestamps with proper delta sync semantics
+    let created_at_us = if let Some(ts) = doc.get("created_at_us") {
+        ts.as_u64().unwrap_or(0) as u128
     } else {
-        0
+        // Fallback to old timestamp_us for backwards compatibility
+        if let Some(ts) = doc.get("timestamp_us") {
+            ts.as_u64().unwrap_or(0) as u128
+        } else {
+            0
+        }
     };
 
-    let latency_us = if inserted_at_us > 0 {
-        received_at_us.saturating_sub(inserted_at_us)
+    let last_modified_us = if let Some(ts) = doc.get("last_modified_us") {
+        ts.as_u64().unwrap_or(0) as u128
     } else {
-        0
+        created_at_us // Fallback
     };
+
+    let version = if let Some(v) = doc.get("version") {
+        v.as_u64().unwrap_or(1)
+    } else {
+        1
+    };
+
+    // Track which documents we've seen to distinguish first reception from updates
+    let is_first_reception = !test_doc_timestamps.contains(&created_at_us);
+
+    // Calculate appropriate latency based on context
+    let (latency_us, latency_type) = if is_first_reception {
+        // First reception: measure from creation
+        (
+            received_at_us.saturating_sub(created_at_us),
+            "creation".to_string(),
+        )
+    } else {
+        // Subsequent reception (update or recovery): measure from last modification
+        (
+            received_at_us.saturating_sub(last_modified_us),
+            "update".to_string(),
+        )
+    };
+
     let latency_ms = latency_us as f64 / 1000.0;
 
     // Check if this is a periodic update document
-    if doc_id.starts_with("sim_doc_soldier") {
+    if doc_id.starts_with("sim_doc_") {
         // Extract message number to track unique updates
         if let Some(msg_num_value) = doc.get("message_number") {
             let msg_num = msg_num_value.as_u64().unwrap_or(0);
@@ -1097,106 +1183,119 @@ async fn process_document(
                 log_metrics(&MetricsEvent::DocumentReceived {
                     node_id: node_id.to_string(),
                     doc_id: format!("{}_msg{}", doc_id, msg_num),
-                    inserted_at_us,
+                    created_at_us,
+                    last_modified_us,
                     received_at_us,
                     latency_us,
                     latency_ms,
+                    version,
+                    is_first_reception,
+                    latency_type: latency_type.clone(),
                 });
             }
         }
     }
     // Check if this is the test document
-    else if doc_id == "sim_test_001" && !*test_doc_received {
-        *test_doc_received = true;
+    else if doc_id == "sim_test_001" {
+        // Only log if this is a new insertion we haven't seen (prevents duplicate logging on re-insertions)
+        if created_at_us > 0 && !test_doc_timestamps.contains(&created_at_us) {
+            test_doc_timestamps.insert(created_at_us);
 
-        println!(
-            "[{}] ✓ Test document received (latency: {:.3}ms)",
-            node_id, latency_ms
-        );
+            println!(
+                "[{}] ✓ Test document received (latency: {:.3}ms)",
+                node_id, latency_ms
+            );
 
-        // Verify content
-        if let Some(Value::String(message)) = doc.get("message") {
-            if message == "Hello from CAP Simulation!" {
-                println!("[{}] ✓ Document content verified", node_id);
+            // Verify content
+            if let Some(Value::String(message)) = doc.get("message") {
+                if message == "Hello from CAP Simulation!" {
+                    println!("[{}] ✓ Document content verified", node_id);
 
-                // Log test document metrics
-                log_metrics(&MetricsEvent::DocumentReceived {
-                    node_id: node_id.to_string(),
-                    doc_id: "sim_test_001".to_string(),
-                    inserted_at_us,
-                    received_at_us,
-                    latency_us,
-                    latency_ms,
-                });
+                    // Log test document metrics
+                    log_metrics(&MetricsEvent::DocumentReceived {
+                        node_id: node_id.to_string(),
+                        doc_id: "sim_test_001".to_string(),
+                        created_at_us,
+                        last_modified_us,
+                        received_at_us,
+                        latency_us,
+                        latency_ms,
+                        version,
+                        is_first_reception,
+                        latency_type: latency_type.clone(),
+                    });
 
-                // Check if acknowledgment is required
-                if let Some(Value::Bool(ack_required)) = doc.get("ack_required") {
-                    if *ack_required {
-                        println!(
-                            "[{}] Acknowledgment required - updating document...",
-                            node_id
-                        );
+                    // Check if acknowledgment is required
+                    if let Some(Value::Bool(ack_required)) = doc.get("ack_required") {
+                        if *ack_required {
+                            println!(
+                                "[{}] Acknowledgment required - updating document...",
+                                node_id
+                            );
 
-                        // Query the current document to get the latest acked_by array
-                        let query = Query::Eq {
-                            field: "_id".to_string(),
-                            value: Value::String("sim_test_001".to_string()),
-                        };
-                        let docs = backend.document_store().query("sim_poc", &query).await?;
+                            // Query the current document to get the latest acked_by array
+                            let query = Query::Eq {
+                                field: "_id".to_string(),
+                                value: Value::String("sim_test_001".to_string()),
+                            };
+                            let docs = backend.document_store().query("sim_poc", &query).await?;
 
-                        if let Some(current_doc) = docs.first() {
-                            // Get current acked_by array
-                            let mut acked_by: Vec<String> =
-                                if let Some(acked) = current_doc.get("acked_by") {
-                                    if let Some(arr) = acked.as_array() {
-                                        arr.iter()
-                                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                                            .collect()
+                            if let Some(current_doc) = docs.first() {
+                                // Get current acked_by array
+                                let mut acked_by: Vec<String> =
+                                    if let Some(acked) = current_doc.get("acked_by") {
+                                        if let Some(arr) = acked.as_array() {
+                                            arr.iter()
+                                                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                                .collect()
+                                        } else {
+                                            Vec::new()
+                                        }
                                     } else {
                                         Vec::new()
+                                    };
+
+                                // Add this node if not already in the list
+                                if !acked_by.contains(&node_id.to_string()) {
+                                    acked_by.push(node_id.to_string());
+
+                                    // Create updated document with new acked_by array
+                                    let mut updated_fields = HashMap::new();
+                                    for (k, v) in current_doc.fields.iter() {
+                                        updated_fields.insert(k.clone(), v.clone());
                                     }
+                                    updated_fields.insert(
+                                        "acked_by".to_string(),
+                                        serde_json::json!(acked_by),
+                                    );
+
+                                    let updated_doc = Document {
+                                        id: Some("sim_test_001".to_string()),
+                                        fields: updated_fields,
+                                        updated_at: current_doc.updated_at,
+                                    };
+
+                                    // Update the document
+                                    backend
+                                        .document_store()
+                                        .upsert("sim_poc", updated_doc)
+                                        .await?;
+
+                                    println!(
+                                        "[{}] ✓ Acknowledgment sent (acked_by count: {})",
+                                        node_id,
+                                        acked_by.len()
+                                    );
+
+                                    // Log acknowledgment metrics
+                                    log_metrics(&MetricsEvent::DocumentAcknowledged {
+                                        node_id: node_id.to_string(),
+                                        doc_id: "sim_test_001".to_string(),
+                                        timestamp_us: now_micros(),
+                                    });
                                 } else {
-                                    Vec::new()
-                                };
-
-                            // Add this node if not already in the list
-                            if !acked_by.contains(&node_id.to_string()) {
-                                acked_by.push(node_id.to_string());
-
-                                // Create updated document with new acked_by array
-                                let mut updated_fields = HashMap::new();
-                                for (k, v) in current_doc.fields.iter() {
-                                    updated_fields.insert(k.clone(), v.clone());
+                                    println!("[{}] Already acknowledged this document", node_id);
                                 }
-                                updated_fields
-                                    .insert("acked_by".to_string(), serde_json::json!(acked_by));
-
-                                let updated_doc = Document {
-                                    id: Some("sim_test_001".to_string()),
-                                    fields: updated_fields,
-                                    updated_at: current_doc.updated_at,
-                                };
-
-                                // Update the document
-                                backend
-                                    .document_store()
-                                    .upsert("sim_poc", updated_doc)
-                                    .await?;
-
-                                println!(
-                                    "[{}] ✓ Acknowledgment sent (acked_by count: {})",
-                                    node_id,
-                                    acked_by.len()
-                                );
-
-                                // Log acknowledgment metrics
-                                log_metrics(&MetricsEvent::DocumentAcknowledged {
-                                    node_id: node_id.to_string(),
-                                    doc_id: "sim_test_001".to_string(),
-                                    timestamp_us: now_micros(),
-                                });
-                            } else {
-                                println!("[{}] Already acknowledged this document", node_id);
                             }
                         }
                     }
@@ -1215,10 +1314,14 @@ async fn process_document(
         log_metrics(&MetricsEvent::DocumentReceived {
             node_id: node_id.to_string(),
             doc_id: doc_id.to_string(),
-            inserted_at_us,
+            created_at_us,
+            last_modified_us,
             received_at_us,
             latency_us,
             latency_ms,
+            version,
+            is_first_reception,
+            latency_type: latency_type.clone(),
         });
     }
 
