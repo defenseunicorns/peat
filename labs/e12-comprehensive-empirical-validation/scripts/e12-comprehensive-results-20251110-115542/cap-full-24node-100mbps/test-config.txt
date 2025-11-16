@@ -1,6 +1,0 @@
-Architecture: cap-full
-Scale: 24node
-Bandwidth: 100mbps
-Topology: platoon-24node-mesh-mode4.yaml
-Start Time: 2025-11-10T12:17:39-05:00
-End Time: 2025-11-10T12:19:21-05:00

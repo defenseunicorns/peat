@@ -1,6 +1,0 @@
-Architecture: cap
-Scale: full
-Bandwidth: 12node-1mbps
-Topology: squad-12node-dynamic-mesh.yaml
-Start Time: 2025-11-10T10:14:03-05:00
-End Time: 2025-11-10T10:15:44-05:00
