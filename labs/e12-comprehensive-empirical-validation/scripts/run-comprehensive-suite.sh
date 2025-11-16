@@ -595,14 +595,15 @@ TEST_CONFIGS["cap-full-24node-256kbps"]="../../../cap-sim/topologies/platoon-24n
 TEST_CONFIGS["cap-full-48node-1gbps"]="../../../cap-sim/topologies/battalion-48node-client-server.yaml"
 TEST_CONFIGS["cap-full-96node-1gbps"]="../../../cap-sim/topologies/battalion-96node-client-server.yaml"
 
-# CAP Hierarchical configurations (CRDT + Mode 4 aggregation)
-TEST_CONFIGS["cap-hierarchical-24node-1gbps"]="../../../cap-sim/topologies/platoon-24node-client-server-mode4.yaml"
-TEST_CONFIGS["cap-hierarchical-24node-100mbps"]="../../../cap-sim/topologies/platoon-24node-client-server-mode4.yaml"
-TEST_CONFIGS["cap-hierarchical-24node-1mbps"]="../../../cap-sim/topologies/platoon-24node-client-server-mode4.yaml"
-TEST_CONFIGS["cap-hierarchical-24node-256kbps"]="../../../cap-sim/topologies/platoon-24node-client-server-mode4.yaml"
-
-TEST_CONFIGS["cap-hierarchical-48node-1gbps"]="../../../cap-sim/topologies/battalion-48node-client-server-mode4.yaml"
-TEST_CONFIGS["cap-hierarchical-96node-1gbps"]="../../../cap-sim/topologies/battalion-96node-client-server-mode4.yaml"
+# CAP Hierarchical configurations (CRDT + Mode 4 aggregation with P2P mesh)
+# IMPORTANT: Using mesh-mode4 topologies for proper hierarchical aggregation with squad summaries
+# These topologies have 3-level hierarchy: Battalion HQ → Platoon Leaders → Squad Leaders → Squad Members
+TEST_CONFIGS["cap-hierarchical-24node-1gbps"]="../../../cap-sim/topologies/platoon-24node-mesh-mode4.yaml"
+TEST_CONFIGS["cap-hierarchical-24node-100mbps"]="../../../cap-sim/topologies/platoon-24node-mesh-mode4.yaml"
+TEST_CONFIGS["cap-hierarchical-24node-1mbps"]="../../../cap-sim/topologies/platoon-24node-mesh-mode4.yaml"
+TEST_CONFIGS["cap-hierarchical-24node-256kbps"]="../../../cap-sim/topologies/platoon-24node-mesh-mode4.yaml"
+TEST_CONFIGS["cap-hierarchical-48node-1gbps"]="../../../cap-sim/topologies/battalion-48node-mesh-mode4.yaml"
+TEST_CONFIGS["cap-hierarchical-96node-1gbps"]="../../../cap-sim/topologies/battalion-96node-mesh-mode4.yaml"
 
 ################################################################################
 # Main Execution
