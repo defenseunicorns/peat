@@ -1,11 +1,11 @@
 [workspace]
 resolver = "2"
 members = [
-    "cap-schema",
-    "cap-protocol",
-    "cap-transport",
-    "cap-persistence",
-    "cap-sim"
+    "hive-schema",
+    "hive-protocol",
+    "hive-transport",
+    "hive-persistence",
+    "hive-sim"
 ]
 
 [workspace.package]
@@ -13,7 +13,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Kit Plummer <kit@revolveteam.com>"]
 license = "MIT"
-repository = "https://github.com/kitplummer/cap"
+repository = "https://github.com/kitplummer/hive"
 
 [workspace.dependencies]
 # CRDT synchronization

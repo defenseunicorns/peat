@@ -103,12 +103,12 @@ Due to the current `cap_sim_node.rs` implementation supporting only writer/reade
 ## Files
 
 ### Topology Definition
-- **File**: `cap-sim/topologies/squad-12node.yaml`
+- **File**: `hive-sim/topologies/squad-12node.yaml`
 - **Format**: ContainerLab YAML
 - **Size**: 12 nodes, 20 network links
 
 ### Test Script
-- **File**: `cap-sim/test-squad-formation.sh`
+- **File**: `hive-sim/test-squad-formation.sh`
 - **Usage**: `./test-squad-formation.sh`
 - **Features**:
   - Automated deployment
@@ -124,12 +124,12 @@ Due to the current `cap_sim_node.rs` implementation supporting only writer/reade
 docker --version
 containerlab version
 test -f .env && echo "✓ .env configured"
-docker images | grep cap-sim-node
+docker images | grep hive-sim-node
 ```
 
 ### Deploy Topology
 ```bash
-cd cap-sim
+cd hive-sim
 ./test-squad-formation.sh
 ```
 
@@ -199,7 +199,7 @@ If network constraints were removed:
 The `cap_sim_node.rs` binary is a simple POC that:
 - Only creates one test document
 - Uses writer/reader pattern (not full autonomous cell formation)
-- Doesn't implement full CAP protocol logic (beacons, cells, etc.)
+- Doesn't implement full HIVE protocol logic (beacons, cells, etc.)
 
 **Why This Is OK**:
 - Validates network topology design
@@ -266,8 +266,8 @@ Phase 1 is complete when:
 
 - **Issue**: #52 (E8 ContainerLab Work - Independent)
 - **ADR-008**: Network Simulation Layer
-- **Topology File**: `cap-sim/topologies/squad-12node.yaml`
-- **Test Script**: `cap-sim/test-squad-formation.sh`
+- **Topology File**: `hive-sim/topologies/squad-12node.yaml`
+- **Test Script**: `hive-sim/test-squad-formation.sh`
 - **Validation Results** (pending): `docs/E8_SQUAD_BASELINE_RESULTS.md`
 
 ---

@@ -197,7 +197,7 @@ source ~/.bashrc
 ### Verify from CAP Directory
 
 ```bash
-cd ~/Code/revolve/cap
+cd ~/Code/revolve/hive
 shadow --version  # Should work from anywhere
 ```
 
@@ -209,12 +209,12 @@ The CAP project uses **stable Rust**, not nightly. This is fine! Only Shadow nee
 
 ✅ **Shadow is installed!** You're ready to begin E8.0 POC.
 
-**Next**: [Issue #36 - E8.0: Shadow + Ditto POC](https://github.com/kitplummer/cap/issues/36)
+**Next**: [Issue #36 - E8.0: Shadow + Ditto POC](https://github.com/kitplummer/hive/issues/36)
 
 Tasks:
-1. Create `cap-protocol/examples/shadow_poc.rs` - Minimal Ditto sync test
-2. Create `cap-sim/scenarios/poc-ditto-sync.yaml` - Shadow configuration
-3. Run: `shadow cap-sim/scenarios/poc-ditto-sync.yaml`
+1. Create `hive-protocol/examples/shadow_poc.rs` - Minimal Ditto sync test
+2. Create `hive-sim/scenarios/poc-ditto-sync.yaml` - Shadow configuration
+3. Run: `shadow hive-sim/scenarios/poc-ditto-sync.yaml`
 4. Document results: GO/NO-GO decision
 
 ## Resources

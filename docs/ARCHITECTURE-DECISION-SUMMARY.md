@@ -197,7 +197,7 @@ Where:
 
 ## References
 
-- [E4.2 Leader Election PR](https://github.com/kitplummer/cap/pull/24)
+- [E4.2 Leader Election PR](https://github.com/kitplummer/hive/pull/24)
 - [CAP Project Plan](./CAP-POC-Project-Plan.md)
 - NATO STANAG 4586 (UAV interoperability)
 - DARPA OFFSET program (human-swarm interfaces)

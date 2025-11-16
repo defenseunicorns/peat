@@ -6,7 +6,7 @@
 
 HIVE Protocol (formerly CAP) addresses a **fundamentally different problem** than existing standards. While STANAG 4586/4817, JAUS, and FACE focus on **individual platform control and message interoperability**, HIVE enables **hierarchical coordination and capability composition** at scale (1000+ platforms). This positions HIVE as **complementary to—not competitive with—existing standards**, creating a strategic opportunity for NATO standardization as the missing "coordination layer" above existing control standards.
 
-**Key Strategic Recommendation:** Position HIVE as the **coordination standard that sits above** STANAG 4586/4817, JAUS, and ROS2/DDS, enabling hierarchical capability aggregation while maintaining compatibility with existing control standards through the three-layer architecture (cap-schema, cap-transport, cap-persistence).
+**Key Strategic Recommendation:** Position HIVE as the **coordination standard that sits above** STANAG 4586/4817, JAUS, and ROS2/DDS, enabling hierarchical capability aggregation while maintaining compatibility with existing control standards through the three-layer architecture (hive-schema, hive-transport, hive-persistence).
 
 ---
 
@@ -106,7 +106,7 @@ Historical examples of successful open standards adoption:
 
 **HIVE Relationship:** 
 - **Complementary:** HIVE can expose capabilities through JAUS service interfaces
-- **Integration Path:** cap-transport layer could include JAUS message adapters
+- **Integration Path:** hive-transport layer could include JAUS message adapters
 - **Differentiation:** HIVE operates at squad/platoon level; JAUS at platform/component level
 
 **Recent Activity:** 
@@ -137,7 +137,7 @@ Historical examples of successful open standards adoption:
 - **Not hierarchical** - flat peer-to-peer model doesn't match military C2 structure
 
 **HIVE Relationship:**
-- **Compatible Transport:** HIVE's cap-transport could use DDS/RTPS as one transport option
+- **Compatible Transport:** HIVE's hive-transport could use DDS/RTPS as one transport option
 - **Differentiation:** HIVE's hierarchical aggregation **reduces** DDS message volume by 95-99%
 - **Integration:** ROS2 platforms can participate in HIVE using DDS bridge
 
@@ -412,7 +412,7 @@ Historical examples of successful open standards adoption:
 **Immediate Actions:**
 - Document HIVE's alignment with MOSA principles:
   - ✅ Establish Enabling Environment (open source, documented interfaces)
-  - ✅ Employ Modular Design (cap-schema/transport/persistence separation)
+  - ✅ Employ Modular Design (hive-schema/transport/persistence separation)
   - ✅ Designate Key Interfaces (well-defined APIs)
   - ✅ Select Open Standards (DDS, RTPS, QUIC, etc.)
   - ✅ Certify Conformance (define HIVE conformance process)
@@ -431,7 +431,7 @@ Historical examples of successful open standards adoption:
 
 ### Short-term (12 months): Adapters & Bridges
 
-**Implement protocol bridges in cap-transport layer:**
+**Implement protocol bridges in hive-transport layer:**
 
 1. **STANAG 4586 Bridge**
    - HIVE node consumes 4586 messages from individual UAVs
@@ -443,7 +443,7 @@ Historical examples of successful open standards adoption:
    - Allows JAUS-compliant systems to participate in HIVE hierarchies
 
 3. **ROS2/DDS Integration**
-   - Native DDS transport option in cap-transport
+   - Native DDS transport option in hive-transport
    - HIVE discovery compatible with DDS discovery
    - ROS2 topics mapped to HIVE capabilities
 

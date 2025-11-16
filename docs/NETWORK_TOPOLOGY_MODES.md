@@ -5,7 +5,7 @@
 
 ## Overview
 
-CAP Protocol network validation supports three topology modes to validate different aspects of hierarchical coordination:
+HIVE Protocol network validation supports three topology modes to validate different aspects of hierarchical coordination:
 
 1. **Client-Server**: Simple validation (all → central server)
 2. **Hub-Spoke**: Realistic hierarchical structure (orchestrated static)
@@ -57,7 +57,7 @@ soldier-2...soldier-9, ugv-1, uav-1, uav-2:
 - **Single point of failure**: If soldier-1 fails, no sync
 - **Not realistic**: Real squads don't have central servers
 - **Worst-case bandwidth**: All traffic through one node
-- **No hierarchy**: Doesn't test CAP protocol's hierarchical design
+- **No hierarchy**: Doesn't test HIVE protocol's hierarchical design
 
 ### When to Use
 - Initial infrastructure validation
@@ -142,7 +142,7 @@ uav-2:
 
 ### Advantages
 - **Realistic**: Matches actual squad organization
-- **Hierarchical**: Tests CAP protocol's intended design
+- **Hierarchical**: Tests HIVE protocol's intended design
 - **Resilient**: Multiple paths (UGV provides redundancy)
 - **Scalable pattern**: Extends to platoon/company
 - **Measurable**: Can track sync through hierarchy
@@ -167,7 +167,7 @@ uav-2:
 ## Mode 3: Dynamic Mesh (Autonomous Discovery)
 
 ### Description
-Fully autonomous peer discovery with no pre-configured connections. Nodes discover each other dynamically and form a mesh network. This is the **goal state** for CAP protocol.
+Fully autonomous peer discovery with no pre-configured connections. Nodes discover each other dynamically and form a mesh network. This is the **goal state** for HIVE protocol.
 
 ### Configuration (Target)
 ```yaml
@@ -194,7 +194,7 @@ soldier-1...soldier-9, ugv-1, uav-1, uav-2:
 - ✅ Leader election
 - ✅ Capability-based routing
 - ✅ Beacon protocol
-- ✅ Real CAP protocol behavior
+- ✅ Real HIVE protocol behavior
 
 ### Implementation Options
 
@@ -224,8 +224,8 @@ soldier-1...soldier-9, ugv-1, uav-1, uav-2:
 
 **Status**: Requires code changes (blocked by Issue #45)
 
-#### Option C: Full CAP Protocol
-**Approach**: Implement complete CAP protocol with beacons, discovery, cell formation
+#### Option C: Full HIVE Protocol
+**Approach**: Implement complete HIVE protocol with beacons, discovery, cell formation
 
 **Requirements**:
 1. Beacon protocol (ADR-003)
@@ -386,4 +386,4 @@ sim-deploy-squad-dynamic:
 
 3. **Future** (Post-Issue #45):
    - Implement Mode 3 (dynamic mesh)
-   - Full CAP protocol testing
+   - Full HIVE protocol testing

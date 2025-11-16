@@ -8,7 +8,7 @@
 
 ```text
 ┌─────────────────────────────────────────────────────────┐
-│ CAP Protocol Business Logic                             │
+│ HIVE Protocol Business Logic                             │
 │ (Uses StorageBackend + CrdtCapable + SyncCapable)       │
 └────────────────┬────────────────────────────────────────┘
                  │
@@ -71,9 +71,9 @@
 5. ⏭ Deferred to Phase 2: Typed operations (protobuf → JSON → Automerge)
 
 **Key Files**:
-- `cap-protocol/src/storage/automerge_store.rs` (239 lines, 6 tests)
-- `cap-protocol/src/storage/automerge_backend.rs` (239 lines, 5 tests)
-- `cap-protocol/Cargo.toml` (dependencies: iroh, rocksdb, lru)
+- `hive-protocol/src/storage/automerge_store.rs` (239 lines, 6 tests)
+- `hive-protocol/src/storage/automerge_backend.rs` (239 lines, 5 tests)
+- `hive-protocol/Cargo.toml` (dependencies: iroh, rocksdb, lru)
 
 **Success Criteria**: ✅ All Met
 - ✅ Can save/load Automerge documents to RocksDB (binary format)
@@ -195,7 +195,7 @@ Node A                          Node B
 4. Handle peer lifecycle (discovered/lost)
 
 **Key Files**:
-- `cap-protocol/src/discovery/` (new module)
+- `hive-protocol/src/discovery/` (new module)
 - Implemented per ADR-017 design
 
 **Success Criteria**:
@@ -259,7 +259,7 @@ let nodes_doc = Automerge::new();
 
 ### 3. Network Protocol
 
-**ALPN**: `b"cap/automerge/1"` - Identifies CAP Protocol Automerge sync
+**ALPN**: `b"cap/automerge/1"` - Identifies HIVE Protocol Automerge sync
 **Message Format**: Length-prefixed protobuf messages containing Automerge sync messages
 
 ```rust
@@ -324,7 +324,7 @@ As we implement, we'll uncover:
 ### Feature Parity (End of Phase 7)
 - ✅ Implements all three traits (StorageBackend, CrdtCapable, SyncCapable)
 - ✅ Automatic peer discovery
-- ✅ Passes CAP Protocol E2E test suite
+- ✅ Passes HIVE Protocol E2E test suite
 - ✅ Performance within 2x of DittoBackend
 
 ### Production Ready (Future)

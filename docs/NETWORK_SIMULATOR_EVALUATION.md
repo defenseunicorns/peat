@@ -1,14 +1,14 @@
 # Network Simulator Evaluation
 
 **Date**: November 2024
-**Purpose**: Evaluate network simulation alternatives for CAP Protocol validation
+**Purpose**: Evaluate network simulation alternatives for HIVE Protocol validation
 **Context**: Shadow network simulator proved incompatible with Ditto SDK
 
 ---
 
 ## Requirements
 
-For CAP Protocol E8 network simulation, we need:
+For HIVE Protocol E8 network simulation, we need:
 
 1. **Run Real Ditto Binaries**: Must execute unmodified Ditto SDK (Rust application with complex networking)
 2. **Network Constraints**: Bandwidth limiting, latency injection, packet loss, jitter
@@ -69,21 +69,21 @@ topology:
   nodes:
     soldier1:
       kind: linux
-      image: cap-sim-node:latest
+      image: hive-sim-node:latest
       env:
         NODE_ID: soldier1
         ROLE: rifleman
 
     soldier2:
       kind: linux
-      image: cap-sim-node:latest
+      image: hive-sim-node:latest
       env:
         NODE_ID: soldier2
         ROLE: team_leader
 
     uav1:
       kind: linux
-      image: cap-sim-node:latest
+      image: hive-sim-node:latest
       env:
         NODE_ID: uav1
         ROLE: scout
@@ -107,7 +107,7 @@ topology:
 #### Implementation Effort
 **Estimate**: 2-3 days
 
-- Day 1: Create Ditto-based `cap-sim-node` container
+- Day 1: Create Ditto-based `hive-sim-node` container
 - Day 2: Test 2-node topology, validate constraints work
 - Day 3: Scale to 12-node squad, automate scenario generation
 
@@ -165,8 +165,8 @@ net.addLink(
 net.start()
 
 # Run Ditto on each host
-soldier1.cmd('/path/to/cap-sim-node --node-id soldier1 &')
-soldier2.cmd('/path/to/cap-sim-node --node-id soldier2 &')
+soldier1.cmd('/path/to/hive-sim-node --node-id soldier1 &')
+soldier2.cmd('/path/to/hive-sim-node --node-id soldier2 &')
 
 # Wait for scenario to complete
 time.sleep(60)
@@ -178,7 +178,7 @@ net.stop()
 **Estimate**: 3-4 days
 
 - Day 1: Learn Mininet API, create simple topology
-- Days 2-3: Build scenario generator, integrate cap-sim-node
+- Days 2-3: Build scenario generator, integrate hive-sim-node
 - Day 4: Scale to 12-node squad, test constraints
 
 ---
@@ -260,7 +260,7 @@ CORE is a network emulator developed by the Naval Research Laboratory. It provid
 **Estimate**: 3-4 days
 
 - Day 1: Install CORE, learn GUI and Python API
-- Days 2-3: Create scenario scripts, integrate cap-sim-node
+- Days 2-3: Create scenario scripts, integrate hive-sim-node
 - Day 4: Test constraints, scale to squad level
 
 ---
@@ -352,7 +352,7 @@ CORE is a network emulator developed by the Naval Research Laboratory. It provid
 
 ### Phase 1: Proof of Concept (Day 1)
 1. Install ContainerLab on Linux machine
-2. Create simple `cap-sim-node` Dockerfile with Ditto
+2. Create simple `hive-sim-node` Dockerfile with Ditto
 3. Test 2-node topology with constraints
 4. Validate document sync works between containers
 
@@ -413,7 +413,7 @@ which tc && tc qdisc help | grep netem
 
 **Next Steps**:
 1. Install ContainerLab on development machine
-2. Create `cap-sim-node` Docker image with Ditto
+2. Create `hive-sim-node` Docker image with Ditto
 3. Test 2-node proof of concept
 4. Proceed with full E8.1 implementation
 

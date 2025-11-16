@@ -20,7 +20,7 @@ Implement production-ready policy enforcement and timeout mechanisms for the hie
 ### 1. Policy Engine Module
 
 ```
-cap-protocol/src/command/
+hive-protocol/src/command/
 ├── mod.rs
 ├── coordinator.rs
 ├── routing.rs
@@ -444,4 +444,4 @@ impl Default for PolicyConfig {
 
 - [BIDIRECTIONAL_FLOW.md](BIDIRECTIONAL_FLOW.md) - Current implementation
 - [ADR-014](adr/014-distributed-coordination-primitives.md) - Design decisions
-- [command.proto](../cap-schema/proto/command.proto) - Schema definitions
+- [command.proto](../hive-schema/proto/command.proto) - Schema definitions

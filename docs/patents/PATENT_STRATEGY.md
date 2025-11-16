@@ -860,7 +860,7 @@ Reason: Accountability for personnel safety
 
 **Technical Validation:**
 - ADR-004 documents human-machine squad composition requirements
-- Implementation in cap-protocol demonstrates feasibility
+- Implementation in hive-protocol demonstrates feasibility
 - Tunable policies enable experimental validation of different authority models
 
 ---

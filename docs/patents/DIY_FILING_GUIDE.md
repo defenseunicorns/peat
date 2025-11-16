@@ -75,7 +75,7 @@ Before you start, gather:
 
 **Provisional #1: Capability Composition**
 ```bash
-cd /Users/kit/Code/cap/docs/patents
+cd /Users/kit/Code/hive/docs/patents
 pandoc provisional-1-capability-composition.md -o provisional-1.pdf \
   --pdf-engine=xelatex \
   --variable geometry:margin=1in
@@ -276,12 +276,12 @@ Create secure folder structure:
 
 ## Step 6: Update Documentation (30 minutes)
 
-Now update your CAP Protocol docs with filing information:
+Now update your HIVE Protocol docs with filing information:
 
 ### 6.1 Update PATENT_STRATEGY.md
 
 ```bash
-cd /Users/kit/Code/cap/docs
+cd /Users/kit/Code/hive/docs
 nano PATENT_STRATEGY.md
 ```
 
@@ -422,7 +422,7 @@ Notes:
 ### Week 1-2
 - Follow POST_FILING_CHECKLIST.md
 - Publish Patent Pledge
-- Open-source CAP Protocol
+- Open-source HIVE Protocol
 
 ### Month 1-11
 - Track evidence for utility decision

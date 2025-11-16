@@ -1,8 +1,8 @@
-# CAP Protocol Testing Strategy
+# HIVE Protocol Testing Strategy
 
 ## Critical Value of Testing
 
-The CAP Protocol is designed for **autonomous multi-agent systems** operating in dynamic, real-world environments. Testing is not just about code correctness—it's about **mission assurance** in scenarios where:
+The HIVE Protocol is designed for **autonomous multi-agent systems** operating in dynamic, real-world environments. Testing is not just about code correctness—it's about **mission assurance** in scenarios where:
 
 - **Human lives depend on system reliability**
 - **Autonomous agents must coordinate without human intervention**
@@ -86,7 +86,7 @@ The CAP Protocol is designed for **autonomous multi-agent systems** operating in
 - No real network/Ditto required
 - Can run in CI without credentials
 
-**Location**: `cap-protocol/tests/*_integration.rs`
+**Location**: `hive-protocol/tests/*_integration.rs`
 
 ### 3. E2E Tests (Real Ditto P2P)
 
@@ -107,7 +107,7 @@ The CAP Protocol is designed for **autonomous multi-agent systems** operating in
 - Event-driven assertions
 - Isolated test sessions
 
-**Location**: `cap-protocol/tests/*_e2e.rs`
+**Location**: `hive-protocol/tests/*_e2e.rs`
 
 **Critical**: E2E tests are THE validation that the p2p mesh works!
 
@@ -135,7 +135,7 @@ Every E2E test MUST:
 
 ### E2E Test Scenarios
 
-See [`cap-protocol/docs/testing/e2e-cell-formation.md`](../cap-protocol/docs/testing/e2e-cell-formation.md) for detailed scenario matrix.
+See [`hive-protocol/docs/testing/e2e-cell-formation.md`](../hive-protocol/docs/testing/e2e-cell-formation.md) for detailed scenario matrix.
 
 **Core Scenarios** (must be validated with real Ditto sync):
 
@@ -166,7 +166,7 @@ See [`cap-protocol/docs/testing/e2e-cell-formation.md`](../cap-protocol/docs/tes
 
 ### E2E Test Infrastructure
 
-**Test Harness** ([`cap-protocol/src/testing/e2e_harness.rs`](../cap-protocol/src/testing/e2e_harness.rs)):
+**Test Harness** ([`hive-protocol/src/testing/e2e_harness.rs`](../hive-protocol/src/testing/e2e_harness.rs)):
 
 ```rust
 pub struct E2EHarness {
@@ -593,12 +593,12 @@ async fn test_node_sync_across_peers() {
 
 ## Related Documentation
 
-- **E2E Cell Formation**: [`cap-protocol/docs/testing/e2e-cell-formation.md`](../cap-protocol/docs/testing/e2e-cell-formation.md)
-- **E2E Test Harness**: [`cap-protocol/src/testing/e2e_harness.rs`](../cap-protocol/src/testing/e2e_harness.rs)
+- **E2E Cell Formation**: [`hive-protocol/docs/testing/e2e-cell-formation.md`](../hive-protocol/docs/testing/e2e-cell-formation.md)
+- **E2E Test Harness**: [`hive-protocol/src/testing/e2e_harness.rs`](../hive-protocol/src/testing/e2e_harness.rs)
 - **ADR-004**: Human-in-the-Loop Authority ([`docs/adr/004-human-machine-cell-composition.md`](adr/004-human-machine-cell-composition.md))
 
 ---
 
 **Last Updated**: 2025-10-31
 **Status**: Living Document
-**Owner**: CAP Protocol Team
+**Owner**: HIVE Protocol Team

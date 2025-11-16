@@ -854,7 +854,7 @@ Every artifact must be cryptographically verifiable throughout distribution:
 
 ## References
 
-- ADR-001: CAP Protocol PoC
+- ADR-001: HIVE Protocol PoC
 - ADR-006: Security, Authentication, and Authorization
 - ADR-007: Automerge-Based Sync Engine
 - ADR-009: Bidirectional Hierarchical Flows

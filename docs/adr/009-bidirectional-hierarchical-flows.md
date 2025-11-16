@@ -3,7 +3,7 @@
 **Status**: Proposed  
 **Date**: 2025-11-05  
 **Authors**: Codex, Kit Plummer  
-**Relates to**: ADR-001 (CAP Protocol), ADR-004 (Human-Machine Composition), ADR-007 (Automerge Sync), ADR-008 (Network Simulation)
+**Relates to**: ADR-001 (HIVE Protocol), ADR-004 (Human-Machine Composition), ADR-007 (Automerge Sync), ADR-008 (Network Simulation)
 
 ## Context
 
@@ -557,7 +557,7 @@ impl SharedContext {
 
 ## Related Decisions
 
-- **ADR-001 (CAP Protocol POC)**: Establishes hierarchical architecture for upward flows
+- **ADR-001 (HIVE Protocol POC)**: Establishes hierarchical architecture for upward flows
 - **ADR-004 (Human-Machine Composition)**: Defines authority model for decision delegation
 - **ADR-006 (Security)**: Cryptographic signatures for command authentication
 - **ADR-007 (Automerge Sync)**: CRDT foundation enables bidirectional sync
