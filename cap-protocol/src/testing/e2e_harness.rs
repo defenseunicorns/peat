@@ -33,6 +33,13 @@ use tokio::sync::mpsc;
 use tokio::time::timeout;
 use tracing::{debug, info, warn};
 
+#[cfg(feature = "automerge-backend")]
+use crate::network::IrohTransport;
+#[cfg(feature = "automerge-backend")]
+use crate::storage::AutomergeStore;
+#[cfg(feature = "automerge-backend")]
+use crate::sync::automerge::AutomergeIrohBackend;
+
 /// Test harness for E2E cell formation testing
 pub struct E2EHarness {
     /// Test scenario name (for logging/debugging)
@@ -158,6 +165,83 @@ impl E2EHarness {
         self.temp_dirs.push(temp_dir);
 
         Ok(Arc::new(backend))
+    }
+
+    /// Create a new isolated Automerge+Iroh backend for testing
+    ///
+    /// This creates an AutomergeIrohBackend instance with:
+    /// - Unique persistence directory (RocksDB)
+    /// - Iroh QUIC transport on random available port
+    /// - Automatic sync coordination
+    ///
+    /// # Feature Gate
+    ///
+    /// Only available with the `automerge-backend` feature enabled.
+    #[cfg(feature = "automerge-backend")]
+    pub async fn create_automerge_backend(&mut self) -> Result<Arc<AutomergeIrohBackend>> {
+        self.create_automerge_backend_with_bind(None).await
+    }
+
+    /// Create a new isolated Automerge+Iroh backend with optional bind address
+    ///
+    /// Use this when you need to bind to a specific address/port for testing.
+    ///
+    /// # Arguments
+    /// * `bind_addr` - Optional socket address to bind the Iroh endpoint to
+    ///
+    /// # Feature Gate
+    ///
+    /// Only available with the `automerge-backend` feature enabled.
+    #[cfg(feature = "automerge-backend")]
+    pub async fn create_automerge_backend_with_bind(
+        &mut self,
+        bind_addr: Option<std::net::SocketAddr>,
+    ) -> Result<Arc<AutomergeIrohBackend>> {
+        let temp_dir = tempfile::tempdir().map_err(|e| {
+            Error::storage_error(
+                format!("Failed to create temp dir: {}", e),
+                "test_setup",
+                None,
+            )
+        })?;
+
+        // Create AutomergeStore with RocksDB persistence
+        let store = Arc::new(AutomergeStore::open(temp_dir.path()).map_err(|e| {
+            Error::storage_error(
+                format!("Failed to create AutomergeStore: {}", e),
+                "test_setup",
+                None,
+            )
+        })?);
+
+        // Create IrohTransport
+        let transport = if let Some(addr) = bind_addr {
+            Arc::new(IrohTransport::bind(addr).await.map_err(|e| {
+                Error::network_error(format!("Failed to bind Iroh transport: {}", e), None)
+            })?)
+        } else {
+            Arc::new(IrohTransport::new().await.map_err(|e| {
+                Error::network_error(format!("Failed to create Iroh transport: {}", e), None)
+            })?)
+        };
+
+        // Create the adapter backend
+        let backend = Arc::new(AutomergeIrohBackend::from_parts(store, transport));
+
+        // Initialize the backend with config (this also starts the accept loop via peer_discovery().start())
+        let config = BackendConfig {
+            app_id: "automerge-test".to_string(),
+            persistence_dir: temp_dir.path().to_path_buf(),
+            shared_key: None,
+            transport: TransportConfig::default(),
+            extra: HashMap::new(),
+        };
+
+        backend.initialize(config).await?;
+
+        self.temp_dirs.push(temp_dir);
+
+        Ok(backend)
     }
 
     /// Create a squad observer that triggers on document changes
