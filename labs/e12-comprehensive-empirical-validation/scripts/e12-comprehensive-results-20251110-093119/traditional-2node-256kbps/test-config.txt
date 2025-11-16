@@ -1,6 +1,0 @@
-Architecture: traditional
-Scale: 2node
-Bandwidth: 256kbps
-Topology: traditional-2node.yaml
-Start Time: 2025-11-10T09:42:36-05:00
-End Time: 2025-11-10T09:44:47-05:00
