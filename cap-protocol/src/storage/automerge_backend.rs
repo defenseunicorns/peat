@@ -377,7 +377,10 @@ impl SyncCapable for AutomergeBackend {
 
         // Phase 6.1: Start accept loop to receive incoming connections
         if let Some(transport) = &self.transport {
-            transport.start_accept_loop()?;
+            // Only start if not already running (may have been started by initialize())
+            if !transport.is_accept_loop_running() {
+                transport.start_accept_loop()?;
+            }
         }
 
         // Phase 6.2: Spawn incoming sync handler task
