@@ -12,13 +12,13 @@
 //! Run with: `cargo bench`
 //! View results in: `target/criterion/`
 
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use hive_protocol::discovery::capability_query::{CapabilityQuery, CapabilityQueryEngine};
 use hive_protocol::discovery::geographic::{GeographicBeacon, GeographicDiscovery};
 use hive_protocol::discovery::GeoCoordinate;
 use hive_protocol::models::capability::{Capability, CapabilityExt, CapabilityType};
 use hive_protocol::models::cell::{CellConfig, CellConfigExt, CellState, CellStateExt};
 use hive_protocol::models::node::{NodeConfig, NodeConfigExt};
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::collections::HashSet;
 
 /// Benchmark 1: Cell Formation Throughput

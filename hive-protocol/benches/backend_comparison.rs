@@ -14,12 +14,12 @@
 
 #![cfg(feature = "automerge-backend")]
 
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use hive_protocol::models::capability::{Capability, CapabilityExt, CapabilityType};
 use hive_protocol::models::cell::{CellConfig, CellConfigExt, CellState, CellStateExt};
 use hive_protocol::models::node::{NodeConfig, NodeConfigExt};
 use hive_protocol::sync::automerge::AutomergeBackend;
 use hive_protocol::sync::{BackendConfig, DataSyncBackend, Document, TransportConfig, Value};
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tokio::runtime::Runtime;

@@ -5,7 +5,9 @@
 //! Unlike E2E tests, these don't test multi-peer synchronization.
 
 use hive_protocol::sync::ditto::DittoBackend;
-use hive_protocol::sync::{BackendConfig, DataSyncBackend, Document, Query, TransportConfig, Value};
+use hive_protocol::sync::{
+    BackendConfig, DataSyncBackend, Document, Query, TransportConfig, Value,
+};
 use std::collections::HashMap;
 
 /// Helper to create a test backend with real Ditto instance

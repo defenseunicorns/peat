@@ -771,15 +771,15 @@ impl DittoStore {
             // Deserialize directly from JSON (full CRDT-enabled format)
             let ack: hive_schema::command::v1::CommandAcknowledgment = serde_json::from_value(doc)
                 .map_err(|e| {
-                Error::storage_error(
-                    format!(
-                        "Failed to deserialize CommandAcknowledgment from JSON: {}",
-                        e
-                    ),
-                    "query_command_acks",
-                    None,
-                )
-            })?;
+                    Error::storage_error(
+                        format!(
+                            "Failed to deserialize CommandAcknowledgment from JSON: {}",
+                            e
+                        ),
+                        "query_command_acks",
+                        None,
+                    )
+                })?;
 
             acks.push(ack);
         }
