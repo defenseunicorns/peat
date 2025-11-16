@@ -642,6 +642,404 @@ impl DataSyncBackend for AutomergeBackend {
     }
 }
 
+// ============================================================================
+// AutomergeIroh Backend Adapter (Phase 7: Lab Integration)
+// ============================================================================
+
+/// Type alias for peer event callback list
+type PeerCallbacks = Arc<Mutex<Vec<Box<dyn Fn(PeerEvent) + Send + Sync>>>>;
+
+/// DataSyncBackend adapter for storage::AutomergeBackend
+///
+/// This adapter wraps the storage::AutomergeBackend (RocksDB + Iroh + Automerge)
+/// to provide DataSyncBackend trait compatibility for cap_sim_node.rs
+pub struct AutomergeIrohBackend {
+    /// The underlying Automerge+Iroh backend
+    backend: Arc<crate::storage::AutomergeBackend>,
+
+    /// Reference to the transport for peer discovery
+    transport: Arc<crate::network::IrohTransport>,
+
+    /// Peer event callbacks
+    peer_callbacks: PeerCallbacks,
+
+    /// Initialization state
+    initialized: Arc<Mutex<bool>>,
+}
+
+impl AutomergeIrohBackend {
+    /// Create a new adapter
+    pub fn new(
+        backend: Arc<crate::storage::AutomergeBackend>,
+        transport: Arc<crate::network::IrohTransport>,
+    ) -> Self {
+        Self {
+            backend,
+            transport,
+            peer_callbacks: Arc::new(Mutex::new(Vec::new())),
+            initialized: Arc::new(Mutex::new(false)),
+        }
+    }
+
+    /// Create from store and transport (convenience method)
+    pub fn from_parts(
+        store: Arc<crate::storage::AutomergeStore>,
+        transport: Arc<crate::network::IrohTransport>,
+    ) -> Self {
+        let backend = Arc::new(crate::storage::AutomergeBackend::with_transport(
+            store,
+            Arc::clone(&transport),
+        ));
+        Self::new(backend, transport)
+    }
+
+    /// Get the transport (for testing/advanced usage)
+    pub fn transport(&self) -> Arc<crate::network::IrohTransport> {
+        Arc::clone(&self.transport)
+    }
+
+    /// Get this node's endpoint ID
+    pub fn endpoint_id(&self) -> iroh::EndpointId {
+        self.transport.endpoint_id()
+    }
+}
+
+// DocumentStore implementation for AutomergeIrohBackend
+struct IrohDocumentStore {
+    backend: Arc<crate::storage::AutomergeBackend>,
+}
+
+#[async_trait]
+impl DocumentStore for IrohDocumentStore {
+    async fn upsert(&self, collection: &str, document: Document) -> Result<DocumentId> {
+        use crate::storage::traits::StorageBackend;
+
+        // Generate ID if not provided
+        let doc_id = document.id.clone().unwrap_or_else(|| {
+            use std::time::SystemTime;
+            let timestamp = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            format!("doc-{}", timestamp)
+        });
+
+        // Serialize document to JSON bytes
+        let json_bytes = serde_json::to_vec(&document)?;
+
+        // Get collection and upsert
+        let coll = self.backend.collection(collection);
+        coll.upsert(&doc_id, json_bytes)
+            .map_err(|e| Error::Storage {
+                message: e.to_string(),
+                operation: Some("upsert".to_string()),
+                key: Some(doc_id.clone()),
+                source: None,
+            })?;
+
+        Ok(doc_id)
+    }
+
+    async fn query(&self, collection: &str, query: &Query) -> Result<Vec<Document>> {
+        use crate::storage::traits::StorageBackend;
+
+        let coll = self.backend.collection(collection);
+        let all_items = coll.scan().map_err(|e| Error::Storage {
+            message: e.to_string(),
+            operation: Some("scan".to_string()),
+            key: None,
+            source: None,
+        })?;
+
+        // Deserialize and filter
+        let mut results = Vec::new();
+        for (doc_id, bytes) in all_items {
+            if let Ok(mut doc) = serde_json::from_slice::<Document>(&bytes) {
+                // Set the ID from the key if not already set
+                if doc.id.is_none() {
+                    doc.id = Some(doc_id);
+                }
+
+                if matches_query(&doc, query) {
+                    results.push(doc);
+                }
+            }
+        }
+
+        Ok(results)
+    }
+
+    async fn remove(&self, collection: &str, doc_id: &DocumentId) -> Result<()> {
+        use crate::storage::traits::StorageBackend;
+
+        let coll = self.backend.collection(collection);
+        coll.delete(doc_id).map_err(|e| Error::Storage {
+            message: e.to_string(),
+            operation: Some("delete".to_string()),
+            key: Some(doc_id.clone()),
+            source: None,
+        })?;
+        Ok(())
+    }
+
+    fn observe(&self, _collection: &str, _query: &Query) -> Result<ChangeStream> {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        let _ = tx.send(ChangeEvent::Initial { documents: vec![] });
+        Ok(ChangeStream { receiver: rx })
+    }
+}
+
+// PeerDiscovery implementation for AutomergeIrohBackend
+struct IrohPeerDiscovery {
+    transport: Arc<crate::network::IrohTransport>,
+    peer_callbacks: PeerCallbacks,
+}
+
+#[async_trait]
+impl PeerDiscovery for IrohPeerDiscovery {
+    async fn start(&self) -> Result<()> {
+        self.transport
+            .start_accept_loop()
+            .map_err(|e| Error::Network {
+                message: format!("Failed to start accept loop: {}", e),
+                peer_id: None,
+                source: None,
+            })?;
+        Ok(())
+    }
+
+    async fn stop(&self) -> Result<()> {
+        Ok(())
+    }
+
+    async fn discovered_peers(&self) -> Result<Vec<PeerInfo>> {
+        let peer_ids = self.transport.connected_peers();
+        let mut peers = Vec::new();
+
+        for peer_id in peer_ids {
+            if self.transport.get_connection(&peer_id).is_some() {
+                peers.push(PeerInfo {
+                    peer_id: hex::encode(peer_id.as_bytes()),
+                    address: None,
+                    transport: TransportType::Custom,
+                    connected: true,
+                    last_seen: std::time::SystemTime::now(),
+                    metadata: HashMap::new(),
+                });
+            }
+        }
+
+        Ok(peers)
+    }
+
+    async fn add_peer(&self, address: &str, _transport: TransportType) -> Result<()> {
+        use crate::network::PeerInfo as NetworkPeerInfo;
+
+        let peer_info = NetworkPeerInfo {
+            name: "manual-peer".to_string(),
+            node_id: address.to_string(),
+            addresses: vec![address.to_string()],
+            relay_url: None,
+        };
+
+        self.transport
+            .connect_peer(&peer_info)
+            .await
+            .map_err(|e| Error::Network {
+                message: format!("Failed to connect to peer: {}", e),
+                peer_id: None,
+                source: None,
+            })?;
+        Ok(())
+    }
+
+    async fn wait_for_peer(&self, peer_id: &PeerId, timeout: Duration) -> Result<()> {
+        let start = std::time::Instant::now();
+
+        loop {
+            let peers = self.discovered_peers().await?;
+            if peers.iter().any(|p| &p.peer_id == peer_id) {
+                return Ok(());
+            }
+
+            if start.elapsed() > timeout {
+                return Err(Error::Network {
+                    message: format!("Timeout waiting for peer: {}", peer_id),
+                    peer_id: Some(peer_id.clone()),
+                    source: None,
+                });
+            }
+
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }
+
+    fn on_peer_event(&self, callback: Box<dyn Fn(PeerEvent) + Send + Sync>) {
+        self.peer_callbacks.lock().unwrap().push(callback);
+    }
+
+    async fn get_peer_info(&self, peer_id: &PeerId) -> Result<Option<PeerInfo>> {
+        let peers = self.discovered_peers().await?;
+        Ok(peers.into_iter().find(|p| &p.peer_id == peer_id))
+    }
+}
+
+// SyncEngine implementation for AutomergeIrohBackend
+struct IrohSyncEngine {
+    backend: Arc<crate::storage::AutomergeBackend>,
+}
+
+#[async_trait]
+impl SyncEngine for IrohSyncEngine {
+    async fn start_sync(&self) -> Result<()> {
+        use crate::storage::capabilities::SyncCapable;
+        self.backend.start_sync().map_err(|e| Error::Storage {
+            message: format!("Failed to start sync: {}", e),
+            operation: Some("start_sync".to_string()),
+            key: None,
+            source: None,
+        })?;
+        Ok(())
+    }
+
+    async fn stop_sync(&self) -> Result<()> {
+        use crate::storage::capabilities::SyncCapable;
+        self.backend.stop_sync().map_err(|e| Error::Storage {
+            message: format!("Failed to stop sync: {}", e),
+            operation: Some("stop_sync".to_string()),
+            key: None,
+            source: None,
+        })?;
+        Ok(())
+    }
+
+    async fn subscribe(&self, collection: &str, _query: &Query) -> Result<SyncSubscription> {
+        Ok(SyncSubscription::new(collection, ()))
+    }
+
+    async fn is_syncing(&self) -> Result<bool> {
+        use crate::storage::capabilities::SyncCapable;
+        let stats = self.backend.sync_stats().map_err(|e| Error::Storage {
+            message: format!("Failed to get sync stats: {}", e),
+            operation: Some("sync_stats".to_string()),
+            key: None,
+            source: None,
+        })?;
+        Ok(stats.peer_count > 0)
+    }
+}
+
+// DataSyncBackend implementation
+#[async_trait]
+impl DataSyncBackend for AutomergeIrohBackend {
+    async fn initialize(&self, _config: BackendConfig) -> Result<()> {
+        *self.initialized.lock().unwrap() = true;
+        self.peer_discovery().start().await?;
+        Ok(())
+    }
+
+    async fn shutdown(&self) -> Result<()> {
+        if self.is_ready().await {
+            let _ = self.sync_engine().stop_sync().await;
+            let _ = self.peer_discovery().stop().await;
+        }
+        *self.initialized.lock().unwrap() = false;
+        Ok(())
+    }
+
+    fn document_store(&self) -> Arc<dyn DocumentStore> {
+        Arc::new(IrohDocumentStore {
+            backend: Arc::clone(&self.backend),
+        })
+    }
+
+    fn peer_discovery(&self) -> Arc<dyn PeerDiscovery> {
+        Arc::new(IrohPeerDiscovery {
+            transport: Arc::clone(&self.transport),
+            peer_callbacks: Arc::clone(&self.peer_callbacks),
+        })
+    }
+
+    fn sync_engine(&self) -> Arc<dyn SyncEngine> {
+        Arc::new(IrohSyncEngine {
+            backend: Arc::clone(&self.backend),
+        })
+    }
+
+    async fn is_ready(&self) -> bool {
+        *self.initialized.lock().unwrap()
+    }
+
+    fn backend_info(&self) -> BackendInfo {
+        BackendInfo {
+            name: "AutomergeIroh".to_string(),
+            version: env!("CARGO_PKG_VERSION").to_string(),
+        }
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+// Helper function for query matching
+fn matches_query(doc: &Document, query: &Query) -> bool {
+    match query {
+        Query::All => true,
+        Query::Eq { field, value } => {
+            // Special case for "id" field - check doc.id instead of doc.fields
+            if field == "id" {
+                if let Some(ref doc_id) = doc.id {
+                    if let Some(value_str) = value.as_str() {
+                        return doc_id == value_str;
+                    }
+                }
+                return false;
+            }
+            doc.get(field) == Some(value)
+        }
+        Query::Lt { field, value } => {
+            if let Some(doc_val) = doc.get(field) {
+                compare_values(doc_val, value) < 0
+            } else {
+                false
+            }
+        }
+        Query::Gt { field, value } => {
+            if let Some(doc_val) = doc.get(field) {
+                compare_values(doc_val, value) > 0
+            } else {
+                false
+            }
+        }
+        Query::And(queries) => queries.iter().all(|q| matches_query(doc, q)),
+        Query::Or(queries) => queries.iter().any(|q| matches_query(doc, q)),
+        Query::Custom(_) => false,
+    }
+}
+
+fn compare_values(a: &serde_json::Value, b: &serde_json::Value) -> i32 {
+    use serde_json::Value as V;
+
+    match (a, b) {
+        (V::Number(n1), V::Number(n2)) => {
+            if let (Some(f1), Some(f2)) = (n1.as_f64(), n2.as_f64()) {
+                if f1 < f2 {
+                    -1
+                } else if f1 > f2 {
+                    1
+                } else {
+                    0
+                }
+            } else {
+                0
+            }
+        }
+        (V::String(s1), V::String(s2)) => s1.cmp(s2) as i32,
+        _ => 0,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
