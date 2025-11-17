@@ -723,6 +723,48 @@ impl AutomergeIrohBackend {
         manager.add_strategy(strategy);
         Ok(())
     }
+
+    /// Get access to the peer discovery information
+    ///
+    /// Returns a handle for querying discovered peers.
+    #[cfg(feature = "automerge-backend")]
+    pub fn get_peer_discovery(&self) -> PeerDiscoveryHandle {
+        PeerDiscoveryHandle {
+            manager: Arc::clone(&self.discovery_manager),
+        }
+    }
+}
+
+/// Handle for accessing peer discovery information
+#[cfg(feature = "automerge-backend")]
+pub struct PeerDiscoveryHandle {
+    manager: Arc<tokio::sync::RwLock<crate::discovery::peer::DiscoveryManager>>,
+}
+
+#[cfg(feature = "automerge-backend")]
+impl PeerDiscoveryHandle {
+    /// Get all discovered peers
+    ///
+    /// Queries all discovery strategies and returns their currently cached peers.
+    /// Strategies update their caches asynchronously, so this is a fast read operation.
+    pub async fn discovered_peers(&self) -> Result<Vec<crate::discovery::peer::PeerInfo>> {
+        let manager = self.manager.read().await;
+        manager
+            .discovered_peers()
+            .await
+            .map_err(|e| Error::Discovery {
+                message: e.to_string(),
+                source: None,
+            })
+    }
+
+    /// Get the number of discovered peers
+    ///
+    /// Queries all discovery strategies and counts their currently cached peers.
+    pub async fn peer_count(&self) -> usize {
+        let manager = self.manager.read().await;
+        manager.peer_count().await
+    }
 }
 
 // DocumentStore implementation for AutomergeIrohBackend
