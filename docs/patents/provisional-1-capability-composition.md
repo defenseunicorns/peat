@@ -1,5 +1,5 @@
 # Provisional Patent Application
-# Hierarchical Capability Composition for Distributed Autonomous Systems
+# Hierarchical Capability Composition for Distributed Autonomous Human-Machine-AI Systems
 
 **Inventors**: Kit Plummer, et al.
 **Company**: (r)evolve LLC
