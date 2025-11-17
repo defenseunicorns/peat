@@ -860,6 +860,9 @@ async fn test_e2e_timestamped_state_updates() {
     }
     set_leader_result.unwrap();
 
+    // Give Ditto time to propagate the update before we start polling
+    tokio::time::sleep(Duration::from_millis(1000)).await;
+
     // Verify peer1 sees its own update
     let peer1_cell = cell_store1.get_cell(&cell_id).await.unwrap().unwrap();
     println!(
@@ -912,6 +915,9 @@ async fn test_e2e_timestamped_state_updates() {
         println!("  ✗ set_leader(node_beta) failed: {:?}", e);
     }
     set_beta_result.unwrap();
+
+    // Give Ditto time to propagate the update before we start polling
+    tokio::time::sleep(Duration::from_millis(1000)).await;
 
     // Verify peer2 sees its own update
     let peer2_cell_after = cell_store2.get_cell(&cell_id).await.unwrap().unwrap();
@@ -1135,6 +1141,9 @@ async fn test_e2e_complete_formation_convergence() {
         .set_leader(&cell_id, "node_2".to_string())
         .await
         .unwrap();
+
+    // Give Ditto time to propagate the update before we start polling
+    tokio::time::sleep(Duration::from_millis(1000)).await;
 
     // Step 4: Validation of final state
     println!("  5. Validating final state convergence...");
