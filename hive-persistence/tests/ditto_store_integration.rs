@@ -23,9 +23,16 @@ async fn create_test_backend(test_name: &str) -> Arc<DittoBackend> {
 
     let backend = Arc::new(DittoBackend::new());
 
+    let persistence_dir = PathBuf::from(format!("/tmp/cap-persistence-test-{}", test_name));
+
+    // Clean up any leftover data from previous test runs
+    if persistence_dir.exists() {
+        let _ = std::fs::remove_dir_all(&persistence_dir);
+    }
+
     let config = BackendConfig {
         app_id,
-        persistence_dir: PathBuf::from(format!("/tmp/cap-persistence-test-{}", test_name)),
+        persistence_dir,
         shared_key: Some(shared_key),
         transport: TransportConfig {
             tcp_listen_port: None, // No network for tests
