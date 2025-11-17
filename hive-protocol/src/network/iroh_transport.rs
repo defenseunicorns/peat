@@ -122,6 +122,13 @@ impl IrohTransport {
         self.endpoint.addr()
     }
 
+    /// Get a reference to the underlying Iroh endpoint
+    ///
+    /// This is useful for advanced operations like mDNS discovery.
+    pub fn endpoint(&self) -> &Endpoint {
+        &self.endpoint
+    }
+
     /// Connect to a peer using EndpointAddr
     ///
     /// # Arguments

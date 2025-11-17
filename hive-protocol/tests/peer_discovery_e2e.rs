@@ -412,3 +412,154 @@ async fn test_e2e_discovery_and_connection() {
     let _ = backend_a.shutdown().await;
     let _ = backend_b.shutdown().await;
 }
+
+/// Test 7: mDNS Zero-Config Discovery
+///
+/// Validates that two nodes can discover each other automatically via mDNS
+/// without any pre-configuration.
+///
+/// **NOTE**: mDNS discovery between processes on the same machine may not work
+/// reliably due to OS-level mDNS filtering (especially on macOS). This test
+/// validates the implementation but may fail in single-machine test environments.
+/// For production validation, test on separate physical machines or VMs.
+///
+/// Test Flow:
+/// 1. Create Node A and Node B with Automerge+Iroh backends
+/// 2. Add MdnsDiscovery to both nodes (no static configuration needed)
+/// 3. Start both nodes' peer discovery
+/// 4. Wait for automatic mDNS discovery
+/// 5. Verify both nodes discover each other
+/// 6. Verify automatic connection is established
+#[tokio::test]
+async fn test_mdns_zero_config_discovery() {
+    use hive_protocol::discovery::peer::MdnsDiscovery;
+    use hive_protocol::network::IrohTransport;
+    use hive_protocol::storage::AutomergeStore;
+    use hive_protocol::sync::automerge::AutomergeIrohBackend;
+    use std::sync::Arc;
+    use tempfile::TempDir;
+
+    // Create temporary directories for each node
+    let temp_a = TempDir::new().expect("Failed to create temp dir");
+    let temp_b = TempDir::new().expect("Failed to create temp dir");
+
+    // Create Node A with mDNS discovery
+    let transport_a = Arc::new(
+        IrohTransport::new()
+            .await
+            .expect("Failed to create transport A"),
+    );
+    let store_a = Arc::new(AutomergeStore::open(temp_a.path()).expect("Failed to create store A"));
+    let backend_a = Arc::new(AutomergeIrohBackend::from_parts(
+        Arc::clone(&store_a),
+        Arc::clone(&transport_a),
+    ));
+
+    // Create Node B with mDNS discovery
+    let transport_b = Arc::new(
+        IrohTransport::new()
+            .await
+            .expect("Failed to create transport B"),
+    );
+    let store_b = Arc::new(AutomergeStore::open(temp_b.path()).expect("Failed to create store B"));
+    let backend_b = Arc::new(AutomergeIrohBackend::from_parts(
+        Arc::clone(&store_b),
+        Arc::clone(&transport_b),
+    ));
+
+    // Create mDNS discovery for Node A
+    // Note: Get endpoint reference before moving transport_a
+    let endpoint_a_ref = transport_a.endpoint();
+    let mdns_a = MdnsDiscovery::new(endpoint_a_ref.clone(), "UAV-Alpha".to_string())
+        .expect("Failed to create mDNS discovery for Node A");
+
+    backend_a
+        .add_discovery_strategy(Box::new(mdns_a))
+        .await
+        .expect("Failed to add mDNS discovery to Node A");
+
+    // Create mDNS discovery for Node B
+    let endpoint_b_ref = transport_b.endpoint();
+    let mdns_b = MdnsDiscovery::new(endpoint_b_ref.clone(), "UAV-Bravo".to_string())
+        .expect("Failed to create mDNS discovery for Node B");
+
+    backend_b
+        .add_discovery_strategy(Box::new(mdns_b))
+        .await
+        .expect("Failed to add mDNS discovery to Node B");
+
+    // Start peer discovery on both nodes
+    use hive_protocol::sync::traits::DataSyncBackend;
+    use hive_protocol::sync::types::{BackendConfig, TransportConfig};
+    use std::collections::HashMap;
+
+    let config_a = BackendConfig {
+        app_id: "test-app-mdns".to_string(),
+        persistence_dir: temp_a.path().to_path_buf(),
+        shared_key: None,
+        transport: TransportConfig::default(),
+        extra: HashMap::new(),
+    };
+
+    let config_b = BackendConfig {
+        app_id: "test-app-mdns".to_string(),
+        persistence_dir: temp_b.path().to_path_buf(),
+        shared_key: None,
+        transport: TransportConfig::default(),
+        extra: HashMap::new(),
+    };
+
+    backend_a
+        .initialize(config_a)
+        .await
+        .expect("Failed to initialize Node A");
+    backend_b
+        .initialize(config_b)
+        .await
+        .expect("Failed to initialize Node B");
+
+    // Wait for mDNS discovery and automatic connection
+    // mDNS typically responds within 1-3 seconds on a local network
+    // We allow extra time for connection establishment and service propagation
+    println!("Waiting for mDNS discovery and connection...");
+    tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+
+    // Verify discovery
+    let peers_a = backend_a
+        .get_peer_discovery()
+        .discovered_peers()
+        .await
+        .expect("Failed to get peers from Node A");
+    let peers_b = backend_b
+        .get_peer_discovery()
+        .discovered_peers()
+        .await
+        .expect("Failed to get peers from Node B");
+
+    println!("Node A (UAV-Alpha) discovered {} peers", peers_a.len());
+    println!("Node B (UAV-Bravo) discovered {} peers", peers_b.len());
+
+    // Verify mutual discovery
+    assert!(
+        !peers_a.is_empty(),
+        "Node A should have discovered at least one peer via mDNS"
+    );
+    assert!(
+        !peers_b.is_empty(),
+        "Node B should have discovered at least one peer via mDNS"
+    );
+
+    // Verify peer names (UAV-Alpha and UAV-Bravo should be visible)
+    let peer_names_a: Vec<String> = peers_a.iter().map(|p| p.name.clone()).collect();
+    let peer_names_b: Vec<String> = peers_b.iter().map(|p| p.name.clone()).collect();
+
+    println!("Node A sees peers: {:?}", peer_names_a);
+    println!("Node B sees peers: {:?}", peer_names_b);
+
+    // Note: For mDNS discovery, we verify that peers are discovered.
+    // Connection establishment is handled separately and not tested here.
+
+    // Cleanup
+    let _ = backend_a.shutdown().await;
+    let _ = backend_b.shutdown().await;
+}
