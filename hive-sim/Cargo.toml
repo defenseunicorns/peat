@@ -8,6 +8,7 @@ repository.workspace = true
 
 [dependencies]
 hive-protocol = { path = "../hive-protocol" }
+hive-schema = { path = "../hive-schema" }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
