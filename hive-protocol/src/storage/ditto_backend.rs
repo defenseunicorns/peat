@@ -447,13 +447,23 @@ impl SyncCapable for DittoBackend {
     }
 
     fn sync_stats(&self) -> Result<SyncStats> {
-        // Ditto doesn't expose detailed sync stats via public API
-        // Return basic stats structure
+        // Get peer count from Ditto presence graph
+        let graph = self.store.ditto().presence().graph();
+        let peer_count = graph.remote_peers.len();
+
+        // Note: Ditto provides sync monitoring via system:data_sync_info collection
+        // (see https://docs.ditto.live/sdk/latest/sync/monitoring-sync-status)
+        // which includes lastReceivedUpdateAt timestamp, but querying it requires
+        // async execute_v2() which doesn't fit the sync trait API.
+        //
+        // Future enhancement: Add async_sync_stats() method to SyncCapable trait
+        // or use a cached/polled approach to populate last_sync.
+
         Ok(SyncStats {
-            peer_count: 0, // Would require Ditto API enhancement
-            bytes_sent: 0,
-            bytes_received: 0,
-            last_sync: None,
+            peer_count,
+            bytes_sent: 0,     // Not available from Ditto SDK public API
+            bytes_received: 0, // Not available from Ditto SDK public API
+            last_sync: None,   // Could query system:data_sync_info but requires async
         })
     }
 }
