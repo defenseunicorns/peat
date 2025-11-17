@@ -560,6 +560,9 @@ async fn test_e2e_role_assignment_sync() {
         .await
         .unwrap();
 
+    // Give Ditto time to propagate the update before we start polling
+    tokio::time::sleep(Duration::from_millis(1000)).await;
+
     println!("  4. Waiting for leader sync to peer2...");
 
     // Poll peer2 for leader update
@@ -699,6 +702,9 @@ async fn test_e2e_leader_election_propagation() {
         .set_leader(&cell_id, "node_candidate_2".to_string())
         .await
         .unwrap();
+
+    // Give Ditto time to propagate the update before we start polling
+    tokio::time::sleep(Duration::from_millis(1000)).await;
 
     println!("  4. Waiting for election result to propagate mesh-wide...");
 
