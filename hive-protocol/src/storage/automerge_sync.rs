@@ -49,14 +49,41 @@ use iroh::EndpointId;
 #[cfg(feature = "automerge-backend")]
 use std::collections::HashMap;
 #[cfg(feature = "automerge-backend")]
+use std::sync::atomic::{AtomicU64, Ordering};
+#[cfg(feature = "automerge-backend")]
 use std::sync::{Arc, RwLock};
+#[cfg(feature = "automerge-backend")]
+use std::time::SystemTime;
 #[cfg(feature = "automerge-backend")]
 #[allow(unused_imports)] // Used in sync message send/receive methods
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+/// Per-peer sync statistics
+#[cfg(feature = "automerge-backend")]
+#[derive(Debug, Clone, Default)]
+pub struct PeerSyncStats {
+    /// Total bytes sent to this peer
+    pub bytes_sent: u64,
+    /// Total bytes received from this peer
+    pub bytes_received: u64,
+    /// Number of successful syncs
+    pub sync_count: u64,
+    /// Last successful sync timestamp
+    pub last_sync: Option<SystemTime>,
+    /// Number of sync failures
+    pub failure_count: u64,
+}
+
 /// Coordinator for Automerge document synchronization over Iroh
 ///
 /// Manages sync state for each peer and coordinates message exchange.
+///
+/// # Phase 4-5 Enhancements
+///
+/// - ✅ Per-peer sync state management
+/// - ✅ Sync statistics tracking (bytes, counts, timestamps)
+/// - ⏭ Partition recovery (TODO)
+/// - ⏭ Flow control and backpressure (TODO)
 #[cfg(feature = "automerge-backend")]
 pub struct AutomergeSyncCoordinator {
     /// Reference to the AutomergeStore
@@ -66,6 +93,13 @@ pub struct AutomergeSyncCoordinator {
     /// Sync state for each peer (per document)
     /// Map: document_key -> peer_id -> SyncState
     peer_states: Arc<RwLock<HashMap<String, HashMap<EndpointId, SyncState>>>>,
+    /// Per-peer sync statistics
+    /// Map: peer_id -> PeerSyncStats
+    peer_stats: Arc<RwLock<HashMap<EndpointId, PeerSyncStats>>>,
+    /// Total bytes sent (across all peers)
+    total_bytes_sent: Arc<AtomicU64>,
+    /// Total bytes received (across all peers)
+    total_bytes_received: Arc<AtomicU64>,
 }
 
 #[cfg(feature = "automerge-backend")]
@@ -81,6 +115,9 @@ impl AutomergeSyncCoordinator {
             store,
             transport,
             peer_states: Arc::new(RwLock::new(HashMap::new())),
+            peer_stats: Arc::new(RwLock::new(HashMap::new())),
+            total_bytes_sent: Arc::new(AtomicU64::new(0)),
+            total_bytes_received: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -125,12 +162,32 @@ impl AutomergeSyncCoordinator {
     /// * `doc_key` - The document identifier
     /// * `peer_id` - The EndpointId of the sending peer
     /// * `message` - The received sync message
+    /// * `message_size` - Size of the received message in bytes (for statistics)
     pub async fn receive_sync_message(
         &self,
         doc_key: &str,
         peer_id: EndpointId,
         message: SyncMessage,
+        message_size: usize,
     ) -> Result<()> {
+        // Track statistics first
+        self.total_bytes_received
+            .fetch_add(message_size as u64, Ordering::Relaxed);
+
+        // Update per-peer statistics
+        {
+            let mut stats = self.peer_stats.write().unwrap();
+            let peer_stat = stats.entry(peer_id).or_default();
+            peer_stat.bytes_received += message_size as u64;
+        }
+
+        tracing::debug!(
+            "Received sync message for {} from {:?}: {} bytes",
+            doc_key,
+            peer_id,
+            message_size
+        );
+
         // Get the document (or create empty one if doesn't exist)
         let mut doc = self.store.get(doc_key)?.unwrap_or_else(Automerge::new);
 
@@ -211,16 +268,39 @@ impl AutomergeSyncCoordinator {
         // Finish the stream
         send.finish().context("Failed to finish stream")?;
 
+        // Track statistics: bytes sent = doc_key overhead + message size
+        let total_bytes = 2 + doc_key_bytes.len() + 4 + encoded.len();
+        self.total_bytes_sent
+            .fetch_add(total_bytes as u64, Ordering::Relaxed);
+
+        // Update per-peer statistics
+        {
+            let mut stats = self.peer_stats.write().unwrap();
+            let peer_stat = stats.entry(peer_id).or_default();
+            peer_stat.bytes_sent += total_bytes as u64;
+            peer_stat.sync_count += 1;
+            peer_stat.last_sync = Some(SystemTime::now());
+        }
+
+        tracing::debug!(
+            "Sent sync message for {} to {:?}: {} bytes",
+            doc_key,
+            peer_id,
+            total_bytes
+        );
+
         Ok(())
     }
 
     /// Receive a sync message from a peer over Iroh stream
     ///
     /// Wire format: [2 bytes: doc_key length][N bytes: doc_key UTF-8][4 bytes: message length][M bytes: encoded message]
+    ///
+    /// Returns (doc_key, message, total_bytes_received)
     async fn receive_sync_message_from_stream(
         &self,
         mut recv: iroh::endpoint::RecvStream,
-    ) -> Result<(String, SyncMessage)> {
+    ) -> Result<(String, SyncMessage, usize)> {
         // Read doc_key length prefix (2 bytes, big-endian)
         let mut doc_key_len_bytes = [0u8; 2];
         recv.read_exact(&mut doc_key_len_bytes)
@@ -252,7 +332,10 @@ impl AutomergeSyncCoordinator {
         // Decode the sync message
         let message = SyncMessage::decode(&buffer).context("Failed to decode sync message")?;
 
-        Ok((doc_key, message))
+        // Calculate total bytes: doc_key overhead + message size
+        let total_bytes = 2 + doc_key_len + 4 + message_len;
+
+        Ok((doc_key, message, total_bytes))
     }
 
     /// Get or create sync state for a peer
@@ -319,14 +402,34 @@ impl AutomergeSyncCoordinator {
             .await
             .context("Failed to accept bidirectional stream")?;
 
-        // Receive the sync message (now includes doc_key in wire format)
-        let (doc_key, message) = self.receive_sync_message_from_stream(recv).await?;
+        // Receive the sync message (now includes doc_key and size in wire format)
+        let (doc_key, message, message_size) = self.receive_sync_message_from_stream(recv).await?;
 
-        // Process the message
-        self.receive_sync_message(&doc_key, peer_id, message)
+        // Process the message with statistics tracking
+        self.receive_sync_message(&doc_key, peer_id, message, message_size)
             .await?;
 
         Ok(())
+    }
+
+    /// Get total bytes sent across all peers
+    pub fn total_bytes_sent(&self) -> u64 {
+        self.total_bytes_sent.load(Ordering::Relaxed)
+    }
+
+    /// Get total bytes received across all peers
+    pub fn total_bytes_received(&self) -> u64 {
+        self.total_bytes_received.load(Ordering::Relaxed)
+    }
+
+    /// Get statistics for a specific peer
+    pub fn peer_stats(&self, peer_id: &EndpointId) -> Option<PeerSyncStats> {
+        self.peer_stats.read().unwrap().get(peer_id).cloned()
+    }
+
+    /// Get statistics for all peers
+    pub fn all_peer_stats(&self) -> HashMap<EndpointId, PeerSyncStats> {
+        self.peer_stats.read().unwrap().clone()
     }
 }
 
