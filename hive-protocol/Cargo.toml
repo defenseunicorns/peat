@@ -36,10 +36,11 @@ rocksdb = { version = "0.22", optional = true }  # Persistent storage
 lru = { version = "0.12", optional = true }  # LRU cache for hot documents
 toml = { version = "0.8", optional = true }  # Static peer configuration
 hex = { version = "0.4", optional = true }  # Hex encoding for PublicKeys
+mdns-sd = { version = "0.11", optional = true }  # mDNS service discovery (ADR-011 Phase 3)
 
 [features]
 default = []
-automerge-backend = ["automerge", "iroh", "rocksdb", "lru", "toml", "hex"]
+automerge-backend = ["automerge", "iroh", "rocksdb", "lru", "toml", "hex", "mdns-sd"]
 
 [dev-dependencies]
 proptest = { workspace = true }
