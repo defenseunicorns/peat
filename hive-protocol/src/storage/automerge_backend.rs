@@ -493,11 +493,34 @@ impl SyncCapable for AutomergeBackend {
     fn sync_stats(&self) -> Result<SyncStats> {
         let peer_count = self.transport.as_ref().map(|t| t.peer_count()).unwrap_or(0);
 
+        // Get statistics from sync coordinator if available
+        let (bytes_sent, bytes_received, last_sync) =
+            if let Some(coordinator) = &self.sync_coordinator {
+                let bytes_sent = coordinator.total_bytes_sent();
+                let bytes_received = coordinator.total_bytes_received();
+
+                // Find the most recent sync timestamp across all peers
+                let last_sync = coordinator
+                    .all_peer_stats()
+                    .values()
+                    .filter_map(|stats| stats.last_sync)
+                    .max();
+
+                (bytes_sent, bytes_received, last_sync)
+            } else {
+                // Fallback to local counters if no coordinator
+                (
+                    self.bytes_sent.load(Ordering::Relaxed),
+                    self.bytes_received.load(Ordering::Relaxed),
+                    None,
+                )
+            };
+
         Ok(SyncStats {
             peer_count,
-            bytes_sent: self.bytes_sent.load(Ordering::Relaxed),
-            bytes_received: self.bytes_received.load(Ordering::Relaxed),
-            last_sync: None, // TODO Phase 6: Track last sync timestamp in coordinator
+            bytes_sent,
+            bytes_received,
+            last_sync,
         })
     }
 }
