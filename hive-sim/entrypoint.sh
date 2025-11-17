@@ -73,37 +73,5 @@ export DITTO_OFFLINE_TOKEN
 export DITTO_SHARED_KEY
 
 # Run the simulation node
-if [ "$USE_TRADITIONAL" = "true" ]; then
-    echo "[${NODE_ID}] Running TRADITIONAL BASELINE (traditional_baseline - NO CRDT, periodic full messages)"
-    # traditional_baseline uses server/client mode instead of writer/reader
-    if [ "$MODE" = "writer" ]; then
-        TRAD_MODE="server"
-    else
-        TRAD_MODE="client"
-    fi
-
-    TRAD_ARGS="--node-id ${NODE_ID} --mode ${TRAD_MODE} --node-type ${NODE_TYPE} --update-frequency ${UPDATE_FREQUENCY_SECS}"
-
-    if [ -n "$TCP_LISTEN" ]; then
-        TRAD_ARGS="$TRAD_ARGS --listen 0.0.0.0:${TCP_LISTEN}"
-    fi
-    if [ -n "$TCP_CONNECT" ]; then
-        TRAD_ARGS="$TRAD_ARGS --connect ${TCP_CONNECT}"
-    fi
-
-    exec /app/target/release/examples/traditional_baseline $TRAD_ARGS
-elif [ "$USE_BASELINE" = "true" ]; then
-    echo "[${NODE_ID}] Running DITTO BASELINE (ditto_baseline - CRDT without CAP)"
-    # ditto_baseline doesn't support all the args, only basic ones
-    BASELINE_ARGS="--node-id ${NODE_ID} --mode ${MODE}"
-    if [ -n "$TCP_LISTEN" ]; then
-        BASELINE_ARGS="$BASELINE_ARGS --tcp-listen ${TCP_LISTEN}"
-    fi
-    if [ -n "$TCP_CONNECT" ]; then
-        BASELINE_ARGS="$BASELINE_ARGS --tcp-connect ${TCP_CONNECT}"
-    fi
-    exec /app/target/release/examples/ditto_baseline $BASELINE_ARGS
-else
-    echo "[${NODE_ID}] Running CAP Protocol (cap_sim_node with backend: ${BACKEND})"
-    exec /app/target/release/examples/cap_sim_node $ARGS
-fi
+echo "[${NODE_ID}] Running HIVE Protocol (hive-sim reference implementation)"
+exec /usr/local/bin/hive-sim $ARGS
