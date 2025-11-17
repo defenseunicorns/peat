@@ -480,7 +480,9 @@ impl DittoStore {
         })?;
 
         // Add Ditto-required metadata
-        doc["_id"] = serde_json::Value::String(squad_id.to_string());
+        // CRITICAL: Append -summary suffix for hierarchical aggregation detection
+        let doc_id = format!("{}-summary", squad_id);
+        doc["_id"] = serde_json::Value::String(doc_id.clone());
         doc["type"] = serde_json::Value::String("squad_summary".to_string());
         doc["collection_name"] = serde_json::Value::String("squad_summaries".to_string());
 
@@ -493,7 +495,7 @@ impl DittoStore {
         // Track both creation and last modification for proper delta sync metrics
         // Check if document already exists to preserve created_at_us
         let (created_at_us, version) = if let Ok(docs) = self
-            .query("sim_poc", &format!("_id == '{}'", squad_id))
+            .query("sim_poc", &format!("_id == '{}'", doc_id))
             .await
         {
             if let Some(existing_doc) = docs.first() {
@@ -545,8 +547,10 @@ impl DittoStore {
         &self,
         squad_id: &str,
     ) -> Result<Option<hive_schema::hierarchy::v1::SquadSummary>> {
+        // Query with -summary suffix
+        let doc_id = format!("{}-summary", squad_id);
         let results = self
-            .query("sim_poc", &format!("_id == '{}'", squad_id))
+            .query("sim_poc", &format!("_id == '{}'", doc_id))
             .await?;
 
         if results.is_empty() {
@@ -594,8 +598,11 @@ impl DittoStore {
         })?;
 
         // Add Ditto-required metadata
-        doc["_id"] = serde_json::Value::String(platoon_id.to_string());
+        // CRITICAL: Append -summary suffix for hierarchical aggregation detection
+        let doc_id = format!("{}-summary", platoon_id);
+        doc["_id"] = serde_json::Value::String(doc_id);
         doc["type"] = serde_json::Value::String("platoon_summary".to_string());
+        doc["collection_name"] = serde_json::Value::String("platoon_summaries".to_string());
 
         // Get current timestamp in microseconds for latency tracking
         let timestamp_us = std::time::SystemTime::now()
@@ -621,8 +628,10 @@ impl DittoStore {
         &self,
         platoon_id: &str,
     ) -> Result<Option<hive_schema::hierarchy::v1::PlatoonSummary>> {
+        // Query with -summary suffix
+        let doc_id = format!("{}-summary", platoon_id);
         let results = self
-            .query("platoon_summaries", &format!("_id == '{}'", platoon_id))
+            .query("platoon_summaries", &format!("_id == '{}'", doc_id))
             .await?;
 
         if results.is_empty() {
@@ -1770,7 +1779,7 @@ mod tests {
             .upsert_squad_summary("squad-alpha", &squad_summary)
             .await
             .expect("Failed to upsert squad summary");
-        assert_eq!(doc_id, "squad-alpha");
+        assert_eq!(doc_id, "squad-alpha-summary");
 
         // Test retrieval
         let retrieved = store
@@ -1883,7 +1892,7 @@ mod tests {
             .upsert_platoon_summary("platoon-1", &platoon_summary)
             .await
             .expect("Failed to upsert platoon summary");
-        assert_eq!(doc_id, "platoon-1");
+        assert_eq!(doc_id, "platoon-1-summary");
 
         // Test retrieval
         let retrieved = store
