@@ -665,6 +665,10 @@ pub struct AutomergeIrohBackend {
 
     /// Initialization state
     initialized: Arc<Mutex<bool>>,
+
+    /// Peer discovery manager (ADR-011 Phase 3)
+    #[cfg(feature = "automerge-backend")]
+    discovery_manager: Arc<tokio::sync::RwLock<crate::discovery::peer::DiscoveryManager>>,
 }
 
 impl AutomergeIrohBackend {
@@ -678,6 +682,10 @@ impl AutomergeIrohBackend {
             transport,
             peer_callbacks: Arc::new(Mutex::new(Vec::new())),
             initialized: Arc::new(Mutex::new(false)),
+            #[cfg(feature = "automerge-backend")]
+            discovery_manager: Arc::new(tokio::sync::RwLock::new(
+                crate::discovery::peer::DiscoveryManager::default(),
+            )),
         }
     }
 
@@ -701,6 +709,19 @@ impl AutomergeIrohBackend {
     /// Get this node's endpoint ID
     pub fn endpoint_id(&self) -> iroh::EndpointId {
         self.transport.endpoint_id()
+    }
+
+    /// Add a discovery strategy to the peer discovery manager
+    ///
+    /// This allows configuring static peers, mDNS discovery, etc.
+    #[cfg(feature = "automerge-backend")]
+    pub async fn add_discovery_strategy(
+        &self,
+        strategy: Box<dyn crate::discovery::peer::DiscoveryStrategy>,
+    ) -> Result<()> {
+        let mut manager = self.discovery_manager.write().await;
+        manager.add_strategy(strategy);
+        Ok(())
     }
 }
 
@@ -793,11 +814,14 @@ impl DocumentStore for IrohDocumentStore {
 struct IrohPeerDiscovery {
     transport: Arc<crate::network::IrohTransport>,
     peer_callbacks: PeerCallbacks,
+    #[cfg(feature = "automerge-backend")]
+    discovery_manager: Arc<tokio::sync::RwLock<crate::discovery::peer::DiscoveryManager>>,
 }
 
 #[async_trait]
 impl PeerDiscovery for IrohPeerDiscovery {
     async fn start(&self) -> Result<()> {
+        // Start Iroh transport accept loop
         self.transport
             .start_accept_loop()
             .map_err(|e| Error::Network {
@@ -805,6 +829,62 @@ impl PeerDiscovery for IrohPeerDiscovery {
                 peer_id: None,
                 source: None,
             })?;
+
+        // Start discovery manager
+        #[cfg(feature = "automerge-backend")]
+        {
+            let mut manager = self.discovery_manager.write().await;
+            manager.start().await.map_err(|e| {
+                Error::Internal(format!("Failed to start discovery manager: {}", e))
+            })?;
+        }
+
+        // Spawn background task to connect to discovered peers
+        #[cfg(feature = "automerge-backend")]
+        {
+            let discovery_manager = Arc::clone(&self.discovery_manager);
+            let transport = Arc::clone(&self.transport);
+
+            tokio::spawn(async move {
+                use crate::network::PeerInfo as NetworkPeerInfo;
+
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
+                    // Get discovered peers
+                    let manager = discovery_manager.read().await;
+                    let discovered_peers = manager.get_peers().await;
+                    drop(manager);
+
+                    // Try to connect to each discovered peer
+                    for peer in discovered_peers {
+                        // Convert discovery::peer::PeerInfo to network::PeerInfo
+                        let network_peer_info = NetworkPeerInfo {
+                            name: peer.name.clone(),
+                            node_id: peer.node_id.clone(),
+                            addresses: peer.addresses.clone(),
+                            relay_url: peer.relay_url.clone(),
+                        };
+
+                        // Only attempt connection if not already connected
+                        if let Ok(endpoint_id) = peer.endpoint_id() {
+                            if transport.get_connection(&endpoint_id).is_none() {
+                                if let Err(e) = transport.connect_peer(&network_peer_info).await {
+                                    tracing::debug!(
+                                        "Failed to connect to discovered peer {}: {}",
+                                        peer.name,
+                                        e
+                                    );
+                                } else {
+                                    tracing::info!("Connected to discovered peer: {}", peer.name);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
         Ok(())
     }
 
@@ -813,9 +893,10 @@ impl PeerDiscovery for IrohPeerDiscovery {
     }
 
     async fn discovered_peers(&self) -> Result<Vec<PeerInfo>> {
-        let peer_ids = self.transport.connected_peers();
         let mut peers = Vec::new();
 
+        // Get connected peers from transport
+        let peer_ids = self.transport.connected_peers();
         for peer_id in peer_ids {
             if self.transport.get_connection(&peer_id).is_some() {
                 peers.push(PeerInfo {
@@ -826,6 +907,25 @@ impl PeerDiscovery for IrohPeerDiscovery {
                     last_seen: std::time::SystemTime::now(),
                     metadata: HashMap::new(),
                 });
+            }
+        }
+
+        // Add discovered but not yet connected peers from discovery manager
+        #[cfg(feature = "automerge-backend")]
+        {
+            let manager = self.discovery_manager.read().await;
+            for discovered_peer in manager.get_peers().await {
+                // Check if already connected
+                if !peers.iter().any(|p| p.peer_id == discovered_peer.node_id) {
+                    peers.push(PeerInfo {
+                        peer_id: discovered_peer.node_id.clone(),
+                        address: discovered_peer.addresses.first().cloned(),
+                        transport: TransportType::Custom,
+                        connected: false,
+                        last_seen: std::time::SystemTime::now(),
+                        metadata: HashMap::new(),
+                    });
+                }
             }
         }
 
@@ -957,6 +1057,8 @@ impl DataSyncBackend for AutomergeIrohBackend {
         Arc::new(IrohPeerDiscovery {
             transport: Arc::clone(&self.transport),
             peer_callbacks: Arc::clone(&self.peer_callbacks),
+            #[cfg(feature = "automerge-backend")]
+            discovery_manager: Arc::clone(&self.discovery_manager),
         })
     }
 
