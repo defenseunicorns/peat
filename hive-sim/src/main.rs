@@ -74,9 +74,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::time::sleep;
 
 // Mode 4: Hierarchical aggregation imports
-use hive_protocol::hierarchy::StateAggregator;
+use hive_protocol::hierarchy::{HierarchicalAggregator, StateAggregator};
 use hive_protocol::models::{NodeConfig, NodeState};
-use hive_protocol::storage::DittoStore;
 
 /// Test document structure
 #[allow(dead_code)]
@@ -147,11 +146,11 @@ enum MetricsEvent {
 
 /// Squad leader aggregation loop (Mode 4)
 ///
-/// Periodically aggregates member NodeStates into SquadSummary and publishes to Ditto.
+/// Periodically aggregates member NodeStates into SquadSummary and publishes via coordinator.
 /// This is the core of hierarchical state aggregation - squad leaders collect member
 /// states and create summary documents that get replicated via P2P mesh.
 async fn squad_leader_aggregation_loop(
-    store: Arc<DittoStore>,
+    coordinator: Arc<HierarchicalAggregator>,
     squad_id: String,
     node_id: String,
     member_ids: Vec<String>,
@@ -203,8 +202,8 @@ async fn squad_leader_aggregation_loop(
                 Ok(squad_summary) => {
                     let timestamp_us = now_micros();
 
-                    // Publish to squad_summaries collection
-                    if let Err(e) = store.upsert_squad_summary(&squad_id, &squad_summary).await {
+                    // Publish to squad_summaries collection via coordinator
+                    if let Err(e) = coordinator.upsert_squad_summary(&squad_id, &squad_summary).await {
                         eprintln!("[{}] Failed to upsert squad summary: {}", node_id, e);
                     } else {
                         println!(
@@ -243,12 +242,12 @@ async fn squad_leader_aggregation_loop(
 
 /// Platoon leader aggregation loop (Mode 4)
 ///
-/// Event-driven aggregation triggered by squad summary updates via Ditto P2P mesh.
+/// Event-driven aggregation triggered by squad summary updates via P2P mesh.
 /// Platoon leaders observe squad summaries arriving from squad leaders and aggregate
 /// them into PlatoonSummary documents.
 async fn platoon_leader_aggregation_loop(
     mut change_stream: ChangeStream,
-    store: Arc<DittoStore>,
+    coordinator: Arc<HierarchicalAggregator>,
     platoon_id: String,
     node_id: String,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -263,8 +262,8 @@ async fn platoon_leader_aggregation_loop(
 
     let squad_ids = vec!["squad-alpha", "squad-bravo", "squad-charlie"];
 
-    // Clone store for aggregation task
-    let store_clone = Arc::clone(&store);
+    // Clone coordinator for aggregation task
+    let coordinator_clone = Arc::clone(&coordinator);
     let platoon_id_clone = platoon_id.clone();
     let node_id_clone = node_id.clone();
     let squad_ids_clone = squad_ids.clone();
@@ -276,7 +275,7 @@ async fn platoon_leader_aggregation_loop(
             let mut squad_summaries = Vec::new();
 
             for squad_id in &squad_ids_clone {
-                if let Ok(Some(summary)) = store_clone.get_squad_summary(squad_id).await {
+                if let Ok(Some(summary)) = coordinator_clone.store().get_squad_summary(squad_id).await {
                     squad_summaries.push(summary);
                 }
             }
@@ -291,8 +290,8 @@ async fn platoon_leader_aggregation_loop(
                     squad_summaries,
                 ) {
                     Ok(platoon_summary) => {
-                        // Publish to platoon_summaries collection
-                        if let Err(e) = store_clone
+                        // Publish to platoon_summaries collection via coordinator
+                        if let Err(e) = coordinator_clone
                             .upsert_platoon_summary(&platoon_id_clone, &platoon_summary)
                             .await
                         {
@@ -650,7 +649,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(ditto_backend) = backend.as_any().downcast_ref::<DittoBackend>() {
                     match ditto_backend.get_ditto_store() {
                         Ok(ditto_store) => {
-                            let store_clone = Arc::clone(&ditto_store);
+                            let coordinator = Arc::new(HierarchicalAggregator::new(Arc::clone(&ditto_store)));
                             let node_id_clone = node_id.clone();
 
                             println!(
@@ -660,7 +659,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                             tokio::spawn(async move {
                                 if let Err(e) = squad_leader_aggregation_loop(
-                                    store_clone,
+                                    coordinator,
                                     squad_id,
                                     node_id_clone.clone(),
                                     member_ids,
@@ -703,7 +702,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(ditto_backend) = backend.as_any().downcast_ref::<DittoBackend>() {
                     match (ditto_backend.get_ditto_store(), change_stream_result) {
                         (Ok(ditto_store), Ok(change_stream)) => {
-                            let store_clone = Arc::clone(&ditto_store);
+                            let coordinator = Arc::new(HierarchicalAggregator::new(Arc::clone(&ditto_store)));
                             let node_id_clone = node_id.clone();
 
                             println!("[{}] → Platoon: {}", node_id, platoon_id);
@@ -711,7 +710,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             tokio::spawn(async move {
                                 if let Err(e) = platoon_leader_aggregation_loop(
                                     change_stream,
-                                    store_clone,
+                                    coordinator,
                                     platoon_id,
                                     node_id_clone.clone(),
                                 )
