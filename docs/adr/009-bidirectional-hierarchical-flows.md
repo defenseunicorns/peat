@@ -1,9 +1,10 @@
 # ADR-009: Bidirectional Hierarchical Flows - Command, Control, and Software Logistics
 
-**Status**: Proposed  
-**Date**: 2025-11-05  
-**Authors**: Claude, Kit Plummer  
-**Relates to**: ADR-001 (HIVE Protocol), ADR-004 (Human-Machine Composition), ADR-007 (Automerge Sync), ADR-008 (Network Simulation)
+**Status**: Accepted (Implementation in progress)
+**Date**: 2025-11-05
+**Updated**: 2025-11-18
+**Authors**: Claude, Kit Plummer
+**Relates to**: ADR-001 (HIVE Protocol), ADR-004 (Human-Machine Composition), ADR-007 (Automerge Sync), ADR-008 (Network Simulation), ADR-021 (Document-Oriented Architecture)
 
 ## Context
 
@@ -577,6 +578,63 @@ impl SharedContext {
 - Link 16 downlink message structure
 - Over-the-Air (OTA) update best practices
 - Byzantine Generals Problem (command authentication)
+
+## Implementation Status (Updated 2025-11-18)
+
+### Phase 1: Command Dissemination (In Progress)
+
+**Completed:**
+- Command schema fully defined in `hive-schema/proto/command.proto`:
+  - `HierarchicalCommand` with policies (buffer, conflict, acknowledgment, leader change)
+  - `CommandAcknowledgment` with ack status flow (received, accepted, completed, rejected, failed)
+  - `CommandTarget` with scope (individual, squad, platoon, broadcast)
+- Core logic implemented in `hive-protocol/src/command/`:
+  - `CommandCoordinator` - Command lifecycle management with in-memory tracking
+  - `CommandRouter` - Target resolution and routing logic (individual/squad/platoon/broadcast)
+  - `ConflictResolver` - Policy-based conflict resolution (last-write-wins, highest-priority, highest-authority, merge-compatible, reject)
+  - `TimeoutManager` - Expiration and acknowledgment timeout tracking
+  - Unit tests for all components (100% coverage of coordinator logic)
+
+**In Progress:**
+- Ditto storage integration for command dissemination:
+  - Creating `CommandStorage` trait (backend-agnostic, following ADR-021 pattern)
+  - Implementing `DittoCommandStorage` for command publishing/subscribing
+  - Collections: `hierarchical_commands`, `hierarchical_commands_acks`
+  - Observer-based command reception (following E2E test harness patterns)
+
+**Next Steps:**
+1. Complete Ditto storage integration (commands + acknowledgments)
+2. Write E2E tests validating command flow across real Ditto mesh
+3. Validate policy-based routing in distributed scenarios
+4. Measure acknowledgment latency and reliability
+
+### Architecture Alignment with ADR-021
+
+The command dissemination implementation follows the **Document-Oriented Architecture** pattern established in ADR-021:
+
+**Upward Flow (Hierarchical Aggregation):**
+- Storage trait: `SummaryStorage` (trait for backend flexibility)
+- Ditto implementation: `DittoSummaryStorage`
+- Coordinator: `HierarchicalAggregator`
+- Pattern: Create-once (squad formation), update-many (delta updates)
+
+**Downward Flow (Command Dissemination):**
+- Storage trait: `CommandStorage` (trait for backend flexibility)
+- Ditto implementation: `DittoCommandStorage` (in progress)
+- Coordinator: `CommandCoordinator` (exists, needs storage integration)
+- Pattern: Publish-once (command issuance), acknowledge-many (ack tracking)
+
+This symmetric architecture ensures both upward and downward flows follow the same design principles, enabling future backend switching (Ditto ↔ Automerge/Iroh) without changing application logic.
+
+### Lessons Learned
+
+1. **Policy Flexibility is Critical**: The conflict resolution policies (highest-priority-wins, highest-authority-wins, etc.) proved essential during design validation. Different mission scenarios require different conflict resolution strategies.
+
+2. **Acknowledgment Tracking Complexity**: Unlike upward aggregation (many redundant sensors), downward commands must be individually tracked. The `TimeoutManager` handles this with per-target timeout tracking.
+
+3. **In-Memory First, Storage Second**: Implementing coordinator logic with in-memory state first (unit tests) before Ditto integration allowed rapid iteration on routing and conflict resolution logic.
+
+4. **Separation of Concerns**: The three-layer architecture (Router → Coordinator → Storage) cleanly separates target resolution, lifecycle management, and persistence concerns.
 
 ## Conclusion
 
