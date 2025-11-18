@@ -24,6 +24,8 @@ pub mod automerge_store;
 #[cfg(feature = "automerge-backend")]
 pub mod automerge_sync;
 #[cfg(feature = "automerge-backend")]
+pub mod sync_errors;
+#[cfg(feature = "automerge-backend")]
 pub mod ttl_manager;
 
 pub use cell_store::CellStore;
