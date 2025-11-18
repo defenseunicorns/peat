@@ -35,6 +35,8 @@
 #[cfg(feature = "automerge-backend")]
 use super::automerge_store::AutomergeStore;
 #[cfg(feature = "automerge-backend")]
+use super::partition_detection::PartitionDetector;
+#[cfg(feature = "automerge-backend")]
 use super::sync_errors::{SyncError, SyncErrorHandler};
 #[cfg(feature = "automerge-backend")]
 use crate::network::iroh_transport::IrohTransport;
@@ -85,7 +87,7 @@ pub struct PeerSyncStats {
 /// - ✅ Per-peer sync state management
 /// - ✅ Sync statistics tracking (bytes, counts, timestamps)
 /// - ✅ Error handling with retry logic and circuit breaker (Phase 5)
-/// - ⏭ Partition recovery (TODO)
+/// - ✅ Partition detection with heartbeat mechanism (Phase 6.3)
 /// - ⏭ Flow control and backpressure (TODO)
 #[cfg(feature = "automerge-backend")]
 pub struct AutomergeSyncCoordinator {
@@ -105,6 +107,8 @@ pub struct AutomergeSyncCoordinator {
     total_bytes_received: Arc<AtomicU64>,
     /// Error handler with retry logic and circuit breaker
     error_handler: Arc<SyncErrorHandler>,
+    /// Partition detector for heartbeat tracking
+    partition_detector: Arc<PartitionDetector>,
 }
 
 #[cfg(feature = "automerge-backend")]
@@ -124,6 +128,7 @@ impl AutomergeSyncCoordinator {
             total_bytes_sent: Arc::new(AtomicU64::new(0)),
             total_bytes_received: Arc::new(AtomicU64::new(0)),
             error_handler: Arc::new(SyncErrorHandler::new()),
+            partition_detector: Arc::new(PartitionDetector::new()),
         }
     }
 
@@ -499,6 +504,11 @@ impl AutomergeSyncCoordinator {
     /// Get reference to the error handler for diagnostics
     pub fn error_handler(&self) -> &SyncErrorHandler {
         &self.error_handler
+    }
+
+    /// Get reference to the partition detector
+    pub fn partition_detector(&self) -> &PartitionDetector {
+        &self.partition_detector
     }
 }
 
