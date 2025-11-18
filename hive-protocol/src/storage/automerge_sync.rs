@@ -35,6 +35,8 @@
 #[cfg(feature = "automerge-backend")]
 use super::automerge_store::AutomergeStore;
 #[cfg(feature = "automerge-backend")]
+use super::sync_errors::{SyncError, SyncErrorHandler};
+#[cfg(feature = "automerge-backend")]
 use crate::network::iroh_transport::IrohTransport;
 #[cfg(feature = "automerge-backend")]
 use anyhow::{Context, Result};
@@ -82,6 +84,7 @@ pub struct PeerSyncStats {
 ///
 /// - ✅ Per-peer sync state management
 /// - ✅ Sync statistics tracking (bytes, counts, timestamps)
+/// - ✅ Error handling with retry logic and circuit breaker (Phase 5)
 /// - ⏭ Partition recovery (TODO)
 /// - ⏭ Flow control and backpressure (TODO)
 #[cfg(feature = "automerge-backend")]
@@ -100,6 +103,8 @@ pub struct AutomergeSyncCoordinator {
     total_bytes_sent: Arc<AtomicU64>,
     /// Total bytes received (across all peers)
     total_bytes_received: Arc<AtomicU64>,
+    /// Error handler with retry logic and circuit breaker
+    error_handler: Arc<SyncErrorHandler>,
 }
 
 #[cfg(feature = "automerge-backend")]
@@ -118,6 +123,7 @@ impl AutomergeSyncCoordinator {
             peer_stats: Arc::new(RwLock::new(HashMap::new())),
             total_bytes_sent: Arc::new(AtomicU64::new(0)),
             total_bytes_received: Arc::new(AtomicU64::new(0)),
+            error_handler: Arc::new(SyncErrorHandler::new()),
         }
     }
 
@@ -130,6 +136,64 @@ impl AutomergeSyncCoordinator {
     /// * `doc_key` - The document identifier (e.g., "cells:cell-1")
     /// * `peer_id` - The EndpointId of the peer to sync with
     pub async fn initiate_sync(&self, doc_key: &str, peer_id: EndpointId) -> Result<()> {
+        // Check circuit breaker before attempting sync
+        if self.error_handler.is_circuit_open(&peer_id) {
+            let err = SyncError::CircuitBreakerOpen;
+            tracing::warn!("Sync blocked by circuit breaker for peer {:?}", peer_id);
+            return Err(anyhow::anyhow!("{}", err));
+        }
+
+        // Attempt sync operation
+        let result = self.initiate_sync_inner(doc_key, peer_id).await;
+
+        // Handle the result through error handler
+        match &result {
+            Ok(_) => {
+                self.error_handler.record_success(&peer_id);
+                tracing::debug!("Sync initiated successfully with peer {:?}", peer_id);
+            }
+            Err(e) => {
+                // Convert error to SyncError
+                let sync_error =
+                    if e.to_string().contains("connection") || e.to_string().contains("network") {
+                        SyncError::Network(e.to_string())
+                    } else if e.to_string().contains("document") || e.to_string().contains("CRDT") {
+                        SyncError::Document(e.to_string())
+                    } else {
+                        SyncError::Protocol(e.to_string())
+                    };
+
+                // Process error through handler
+                match self.error_handler.handle_error(&peer_id, sync_error) {
+                    Ok(Some(retry_delay)) => {
+                        tracing::warn!(
+                            "Sync failed for peer {:?}, will retry after {:?}",
+                            peer_id,
+                            retry_delay
+                        );
+                    }
+                    Ok(None) => {
+                        tracing::error!("Sync failed for peer {:?}, max retries exceeded", peer_id);
+                    }
+                    Err(SyncError::CircuitBreakerOpen) => {
+                        tracing::error!("Circuit breaker opened for peer {:?}", peer_id);
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            "Error handling sync failure for peer {:?}: {}",
+                            peer_id,
+                            e
+                        );
+                    }
+                }
+            }
+        }
+
+        result
+    }
+
+    /// Inner sync method without error handling wrapper
+    async fn initiate_sync_inner(&self, doc_key: &str, peer_id: EndpointId) -> Result<()> {
         // Get the document
         let doc = self
             .store
@@ -430,6 +494,11 @@ impl AutomergeSyncCoordinator {
     /// Get statistics for all peers
     pub fn all_peer_stats(&self) -> HashMap<EndpointId, PeerSyncStats> {
         self.peer_stats.read().unwrap().clone()
+    }
+
+    /// Get reference to the error handler for diagnostics
+    pub fn error_handler(&self) -> &SyncErrorHandler {
+        &self.error_handler
     }
 }
 
