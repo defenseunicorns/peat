@@ -78,9 +78,12 @@ use hive_protocol::hierarchy::{HierarchicalAggregator, StateAggregator};
 use hive_protocol::models::{NodeConfig, NodeState};
 
 // Phase 3: Command dissemination imports
-use hive_protocol::command::CommandCoordinator;
+use hive_protocol::command::{CommandCoordinator, CommandStorage};
 use hive_protocol::storage::DittoCommandStorage;
-use hive_schema::command::v1::{command_target::Scope, CommandTarget, HierarchicalCommand};
+use hive_schema::command::v1::{
+    command_target::Scope, AckStatus, CommandAcknowledgment, CommandTarget, HierarchicalCommand,
+};
+use hive_schema::common::v1::Timestamp;
 
 /// Test document structure
 #[allow(dead_code)]
@@ -156,7 +159,6 @@ enum MetricsEvent {
         priority: i32,
         timestamp_us: u128,
     },
-    #[allow(dead_code)] // Will be used when command reception is implemented
     CommandReceived {
         node_id: String,
         command_id: String,
@@ -165,7 +167,6 @@ enum MetricsEvent {
         latency_us: u128,
         latency_ms: f64,
     },
-    #[allow(dead_code)] // Will be used when command acknowledgment is implemented
     CommandAcknowledged {
         node_id: String,
         command_id: String,
@@ -232,6 +233,102 @@ async fn demo_command_issuance(
     println!("{}", serde_json::to_string(&event)?);
 
     Ok(())
+}
+
+/// Phase 3: Command reception and acknowledgment handler
+///
+/// Observes commands targeted at this node and sends acknowledgments back.
+/// This completes the bidirectional flow: commands down, acknowledgments up.
+async fn handle_command_reception(
+    node_id: String,
+    ditto_store: Arc<hive_protocol::storage::DittoStore>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("[{}] Starting command reception observer...", node_id);
+
+    // Create DittoCommandStorage for observing commands
+    let cmd_storage = Arc::new(DittoCommandStorage::new(Arc::clone(&ditto_store)));
+
+    // Set up observer for commands targeting this node
+    let node_id_clone = node_id.clone();
+    let ditto_store_clone = Arc::clone(&ditto_store);
+
+    let _observer = cmd_storage
+        .observe_commands(
+            &node_id,
+            Box::new(move |command: HierarchicalCommand| {
+                let node_id = node_id_clone.clone();
+                let ditto_store = Arc::clone(&ditto_store_clone);
+
+                Box::pin(async move {
+                    let received_at_us = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_micros();
+
+                    // Log CommandReceived event
+                    let issued_at_us = command
+                        .issued_at
+                        .as_ref()
+                        .map(|t| (t.seconds as u128 * 1_000_000) + (t.nanos as u128 / 1000))
+                        .unwrap_or(0);
+
+                    let latency_us = if issued_at_us > 0 {
+                        received_at_us.saturating_sub(issued_at_us)
+                    } else {
+                        0
+                    };
+
+                    let event = MetricsEvent::CommandReceived {
+                        node_id: node_id.clone(),
+                        command_id: command.command_id.clone(),
+                        originator_id: command.originator_id.clone(),
+                        received_at_us,
+                        latency_us,
+                        latency_ms: latency_us as f64 / 1000.0,
+                    };
+                    if let Ok(json) = serde_json::to_string(&event) {
+                        println!("{}", json);
+                    }
+
+                    // Send acknowledgment
+                    let ack = CommandAcknowledgment {
+                        command_id: command.command_id.clone(),
+                        node_id: node_id.clone(),
+                        status: AckStatus::AckCompleted as i32,
+                        reason: None,
+                        timestamp: Some(Timestamp {
+                            seconds: (received_at_us / 1_000_000) as u64,
+                            nanos: ((received_at_us % 1_000_000) * 1000) as u32,
+                        }),
+                    };
+
+                    // Publish acknowledgment to Ditto
+                    let ack_id = format!("{}-ack-{}", command.command_id, node_id);
+                    if let Err(e) = ditto_store.upsert_command_ack(&ack_id, &ack).await {
+                        eprintln!("[{}] Failed to send acknowledgment: {}", node_id, e);
+                    } else {
+                        // Log CommandAcknowledged event
+                        let event = MetricsEvent::CommandAcknowledged {
+                            node_id: node_id.clone(),
+                            command_id: command.command_id.clone(),
+                            status: "COMPLETED".to_string(),
+                            timestamp_us: received_at_us,
+                        };
+                        if let Ok(json) = serde_json::to_string(&event) {
+                            println!("{}", json);
+                        }
+                    }
+                })
+            }),
+        )
+        .await?;
+
+    println!("[{}] ✓ Command reception observer active", node_id);
+
+    // Keep the observer alive
+    loop {
+        sleep(Duration::from_secs(60)).await;
+    }
 }
 
 /// Squad leader aggregation loop (Mode 4)
@@ -961,6 +1058,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "[{}] No aggregation task needed for role: {}",
                     node_id, role
                 );
+            }
+        }
+
+        // Phase 3: Spawn command reception task for ALL nodes in hierarchical mode
+        // This enables subordinates to receive commands and send acknowledgments
+        if let Some(ditto_backend) = backend.as_any().downcast_ref::<DittoBackend>() {
+            if let Ok(ditto_store) = ditto_backend.get_ditto_store() {
+                let reception_node_id = node_id.clone();
+                tokio::spawn(async move {
+                    if let Err(e) =
+                        handle_command_reception(reception_node_id.clone(), ditto_store).await
+                    {
+                        eprintln!("[{}] Command reception error: {}", reception_node_id, e);
+                    }
+                });
+                println!("[{}] ✓ Command reception task spawned", node_id);
             }
         }
     }
