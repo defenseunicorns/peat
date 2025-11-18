@@ -510,6 +510,127 @@ impl AutomergeSyncCoordinator {
     pub fn partition_detector(&self) -> &PartitionDetector {
         &self.partition_detector
     }
+
+    /// Send a heartbeat to a peer
+    ///
+    /// Sends a minimal heartbeat message to verify the peer is reachable.
+    /// Wire format: [1 byte: 0x01 (heartbeat marker)][8 bytes: timestamp (u64, big-endian)]
+    ///
+    /// # Arguments
+    ///
+    /// * `peer_id` - The EndpointId of the peer to send heartbeat to
+    pub async fn send_heartbeat(&self, peer_id: EndpointId) -> Result<()> {
+        // Get connection to peer
+        let conn = self
+            .transport
+            .get_connection(&peer_id)
+            .context("No connection to peer")?;
+
+        // Open a unidirectional stream (heartbeats don't need response)
+        let mut send = conn
+            .open_uni()
+            .await
+            .context("Failed to open unidirectional stream")?;
+
+        // Write heartbeat marker (1 byte: 0x01)
+        send.write_all(&[0x01])
+            .await
+            .context("Failed to write heartbeat marker")?;
+
+        // Write timestamp (8 bytes, big-endian)
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        send.write_all(&timestamp.to_be_bytes())
+            .await
+            .context("Failed to write timestamp")?;
+
+        // Finish the stream
+        send.finish().context("Failed to finish stream")?;
+
+        tracing::trace!("Sent heartbeat to peer {:?}", peer_id);
+
+        Ok(())
+    }
+
+    /// Handle an incoming heartbeat from a peer
+    ///
+    /// Called when a peer sends a heartbeat. Records the heartbeat
+    /// success in the partition detector.
+    ///
+    /// # Arguments
+    ///
+    /// * `conn` - The connection the heartbeat arrived on
+    pub async fn handle_incoming_heartbeat(&self, conn: Connection) -> Result<()> {
+        let peer_id = conn.remote_id();
+
+        // Accept a unidirectional stream
+        let mut recv = conn
+            .accept_uni()
+            .await
+            .context("Failed to accept unidirectional stream")?;
+
+        // Read heartbeat marker (1 byte: 0x01)
+        let mut marker = [0u8; 1];
+        recv.read_exact(&mut marker)
+            .await
+            .context("Failed to read heartbeat marker")?;
+
+        if marker[0] != 0x01 {
+            anyhow::bail!(
+                "Invalid heartbeat marker: expected 0x01, got {:#x}",
+                marker[0]
+            );
+        }
+
+        // Read timestamp (8 bytes, big-endian)
+        let mut timestamp_bytes = [0u8; 8];
+        recv.read_exact(&mut timestamp_bytes)
+            .await
+            .context("Failed to read timestamp")?;
+        let _timestamp = u64::from_be_bytes(timestamp_bytes);
+
+        // Record heartbeat success in partition detector
+        self.partition_detector.record_heartbeat_success(&peer_id);
+
+        tracing::trace!("Received heartbeat from peer {:?}", peer_id);
+
+        Ok(())
+    }
+
+    /// Send heartbeats to all connected peers
+    ///
+    /// This is called periodically by the background heartbeat task.
+    pub async fn send_heartbeats_to_all_peers(&self) -> Result<()> {
+        let peer_ids = self.transport.connected_peers();
+
+        for peer_id in peer_ids {
+            // Register peer with partition detector if not already registered
+            self.partition_detector.register_peer(peer_id);
+
+            // Send heartbeat
+            if let Err(e) = self.send_heartbeat(peer_id).await {
+                tracing::debug!("Failed to send heartbeat to {:?}: {}", peer_id, e);
+                // Record heartbeat failure
+                let triggered_partition =
+                    self.partition_detector.record_heartbeat_failure(&peer_id);
+                if triggered_partition {
+                    tracing::warn!("Partition detected for peer {:?}", peer_id);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Check all peers for partition timeouts
+    ///
+    /// This is called periodically to detect partitions based on elapsed time
+    /// since last successful heartbeat.
+    pub fn check_partition_timeouts(&self) -> Vec<EndpointId> {
+        self.partition_detector.check_timeouts()
+    }
 }
 
 #[cfg(all(test, feature = "automerge-backend"))]
