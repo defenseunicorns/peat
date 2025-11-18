@@ -85,18 +85,25 @@ sysctl -w net.ipv6.neigh.default.gc_thresh3=32768
 **Root Cause**: Linux bridge device has a hard limit of **1024 network interfaces**
 - 1023 container interfaces + 1 bridge management interface = 1024 total
 
-**Status**: **HARD LIMIT IDENTIFIED** - Cannot be resolved without architectural changes
+**Status**: **HARD LIMIT CONFIRMED** - Linux kernel architectural limitation
 
-**Note**: This limit was observed after multiple sequential test runs. To verify this is a true hard limit rather than accumulated Docker state, a clean-system retest is recommended:
-1. Restart Docker daemon
-2. Prune all networks: `docker network prune -f`
-3. Verify clean state: `ip -6 neigh | wc -l` (should be minimal)
-4. Retest 1500-node deployment from clean state
+**Clean-Slate Validation** (2025-11-18):
+✅ **Confirmed**: 1023-node limit is a true hard limit, NOT accumulated state
+- Clean Docker environment (0 existing containers)
+- Fresh network state (6 IPv6 neighbors)
+- Proper kernel tuning applied (gc_thresh3 = 32,768)
+- Result: Exactly 1,023 containers running, 477 failed with "exchange full"
+- Deployment time: 170 seconds (2:50)
+
+**Root Cause**: Linux bridge device has a hard-coded limit of 1,024 network interfaces (see `net/bridge/br_if.c` in Linux kernel)
+- 1,023 container veth interfaces
+- 1 bridge management interface
+- = 1,024 total (absolute maximum)
 
 **Implications**:
-- 1000 nodes is the practical validated maximum
+- 1000 nodes is the practical validated maximum for production use
 - 1023 is the absolute technical ceiling for single-bridge deployment
-- Exceeding this requires multi-bridge or multi-host architecture
+- Exceeding this requires architectural changes (see alternatives below)
 
 ---
 
@@ -190,26 +197,129 @@ ulimit -u 511300     # Max user processes
 
 To deploy more than 1023 nodes on a single machine, one of these architectural changes is required:
 
-### Option 1: Multi-Bridge Architecture
-- Create multiple Docker bridge networks
-- Distribute containers across bridges
-- Maximum: ~1023 nodes × N bridges (limited by routing complexity)
-- **Complexity**: Medium
-- **Containerlab support**: May require custom configuration
+### Option 1: Multi-Bridge Architecture (Recommended for 1500-3000 nodes)
+**Concept**: Create multiple Docker bridge networks, distribute containers across bridges
 
-### Option 2: Multi-Host Deployment
-- Distribute containers across multiple physical/virtual machines
-- Use Containerlab's multi-host features or Kubernetes
-- Maximum: Virtually unlimited (scales horizontally)
-- **Complexity**: High
-- **Infrastructure**: Requires cluster setup
+**Implementation Approach**:
+```bash
+# Create multiple bridge networks
+docker network create --driver bridge clab-bridge-1 --subnet 172.20.0.0/16
+docker network create --driver bridge clab-bridge-2 --subnet 172.21.0.0/16
+docker network create --driver bridge clab-bridge-3 --subnet 172.22.0.0/16
 
-### Option 3: Alternative Network Driver
-- Use Docker's `macvlan` or `ipvlan` drivers (no bridge limit)
-- Containers get direct network access
-- Maximum: Limited by subnet size, not bridge ports
-- **Complexity**: Medium
-- **Trade-offs**: May complicate network isolation and routing
+# Distribute 1500 nodes across 2 bridges: 750 per bridge
+# Modify topology to assign nodes to different networks
+```
+
+**Pros**:
+- Stays on single machine
+- Can scale to ~2,000-3,000 nodes (2-3 bridges)
+- Docker-native solution
+
+**Cons**:
+- Requires cross-bridge routing for inter-node communication
+- Containerlab doesn't natively support multi-bridge per topology
+- Need custom network configuration in topology files
+
+**Complexity**: Medium
+**Best for**: 1,500-3,000 node tests
+**Estimated effort**: 2-4 hours to implement and test
+
+### Option 2: macvlan/ipvlan Network Driver (Recommended for 2000-5000 nodes)
+**Concept**: Use macvlan or ipvlan drivers that bypass bridge limitations entirely
+
+**Implementation Approach**:
+```bash
+# Create macvlan network (containers get direct host network access)
+docker network create -d macvlan \
+  --subnet=192.168.100.0/16 \
+  --gateway=192.168.100.1 \
+  -o parent=eth0 clab-macvlan
+
+# Containers connect directly to network without bridge
+# No 1024-port limit
+```
+
+**Pros**:
+- No bridge port limit (can scale to 10,000+ containers)
+- Better network performance (no bridge overhead)
+- Single network namespace
+
+**Cons**:
+- Containers cannot communicate with Docker host directly
+- Requires promiscuous mode on host interface
+- May not work in all virtualized environments
+- Containerlab support varies by version
+
+**Complexity**: Medium-High
+**Best for**: 2,000-5,000+ node tests
+**Estimated effort**: 4-8 hours (includes testing host connectivity workarounds)
+
+### Option 3: Multi-Host Deployment (Recommended for 5000+ nodes)
+**Concept**: Distribute containers across multiple physical/virtual machines
+
+**Implementation Approach**:
+```bash
+# Option A: Containerlab multi-node feature
+# Define topology with nodes distributed across hosts
+# Requires shared storage and SSH access between hosts
+
+# Option B: Kubernetes with custom CRDs
+# Deploy containers as pods across cluster
+# Use network policies for inter-pod communication
+
+# Option C: Docker Swarm
+# Create swarm cluster, deploy services
+# Overlay network handles cross-host routing
+```
+
+**Pros**:
+- Virtually unlimited scaling (horizontal)
+- Production-grade orchestration
+- High availability and fault tolerance
+- Realistic distributed system testing
+
+**Cons**:
+- Requires multiple machines or VMs
+- Complex network configuration
+- Higher operational overhead
+- May not match single-machine test simplicity
+
+**Complexity**: High
+**Best for**: Large-scale tests (5,000+ nodes), production deployments
+**Estimated effort**: 1-2 days (cluster setup + testing)
+
+---
+
+## Decision Matrix: Choosing the Right Approach
+
+| Target Node Count | Recommended Approach | Why |
+|------------------|---------------------|-----|
+| Up to 1,000 | **Single bridge (current)** | Simple, validated, no architectural changes needed |
+| 1,001 - 1,500 | **Multi-Bridge** | Moderate complexity, stays on single machine, good for baseline testing |
+| 1,501 - 5,000 | **macvlan/ipvlan** | Better performance, no bridge limit, acceptable complexity |
+| 5,000+ | **Multi-Host** | Scales indefinitely, production-grade, worth the setup overhead |
+
+### Recommendation for HIVE Baseline Testing
+
+**Current maximum (1,000 nodes)** is sufficient for:
+- Traditional baseline validation
+- HIVE protocol comparison testing
+- Performance benchmarking at scale
+- Demonstrating architectural advantages
+
+**When to consider exceeding 1,000 nodes**:
+- Testing HIVE's hierarchical scaling beyond traditional limits
+- Stress testing command dissemination across large formations
+- Validating aggregation performance at battalion+ scale (1,500+ nodes)
+- Production deployment planning
+
+**Suggested next step**:
+Start with **multi-bridge architecture** to test 1,500-node traditional baseline. This provides:
+1. Apples-to-apples comparison with current 1,000-node tests
+2. Proof that traditional architecture struggles at scale
+3. Foundation for demonstrating HIVE's hierarchical advantages
+4. Minimal infrastructure changes (single machine)
 
 ---
 
@@ -387,5 +497,57 @@ For experiments requiring more than 1000 nodes, plan for multi-bridge or multi-h
 
 ---
 
+## Clean-Slate Validation Test (2025-11-18)
+
+### Test Objective
+Verify that the 1,023-container limit is a true Linux kernel hard limit, not an artifact of accumulated Docker state from sequential tests.
+
+### Pre-Test Environment
+```bash
+# System state verification
+Docker containers: 0 (clean)
+Docker networks: 0 clab networks (pruned)
+IPv6 neighbors: 6 (minimal baseline)
+Kernel tuning: Applied (gc_thresh3 = 32,768)
+System memory: 119 GB available
+```
+
+### Test Execution
+```bash
+cd hive-sim
+./test-scaling-validation.sh 1500
+```
+
+### Results
+| Metric | Value |
+|--------|-------|
+| **Deployment time** | 170 seconds (2:50) |
+| **Containers created** | 1,500 |
+| **Containers running** | **1,023** |
+| **Containers failed** | 477 (status: "Created") |
+| **Success rate** | 68.2% (1023/1500) |
+
+### Error Pattern
+All 477 failures showed identical error:
+```
+failed to set up container networking:
+failed to create endpoint clab-traditional-battalion-1500node-p1-soldier-* on network clab:
+adding interface veth* to bridge br-* failed: exchange full
+```
+
+### Key Findings
+1. ✅ **Confirmed hard limit**: Exactly 1,023 containers achieved network connectivity
+2. ✅ **Not state-related**: Clean environment reproduced identical limit
+3. ✅ **Kernel limitation**: "exchange full" error indicates bridge interface table exhaustion
+4. ✅ **Predictable behavior**: Same limit across multiple test runs
+5. ✅ **Resource headroom**: System had 119 GB RAM available, limit was network-based
+
+### Conclusion
+The 1,023-container limit is a **fundamental Linux kernel architectural constraint** in the bridge driver (`net/bridge/br_if.c`), not a configuration or state issue. This limit cannot be overcome without changing the network architecture (multi-bridge, macvlan, or multi-host deployment).
+
+---
+
 **Investigation completed**: 2025-11-18
+**Clean-slate validation**: 2025-11-18
 **Status**: ✅ **1000-node deployment validated and production-ready**
+**Hard limit confirmed**: ✅ **1023 nodes maximum on single Docker bridge**
