@@ -23,6 +23,33 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 #[cfg(feature = "automerge-backend")]
 use std::time::{Duration, SystemTime};
+#[cfg(feature = "automerge-backend")]
+use tracing::{debug, info, warn};
+
+/// Partition lifecycle event
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg(feature = "automerge-backend")]
+pub enum PartitionEvent {
+    /// Partition detected for a peer
+    PartitionDetected {
+        peer_id: EndpointId,
+        consecutive_failures: u64,
+    },
+    /// Partition healed - peer started recovering
+    PartitionHealed {
+        peer_id: EndpointId,
+        partition_duration: Duration,
+    },
+    /// Peer fully recovered - returned to Connected state
+    PeerRecovered { peer_id: EndpointId },
+    /// Heartbeat success recorded
+    HeartbeatSuccess { peer_id: EndpointId },
+    /// Heartbeat failure recorded (but partition not yet detected)
+    HeartbeatFailure {
+        peer_id: EndpointId,
+        consecutive_failures: u64,
+    },
+}
 
 /// Partition state for a peer
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,7 +90,9 @@ impl PeerHeartbeat {
     }
 
     /// Record a successful heartbeat
-    pub fn record_success(&mut self) {
+    ///
+    /// Returns an optional event if a state transition occurred
+    pub fn record_success(&mut self, peer_id: EndpointId) -> Option<PartitionEvent> {
         let now = SystemTime::now();
         let was_partitioned = self.state == PeerPartitionState::Partitioned;
 
@@ -72,18 +101,45 @@ impl PeerHeartbeat {
 
         if was_partitioned {
             // Transition from Partitioned → Recovering
+            let partition_duration = self
+                .partition_detected_at
+                .and_then(|detected_at| now.duration_since(detected_at).ok())
+                .unwrap_or(Duration::from_secs(0));
+
             self.state = PeerPartitionState::Recovering;
             self.partition_detected_at = None;
+
+            info!(
+                peer_id = ?peer_id,
+                partition_duration_secs = partition_duration.as_secs(),
+                "Partition healed - peer recovering"
+            );
+
+            return Some(PartitionEvent::PartitionHealed {
+                peer_id,
+                partition_duration,
+            });
         } else if self.state == PeerPartitionState::Recovering {
             // Transition from Recovering → Connected
             self.state = PeerPartitionState::Connected;
+
+            info!(peer_id = ?peer_id, "Peer fully recovered");
+
+            return Some(PartitionEvent::PeerRecovered { peer_id });
         }
+
+        debug!(peer_id = ?peer_id, "Heartbeat success");
+        Some(PartitionEvent::HeartbeatSuccess { peer_id })
     }
 
     /// Record a heartbeat failure
     ///
-    /// Returns true if this failure triggered a partition detection
-    pub fn record_failure(&mut self, timeout_threshold: u64) -> bool {
+    /// Returns an optional event if a partition was detected
+    pub fn record_failure(
+        &mut self,
+        peer_id: EndpointId,
+        timeout_threshold: u64,
+    ) -> Option<PartitionEvent> {
         self.consecutive_failures += 1;
 
         // Detect partition if we've exceeded the threshold
@@ -92,10 +148,35 @@ impl PeerHeartbeat {
         {
             self.state = PeerPartitionState::Partitioned;
             self.partition_detected_at = Some(SystemTime::now());
-            return true;
+
+            warn!(
+                peer_id = ?peer_id,
+                consecutive_failures = self.consecutive_failures,
+                "Partition detected"
+            );
+
+            return Some(PartitionEvent::PartitionDetected {
+                peer_id,
+                consecutive_failures: self.consecutive_failures,
+            });
         }
 
-        false
+        // Still connected but experiencing failures
+        if self.state == PeerPartitionState::Connected {
+            debug!(
+                peer_id = ?peer_id,
+                consecutive_failures = self.consecutive_failures,
+                threshold = timeout_threshold,
+                "Heartbeat failure"
+            );
+
+            return Some(PartitionEvent::HeartbeatFailure {
+                peer_id,
+                consecutive_failures: self.consecutive_failures,
+            });
+        }
+
+        None
     }
 
     /// Check if peer should be considered partitioned based on time elapsed
@@ -187,24 +268,24 @@ impl PartitionDetector {
 
     /// Record a successful heartbeat for a peer
     ///
-    /// Returns the peer's partition state after the heartbeat
-    pub fn record_heartbeat_success(&self, peer_id: &EndpointId) -> Option<PeerPartitionState> {
-        self.heartbeats.write().unwrap().get_mut(peer_id).map(|hb| {
-            hb.record_success();
-            hb.state
-        })
-    }
-
-    /// Record a heartbeat failure for a peer
-    ///
-    /// Returns true if this failure triggered a partition detection
-    pub fn record_heartbeat_failure(&self, peer_id: &EndpointId) -> bool {
+    /// Returns an optional partition event if a state transition occurred
+    pub fn record_heartbeat_success(&self, peer_id: &EndpointId) -> Option<PartitionEvent> {
         self.heartbeats
             .write()
             .unwrap()
             .get_mut(peer_id)
-            .map(|hb| hb.record_failure(self.config.failure_threshold))
-            .unwrap_or(false)
+            .and_then(|hb| hb.record_success(*peer_id))
+    }
+
+    /// Record a heartbeat failure for a peer
+    ///
+    /// Returns an optional partition event if partition was detected or failure occurred
+    pub fn record_heartbeat_failure(&self, peer_id: &EndpointId) -> Option<PartitionEvent> {
+        self.heartbeats
+            .write()
+            .unwrap()
+            .get_mut(peer_id)
+            .and_then(|hb| hb.record_failure(*peer_id, self.config.failure_threshold))
     }
 
     /// Get the partition state for a peer
@@ -234,9 +315,9 @@ impl PartitionDetector {
 
     /// Check all peers for timeout-based partition detection
     ///
-    /// Returns a list of newly partitioned peers
-    pub fn check_timeouts(&self) -> Vec<EndpointId> {
-        let mut newly_partitioned = Vec::new();
+    /// Returns a list of partition events for newly partitioned peers
+    pub fn check_timeouts(&self) -> Vec<PartitionEvent> {
+        let mut events = Vec::new();
 
         let mut heartbeats = self.heartbeats.write().unwrap();
         for (peer_id, hb) in heartbeats.iter_mut() {
@@ -245,11 +326,21 @@ impl PartitionDetector {
             {
                 hb.state = PeerPartitionState::Partitioned;
                 hb.partition_detected_at = Some(SystemTime::now());
-                newly_partitioned.push(*peer_id);
+
+                warn!(
+                    peer_id = ?peer_id,
+                    timeout_secs = self.config.heartbeat_timeout.as_secs(),
+                    "Partition detected via timeout"
+                );
+
+                events.push(PartitionEvent::PartitionDetected {
+                    peer_id: *peer_id,
+                    consecutive_failures: hb.consecutive_failures,
+                });
             }
         }
 
-        newly_partitioned
+        events
     }
 
     /// Get number of tracked peers
@@ -275,46 +366,76 @@ mod tests {
         let mut hb = PeerHeartbeat::new();
         hb.consecutive_failures = 2;
 
-        hb.record_success();
+        // Create a dummy endpoint ID for testing
+        let mut rng = rand::rng();
+        let secret_key = iroh::SecretKey::generate(&mut rng);
+        let peer_id = secret_key.public();
+
+        let event = hb.record_success(peer_id);
 
         assert_eq!(hb.consecutive_failures, 0);
         assert_eq!(hb.state, PeerPartitionState::Connected);
+        assert_eq!(event, Some(PartitionEvent::HeartbeatSuccess { peer_id }));
     }
 
     #[test]
     fn test_peer_heartbeat_partition_detection() {
         let mut hb = PeerHeartbeat::new();
+        let mut rng = rand::rng();
+        let secret_key = iroh::SecretKey::generate(&mut rng);
+        let peer_id = secret_key.public();
 
         // First 2 failures don't trigger partition
-        assert!(!hb.record_failure(3));
+        let event1 = hb.record_failure(peer_id, 3);
         assert_eq!(hb.state, PeerPartitionState::Connected);
-        assert!(!hb.record_failure(3));
+        assert!(matches!(
+            event1,
+            Some(PartitionEvent::HeartbeatFailure { .. })
+        ));
+
+        let event2 = hb.record_failure(peer_id, 3);
         assert_eq!(hb.state, PeerPartitionState::Connected);
+        assert!(matches!(
+            event2,
+            Some(PartitionEvent::HeartbeatFailure { .. })
+        ));
 
         // 3rd failure triggers partition
-        assert!(hb.record_failure(3));
+        let event3 = hb.record_failure(peer_id, 3);
         assert_eq!(hb.state, PeerPartitionState::Partitioned);
         assert!(hb.partition_detected_at.is_some());
+        assert!(matches!(
+            event3,
+            Some(PartitionEvent::PartitionDetected { .. })
+        ));
     }
 
     #[test]
     fn test_peer_heartbeat_recovery() {
         let mut hb = PeerHeartbeat::new();
+        let mut rng = rand::rng();
+        let secret_key = iroh::SecretKey::generate(&mut rng);
+        let peer_id = secret_key.public();
 
         // Trigger partition
-        hb.record_failure(3);
-        hb.record_failure(3);
-        hb.record_failure(3);
+        hb.record_failure(peer_id, 3);
+        hb.record_failure(peer_id, 3);
+        hb.record_failure(peer_id, 3);
         assert_eq!(hb.state, PeerPartitionState::Partitioned);
 
         // First success after partition → Recovering
-        hb.record_success();
+        let event1 = hb.record_success(peer_id);
         assert_eq!(hb.state, PeerPartitionState::Recovering);
         assert!(hb.partition_detected_at.is_none());
+        assert!(matches!(
+            event1,
+            Some(PartitionEvent::PartitionHealed { .. })
+        ));
 
         // Second success → Connected
-        hb.record_success();
+        let event2 = hb.record_success(peer_id);
         assert_eq!(hb.state, PeerPartitionState::Connected);
+        assert!(matches!(event2, Some(PartitionEvent::PeerRecovered { .. })));
     }
 
     #[test]

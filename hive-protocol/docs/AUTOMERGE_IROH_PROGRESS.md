@@ -1,6 +1,6 @@
 # Automerge+Iroh Backend Implementation Progress
 
-**Status**: Phase 6.4 Complete - Heartbeat Exchange Implemented ✅
+**Status**: Phase 7.1 Complete - Partition Lifecycle Metrics ✅
 **Last Updated**: 2025-11-18
 
 ## Overview
@@ -266,13 +266,67 @@ All 5 tests passing ✅:
 
 #### Next Steps (Phase 7)
 
-1. **Partition Lifecycle Metrics**: Emit events for partition detection/heal
+1. ~~**Partition Lifecycle Metrics**: Emit events for partition detection/heal~~ (✅ Completed in Phase 7.1)
 2. **ContainerLab E2E Testing**: Simulate network partitions with tc/netem
 3. **mDNS Discovery**: Zero-config peer discovery (Phase 7)
 
+### ✅ Phase 7.1: Partition Lifecycle Metrics (COMPLETE)
+
+**Status**: ✅ Events and tracing integration complete
+
+#### Implementation Details
+
+**Partition Lifecycle Events** (partition_detection.rs:29-52):
+- `PartitionEvent` enum with 5 event types:
+  - `PartitionDetected`: Partition detected via heartbeat failures or timeout
+  - `PartitionHealed`: Peer started recovering after partition
+  - `PeerRecovered`: Peer fully recovered and returned to Connected state
+  - `HeartbeatSuccess`: Heartbeat success recorded
+  - `HeartbeatFailure`: Heartbeat failure recorded (before partition threshold)
+
+**Tracing Integration** (partition_detection.rs):
+- `info!` logs for partition heal and peer recovery events
+- `warn!` logs for partition detection (both failure-based and timeout-based)
+- `debug!` logs for heartbeat successes and failures
+- All logs include relevant context (peer_id, consecutive_failures, partition_duration, etc.)
+
+**Event Emission** (partition_detection.rs:95-180):
+- `PeerHeartbeat::record_success()` → Returns `Option<PartitionEvent>`
+- `PeerHeartbeat::record_failure()` → Returns `Option<PartitionEvent>`
+- `PartitionDetector::record_heartbeat_success()` → Propagates events
+- `PartitionDetector::record_heartbeat_failure()` → Propagates events
+- `PartitionDetector::check_timeouts()` → Returns `Vec<PartitionEvent>`
+
+**Integration with Sync** (automerge_sync.rs):
+- Heartbeat sender records failures and emits events
+- Timeout checker returns events for newly detected partitions
+- Events available to callers via `check_partition_timeouts()`
+
+#### Unit Tests
+
+All 5 partition_detection tests passing ✅:
+- `test_peer_heartbeat_success_resets_failures`
+- `test_peer_heartbeat_partition_detection` - Verifies event emission
+- `test_peer_heartbeat_recovery` - Verifies state transitions and events
+- `test_partition_config_defaults`
+- `test_partition_detector_creation`
+
+#### E2E Test Results
+
+All 5 Automerge+Iroh E2E tests passing (2.84s) ✅:
+- No performance regression
+- Partition detection infrastructure working alongside existing sync
+
+#### Key Features
+
+1. **Observable Partition Lifecycle**: All state transitions emit structured events
+2. **Structured Logging**: Tracing integration for operational visibility
+3. **Event-Driven API**: Callers can subscribe to partition events for metrics/alerting
+4. **No Breaking Changes**: Existing code continues to work
+
 ## Current Capabilities
 
-### ✅ Working (Complete as of Phase 6.4)
+### ✅ Working (Complete as of Phase 7.1)
 1. **Static Mesh Configuration**: TOML-based peer lists
 2. **Direct Addressing**: Localhost P2P without relay
 3. **Connection Establishment**: Sub-second connection times (~0.4s)
@@ -285,13 +339,14 @@ All 5 tests passing ✅:
 10. **Metrics Tracking**: ✅ bytes_sent/bytes_received updated
 11. **Partition Detection Infrastructure**: ✅ Heartbeat mechanism with state tracking (Phase 6.3)
 12. **Active Heartbeat Exchange**: ✅ Periodic heartbeat messages over Iroh streams (Phase 6.4)
+13. **Partition Lifecycle Events**: ✅ Structured events for partition detect/heal/recovery (Phase 7.1)
+14. **Tracing Integration**: ✅ Structured logging for partition lifecycle (Phase 7.1)
 
 ### 🔄 Optimizations Pending (Future)
-1. **Partition Lifecycle Metrics**: Emit events for partition detection/heal (Phase 7)
-2. **ContainerLab Testing**: Network partition simulation with tc/netem (Phase 7)
-3. **Flow Control**: Backpressure for large documents
-4. **mDNS Discovery**: Zero-config peer discovery (Phase 7)
-5. **Relay Support**: Cross-network sync via Iroh relay (Phase 7)
+1. **ContainerLab Testing**: Network partition simulation with tc/netem (Phase 7.2)
+2. **Flow Control**: Backpressure for large documents
+3. **mDNS Discovery**: Zero-config peer discovery (Phase 7.3)
+4. **Relay Support**: Cross-network sync via Iroh relay (Phase 7.4)
 
 ## Next Steps: Phase 7 (Discovery & Relay)
 
