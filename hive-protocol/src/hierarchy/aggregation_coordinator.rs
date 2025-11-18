@@ -119,9 +119,7 @@ impl HierarchicalAggregator {
     ) -> Result<String> {
         // For now, delegate directly to DittoStore
         // Future: Add lifecycle tracking logic here
-        self.store
-            .upsert_platoon_summary(platoon_id, summary)
-            .await
+        self.store.upsert_platoon_summary(platoon_id, summary).await
     }
 
     /// Get a reference to the underlying storage backend
@@ -135,8 +133,6 @@ impl HierarchicalAggregator {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_coordinator_creation() {
         // Coordinator creation is tested in integration tests
