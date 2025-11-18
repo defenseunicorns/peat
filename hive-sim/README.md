@@ -208,6 +208,58 @@ Nodes are configured via environment variables in topology YAML:
 
 Ditto credentials are loaded from `.env` file via `--env-file` flag.
 
+## Hierarchical Command Dissemination
+
+The simulator supports bidirectional hierarchical command flow with optional acknowledgment collection:
+
+### Command Reception
+
+All nodes in hierarchical mode automatically:
+- Monitor for incoming commands via Ditto observers (`CommandStorage.observe_commands()`)
+- Process commands targeting them (by node ID, squad ID, or platoon ID)
+- Send automatic acknowledgments (`CommandAcknowledgment` with `AckCompleted` status)
+
+Metrics events emitted:
+- `CommandReceived`: When a command is received and processed
+- `CommandAcknowledged`: When acknowledgment is sent back to command originator
+
+### Acknowledgment Collection (Optional)
+
+Squad leaders can optionally track acknowledgments from subordinates:
+
+```bash
+# Enable acknowledgment collection for a squad leader
+hive-sim-node --enable-ack-collection \
+  --node-id squad-leader \
+  --squad-id alpha \
+  --mode hierarchical
+```
+
+When enabled:
+- Monitors for acknowledgments via Ditto observers (`CommandStorage.observe_acknowledgments()`)
+- Tracks acknowledgment count vs. expected count
+- Emits `AcknowledgmentReceived` metrics events
+
+**Use Cases**:
+- **Fire-and-forget**: Disable ack collection for simple command broadcast
+- **Mission-critical tracking**: Enable ack collection to verify all squad members acknowledged
+
+### E2E Test Coverage
+
+The bidirectional command flow is validated with E2E tests:
+- `/Users/kit/Code/cap/hive-protocol/tests/bidirectional_flow_e2e.rs`
+
+Tests verify:
+1. Commands propagate from leader → members (downward flow)
+2. Acknowledgments propagate from members → leader (upward flow)
+3. Full-duplex bidirectional flow works simultaneously
+4. Concurrent commands are handled correctly
+
+Run tests with:
+```bash
+cargo test --test bidirectional_flow_e2e
+```
+
 ## Troubleshooting
 
 ### "Permission denied" errors
