@@ -11,6 +11,7 @@ pub mod ditto_backend;
 // Existing implementations
 pub mod cell_store;
 pub mod ditto_store;
+pub mod ditto_summary_storage;
 pub mod node_store;
 pub mod throttled_node_store;
 pub mod ttl;
@@ -30,6 +31,7 @@ pub mod ttl_manager;
 
 pub use cell_store::CellStore;
 pub use ditto_store::DittoStore;
+pub use ditto_summary_storage::DittoSummaryStorage;
 pub use node_store::NodeStore;
 pub use throttled_node_store::{ThrottleStats, ThrottledNodeStore};
 pub use ttl::{EvictionStrategy, OfflineRetentionPolicy, TtlConfig};

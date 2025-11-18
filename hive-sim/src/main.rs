@@ -203,6 +203,7 @@ async fn squad_leader_aggregation_loop(
                     let timestamp_us = now_micros();
 
                     // Publish to squad_summaries collection via coordinator
+                    #[allow(deprecated)]
                     if let Err(e) = coordinator
                         .upsert_squad_summary(&squad_id, &squad_summary)
                         .await
@@ -278,9 +279,7 @@ async fn platoon_leader_aggregation_loop(
             let mut squad_summaries = Vec::new();
 
             for squad_id in &squad_ids_clone {
-                if let Ok(Some(summary)) =
-                    coordinator_clone.store().get_squad_summary(squad_id).await
-                {
+                if let Ok(Some(summary)) = coordinator_clone.get_squad_summary(squad_id).await {
                     squad_summaries.push(summary);
                 }
             }
@@ -296,6 +295,7 @@ async fn platoon_leader_aggregation_loop(
                 ) {
                     Ok(platoon_summary) => {
                         // Publish to platoon_summaries collection via coordinator
+                        #[allow(deprecated)]
                         if let Err(e) = coordinator_clone
                             .upsert_platoon_summary(&platoon_id_clone, &platoon_summary)
                             .await
@@ -654,8 +654,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(ditto_backend) = backend.as_any().downcast_ref::<DittoBackend>() {
                     match ditto_backend.get_ditto_store() {
                         Ok(ditto_store) => {
-                            let coordinator =
-                                Arc::new(HierarchicalAggregator::new(Arc::clone(&ditto_store)));
+                            // Wrap DittoStore in DittoSummaryStorage for backend abstraction
+                            let storage =
+                                Arc::new(hive_protocol::storage::DittoSummaryStorage::new(
+                                    Arc::clone(&ditto_store),
+                                ));
+                            let coordinator = Arc::new(HierarchicalAggregator::new(storage));
                             let node_id_clone = node_id.clone();
 
                             println!(
@@ -708,8 +712,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(ditto_backend) = backend.as_any().downcast_ref::<DittoBackend>() {
                     match (ditto_backend.get_ditto_store(), change_stream_result) {
                         (Ok(ditto_store), Ok(change_stream)) => {
-                            let coordinator =
-                                Arc::new(HierarchicalAggregator::new(Arc::clone(&ditto_store)));
+                            // Wrap DittoStore in DittoSummaryStorage for backend abstraction
+                            let storage =
+                                Arc::new(hive_protocol::storage::DittoSummaryStorage::new(
+                                    Arc::clone(&ditto_store),
+                                ));
+                            let coordinator = Arc::new(HierarchicalAggregator::new(storage));
                             let node_id_clone = node_id.clone();
 
                             println!("[{}] → Platoon: {}", node_id, platoon_id);
