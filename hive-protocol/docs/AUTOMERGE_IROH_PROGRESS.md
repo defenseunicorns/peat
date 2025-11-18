@@ -1,6 +1,6 @@
 # Automerge+Iroh Backend Implementation Progress
 
-**Status**: Phase 6.2 Complete - Document Sync Working ✅
+**Status**: Phase 6.4 Complete - Heartbeat Exchange Implemented ✅
 **Last Updated**: 2025-11-18
 
 ## Overview
@@ -224,15 +224,55 @@ All 5 tests passing ✅:
 - `test_partition_config_defaults`
 - `test_partition_detector_creation`
 
-#### Next Steps (Phase 6.4)
+### ✅ Phase 6.4: Heartbeat Exchange (COMPLETE)
 
-1. **Heartbeat Exchange**: Implement periodic heartbeat messages over Iroh streams
-2. **Partition Lifecycle Events**: Emit metrics for partition detection/heal
-3. **Integration Testing**: E2E tests with ContainerLab network partition simulation
+**Status**: ✅ Active heartbeat messaging implemented
+
+#### Implementation Details
+
+**Heartbeat Wire Protocol** (automerge_sync.rs:514-629):
+- Wire format: `[1 byte: 0x01 marker][8 bytes: timestamp (u64, big-endian)]`
+- Uses unidirectional Iroh streams (heartbeats don't need responses)
+- Minimal 9-byte message per heartbeat
+
+**Heartbeat Sender** (automerge_backend.rs:483-511):
+- Background task sends periodic heartbeats to all connected peers
+- Interval configured by `PartitionConfig` (default: 5s)
+- Automatically registers peers with partition detector
+- Records failures and triggers partition detection
+
+**Heartbeat Receiver** (automerge_backend.rs:441-474):
+- Background task accepts incoming heartbeat streams
+- Validates heartbeat marker (0x01)
+- Records heartbeat success in partition detector
+- Updates peer partition state
+
+**Partition Detection Integration**:
+- Successful heartbeats → `partition_detector.record_heartbeat_success()`
+- Failed heartbeats → `partition_detector.record_heartbeat_failure()`
+- Timeout checks → `partition_detector.check_timeouts()`
+- State transitions: Connected → Partitioned → Recovering → Connected
+
+**Background Tasks** (3 tasks per node):
+1. Heartbeat sender: Sends periodic heartbeats (5s interval)
+2. Heartbeat receiver: Accepts incoming heartbeat streams
+3. Timeout checker: Detects partitions based on elapsed time
+
+#### Verified Behavior
+
+- ✅ E2E tests still passing (5/5 in 2.83s)
+- ✅ Heartbeat tasks spawn/stop with sync lifecycle
+- ✅ No performance regression from Phase 6.3
+
+#### Next Steps (Phase 7)
+
+1. **Partition Lifecycle Metrics**: Emit events for partition detection/heal
+2. **ContainerLab E2E Testing**: Simulate network partitions with tc/netem
+3. **mDNS Discovery**: Zero-config peer discovery (Phase 7)
 
 ## Current Capabilities
 
-### ✅ Working (Complete as of Phase 6.3)
+### ✅ Working (Complete as of Phase 6.4)
 1. **Static Mesh Configuration**: TOML-based peer lists
 2. **Direct Addressing**: Localhost P2P without relay
 3. **Connection Establishment**: Sub-second connection times (~0.4s)
@@ -243,11 +283,12 @@ All 5 tests passing ✅:
 8. **Automerge Sync Protocol**: ✅ Sync messages over QUIC streams
 9. **Incoming Sync Handler**: ✅ Receives and applies remote changes
 10. **Metrics Tracking**: ✅ bytes_sent/bytes_received updated
-11. **Partition Detection**: ✅ Heartbeat mechanism with state tracking (Phase 6.3)
+11. **Partition Detection Infrastructure**: ✅ Heartbeat mechanism with state tracking (Phase 6.3)
+12. **Active Heartbeat Exchange**: ✅ Periodic heartbeat messages over Iroh streams (Phase 6.4)
 
 ### 🔄 Optimizations Pending (Future)
-1. **Heartbeat Exchange**: Active heartbeat messages over Iroh streams (Phase 6.4)
-2. **Partition Lifecycle Events**: Metrics emission for partition detection/heal (Phase 6.4)
+1. **Partition Lifecycle Metrics**: Emit events for partition detection/heal (Phase 7)
+2. **ContainerLab Testing**: Network partition simulation with tc/netem (Phase 7)
 3. **Flow Control**: Backpressure for large documents
 4. **mDNS Discovery**: Zero-config peer discovery (Phase 7)
 5. **Relay Support**: Cross-network sync via Iroh relay (Phase 7)
