@@ -9,14 +9,102 @@
 //! - Policy-based behavior (acknowledgment, buffer, conflict)
 
 use hive_protocol::{
-    command::CommandCoordinator,
+    command::{CommandCoordinator, CommandStorage, ObserverHandle},
     storage::{ditto_store::DittoConfig, DittoStore},
 };
 use hive_schema::command::v1::{
-    command_target::Scope, AckStatus, CommandAcknowledgment, CommandTarget, HierarchicalCommand,
+    command_target::Scope, AckStatus, CommandAcknowledgment, CommandStatus, CommandTarget,
+    HierarchicalCommand,
 };
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
+
+// Mock storage for integration tests
+struct MockCommandStorage;
+
+#[async_trait::async_trait]
+impl CommandStorage for MockCommandStorage {
+    async fn publish_command(
+        &self,
+        _command: &HierarchicalCommand,
+    ) -> hive_protocol::Result<String> {
+        Ok("mock-doc-id".to_string())
+    }
+
+    async fn get_command(
+        &self,
+        _command_id: &str,
+    ) -> hive_protocol::Result<Option<HierarchicalCommand>> {
+        Ok(None)
+    }
+
+    async fn query_commands_by_target(
+        &self,
+        _target_id: &str,
+    ) -> hive_protocol::Result<Vec<HierarchicalCommand>> {
+        Ok(Vec::new())
+    }
+
+    async fn delete_command(&self, _command_id: &str) -> hive_protocol::Result<()> {
+        Ok(())
+    }
+
+    async fn publish_acknowledgment(
+        &self,
+        _ack: &CommandAcknowledgment,
+    ) -> hive_protocol::Result<String> {
+        Ok("mock-ack-id".to_string())
+    }
+
+    async fn get_acknowledgments(
+        &self,
+        _command_id: &str,
+    ) -> hive_protocol::Result<Vec<CommandAcknowledgment>> {
+        Ok(Vec::new())
+    }
+
+    async fn update_command_status(&self, _status: &CommandStatus) -> hive_protocol::Result<()> {
+        Ok(())
+    }
+
+    async fn get_command_status(
+        &self,
+        _command_id: &str,
+    ) -> hive_protocol::Result<Option<CommandStatus>> {
+        Ok(None)
+    }
+
+    async fn observe_commands(
+        &self,
+        _node_id: &str,
+        _callback: Box<
+            dyn Fn(
+                    HierarchicalCommand,
+                )
+                    -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
+                + Send
+                + Sync,
+        >,
+    ) -> hive_protocol::Result<ObserverHandle> {
+        Ok(ObserverHandle::new(()))
+    }
+
+    async fn observe_acknowledgments(
+        &self,
+        _issuer_id: &str,
+        _callback: Box<
+            dyn Fn(
+                    CommandAcknowledgment,
+                )
+                    -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
+                + Send
+                + Sync,
+        >,
+    ) -> hive_protocol::Result<ObserverHandle> {
+        Ok(ObserverHandle::new(()))
+    }
+}
 
 /// Helper to create a test DittoStore
 async fn create_test_store(test_name: &str) -> DittoStore {
@@ -72,6 +160,7 @@ async fn test_command_issue_and_persist() {
         Some("squad-alpha".to_string()),
         "node-leader".to_string(),
         vec!["node-1".to_string(), "node-2".to_string()],
+        Arc::new(MockCommandStorage),
     );
 
     // Create a command targeting squad members
@@ -135,6 +224,7 @@ async fn test_command_reception_and_execution() {
         Some("squad-alpha".to_string()),
         "node-1".to_string(),
         vec![], // Not a leader, just a member
+        Arc::new(MockCommandStorage),
     );
 
     // Create a command targeting this specific node
@@ -196,6 +286,7 @@ async fn test_acknowledgment_persistence() {
         Some("squad-alpha".to_string()),
         "node-1".to_string(),
         vec![],
+        Arc::new(MockCommandStorage),
     );
 
     // Create and receive command
@@ -258,6 +349,7 @@ async fn test_squad_command_routing() {
         Some("squad-alpha".to_string()),
         "node-leader".to_string(),
         vec!["node-1".to_string(), "node-2".to_string()],
+        Arc::new(MockCommandStorage),
     );
 
     // Create squad-level command
@@ -307,6 +399,7 @@ async fn test_acknowledgment_policy_none() {
         Some("squad-alpha".to_string()),
         "node-1".to_string(),
         vec![],
+        Arc::new(MockCommandStorage),
     );
 
     // Create command with NONE acknowledgment policy
@@ -361,6 +454,7 @@ async fn test_command_not_applicable() {
         Some("squad-alpha".to_string()),
         "node-1".to_string(),
         vec![],
+        Arc::new(MockCommandStorage),
     );
 
     // Create command targeting a different node

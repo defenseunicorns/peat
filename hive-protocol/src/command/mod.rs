@@ -69,11 +69,13 @@ mod conflict_resolver;
 mod coordinator;
 mod policy_impl; // Conflictable implementation for HierarchicalCommand
 mod routing;
+mod storage_trait;
 mod timeout_manager;
 
 pub use conflict_resolver::{ConflictResolver, ConflictResult};
 pub use coordinator::CommandCoordinator;
 pub use routing::{CommandRouter, TargetResolution};
+pub use storage_trait::{CommandStorage, ObserverHandle};
 pub use timeout_manager::{AckTimeout, TimeoutManager};
 
 #[cfg(test)]
