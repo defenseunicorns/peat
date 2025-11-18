@@ -747,12 +747,12 @@ impl DittoStore {
                 )
             })?;
 
-        // Increment update counter (separate query to avoid conflicts)
-        self.increment_counter(&doc_id, "update_count").await?;
-
-        // Track delta size for bandwidth metrics
-        self.add_to_counter(&doc_id, "total_delta_bytes", delta.size_bytes() as u64)
-            .await?;
+        // TODO: Implement lifecycle metrics tracking
+        // Note: DQL doesn't support document references in SET clauses (field = field + 1)
+        // Need to implement proper counter CRDT or read-modify-write pattern
+        // For now, skip counter updates
+        // self.increment_counter(&doc_id, "update_count").await?;
+        // self.add_to_counter(&doc_id, "total_delta_bytes", delta.size_bytes() as u64).await?;
 
         // Emit lifecycle metric
         tracing::debug!(
@@ -768,6 +768,7 @@ impl DittoStore {
     }
 
     /// Helper: Increment a counter field
+    #[allow(dead_code)]
     async fn increment_counter(&self, doc_id: &str, field: &str) -> Result<()> {
         let query = format!(
             "UPDATE sim_poc SET {} = {} + 1 WHERE _id = :_id",
@@ -790,6 +791,7 @@ impl DittoStore {
     }
 
     /// Helper: Add to a counter field
+    #[allow(dead_code)]
     async fn add_to_counter(&self, doc_id: &str, field: &str, value: u64) -> Result<()> {
         let query = format!(
             "UPDATE sim_poc SET {} = {} + :value WHERE _id = :_id",
@@ -841,7 +843,7 @@ impl DittoStore {
         let doc_id = format!("{}-summary", platoon_id);
         doc["_id"] = serde_json::Value::String(doc_id);
         doc["type"] = serde_json::Value::String("platoon_summary".to_string());
-        doc["collection_name"] = serde_json::Value::String("platoon_summaries".to_string());
+        doc["collection_name"] = serde_json::Value::String("sim_poc".to_string());
 
         // Get current timestamp in microseconds for latency tracking
         let timestamp_us = std::time::SystemTime::now()
@@ -850,7 +852,7 @@ impl DittoStore {
             .as_micros() as u64;
         doc["timestamp_us"] = serde_json::Value::Number(timestamp_us.into());
 
-        self.upsert("platoon_summaries", doc).await
+        self.upsert("sim_poc", doc).await
     }
 
     /// Retrieve a PlatoonSummary from the platoon_summaries collection
@@ -870,7 +872,7 @@ impl DittoStore {
         // Query with -summary suffix
         let doc_id = format!("{}-summary", platoon_id);
         let results = self
-            .query("platoon_summaries", &format!("_id == '{}'", doc_id))
+            .query("sim_poc", &format!("_id == '{}'", doc_id))
             .await?;
 
         if results.is_empty() {
@@ -1078,12 +1080,12 @@ impl DittoStore {
                 )
             })?;
 
-        // Increment update counter
-        self.increment_counter(&doc_id, "update_count").await?;
-
-        // Track delta size for bandwidth metrics
-        self.add_to_counter(&doc_id, "total_delta_bytes", delta.size_bytes() as u64)
-            .await?;
+        // TODO: Implement lifecycle metrics tracking
+        // Note: DQL doesn't support document references in SET clauses (field = field + 1)
+        // Need to implement proper counter CRDT or read-modify-write pattern
+        // For now, skip counter updates
+        // self.increment_counter(&doc_id, "update_count").await?;
+        // self.add_to_counter(&doc_id, "total_delta_bytes", delta.size_bytes() as u64).await?;
 
         tracing::debug!(
             platoon_id = platoon_id,
@@ -1316,12 +1318,12 @@ impl DittoStore {
                 )
             })?;
 
-        // Increment update counter
-        self.increment_counter(&doc_id, "update_count").await?;
-
-        // Track delta size for bandwidth metrics
-        self.add_to_counter(&doc_id, "total_delta_bytes", delta.size_bytes() as u64)
-            .await?;
+        // TODO: Implement lifecycle metrics tracking
+        // Note: DQL doesn't support document references in SET clauses (field = field + 1)
+        // Need to implement proper counter CRDT or read-modify-write pattern
+        // For now, skip counter updates
+        // self.increment_counter(&doc_id, "update_count").await?;
+        // self.add_to_counter(&doc_id, "total_delta_bytes", delta.size_bytes() as u64).await?;
 
         tracing::debug!(
             company_id = company_id,
