@@ -612,12 +612,8 @@ impl AutomergeSyncCoordinator {
             // Send heartbeat
             if let Err(e) = self.send_heartbeat(peer_id).await {
                 tracing::debug!("Failed to send heartbeat to {:?}: {}", peer_id, e);
-                // Record heartbeat failure
-                let triggered_partition =
-                    self.partition_detector.record_heartbeat_failure(&peer_id);
-                if triggered_partition {
-                    tracing::warn!("Partition detected for peer {:?}", peer_id);
-                }
+                // Record heartbeat failure - event already logged via tracing in partition_detector
+                let _event = self.partition_detector.record_heartbeat_failure(&peer_id);
             }
         }
 
@@ -628,7 +624,9 @@ impl AutomergeSyncCoordinator {
     ///
     /// This is called periodically to detect partitions based on elapsed time
     /// since last successful heartbeat.
-    pub fn check_partition_timeouts(&self) -> Vec<EndpointId> {
+    ///
+    /// Returns partition events for newly detected partitions (events already logged via tracing).
+    pub fn check_partition_timeouts(&self) -> Vec<crate::storage::PartitionEvent> {
         self.partition_detector.check_timeouts()
     }
 }
