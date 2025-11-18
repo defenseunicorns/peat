@@ -747,10 +747,12 @@ impl DittoStore {
                 )
             })?;
 
-        // TODO: Implement lifecycle metrics tracking
-        // Note: DQL doesn't support document references in SET clauses (field = field + 1)
-        // Need to implement proper counter CRDT or read-modify-write pattern
-        // For now, skip counter updates
+        // TODO: Enable lifecycle metrics tracking using PN_COUNTER
+        // IMPORTANT: Counter fields must NOT be initialized in the document!
+        // Ditto creates them as REGISTER if initialized with a value (even 0.0).
+        // Counter fields must be created via first PN_INCREMENT operation.
+        // Solution: Add counter fields to document ONLY via PN_INCREMENT (not in schema).
+        // For now, metrics tracking is disabled until we refactor document creation.
         // self.increment_counter(&doc_id, "update_count").await?;
         // self.add_to_counter(&doc_id, "total_delta_bytes", delta.size_bytes() as u64).await?;
 
@@ -767,12 +769,15 @@ impl DittoStore {
         Ok(())
     }
 
-    /// Helper: Increment a counter field
+    /// Helper: Increment a counter field using PN_COUNTER CRDT
+    ///
+    /// Uses Ditto's PN_INCREMENT operation for distributed counter semantics.
+    /// This correctly handles concurrent increments from multiple peers.
     #[allow(dead_code)]
     async fn increment_counter(&self, doc_id: &str, field: &str) -> Result<()> {
         let query = format!(
-            "UPDATE sim_poc SET {} = {} + 1 WHERE _id = :_id",
-            field, field
+            "UPDATE sim_poc APPLY {} PN_INCREMENT BY 1.0 WHERE _id = :_id",
+            field
         );
 
         self.ditto
@@ -790,17 +795,23 @@ impl DittoStore {
         Ok(())
     }
 
-    /// Helper: Add to a counter field
+    /// Helper: Add to a counter field using PN_COUNTER CRDT
+    ///
+    /// Uses Ditto's PN_INCREMENT operation for distributed counter semantics.
+    /// This correctly handles concurrent increments from multiple peers.
     #[allow(dead_code)]
     async fn add_to_counter(&self, doc_id: &str, field: &str, value: u64) -> Result<()> {
         let query = format!(
-            "UPDATE sim_poc SET {} = {} + :value WHERE _id = :_id",
-            field, field
+            "UPDATE sim_poc APPLY {} PN_INCREMENT BY :value WHERE _id = :_id",
+            field
         );
 
         self.ditto
             .store()
-            .execute_v2((query, serde_json::json!({"_id": doc_id, "value": value})))
+            .execute_v2((
+                query,
+                serde_json::json!({"_id": doc_id, "value": value as f64}),
+            ))
             .await
             .map_err(|e| {
                 Error::storage_error(
@@ -1080,10 +1091,12 @@ impl DittoStore {
                 )
             })?;
 
-        // TODO: Implement lifecycle metrics tracking
-        // Note: DQL doesn't support document references in SET clauses (field = field + 1)
-        // Need to implement proper counter CRDT or read-modify-write pattern
-        // For now, skip counter updates
+        // TODO: Enable lifecycle metrics tracking using PN_COUNTER
+        // IMPORTANT: Counter fields must NOT be initialized in the document!
+        // Ditto creates them as REGISTER if initialized with a value (even 0.0).
+        // Counter fields must be created via first PN_INCREMENT operation.
+        // Solution: Add counter fields to document ONLY via PN_INCREMENT (not in schema).
+        // For now, metrics tracking is disabled until we refactor document creation.
         // self.increment_counter(&doc_id, "update_count").await?;
         // self.add_to_counter(&doc_id, "total_delta_bytes", delta.size_bytes() as u64).await?;
 
@@ -1318,10 +1331,12 @@ impl DittoStore {
                 )
             })?;
 
-        // TODO: Implement lifecycle metrics tracking
-        // Note: DQL doesn't support document references in SET clauses (field = field + 1)
-        // Need to implement proper counter CRDT or read-modify-write pattern
-        // For now, skip counter updates
+        // TODO: Enable lifecycle metrics tracking using PN_COUNTER
+        // IMPORTANT: Counter fields must NOT be initialized in the document!
+        // Ditto creates them as REGISTER if initialized with a value (even 0.0).
+        // Counter fields must be created via first PN_INCREMENT operation.
+        // Solution: Add counter fields to document ONLY via PN_INCREMENT (not in schema).
+        // For now, metrics tracking is disabled until we refactor document creation.
         // self.increment_counter(&doc_id, "update_count").await?;
         // self.add_to_counter(&doc_id, "total_delta_bytes", delta.size_bytes() as u64).await?;
 
