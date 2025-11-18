@@ -5,6 +5,7 @@
 use crate::command::conflict_resolver::{ConflictResolver, ConflictResult};
 use crate::command::routing::{CommandRouter, TargetResolution};
 use crate::command::timeout_manager::TimeoutManager;
+use crate::command::CommandStorage;
 use crate::Result;
 use hive_schema::command::v1::{
     AckStatus, CommandAcknowledgment, CommandStatus, ConflictPolicy, HierarchicalCommand,
@@ -22,13 +23,16 @@ pub struct CommandCoordinator {
     /// Router for target resolution
     router: CommandRouter,
 
-    /// Active commands indexed by command_id
+    /// Storage backend for command dissemination
+    storage: Arc<dyn CommandStorage>,
+
+    /// Active commands indexed by command_id (in-memory cache)
     active_commands: Arc<RwLock<HashMap<String, HierarchicalCommand>>>,
 
-    /// Command acknowledgments indexed by (command_id, node_id)
+    /// Command acknowledgments indexed by (command_id, node_id) (in-memory cache)
     acknowledgments: Arc<RwLock<HashMap<(String, String), CommandAcknowledgment>>>,
 
-    /// Command execution status
+    /// Command execution status (in-memory cache)
     command_status: Arc<RwLock<HashMap<String, CommandStatus>>>,
 
     /// Conflict resolution engine
@@ -39,13 +43,19 @@ pub struct CommandCoordinator {
 }
 
 impl CommandCoordinator {
-    /// Create new command coordinator
-    pub fn new(squad_id: Option<String>, node_id: String, squad_members: Vec<String>) -> Self {
+    /// Create new command coordinator with storage backend
+    pub fn new(
+        squad_id: Option<String>,
+        node_id: String,
+        squad_members: Vec<String>,
+        storage: Arc<dyn CommandStorage>,
+    ) -> Self {
         let router = CommandRouter::new(node_id.clone(), squad_id, squad_members, None);
 
         Self {
             node_id,
             router,
+            storage,
             active_commands: Arc::new(RwLock::new(HashMap::new())),
             acknowledgments: Arc::new(RwLock::new(HashMap::new())),
             command_status: Arc::new(RwLock::new(HashMap::new())),
@@ -204,8 +214,16 @@ impl CommandCoordinator {
             targets.len()
         );
 
-        // In a real implementation, this would publish to Ditto
-        // For now, we'll just log the routing action
+        // Publish command to storage for dissemination
+        let doc_id = self.storage.publish_command(command).await?;
+
+        tracing::debug!(
+            "[{}] Published command {} to storage (doc_id: {})",
+            self.node_id,
+            command.command_id,
+            doc_id
+        );
+
         for target_id in &targets {
             tracing::debug!(
                 "[{}] → Routing command {} to {}",
@@ -296,7 +314,17 @@ impl CommandCoordinator {
             status
         );
 
-        // Store acknowledgment
+        // Publish acknowledgment to storage
+        let doc_id = self.storage.publish_acknowledgment(&ack).await?;
+
+        tracing::debug!(
+            "[{}] Published acknowledgment for command {} to storage (doc_id: {})",
+            self.node_id,
+            command.command_id,
+            doc_id
+        );
+
+        // Store acknowledgment in local cache
         self.acknowledgments
             .write()
             .await
@@ -319,9 +347,6 @@ impl CommandCoordinator {
                 .unregister_ack_timeout(&command.command_id)
                 .await?;
         }
-
-        // In a real implementation, this would publish to Ditto
-        // TODO: Publish acknowledgment to hierarchical_commands_acks collection
 
         Ok(())
     }
@@ -370,14 +395,100 @@ impl CommandCoordinator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::command::ObserverHandle;
     use hive_schema::command::v1::{command_target::Scope, CommandTarget};
+
+    // Mock storage for unit tests
+    struct MockStorage;
+
+    #[async_trait::async_trait]
+    impl CommandStorage for MockStorage {
+        async fn publish_command(&self, _command: &HierarchicalCommand) -> crate::Result<String> {
+            Ok("mock-doc-id".to_string())
+        }
+
+        async fn get_command(
+            &self,
+            _command_id: &str,
+        ) -> crate::Result<Option<HierarchicalCommand>> {
+            Ok(None)
+        }
+
+        async fn query_commands_by_target(
+            &self,
+            _target_id: &str,
+        ) -> crate::Result<Vec<HierarchicalCommand>> {
+            Ok(Vec::new())
+        }
+
+        async fn delete_command(&self, _command_id: &str) -> crate::Result<()> {
+            Ok(())
+        }
+
+        async fn publish_acknowledgment(
+            &self,
+            _ack: &CommandAcknowledgment,
+        ) -> crate::Result<String> {
+            Ok("mock-ack-id".to_string())
+        }
+
+        async fn get_acknowledgments(
+            &self,
+            _command_id: &str,
+        ) -> crate::Result<Vec<CommandAcknowledgment>> {
+            Ok(Vec::new())
+        }
+
+        async fn update_command_status(&self, _status: &CommandStatus) -> crate::Result<()> {
+            Ok(())
+        }
+
+        async fn get_command_status(
+            &self,
+            _command_id: &str,
+        ) -> crate::Result<Option<CommandStatus>> {
+            Ok(None)
+        }
+
+        async fn observe_commands(
+            &self,
+            _node_id: &str,
+            _callback: Box<
+                dyn Fn(
+                        HierarchicalCommand,
+                    )
+                        -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
+                    + Send
+                    + Sync,
+            >,
+        ) -> crate::Result<ObserverHandle> {
+            Ok(ObserverHandle::new(()))
+        }
+
+        async fn observe_acknowledgments(
+            &self,
+            _issuer_id: &str,
+            _callback: Box<
+                dyn Fn(
+                        CommandAcknowledgment,
+                    )
+                        -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
+                    + Send
+                    + Sync,
+            >,
+        ) -> crate::Result<ObserverHandle> {
+            Ok(ObserverHandle::new(()))
+        }
+    }
 
     #[tokio::test]
     async fn test_issue_command() {
+        let storage = Arc::new(MockStorage);
         let coordinator = CommandCoordinator::new(
             Some("squad-alpha".to_string()),
             "node-1".to_string(),
             vec!["node-1".to_string(), "node-2".to_string()],
+            storage,
         );
 
         let command = HierarchicalCommand {
@@ -401,10 +512,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_receive_and_execute_command() {
+        let storage = Arc::new(MockStorage);
         let coordinator = CommandCoordinator::new(
             Some("squad-alpha".to_string()),
             "node-1".to_string(),
             vec!["node-1".to_string(), "node-2".to_string()],
+            storage,
         );
 
         let command = HierarchicalCommand {
@@ -431,10 +544,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_acknowledgment_tracking() {
+        let storage = Arc::new(MockStorage);
         let coordinator = CommandCoordinator::new(
             Some("squad-alpha".to_string()),
             "node-1".to_string(),
             vec!["node-1".to_string(), "node-2".to_string()],
+            storage,
         );
 
         let command = HierarchicalCommand {
