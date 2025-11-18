@@ -19,8 +19,9 @@ WORKDIR /build
 # Copy entire workspace (needed for workspace dependencies)
 COPY . .
 
-# Build the hive-sim binary (release mode with optimizations)
-RUN cargo build --release -p hive-sim
+# Build the hive-sim binary and traditional_baseline example (release mode with optimizations)
+RUN cargo build --release -p hive-sim && \
+    cargo build --release --example traditional_baseline -p hive-protocol
 
 # ============================================================================
 # Stage 2: Runtime - Minimal runtime image
@@ -41,8 +42,9 @@ RUN apt-get update && apt-get install -y \
 # Create runtime directory for Ditto persistence
 RUN mkdir -p /data/ditto
 
-# Copy the compiled binary from builder stage
+# Copy the compiled binaries from builder stage
 COPY --from=builder /build/target/release/hive-sim /usr/local/bin/hive-sim
+COPY --from=builder /build/target/release/examples/traditional_baseline /usr/local/bin/traditional_baseline
 
 # Copy entrypoint script
 COPY hive-sim/entrypoint.sh /entrypoint.sh
