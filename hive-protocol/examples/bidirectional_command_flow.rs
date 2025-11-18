@@ -19,14 +19,102 @@
 //! cargo run --example bidirectional_command_flow
 //! ```
 
-use hive_protocol::command::CommandCoordinator;
+use hive_protocol::command::{CommandCoordinator, CommandStorage, ObserverHandle};
 use hive_protocol::storage::{ditto_store::DittoConfig, DittoStore};
 use hive_schema::command::v1::{
-    command_target::Scope, AckStatus, CommandAcknowledgment, CommandTarget, HierarchicalCommand,
+    command_target::Scope, AckStatus, CommandAcknowledgment, CommandStatus, CommandTarget,
+    HierarchicalCommand,
 };
+use std::sync::Arc;
 use std::time::Duration;
 use tempfile::tempdir;
 use tokio::time::sleep;
+
+// Mock storage for the example
+struct MockCommandStorage;
+
+#[async_trait::async_trait]
+impl CommandStorage for MockCommandStorage {
+    async fn publish_command(
+        &self,
+        _command: &HierarchicalCommand,
+    ) -> hive_protocol::Result<String> {
+        Ok("mock-doc-id".to_string())
+    }
+
+    async fn get_command(
+        &self,
+        _command_id: &str,
+    ) -> hive_protocol::Result<Option<HierarchicalCommand>> {
+        Ok(None)
+    }
+
+    async fn query_commands_by_target(
+        &self,
+        _target_id: &str,
+    ) -> hive_protocol::Result<Vec<HierarchicalCommand>> {
+        Ok(Vec::new())
+    }
+
+    async fn delete_command(&self, _command_id: &str) -> hive_protocol::Result<()> {
+        Ok(())
+    }
+
+    async fn publish_acknowledgment(
+        &self,
+        _ack: &CommandAcknowledgment,
+    ) -> hive_protocol::Result<String> {
+        Ok("mock-ack-id".to_string())
+    }
+
+    async fn get_acknowledgments(
+        &self,
+        _command_id: &str,
+    ) -> hive_protocol::Result<Vec<CommandAcknowledgment>> {
+        Ok(Vec::new())
+    }
+
+    async fn update_command_status(&self, _status: &CommandStatus) -> hive_protocol::Result<()> {
+        Ok(())
+    }
+
+    async fn get_command_status(
+        &self,
+        _command_id: &str,
+    ) -> hive_protocol::Result<Option<CommandStatus>> {
+        Ok(None)
+    }
+
+    async fn observe_commands(
+        &self,
+        _node_id: &str,
+        _callback: Box<
+            dyn Fn(
+                    HierarchicalCommand,
+                )
+                    -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
+                + Send
+                + Sync,
+        >,
+    ) -> hive_protocol::Result<ObserverHandle> {
+        Ok(ObserverHandle::new(()))
+    }
+
+    async fn observe_acknowledgments(
+        &self,
+        _issuer_id: &str,
+        _callback: Box<
+            dyn Fn(
+                    CommandAcknowledgment,
+                )
+                    -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
+                + Send
+                + Sync,
+        >,
+    ) -> hive_protocol::Result<ObserverHandle> {
+        Ok(ObserverHandle::new(()))
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -81,24 +169,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         None,                      // Not in a squad (zone level)
         "zone-leader".to_string(), // node_id
         vec![],                    // No direct subordinates (routes via squads)
+        Arc::new(MockCommandStorage),
     );
 
     let squad_leader = CommandCoordinator::new(
         Some("squad-alpha".to_string()),                  // squad_id
         "squad-leader".to_string(),                       // node_id
         vec!["node-1".to_string(), "node-2".to_string()], // squad members
+        Arc::new(MockCommandStorage),
     );
 
     let node1 = CommandCoordinator::new(
         Some("squad-alpha".to_string()), // squad_id
         "node-1".to_string(),            // node_id
         vec![],                          // No subordinates (leaf node)
+        Arc::new(MockCommandStorage),
     );
 
     let node2 = CommandCoordinator::new(
         Some("squad-alpha".to_string()), // squad_id
         "node-2".to_string(),            // node_id
         vec![],                          // No subordinates (leaf node)
+        Arc::new(MockCommandStorage),
     );
 
     println!("3. Created coordinators:");

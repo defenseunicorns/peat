@@ -119,14 +119,18 @@ pub trait CommandStorage: Send + Sync {
     ///
     /// This is the critical method for real-time command reception.
     /// Implementations should use native observer patterns (Ditto observers, Automerge subscriptions).
-    async fn observe_commands<F>(&self, node_id: &str, callback: F) -> Result<ObserverHandle>
-    where
-        F: Fn(
-                HierarchicalCommand,
-            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
-            + Send
-            + Sync
-            + 'static;
+    async fn observe_commands(
+        &self,
+        node_id: &str,
+        callback: Box<
+            dyn Fn(
+                    HierarchicalCommand,
+                )
+                    -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
+                + Send
+                + Sync,
+        >,
+    ) -> Result<ObserverHandle>;
 
     /// Register a callback for new acknowledgments for commands issued by this node
     ///
@@ -134,18 +138,18 @@ pub trait CommandStorage: Send + Sync {
     ///
     /// * `issuer_id` - The node ID that issued commands
     /// * `callback` - Async callback invoked when new acknowledgments arrive
-    async fn observe_acknowledgments<F>(
+    async fn observe_acknowledgments(
         &self,
         issuer_id: &str,
-        callback: F,
-    ) -> Result<ObserverHandle>
-    where
-        F: Fn(
-                CommandAcknowledgment,
-            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
-            + Send
-            + Sync
-            + 'static;
+        callback: Box<
+            dyn Fn(
+                    CommandAcknowledgment,
+                )
+                    -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
+                + Send
+                + Sync,
+        >,
+    ) -> Result<ObserverHandle>;
 }
 
 /// Handle for an active observer subscription

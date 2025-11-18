@@ -432,15 +432,18 @@ impl CommandStorage for DittoCommandStorage {
     // Observer Pattern (for real-time command reception)
     // ========================================================================
 
-    async fn observe_commands<F>(&self, node_id: &str, callback: F) -> Result<ObserverHandle>
-    where
-        F: Fn(
-                HierarchicalCommand,
-            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
-            + Send
-            + Sync
-            + 'static,
-    {
+    async fn observe_commands(
+        &self,
+        node_id: &str,
+        callback: Box<
+            dyn Fn(
+                    HierarchicalCommand,
+                )
+                    -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
+                + Send
+                + Sync,
+        >,
+    ) -> Result<ObserverHandle> {
         // Create query for commands targeting this node
         // This is a simplified implementation - full implementation would
         // handle all CommandTarget scopes (individual, squad, platoon, broadcast)
@@ -491,19 +494,18 @@ impl CommandStorage for DittoCommandStorage {
         Ok(ObserverHandle::new(observer))
     }
 
-    async fn observe_acknowledgments<F>(
+    async fn observe_acknowledgments(
         &self,
         issuer_id: &str,
-        callback: F,
-    ) -> Result<ObserverHandle>
-    where
-        F: Fn(
-                CommandAcknowledgment,
-            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
-            + Send
-            + Sync
-            + 'static,
-    {
+        callback: Box<
+            dyn Fn(
+                    CommandAcknowledgment,
+                )
+                    -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
+                + Send
+                + Sync,
+        >,
+    ) -> Result<ObserverHandle> {
         // Create query for acknowledgments of commands issued by this node
         // We need to join with commands collection, but for simplicity we'll
         // query all acks and filter in the callback
