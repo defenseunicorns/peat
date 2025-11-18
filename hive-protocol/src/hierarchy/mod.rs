@@ -3,6 +3,7 @@
 //! This module implements the hierarchical coordination layer for E5,
 //! including zone management and hierarchical message routing.
 
+pub mod aggregation_coordinator;
 pub mod flow_control;
 pub mod maintenance;
 pub mod router;
@@ -11,6 +12,7 @@ pub mod routing_table;
 pub mod state_aggregation;
 pub mod zone_coordinator;
 
+pub use aggregation_coordinator::HierarchicalAggregator;
 pub use flow_control::{
     BandwidthLimit, CapacityInfo, FlowController, FlowMetrics, MessageDropPolicy, Permit,
     RoutingLevel,
