@@ -535,6 +535,327 @@ impl DittoStore {
         Ok(Some(summary))
     }
 
+    /// Create a squad summary document (ONCE per squad lifecycle)
+    ///
+    /// Implements ADR-021 create-once pattern. This method should be called exactly
+    /// once during squad formation. Subsequent updates use `update_squad_summary()`.
+    ///
+    /// # Arguments
+    ///
+    /// * `squad_id` - Unique squad identifier
+    /// * `initial_state` - Initial SquadSummary state
+    ///
+    /// # Returns
+    ///
+    /// Document ID on success
+    ///
+    /// # Errors
+    ///
+    /// Returns error if document already exists (prevents recreation)
+    #[instrument(skip(self, initial_state), fields(squad_id))]
+    pub async fn create_squad_summary(
+        &self,
+        squad_id: &str,
+        initial_state: &hive_schema::hierarchy::v1::SquadSummary,
+    ) -> Result<String> {
+        let doc_id = format!("{}-summary", squad_id);
+
+        // Check if already exists (enforce create-once invariant)
+        if self.get_squad_summary(squad_id).await?.is_some() {
+            return Err(Error::storage_error(
+                format!(
+                    "Squad summary {} already exists (cannot recreate - violates ADR-021)",
+                    squad_id
+                ),
+                "create_squad_summary",
+                Some(squad_id.to_string()),
+            ));
+        }
+
+        // Create document with full initial state
+        let mut doc = serde_json::to_value(initial_state).map_err(|e| {
+            Error::storage_error(
+                format!("Failed to serialize SquadSummary to JSON: {}", e),
+                "create_squad_summary",
+                Some(squad_id.to_string()),
+            )
+        })?;
+
+        // Add Ditto metadata
+        doc["_id"] = serde_json::Value::String(doc_id.clone());
+        doc["type"] = serde_json::Value::String("squad_summary".to_string());
+        doc["collection_name"] = serde_json::Value::String("squad_summaries".to_string());
+
+        // Add lifecycle tracking fields (timestamps only - counters initialized separately)
+        let timestamp_us = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as u64;
+        doc["created_at_us"] = serde_json::Value::Number(timestamp_us.into());
+        doc["last_update_us"] = serde_json::Value::Number(timestamp_us.into());
+        doc["sequence"] = serde_json::Value::Number(0.into());
+
+        // Use plain INSERT (not upsert) for document creation
+        // This ensures we're creating a NEW document, not updating an existing one
+        let dql_query = "INSERT INTO sim_poc DOCUMENTS (:doc)";
+
+        self.ditto
+            .store()
+            .execute_v2((dql_query, serde_json::json!({"doc": doc})))
+            .await
+            .map_err(|e| {
+                Error::storage_error(
+                    format!("Failed to insert squad summary: {}", e),
+                    "create_squad_summary",
+                    Some(squad_id.to_string()),
+                )
+            })?;
+
+        // Initialize PN_COUNTER fields AFTER document creation
+        // This ensures they are created as PN_COUNTERs, not REGISTERs
+        self.increment_counter(&doc_id, "create_count").await?;
+        // update_count and total_delta_bytes start at 0, will be incremented on first update
+
+        // Emit lifecycle metric
+        tracing::info!(
+            squad_id = squad_id,
+            doc_id = %doc_id,
+            "SquadSummaryCreated"
+        );
+
+        Ok(doc_id)
+    }
+
+    /// Update an existing squad summary with delta (MANY times)
+    ///
+    /// Implements ADR-021 update-many pattern. Applies field-level delta updates
+    /// to existing document, enabling CRDT delta propagation instead of full
+    /// document recreation.
+    ///
+    /// # Arguments
+    ///
+    /// * `squad_id` - Unique squad identifier
+    /// * `delta` - Field-level delta updates
+    ///
+    /// # Errors
+    ///
+    /// Returns error if document does not exist (must create first)
+    #[instrument(skip(self, delta), fields(squad_id, delta_size = delta.size_bytes()))]
+    pub async fn update_squad_summary(
+        &self,
+        squad_id: &str,
+        delta: crate::hierarchy::deltas::SquadDelta,
+    ) -> Result<()> {
+        use crate::hierarchy::deltas::SquadFieldUpdate;
+
+        let doc_id = format!("{}-summary", squad_id);
+
+        // Verify document exists (enforce must-create-first invariant)
+        if self.get_squad_summary(squad_id).await?.is_none() {
+            return Err(Error::storage_error(
+                format!(
+                    "Squad summary {} does not exist (must create first)",
+                    squad_id
+                ),
+                "update_squad_summary",
+                Some(squad_id.to_string()),
+            ));
+        }
+
+        // Skip if delta is empty
+        if delta.is_empty() {
+            tracing::debug!(squad_id = squad_id, "Skipping empty delta");
+            return Ok(());
+        }
+
+        // Build UPDATE SET clause from delta
+        let mut set_clauses = Vec::new();
+        let mut params = serde_json::Map::new();
+        params.insert("_id".to_string(), serde_json::json!(doc_id.clone()));
+
+        // Convert delta updates to SET clauses
+        for (idx, update) in delta.updates.iter().enumerate() {
+            let param_name = format!("p{}", idx);
+
+            match update {
+                SquadFieldUpdate::SetLeaderId(id) => {
+                    set_clauses.push(format!("leader_id = :{}", param_name));
+                    params.insert(param_name, serde_json::json!(id));
+                }
+                SquadFieldUpdate::SetMemberCount(count) => {
+                    set_clauses.push(format!("member_count = :{}", param_name));
+                    params.insert(param_name, serde_json::json!(count));
+                }
+                SquadFieldUpdate::SetOperationalCount(count) => {
+                    set_clauses.push(format!("operational_count = :{}", param_name));
+                    params.insert(param_name, serde_json::json!(count));
+                }
+                SquadFieldUpdate::SetAvgFuelMinutes(fuel) => {
+                    set_clauses.push(format!("avg_fuel_minutes = :{}", param_name));
+                    params.insert(param_name, serde_json::json!(fuel));
+                }
+                SquadFieldUpdate::SetWorstHealth(health) => {
+                    set_clauses.push(format!("worst_health = :{}", param_name));
+                    params.insert(param_name, serde_json::json!(health));
+                }
+                SquadFieldUpdate::SetReadinessScore(score) => {
+                    set_clauses.push(format!("readiness_score = :{}", param_name));
+                    params.insert(param_name, serde_json::json!(score));
+                }
+                SquadFieldUpdate::UpdatePositionCentroid(pos) => {
+                    set_clauses.push(format!("position_centroid = :{}", param_name));
+                    params.insert(
+                        param_name,
+                        serde_json::to_value(pos).unwrap_or(serde_json::json!(null)),
+                    );
+                }
+                SquadFieldUpdate::UpdateBoundingBox(bbox) => {
+                    set_clauses.push(format!("bounding_box = :{}", param_name));
+                    params.insert(
+                        param_name,
+                        serde_json::to_value(bbox).unwrap_or(serde_json::json!(null)),
+                    );
+                }
+                SquadFieldUpdate::UpdateAggregatedAt(ts) => {
+                    set_clauses.push(format!("aggregated_at = :{}", param_name));
+                    params.insert(
+                        param_name,
+                        serde_json::to_value(ts).unwrap_or(serde_json::json!(null)),
+                    );
+                }
+                // Array operations handled separately (OR-Set semantics need special handling)
+                _ => {
+                    tracing::warn!(
+                        "Array operations (Add/Remove) not yet implemented in DQL UPDATE"
+                    );
+                    // TODO: For now, arrays require full document read-modify-write
+                    // Future: Implement using Ditto's array operations or custom CRDT logic
+                }
+            }
+        }
+
+        // Add metadata updates
+        set_clauses.push("last_update_us = :last_update_us".to_string());
+        params.insert(
+            "last_update_us".to_string(),
+            serde_json::json!(delta.timestamp_us),
+        );
+
+        set_clauses.push("sequence = :sequence".to_string());
+        params.insert("sequence".to_string(), serde_json::json!(delta.sequence));
+
+        // Build and execute UPDATE query
+        let query = format!(
+            "UPDATE sim_poc SET {} WHERE _id = :_id",
+            set_clauses.join(", ")
+        );
+
+        self.ditto
+            .store()
+            .execute_v2((query, serde_json::Value::Object(params)))
+            .await
+            .map_err(|e| {
+                tracing::error!("Delta update failed: {}", e);
+                Error::storage_error(
+                    format!("Failed to update squad summary {}: {}", squad_id, e),
+                    "update_squad_summary",
+                    Some(squad_id.to_string()),
+                )
+            })?;
+
+        // Update lifecycle metrics using PN_COUNTER
+        // These were initialized as PN_COUNTERs in create_*_summary()
+        self.increment_counter(&doc_id, "update_count").await?;
+        self.add_to_counter(&doc_id, "total_delta_bytes", delta.size_bytes() as u64)
+            .await?;
+
+        // Emit lifecycle metric
+        tracing::debug!(
+            squad_id = squad_id,
+            doc_id = %doc_id,
+            update_count = delta.updates.len(),
+            delta_size = delta.size_bytes(),
+            sequence = delta.sequence,
+            "SquadSummaryUpdated"
+        );
+
+        Ok(())
+    }
+
+    /// Helper: Increment a counter field using PN_COUNTER CRDT
+    ///
+    /// Uses Ditto's PN_INCREMENT operation for distributed counter semantics.
+    /// This correctly handles concurrent increments from multiple peers.
+    ///
+    /// **Important**: Includes explicit PN_COUNTER type declaration for strict mode.
+    async fn increment_counter(&self, doc_id: &str, field: &str) -> Result<()> {
+        // Include type declaration (field PN_COUNTER) for strict mode support
+        // Also update last_update_us timestamp
+        let timestamp_us = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as u64;
+
+        let query = format!(
+            "UPDATE COLLECTION sim_poc ({} PN_COUNTER) APPLY {} PN_INCREMENT BY 1.0 SET last_update_us = :timestamp WHERE _id = :_id",
+            field, field
+        );
+
+        self.ditto
+            .store()
+            .execute_v2((
+                query,
+                serde_json::json!({"_id": doc_id, "timestamp": timestamp_us}),
+            ))
+            .await
+            .map_err(|e| {
+                Error::storage_error(
+                    format!("Failed to increment counter {}: {}", field, e),
+                    "increment_counter",
+                    Some(doc_id.to_string()),
+                )
+            })?;
+
+        Ok(())
+    }
+
+    /// Helper: Add to a counter field using PN_COUNTER CRDT
+    ///
+    /// Uses Ditto's PN_INCREMENT operation for distributed counter semantics.
+    /// This correctly handles concurrent increments from multiple peers.
+    ///
+    /// **Important**: Includes explicit PN_COUNTER type declaration for strict mode.
+    async fn add_to_counter(&self, doc_id: &str, field: &str, value: u64) -> Result<()> {
+        // Include type declaration (field PN_COUNTER) for strict mode support
+        // Also update last_update_us timestamp
+        let timestamp_us = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as u64;
+
+        let query = format!(
+            "UPDATE COLLECTION sim_poc ({} PN_COUNTER) APPLY {} PN_INCREMENT BY :value SET last_update_us = :timestamp WHERE _id = :_id",
+            field, field
+        );
+
+        self.ditto
+            .store()
+            .execute_v2((
+                query,
+                serde_json::json!({"_id": doc_id, "value": value as f64, "timestamp": timestamp_us}),
+            ))
+            .await
+            .map_err(|e| {
+                Error::storage_error(
+                    format!("Failed to add to counter {}: {}", field, e),
+                    "add_to_counter",
+                    Some(doc_id.to_string()),
+                )
+            })?;
+
+        Ok(())
+    }
+
     /// Store a PlatoonSummary in the platoon_summaries collection
     ///
     /// # Arguments
@@ -565,7 +886,7 @@ impl DittoStore {
         let doc_id = format!("{}-summary", platoon_id);
         doc["_id"] = serde_json::Value::String(doc_id);
         doc["type"] = serde_json::Value::String("platoon_summary".to_string());
-        doc["collection_name"] = serde_json::Value::String("platoon_summaries".to_string());
+        doc["collection_name"] = serde_json::Value::String("sim_poc".to_string());
 
         // Get current timestamp in microseconds for latency tracking
         let timestamp_us = std::time::SystemTime::now()
@@ -574,7 +895,7 @@ impl DittoStore {
             .as_micros() as u64;
         doc["timestamp_us"] = serde_json::Value::Number(timestamp_us.into());
 
-        self.upsert("platoon_summaries", doc).await
+        self.upsert("sim_poc", doc).await
     }
 
     /// Retrieve a PlatoonSummary from the platoon_summaries collection
@@ -594,7 +915,7 @@ impl DittoStore {
         // Query with -summary suffix
         let doc_id = format!("{}-summary", platoon_id);
         let results = self
-            .query("platoon_summaries", &format!("_id == '{}'", doc_id))
+            .query("sim_poc", &format!("_id == '{}'", doc_id))
             .await?;
 
         if results.is_empty() {
@@ -614,6 +935,533 @@ impl DittoStore {
             })?;
 
         Ok(Some(summary))
+    }
+
+    /// Create a platoon summary document (ONCE per platoon lifecycle)
+    ///
+    /// Implements ADR-021 create-once pattern. This method should be called exactly
+    /// once during platoon formation. Subsequent updates use `update_platoon_summary()`.
+    #[instrument(skip(self, initial_state), fields(platoon_id))]
+    pub async fn create_platoon_summary(
+        &self,
+        platoon_id: &str,
+        initial_state: &hive_schema::hierarchy::v1::PlatoonSummary,
+    ) -> Result<String> {
+        let doc_id = format!("{}-summary", platoon_id);
+
+        // Check if already exists (enforce create-once invariant)
+        if self.get_platoon_summary(platoon_id).await?.is_some() {
+            return Err(Error::storage_error(
+                format!(
+                    "Platoon summary {} already exists (cannot recreate - violates ADR-021)",
+                    platoon_id
+                ),
+                "create_platoon_summary",
+                Some(platoon_id.to_string()),
+            ));
+        }
+
+        // Create document with full initial state
+        let mut doc = serde_json::to_value(initial_state).map_err(|e| {
+            Error::storage_error(
+                format!("Failed to serialize PlatoonSummary to JSON: {}", e),
+                "create_platoon_summary",
+                Some(platoon_id.to_string()),
+            )
+        })?;
+
+        // Add Ditto metadata
+        doc["_id"] = serde_json::Value::String(doc_id.clone());
+        doc["type"] = serde_json::Value::String("platoon_summary".to_string());
+        doc["collection_name"] = serde_json::Value::String("platoon_summaries".to_string());
+
+        // Add lifecycle tracking fields (timestamps only - counters initialized separately)
+        let timestamp_us = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as u64;
+        doc["created_at_us"] = serde_json::Value::Number(timestamp_us.into());
+        doc["last_update_us"] = serde_json::Value::Number(timestamp_us.into());
+        doc["sequence"] = serde_json::Value::Number(0.into());
+
+        self.upsert("sim_poc", doc).await?;
+
+        // Initialize PN_COUNTER fields AFTER document creation
+        // This ensures they are created as PN_COUNTERs, not REGISTERs
+        self.increment_counter(&doc_id, "create_count").await?;
+        // update_count and total_delta_bytes start at 0, will be incremented on first update
+
+        tracing::info!(
+            platoon_id = platoon_id,
+            doc_id = %doc_id,
+            "PlatoonSummaryCreated"
+        );
+
+        Ok(doc_id)
+    }
+
+    /// Update an existing platoon summary with delta (MANY times)
+    #[instrument(skip(self, delta), fields(platoon_id, delta_size = delta.size_bytes()))]
+    pub async fn update_platoon_summary(
+        &self,
+        platoon_id: &str,
+        delta: crate::hierarchy::deltas::PlatoonDelta,
+    ) -> Result<()> {
+        use crate::hierarchy::deltas::PlatoonFieldUpdate;
+
+        let doc_id = format!("{}-summary", platoon_id);
+
+        // Verify document exists
+        if self.get_platoon_summary(platoon_id).await?.is_none() {
+            return Err(Error::storage_error(
+                format!(
+                    "Platoon summary {} does not exist (must create first)",
+                    platoon_id
+                ),
+                "update_platoon_summary",
+                Some(platoon_id.to_string()),
+            ));
+        }
+
+        // Skip if delta is empty
+        if delta.is_empty() {
+            tracing::debug!(platoon_id = platoon_id, "Skipping empty delta");
+            return Ok(());
+        }
+
+        // Build UPDATE SET clause from delta
+        let mut set_clauses = Vec::new();
+        let mut params = serde_json::Map::new();
+        params.insert("_id".to_string(), serde_json::json!(doc_id.clone()));
+
+        // Convert delta updates to SET clauses
+        for (idx, update) in delta.updates.iter().enumerate() {
+            let param_name = format!("p{}", idx);
+
+            match update {
+                PlatoonFieldUpdate::SetLeaderId(id) => {
+                    set_clauses.push(format!("leader_id = :{}", param_name));
+                    params.insert(param_name, serde_json::json!(id));
+                }
+                PlatoonFieldUpdate::SetSquadCount(count) => {
+                    set_clauses.push(format!("squad_count = :{}", param_name));
+                    params.insert(param_name, serde_json::json!(count));
+                }
+                PlatoonFieldUpdate::SetTotalMemberCount(count) => {
+                    set_clauses.push(format!("total_member_count = :{}", param_name));
+                    params.insert(param_name, serde_json::json!(count));
+                }
+                PlatoonFieldUpdate::SetOperationalCount(count) => {
+                    set_clauses.push(format!("operational_count = :{}", param_name));
+                    params.insert(param_name, serde_json::json!(count));
+                }
+                PlatoonFieldUpdate::SetAvgFuelMinutes(fuel) => {
+                    set_clauses.push(format!("avg_fuel_minutes = :{}", param_name));
+                    params.insert(param_name, serde_json::json!(fuel));
+                }
+                PlatoonFieldUpdate::SetWorstHealth(health) => {
+                    set_clauses.push(format!("worst_health = :{}", param_name));
+                    params.insert(param_name, serde_json::json!(health));
+                }
+                PlatoonFieldUpdate::SetReadinessScore(score) => {
+                    set_clauses.push(format!("readiness_score = :{}", param_name));
+                    params.insert(param_name, serde_json::json!(score));
+                }
+                PlatoonFieldUpdate::UpdatePositionCentroid(pos) => {
+                    set_clauses.push(format!("position_centroid = :{}", param_name));
+                    params.insert(
+                        param_name,
+                        serde_json::to_value(pos).unwrap_or(serde_json::json!(null)),
+                    );
+                }
+                PlatoonFieldUpdate::UpdateBoundingBox(bbox) => {
+                    set_clauses.push(format!("bounding_box = :{}", param_name));
+                    params.insert(
+                        param_name,
+                        serde_json::to_value(bbox).unwrap_or(serde_json::json!(null)),
+                    );
+                }
+                PlatoonFieldUpdate::UpdateAggregatedAt(ts) => {
+                    set_clauses.push(format!("aggregated_at = :{}", param_name));
+                    params.insert(
+                        param_name,
+                        serde_json::to_value(ts).unwrap_or(serde_json::json!(null)),
+                    );
+                }
+                // Array operations handled separately
+                _ => {
+                    tracing::warn!(
+                        "Array operations (Add/Remove) not yet implemented in DQL UPDATE"
+                    );
+                }
+            }
+        }
+
+        // Add metadata updates
+        set_clauses.push("last_update_us = :last_update_us".to_string());
+        params.insert(
+            "last_update_us".to_string(),
+            serde_json::json!(delta.timestamp_us),
+        );
+
+        set_clauses.push("sequence = :sequence".to_string());
+        params.insert("sequence".to_string(), serde_json::json!(delta.sequence));
+
+        // Build and execute UPDATE query
+        let query = format!(
+            "UPDATE sim_poc SET {} WHERE _id = :_id",
+            set_clauses.join(", ")
+        );
+
+        self.ditto
+            .store()
+            .execute_v2((query, serde_json::Value::Object(params)))
+            .await
+            .map_err(|e| {
+                Error::storage_error(
+                    format!("Failed to update platoon summary {}: {}", platoon_id, e),
+                    "update_platoon_summary",
+                    Some(platoon_id.to_string()),
+                )
+            })?;
+
+        // Update lifecycle metrics using PN_COUNTER
+        // These were initialized as PN_COUNTERs in create_*_summary()
+        self.increment_counter(&doc_id, "update_count").await?;
+        self.add_to_counter(&doc_id, "total_delta_bytes", delta.size_bytes() as u64)
+            .await?;
+
+        tracing::debug!(
+            platoon_id = platoon_id,
+            doc_id = %doc_id,
+            update_count = delta.updates.len(),
+            delta_size = delta.size_bytes(),
+            sequence = delta.sequence,
+            "PlatoonSummaryUpdated"
+        );
+
+        Ok(())
+    }
+
+    // ========================================================================
+    // Company Summary Operations
+    // ========================================================================
+
+    /// Retrieve a CompanySummary from the company_summaries collection
+    #[instrument(skip(self), fields(company_id))]
+    pub async fn get_company_summary(
+        &self,
+        company_id: &str,
+    ) -> Result<Option<hive_schema::hierarchy::v1::CompanySummary>> {
+        let doc_id = format!("{}-summary", company_id);
+        let results = self
+            .query("company_summaries", &format!("_id == '{}'", doc_id))
+            .await?;
+
+        if results.is_empty() {
+            return Ok(None);
+        }
+
+        let doc = &results[0];
+
+        let summary: hive_schema::hierarchy::v1::CompanySummary =
+            serde_json::from_value(doc.clone()).map_err(|e| {
+                Error::storage_error(
+                    format!("Failed to deserialize CompanySummary from JSON: {}", e),
+                    "get_company_summary",
+                    Some(company_id.to_string()),
+                )
+            })?;
+
+        Ok(Some(summary))
+    }
+
+    /// Create a company summary document (ONCE per company lifecycle)
+    ///
+    /// Implements ADR-021 create-once pattern. This method should be called exactly
+    /// once during company formation. Subsequent updates use `update_company_summary()`.
+    #[instrument(skip(self, initial_state), fields(company_id))]
+    pub async fn create_company_summary(
+        &self,
+        company_id: &str,
+        initial_state: &hive_schema::hierarchy::v1::CompanySummary,
+    ) -> Result<String> {
+        let doc_id = format!("{}-summary", company_id);
+
+        // Check if already exists (enforce create-once invariant)
+        if self.get_company_summary(company_id).await?.is_some() {
+            return Err(Error::storage_error(
+                format!(
+                    "Company summary {} already exists (cannot recreate - violates ADR-021)",
+                    company_id
+                ),
+                "create_company_summary",
+                Some(company_id.to_string()),
+            ));
+        }
+
+        // Create document with full initial state
+        let mut doc = serde_json::to_value(initial_state).map_err(|e| {
+            Error::storage_error(
+                format!("Failed to serialize CompanySummary to JSON: {}", e),
+                "create_company_summary",
+                Some(company_id.to_string()),
+            )
+        })?;
+
+        // Add Ditto metadata
+        doc["_id"] = serde_json::Value::String(doc_id.clone());
+        doc["type"] = serde_json::Value::String("company_summary".to_string());
+        doc["collection_name"] = serde_json::Value::String("company_summaries".to_string());
+
+        // Add lifecycle tracking fields (timestamps only - counters initialized separately)
+        let timestamp_us = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as u64;
+        doc["created_at_us"] = serde_json::Value::Number(timestamp_us.into());
+        doc["last_update_us"] = serde_json::Value::Number(timestamp_us.into());
+        doc["sequence"] = serde_json::Value::Number(0.into());
+
+        self.upsert("sim_poc", doc).await?;
+
+        // Initialize PN_COUNTER fields AFTER document creation
+        // This ensures they are created as PN_COUNTERs, not REGISTERs
+        self.increment_counter(&doc_id, "create_count").await?;
+        // update_count and total_delta_bytes start at 0, will be incremented on first update
+
+        tracing::info!(
+            company_id = company_id,
+            doc_id = %doc_id,
+            "CompanySummaryCreated"
+        );
+
+        Ok(doc_id)
+    }
+
+    /// Update an existing company summary with delta (MANY times)
+    #[instrument(skip(self, delta), fields(company_id, delta_size = delta.size_bytes()))]
+    pub async fn update_company_summary(
+        &self,
+        company_id: &str,
+        delta: crate::hierarchy::deltas::CompanyDelta,
+    ) -> Result<()> {
+        use crate::hierarchy::deltas::CompanyFieldUpdate;
+
+        let doc_id = format!("{}-summary", company_id);
+
+        // Verify document exists
+        if self.get_company_summary(company_id).await?.is_none() {
+            return Err(Error::storage_error(
+                format!(
+                    "Company summary {} does not exist (must create first)",
+                    company_id
+                ),
+                "update_company_summary",
+                Some(company_id.to_string()),
+            ));
+        }
+
+        // Skip if delta is empty
+        if delta.is_empty() {
+            tracing::debug!(company_id = company_id, "Skipping empty delta");
+            return Ok(());
+        }
+
+        // Build UPDATE SET clause from delta
+        let mut set_clauses = Vec::new();
+        let mut params = serde_json::Map::new();
+        params.insert("_id".to_string(), serde_json::json!(doc_id.clone()));
+
+        // Convert delta updates to SET clauses
+        for (idx, update) in delta.updates.iter().enumerate() {
+            let param_name = format!("p{}", idx);
+
+            match update {
+                CompanyFieldUpdate::SetLeaderId(id) => {
+                    set_clauses.push(format!("leader_id = :{}", param_name));
+                    params.insert(param_name, serde_json::json!(id));
+                }
+                CompanyFieldUpdate::SetPlatoonCount(count) => {
+                    set_clauses.push(format!("platoon_count = :{}", param_name));
+                    params.insert(param_name, serde_json::json!(count));
+                }
+                CompanyFieldUpdate::SetTotalMemberCount(count) => {
+                    set_clauses.push(format!("total_member_count = :{}", param_name));
+                    params.insert(param_name, serde_json::json!(count));
+                }
+                CompanyFieldUpdate::SetOperationalCount(count) => {
+                    set_clauses.push(format!("operational_count = :{}", param_name));
+                    params.insert(param_name, serde_json::json!(count));
+                }
+                CompanyFieldUpdate::SetAvgFuelMinutes(fuel) => {
+                    set_clauses.push(format!("avg_fuel_minutes = :{}", param_name));
+                    params.insert(param_name, serde_json::json!(fuel));
+                }
+                CompanyFieldUpdate::SetWorstHealth(health) => {
+                    set_clauses.push(format!("worst_health = :{}", param_name));
+                    params.insert(param_name, serde_json::json!(health));
+                }
+                CompanyFieldUpdate::SetReadinessScore(score) => {
+                    set_clauses.push(format!("readiness_score = :{}", param_name));
+                    params.insert(param_name, serde_json::json!(score));
+                }
+                CompanyFieldUpdate::UpdatePositionCentroid(pos) => {
+                    set_clauses.push(format!("position_centroid = :{}", param_name));
+                    params.insert(
+                        param_name,
+                        serde_json::to_value(pos).unwrap_or(serde_json::json!(null)),
+                    );
+                }
+                CompanyFieldUpdate::UpdateBoundingBox(bbox) => {
+                    set_clauses.push(format!("bounding_box = :{}", param_name));
+                    params.insert(
+                        param_name,
+                        serde_json::to_value(bbox).unwrap_or(serde_json::json!(null)),
+                    );
+                }
+                CompanyFieldUpdate::UpdateAggregatedAt(ts) => {
+                    set_clauses.push(format!("aggregated_at = :{}", param_name));
+                    params.insert(
+                        param_name,
+                        serde_json::to_value(ts).unwrap_or(serde_json::json!(null)),
+                    );
+                }
+                // Array operations handled separately
+                _ => {
+                    tracing::warn!(
+                        "Array operations (Add/Remove) not yet implemented in DQL UPDATE"
+                    );
+                }
+            }
+        }
+
+        // Add metadata updates
+        set_clauses.push("last_update_us = :last_update_us".to_string());
+        params.insert(
+            "last_update_us".to_string(),
+            serde_json::json!(delta.timestamp_us),
+        );
+
+        set_clauses.push("sequence = :sequence".to_string());
+        params.insert("sequence".to_string(), serde_json::json!(delta.sequence));
+
+        // Build and execute UPDATE query
+        let query = format!(
+            "UPDATE sim_poc SET {} WHERE _id = :_id",
+            set_clauses.join(", ")
+        );
+
+        self.ditto
+            .store()
+            .execute_v2((query, serde_json::Value::Object(params)))
+            .await
+            .map_err(|e| {
+                Error::storage_error(
+                    format!("Failed to update company summary {}: {}", company_id, e),
+                    "update_company_summary",
+                    Some(company_id.to_string()),
+                )
+            })?;
+
+        // Update lifecycle metrics using PN_COUNTER
+        // These were initialized as PN_COUNTERs in create_*_summary()
+        self.increment_counter(&doc_id, "update_count").await?;
+        self.add_to_counter(&doc_id, "total_delta_bytes", delta.size_bytes() as u64)
+            .await?;
+
+        tracing::debug!(
+            company_id = company_id,
+            doc_id = %doc_id,
+            update_count = delta.updates.len(),
+            delta_size = delta.size_bytes(),
+            sequence = delta.sequence,
+            "CompanySummaryUpdated"
+        );
+
+        Ok(())
+    }
+
+    // ========================================================================
+    // Lifecycle Metrics
+    // ========================================================================
+
+    /// Get document lifecycle metrics for validation (ADR-021)
+    ///
+    /// Returns metrics for validating architectural invariants:
+    /// - create_count must equal 1
+    /// - compression_ratio should be > 10×
+    #[instrument(skip(self), fields(doc_id))]
+    pub async fn get_document_metrics(
+        &self,
+        doc_id: &str,
+    ) -> Result<crate::hierarchy::storage_trait::DocumentMetrics> {
+        use crate::hierarchy::storage_trait::DocumentMetrics;
+
+        // Query document to get lifecycle fields
+        let results = self
+            .query("sim_poc", &format!("_id == '{}'", doc_id))
+            .await?;
+
+        if results.is_empty() {
+            return Err(Error::storage_error(
+                format!("Document {} not found", doc_id),
+                "get_document_metrics",
+                Some(doc_id.to_string()),
+            ));
+        }
+
+        let doc = &results[0];
+
+        // Extract lifecycle fields
+        let created_at_us = doc
+            .get("created_at_us")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        let create_count = doc
+            .get("create_count")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        let update_count = doc
+            .get("update_count")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        let last_update_us = doc
+            .get("last_update_us")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(created_at_us);
+        let total_delta_bytes = doc
+            .get("total_delta_bytes")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as usize;
+        let sequence = doc.get("sequence").and_then(|v| v.as_u64()).unwrap_or(0);
+
+        // Calculate full document size
+        let full_doc_size = serde_json::to_vec(&doc).map(|v| v.len()).unwrap_or(0);
+
+        // Calculate compression ratio
+        let avg_delta_size = if update_count > 0 {
+            total_delta_bytes / update_count as usize
+        } else {
+            0
+        };
+        let compression_ratio = if avg_delta_size > 0 {
+            full_doc_size as f32 / avg_delta_size as f32
+        } else {
+            0.0
+        };
+
+        Ok(DocumentMetrics {
+            document_id: doc_id.to_string(),
+            created_at_us,
+            create_count,
+            update_count,
+            last_update_us,
+            total_delta_bytes,
+            full_doc_size,
+            compression_ratio,
+            sequence,
+        })
     }
 
     /// Upsert a HierarchicalCommand to the hierarchical_commands collection
