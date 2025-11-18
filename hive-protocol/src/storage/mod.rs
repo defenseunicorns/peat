@@ -26,6 +26,8 @@ pub mod automerge_store;
 #[cfg(feature = "automerge-backend")]
 pub mod automerge_sync;
 #[cfg(feature = "automerge-backend")]
+pub mod partition_detection;
+#[cfg(feature = "automerge-backend")]
 pub mod sync_errors;
 #[cfg(feature = "automerge-backend")]
 pub mod ttl_manager;
@@ -44,6 +46,10 @@ pub use automerge_backend::AutomergeBackend;
 pub use automerge_store::AutomergeStore;
 #[cfg(feature = "automerge-backend")]
 pub use automerge_sync::AutomergeSyncCoordinator;
+#[cfg(feature = "automerge-backend")]
+pub use partition_detection::{
+    PartitionConfig, PartitionDetector, PeerHeartbeat, PeerPartitionState,
+};
 #[cfg(feature = "automerge-backend")]
 pub use ttl_manager::TtlManager;
 
