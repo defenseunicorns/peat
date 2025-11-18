@@ -77,6 +77,11 @@ use tokio::time::sleep;
 use hive_protocol::hierarchy::{HierarchicalAggregator, StateAggregator};
 use hive_protocol::models::{NodeConfig, NodeState};
 
+// Phase 3: Command dissemination imports
+use hive_protocol::command::CommandCoordinator;
+use hive_protocol::storage::DittoCommandStorage;
+use hive_schema::command::v1::{command_target::Scope, CommandTarget, HierarchicalCommand};
+
 /// Test document structure
 #[allow(dead_code)]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -142,6 +147,91 @@ enum MetricsEvent {
         total_member_count: usize,
         timestamp_us: u128,
     },
+    // Phase 3: Command dissemination events
+    CommandIssued {
+        node_id: String,
+        command_id: String,
+        target_scope: String, // "Node", "Squad", "Platoon", "Battalion"
+        target_ids: Vec<String>,
+        priority: i32,
+        timestamp_us: u128,
+    },
+    #[allow(dead_code)] // Will be used when command reception is implemented
+    CommandReceived {
+        node_id: String,
+        command_id: String,
+        originator_id: String,
+        received_at_us: u128,
+        latency_us: u128,
+        latency_ms: f64,
+    },
+    #[allow(dead_code)] // Will be used when command acknowledgment is implemented
+    CommandAcknowledged {
+        node_id: String,
+        command_id: String,
+        status: String, // "RECEIVED", "COMPLETED", "FAILED"
+        timestamp_us: u128,
+    },
+    #[allow(dead_code)] // Will be used when command acknowledgment is implemented
+    AllCommandAcksReceived {
+        node_id: String,
+        command_id: String,
+        issued_at_us: u128,
+        all_acked_at_us: u128,
+        round_trip_latency_us: u128,
+        round_trip_latency_ms: f64,
+        ack_count: usize,
+    },
+}
+
+/// Phase 3: Simple command demonstration function
+///
+/// Issues a test command to demonstrate command dissemination capability.
+/// This is a minimal demonstration - full command loop implementation would
+/// include command reception, acknowledgment handling, and metrics tracking.
+async fn demo_command_issuance(
+    coordinator: Arc<CommandCoordinator>,
+    node_id: String,
+    target_scope: Scope,
+    target_ids: Vec<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Generate a simple command ID
+    let command_id = format!(
+        "{}-cmd-{}",
+        node_id,
+        SystemTime::now().duration_since(UNIX_EPOCH)?.as_micros()
+    );
+
+    let command = HierarchicalCommand {
+        command_id: command_id.clone(),
+        originator_id: node_id.clone(),
+        target: Some(CommandTarget {
+            scope: target_scope as i32,
+            target_ids: target_ids.clone(),
+        }),
+        priority: 3,              // IMMEDIATE
+        acknowledgment_policy: 2, // ACK_REQUIRED
+        buffer_policy: 1,         // BUFFER_AND_RETRY
+        conflict_policy: 2,       // HIGHEST_PRIORITY_WINS
+        leader_change_policy: 1,  // REISSUE_FROM_NEW_LEADER
+        ..Default::default()
+    };
+
+    // Issue the command
+    coordinator.issue_command(command.clone()).await?;
+
+    // Log metrics event
+    let event = MetricsEvent::CommandIssued {
+        node_id: node_id.clone(),
+        command_id,
+        target_scope: format!("{:?}", target_scope),
+        target_ids,
+        priority: 3,
+        timestamp_us: SystemTime::now().duration_since(UNIX_EPOCH)?.as_micros(),
+    };
+    println!("{}", serde_json::to_string(&event)?);
+
+    Ok(())
 }
 
 /// Squad leader aggregation loop (Mode 4)
@@ -725,13 +815,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     Arc::clone(&ditto_store),
                                 ));
                             let coordinator = Arc::new(HierarchicalAggregator::new(storage));
+
+                            // Phase 3: Instantiate CommandCoordinator for command dissemination
+                            let cmd_storage =
+                                Arc::new(DittoCommandStorage::new(Arc::clone(&ditto_store)));
+                            let cmd_coordinator = Arc::new(CommandCoordinator::new(
+                                Some(squad_id.clone()),
+                                node_id.clone(),
+                                member_ids.clone(),
+                                cmd_storage,
+                            ));
+
                             let node_id_clone = node_id.clone();
+                            let member_ids_clone = member_ids.clone();
 
                             println!(
                                 "[{}] → Squad: {}, Members: {:?}",
                                 node_id, squad_id, member_ids
                             );
 
+                            // Spawn aggregation loop
                             tokio::spawn(async move {
                                 if let Err(e) = squad_leader_aggregation_loop(
                                     coordinator,
@@ -745,6 +848,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         "[{}] Squad leader aggregation error: {}",
                                         node_id_clone, e
                                     );
+                                }
+                            });
+
+                            // Phase 3: Spawn command demo task (issue one command every 30 seconds)
+                            let cmd_node_id = node_id.clone();
+                            tokio::spawn(async move {
+                                sleep(Duration::from_secs(15)).await; // Wait before first command
+                                loop {
+                                    if let Err(e) = demo_command_issuance(
+                                        Arc::clone(&cmd_coordinator),
+                                        cmd_node_id.clone(),
+                                        Scope::Individual,
+                                        member_ids_clone.clone(),
+                                    )
+                                    .await
+                                    {
+                                        eprintln!(
+                                            "[{}] Command issuance error: {}",
+                                            cmd_node_id, e
+                                        );
+                                    }
+                                    sleep(Duration::from_secs(30)).await;
                                 }
                             });
 
@@ -783,6 +908,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     Arc::clone(&ditto_store),
                                 ));
                             let coordinator = Arc::new(HierarchicalAggregator::new(storage));
+
+                            // Phase 3: Instantiate CommandCoordinator for command dissemination
+                            // Platoon leader can command squads in the platoon
+                            let cmd_storage =
+                                Arc::new(DittoCommandStorage::new(Arc::clone(&ditto_store)));
+                            let _cmd_coordinator = Arc::new(CommandCoordinator::new(
+                                None, // Platoon leader is not in a squad
+                                node_id.clone(),
+                                vec![], // Squad IDs will be determined dynamically
+                                cmd_storage,
+                            ));
+
                             let node_id_clone = node_id.clone();
 
                             println!("[{}] → Platoon: {}", node_id, platoon_id);
