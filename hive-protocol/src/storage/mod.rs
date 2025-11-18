@@ -48,7 +48,7 @@ pub use automerge_store::AutomergeStore;
 pub use automerge_sync::AutomergeSyncCoordinator;
 #[cfg(feature = "automerge-backend")]
 pub use partition_detection::{
-    PartitionConfig, PartitionDetector, PeerHeartbeat, PeerPartitionState,
+    PartitionConfig, PartitionDetector, PartitionEvent, PeerHeartbeat, PeerPartitionState,
 };
 #[cfg(feature = "automerge-backend")]
 pub use ttl_manager::TtlManager;
