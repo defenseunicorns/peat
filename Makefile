@@ -73,6 +73,20 @@ test: clean-ditto
 		cargo test -- --test-threads=1; \
 	fi
 
+# Run functional/unit tests only (fast, for CI)
+test-functional: clean-ditto
+	@echo "Running functional/unit tests only..."
+	@if [ -f .env ]; then \
+		export $$(grep -v '^#' .env | xargs) && cargo test -- --test-threads=1; \
+	else \
+		cargo test -- --test-threads=1; \
+	fi
+
+# Run baseline comparison tests only (Containerlab-based)
+test-baseline:
+	@echo "Running baseline comparison tests..."
+	@cd hive-sim && ./run-baseline-comparison.sh
+
 # Run E2E integration tests
 test-e2e: clean-ditto
 	@echo "Running E2E integration tests..."
@@ -333,6 +347,84 @@ e8-baseline-comparison:
 	@echo "Estimated time: ~5 minutes"
 	@echo ""
 	@cd hive-sim && ./run-baseline-comparison.sh
+
+# ============================================
+# Scaling Validation Tests
+# ============================================
+
+# Validate 96-node baseline (Traditional IoT)
+scaling-validate-96:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Scaling Validation - 96 Nodes (Battalion Large)         ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "Testing Traditional Baseline at 96-node scale"
+	@echo "Estimated time: ~3-5 minutes"
+	@echo ""
+	@cd hive-sim && ./test-scaling-validation.sh 96
+
+# Validate 192-node baseline (Traditional IoT)
+scaling-validate-192:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Scaling Validation - 192 Nodes (Battalion Extra)        ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "Testing Traditional Baseline at 192-node scale"
+	@echo "⚠️  First test at this scale - infrastructure validation"
+	@echo "Estimated time: ~5-8 minutes"
+	@echo ""
+	@cd hive-sim && ./test-scaling-validation.sh 192
+
+# Validate 384-node baseline (Traditional IoT) - EXPERIMENTAL
+scaling-validate-384:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Scaling Validation - 384 Nodes (EXPERIMENTAL)           ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "⚠️  WARNING: Experimental scale test"
+	@echo "   • RAM requirement: ~20-30GB"
+	@echo "   • CPU requirement: 32+ cores"
+	@echo "   • May push system limits"
+	@echo ""
+	@echo "Testing Traditional Baseline at 384-node scale"
+	@echo "Estimated time: ~10-15 minutes"
+	@echo ""
+	@cd hive-sim && ./test-scaling-validation.sh 384
+
+# Validate 500-node baseline (Traditional IoT) - APPROACHING LIMITS
+scaling-validate-500:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Scaling Validation - 500 Nodes (APPROACHING LIMITS)     ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "⚠️  WARNING: Approaching Containerlab single-machine limits"
+	@echo "   • RAM requirement: ~25-30GB"
+	@echo "   • CPU requirement: 32+ cores"
+	@echo "   • Linux bridge limit: ~1024 nodes"
+	@echo "   • Will test infrastructure scaling capabilities"
+	@echo ""
+	@echo "Testing Traditional Baseline at 500-node scale"
+	@echo "Estimated time: ~15-20 minutes"
+	@echo ""
+	@cd hive-sim && ./test-scaling-validation.sh 500
+
+# Run all scaling validation tests (96, 192, 384, 500 nodes)
+scaling-validate-all:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Complete Scaling Validation Suite                       ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "This will run scaling tests at 96, 192, 384, and 500 nodes"
+	@echo "⚠️  Total estimated time: ~30-40 minutes"
+	@echo "⚠️  Peak RAM usage: ~30GB"
+	@echo ""
+	@$(MAKE) scaling-validate-96
+	@$(MAKE) scaling-validate-192
+	@$(MAKE) scaling-validate-384
+	@$(MAKE) scaling-validate-500
+	@echo ""
+	@echo "✅ All scaling validation tests completed"
+	@echo "Results: hive-sim/scaling-results-*/"
 
 # ============================================
 # Documentation

@@ -72,6 +72,30 @@ export DITTO_APP_ID
 export DITTO_OFFLINE_TOKEN
 export DITTO_SHARED_KEY
 
-# Run the simulation node
-echo "[${NODE_ID}] Running HIVE Protocol (hive-sim reference implementation)"
-exec /usr/local/bin/hive-sim $ARGS
+# Run the appropriate simulation node
+if [ "$USE_TRADITIONAL" = "true" ]; then
+    echo "[${NODE_ID}] Running Traditional Baseline (NO CRDT - periodic full messages)"
+
+    # Traditional baseline uses different arguments
+    TRAD_ARGS="--node-id ${NODE_ID}"
+
+    if [ "$MODE" = "writer" ]; then
+        TRAD_ARGS="$TRAD_ARGS --mode server"
+        if [ -n "$TCP_LISTEN" ]; then
+            TRAD_ARGS="$TRAD_ARGS --listen 0.0.0.0:${TCP_LISTEN}"
+        fi
+    else
+        TRAD_ARGS="$TRAD_ARGS --mode client"
+        if [ -n "$TCP_CONNECT" ]; then
+            TRAD_ARGS="$TRAD_ARGS --connect ${TCP_CONNECT}"
+        fi
+    fi
+
+    TRAD_ARGS="$TRAD_ARGS --update-frequency ${UPDATE_FREQUENCY_SECS}"
+    TRAD_ARGS="$TRAD_ARGS --node-type ${NODE_TYPE}"
+
+    exec /usr/local/bin/traditional_baseline $TRAD_ARGS
+else
+    echo "[${NODE_ID}] Running HIVE Protocol (hive-sim reference implementation)"
+    exec /usr/local/bin/hive-sim $ARGS
+fi
