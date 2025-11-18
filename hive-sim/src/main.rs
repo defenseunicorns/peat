@@ -173,7 +173,16 @@ enum MetricsEvent {
         status: String, // "RECEIVED", "COMPLETED", "FAILED"
         timestamp_us: u128,
     },
-    #[allow(dead_code)] // Will be used when command acknowledgment is implemented
+    AcknowledgmentReceived {
+        node_id: String, // Originator who receives the ack
+        command_id: String,
+        ack_from_node_id: String, // Subordinate who sent ack
+        status: String,           // "RECEIVED", "COMPLETED", "FAILED"
+        timestamp_us: u128,
+        ack_count: usize,          // How many acks received so far
+        expected_ack_count: usize, // Total expected acks
+    },
+    #[allow(dead_code)] // Will be used for round-trip latency tracking
     AllCommandAcksReceived {
         node_id: String,
         command_id: String,
@@ -324,6 +333,106 @@ async fn handle_command_reception(
         .await?;
 
     println!("[{}] ✓ Command reception observer active", node_id);
+
+    // Keep the observer alive
+    loop {
+        sleep(Duration::from_secs(60)).await;
+    }
+}
+
+/// Phase 3: Acknowledgment collection handler (optional)
+///
+/// Observes acknowledgments coming back from subordinates for commands issued by this node.
+/// This completes the full-duplex flow: originators can track command completion.
+///
+/// This is OPTIONAL and can be enabled/disabled via CLI flag for experimentation.
+async fn handle_acknowledgment_collection(
+    node_id: String,
+    ditto_store: Arc<hive_protocol::storage::DittoStore>,
+    expected_targets: HashMap<String, usize>, // command_id -> expected_ack_count
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!(
+        "[{}] Starting acknowledgment collection observer...",
+        node_id
+    );
+
+    // Track acknowledgments received per command
+    let ack_tracker = Arc::new(std::sync::Mutex::new(HashMap::<
+        String,
+        Vec<CommandAcknowledgment>,
+    >::new()));
+    let expected_targets_arc = Arc::new(expected_targets);
+
+    // Create DittoCommandStorage for observing acknowledgments
+    let cmd_storage = Arc::new(DittoCommandStorage::new(Arc::clone(&ditto_store)));
+
+    // Set up observer for acknowledgments to commands issued by this node
+    let node_id_clone = node_id.clone();
+    let ack_tracker_clone = Arc::clone(&ack_tracker);
+    let expected_targets_clone = Arc::clone(&expected_targets_arc);
+
+    let _observer = cmd_storage
+        .observe_acknowledgments(
+            &node_id,
+            Box::new(move |ack: CommandAcknowledgment| {
+                let node_id = node_id_clone.clone();
+                let ack_tracker = Arc::clone(&ack_tracker_clone);
+                let expected_targets = Arc::clone(&expected_targets_clone);
+
+                Box::pin(async move {
+                    let timestamp_us = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_micros();
+
+                    // Track this acknowledgment
+                    let mut tracker = ack_tracker.lock().unwrap();
+                    let acks = tracker.entry(ack.command_id.clone()).or_default();
+                    acks.push(ack.clone());
+                    let ack_count = acks.len();
+
+                    // Get expected count for this command
+                    let expected_count =
+                        expected_targets.get(&ack.command_id).copied().unwrap_or(1);
+
+                    drop(tracker); // Release lock
+
+                    // Log AcknowledgmentReceived event
+                    let status_str = match ack.status {
+                        1 => "RECEIVED",
+                        2 => "COMPLETED",
+                        3 => "FAILED",
+                        _ => "UNKNOWN",
+                    };
+
+                    let event = MetricsEvent::AcknowledgmentReceived {
+                        node_id: node_id.clone(),
+                        command_id: ack.command_id.clone(),
+                        ack_from_node_id: ack.node_id.clone(),
+                        status: status_str.to_string(),
+                        timestamp_us,
+                        ack_count,
+                        expected_ack_count: expected_count,
+                    };
+                    if let Ok(json) = serde_json::to_string(&event) {
+                        println!("{}", json);
+                    }
+
+                    // If all acks received, log completion event
+                    if ack_count == expected_count {
+                        // Note: We'd need the issued_at_us from the original command
+                        // For now, just log that all acks are received
+                        println!(
+                            "[{}] ✓ All acknowledgments received for command {} ({}/{})",
+                            node_id, ack.command_id, ack_count, expected_count
+                        );
+                    }
+                })
+            }),
+        )
+        .await?;
+
+    println!("[{}] ✓ Acknowledgment collection observer active", node_id);
 
     // Keep the observer alive
     loop {
@@ -737,6 +846,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut node_type = None;
     let mut update_rate_ms = None;
     let mut hive_filter_enabled = false;
+    let mut ack_collection_enabled = false;
 
     let mut i = 1;
     while i < args.len() {
@@ -785,6 +895,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "--hive-filter" => {
                 hive_filter_enabled = true;
+            }
+            "--enable-ack-collection" => {
+                ack_collection_enabled = true;
             }
             _ => {}
         }
@@ -969,6 +1082,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     sleep(Duration::from_secs(30)).await;
                                 }
                             });
+
+                            // Phase 3 (Optional): Spawn acknowledgment collection observer
+                            if ack_collection_enabled {
+                                let ack_node_id = node_id.clone();
+                                let ack_ditto_store = Arc::clone(&ditto_store);
+
+                                // For demo, expect acks from 3 members
+                                let expected_targets = HashMap::new();
+                                // This will be populated dynamically by the command issuance loop
+                                // For now, start empty and we'll observe all acks
+
+                                tokio::spawn(async move {
+                                    if let Err(e) = handle_acknowledgment_collection(
+                                        ack_node_id.clone(),
+                                        ack_ditto_store,
+                                        expected_targets,
+                                    )
+                                    .await
+                                    {
+                                        eprintln!(
+                                            "[{}] Acknowledgment collection error: {}",
+                                            ack_node_id, e
+                                        );
+                                    }
+                                });
+
+                                println!(
+                                    "[{}] ✓ Acknowledgment collection observer spawned (ENABLED)",
+                                    node_id
+                                );
+                            } else {
+                                println!(
+                                    "[{}] ⊗ Acknowledgment collection DISABLED (use --enable-ack-collection to enable)",
+                                    node_id
+                                );
+                            }
 
                             println!("[{}] ✓ Squad leader aggregation task spawned", node_id);
                         }
