@@ -586,19 +586,35 @@ impl DittoStore {
         doc["type"] = serde_json::Value::String("squad_summary".to_string());
         doc["collection_name"] = serde_json::Value::String("squad_summaries".to_string());
 
-        // Add lifecycle tracking fields
+        // Add lifecycle tracking fields (timestamps only - counters initialized separately)
         let timestamp_us = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_micros() as u64;
         doc["created_at_us"] = serde_json::Value::Number(timestamp_us.into());
         doc["last_update_us"] = serde_json::Value::Number(timestamp_us.into());
-        doc["create_count"] = serde_json::Value::Number(1.into()); // Track creation
-        doc["update_count"] = serde_json::Value::Number(0.into()); // No updates yet
-        doc["total_delta_bytes"] = serde_json::Value::Number(0.into());
         doc["sequence"] = serde_json::Value::Number(0.into());
 
-        self.upsert("sim_poc", doc).await?;
+        // Use plain INSERT (not upsert) for document creation
+        // This ensures we're creating a NEW document, not updating an existing one
+        let dql_query = "INSERT INTO sim_poc DOCUMENTS (:doc)";
+
+        self.ditto
+            .store()
+            .execute_v2((dql_query, serde_json::json!({"doc": doc})))
+            .await
+            .map_err(|e| {
+                Error::storage_error(
+                    format!("Failed to insert squad summary: {}", e),
+                    "create_squad_summary",
+                    Some(squad_id.to_string()),
+                )
+            })?;
+
+        // Initialize PN_COUNTER fields AFTER document creation
+        // This ensures they are created as PN_COUNTERs, not REGISTERs
+        self.increment_counter(&doc_id, "create_count").await?;
+        // update_count and total_delta_bytes start at 0, will be incremented on first update
 
         // Emit lifecycle metric
         tracing::info!(
@@ -747,14 +763,11 @@ impl DittoStore {
                 )
             })?;
 
-        // TODO: Enable lifecycle metrics tracking using PN_COUNTER
-        // IMPORTANT: Counter fields must NOT be initialized in the document!
-        // Ditto creates them as REGISTER if initialized with a value (even 0.0).
-        // Counter fields must be created via first PN_INCREMENT operation.
-        // Solution: Add counter fields to document ONLY via PN_INCREMENT (not in schema).
-        // For now, metrics tracking is disabled until we refactor document creation.
-        // self.increment_counter(&doc_id, "update_count").await?;
-        // self.add_to_counter(&doc_id, "total_delta_bytes", delta.size_bytes() as u64).await?;
+        // Update lifecycle metrics using PN_COUNTER
+        // These were initialized as PN_COUNTERs in create_*_summary()
+        self.increment_counter(&doc_id, "update_count").await?;
+        self.add_to_counter(&doc_id, "total_delta_bytes", delta.size_bytes() as u64)
+            .await?;
 
         // Emit lifecycle metric
         tracing::debug!(
@@ -773,16 +786,27 @@ impl DittoStore {
     ///
     /// Uses Ditto's PN_INCREMENT operation for distributed counter semantics.
     /// This correctly handles concurrent increments from multiple peers.
-    #[allow(dead_code)]
+    ///
+    /// **Important**: Includes explicit PN_COUNTER type declaration for strict mode.
     async fn increment_counter(&self, doc_id: &str, field: &str) -> Result<()> {
+        // Include type declaration (field PN_COUNTER) for strict mode support
+        // Also update last_update_us timestamp
+        let timestamp_us = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as u64;
+
         let query = format!(
-            "UPDATE sim_poc APPLY {} PN_INCREMENT BY 1.0 WHERE _id = :_id",
-            field
+            "UPDATE COLLECTION sim_poc ({} PN_COUNTER) APPLY {} PN_INCREMENT BY 1.0 SET last_update_us = :timestamp WHERE _id = :_id",
+            field, field
         );
 
         self.ditto
             .store()
-            .execute_v2((query, serde_json::json!({"_id": doc_id})))
+            .execute_v2((
+                query,
+                serde_json::json!({"_id": doc_id, "timestamp": timestamp_us}),
+            ))
             .await
             .map_err(|e| {
                 Error::storage_error(
@@ -799,18 +823,26 @@ impl DittoStore {
     ///
     /// Uses Ditto's PN_INCREMENT operation for distributed counter semantics.
     /// This correctly handles concurrent increments from multiple peers.
-    #[allow(dead_code)]
+    ///
+    /// **Important**: Includes explicit PN_COUNTER type declaration for strict mode.
     async fn add_to_counter(&self, doc_id: &str, field: &str, value: u64) -> Result<()> {
+        // Include type declaration (field PN_COUNTER) for strict mode support
+        // Also update last_update_us timestamp
+        let timestamp_us = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as u64;
+
         let query = format!(
-            "UPDATE sim_poc APPLY {} PN_INCREMENT BY :value WHERE _id = :_id",
-            field
+            "UPDATE COLLECTION sim_poc ({} PN_COUNTER) APPLY {} PN_INCREMENT BY :value SET last_update_us = :timestamp WHERE _id = :_id",
+            field, field
         );
 
         self.ditto
             .store()
             .execute_v2((
                 query,
-                serde_json::json!({"_id": doc_id, "value": value as f64}),
+                serde_json::json!({"_id": doc_id, "value": value as f64, "timestamp": timestamp_us}),
             ))
             .await
             .map_err(|e| {
@@ -943,19 +975,21 @@ impl DittoStore {
         doc["type"] = serde_json::Value::String("platoon_summary".to_string());
         doc["collection_name"] = serde_json::Value::String("platoon_summaries".to_string());
 
-        // Add lifecycle tracking fields
+        // Add lifecycle tracking fields (timestamps only - counters initialized separately)
         let timestamp_us = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_micros() as u64;
         doc["created_at_us"] = serde_json::Value::Number(timestamp_us.into());
         doc["last_update_us"] = serde_json::Value::Number(timestamp_us.into());
-        doc["create_count"] = serde_json::Value::Number(1.into());
-        doc["update_count"] = serde_json::Value::Number(0.into());
-        doc["total_delta_bytes"] = serde_json::Value::Number(0.into());
         doc["sequence"] = serde_json::Value::Number(0.into());
 
         self.upsert("sim_poc", doc).await?;
+
+        // Initialize PN_COUNTER fields AFTER document creation
+        // This ensures they are created as PN_COUNTERs, not REGISTERs
+        self.increment_counter(&doc_id, "create_count").await?;
+        // update_count and total_delta_bytes start at 0, will be incremented on first update
 
         tracing::info!(
             platoon_id = platoon_id,
@@ -1091,14 +1125,11 @@ impl DittoStore {
                 )
             })?;
 
-        // TODO: Enable lifecycle metrics tracking using PN_COUNTER
-        // IMPORTANT: Counter fields must NOT be initialized in the document!
-        // Ditto creates them as REGISTER if initialized with a value (even 0.0).
-        // Counter fields must be created via first PN_INCREMENT operation.
-        // Solution: Add counter fields to document ONLY via PN_INCREMENT (not in schema).
-        // For now, metrics tracking is disabled until we refactor document creation.
-        // self.increment_counter(&doc_id, "update_count").await?;
-        // self.add_to_counter(&doc_id, "total_delta_bytes", delta.size_bytes() as u64).await?;
+        // Update lifecycle metrics using PN_COUNTER
+        // These were initialized as PN_COUNTERs in create_*_summary()
+        self.increment_counter(&doc_id, "update_count").await?;
+        self.add_to_counter(&doc_id, "total_delta_bytes", delta.size_bytes() as u64)
+            .await?;
 
         tracing::debug!(
             platoon_id = platoon_id,
@@ -1183,19 +1214,21 @@ impl DittoStore {
         doc["type"] = serde_json::Value::String("company_summary".to_string());
         doc["collection_name"] = serde_json::Value::String("company_summaries".to_string());
 
-        // Add lifecycle tracking fields
+        // Add lifecycle tracking fields (timestamps only - counters initialized separately)
         let timestamp_us = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_micros() as u64;
         doc["created_at_us"] = serde_json::Value::Number(timestamp_us.into());
         doc["last_update_us"] = serde_json::Value::Number(timestamp_us.into());
-        doc["create_count"] = serde_json::Value::Number(1.into());
-        doc["update_count"] = serde_json::Value::Number(0.into());
-        doc["total_delta_bytes"] = serde_json::Value::Number(0.into());
         doc["sequence"] = serde_json::Value::Number(0.into());
 
         self.upsert("sim_poc", doc).await?;
+
+        // Initialize PN_COUNTER fields AFTER document creation
+        // This ensures they are created as PN_COUNTERs, not REGISTERs
+        self.increment_counter(&doc_id, "create_count").await?;
+        // update_count and total_delta_bytes start at 0, will be incremented on first update
 
         tracing::info!(
             company_id = company_id,
@@ -1331,14 +1364,11 @@ impl DittoStore {
                 )
             })?;
 
-        // TODO: Enable lifecycle metrics tracking using PN_COUNTER
-        // IMPORTANT: Counter fields must NOT be initialized in the document!
-        // Ditto creates them as REGISTER if initialized with a value (even 0.0).
-        // Counter fields must be created via first PN_INCREMENT operation.
-        // Solution: Add counter fields to document ONLY via PN_INCREMENT (not in schema).
-        // For now, metrics tracking is disabled until we refactor document creation.
-        // self.increment_counter(&doc_id, "update_count").await?;
-        // self.add_to_counter(&doc_id, "total_delta_bytes", delta.size_bytes() as u64).await?;
+        // Update lifecycle metrics using PN_COUNTER
+        // These were initialized as PN_COUNTERs in create_*_summary()
+        self.increment_counter(&doc_id, "update_count").await?;
+        self.add_to_counter(&doc_id, "total_delta_bytes", delta.size_bytes() as u64)
+            .await?;
 
         tracing::debug!(
             company_id = company_id,
