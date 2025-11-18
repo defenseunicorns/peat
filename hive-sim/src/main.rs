@@ -202,31 +202,57 @@ async fn squad_leader_aggregation_loop(
                 Ok(squad_summary) => {
                     let timestamp_us = now_micros();
 
-                    // Publish to squad_summaries collection via coordinator
-                    #[allow(deprecated)]
-                    if let Err(e) = coordinator
-                        .upsert_squad_summary(&squad_id, &squad_summary)
-                        .await
-                    {
-                        eprintln!("[{}] Failed to upsert squad summary: {}", node_id, e);
-                    } else {
-                        println!(
-                            "[{}] ✓ Aggregated squad {} ({} members, readiness: {:.2})",
-                            node_id,
-                            squad_id,
-                            squad_summary.member_count,
-                            squad_summary.readiness_score
-                        );
+                    // Check if squad summary document exists (create-once pattern)
+                    match coordinator.get_squad_summary(&squad_id).await {
+                        Ok(None) => {
+                            // First time - create document
+                            if let Err(e) = coordinator
+                                .create_squad_summary(&squad_id, &squad_summary)
+                                .await
+                            {
+                                eprintln!("[{}] Failed to create squad summary: {}", node_id, e);
+                            } else {
+                                println!(
+                                    "[{}] ✓ Created squad {} ({} members, readiness: {:.2})",
+                                    node_id,
+                                    squad_id,
+                                    squad_summary.member_count,
+                                    squad_summary.readiness_score
+                                );
+                            }
+                        }
+                        Ok(Some(_existing)) => {
+                            // Document exists - send delta update
+                            use hive_protocol::hierarchy::deltas::SquadDelta;
+                            let delta =
+                                SquadDelta::from_summary(&squad_summary, timestamp_us as u64);
 
-                        // Log squad summary creation metrics
-                        log_metrics(&MetricsEvent::SquadSummaryCreated {
-                            node_id: node_id.clone(),
-                            squad_id: squad_id.clone(),
-                            member_count: squad_summary.member_count as usize,
-                            readiness_score: squad_summary.readiness_score as f64,
-                            timestamp_us,
-                        });
+                            if let Err(e) = coordinator.update_squad_summary(&squad_id, delta).await
+                            {
+                                eprintln!("[{}] Failed to update squad summary: {}", node_id, e);
+                            } else {
+                                println!(
+                                    "[{}] ✓ Updated squad {} ({} members, readiness: {:.2})",
+                                    node_id,
+                                    squad_id,
+                                    squad_summary.member_count,
+                                    squad_summary.readiness_score
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("[{}] Failed to check squad summary: {}", node_id, e);
+                        }
                     }
+
+                    // Log squad summary metrics
+                    log_metrics(&MetricsEvent::SquadSummaryCreated {
+                        node_id: node_id.clone(),
+                        squad_id: squad_id.clone(),
+                        member_count: squad_summary.member_count as usize,
+                        readiness_score: squad_summary.readiness_score as f64,
+                        timestamp_us,
+                    });
                 }
                 Err(e) => {
                     eprintln!("[{}] Failed to aggregate squad: {}", node_id, e);
@@ -294,34 +320,73 @@ async fn platoon_leader_aggregation_loop(
                     squad_summaries,
                 ) {
                     Ok(platoon_summary) => {
-                        // Publish to platoon_summaries collection via coordinator
-                        #[allow(deprecated)]
-                        if let Err(e) = coordinator_clone
-                            .upsert_platoon_summary(&platoon_id_clone, &platoon_summary)
+                        // Check if platoon summary document exists (create-once pattern)
+                        match coordinator_clone
+                            .get_platoon_summary(&platoon_id_clone)
                             .await
                         {
-                            eprintln!(
-                                "[{}] Failed to upsert platoon summary: {}",
-                                node_id_clone, e
-                            );
-                        } else {
-                            println!(
-                                "[{}] ✓ Aggregated platoon {} ({} squads, {} total members)",
-                                node_id_clone,
-                                platoon_id_clone,
-                                platoon_summary.squad_count,
-                                platoon_summary.total_member_count
-                            );
+                            Ok(None) => {
+                                // First time - create document
+                                if let Err(e) = coordinator_clone
+                                    .create_platoon_summary(&platoon_id_clone, &platoon_summary)
+                                    .await
+                                {
+                                    eprintln!(
+                                        "[{}] Failed to create platoon summary: {}",
+                                        node_id_clone, e
+                                    );
+                                } else {
+                                    println!(
+                                        "[{}] ✓ Created platoon {} ({} squads, {} total members)",
+                                        node_id_clone,
+                                        platoon_id_clone,
+                                        platoon_summary.squad_count,
+                                        platoon_summary.total_member_count
+                                    );
+                                }
+                            }
+                            Ok(Some(_existing)) => {
+                                // Document exists - send delta update
+                                use hive_protocol::hierarchy::deltas::PlatoonDelta;
+                                let delta = PlatoonDelta::from_summary(
+                                    &platoon_summary,
+                                    timestamp_us as u64,
+                                );
 
-                            // Log platoon summary creation metrics
-                            log_metrics(&MetricsEvent::PlatoonSummaryCreated {
-                                node_id: node_id_clone.clone(),
-                                platoon_id: platoon_id_clone.clone(),
-                                squad_count: platoon_summary.squad_count as usize,
-                                total_member_count: platoon_summary.total_member_count as usize,
-                                timestamp_us,
-                            });
+                                if let Err(e) = coordinator_clone
+                                    .update_platoon_summary(&platoon_id_clone, delta)
+                                    .await
+                                {
+                                    eprintln!(
+                                        "[{}] Failed to update platoon summary: {}",
+                                        node_id_clone, e
+                                    );
+                                } else {
+                                    println!(
+                                        "[{}] ✓ Updated platoon {} ({} squads, {} total members)",
+                                        node_id_clone,
+                                        platoon_id_clone,
+                                        platoon_summary.squad_count,
+                                        platoon_summary.total_member_count
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!(
+                                    "[{}] Failed to check platoon summary: {}",
+                                    node_id_clone, e
+                                );
+                            }
                         }
+
+                        // Log platoon summary metrics
+                        log_metrics(&MetricsEvent::PlatoonSummaryCreated {
+                            node_id: node_id_clone.clone(),
+                            platoon_id: platoon_id_clone.clone(),
+                            squad_count: platoon_summary.squad_count as usize,
+                            total_member_count: platoon_summary.total_member_count as usize,
+                            timestamp_us,
+                        });
                     }
                     Err(e) => {
                         eprintln!("[{}] Failed to aggregate platoon: {}", node_id_clone, e);

@@ -527,6 +527,192 @@ pub fn current_timestamp_us() -> u64 {
         .as_micros() as u64
 }
 
+// ============================================================================
+// Delta Generation Helpers
+// ============================================================================
+
+use hive_schema::hierarchy::v1::{CompanySummary, PlatoonSummary, SquadSummary};
+
+impl SquadDelta {
+    /// Create a delta from a SquadSummary
+    ///
+    /// Generates field updates representing the complete state of the summary.
+    /// This is used for both:
+    /// - Initial creation (all fields as updates)
+    /// - Subsequent updates (Ditto will only propagate changed fields)
+    ///
+    /// The bandwidth savings come from Ditto's CRDT delta propagation, which only
+    /// sends changed fields across the network even if we send all field updates.
+    #[allow(clippy::vec_init_then_push, clippy::clone_on_copy)]
+    pub fn from_summary(summary: &SquadSummary, sequence: u64) -> Self {
+        let mut updates = Vec::new();
+
+        // Scalar fields (LWW semantics)
+        updates.push(SquadFieldUpdate::SetLeaderId(summary.leader_id.clone()));
+        updates.push(SquadFieldUpdate::SetMemberCount(summary.member_count));
+        updates.push(SquadFieldUpdate::SetOperationalCount(
+            summary.operational_count,
+        ));
+        updates.push(SquadFieldUpdate::SetAvgFuelMinutes(
+            summary.avg_fuel_minutes,
+        ));
+        updates.push(SquadFieldUpdate::SetWorstHealth(summary.worst_health));
+        updates.push(SquadFieldUpdate::SetReadinessScore(summary.readiness_score));
+
+        // Position centroid
+        if let Some(pos) = &summary.position_centroid {
+            updates.push(SquadFieldUpdate::UpdatePositionCentroid(pos.clone()));
+        }
+
+        // Member IDs (OR-Set semantics - send current set)
+        for member_id in &summary.member_ids {
+            updates.push(SquadFieldUpdate::AddMemberId(member_id.clone()));
+        }
+
+        // Aggregated capabilities
+        for capability in &summary.aggregated_capabilities {
+            updates.push(SquadFieldUpdate::AddCapability(capability.clone()));
+        }
+
+        // Bounding box
+        if let Some(bbox) = &summary.bounding_box {
+            updates.push(SquadFieldUpdate::UpdateBoundingBox(bbox.clone()));
+        }
+
+        // Aggregated timestamp
+        if let Some(ts) = &summary.aggregated_at {
+            updates.push(SquadFieldUpdate::UpdateAggregatedAt(ts.clone()));
+        }
+
+        Self {
+            squad_id: summary.squad_id.clone(),
+            timestamp_us: current_timestamp_us(),
+            sequence,
+            updates,
+        }
+    }
+}
+
+impl PlatoonDelta {
+    /// Create a delta from a PlatoonSummary
+    ///
+    /// Similar to SquadDelta::from_summary, generates field updates representing
+    /// the complete state. Ditto handles delta compression during CRDT sync.
+    #[allow(clippy::vec_init_then_push, clippy::clone_on_copy)]
+    pub fn from_summary(summary: &PlatoonSummary, sequence: u64) -> Self {
+        let mut updates = Vec::new();
+
+        // Scalar fields
+        updates.push(PlatoonFieldUpdate::SetLeaderId(summary.leader_id.clone()));
+        updates.push(PlatoonFieldUpdate::SetSquadCount(summary.squad_count));
+        updates.push(PlatoonFieldUpdate::SetTotalMemberCount(
+            summary.total_member_count,
+        ));
+        updates.push(PlatoonFieldUpdate::SetOperationalCount(
+            summary.operational_count,
+        ));
+        updates.push(PlatoonFieldUpdate::SetAvgFuelMinutes(
+            summary.avg_fuel_minutes,
+        ));
+        updates.push(PlatoonFieldUpdate::SetWorstHealth(summary.worst_health));
+        updates.push(PlatoonFieldUpdate::SetReadinessScore(
+            summary.readiness_score,
+        ));
+
+        // Position centroid
+        if let Some(pos) = &summary.position_centroid {
+            updates.push(PlatoonFieldUpdate::UpdatePositionCentroid(pos.clone()));
+        }
+
+        // Squad IDs
+        for squad_id in &summary.squad_ids {
+            updates.push(PlatoonFieldUpdate::AddSquadId(squad_id.clone()));
+        }
+
+        // Aggregated capabilities
+        for capability in &summary.aggregated_capabilities {
+            updates.push(PlatoonFieldUpdate::AddCapability(capability.clone()));
+        }
+
+        // Bounding box
+        if let Some(bbox) = &summary.bounding_box {
+            updates.push(PlatoonFieldUpdate::UpdateBoundingBox(bbox.clone()));
+        }
+
+        // Aggregated timestamp
+        if let Some(ts) = &summary.aggregated_at {
+            updates.push(PlatoonFieldUpdate::UpdateAggregatedAt(ts.clone()));
+        }
+
+        Self {
+            platoon_id: summary.platoon_id.clone(),
+            timestamp_us: current_timestamp_us(),
+            sequence,
+            updates,
+        }
+    }
+}
+
+impl CompanyDelta {
+    /// Create a delta from a CompanySummary
+    ///
+    /// Similar to Squad/Platoon delta generation, represents complete state
+    /// while relying on Ditto's CRDT delta compression for bandwidth efficiency.
+    #[allow(clippy::vec_init_then_push, clippy::clone_on_copy)]
+    pub fn from_summary(summary: &CompanySummary, sequence: u64) -> Self {
+        let mut updates = Vec::new();
+
+        // Scalar fields
+        updates.push(CompanyFieldUpdate::SetLeaderId(summary.leader_id.clone()));
+        updates.push(CompanyFieldUpdate::SetPlatoonCount(summary.platoon_count));
+        updates.push(CompanyFieldUpdate::SetTotalMemberCount(
+            summary.total_member_count,
+        ));
+        updates.push(CompanyFieldUpdate::SetOperationalCount(
+            summary.operational_count,
+        ));
+        updates.push(CompanyFieldUpdate::SetAvgFuelMinutes(
+            summary.avg_fuel_minutes,
+        ));
+        updates.push(CompanyFieldUpdate::SetWorstHealth(summary.worst_health));
+        updates.push(CompanyFieldUpdate::SetReadinessScore(
+            summary.readiness_score,
+        ));
+
+        // Position centroid
+        if let Some(pos) = &summary.position_centroid {
+            updates.push(CompanyFieldUpdate::UpdatePositionCentroid(pos.clone()));
+        }
+
+        // Platoon IDs
+        for platoon_id in &summary.platoon_ids {
+            updates.push(CompanyFieldUpdate::AddPlatoonId(platoon_id.clone()));
+        }
+
+        // Aggregated capabilities
+        for capability in &summary.aggregated_capabilities {
+            updates.push(CompanyFieldUpdate::AddCapability(capability.clone()));
+        }
+
+        // Bounding box
+        if let Some(bbox) = &summary.bounding_box {
+            updates.push(CompanyFieldUpdate::UpdateBoundingBox(bbox.clone()));
+        }
+
+        // Aggregated timestamp
+        if let Some(ts) = &summary.aggregated_at {
+            updates.push(CompanyFieldUpdate::UpdateAggregatedAt(ts.clone()));
+        }
+
+        Self {
+            company_id: summary.company_id.clone(),
+            timestamp_us: current_timestamp_us(),
+            sequence,
+            updates,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
