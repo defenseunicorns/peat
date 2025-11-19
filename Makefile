@@ -94,7 +94,7 @@ test-e2e: clean-ditto
 		echo "⚠️  Warning: .env file not found. Ditto tests may be skipped."; \
 		echo "   Create .env with DITTO_APP_ID, DITTO_OFFLINE_TOKEN, DITTO_SHARED_KEY"; \
 	fi
-	cd hive-protocol && export $$(grep -v '^#' ../.env | xargs) && cargo test --test squad_formation_e2e -- --nocapture
+	cd hive-protocol && export $$(grep -v '^#' ../.env | xargs) && cargo test --test squad_formation_e2e -- --test-threads=1 --nocapture
 
 # Format all code
 fmt:
