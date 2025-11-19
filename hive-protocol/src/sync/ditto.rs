@@ -840,6 +840,7 @@ mod tests {
         sync2.start_sync().await.expect("Failed to start sync2");
 
         // Create subscriptions via trait
+        // IMPORTANT: Keep subscription handles alive to maintain Ditto sync
         println!("Creating subscriptions via trait...");
         let _sub1 = sync1
             .subscribe("trait_sync_test", &Query::All)
@@ -849,6 +850,10 @@ mod tests {
             .subscribe("trait_sync_test", &Query::All)
             .await
             .expect("Failed to create subscription on backend2");
+
+        // Prevent subscription handles from being optimized away
+        // They must stay alive until shutdown for Ditto sync to work
+        let _ = (&_sub1, &_sub2);
 
         // Wait for peer connection
         println!("Waiting for peer connection...");
