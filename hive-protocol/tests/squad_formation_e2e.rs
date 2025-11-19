@@ -32,15 +32,15 @@ use std::sync::Arc;
 use std::time::Duration;
 
 /// Returns the number of sync attempts based on environment.
-/// CI environments need more time due to resource contention and network latency.
+/// CI environments and concurrent test execution need more time due to resource contention and network latency.
 ///
-/// - Local: 20 attempts × 500ms = 10 seconds
+/// - Local: 40 attempts × 500ms = 20 seconds (increased to handle concurrent test execution)
 /// - CI: 60 attempts × 500ms = 30 seconds
 fn sync_timeout_attempts() -> usize {
     if std::env::var("CI").is_ok() {
         60 // 30 seconds for CI
     } else {
-        20 // 10 seconds for local
+        40 // 20 seconds for local (increased for concurrent test stability)
     }
 }
 
@@ -484,13 +484,17 @@ async fn test_e2e_role_assignment_sync() {
 
     println!("=== E2E: Role Assignment Sync ===");
 
+    // Allocate random TCP port to avoid conflicts with concurrent tests
+    let tcp_port = E2EHarness::allocate_tcp_port().expect("Failed to allocate TCP port");
+    println!("  Using TCP port: {}", tcp_port);
+
     // Create two peers with explicit TCP connections (mDNS unreliable in 4.11.5)
     let store1 = harness
-        .create_ditto_store_with_tcp(Some(12349), None)
+        .create_ditto_store_with_tcp(Some(tcp_port), None)
         .await
         .unwrap();
     let store2 = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12349".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
         .await
         .unwrap();
 
@@ -1018,17 +1022,21 @@ async fn test_e2e_complete_formation_convergence() {
 
     println!("=== E2E: Complete Formation Convergence ===");
 
+    // Allocate random TCP port to avoid conflicts with concurrent tests
+    let tcp_port = E2EHarness::allocate_tcp_port().expect("Failed to allocate TCP port");
+    println!("  Using TCP port: {}", tcp_port);
+
     // Create three peers with explicit TCP (star topology: store1 is hub)
     let store1 = harness
-        .create_ditto_store_with_tcp(Some(12352), None)
+        .create_ditto_store_with_tcp(Some(tcp_port), None)
         .await
         .unwrap();
     let store2 = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12352".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
         .await
         .unwrap();
     let store3 = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12352".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
         .await
         .unwrap();
 
