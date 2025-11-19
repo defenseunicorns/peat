@@ -120,6 +120,10 @@ pub struct AutomergeBackend {
     incoming_handler_task: Arc<RwLock<Option<JoinHandle<()>>>>,
     /// Automatic sync task handle (Phase 6.3)
     auto_sync_task: Arc<RwLock<Option<JoinHandle<()>>>>,
+    /// Heartbeat sender task handle (Phase 6.4)
+    heartbeat_task: Arc<RwLock<Option<JoinHandle<()>>>>,
+    /// Heartbeat receiver task handle (Phase 6.4)
+    heartbeat_receiver_task: Arc<RwLock<Option<JoinHandle<()>>>>,
 }
 
 #[cfg(feature = "automerge-backend")]
@@ -153,6 +157,8 @@ impl AutomergeBackend {
             bytes_received: Arc::new(AtomicU64::new(0)),
             incoming_handler_task: Arc::new(RwLock::new(None)),
             auto_sync_task: Arc::new(RwLock::new(None)),
+            heartbeat_task: Arc::new(RwLock::new(None)),
+            heartbeat_receiver_task: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -190,6 +196,8 @@ impl AutomergeBackend {
             bytes_received: Arc::new(AtomicU64::new(0)),
             incoming_handler_task: Arc::new(RwLock::new(None)),
             auto_sync_task: Arc::new(RwLock::new(None)),
+            heartbeat_task: Arc::new(RwLock::new(None)),
+            heartbeat_receiver_task: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -427,6 +435,46 @@ impl SyncCapable for AutomergeBackend {
 
         *self.incoming_handler_task.write().unwrap() = Some(task);
 
+        // Phase 6.4: Spawn incoming heartbeat handler task
+        //
+        // Accept incoming heartbeat messages on unidirectional streams
+        let transport_heartbeat_rx = self.transport.clone().unwrap();
+        let coordinator_heartbeat_rx = self.sync_coordinator.clone().unwrap();
+        let sync_active_heartbeat_rx = Arc::clone(&self.sync_active);
+
+        let heartbeat_rx_task = tokio::spawn(async move {
+            while sync_active_heartbeat_rx.load(Ordering::Relaxed) {
+                // Get all connected peers
+                let peer_ids = transport_heartbeat_rx.connected_peers();
+
+                for peer_id in peer_ids {
+                    // Get connection for this peer
+                    if let Some(conn) = transport_heartbeat_rx.get_connection(&peer_id) {
+                        // Clone for the async block
+                        let coordinator_clone = Arc::clone(&coordinator_heartbeat_rx);
+                        let conn_clone = conn.clone();
+
+                        // Spawn a task to accept incoming heartbeat streams on this connection
+                        tokio::spawn(async move {
+                            if let Err(e) = coordinator_clone
+                                .handle_incoming_heartbeat(conn_clone)
+                                .await
+                            {
+                                tracing::trace!("Error handling incoming heartbeat: {}", e);
+                            }
+                        });
+                    }
+                }
+
+                // Small delay to avoid busy loop
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            }
+
+            tracing::debug!("Incoming heartbeat handler stopped");
+        });
+
+        *self.heartbeat_receiver_task.write().unwrap() = Some(heartbeat_rx_task);
+
         // Phase 6.3: Spawn automatic sync task for outgoing sync
         //
         // Subscribe to document change notifications and automatically sync
@@ -469,6 +517,42 @@ impl SyncCapable for AutomergeBackend {
         } else {
             tracing::warn!("Could not subscribe to store changes - automatic sync disabled");
         }
+
+        // Phase 6.4: Spawn heartbeat task for partition detection
+        //
+        // Periodically send heartbeats to all connected peers to detect partitions
+        let coordinator_heartbeat = self.sync_coordinator.clone().unwrap();
+        let sync_active_heartbeat = Arc::clone(&self.sync_active);
+
+        let heartbeat_task = tokio::spawn(async move {
+            tracing::debug!("Heartbeat task started");
+
+            // Get heartbeat interval from partition detector config
+            let heartbeat_interval = coordinator_heartbeat
+                .partition_detector()
+                .config()
+                .heartbeat_interval;
+
+            while sync_active_heartbeat.load(Ordering::Relaxed) {
+                // Send heartbeats to all connected peers
+                if let Err(e) = coordinator_heartbeat.send_heartbeats_to_all_peers().await {
+                    tracing::debug!("Error sending heartbeats: {}", e);
+                }
+
+                // Check for partition timeouts
+                let partitioned_peers = coordinator_heartbeat.check_partition_timeouts();
+                if !partitioned_peers.is_empty() {
+                    tracing::warn!("Detected {} partitioned peers", partitioned_peers.len());
+                }
+
+                // Sleep until next heartbeat interval
+                tokio::time::sleep(heartbeat_interval).await;
+            }
+
+            tracing::debug!("Heartbeat task stopped");
+        });
+
+        *self.heartbeat_task.write().unwrap() = Some(heartbeat_task);
 
         Ok(())
     }

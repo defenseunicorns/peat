@@ -1,7 +1,7 @@
 # Automerge+Iroh Backend Implementation Progress
 
-**Status**: Phase 6.1 Complete - P2P Connections Working
-**Last Updated**: 2025-11-15
+**Status**: Phase 7.1 Complete - Partition Lifecycle Metrics ✅
+**Last Updated**: 2025-11-18
 
 ## Overview
 
@@ -12,17 +12,17 @@ The AutomergeIrohBackend provides an open-source alternative to DittoBackend usi
 
 ## Implementation Phases
 
-### ✅ Phase 1-2: Storage Layer (Previous Session)
+### ✅ Phase 1-2: Storage Layer
 - AutomergeStore with RocksDB persistence
 - CRDT integration with Automerge
 - 13 tests passing
 
-### ✅ Phase 5: SyncCapable Trait (Previous Session)
+### ✅ Phase 5: SyncCapable Trait
 - Lifecycle management (start_sync, stop_sync, sync_stats)
 - Atomic state tracking
 - 4 new tests passing
 
-### ✅ Phase 6.1: Static Peer Configuration (Current Session)
+### ✅ Phase 6.1: Static Peer Configuration
 
 #### Phase 6.1a: TOML Configuration
 **Files Created:**
@@ -127,57 +127,246 @@ pub fn is_accept_loop_running(&self) -> bool
 - ⏳ test_concurrent_updates_merge (connection works, sync TODO)
 - ⏳ test_sync_stats_tracking (connection works, metrics TODO)
 
+###  ✅ Phase 6.2: Document Sync Over Iroh (COMPLETE)
+
+**Status**: ✅ All E2E tests passing (5/5)
+
+#### Implementation Details
+
+**Background Sync Task** (automerge_backend.rs:434-459):
+- Subscribes to document change notifications via `AutomergeStore.subscribe_to_changes()`
+- Automatically syncs changed documents with all connected peers
+- Runs in background tokio task while `sync_active` is true
+
+**Incoming Sync Handler** (automerge_backend.rs:399-428):
+- Spawned by `start_sync()` to handle incoming sync requests
+- Polls connected peers for incoming streams
+- Calls `AutomergeSyncCoordinator.handle_incoming_sync()`  for each stream
+- Applies remote changes to local documents
+
+**Sync Coordinator** (automerge_sync.rs):
+- `initiate_sync()` - Generate and send initial sync message
+- `receive_sync_message()` - Apply incoming changes, generate response
+- `sync_document_with_all_peers()` - Broadcast sync to all connected peers
+- Wire format: `[2 bytes: doc_key_len][doc_key][4 bytes: msg_len][sync_message]`
+
+**Metrics Tracking**:
+- `total_bytes_sent` / `total_bytes_received` (AtomicU64)
+- Per-peer statistics (bytes, sync count, last sync timestamp)
+- Tracked in AutomergeSyncCoordinator
+
+#### E2E Test Results
+
+All tests passing in 2.69s:
+
+1. ✅ **test_two_nodes_connect** (0.43s)
+   - P2P connection establishment
+   - Peer discovery via static config
+
+2. ✅ **test_document_sync_two_nodes** (0.43s)
+   - Automatic document synchronization
+   - Document created on Node 1 syncs to Node 2
+
+3. ✅ **test_bidirectional_sync** (passing)
+   - Documents created on both nodes
+   - Bidirectional sync verified
+
+4. ✅ **test_concurrent_updates_merge** (passing)
+   - Concurrent updates to same document
+   - CRDT merge semantics verified (fuel=100, health=2)
+
+5. ✅ **test_sync_stats_tracking** (passing)
+   - Peer count tracking
+   - Metrics collection verified
+
+#### Key Features Working
+
+1. **Automatic Sync**: Document changes trigger sync automatically
+2. **Bidirectional**: Changes propagate in both directions
+3. **CRDT Merging**: Concurrent updates merge correctly
+4. **Error Handling**: Circuit breaker and retry logic active
+5. **Metrics**: Bytes sent/received tracked per peer
+
+### ✅ Phase 6.3: Partition Detection Infrastructure (COMPLETE)
+
+**Status**: ✅ Foundation complete, heartbeat exchange pending
+
+#### Implementation Details
+
+**Partition Detection Module** (partition_detection.rs, 350 lines):
+- `PeerPartitionState` - State machine: Connected/Partitioned/Recovering
+- `PeerHeartbeat` - Per-peer heartbeat tracking with timestamps
+- `PartitionDetector` - Coordinator for managing all peers
+- `PartitionConfig` - Configurable timeouts (default: 5s interval, 15s timeout, 3 failures)
+
+**Integration with AutomergeSyncCoordinator** (automerge_sync.rs:111):
+- Added `partition_detector: Arc<PartitionDetector>` field
+- Public accessor: `partition_detector()` method
+- Ready for heartbeat exchange implementation
+
+#### Conceptual Clarity
+
+**Key Insight**: Automerge CRDTs handle "recovery" automatically via eventual consistency.
+**What we implemented**: Operational mechanisms for partition handling:
+- **Detection**: Heartbeat mechanism to identify unreachable peers
+- **State Tracking**: Monitor partition lifecycle (Connected → Partitioned → Recovering → Connected)
+- **Observability**: Foundation for metrics/events
+
+The CRDT provides **correctness guarantees** (no data loss, automatic merge).
+This module provides **operational mechanisms** (detection, efficiency, observability).
+
+#### Unit Tests
+
+All 5 tests passing ✅:
+- `test_peer_heartbeat_success_resets_failures`
+- `test_peer_heartbeat_partition_detection`
+- `test_peer_heartbeat_recovery`
+- `test_partition_config_defaults`
+- `test_partition_detector_creation`
+
+### ✅ Phase 6.4: Heartbeat Exchange (COMPLETE)
+
+**Status**: ✅ Active heartbeat messaging implemented
+
+#### Implementation Details
+
+**Heartbeat Wire Protocol** (automerge_sync.rs:514-629):
+- Wire format: `[1 byte: 0x01 marker][8 bytes: timestamp (u64, big-endian)]`
+- Uses unidirectional Iroh streams (heartbeats don't need responses)
+- Minimal 9-byte message per heartbeat
+
+**Heartbeat Sender** (automerge_backend.rs:483-511):
+- Background task sends periodic heartbeats to all connected peers
+- Interval configured by `PartitionConfig` (default: 5s)
+- Automatically registers peers with partition detector
+- Records failures and triggers partition detection
+
+**Heartbeat Receiver** (automerge_backend.rs:441-474):
+- Background task accepts incoming heartbeat streams
+- Validates heartbeat marker (0x01)
+- Records heartbeat success in partition detector
+- Updates peer partition state
+
+**Partition Detection Integration**:
+- Successful heartbeats → `partition_detector.record_heartbeat_success()`
+- Failed heartbeats → `partition_detector.record_heartbeat_failure()`
+- Timeout checks → `partition_detector.check_timeouts()`
+- State transitions: Connected → Partitioned → Recovering → Connected
+
+**Background Tasks** (3 tasks per node):
+1. Heartbeat sender: Sends periodic heartbeats (5s interval)
+2. Heartbeat receiver: Accepts incoming heartbeat streams
+3. Timeout checker: Detects partitions based on elapsed time
+
+#### Verified Behavior
+
+- ✅ E2E tests still passing (5/5 in 2.83s)
+- ✅ Heartbeat tasks spawn/stop with sync lifecycle
+- ✅ No performance regression from Phase 6.3
+
+#### Next Steps (Phase 7)
+
+1. ~~**Partition Lifecycle Metrics**: Emit events for partition detection/heal~~ (✅ Completed in Phase 7.1)
+2. **ContainerLab E2E Testing**: Simulate network partitions with tc/netem
+3. **mDNS Discovery**: Zero-config peer discovery (Phase 7)
+
+### ✅ Phase 7.1: Partition Lifecycle Metrics (COMPLETE)
+
+**Status**: ✅ Events and tracing integration complete
+
+#### Implementation Details
+
+**Partition Lifecycle Events** (partition_detection.rs:29-52):
+- `PartitionEvent` enum with 5 event types:
+  - `PartitionDetected`: Partition detected via heartbeat failures or timeout
+  - `PartitionHealed`: Peer started recovering after partition
+  - `PeerRecovered`: Peer fully recovered and returned to Connected state
+  - `HeartbeatSuccess`: Heartbeat success recorded
+  - `HeartbeatFailure`: Heartbeat failure recorded (before partition threshold)
+
+**Tracing Integration** (partition_detection.rs):
+- `info!` logs for partition heal and peer recovery events
+- `warn!` logs for partition detection (both failure-based and timeout-based)
+- `debug!` logs for heartbeat successes and failures
+- All logs include relevant context (peer_id, consecutive_failures, partition_duration, etc.)
+
+**Event Emission** (partition_detection.rs:95-180):
+- `PeerHeartbeat::record_success()` → Returns `Option<PartitionEvent>`
+- `PeerHeartbeat::record_failure()` → Returns `Option<PartitionEvent>`
+- `PartitionDetector::record_heartbeat_success()` → Propagates events
+- `PartitionDetector::record_heartbeat_failure()` → Propagates events
+- `PartitionDetector::check_timeouts()` → Returns `Vec<PartitionEvent>`
+
+**Integration with Sync** (automerge_sync.rs):
+- Heartbeat sender records failures and emits events
+- Timeout checker returns events for newly detected partitions
+- Events available to callers via `check_partition_timeouts()`
+
+#### Unit Tests
+
+All 5 partition_detection tests passing ✅:
+- `test_peer_heartbeat_success_resets_failures`
+- `test_peer_heartbeat_partition_detection` - Verifies event emission
+- `test_peer_heartbeat_recovery` - Verifies state transitions and events
+- `test_partition_config_defaults`
+- `test_partition_detector_creation`
+
+#### E2E Test Results
+
+All 5 Automerge+Iroh E2E tests passing (2.84s) ✅:
+- No performance regression
+- Partition detection infrastructure working alongside existing sync
+
+#### Key Features
+
+1. **Observable Partition Lifecycle**: All state transitions emit structured events
+2. **Structured Logging**: Tracing integration for operational visibility
+3. **Event-Driven API**: Callers can subscribe to partition events for metrics/alerting
+4. **No Breaking Changes**: Existing code continues to work
+
 ## Current Capabilities
 
-### ✅ Working
+### ✅ Working (Complete as of Phase 7.1)
 1. **Static Mesh Configuration**: TOML-based peer lists
 2. **Direct Addressing**: Localhost P2P without relay
-3. **Connection Establishment**: Sub-second connection times
+3. **Connection Establishment**: Sub-second connection times (~0.4s)
 4. **Accept Loop**: Background task receives incoming connections
 5. **Connection Management**: Track peers, disconnect, peer count
+6. **Document Sync**: ✅ Changes propagate automatically between nodes
+7. **Background Sync Task**: ✅ Automatic sync on document changes
+8. **Automerge Sync Protocol**: ✅ Sync messages over QUIC streams
+9. **Incoming Sync Handler**: ✅ Receives and applies remote changes
+10. **Metrics Tracking**: ✅ bytes_sent/bytes_received updated
+11. **Partition Detection Infrastructure**: ✅ Heartbeat mechanism with state tracking (Phase 6.3)
+12. **Active Heartbeat Exchange**: ✅ Periodic heartbeat messages over Iroh streams (Phase 6.4)
+13. **Partition Lifecycle Events**: ✅ Structured events for partition detect/heal/recovery (Phase 7.1)
+14. **Tracing Integration**: ✅ Structured logging for partition lifecycle (Phase 7.1)
 
-### ❌ Not Yet Implemented
-1. **Document Sync**: Changes don't propagate between nodes
-2. **Background Sync Task**: No automatic sync on document changes
-3. **CRDC Sync Protocol**: No Automerge sync messages over QUIC
-4. **Incoming Sync Handler**: Can't receive/apply remote changes
-5. **Metrics Tracking**: bytes_sent/bytes_received not updated
+### 🔄 Optimizations Pending (Future)
+1. **ContainerLab Testing**: Network partition simulation with tc/netem (Phase 7.2)
+2. **Flow Control**: Backpressure for large documents
+3. **mDNS Discovery**: Zero-config peer discovery (Phase 7.3)
+4. **Relay Support**: Cross-network sync via Iroh relay (Phase 7.4)
 
-## Next Steps: Phase 6.2
+## Next Steps: Phase 7 (Discovery & Relay)
 
-### 1. Update AutomergeBackend.start_sync()
-```rust
-fn start_sync(&self) -> Result<()> {
-    // Start accept loop
-    if let Some(transport) = &self.transport {
-        transport.start_accept_loop()?;
-    }
+### Planned Enhancements
 
-    // Spawn background sync task (NEW)
-    // TODO: Implement
+1. **mDNS Discovery**
+   - Zero-config peer discovery on local networks
+   - Automatic peer announcement and discovery
+   - Integration with existing static config
 
-    Ok(())
-}
-```
+2. **Iroh Relay Support**
+   - Cross-network sync via Iroh relay servers
+   - NAT traversal for WAN deployments
+   - Fallback to relay when direct connection fails
 
-### 2. Implement Background Sync Task
-- Detect document changes (polling or watch API)
-- For each connected peer:
-  - Generate Automerge sync message
-  - Send over QUIC stream
-  - Track bytes sent
-
-### 3. Implement Incoming Sync Handler
-- Accept incoming QUIC streams
-- Receive Automerge sync messages
-- Apply changes to local documents
-- Track bytes received
-
-### 4. Verify E2E Tests Pass
-- test_document_sync_two_nodes
-- test_bidirectional_sync
-- test_concurrent_updates_merge
-- test_sync_stats_tracking
+3. **Optimizations**
+   - Flow control and backpressure for large documents
+   - Partition detection and recovery
+   - Delta sync optimization
+   - Watch API for change detection (reduce polling overhead)
 
 ## Key Decisions
 
@@ -203,14 +392,21 @@ fn start_sync(&self) -> Result<()> {
 
 ## Performance
 
-### Connection Times
-- First connection: ~0.6s
-- Minimal test: 2.58s total (2 nodes, connection, verification)
-- Previous (no accept): 30s timeout ❌
+### E2E Test Suite (Phase 6.2)
+- All 5 E2E tests: 2.69s total ✅
+- Single test: ~0.4-0.5s average
+- P2P connection: ~0.4s
+- Document sync: <100ms after connection
 
-### Test Suite
-- All automerge-backend tests: <10s
-- Pre-commit checks: ~8s (fmt + clippy + tests)
+### Comparison
+- **Phase 6.1** (connections only): 2.58s
+- **Phase 6.2** (with sync): 2.69s (+110ms overhead for sync)
+- **Previous** (no accept loop): 30s timeout ❌
+
+### Test Suite Coverage
+- Unit tests: 13 (automerge_store.rs)
+- Integration tests: 5 (automerge_iroh_sync_e2e.rs)
+- Pre-commit checks: ~10s (fmt + clippy + all tests)
 
 ## Dependencies
 
