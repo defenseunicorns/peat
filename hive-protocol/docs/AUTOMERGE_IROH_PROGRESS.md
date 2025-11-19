@@ -342,6 +342,13 @@ All 5 Automerge+Iroh E2E tests passing (2.84s) ✅:
 13. **Partition Lifecycle Events**: ✅ Structured events for partition detect/heal/recovery (Phase 7.1)
 14. **Tracing Integration**: ✅ Structured logging for partition lifecycle (Phase 7.1)
 
+### ✅ hive-sim Backend Support (2025-11-19)
+15. **hive-sim Integration**: ✅ Simulator now supports both backends via --backend flag
+    - Backend selection: `--backend ditto` or `--backend automerge`
+    - Feature flag: `--features automerge-backend` for build
+    - Enables A/B testing and performance comparison
+    - See hive-sim/README.md for usage details
+
 ### 🔄 Optimizations Pending (Future)
 1. **ContainerLab Testing**: Network partition simulation with tc/netem (Phase 7.2)
 2. **Flow Control**: Backpressure for large documents

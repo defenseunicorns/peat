@@ -2612,6 +2612,41 @@ let endpoint = Endpoint::builder()
 
 ---
 
-**Last Updated**: 2025-11-06  
-**Next Review**: After Phase 1 completion (Week 4)  
-**Decision Status**: Pending team review and approval
+**Last Updated**: 2025-11-19
+**Next Review**: After Phase 7 completion (mDNS Discovery)
+**Decision Status**: ✅ **ADOPTED** - Implementation in progress
+
+## Implementation Status
+
+### Milestone Updates
+
+**2025-11-19: hive-sim Backend Abstraction Complete** ✅
+
+Added pluggable backend support to hive-sim network simulator:
+
+**Changes Made**:
+- Added `--backend` CLI flag for backend selection (`ditto` or `automerge`)
+- Updated `hive-sim/src/main.rs` with backend-agnostic initialization (main.rs:1281-1349)
+- Exposed `automerge-backend` feature flag in `hive-sim/Cargo.toml`
+- Documentation updated in `hive-sim/README.md` with backend comparison table and usage guide
+
+**Usage**:
+```bash
+# Ditto backend (default - requires credentials)
+docker build -f hive-sim/Dockerfile -t hive-sim-node:latest .
+hive-sim --backend ditto --node-id node1
+
+# Automerge+Iroh backend (open source - no credentials)
+docker build -f hive-sim/Dockerfile \
+  --build-arg FEATURES="automerge-backend" \
+  -t hive-sim-node:automerge .
+hive-sim --backend automerge --node-id node1
+```
+
+**Impact**:
+- ✅ Enables A/B testing: Compare Ditto vs Automerge+Iroh performance side-by-side
+- ✅ Validates backend abstraction: Proves `DataSyncBackend` trait works across implementations
+- ✅ Accelerates evaluation: Can benchmark open-source stack in production-like scenarios
+- ✅ De-risks migration: Parallel deployment path reduces switching costs
+
+This completes the simulator infrastructure needed for comprehensive backend evaluation and large-scale experimentation.
