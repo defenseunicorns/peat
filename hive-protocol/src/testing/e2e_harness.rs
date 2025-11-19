@@ -57,6 +57,23 @@ impl E2EHarness {
         }
     }
 
+    /// Allocate a random available TCP port
+    ///
+    /// This prevents port conflicts when running multiple tests concurrently.
+    /// Uses OS-assigned ephemeral ports by binding to port 0 and retrieving the assigned port.
+    pub fn allocate_tcp_port() -> std::io::Result<u16> {
+        use std::net::{SocketAddr, TcpListener};
+
+        // Bind to port 0 to get an OS-assigned ephemeral port
+        let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0)))?;
+        let port = listener.local_addr()?.port();
+
+        // Drop the listener to free the port
+        drop(listener);
+
+        Ok(port)
+    }
+
     /// Create a new isolated Ditto store for testing
     ///
     /// Each store gets:
