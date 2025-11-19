@@ -62,6 +62,8 @@
 //! 0: Success (document synced, all operations completed)
 //! 1: Failure (timeout, error, or document not received)
 
+#[cfg(feature = "automerge-backend")]
+use hive_protocol::sync::automerge::AutomergeBackend;
 use hive_protocol::sync::ditto::DittoBackend;
 use hive_protocol::sync::{
     BackendConfig, ChangeEvent, ChangeStream, DataSyncBackend, Document, Query, TransportConfig,
@@ -1281,7 +1283,18 @@ fn create_backend(
 ) -> Result<Box<dyn DataSyncBackend>, Box<dyn std::error::Error>> {
     match backend_type {
         "ditto" => Ok(Box::new(DittoBackend::new())),
-        _ => Err(format!("Unknown backend type: {}", backend_type).into()),
+        #[cfg(feature = "automerge-backend")]
+        "automerge" => Ok(Box::new(AutomergeBackend::new())),
+        _ => Err(format!(
+            "Unknown backend type: {}. Available: ditto{}",
+            backend_type,
+            if cfg!(feature = "automerge-backend") {
+                ", automerge"
+            } else {
+                ""
+            }
+        )
+        .into()),
     }
 }
 
@@ -1320,6 +1333,17 @@ fn create_backend_config(
                 app_id,
                 persistence_dir,
                 shared_key: Some(shared_key),
+                transport,
+                extra: HashMap::new(),
+            }
+        }
+        #[cfg(feature = "automerge-backend")]
+        "automerge" => {
+            // Automerge doesn't require app_id or shared_key
+            BackendConfig {
+                app_id: format!("automerge-{}", node_id),
+                persistence_dir,
+                shared_key: None,
                 transport,
                 extra: HashMap::new(),
             }
