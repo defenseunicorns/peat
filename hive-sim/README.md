@@ -5,10 +5,21 @@ This directory contains ContainerLab-based network simulation infrastructure for
 ## Overview
 
 ContainerLab provides declarative Lab-as-Code for creating network topologies with:
-- Docker containers running real Ditto-based CAP nodes
+- Docker containers running CAP nodes with pluggable sync backends (Ditto or Automerge+Iroh)
 - Network constraints (bandwidth, latency, jitter, packet loss)
 - Scalable topologies (tested up to 112 nodes)
 - Easy scenario reproduction and version control
+
+### Supported Sync Backends
+
+hive-sim supports two CRDT sync backends via the `--backend` flag:
+
+| Backend | Description | Use Case | License |
+|---------|-------------|----------|---------|
+| **Ditto** (default) | Production-grade CRDT sync with multi-transport support | Production deployments, baseline benchmarks | Proprietary (requires license) |
+| **Automerge+Iroh** | Open-source CRDT (Automerge 0.7) + QUIC transport (Iroh 0.95) | Open-source deployments, research, DoD/NATO environments | MIT/Apache 2.0 |
+
+See [Backend Selection](#backend-selection) for usage details.
 
 ## Prerequisites
 
@@ -194,19 +205,99 @@ docker exec clab-<lab-name>-node1 tc qdisc show
 docker exec clab-<lab-name>-node1 tcpdump -i eth1 -w /tmp/capture.pcap
 ```
 
+## Backend Selection
+
+hive-sim supports pluggable sync backends to enable both production deployments (Ditto) and open-source alternatives (Automerge+Iroh).
+
+### Using Ditto Backend (Default)
+
+No special configuration needed - Ditto is the default backend:
+
+```bash
+# Build with Ditto support
+docker build -f hive-sim/Dockerfile -t hive-sim-node:latest .
+
+# Run with Ditto (explicit)
+hive-sim --backend ditto --node-id node1
+
+# Run with Ditto (implicit default)
+hive-sim --node-id node1
+```
+
+**Requirements:**
+- Ditto credentials (`DITTO_APP_ID`, `DITTO_OFFLINE_TOKEN`, `DITTO_SHARED_KEY`)
+- See `.env.example` for setup
+
+### Using Automerge+Iroh Backend
+
+Build and run with the `automerge-backend` feature:
+
+```bash
+# Build with Automerge+Iroh support
+docker build -f hive-sim/Dockerfile \
+  --build-arg FEATURES="automerge-backend" \
+  -t hive-sim-node:automerge .
+
+# Run with Automerge+Iroh
+hive-sim --backend automerge --node-id node1
+```
+
+**Requirements:**
+- No Ditto credentials needed
+- Nodes discover each other via static configuration or mDNS
+- QUIC transport via Iroh (no relay required for LAN)
+
+### Backend Comparison
+
+| Feature | Ditto | Automerge+Iroh |
+|---------|-------|----------------|
+| **CRDT Library** | Proprietary CBOR-based | Automerge 0.7 (columnar) |
+| **Transport** | TCP, WebSocket, BLE, P2P | QUIC (Iroh 0.95) |
+| **Storage** | SQLite | RocksDB |
+| **Credentials** | Required (app_id, token, key) | Not required |
+| **License** | Proprietary | MIT/Apache 2.0 |
+| **Multi-node mesh** | ✅ Automatic | ✅ Manual (static config) |
+| **Network partition handling** | ✅ Built-in | ✅ Heartbeat-based (Phase 7.1) |
+| **E2E Test Coverage** | ✅ 3-node mesh | ✅ 3-node mesh |
+
+### Choosing a Backend
+
+**Use Ditto when:**
+- Deploying to production environments with Ditto licenses
+- Need multi-transport support (BLE, WebSocket, etc.)
+- Want automatic peer discovery and mesh formation
+- Establishing baseline performance benchmarks
+
+**Use Automerge+Iroh when:**
+- Deploying to DoD/NATO environments requiring open-source
+- Conducting research on CRDT performance
+- Testing without Ditto credentials
+- Evaluating QUIC transport characteristics
+- Contributing to open-source development
+
 ## Environment Variables
 
 Nodes are configured via environment variables in topology YAML:
 
+**Core Configuration:**
 - `NODE_ID`: Unique identifier for this node (required)
 - `MODE`: "writer" or "reader" (required for POC)
+- `BACKEND`: Backend type - "ditto" (default) or "automerge"
+
+**Networking:**
 - `TCP_LISTEN`: Port to listen on for TCP connections
 - `TCP_CONNECT`: Address:port to connect to (e.g., "node1:12345")
+
+**Ditto Backend (required only when using `--backend ditto`):**
 - `DITTO_APP_ID`: Ditto application ID (from portal)
 - `DITTO_OFFLINE_TOKEN`: Ditto offline license token
 - `DITTO_SHARED_KEY`: Ditto shared encryption key
 
 Ditto credentials are loaded from `.env` file via `--env-file` flag.
+
+**Automerge+Iroh Backend (when using `--backend automerge`):**
+- No credentials required
+- Peer discovery via static configuration or mDNS (Phase 7.3)
 
 ## Hierarchical Command Dissemination
 

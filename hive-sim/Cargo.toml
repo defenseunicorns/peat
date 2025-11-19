@@ -6,6 +6,9 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+automerge-backend = ["hive-protocol/automerge-backend"]
+
 [dependencies]
 hive-protocol = { path = "../hive-protocol" }
 hive-schema = { path = "../hive-schema" }
