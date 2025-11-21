@@ -6,7 +6,8 @@ members = [
     "hive-transport",
     "hive-persistence",
     "hive-sim",
-    "hive-discovery"
+    "hive-discovery",
+    "hive-mesh"
 ]
 
 [workspace.package]
