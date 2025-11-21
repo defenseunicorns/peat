@@ -105,12 +105,14 @@
 //! - `WS /api/v1/collections/:name/subscribe` - Subscribe to changes
 //!
 
+pub mod adapters;
 pub mod backends;
 pub mod error;
 pub mod store;
 pub mod types;
 
 // Re-export commonly used types
+pub use adapters::PersistentBeaconStorage;
 pub use error::{Error, Result};
 pub use store::{ChangeEvent, DataStore, StoreInfo};
 pub use types::{Document, DocumentId, Query};
