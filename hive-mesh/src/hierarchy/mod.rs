@@ -48,7 +48,7 @@ pub enum NodeRole {
 /// let level = strategy.determine_level(&node_profile);
 /// let role = strategy.determine_role(&node_profile, &nearby_beacons);
 /// ```
-pub trait HierarchyStrategy: Send + Sync {
+pub trait HierarchyStrategy: Send + Sync + std::fmt::Debug {
     /// Determine this node's hierarchy level
     ///
     /// # Arguments

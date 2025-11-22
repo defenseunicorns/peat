@@ -4,7 +4,7 @@
 //! by observing nearby beacons, selecting peers, and maintaining topology state.
 
 use crate::beacon::{BeaconObserver, GeoPosition, GeographicBeacon, HierarchyLevel, NodeProfile};
-use crate::hierarchy::NodeRole;
+use crate::hierarchy::{HierarchyStrategy, NodeRole};
 use crate::topology::selection::{PeerSelector, SelectionConfig};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
@@ -97,6 +97,8 @@ pub struct TopologyConfig {
     pub peer_change_cooldown: Duration,
     /// Time before considering peer lost if no beacon received
     pub peer_timeout: Duration,
+    /// Hierarchy strategy for role and level determination
+    pub hierarchy_strategy: Option<Arc<dyn HierarchyStrategy>>,
 }
 
 impl Default for TopologyConfig {
@@ -106,6 +108,7 @@ impl Default for TopologyConfig {
             reevaluation_interval: Some(Duration::from_secs(30)),
             peer_change_cooldown: Duration::from_secs(60),
             peer_timeout: Duration::from_secs(180), // 3 minutes
+            hierarchy_strategy: None, // No strategy by default (uses fixed hierarchy_level)
         }
     }
 }
@@ -168,6 +171,7 @@ impl TopologyBuilder {
         let config = self.config.clone();
         let position = self.position.clone();
         let hierarchy_level = self.hierarchy_level;
+        let profile = self.profile.clone();
         let observer = self.observer.clone();
         let state = self.state.clone();
         let event_tx = self.event_tx.clone();
@@ -191,8 +195,39 @@ impl TopologyBuilder {
                 // Get nearby beacons
                 let nearby = observer.get_nearby_beacons().await;
 
-                // Check current peer status
+                // Evaluate hierarchy strategy if provided
                 let mut state_lock = state.lock().unwrap();
+                let current_hierarchy_level = if let (Some(strategy), Some(prof)) =
+                    (config.hierarchy_strategy.as_ref(), profile.as_ref())
+                {
+                    // Determine level and role using strategy
+                    let new_level = strategy.determine_level(prof);
+                    let new_role = strategy.determine_role(prof, &nearby);
+
+                    // Check for level change
+                    if new_level != state_lock.hierarchy_level {
+                        let old_level = state_lock.hierarchy_level;
+                        state_lock.hierarchy_level = new_level;
+                        let _ = event_tx.send(TopologyEvent::LevelChanged {
+                            old_level,
+                            new_level,
+                        });
+                    }
+
+                    // Check for role change
+                    if new_role != state_lock.role {
+                        let old_role = state_lock.role;
+                        state_lock.role = new_role;
+                        let _ = event_tx.send(TopologyEvent::RoleChanged { old_role, new_role });
+                    }
+
+                    new_level
+                } else {
+                    // No strategy provided, use fixed hierarchy_level
+                    hierarchy_level
+                };
+
+                // Check current peer status
                 let needs_peer =
                     Self::check_peer_status(&mut state_lock, &config, &nearby, &event_tx);
 
@@ -208,7 +243,7 @@ impl TopologyBuilder {
                     &mut state_lock,
                     &config,
                     &nearby,
-                    hierarchy_level,
+                    current_hierarchy_level,
                     &event_tx,
                 );
 
@@ -217,7 +252,7 @@ impl TopologyBuilder {
                     &mut state_lock,
                     &config,
                     &nearby,
-                    hierarchy_level,
+                    current_hierarchy_level,
                     &event_tx,
                 );
 
