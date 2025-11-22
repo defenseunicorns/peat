@@ -6,6 +6,6 @@ pub use beacon::{
     BeaconBroadcaster, BeaconJanitor, BeaconObserver, GeoPosition, GeographicBeacon, HierarchyLevel,
 };
 pub use topology::{
-    ParentCandidate, ParentInfo, ParentSelector, SelectionConfig, TopologyBuilder, TopologyConfig,
+    PeerCandidate, PeerSelector, SelectedPeer, SelectionConfig, TopologyBuilder, TopologyConfig,
     TopologyEvent, TopologyState,
 };
