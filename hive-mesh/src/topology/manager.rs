@@ -220,13 +220,26 @@ impl TopologyManager {
                 }
 
                 TopologyEvent::PeerAdded { linked_peer_id } => {
-                    debug!("Linked peer added: {}", linked_peer_id);
-                    // Future: Track linked peer connections if needed
+                    info!("Linked peer added: {}", linked_peer_id);
+                    // Linked peers connect TO us, so no action needed here
+                    // The transport layer handles incoming connections automatically
                 }
 
                 TopologyEvent::PeerRemoved { linked_peer_id } => {
-                    debug!("Linked peer removed: {}", linked_peer_id);
-                    // Future: Clean up linked peer connections if needed
+                    info!("Linked peer removed (beacon expired): {}", linked_peer_id);
+
+                    // Disconnect from stale linked peer
+                    let node_id = NodeId::new(linked_peer_id.clone());
+                    if transport.is_connected(&node_id) {
+                        if let Err(e) = transport.disconnect(&node_id).await {
+                            warn!(
+                                "Failed to disconnect from stale linked peer {}: {}",
+                                linked_peer_id, e
+                            );
+                        } else {
+                            debug!("Disconnected from stale linked peer: {}", linked_peer_id);
+                        }
+                    }
                 }
             }
         }
