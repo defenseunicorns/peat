@@ -1,4227 +1,4236 @@
 name: traditional-battalion-384node
+
+# Battalion 1: 384 nodes
+# Independent topology with dedicated management network
+
+mgmt:
+  network: battalion-1-net
+  ipv4-subnet: 172.21.0.0/16
+  ipv6-subnet: 3fff:172:21::/48
+
 topology:
   nodes:
-    battalion-hq:
+    battalion-1-hq:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: battalion-hq
+        NODE_ID: battalion-1-hq
         ROLE: battalion_commander
         PLATFORM_TYPE: soldier
         MODE: writer
         TCP_LISTEN: '12345'
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-1:
+    b1-soldier-1:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-1
+        NODE_ID: b1-soldier-1
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-2:
+    b1-soldier-2:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-2
+        NODE_ID: b1-soldier-2
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-3:
+    b1-soldier-3:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-3
+        NODE_ID: b1-soldier-3
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-4:
+    b1-soldier-4:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-4
+        NODE_ID: b1-soldier-4
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-5:
+    b1-soldier-5:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-5
+        NODE_ID: b1-soldier-5
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-6:
+    b1-soldier-6:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-6
+        NODE_ID: b1-soldier-6
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-7:
+    b1-soldier-7:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-7
+        NODE_ID: b1-soldier-7
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-8:
+    b1-soldier-8:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-8
+        NODE_ID: b1-soldier-8
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-9:
+    b1-soldier-9:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-9
+        NODE_ID: b1-soldier-9
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-10:
+    b1-soldier-10:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-10
+        NODE_ID: b1-soldier-10
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-11:
+    b1-soldier-11:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-11
+        NODE_ID: b1-soldier-11
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-12:
+    b1-soldier-12:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-12
+        NODE_ID: b1-soldier-12
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-13:
+    b1-soldier-13:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-13
+        NODE_ID: b1-soldier-13
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-14:
+    b1-soldier-14:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-14
+        NODE_ID: b1-soldier-14
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-15:
+    b1-soldier-15:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-15
+        NODE_ID: b1-soldier-15
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-16:
+    b1-soldier-16:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-16
+        NODE_ID: b1-soldier-16
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-17:
+    b1-soldier-17:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-17
+        NODE_ID: b1-soldier-17
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-18:
+    b1-soldier-18:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-18
+        NODE_ID: b1-soldier-18
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-19:
+    b1-soldier-19:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-19
+        NODE_ID: b1-soldier-19
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-20:
+    b1-soldier-20:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-20
+        NODE_ID: b1-soldier-20
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-21:
+    b1-soldier-21:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-21
+        NODE_ID: b1-soldier-21
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-22:
+    b1-soldier-22:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-22
+        NODE_ID: b1-soldier-22
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-23:
+    b1-soldier-23:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-23
+        NODE_ID: b1-soldier-23
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-24:
+    b1-soldier-24:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-24
+        NODE_ID: b1-soldier-24
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-25:
+    b1-soldier-25:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-25
+        NODE_ID: b1-soldier-25
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-26:
+    b1-soldier-26:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-26
+        NODE_ID: b1-soldier-26
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-27:
+    b1-soldier-27:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-27
+        NODE_ID: b1-soldier-27
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-28:
+    b1-soldier-28:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-28
+        NODE_ID: b1-soldier-28
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-29:
+    b1-soldier-29:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-29
+        NODE_ID: b1-soldier-29
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-30:
+    b1-soldier-30:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-30
+        NODE_ID: b1-soldier-30
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-31:
+    b1-soldier-31:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-31
+        NODE_ID: b1-soldier-31
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-32:
+    b1-soldier-32:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-32
+        NODE_ID: b1-soldier-32
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-33:
+    b1-soldier-33:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-33
+        NODE_ID: b1-soldier-33
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-34:
+    b1-soldier-34:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-34
+        NODE_ID: b1-soldier-34
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-35:
+    b1-soldier-35:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-35
+        NODE_ID: b1-soldier-35
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-36:
+    b1-soldier-36:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-36
+        NODE_ID: b1-soldier-36
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-37:
+    b1-soldier-37:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-37
+        NODE_ID: b1-soldier-37
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-38:
+    b1-soldier-38:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-38
+        NODE_ID: b1-soldier-38
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-39:
+    b1-soldier-39:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-39
+        NODE_ID: b1-soldier-39
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-40:
+    b1-soldier-40:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-40
+        NODE_ID: b1-soldier-40
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-41:
+    b1-soldier-41:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-41
+        NODE_ID: b1-soldier-41
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-42:
+    b1-soldier-42:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-42
+        NODE_ID: b1-soldier-42
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-43:
+    b1-soldier-43:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-43
+        NODE_ID: b1-soldier-43
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-44:
+    b1-soldier-44:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-44
+        NODE_ID: b1-soldier-44
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-45:
+    b1-soldier-45:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-45
+        NODE_ID: b1-soldier-45
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-46:
+    b1-soldier-46:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-46
+        NODE_ID: b1-soldier-46
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-47:
+    b1-soldier-47:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-47
+        NODE_ID: b1-soldier-47
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-48:
+    b1-soldier-48:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-48
+        NODE_ID: b1-soldier-48
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-49:
+    b1-soldier-49:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-49
+        NODE_ID: b1-soldier-49
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-50:
+    b1-soldier-50:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-50
+        NODE_ID: b1-soldier-50
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-51:
+    b1-soldier-51:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-51
+        NODE_ID: b1-soldier-51
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-52:
+    b1-soldier-52:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-52
+        NODE_ID: b1-soldier-52
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-53:
+    b1-soldier-53:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-53
+        NODE_ID: b1-soldier-53
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-54:
+    b1-soldier-54:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-54
+        NODE_ID: b1-soldier-54
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-55:
+    b1-soldier-55:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-55
+        NODE_ID: b1-soldier-55
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-56:
+    b1-soldier-56:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-56
+        NODE_ID: b1-soldier-56
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-57:
+    b1-soldier-57:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-57
+        NODE_ID: b1-soldier-57
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-58:
+    b1-soldier-58:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-58
+        NODE_ID: b1-soldier-58
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-59:
+    b1-soldier-59:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-59
+        NODE_ID: b1-soldier-59
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-60:
+    b1-soldier-60:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-60
+        NODE_ID: b1-soldier-60
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-61:
+    b1-soldier-61:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-61
+        NODE_ID: b1-soldier-61
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-62:
+    b1-soldier-62:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-62
+        NODE_ID: b1-soldier-62
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-63:
+    b1-soldier-63:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-63
+        NODE_ID: b1-soldier-63
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-64:
+    b1-soldier-64:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-64
+        NODE_ID: b1-soldier-64
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-65:
+    b1-soldier-65:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-65
+        NODE_ID: b1-soldier-65
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-66:
+    b1-soldier-66:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-66
+        NODE_ID: b1-soldier-66
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-67:
+    b1-soldier-67:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-67
+        NODE_ID: b1-soldier-67
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-68:
+    b1-soldier-68:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-68
+        NODE_ID: b1-soldier-68
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-69:
+    b1-soldier-69:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-69
+        NODE_ID: b1-soldier-69
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-70:
+    b1-soldier-70:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-70
+        NODE_ID: b1-soldier-70
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-71:
+    b1-soldier-71:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-71
+        NODE_ID: b1-soldier-71
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-72:
+    b1-soldier-72:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-72
+        NODE_ID: b1-soldier-72
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-73:
+    b1-soldier-73:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-73
+        NODE_ID: b1-soldier-73
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-74:
+    b1-soldier-74:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-74
+        NODE_ID: b1-soldier-74
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-75:
+    b1-soldier-75:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-75
+        NODE_ID: b1-soldier-75
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-76:
+    b1-soldier-76:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-76
+        NODE_ID: b1-soldier-76
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-77:
+    b1-soldier-77:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-77
+        NODE_ID: b1-soldier-77
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-78:
+    b1-soldier-78:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-78
+        NODE_ID: b1-soldier-78
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-79:
+    b1-soldier-79:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-79
+        NODE_ID: b1-soldier-79
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-80:
+    b1-soldier-80:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-80
+        NODE_ID: b1-soldier-80
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-81:
+    b1-soldier-81:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-81
+        NODE_ID: b1-soldier-81
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-82:
+    b1-soldier-82:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-82
+        NODE_ID: b1-soldier-82
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-83:
+    b1-soldier-83:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-83
+        NODE_ID: b1-soldier-83
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-84:
+    b1-soldier-84:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-84
+        NODE_ID: b1-soldier-84
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-85:
+    b1-soldier-85:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-85
+        NODE_ID: b1-soldier-85
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-86:
+    b1-soldier-86:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-86
+        NODE_ID: b1-soldier-86
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-87:
+    b1-soldier-87:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-87
+        NODE_ID: b1-soldier-87
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-88:
+    b1-soldier-88:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-88
+        NODE_ID: b1-soldier-88
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-89:
+    b1-soldier-89:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-89
+        NODE_ID: b1-soldier-89
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-90:
+    b1-soldier-90:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-90
+        NODE_ID: b1-soldier-90
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-91:
+    b1-soldier-91:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-91
+        NODE_ID: b1-soldier-91
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-92:
+    b1-soldier-92:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-92
+        NODE_ID: b1-soldier-92
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-93:
+    b1-soldier-93:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-93
+        NODE_ID: b1-soldier-93
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-94:
+    b1-soldier-94:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-94
+        NODE_ID: b1-soldier-94
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-95:
+    b1-soldier-95:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-95
+        NODE_ID: b1-soldier-95
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-96:
+    b1-soldier-96:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-96
+        NODE_ID: b1-soldier-96
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-97:
+    b1-soldier-97:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-97
+        NODE_ID: b1-soldier-97
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-98:
+    b1-soldier-98:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-98
+        NODE_ID: b1-soldier-98
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-99:
+    b1-soldier-99:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-99
+        NODE_ID: b1-soldier-99
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-100:
+    b1-soldier-100:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-100
+        NODE_ID: b1-soldier-100
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-101:
+    b1-soldier-101:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-101
+        NODE_ID: b1-soldier-101
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-102:
+    b1-soldier-102:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-102
+        NODE_ID: b1-soldier-102
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-103:
+    b1-soldier-103:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-103
+        NODE_ID: b1-soldier-103
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-104:
+    b1-soldier-104:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-104
+        NODE_ID: b1-soldier-104
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-105:
+    b1-soldier-105:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-105
+        NODE_ID: b1-soldier-105
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-106:
+    b1-soldier-106:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-106
+        NODE_ID: b1-soldier-106
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-107:
+    b1-soldier-107:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-107
+        NODE_ID: b1-soldier-107
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-108:
+    b1-soldier-108:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-108
+        NODE_ID: b1-soldier-108
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-109:
+    b1-soldier-109:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-109
+        NODE_ID: b1-soldier-109
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-110:
+    b1-soldier-110:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-110
+        NODE_ID: b1-soldier-110
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-111:
+    b1-soldier-111:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-111
+        NODE_ID: b1-soldier-111
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-112:
+    b1-soldier-112:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-112
+        NODE_ID: b1-soldier-112
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-113:
+    b1-soldier-113:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-113
+        NODE_ID: b1-soldier-113
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-114:
+    b1-soldier-114:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-114
+        NODE_ID: b1-soldier-114
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-115:
+    b1-soldier-115:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-115
+        NODE_ID: b1-soldier-115
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-116:
+    b1-soldier-116:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-116
+        NODE_ID: b1-soldier-116
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-117:
+    b1-soldier-117:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-117
+        NODE_ID: b1-soldier-117
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-118:
+    b1-soldier-118:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-118
+        NODE_ID: b1-soldier-118
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-119:
+    b1-soldier-119:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-119
+        NODE_ID: b1-soldier-119
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-120:
+    b1-soldier-120:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-120
+        NODE_ID: b1-soldier-120
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-121:
+    b1-soldier-121:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-121
+        NODE_ID: b1-soldier-121
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-122:
+    b1-soldier-122:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-122
+        NODE_ID: b1-soldier-122
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-123:
+    b1-soldier-123:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-123
+        NODE_ID: b1-soldier-123
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-124:
+    b1-soldier-124:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-124
+        NODE_ID: b1-soldier-124
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-125:
+    b1-soldier-125:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-125
+        NODE_ID: b1-soldier-125
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-126:
+    b1-soldier-126:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-126
+        NODE_ID: b1-soldier-126
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-127:
+    b1-soldier-127:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-127
+        NODE_ID: b1-soldier-127
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-128:
+    b1-soldier-128:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-128
+        NODE_ID: b1-soldier-128
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-129:
+    b1-soldier-129:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-129
+        NODE_ID: b1-soldier-129
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-130:
+    b1-soldier-130:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-130
+        NODE_ID: b1-soldier-130
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-131:
+    b1-soldier-131:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-131
+        NODE_ID: b1-soldier-131
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-132:
+    b1-soldier-132:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-132
+        NODE_ID: b1-soldier-132
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-133:
+    b1-soldier-133:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-133
+        NODE_ID: b1-soldier-133
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-134:
+    b1-soldier-134:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-134
+        NODE_ID: b1-soldier-134
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-135:
+    b1-soldier-135:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-135
+        NODE_ID: b1-soldier-135
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-136:
+    b1-soldier-136:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-136
+        NODE_ID: b1-soldier-136
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-137:
+    b1-soldier-137:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-137
+        NODE_ID: b1-soldier-137
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-138:
+    b1-soldier-138:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-138
+        NODE_ID: b1-soldier-138
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-139:
+    b1-soldier-139:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-139
+        NODE_ID: b1-soldier-139
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-140:
+    b1-soldier-140:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-140
+        NODE_ID: b1-soldier-140
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-141:
+    b1-soldier-141:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-141
+        NODE_ID: b1-soldier-141
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-142:
+    b1-soldier-142:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-142
+        NODE_ID: b1-soldier-142
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-143:
+    b1-soldier-143:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-143
+        NODE_ID: b1-soldier-143
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-144:
+    b1-soldier-144:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-144
+        NODE_ID: b1-soldier-144
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-145:
+    b1-soldier-145:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-145
+        NODE_ID: b1-soldier-145
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-146:
+    b1-soldier-146:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-146
+        NODE_ID: b1-soldier-146
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-147:
+    b1-soldier-147:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-147
+        NODE_ID: b1-soldier-147
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-148:
+    b1-soldier-148:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-148
+        NODE_ID: b1-soldier-148
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-149:
+    b1-soldier-149:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-149
+        NODE_ID: b1-soldier-149
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-150:
+    b1-soldier-150:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-150
+        NODE_ID: b1-soldier-150
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-151:
+    b1-soldier-151:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-151
+        NODE_ID: b1-soldier-151
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-152:
+    b1-soldier-152:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-152
+        NODE_ID: b1-soldier-152
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-153:
+    b1-soldier-153:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-153
+        NODE_ID: b1-soldier-153
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-154:
+    b1-soldier-154:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-154
+        NODE_ID: b1-soldier-154
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-155:
+    b1-soldier-155:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-155
+        NODE_ID: b1-soldier-155
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-156:
+    b1-soldier-156:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-156
+        NODE_ID: b1-soldier-156
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-157:
+    b1-soldier-157:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-157
+        NODE_ID: b1-soldier-157
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-158:
+    b1-soldier-158:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-158
+        NODE_ID: b1-soldier-158
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-159:
+    b1-soldier-159:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-159
+        NODE_ID: b1-soldier-159
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-160:
+    b1-soldier-160:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-160
+        NODE_ID: b1-soldier-160
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-161:
+    b1-soldier-161:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-161
+        NODE_ID: b1-soldier-161
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-162:
+    b1-soldier-162:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-162
+        NODE_ID: b1-soldier-162
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-163:
+    b1-soldier-163:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-163
+        NODE_ID: b1-soldier-163
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-164:
+    b1-soldier-164:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-164
+        NODE_ID: b1-soldier-164
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-165:
+    b1-soldier-165:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-165
+        NODE_ID: b1-soldier-165
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-166:
+    b1-soldier-166:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-166
+        NODE_ID: b1-soldier-166
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-167:
+    b1-soldier-167:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-167
+        NODE_ID: b1-soldier-167
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-168:
+    b1-soldier-168:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-168
+        NODE_ID: b1-soldier-168
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-169:
+    b1-soldier-169:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-169
+        NODE_ID: b1-soldier-169
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-170:
+    b1-soldier-170:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-170
+        NODE_ID: b1-soldier-170
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-171:
+    b1-soldier-171:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-171
+        NODE_ID: b1-soldier-171
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-172:
+    b1-soldier-172:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-172
+        NODE_ID: b1-soldier-172
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-173:
+    b1-soldier-173:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-173
+        NODE_ID: b1-soldier-173
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-174:
+    b1-soldier-174:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-174
+        NODE_ID: b1-soldier-174
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-175:
+    b1-soldier-175:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-175
+        NODE_ID: b1-soldier-175
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-176:
+    b1-soldier-176:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-176
+        NODE_ID: b1-soldier-176
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-177:
+    b1-soldier-177:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-177
+        NODE_ID: b1-soldier-177
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-178:
+    b1-soldier-178:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-178
+        NODE_ID: b1-soldier-178
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-179:
+    b1-soldier-179:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-179
+        NODE_ID: b1-soldier-179
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-180:
+    b1-soldier-180:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-180
+        NODE_ID: b1-soldier-180
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-181:
+    b1-soldier-181:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-181
+        NODE_ID: b1-soldier-181
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-182:
+    b1-soldier-182:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-182
+        NODE_ID: b1-soldier-182
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-183:
+    b1-soldier-183:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-183
+        NODE_ID: b1-soldier-183
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-184:
+    b1-soldier-184:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-184
+        NODE_ID: b1-soldier-184
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-185:
+    b1-soldier-185:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-185
+        NODE_ID: b1-soldier-185
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-186:
+    b1-soldier-186:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-186
+        NODE_ID: b1-soldier-186
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-187:
+    b1-soldier-187:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-187
+        NODE_ID: b1-soldier-187
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-188:
+    b1-soldier-188:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-188
+        NODE_ID: b1-soldier-188
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-189:
+    b1-soldier-189:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-189
+        NODE_ID: b1-soldier-189
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-190:
+    b1-soldier-190:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-190
+        NODE_ID: b1-soldier-190
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-191:
+    b1-soldier-191:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-191
+        NODE_ID: b1-soldier-191
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-192:
+    b1-soldier-192:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-192
+        NODE_ID: b1-soldier-192
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-193:
+    b1-soldier-193:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-193
+        NODE_ID: b1-soldier-193
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-194:
+    b1-soldier-194:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-194
+        NODE_ID: b1-soldier-194
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-195:
+    b1-soldier-195:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-195
+        NODE_ID: b1-soldier-195
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-196:
+    b1-soldier-196:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-196
+        NODE_ID: b1-soldier-196
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-197:
+    b1-soldier-197:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-197
+        NODE_ID: b1-soldier-197
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-198:
+    b1-soldier-198:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-198
+        NODE_ID: b1-soldier-198
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-199:
+    b1-soldier-199:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-199
+        NODE_ID: b1-soldier-199
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-200:
+    b1-soldier-200:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-200
+        NODE_ID: b1-soldier-200
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-201:
+    b1-soldier-201:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-201
+        NODE_ID: b1-soldier-201
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-202:
+    b1-soldier-202:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-202
+        NODE_ID: b1-soldier-202
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-203:
+    b1-soldier-203:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-203
+        NODE_ID: b1-soldier-203
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-204:
+    b1-soldier-204:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-204
+        NODE_ID: b1-soldier-204
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-205:
+    b1-soldier-205:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-205
+        NODE_ID: b1-soldier-205
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-206:
+    b1-soldier-206:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-206
+        NODE_ID: b1-soldier-206
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-207:
+    b1-soldier-207:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-207
+        NODE_ID: b1-soldier-207
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-208:
+    b1-soldier-208:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-208
+        NODE_ID: b1-soldier-208
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-209:
+    b1-soldier-209:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-209
+        NODE_ID: b1-soldier-209
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-210:
+    b1-soldier-210:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-210
+        NODE_ID: b1-soldier-210
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-211:
+    b1-soldier-211:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-211
+        NODE_ID: b1-soldier-211
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-212:
+    b1-soldier-212:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-212
+        NODE_ID: b1-soldier-212
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-213:
+    b1-soldier-213:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-213
+        NODE_ID: b1-soldier-213
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-214:
+    b1-soldier-214:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-214
+        NODE_ID: b1-soldier-214
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-215:
+    b1-soldier-215:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-215
+        NODE_ID: b1-soldier-215
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-216:
+    b1-soldier-216:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-216
+        NODE_ID: b1-soldier-216
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-217:
+    b1-soldier-217:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-217
+        NODE_ID: b1-soldier-217
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-218:
+    b1-soldier-218:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-218
+        NODE_ID: b1-soldier-218
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-219:
+    b1-soldier-219:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-219
+        NODE_ID: b1-soldier-219
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-220:
+    b1-soldier-220:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-220
+        NODE_ID: b1-soldier-220
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-221:
+    b1-soldier-221:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-221
+        NODE_ID: b1-soldier-221
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-222:
+    b1-soldier-222:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-222
+        NODE_ID: b1-soldier-222
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-223:
+    b1-soldier-223:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-223
+        NODE_ID: b1-soldier-223
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-224:
+    b1-soldier-224:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-224
+        NODE_ID: b1-soldier-224
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-225:
+    b1-soldier-225:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-225
+        NODE_ID: b1-soldier-225
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-226:
+    b1-soldier-226:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-226
+        NODE_ID: b1-soldier-226
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-227:
+    b1-soldier-227:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-227
+        NODE_ID: b1-soldier-227
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-228:
+    b1-soldier-228:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-228
+        NODE_ID: b1-soldier-228
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-229:
+    b1-soldier-229:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-229
+        NODE_ID: b1-soldier-229
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-230:
+    b1-soldier-230:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-230
+        NODE_ID: b1-soldier-230
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-231:
+    b1-soldier-231:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-231
+        NODE_ID: b1-soldier-231
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-232:
+    b1-soldier-232:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-232
+        NODE_ID: b1-soldier-232
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-233:
+    b1-soldier-233:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-233
+        NODE_ID: b1-soldier-233
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-234:
+    b1-soldier-234:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-234
+        NODE_ID: b1-soldier-234
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-235:
+    b1-soldier-235:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-235
+        NODE_ID: b1-soldier-235
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-236:
+    b1-soldier-236:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-236
+        NODE_ID: b1-soldier-236
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-237:
+    b1-soldier-237:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-237
+        NODE_ID: b1-soldier-237
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-238:
+    b1-soldier-238:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-238
+        NODE_ID: b1-soldier-238
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-239:
+    b1-soldier-239:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-239
+        NODE_ID: b1-soldier-239
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-240:
+    b1-soldier-240:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-240
+        NODE_ID: b1-soldier-240
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-241:
+    b1-soldier-241:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-241
+        NODE_ID: b1-soldier-241
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-242:
+    b1-soldier-242:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-242
+        NODE_ID: b1-soldier-242
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-243:
+    b1-soldier-243:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-243
+        NODE_ID: b1-soldier-243
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-244:
+    b1-soldier-244:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-244
+        NODE_ID: b1-soldier-244
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-245:
+    b1-soldier-245:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-245
+        NODE_ID: b1-soldier-245
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-246:
+    b1-soldier-246:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-246
+        NODE_ID: b1-soldier-246
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-247:
+    b1-soldier-247:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-247
+        NODE_ID: b1-soldier-247
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-248:
+    b1-soldier-248:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-248
+        NODE_ID: b1-soldier-248
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-249:
+    b1-soldier-249:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-249
+        NODE_ID: b1-soldier-249
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-250:
+    b1-soldier-250:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-250
+        NODE_ID: b1-soldier-250
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-251:
+    b1-soldier-251:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-251
+        NODE_ID: b1-soldier-251
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-252:
+    b1-soldier-252:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-252
+        NODE_ID: b1-soldier-252
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-253:
+    b1-soldier-253:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-253
+        NODE_ID: b1-soldier-253
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-254:
+    b1-soldier-254:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-254
+        NODE_ID: b1-soldier-254
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-255:
+    b1-soldier-255:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-255
+        NODE_ID: b1-soldier-255
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-256:
+    b1-soldier-256:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-256
+        NODE_ID: b1-soldier-256
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-257:
+    b1-soldier-257:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-257
+        NODE_ID: b1-soldier-257
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-258:
+    b1-soldier-258:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-258
+        NODE_ID: b1-soldier-258
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-259:
+    b1-soldier-259:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-259
+        NODE_ID: b1-soldier-259
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-260:
+    b1-soldier-260:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-260
+        NODE_ID: b1-soldier-260
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-261:
+    b1-soldier-261:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-261
+        NODE_ID: b1-soldier-261
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-262:
+    b1-soldier-262:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-262
+        NODE_ID: b1-soldier-262
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-263:
+    b1-soldier-263:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-263
+        NODE_ID: b1-soldier-263
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-264:
+    b1-soldier-264:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-264
+        NODE_ID: b1-soldier-264
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-265:
+    b1-soldier-265:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-265
+        NODE_ID: b1-soldier-265
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-266:
+    b1-soldier-266:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-266
+        NODE_ID: b1-soldier-266
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-267:
+    b1-soldier-267:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-267
+        NODE_ID: b1-soldier-267
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-268:
+    b1-soldier-268:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-268
+        NODE_ID: b1-soldier-268
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-269:
+    b1-soldier-269:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-269
+        NODE_ID: b1-soldier-269
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-270:
+    b1-soldier-270:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-270
+        NODE_ID: b1-soldier-270
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-271:
+    b1-soldier-271:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-271
+        NODE_ID: b1-soldier-271
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-272:
+    b1-soldier-272:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-272
+        NODE_ID: b1-soldier-272
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-273:
+    b1-soldier-273:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-273
+        NODE_ID: b1-soldier-273
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-274:
+    b1-soldier-274:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-274
+        NODE_ID: b1-soldier-274
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-275:
+    b1-soldier-275:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-275
+        NODE_ID: b1-soldier-275
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-276:
+    b1-soldier-276:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-276
+        NODE_ID: b1-soldier-276
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-277:
+    b1-soldier-277:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-277
+        NODE_ID: b1-soldier-277
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-278:
+    b1-soldier-278:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-278
+        NODE_ID: b1-soldier-278
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-279:
+    b1-soldier-279:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-279
+        NODE_ID: b1-soldier-279
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-280:
+    b1-soldier-280:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-280
+        NODE_ID: b1-soldier-280
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-281:
+    b1-soldier-281:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-281
+        NODE_ID: b1-soldier-281
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-282:
+    b1-soldier-282:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-282
+        NODE_ID: b1-soldier-282
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-283:
+    b1-soldier-283:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-283
+        NODE_ID: b1-soldier-283
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-284:
+    b1-soldier-284:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-284
+        NODE_ID: b1-soldier-284
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-285:
+    b1-soldier-285:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-285
+        NODE_ID: b1-soldier-285
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-286:
+    b1-soldier-286:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-286
+        NODE_ID: b1-soldier-286
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-287:
+    b1-soldier-287:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-287
+        NODE_ID: b1-soldier-287
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-288:
+    b1-soldier-288:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-288
+        NODE_ID: b1-soldier-288
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-289:
+    b1-soldier-289:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-289
+        NODE_ID: b1-soldier-289
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-290:
+    b1-soldier-290:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-290
+        NODE_ID: b1-soldier-290
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-291:
+    b1-soldier-291:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-291
+        NODE_ID: b1-soldier-291
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-292:
+    b1-soldier-292:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-292
+        NODE_ID: b1-soldier-292
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-293:
+    b1-soldier-293:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-293
+        NODE_ID: b1-soldier-293
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-294:
+    b1-soldier-294:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-294
+        NODE_ID: b1-soldier-294
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-295:
+    b1-soldier-295:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-295
+        NODE_ID: b1-soldier-295
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-296:
+    b1-soldier-296:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-296
+        NODE_ID: b1-soldier-296
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-297:
+    b1-soldier-297:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-297
+        NODE_ID: b1-soldier-297
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-298:
+    b1-soldier-298:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-298
+        NODE_ID: b1-soldier-298
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-299:
+    b1-soldier-299:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-299
+        NODE_ID: b1-soldier-299
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-300:
+    b1-soldier-300:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-300
+        NODE_ID: b1-soldier-300
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-301:
+    b1-soldier-301:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-301
+        NODE_ID: b1-soldier-301
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-302:
+    b1-soldier-302:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-302
+        NODE_ID: b1-soldier-302
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-303:
+    b1-soldier-303:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-303
+        NODE_ID: b1-soldier-303
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-304:
+    b1-soldier-304:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-304
+        NODE_ID: b1-soldier-304
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-305:
+    b1-soldier-305:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-305
+        NODE_ID: b1-soldier-305
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-306:
+    b1-soldier-306:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-306
+        NODE_ID: b1-soldier-306
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-307:
+    b1-soldier-307:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-307
+        NODE_ID: b1-soldier-307
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-308:
+    b1-soldier-308:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-308
+        NODE_ID: b1-soldier-308
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-309:
+    b1-soldier-309:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-309
+        NODE_ID: b1-soldier-309
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-310:
+    b1-soldier-310:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-310
+        NODE_ID: b1-soldier-310
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-311:
+    b1-soldier-311:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-311
+        NODE_ID: b1-soldier-311
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-312:
+    b1-soldier-312:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-312
+        NODE_ID: b1-soldier-312
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-313:
+    b1-soldier-313:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-313
+        NODE_ID: b1-soldier-313
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-314:
+    b1-soldier-314:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-314
+        NODE_ID: b1-soldier-314
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-315:
+    b1-soldier-315:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-315
+        NODE_ID: b1-soldier-315
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-316:
+    b1-soldier-316:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-316
+        NODE_ID: b1-soldier-316
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-317:
+    b1-soldier-317:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-317
+        NODE_ID: b1-soldier-317
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-318:
+    b1-soldier-318:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-318
+        NODE_ID: b1-soldier-318
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-319:
+    b1-soldier-319:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-319
+        NODE_ID: b1-soldier-319
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-320:
+    b1-soldier-320:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-320
+        NODE_ID: b1-soldier-320
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-321:
+    b1-soldier-321:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-321
+        NODE_ID: b1-soldier-321
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-322:
+    b1-soldier-322:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-322
+        NODE_ID: b1-soldier-322
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-323:
+    b1-soldier-323:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-323
+        NODE_ID: b1-soldier-323
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-324:
+    b1-soldier-324:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-324
+        NODE_ID: b1-soldier-324
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-325:
+    b1-soldier-325:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-325
+        NODE_ID: b1-soldier-325
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-326:
+    b1-soldier-326:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-326
+        NODE_ID: b1-soldier-326
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-327:
+    b1-soldier-327:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-327
+        NODE_ID: b1-soldier-327
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-328:
+    b1-soldier-328:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-328
+        NODE_ID: b1-soldier-328
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-329:
+    b1-soldier-329:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-329
+        NODE_ID: b1-soldier-329
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-330:
+    b1-soldier-330:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-330
+        NODE_ID: b1-soldier-330
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-331:
+    b1-soldier-331:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-331
+        NODE_ID: b1-soldier-331
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-332:
+    b1-soldier-332:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-332
+        NODE_ID: b1-soldier-332
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-333:
+    b1-soldier-333:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-333
+        NODE_ID: b1-soldier-333
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-334:
+    b1-soldier-334:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-334
+        NODE_ID: b1-soldier-334
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-335:
+    b1-soldier-335:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-335
+        NODE_ID: b1-soldier-335
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-336:
+    b1-soldier-336:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-336
+        NODE_ID: b1-soldier-336
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-337:
+    b1-soldier-337:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-337
+        NODE_ID: b1-soldier-337
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-338:
+    b1-soldier-338:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-338
+        NODE_ID: b1-soldier-338
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-339:
+    b1-soldier-339:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-339
+        NODE_ID: b1-soldier-339
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-340:
+    b1-soldier-340:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-340
+        NODE_ID: b1-soldier-340
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-341:
+    b1-soldier-341:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-341
+        NODE_ID: b1-soldier-341
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-342:
+    b1-soldier-342:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-342
+        NODE_ID: b1-soldier-342
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-343:
+    b1-soldier-343:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-343
+        NODE_ID: b1-soldier-343
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-344:
+    b1-soldier-344:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-344
+        NODE_ID: b1-soldier-344
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-345:
+    b1-soldier-345:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-345
+        NODE_ID: b1-soldier-345
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-346:
+    b1-soldier-346:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-346
+        NODE_ID: b1-soldier-346
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-347:
+    b1-soldier-347:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-347
+        NODE_ID: b1-soldier-347
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-348:
+    b1-soldier-348:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-348
+        NODE_ID: b1-soldier-348
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-349:
+    b1-soldier-349:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-349
+        NODE_ID: b1-soldier-349
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-350:
+    b1-soldier-350:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-350
+        NODE_ID: b1-soldier-350
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-351:
+    b1-soldier-351:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-351
+        NODE_ID: b1-soldier-351
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-352:
+    b1-soldier-352:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-352
+        NODE_ID: b1-soldier-352
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-353:
+    b1-soldier-353:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-353
+        NODE_ID: b1-soldier-353
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-354:
+    b1-soldier-354:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-354
+        NODE_ID: b1-soldier-354
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-355:
+    b1-soldier-355:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-355
+        NODE_ID: b1-soldier-355
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-356:
+    b1-soldier-356:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-356
+        NODE_ID: b1-soldier-356
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-357:
+    b1-soldier-357:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-357
+        NODE_ID: b1-soldier-357
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-358:
+    b1-soldier-358:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-358
+        NODE_ID: b1-soldier-358
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-359:
+    b1-soldier-359:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-359
+        NODE_ID: b1-soldier-359
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-360:
+    b1-soldier-360:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-360
+        NODE_ID: b1-soldier-360
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-361:
+    b1-soldier-361:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-361
+        NODE_ID: b1-soldier-361
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-362:
+    b1-soldier-362:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-362
+        NODE_ID: b1-soldier-362
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-363:
+    b1-soldier-363:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-363
+        NODE_ID: b1-soldier-363
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-364:
+    b1-soldier-364:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-364
+        NODE_ID: b1-soldier-364
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-365:
+    b1-soldier-365:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-365
+        NODE_ID: b1-soldier-365
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-366:
+    b1-soldier-366:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-366
+        NODE_ID: b1-soldier-366
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-367:
+    b1-soldier-367:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-367
+        NODE_ID: b1-soldier-367
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-368:
+    b1-soldier-368:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-368
+        NODE_ID: b1-soldier-368
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-369:
+    b1-soldier-369:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-369
+        NODE_ID: b1-soldier-369
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-370:
+    b1-soldier-370:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-370
+        NODE_ID: b1-soldier-370
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-371:
+    b1-soldier-371:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-371
+        NODE_ID: b1-soldier-371
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-372:
+    b1-soldier-372:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-372
+        NODE_ID: b1-soldier-372
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-373:
+    b1-soldier-373:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-373
+        NODE_ID: b1-soldier-373
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-374:
+    b1-soldier-374:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-374
+        NODE_ID: b1-soldier-374
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-375:
+    b1-soldier-375:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-375
+        NODE_ID: b1-soldier-375
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-376:
+    b1-soldier-376:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-376
+        NODE_ID: b1-soldier-376
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-377:
+    b1-soldier-377:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-377
+        NODE_ID: b1-soldier-377
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-378:
+    b1-soldier-378:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-378
+        NODE_ID: b1-soldier-378
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-379:
+    b1-soldier-379:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-379
+        NODE_ID: b1-soldier-379
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-380:
+    b1-soldier-380:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-380
+        NODE_ID: b1-soldier-380
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-381:
+    b1-soldier-381:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-381
+        NODE_ID: b1-soldier-381
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-382:
+    b1-soldier-382:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-382
+        NODE_ID: b1-soldier-382
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
-    p1-soldier-383:
+    b1-soldier-383:
       kind: linux
       image: hive-sim-node:latest
       env:
-        NODE_ID: p1-soldier-383
+        NODE_ID: b1-soldier-383
         ROLE: soldier
         PLATFORM_TYPE: soldier
         MODE: reader
-        TCP_CONNECT: battalion-hq:12345
+        TCP_CONNECT: battalion-1-hq:12345
         USE_TRADITIONAL: 'true'
         UPDATE_FREQUENCY_SECS: '0.5'
