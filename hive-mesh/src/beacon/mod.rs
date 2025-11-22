@@ -11,3 +11,6 @@ pub use janitor::BeaconJanitor;
 pub use observer::BeaconObserver;
 pub use storage::{BeaconChangeEvent, BeaconChangeStream, BeaconStorage, StorageError};
 pub use types::{GeoPosition, GeographicBeacon, HierarchyLevel};
+
+#[cfg(test)]
+pub use storage::MockBeaconStorage;
