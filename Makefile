@@ -1,454 +1,295 @@
-.PHONY: help clean clean-ditto build test test-e2e fmt clippy check all pre-commit ci
-.PHONY: sim-build sim-deploy-poc sim-deploy-squad sim-destroy sim-logs sim-clean
-.PHONY: docs-presentation docs-presentation-pdf
+.PHONY: help clean clean-ditto build test fmt clippy check pre-commit ci
 
-# Default target
+# ============================================
+# HIVE Protocol Development Makefile
+# ============================================
+
 help:
-	@echo "CAP Protocol Development Makefile"
+	@echo "HIVE Protocol Development & Testing"
 	@echo ""
 	@echo "Development:"
-	@echo "  help         - Show this help message"
-	@echo "  clean        - Remove build artifacts and Ditto directories"
-	@echo "  clean-ditto  - Remove Ditto persistence directories only"
 	@echo "  build        - Build all crates"
-	@echo "  test         - Run all tests serially (due to Ditto resource usage)"
-	@echo "  test-e2e     - Run E2E integration tests for Squad Formation"
-	@echo "  fmt          - Format all code with cargo fmt"
-	@echo "  clippy       - Run clippy linter"
+	@echo "  test         - Run all tests"
+	@echo "  fmt          - Format code"
+	@echo "  clippy       - Run linter"
 	@echo "  check        - Run fmt + clippy + test"
-	@echo "  pre-commit   - Run all checks before committing (fmt + clippy + test)"
-	@echo "  ci           - Run full CI pipeline (fmt check + clippy + test)"
-	@echo "  all          - Clean, build, and run all checks"
+	@echo "  clean        - Remove build artifacts"
+	@echo "  clean-labs   - Clean up all containerlab topologies and containers"
 	@echo ""
-	@echo "Documentation:"
-	@echo "  docs-presentation     - Build HTML presentation from markdown"
-	@echo "  docs-presentation-pdf - Build PDF presentation from markdown"
+	@echo "Quick Validation:"
+	@echo "  validate              - Quick validation (Traditional 24-node) ⭐ Start here!"
+	@echo "  validate-event-driven - Validate event-driven hierarchical (24-node, 60s)"
 	@echo ""
-	@echo "Network Simulation (E8 - requires Linux with ContainerLab):"
-	@echo "  sim-build                  - Build hive-sim-node Docker image"
-	@echo "  sim-deploy-poc             - Deploy 2-node POC topology"
-	@echo "  sim-deploy-squad-simple    - Deploy squad (Mode 1: Client-Server)"
-	@echo "  sim-deploy-squad-hierarchical - Deploy squad (Mode 2: Hub-Spoke)"
-	@echo "  sim-deploy-squad-dynamic   - Deploy squad (Mode 3: Dynamic Mesh) ⭐"
-	@echo "  sim-deploy-squad           - Alias for Mode 3 (recommended)"
-	@echo "  sim-logs NODE=x            - Show logs for specific node"
-	@echo "  sim-inspect                - Inspect running topologies"
-	@echo "  sim-destroy                - Destroy running topology"
-	@echo "  sim-clean                  - Destroy all and clean up artifacts"
+	@echo "Architecture Comparison (O(n²) vs O(n log n)):"
+	@echo "  baseline-client-server    - Traditional hub-spoke (all node counts)"
+	@echo "  baseline-mesh             - Traditional P2P mesh (all node counts)"
+	@echo "  hive-hierarchical         - HIVE hierarchical (all node counts)"
+	@echo "  compare-architectures     - Run all 3 architectures for comparison"
 	@echo ""
-	@echo "Empirical Validation & Testing:"
-	@echo "  e12-comprehensive-validation - Full experimental validation (24 tests, ~3-4hrs) ⭐⭐⭐⭐"
-	@echo "  e12-validate                 - Validate E12 test harness infrastructure"
-	@echo "  e12-analyze DIR=x            - Analyze E12 results and generate reports"
-	@echo "  e11-comprehensive-suite      - Test all modes × all bandwidths (16 tests, ~60min)"
-	@echo "  e11-all-modes-report         - Test all modes unconstrained + report"
-	@echo "  e11-mode4-bandwidth BW=x     - Test Mode 4 at specific bandwidth"
-	@echo "  e8-baseline-comparison       - Three-way baseline comparison (Traditional/CAP Full/CAP Differential)"
+	@echo "Bandwidth Testing:"
+	@echo "  bandwidth-matrix          - Test all architectures × bandwidths"
+	@echo "  bandwidth-constrained BW=x - Test specific bandwidth (1gbps|100mbps|1mbps|256kbps)"
+	@echo ""
+	@echo "Backend Comparison:"
+	@echo "  backend-comparison              - Quick comparison: Ditto vs Automerge (24-node, 4 bandwidths)"
+	@echo "  backend-comparison-hierarchical - Traditional vs Hierarchical (O(n²) vs O(n log n)) ⭐ Recommended!"
+	@echo "  traditional-baseline            - Traditional tests only (run once, save for reuse)"
+	@echo "  hierarchical-only               - Hierarchical only (reuses traditional, faster iteration)"
+	@echo "  backend-comparison-scaling      - Legacy: Full scaling study (48 tests)"
+	@echo ""
+	@echo "Full Experimental Matrix:"
+	@echo "  matrix-full              - Complete: 3 architectures × all sizes × 4 bandwidths"
+	@echo "  matrix-analyze DIR=x     - Analyze results from matrix run"
+	@echo ""
+	@echo "Build Commands:"
+	@echo "  build                    - Build all Rust crates"
+	@echo "  build-docker             - Build Docker image (run once before tests)"
+	@echo ""
+	@echo "Legacy E-Series Tests (for reference):"
+	@echo "  e11-modes                - Test HIVE modes (legacy)"
+	@echo "  e12-comprehensive        - Full validation suite (legacy)"
 
-# Clean build artifacts and Ditto directories
-clean: clean-ditto
-	@echo "Cleaning build artifacts..."
-	cargo clean
+# ============================================
+# Development
+# ============================================
 
-# Remove Ditto persistence directories
-clean-ditto:
-	@echo "Removing Ditto persistence directories..."
-	@find . -type d -name ".ditto*" -exec rm -rf {} + 2>/dev/null || true
-	@rm -rf /tmp/hive-persistence-test-* 2>/dev/null || true
-	@rm -rf /tmp/cap-persistence-test-* 2>/dev/null || true
-	@echo "Ditto directories cleaned"
-
-# Build all crates
 build:
 	@echo "Building all crates..."
 	cargo build
 
-# Run tests (serial execution due to Ditto resource usage)
-# NOTE: Most tests use real Ditto instances and must run serially to avoid FD exhaustion
+build-docker:
+	@echo "Building Docker image for hive-sim..."
+	@cd hive-sim && docker build -f Dockerfile -t hive-sim-node:latest ..
+	@echo "✓ Docker image built: hive-sim-node:latest"
+
 test: clean-ditto
-	@echo "Running tests serially (single-threaded due to Ditto resource usage)..."
+	@echo "Running tests..."
 	@if [ -f .env ]; then \
 		export $$(grep -v '^#' .env | xargs) && cargo test -- --test-threads=1; \
 	else \
 		cargo test -- --test-threads=1; \
 	fi
 
-# Run functional/unit tests only (fast, for CI)
-test-functional: clean-ditto
-	@echo "Running functional/unit tests only..."
-	@if [ -f .env ]; then \
-		export $$(grep -v '^#' .env | xargs) && cargo test -- --test-threads=1; \
-	else \
-		cargo test -- --test-threads=1; \
-	fi
-
-# Run baseline comparison tests only (Containerlab-based)
-test-baseline:
-	@echo "Running baseline comparison tests..."
-	@cd hive-sim && ./run-baseline-comparison.sh
-
-# Run E2E integration tests
-test-e2e: clean-ditto
-	@echo "Running E2E integration tests..."
-	@if [ ! -f .env ]; then \
-		echo "⚠️  Warning: .env file not found. Ditto tests may be skipped."; \
-		echo "   Create .env with DITTO_APP_ID, DITTO_OFFLINE_TOKEN, DITTO_SHARED_KEY"; \
-	fi
-	cd hive-protocol && export $$(grep -v '^#' ../.env | xargs) && cargo test --test squad_formation_e2e -- --nocapture
-
-# Format all code
 fmt:
 	@echo "Formatting code..."
 	cargo fmt --all
 
-# Run clippy linter
 clippy:
 	@echo "Running clippy..."
 	cargo clippy --all-targets --all-features -- -D warnings
 
-# Quick check: fmt + clippy + test
 check: fmt clippy test
+	@echo "✅ All checks passed!"
 
-# Pre-commit hook: run all checks
 pre-commit: clean-ditto
 	@echo "Running pre-commit checks..."
-	@echo "1. Formatting code..."
 	@cargo fmt --all
-	@echo "2. Running clippy..."
 	@cargo clippy --all-targets --all-features -- -D warnings
-	@echo "3. Running tests serially (due to Ditto resource usage)..."
 	@if [ -f .env ]; then \
 		export $$(grep -v '^#' .env | xargs) && cargo test -- --test-threads=1; \
 	else \
 		cargo test -- --test-threads=1; \
 	fi
-	@echo ""
-	@echo "✅ All pre-commit checks passed!"
+	@echo "✅ Pre-commit checks passed!"
 
-# CI pipeline: check formatting without modifying, then clippy and test
 ci: clean-ditto
 	@echo "Running CI pipeline..."
-	@echo "1. Checking code formatting..."
 	@cargo fmt --all -- --check
-	@echo "2. Running clippy..."
 	@cargo clippy --all-targets --all-features -- -D warnings
-	@echo "3. Running tests serially (due to Ditto resource usage)..."
 	@if [ -f .env ]; then \
 		export $$(grep -v '^#' .env | xargs) && cargo test -- --test-threads=1; \
 	else \
 		cargo test -- --test-threads=1; \
 	fi
-	@echo ""
 	@echo "✅ CI pipeline passed!"
 
-# Full workflow: clean, build, and check
-all: clean build check
-	@echo ""
-	@echo "✅ All tasks completed successfully!"
+clean: clean-ditto
+	@echo "Cleaning build artifacts..."
+	cargo clean
+
+clean-ditto:
+	@find . -type d -name ".ditto*" -exec rm -rf {} + 2>/dev/null || true
+	@rm -rf /tmp/hive-persistence-test-* 2>/dev/null || true
+
+clean-labs:
+	@echo "Cleaning up all containerlab topologies..."
+	@cd hive-sim && ./cleanup-all-labs.sh
 
 # ============================================
-# E8 Network Simulation (ContainerLab)
+# Quick Validation
 # ============================================
 
-# Build hive-sim-node Docker image
-sim-build:
-	@echo "Building hive-sim-node Docker image..."
-	@docker build -f hive-sim/Dockerfile -t hive-sim-node:latest .
+validate:
+	@$(MAKE) -C hive-sim validate
 
-# Deploy 2-node POC
-sim-deploy-poc:
-	@echo "Deploying 2-node POC topology..."
-	@bash -c 'set -a && source .env && set +a && cd hive-sim && containerlab deploy -t topologies/poc-2node.yaml'
+# ============================================
+# Architecture Comparison (O(n²) vs O(n))
+# ============================================
 
-# Deploy 12-node squad (Mode 1: Client-Server)
-sim-deploy-squad-simple:
-	@echo "Deploying 12-node squad (Mode 1: Client-Server)..."
-	@bash -c 'set -a && source .env && set +a && cd hive-sim && containerlab deploy -t topologies/squad-12node-client-server.yaml'
-
-# Deploy 12-node squad (Mode 2: Hub-Spoke)
-sim-deploy-squad-hierarchical:
-	@echo "Deploying 12-node squad (Mode 2: Hub-Spoke - Hierarchical)..."
-	@bash -c 'set -a && source .env && set +a && cd hive-sim && containerlab deploy -t topologies/squad-12node-hub-spoke.yaml'
-
-# Deploy 12-node squad (Mode 3: Dynamic Mesh)
-sim-deploy-squad-dynamic:
-	@echo "Deploying 12-node squad (Mode 3: Dynamic Mesh)..."
-	@bash -c 'set -a && source .env && set +a && cd hive-sim && containerlab deploy -t topologies/squad-12node-dynamic-mesh.yaml'
-
-# Deploy 12-node squad (alias for Mode 3 - recommended)
-sim-deploy-squad: sim-deploy-squad-dynamic
-
-# Show logs for specific node
-sim-logs:
-	@if [ -z "$(NODE)" ]; then \
-		echo "Usage: make sim-logs NODE=<container-name>"; \
-		echo "Example: make sim-logs NODE=clab-cap-squad-12node-soldier-1"; \
-		exit 1; \
-	fi
-	@docker logs -f $(NODE)
-
-# Inspect running topologies
-sim-inspect:
-	@containerlab inspect --all
-
-# Destroy current topology
-sim-destroy:
-	@echo "Destroying all ContainerLab topologies..."
-	@containerlab destroy --all --cleanup
-
-# Clean up all simulation artifacts
-sim-clean: sim-destroy
-	@echo "Cleaning up ContainerLab artifacts..."
-	@cd hive-sim && rm -rf topologies/clab-* || true
-	@echo "✅ Simulation cleanup complete"
-
-# E11 All-Modes Validation: Test all CAP modes and generate comprehensive report
-# Tests Modes 1-4 with full experimental validation
-# Estimated time: ~5-6 minutes
-# E11 Comprehensive Test Suite: All modes × all bandwidths
-# Tests Modes 1-4 across 1Gbps, 100Mbps, 1Mbps, 256Kbps
-# Total: 16 test runs (~60 minutes)
-e11-comprehensive-suite:
+# Traditional Client-Server (Hub-Spoke) - Shows O(n²) at HQ bottleneck
+baseline-client-server:
 	@echo "╔════════════════════════════════════════════════════════════╗"
-	@echo "║  E11 Comprehensive Suite - All Modes × All Bandwidths     ║"
+	@echo "║  Traditional Client-Server Baseline                       ║"
+	@echo "║  Hub-and-Spoke: All nodes → HQ → All nodes                ║"
+	@echo "║  Expected: O(n²) message volume at HQ                     ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@echo ""
-	@echo "This will run 16 tests (4 modes × 4 bandwidths):"
-	@echo "  • Modes: 1 (Client-Server), 2 (Hub-Spoke), 3 (Mesh), 4 (Hierarchical)"
-	@echo "  • Bandwidths: 1Gbps, 100Mbps, 1Mbps, 256Kbps"
-	@echo ""
-	@echo "⚠️  WARNING: This will take approximately 60 minutes"
-	@echo ""
-	@cd hive-sim && ./test-bandwidth-suite.sh
+	@cd hive-sim && ./test-traditional-client-server-suite.sh
 
-# E11 Mode 4 Bandwidth Test: Test Mode 4 at specific bandwidth
-# Usage: make e11-mode4-bandwidth BW=256kbps
-# Options: 1gbps, 100mbps, 1mbps, 256kbps
-e11-mode4-bandwidth:
+# Traditional P2P Mesh - Shows O(n²) connections AND messages
+baseline-mesh:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Traditional P2P Mesh Baseline                            ║"
+	@echo "║  Full Mesh: Every node ↔ Every other node                 ║"
+	@echo "║  Expected: O(n²) connections + O(n²) messages per node    ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@cd hive-sim && ./test-traditional-mesh-suite.sh
+
+# HIVE Hierarchical - Shows O(n log n) scaling
+hive-hierarchical:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  HIVE Hierarchical Protocol                               ║"
+	@echo "║  Hierarchical aggregation with differential filtering     ║"
+	@echo "║  Expected: O(n log n) message volume via aggregation      ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@cd hive-sim && ./test-hive-hierarchical-suite.sh
+
+# Run all three architectures for direct comparison
+compare-architectures:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Architecture Comparison Suite                            ║"
+	@echo "║  Testing all 3 architectures at multiple scales           ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@$(MAKE) baseline-client-server
+	@$(MAKE) baseline-mesh
+	@$(MAKE) hive-hierarchical
+	@echo ""
+	@echo "✅ Architecture comparison complete"
+	@echo "📊 Compare results in hive-sim/architecture-comparison-*/"
+
+# ============================================
+# Backend Comparison
+# ============================================
+
+backend-comparison:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Backend Comparison: Ditto vs Automerge-Iroh             ║"
+	@echo "║  2 Backends × 4 Bandwidths = 8 test runs                  ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@cd hive-sim && ./test-backend-comparison.sh
+
+# Quick validation: Test event-driven hierarchical (24-node only)
+validate-event-driven:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Event-Driven Hierarchical Validation (24 nodes)          ║"
+	@echo "║  Zero polling - measuring REAL empirical latencies        ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@cd hive-sim && ./validate-event-driven.sh
+
+backend-comparison-scaling:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Backend Scaling Comparison                               ║"
+	@echo "║  2 Backends × 3 Node Counts × 2 Topologies × 4 BW         ║"
+	@echo "║  = 48 test runs with real sync metrics                    ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "⚠️  WARNING: This will take several hours"
+	@echo "   Tests: 24/48/96 nodes × Traditional/Hierarchical"
+	@echo "   Metrics: Document sync latency (P50/P95/P99)"
+	@echo ""
+	@cd hive-sim && ./test-backend-comparison-scaling.sh
+
+backend-comparison-hierarchical:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Hierarchical Backend Comparison                          ║"
+	@echo "║  Traditional (O(n²)) vs Hierarchical (O(n log n))         ║"
+	@echo "║  2 Backends × 3 Scales × 2 Topologies × 4 BW = 48 tests   ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@cd hive-sim && ./test-backend-comparison-hierarchical.sh
+
+# Traditional baseline tests - run once and reuse (NO CRDT)
+traditional-baseline:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Traditional Baseline Tests (NO CRDT)                     ║"
+	@echo "║  Hub-Spoke Client-Server (O(n²) scaling)                  ║"
+	@echo "║  4 Scales × 4 BW = 16 tests (~45 mins)                    ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@cd hive-sim && ./test-traditional-baseline.sh
+
+# Hierarchical tests only - reuse traditional results from previous run
+hierarchical-only:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Hierarchical Tests Only (Faster Iteration)              ║"
+	@echo "║  Reuses traditional results, only tests hierarchical      ║"
+	@echo "║  2 Backends × 3 Scales × 4 BW = 24 tests (~60 mins)       ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@cd hive-sim && ./test-hierarchical-only.sh
+
+# ============================================
+# Bandwidth Testing
+# ============================================
+
+# Test all architectures across different bandwidth constraints
+bandwidth-matrix:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Bandwidth Constraint Matrix                              ║"
+	@echo "║  3 Architectures × 4 Bandwidths = 12 test runs            ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@cd hive-sim && ./test-bandwidth-matrix.sh
+
+# Test specific bandwidth constraint
+bandwidth-constrained:
 	@if [ -z "$(BW)" ]; then \
 		echo "Error: BW parameter required"; \
-		echo "Usage: make e11-mode4-bandwidth BW=256kbps"; \
+		echo "Usage: make bandwidth-constrained BW=256kbps"; \
 		echo "Options: 1gbps, 100mbps, 1mbps, 256kbps"; \
 		exit 1; \
 	fi
-	@echo "╔════════════════════════════════════════════════════════════╗"
-	@echo "║    E11 Mode 4 Bandwidth Test - $(BW)                      ║"
-	@echo "╚════════════════════════════════════════════════════════════╝"
-	@echo ""
-	@cd hive-sim && ./test-mode4-bandwidth.sh $(BW)
+	@echo "Testing all architectures at $(BW) bandwidth..."
+	@cd hive-sim && ./test-bandwidth-constrained.sh $(BW)
 
-# E11 All-Modes Validation: Test all modes unconstrained
-e11-all-modes-report:
+# ============================================
+# Full Experimental Matrix
+# ============================================
+
+# Complete matrix: 3 architectures × all sizes × 4 bandwidths
+matrix-full:
 	@echo "╔════════════════════════════════════════════════════════════╗"
-	@echo "║    E11 All-Modes Validation - Unconstrained Report        ║"
+	@echo "║  Complete Experimental Matrix                             ║"
+	@echo "║  3 Architectures × N Sizes × 4 Bandwidths                 ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@echo ""
-	@echo "This will test all CAP modes (unconstrained) and generate a report:"
-	@echo "  • Mode 1: Client-Server (12 nodes)"
-	@echo "  • Mode 2: Hub-Spoke (12 nodes)"
-	@echo "  • Mode 3: Dynamic Mesh (12 nodes)"
-	@echo "  • Mode 4: Hierarchical Aggregation (24 nodes)"
+	@echo "⚠️  WARNING: This will take several hours"
 	@echo ""
-	@echo "Estimated time: ~5-6 minutes"
-	@echo ""
+	@cd hive-sim && ./run-complete-matrix.sh
+
+# Analyze matrix results
+matrix-analyze:
+	@if [ -z "$(DIR)" ]; then \
+		echo "Usage: make matrix-analyze DIR=<results-directory>"; \
+		echo "Example: make matrix-analyze DIR=hive-sim/matrix-results-20251118-120000"; \
+		exit 1; \
+	fi
+	@echo "Generating comparative analysis for $(DIR)..."
+	@cd hive-sim && python3 analyze-matrix-results.py $(DIR)
+
+# ============================================
+# Legacy E-Series Tests (kept for compatibility)
+# ============================================
+
+e11-modes:
+	@echo "Running E11 mode testing (legacy)..."
 	@cd hive-sim && ./test-all-modes-report.sh
 
-# E12 Comprehensive Empirical Validation
-# Complete experimental framework with dual metrics collection
-# Tests all architectures × scales × bandwidth constraints
-# Total: 24 test configurations (~3-4 hours)
-e12-comprehensive-validation:
-	@echo "╔════════════════════════════════════════════════════════════╗"
-	@echo "║  E12 Comprehensive Empirical Validation                   ║"
-	@echo "║  Rigorous proof of CAP Protocol advantages                ║"
-	@echo "╚════════════════════════════════════════════════════════════╝"
-	@echo ""
-	@echo "This will run complete experimental validation:"
-	@echo "  • 3 Architectures: Traditional IoT, CAP Full, CAP Hierarchical"
-	@echo "  • Multiple Scales: 2, 12, 24 nodes"
-	@echo "  • 4 Bandwidths: 1Gbps, 100Mbps, 1Mbps, 256Kbps"
-	@echo ""
-	@echo "Metrics Collected:"
-	@echo "  • Application-level: Messages, documents, latency (JSONL)"
-	@echo "  • Docker-level: Network bytes tx/rx, CPU, memory"
-	@echo ""
-	@echo "⚠️  WARNING: This will take approximately 3-4 hours"
-	@echo ""
+e12-comprehensive:
+	@echo "Running E12 comprehensive validation (legacy)..."
 	@cd labs/e12-comprehensive-empirical-validation/scripts && ./run-comprehensive-suite.sh
-
-# E12 Validation Harness Test
-# Validates all E12 infrastructure components
-# Estimated time: ~3 minutes
-e12-validate:
-	@echo "╔════════════════════════════════════════════════════════════╗"
-	@echo "║  E12 Infrastructure Validation                            ║"
-	@echo "╚════════════════════════════════════════════════════════════╝"
-	@echo ""
-	@echo "Testing infrastructure components:"
-	@echo "  • Docker stats collection"
-	@echo "  • Topology deployment"
-	@echo "  • Bandwidth constraints"
-	@echo "  • Metrics extraction"
-	@echo "  • Analysis pipeline"
-	@echo ""
-	@cd labs/e12-comprehensive-empirical-validation/scripts && ./validate-harness.sh
-
-# E12 Analyze Results
-# Generate comparative analysis from test results
-# Usage: make e12-analyze DIR=<results-directory>
-e12-analyze:
-	@if [ -z "$(DIR)" ]; then \
-		echo "Usage: make e12-analyze DIR=<results-directory>"; \
-		echo "Example: make e12-analyze DIR=labs/e12-comprehensive-empirical-validation/e12-comprehensive-results-20251110-120000"; \
-		exit 1; \
-	fi
-	@echo "Generating comprehensive analysis for $(DIR)..."
-	@cd labs/e12-comprehensive-empirical-validation/scripts && python3 analyze-comprehensive-results.py ../$(DIR)
-
-# E8 Performance Test Suite (Three-Way Comparison with Bandwidth Constraints)
-# Runs 32 tests across 3 configurations: Traditional IoT, CAP Full, CAP Differential
-# Estimated time: 30-35 minutes
-e8-performance-tests:
-	@echo "╔════════════════════════════════════════════════════════════╗"
-	@echo "║   E8 Performance Test Suite - Three-Way Comparison        ║"
-	@echo "╚════════════════════════════════════════════════════════════╝"
-	@echo ""
-	@echo "This will run 32 tests and take approximately 30-35 minutes"
-	@echo "Tests: Traditional (8) + CAP Full (12) + CAP Differential (12)"
-	@echo "Bandwidths: 100Mbps, 10Mbps, 1Mbps, 256Kbps"
-	@echo ""
-	@cd hive-sim && ./run-e8-performance-suite.sh
-
-# Compare E8 performance results and generate analysis report
-e8-compare-results:
-	@if [ -z "$(DIR)" ]; then \
-		echo "Usage: make e8-compare-results DIR=<results-directory>"; \
-		echo "Example: make e8-compare-results DIR=hive-sim/e8-performance-results-20251107-140000"; \
-		exit 1; \
-	fi
-	@echo "Generating three-way comparison report for $(DIR)..."
-	@echo "TODO: Implement comparison script"
-
-# Three-Way Baseline Comparison: Traditional IoT vs CAP Full vs CAP Differential
-# Tests identical topologies (2-node, 12-node client-server, 12-node hub-spoke)
-# Estimated time: ~5 minutes
-e8-baseline-comparison:
-	@echo "╔════════════════════════════════════════════════════════════╗"
-	@echo "║  Three-Way Baseline Comparison                            ║"
-	@echo "║  Traditional IoT vs CAP Full vs CAP Differential          ║"
-	@echo "╚════════════════════════════════════════════════════════════╝"
-	@echo ""
-	@echo "This will run the complete baseline comparison matrix:"
-	@echo "  1. Traditional IoT Baseline (NO CRDT, periodic full messages)"
-	@echo "  2. CAP Full Replication (CRDT without filtering)"
-	@echo "  3. CAP Differential Filtering (CRDT + capability filtering)"
-	@echo ""
-	@echo "Tests: 3 architectures × 3 topologies = 9 test scenarios"
-	@echo "Estimated time: ~5 minutes"
-	@echo ""
-	@cd hive-sim && ./run-baseline-comparison.sh
-
-# ============================================
-# Scaling Validation Tests
-# ============================================
-
-# Validate 96-node baseline (Traditional IoT)
-scaling-validate-96:
-	@echo "╔════════════════════════════════════════════════════════════╗"
-	@echo "║  Scaling Validation - 96 Nodes (Battalion Large)         ║"
-	@echo "╚════════════════════════════════════════════════════════════╝"
-	@echo ""
-	@echo "Testing Traditional Baseline at 96-node scale"
-	@echo "Estimated time: ~3-5 minutes"
-	@echo ""
-	@cd hive-sim && ./test-scaling-validation.sh 96
-
-# Validate 192-node baseline (Traditional IoT)
-scaling-validate-192:
-	@echo "╔════════════════════════════════════════════════════════════╗"
-	@echo "║  Scaling Validation - 192 Nodes (Battalion Extra)        ║"
-	@echo "╚════════════════════════════════════════════════════════════╝"
-	@echo ""
-	@echo "Testing Traditional Baseline at 192-node scale"
-	@echo "⚠️  First test at this scale - infrastructure validation"
-	@echo "Estimated time: ~5-8 minutes"
-	@echo ""
-	@cd hive-sim && ./test-scaling-validation.sh 192
-
-# Validate 384-node baseline (Traditional IoT) - EXPERIMENTAL
-scaling-validate-384:
-	@echo "╔════════════════════════════════════════════════════════════╗"
-	@echo "║  Scaling Validation - 384 Nodes (EXPERIMENTAL)           ║"
-	@echo "╚════════════════════════════════════════════════════════════╝"
-	@echo ""
-	@echo "⚠️  WARNING: Experimental scale test"
-	@echo "   • RAM requirement: ~20-30GB"
-	@echo "   • CPU requirement: 32+ cores"
-	@echo "   • May push system limits"
-	@echo ""
-	@echo "Testing Traditional Baseline at 384-node scale"
-	@echo "Estimated time: ~10-15 minutes"
-	@echo ""
-	@cd hive-sim && ./test-scaling-validation.sh 384
-
-# Validate 500-node baseline (Traditional IoT) - APPROACHING LIMITS
-scaling-validate-500:
-	@echo "╔════════════════════════════════════════════════════════════╗"
-	@echo "║  Scaling Validation - 500 Nodes (APPROACHING LIMITS)     ║"
-	@echo "╚════════════════════════════════════════════════════════════╝"
-	@echo ""
-	@echo "⚠️  WARNING: Approaching Containerlab single-machine limits"
-	@echo "   • RAM requirement: ~25-30GB"
-	@echo "   • CPU requirement: 32+ cores"
-	@echo "   • Linux bridge limit: ~1024 nodes"
-	@echo "   • Will test infrastructure scaling capabilities"
-	@echo ""
-	@echo "Testing Traditional Baseline at 500-node scale"
-	@echo "Estimated time: ~15-20 minutes"
-	@echo ""
-	@cd hive-sim && ./test-scaling-validation.sh 500
-
-# Run all scaling validation tests (96, 192, 384, 500 nodes)
-scaling-validate-all:
-	@echo "╔════════════════════════════════════════════════════════════╗"
-	@echo "║  Complete Scaling Validation Suite                       ║"
-	@echo "╚════════════════════════════════════════════════════════════╝"
-	@echo ""
-	@echo "This will run scaling tests at 96, 192, 384, and 500 nodes"
-	@echo "⚠️  Total estimated time: ~30-40 minutes"
-	@echo "⚠️  Peak RAM usage: ~30GB"
-	@echo ""
-	@$(MAKE) scaling-validate-96
-	@$(MAKE) scaling-validate-192
-	@$(MAKE) scaling-validate-384
-	@$(MAKE) scaling-validate-500
-	@echo ""
-	@echo "✅ All scaling validation tests completed"
-	@echo "Results: hive-sim/scaling-results-*/"
-
-# ============================================
-# Documentation
-# ============================================
-
-# Build HTML presentation from markdown
-docs-presentation:
-	@echo "Building HTML presentation..."
-	@if ! command -v marp &> /dev/null; then \
-		echo "❌ Error: marp-cli not found"; \
-		echo "Install with: npm install -g @marp-team/marp-cli"; \
-		exit 1; \
-	fi
-	@marp docs/CAP_PROTOCOL_TECHNOLOGY_DEEPDIVE.md --html --allow-local-files -o docs/CAP_PROTOCOL_TECHNOLOGY_DEEPDIVE.html
-	@echo "✅ Presentation built: docs/CAP_PROTOCOL_TECHNOLOGY_DEEPDIVE.html"
-
-# Build PDF presentation from markdown
-docs-presentation-pdf:
-	@echo "Building PDF presentation..."
-	@if ! command -v marp &> /dev/null; then \
-		echo "❌ Error: marp-cli not found"; \
-		echo "Install with: npm install -g @marp-team/marp-cli"; \
-		exit 1; \
-	fi
-	@echo "Note: PDF generation requires Chromium/Chrome to be installed"
-	@marp docs/CAP_PROTOCOL_TECHNOLOGY_DEEPDIVE.md --pdf --allow-local-files -o docs/CAP_PROTOCOL_TECHNOLOGY_DEEPDIVE.pdf
-	@echo "✅ Presentation built: docs/CAP_PROTOCOL_TECHNOLOGY_DEEPDIVE.pdf"

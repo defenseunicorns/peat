@@ -6,11 +6,13 @@
 # ============================================================================
 # Stage 1: Builder - Build the hive-sim binary
 # ============================================================================
-FROM rust:1.86-bookworm AS builder
+FROM rust:1.89-bookworm AS builder
 
 # Install build dependencies
+# libclang-dev required for automerge-backend's bindgen dependency
 RUN apt-get update && apt-get install -y \
     protobuf-compiler \
+    libclang-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -19,8 +21,11 @@ WORKDIR /build
 # Copy entire workspace (needed for workspace dependencies)
 COPY . .
 
-# Build the hive-sim binary and traditional_baseline example (release mode with optimizations)
-RUN cargo build --release -p hive-sim && \
+# Build the hive-sim binary with both backends enabled, and the traditional baseline
+# Always build with automerge-backend feature for maximum flexibility
+# Note: We only build hive-sim (protocol-based) and traditional_baseline
+# The hierarchical_sim_node examples are Ditto-specific and should not be used
+RUN cargo build --release -p hive-sim --features automerge-backend && \
     cargo build --release --example traditional_baseline -p hive-protocol
 
 # ============================================================================
@@ -46,7 +51,7 @@ RUN mkdir -p /data/ditto
 COPY --from=builder /build/target/release/hive-sim /usr/local/bin/hive-sim
 COPY --from=builder /build/target/release/examples/traditional_baseline /usr/local/bin/traditional_baseline
 
-# Copy entrypoint script
+# Copy entrypoint script (relative to build context which is parent dir)
 COPY hive-sim/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
