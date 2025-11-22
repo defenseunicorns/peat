@@ -212,17 +212,6 @@ enum MetricsEvent {
         processing_time_us: u128,  // Time spent aggregating
         timestamp_us: u128,
     },
-    PeerSyncDetected {
-        node_id: String,
-        tier: String,
-        doc_type: String,
-        doc_id: String,
-        from_peer: String,          // Which peer sent this
-        received_at_us: u128,
-        created_at_us: u128,
-        horizontal_latency_us: u128,
-        horizontal_latency_ms: f64,
-    },
 }
 
 /// Phase 3: Simple command demonstration function
@@ -2158,28 +2147,27 @@ async fn process_document(
         }
     }
     // Check if this is a platoon summary document
-    else if doc_id.starts_with("platoon-") && doc_id.ends_with("-summary") {
-        if created_at_us > 0 && !test_doc_timestamps.contains(&created_at_us) {
-            test_doc_timestamps.insert(created_at_us);
+    else if doc_id.starts_with("platoon-") && doc_id.ends_with("-summary")
+        && created_at_us > 0 && !test_doc_timestamps.contains(&created_at_us) {
+        test_doc_timestamps.insert(created_at_us);
 
-            println!(
-                "[{}] ✓ Platoon summary received: {} (latency: {:.3}ms)",
-                node_id, doc_id, latency_ms
-            );
+        println!(
+            "[{}] ✓ Platoon summary received: {} (latency: {:.3}ms)",
+            node_id, doc_id, latency_ms
+        );
 
-            log_metrics(&MetricsEvent::DocumentReceived {
-                node_id: node_id.to_string(),
-                doc_id: doc_id.to_string(),
-                created_at_us,
-                last_modified_us,
-                received_at_us,
-                latency_us,
-                latency_ms,
-                version,
-                is_first_reception: true, // Inside conditional, so always first reception
-                latency_type: latency_type.clone(),
-            });
-        }
+        log_metrics(&MetricsEvent::DocumentReceived {
+            node_id: node_id.to_string(),
+            doc_id: doc_id.to_string(),
+            created_at_us,
+            last_modified_us,
+            received_at_us,
+            latency_us,
+            latency_ms,
+            version,
+            is_first_reception: true, // Inside conditional, so always first reception
+            latency_type: latency_type.clone(),
+        });
     }
 
     Ok(())
