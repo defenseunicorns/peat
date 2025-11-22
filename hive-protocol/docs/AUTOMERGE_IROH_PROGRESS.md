@@ -342,6 +342,96 @@ All 5 Automerge+Iroh E2E tests passing (2.84s) ✅:
 13. **Partition Lifecycle Events**: ✅ Structured events for partition detect/heal/recovery (Phase 7.1)
 14. **Tracing Integration**: ✅ Structured logging for partition lifecycle (Phase 7.1)
 
+### ✅ Phase 8.1: Transport Abstraction - Core Implementation (COMPLETE)
+
+**Status**: ✅ Phase 8.1 Complete - Core abstraction implemented and tested
+**Updated**: 2025-11-22
+
+#### Goals
+
+Create backend-agnostic transport layer for mesh topology formation:
+- Enable `TopologyManager` to establish parent-child connections
+- Support both Iroh (explicit) and Ditto (implicit) transports
+- Follow Ports & Adapters pattern (like `BeaconStorage`)
+
+#### Architecture
+
+**MeshTransport Trait**:
+```rust
+#[async_trait]
+pub trait MeshTransport {
+    async fn start() -> Result<()>;
+    async fn stop() -> Result<()>;
+    async fn connect(&self, peer_id: &NodeId) -> Result<Box<dyn MeshConnection>>;
+    async fn disconnect(&self, peer_id: &NodeId) -> Result<()>;
+    fn get_connection(&self, peer_id: &NodeId) -> Option<Box<dyn MeshConnection>>;
+    fn peer_count(&self) -> usize;
+    fn connected_peers(&self) -> Vec<NodeId>;
+}
+```
+
+**Implementation Strategy**:
+1. **IrohMeshTransport**: Wraps `IrohTransport`, handles NodeId ↔ EndpointId mapping
+2. **DittoMeshTransport**: Wraps `DittoBackend`, mostly no-ops (Ditto manages internally)
+
+**TopologyManager Integration**:
+- Accepts `Arc<dyn MeshTransport>` for backend-agnostic connections
+- Reacts to `TopologyEvent` (ParentSelected/Changed/Lost)
+- Establishes/tears down parent-child connections automatically
+
+#### Phase 8.1 Implementation (COMPLETE)
+
+**Core Abstractions** (transport/mod.rs, 280 lines):
+- ✅ `MeshTransport` trait - Backend-agnostic connection management
+- ✅ `MeshConnection` trait - Active peer connection interface
+- ✅ `NodeId` type - Mesh network node identifier
+- ✅ `TransportError` enum - Unified error type
+- ✅ 4 unit tests passing
+
+**IrohMeshTransport** (transport/iroh.rs, 350 lines):
+- ✅ Wraps `IrohTransport` for mesh operations
+- ✅ NodeId ↔ EndpointId mapping for discovery
+- ✅ Static peer configuration integration
+- ✅ Connection lifecycle management (start/stop/connect/disconnect)
+- ✅ IrohMeshConnection wrapper for QUIC connections
+- ✅ 6 unit tests passing
+
+**DittoMeshTransport** (transport/ditto.rs, 190 lines):
+- ✅ Wraps `DittoBackend` for mesh operations
+- ✅ No-op lifecycle (Ditto manages internally)
+- ✅ Virtual connections (Ditto handles transport)
+- ✅ DittoMeshConnection wrapper
+- ✅ 7 unit tests passing
+
+**Test Results**:
+- All 25 transport tests passing ✅
+- No regressions in existing test suite ✅
+
+#### Remaining Tasks
+
+Phase 8.2: TopologyManager Integration (Week 5-6)
+- [ ] Update `TopologyManager` to use `MeshTransport`
+- [ ] Handle topology events for connection lifecycle
+- [ ] Integration tests with both backends
+
+Phase 8.3: Discovery Enhancement (Week 6+)
+- [ ] Integrate mDNS discovery with `IrohMeshTransport`
+- [ ] Dynamic peer registration and NodeId resolution
+- [ ] Connection health monitoring and reconnection
+
+#### Documentation
+
+**Design Document**: [TRANSPORT_ABSTRACTION.md](TRANSPORT_ABSTRACTION.md)
+- Full trait definitions with Rust code
+- Implementation strategy for both backends
+- TopologyManager integration examples
+- Testing strategy
+
+**Related**:
+- Issue #122 (Phase 3: Topology Management)
+- ADR-017 (Section 2.2: TopologyManager architecture)
+- ADR-011 (AutomergeIrohBackend)
+
 ### ✅ hive-sim Backend Support (2025-11-19)
 15. **hive-sim Integration**: ✅ Simulator now supports both backends via --backend flag
     - Backend selection: `--backend ditto` or `--backend automerge`
@@ -445,4 +535,6 @@ tempfile = "3.13"
 - [Iroh Examples](https://github.com/n0-computer/iroh/tree/main/iroh/examples)
 - [Automerge 0.7 Documentation](https://docs.rs/automerge/0.7.1/automerge/)
 - [ADR-011: AutomergeIrohBackend](../adr/011-automerge-iroh-backend.md)
+- [ADR-017: P2P Mesh Intelligence](../adr/017-mesh-intelligence.md)
 - [Phase 6 Requirements](AUTOMERGE_IROH_PHASE6_REQUIREMENTS.md)
+- [Transport Abstraction Design](TRANSPORT_ABSTRACTION.md)
