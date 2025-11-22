@@ -11,10 +11,13 @@ repository = "https://github.com/kitplummer/cap"
 # CAP dependencies
 hive-schema = { path = "../hive-schema" }
 hive-protocol = { path = "../hive-protocol" }
+hive-mesh = { path = "../hive-mesh" }
 
 # Async runtime
 tokio = { workspace = true, features = ["full"] }
+tokio-stream = "0.1"
 async-trait = "0.1"
+futures = "0.3"
 
 # Serialization
 serde = { workspace = true }
@@ -38,6 +41,7 @@ tokio-test = "0.4"
 reqwest = { version = "0.12", features = ["json"] }
 tracing-subscriber = { workspace = true }
 dotenvy = { workspace = true }
+serial_test = "3.2"
 
 [features]
 default = ["external-api"]

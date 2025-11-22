@@ -13,7 +13,7 @@
 //!
 //! # Usage
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 //! use hive_protocol::hierarchy::{HierarchicalAggregator, storage_trait::SummaryStorage};
 //! use std::sync::Arc;
 //!

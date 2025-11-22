@@ -45,9 +45,20 @@ impl DataStore for DittoStore {
             }
         };
 
+        // Extract document ID from fields if present
+        // Look for "node_id" (beacons) or "_id" (generic) field
+        let doc_id = if let Some(Value::String(node_id)) = document.get("node_id") {
+            Some(node_id.clone())
+        } else {
+            document
+                .get("_id")
+                .and_then(|v| v.as_str())
+                .map(String::from)
+        };
+
         // Create sync document
         let sync_doc = SyncDocument {
-            id: None, // Let Ditto generate ID
+            id: doc_id.clone(),
             fields,
             updated_at: std::time::SystemTime::now(),
         };

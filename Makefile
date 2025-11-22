@@ -70,6 +70,29 @@ test: clean-ditto
 		cargo test -- --test-threads=1; \
 	fi
 
+# Run functional/unit tests only (fast, for CI)
+test-functional: clean-ditto
+	@echo "Running functional/unit tests only..."
+	@if [ -f .env ]; then \
+		export $$(grep -v '^#' .env | xargs) && cargo test -- --test-threads=1; \
+	else \
+		cargo test -- --test-threads=1; \
+	fi
+
+# Run baseline comparison tests only (Containerlab-based)
+test-baseline:
+	@echo "Running baseline comparison tests..."
+	@cd hive-sim && ./run-baseline-comparison.sh
+
+# Run E2E integration tests
+test-e2e: clean-ditto
+	@echo "Running E2E integration tests..."
+	@if [ ! -f .env ]; then \
+		echo "⚠️  Warning: .env file not found. Ditto tests may be skipped."; \
+		echo "   Create .env with DITTO_APP_ID, DITTO_OFFLINE_TOKEN, DITTO_SHARED_KEY"; \
+	fi
+	cd hive-protocol && export $$(grep -v '^#' ../.env | xargs) && cargo test --test squad_formation_e2e -- --test-threads=1 --nocapture
+
 fmt:
 	@echo "Formatting code..."
 	cargo fmt --all

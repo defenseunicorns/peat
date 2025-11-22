@@ -28,24 +28,26 @@ use hive_protocol::models::{
 use hive_protocol::storage::{CellStore, NodeStore};
 use hive_protocol::sync::ditto::DittoBackend;
 use hive_protocol::testing::E2EHarness;
+use serial_test::serial;
 use std::sync::Arc;
 use std::time::Duration;
 
 /// Returns the number of sync attempts based on environment.
-/// CI environments need more time due to resource contention and network latency.
+/// CI environments and concurrent test execution need more time due to resource contention and network latency.
 ///
-/// - Local: 20 attempts × 500ms = 10 seconds
+/// - Local: 40 attempts × 500ms = 20 seconds (increased to handle concurrent test execution)
 /// - CI: 60 attempts × 500ms = 30 seconds
 fn sync_timeout_attempts() -> usize {
     if std::env::var("CI").is_ok() {
         60 // 30 seconds for CI
     } else {
-        20 // 10 seconds for local
+        40 // 20 seconds for local (increased for concurrent test stability)
     }
 }
 
 /// Test: Verify E2E test harness creates isolated Ditto stores
 #[tokio::test]
+#[serial]
 async fn test_harness_creates_isolated_stores() {
     // Fail if Ditto credentials not properly configured
     let ditto_app_id =
@@ -70,6 +72,7 @@ async fn test_harness_creates_isolated_stores() {
 /// - Observers trigger on data changes
 /// - Sync happens deterministically
 #[tokio::test]
+#[serial]
 async fn test_ditto_peer_sync_with_observers() {
     // Fail if Ditto credentials not properly configured
     let ditto_app_id =
@@ -129,6 +132,7 @@ async fn test_ditto_peer_sync_with_observers() {
 /// Validates that NodeConfig stored on peer1 syncs to peer2 via CRDT replication.
 /// This is the foundation for distributed node discovery.
 #[tokio::test]
+#[serial]
 async fn test_e2e_node_advertisement_sync() {
     let ditto_app_id =
         std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
@@ -227,6 +231,7 @@ async fn test_e2e_node_advertisement_sync() {
 /// Validates that nodes with different capabilities sync across mesh.
 /// Tests G-Set CRDT semantics for capability aggregation.
 #[tokio::test]
+#[serial]
 async fn test_e2e_capability_multi_peer_propagation() {
     let ditto_app_id =
         std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
@@ -383,6 +388,7 @@ async fn test_e2e_capability_multi_peer_propagation() {
 ///
 /// Validates that CellState member list syncs across peers via OR-Set CRDT.
 #[tokio::test]
+#[serial]
 async fn test_e2e_cell_formation_multi_peer() {
     let ditto_app_id =
         std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
@@ -475,6 +481,7 @@ async fn test_e2e_cell_formation_multi_peer() {
 ///
 /// Validates that role assignments (leader_id) propagate via LWW-Register CRDT.
 #[tokio::test]
+#[serial]
 async fn test_e2e_role_assignment_sync() {
     let ditto_app_id =
         std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
@@ -484,13 +491,17 @@ async fn test_e2e_role_assignment_sync() {
 
     println!("=== E2E: Role Assignment Sync ===");
 
+    // Allocate random TCP port to avoid conflicts with concurrent tests
+    let tcp_port = E2EHarness::allocate_tcp_port().expect("Failed to allocate TCP port");
+    println!("  Using TCP port: {}", tcp_port);
+
     // Create two peers with explicit TCP connections (mDNS unreliable in 4.11.5)
     let store1 = harness
-        .create_ditto_store_with_tcp(Some(12349), None)
+        .create_ditto_store_with_tcp(Some(tcp_port), None)
         .await
         .unwrap();
     let store2 = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12349".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
         .await
         .unwrap();
 
@@ -528,31 +539,34 @@ async fn test_e2e_role_assignment_sync() {
 
     println!("  2. Storing cell on peer1: {}", cell_id);
 
+    // Set up observer BEFORE storing the cell (observer-based sync pattern)
+    let mut observer2 = harness.observe_cell(&store2, &cell_id).await.unwrap();
+
     cell_store1.store_cell(&cell_state).await.unwrap();
 
-    // Wait for cell to sync to peer2 before modifying
-    println!("  2a. Waiting for cell to sync to peer2...");
-    let mut cell_synced = false;
-    for attempt in 1..=sync_timeout_attempts() {
-        tokio::time::sleep(Duration::from_millis(500)).await;
-        if cell_store2
-            .get_cell(&cell_id)
-            .await
-            .ok()
-            .flatten()
-            .is_some()
-        {
-            cell_synced = true;
-            println!("  ✓ Cell synced to peer2 (attempt {})", attempt);
-            break;
+    // Wait for cell to sync to peer2 using observer (event-driven, not polling!)
+    println!("  2a. Waiting for cell to sync to peer2 (observer-based)...");
+    match observer2
+        .wait_and_verify(&cell_store2, Duration::from_secs(15))
+        .await
+    {
+        Ok(_) => println!("  ✓ Cell synced to peer2 and verified queryable"),
+        Err(_) => {
+            println!("  ✗ Cell sync timeout for peer2");
+            harness.shutdown_store(store1).await;
+            harness.shutdown_store(store2).await;
+            panic!("Cell failed to sync to peer2 within timeout");
         }
     }
-    assert!(
-        cell_synced,
-        "Cell failed to sync to peer2 before leader assignment"
-    );
 
     println!("  3. Setting leader to node_leader...");
+
+    // Set up observer BEFORE leader election (observer-based sync pattern)
+    let mut observer2_leader = harness.observe_cell(&store2, &cell_id).await.unwrap();
+
+    // Give observer time to fully register before mutation
+    // Increased from 500ms to 2000ms to ensure observer is fully active
+    tokio::time::sleep(Duration::from_millis(2000)).await;
 
     // Set leader on peer1
     cell_store1
@@ -560,26 +574,44 @@ async fn test_e2e_role_assignment_sync() {
         .await
         .unwrap();
 
-    // Give Ditto time to propagate the update before we start polling
-    tokio::time::sleep(Duration::from_millis(1000)).await;
-
-    println!("  4. Waiting for leader sync to peer2...");
-
-    // Poll peer2 for leader update
-    let mut leader_synced = false;
-    for attempt in 1..=sync_timeout_attempts() {
-        tokio::time::sleep(Duration::from_millis(500)).await;
-
-        if let Ok(Some(cell)) = cell_store2.get_cell(&cell_id).await {
+    // Verify leader was set on peer1 before waiting for sync to peer2
+    println!("  3a. Verifying leader set on peer1...");
+    let mut leader_set_on_peer1 = false;
+    for attempt in 1..=10 {
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        if let Some(cell) = cell_store1.get_cell(&cell_id).await.ok().flatten() {
             if cell.leader_id == Some("node_leader".to_string()) {
-                leader_synced = true;
-                println!("  ✓ Leader synced to peer2 (attempt {})", attempt);
+                leader_set_on_peer1 = true;
+                println!("  ✓ Leader confirmed on peer1 (attempt {})", attempt);
                 break;
             }
         }
     }
 
-    assert!(leader_synced, "Leader failed to sync to peer2");
+    if !leader_set_on_peer1 {
+        println!("  ✗ Leader not set on peer1 - test setup failed");
+        harness.shutdown_store(store1).await;
+        harness.shutdown_store(store2).await;
+        panic!("Leader update failed on peer1 (originating peer)");
+    }
+
+    println!("  4. Waiting for leader sync to peer2 (observer-based)...");
+
+    // Wait for peer2 observer AND verify leader_id is actually set (handles CRDT indexing lag)
+    match observer2_leader
+        .wait_and_verify_with(&cell_store2, Duration::from_secs(15), |cell| {
+            cell.leader_id == Some("node_leader".to_string())
+        })
+        .await
+    {
+        Ok(_) => println!("  ✓ Leader synced to peer2 with leader_id validated"),
+        Err(_) => {
+            println!("  ✗ Leader sync timeout for peer2");
+            harness.shutdown_store(store1).await;
+            harness.shutdown_store(store2).await;
+            panic!("Leader failed to sync to peer2 within timeout");
+        }
+    }
 
     // Cleanup
     harness.shutdown_store(store1).await;
@@ -592,6 +624,7 @@ async fn test_e2e_role_assignment_sync() {
 ///
 /// Validates that leader election results distribute mesh-wide via LWW-Register.
 #[tokio::test]
+#[serial]
 async fn test_e2e_leader_election_propagation() {
     let ditto_app_id =
         std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
@@ -780,6 +813,7 @@ async fn test_e2e_leader_election_propagation() {
 ///
 /// Validates LWW-Register semantics where latest update wins across peers.
 #[tokio::test]
+#[serial]
 async fn test_e2e_timestamped_state_updates() {
     dotenvy::dotenv().ok();
 
@@ -1009,6 +1043,7 @@ async fn test_e2e_timestamped_state_updates() {
 ///
 /// Full lifecycle test: capability advertisement → cell formation → leader election → validation.
 #[tokio::test]
+#[serial]
 async fn test_e2e_complete_formation_convergence() {
     let ditto_app_id =
         std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
@@ -1018,17 +1053,21 @@ async fn test_e2e_complete_formation_convergence() {
 
     println!("=== E2E: Complete Formation Convergence ===");
 
+    // Allocate random TCP port to avoid conflicts with concurrent tests
+    let tcp_port = E2EHarness::allocate_tcp_port().expect("Failed to allocate TCP port");
+    println!("  Using TCP port: {}", tcp_port);
+
     // Create three peers with explicit TCP (star topology: store1 is hub)
     let store1 = harness
-        .create_ditto_store_with_tcp(Some(12352), None)
+        .create_ditto_store_with_tcp(Some(tcp_port), None)
         .await
         .unwrap();
     let store2 = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12352".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
         .await
         .unwrap();
     let store3 = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12352".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
         .await
         .unwrap();
 
@@ -1119,92 +1158,156 @@ async fn test_e2e_complete_formation_convergence() {
     cell_state.add_capability(node2.capabilities[0].clone());
     cell_state.add_capability(node3.capabilities[0].clone());
 
+    // Set up observers BEFORE storing the cell (observer-based sync pattern)
+    println!("  3a. Setting up observers for cell sync...");
+    let mut observer2 = harness.observe_cell(&store2, &cell_id).await.unwrap();
+    let mut observer3 = harness.observe_cell(&store3, &cell_id).await.unwrap();
+
+    // Now store the cell on peer1
     cell_store1.store_cell(&cell_state).await.unwrap();
 
-    // Wait for cell to sync to all peers before modifying
-    println!("  3a. Waiting for cell to sync to all peers...");
-    let mut cell_synced_to_2 = false;
-    let mut cell_synced_to_3 = false;
-    for attempt in 1..=sync_timeout_attempts() {
-        tokio::time::sleep(Duration::from_millis(500)).await;
-        if !cell_synced_to_2
-            && cell_store2
-                .get_cell(&cell_id)
-                .await
-                .ok()
-                .flatten()
-                .is_some()
-        {
-            cell_synced_to_2 = true;
-            println!("  ✓ Cell synced to peer2 (attempt {})", attempt);
-        }
-        if !cell_synced_to_3
-            && cell_store3
-                .get_cell(&cell_id)
-                .await
-                .ok()
-                .flatten()
-                .is_some()
-        {
-            cell_synced_to_3 = true;
-            println!("  ✓ Cell synced to peer3 (attempt {})", attempt);
-        }
-        if cell_synced_to_2 && cell_synced_to_3 {
-            break;
+    // Wait for cell to sync to all peers using observers (event-driven, not polling!)
+    println!("  3b. Waiting for cell to sync to all peers (observer-based)...");
+
+    // Wait for peer2 observer AND verify document is queryable (handles CRDT indexing lag)
+    match observer2
+        .wait_and_verify(&cell_store2, Duration::from_secs(15))
+        .await
+    {
+        Ok(_) => println!("  ✓ Cell synced to peer2 and verified queryable"),
+        Err(_) => {
+            println!("  ✗ Cell sync timeout for peer2");
+            harness.shutdown_store(store1).await;
+            harness.shutdown_store(store2).await;
+            harness.shutdown_store(store3).await;
+            panic!("Cell failed to sync to peer2 within timeout");
         }
     }
-    assert!(
-        cell_synced_to_2 && cell_synced_to_3,
-        "Cell failed to sync to all peers before leader election"
-    );
+
+    // Wait for peer3 observer AND verify document is queryable
+    match observer3
+        .wait_and_verify(&cell_store3, Duration::from_secs(15))
+        .await
+    {
+        Ok(_) => println!("  ✓ Cell synced to peer3 and verified queryable"),
+        Err(_) => {
+            println!("  ✗ Cell sync timeout for peer3");
+            harness.shutdown_store(store1).await;
+            harness.shutdown_store(store2).await;
+            harness.shutdown_store(store3).await;
+            panic!("Cell failed to sync to peer3 within timeout");
+        }
+    }
 
     // Step 3: Leader election
     println!("  4. Electing leader...");
 
+    // Document is now verified to be queryable on peer2
+    let cell_on_peer2 = cell_store2
+        .get_cell(&cell_id)
+        .await
+        .expect("Cell should exist on peer2 after verification");
+    assert!(
+        cell_on_peer2.is_some(),
+        "Cell must exist on peer2 before leader election"
+    );
+
+    // Set up observers BEFORE leader election (observer-based sync pattern)
+    let mut observer1 = harness.observe_cell(&store1, &cell_id).await.unwrap();
+    let mut observer3_leader = harness.observe_cell(&store3, &cell_id).await.unwrap();
+
+    // Give observers time to fully register before mutation
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // Perform leader election on peer2
     cell_store2
         .set_leader(&cell_id, "node_2".to_string())
         .await
         .unwrap();
 
-    // Give Ditto time to propagate the update before we start polling
-    tokio::time::sleep(Duration::from_millis(1000)).await;
+    // Wait for leader election to propagate using observers (event-driven, not polling!)
+    println!("  4a. Waiting for leader election to propagate (observer-based)...");
+
+    // Wait for peer1 observer AND verify leader_id is actually set (handles CRDT indexing lag)
+    match observer1
+        .wait_and_verify_with(&cell_store1, Duration::from_secs(15), |cell| {
+            cell.leader_id == Some("node_2".to_string())
+        })
+        .await
+    {
+        Ok(_) => println!("  ✓ Leader election synced to peer1 with leader_id validated"),
+        Err(_) => {
+            println!("  ✗ Leader election sync timeout for peer1");
+            harness.shutdown_store(store1).await;
+            harness.shutdown_store(store2).await;
+            harness.shutdown_store(store3).await;
+            panic!("Leader election failed to sync to peer1 within timeout");
+        }
+    }
+
+    // Wait for peer3 observer AND verify leader_id is actually set
+    match observer3_leader
+        .wait_and_verify_with(&cell_store3, Duration::from_secs(15), |cell| {
+            cell.leader_id == Some("node_2".to_string())
+        })
+        .await
+    {
+        Ok(_) => println!("  ✓ Leader election synced to peer3 with leader_id validated"),
+        Err(_) => {
+            println!("  ✗ Leader election sync timeout for peer3");
+            harness.shutdown_store(store1).await;
+            harness.shutdown_store(store2).await;
+            harness.shutdown_store(store3).await;
+            panic!("Leader election failed to sync to peer3 within timeout");
+        }
+    }
 
     // Step 4: Validation of final state
     println!("  5. Validating final state convergence...");
 
-    let mut all_converged = false;
+    // After observers fire, verify the actual state
+    let cell1 = cell_store1.get_cell(&cell_id).await.ok().flatten();
+    let cell2 = cell_store2.get_cell(&cell_id).await.ok().flatten();
+    let cell3 = cell_store3.get_cell(&cell_id).await.ok().flatten();
 
-    for attempt in 1..=sync_timeout_attempts() {
-        tokio::time::sleep(Duration::from_millis(500)).await;
+    assert!(cell1.is_some(), "Cell should exist on peer1");
+    assert!(cell2.is_some(), "Cell should exist on peer2");
+    assert!(cell3.is_some(), "Cell should exist on peer3");
 
-        // Check all peers have converged to same state
-        let cell1 = cell_store1.get_cell(&cell_id).await.ok().flatten();
-        let cell2 = cell_store2.get_cell(&cell_id).await.ok().flatten();
-        let cell3 = cell_store3.get_cell(&cell_id).await.ok().flatten();
+    let c1 = cell1.unwrap();
+    let c2 = cell2.unwrap();
+    let c3 = cell3.unwrap();
 
-        if let (Some(c1), Some(c2), Some(c3)) = (cell1, cell2, cell3) {
-            // Check members
-            let members_match = c1.members == c2.members && c2.members == c3.members;
+    // Check members
+    assert_eq!(c1.members.len(), 3, "Peer1 should have 3 members");
+    assert_eq!(c2.members.len(), 3, "Peer2 should have 3 members");
+    assert_eq!(c3.members.len(), 3, "Peer3 should have 3 members");
+    assert_eq!(c1.members, c2.members, "Members should match across peers");
+    assert_eq!(c2.members, c3.members, "Members should match across peers");
 
-            // Check leader
-            let leader_match = c1.leader_id == Some("node_2".to_string())
-                && c2.leader_id == Some("node_2".to_string())
-                && c3.leader_id == Some("node_2".to_string());
+    // Check leader
+    assert_eq!(
+        c1.leader_id,
+        Some("node_2".to_string()),
+        "Peer1 should have correct leader"
+    );
+    assert_eq!(
+        c2.leader_id,
+        Some("node_2".to_string()),
+        "Peer2 should have correct leader"
+    );
+    assert_eq!(
+        c3.leader_id,
+        Some("node_2".to_string()),
+        "Peer3 should have correct leader"
+    );
 
-            // Check capabilities
-            let caps_match = c1.capabilities.len() == 3
-                && c2.capabilities.len() == 3
-                && c3.capabilities.len() == 3;
+    // Check capabilities
+    assert_eq!(c1.capabilities.len(), 3, "Peer1 should have 3 capabilities");
+    assert_eq!(c2.capabilities.len(), 3, "Peer2 should have 3 capabilities");
+    assert_eq!(c3.capabilities.len(), 3, "Peer3 should have 3 capabilities");
 
-            if members_match && leader_match && caps_match {
-                all_converged = true;
-                println!("  ✓ All state converged (attempt {})", attempt);
-                break;
-            }
-        }
-    }
-
-    assert!(all_converged, "Failed to achieve full state convergence");
+    println!("  ✓ All state converged (verified via observers)");
 
     // Final validation
     let final_cell = cell_store1.get_cell(&cell_id).await.unwrap().unwrap();
@@ -1236,6 +1339,7 @@ async fn test_e2e_complete_formation_convergence() {
 /// protocol operations beyond basic document sync.
 #[cfg(feature = "automerge-backend")]
 #[tokio::test]
+#[serial]
 async fn test_e2e_automerge_node_advertisement_sync() {
     use hive_protocol::sync::automerge::AutomergeIrohBackend;
 

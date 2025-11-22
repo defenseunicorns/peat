@@ -57,6 +57,23 @@ impl E2EHarness {
         }
     }
 
+    /// Allocate a random available TCP port
+    ///
+    /// This prevents port conflicts when running multiple tests concurrently.
+    /// Uses OS-assigned ephemeral ports by binding to port 0 and retrieving the assigned port.
+    pub fn allocate_tcp_port() -> std::io::Result<u16> {
+        use std::net::{SocketAddr, TcpListener};
+
+        // Bind to port 0 to get an OS-assigned ephemeral port
+        let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0)))?;
+        let port = listener.local_addr()?.port();
+
+        // Drop the listener to free the port
+        drop(listener);
+
+        Ok(port)
+    }
+
     /// Create a new isolated Ditto store for testing
     ///
     /// Each store gets:
@@ -289,6 +306,7 @@ impl E2EHarness {
             _sync_sub: sync_sub,
             _observer: observer,
             receiver: rx,
+            cell_id: cell_id.to_string(),
         })
     }
 
@@ -381,6 +399,7 @@ pub struct CellObserver {
     _sync_sub: Arc<dittolive_ditto::sync::SyncSubscription>,
     _observer: Arc<dittolive_ditto::store::StoreObserver>,
     receiver: mpsc::UnboundedReceiver<CellObserverEvent>,
+    cell_id: String,
 }
 
 impl CellObserver {
@@ -407,6 +426,103 @@ impl CellObserver {
     /// Try to receive an event without blocking
     pub fn try_recv(&mut self) -> Option<CellObserverEvent> {
         self.receiver.try_recv().ok()
+    }
+
+    /// Wait for observer event, then verify cell exists with retry
+    ///
+    /// This handles the CRDT eventual consistency issue where observers fire
+    /// when documents arrive but queries may lag slightly due to indexing.
+    ///
+    /// Pattern:
+    /// 1. Wait for observer to fire (efficient, event-driven)
+    /// 2. Retry get_cell with validation predicate until it passes
+    ///
+    /// Note: Optional validation function allows checking specific fields
+    /// (e.g., leader_id is set) rather than just document existence.
+    pub async fn wait_and_verify<B: crate::sync::DataSyncBackend>(
+        &mut self,
+        cell_store: &crate::storage::cell_store::CellStore<B>,
+        timeout_duration: Duration,
+    ) -> Result<()> {
+        self.wait_and_verify_with(cell_store, timeout_duration, |_| true)
+            .await
+    }
+
+    /// Wait for observer event, then verify cell matches predicate
+    ///
+    /// This is the full-featured version that allows validating specific
+    /// fields (e.g., "leader_id is Some") to handle document updates where
+    /// the document already exists but a field is being set.
+    pub async fn wait_and_verify_with<B, F>(
+        &mut self,
+        cell_store: &crate::storage::cell_store::CellStore<B>,
+        timeout_duration: Duration,
+        mut predicate: F,
+    ) -> Result<()>
+    where
+        B: crate::sync::DataSyncBackend,
+        F: FnMut(&crate::models::cell::CellState) -> bool,
+    {
+        // Step 1: Wait for observer event (efficient)
+        self.wait_for_event(timeout_duration).await?;
+
+        // Step 2: Retry query with validation until predicate passes
+        let start = std::time::Instant::now();
+        let mut retry_delay = Duration::from_millis(10); // Start with 10ms
+        const MAX_RETRY_DELAY: Duration = Duration::from_millis(500);
+
+        loop {
+            // Try to get the cell and validate it
+            match cell_store.get_cell(&self.cell_id).await {
+                Ok(Some(cell)) => {
+                    // Cell found! Check if it matches the expected state
+                    if predicate(&cell) {
+                        // Validation passed!
+                        return Ok(());
+                    }
+
+                    // Cell exists but doesn't match predicate yet
+                    // (e.g., leader_id not set yet - old version still in index)
+                    if start.elapsed() >= timeout_duration {
+                        return Err(Error::storage_error(
+                            format!(
+                                "Cell {} exists but validation failed after timeout: {:?}",
+                                self.cell_id, timeout_duration
+                            ),
+                            "wait_and_verify_with",
+                            None,
+                        ));
+                    }
+
+                    // Retry with backoff
+                    tokio::time::sleep(retry_delay).await;
+                    retry_delay = std::cmp::min(retry_delay * 2, MAX_RETRY_DELAY);
+                }
+                Ok(None) => {
+                    // Cell not found yet, check if we should retry
+                    if start.elapsed() >= timeout_duration {
+                        return Err(Error::storage_error(
+                            format!(
+                                "Cell {} not found after observer fired (timeout: {:?})",
+                                self.cell_id, timeout_duration
+                            ),
+                            "wait_and_verify_with",
+                            None,
+                        ));
+                    }
+
+                    // Wait before retrying
+                    tokio::time::sleep(retry_delay).await;
+
+                    // Exponential backoff with max
+                    retry_delay = std::cmp::min(retry_delay * 2, MAX_RETRY_DELAY);
+                }
+                Err(e) => {
+                    // Query error, propagate
+                    return Err(e);
+                }
+            }
+        }
     }
 }
 

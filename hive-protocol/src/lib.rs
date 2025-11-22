@@ -32,6 +32,7 @@ pub mod storage;
 pub mod sync; // Data synchronization abstraction layer
 pub mod testing;
 pub mod traits;
+pub mod transport; // Backend-agnostic transport abstraction for mesh topology
 
 pub use error::{Error, Result};
 

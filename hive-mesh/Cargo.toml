@@ -1,0 +1,30 @@
+[package]
+name = "hive-mesh"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Workspace dependencies
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true}
+tracing = { workspace = true }
+chrono = { workspace = true }
+
+# Mesh-specific dependencies
+futures = "0.3"
+geohash = "0.13"
+
+# Internal dependencies
+hive-discovery = { path = "../hive-discovery" }
+hive-protocol = { path = "../hive-protocol" }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros"] }
+tracing-subscriber = { workspace = true }
