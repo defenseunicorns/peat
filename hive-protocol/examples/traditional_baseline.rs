@@ -82,6 +82,12 @@ struct SimpleDocument {
 
     /// Last update timestamp (microseconds since UNIX epoch)
     updated_at_us: u128,
+
+    /// Origin tracking: When this document was first created by originating client
+    origin_updated_at_us: u128,
+
+    /// Origin tracking: Which client originally created this document
+    origin_node_id: String,
 }
 
 /// Metrics events for JSON logging (same format as CAP tests)
@@ -114,6 +120,15 @@ enum MetricsEvent {
         received_at_us: u128,
         latency_us: i128,
         latency_ms: f64,
+    },
+    PropagationReceived {
+        node_id: String,
+        doc_id: String,
+        origin_node_id: String,
+        origin_updated_at_us: u128,
+        received_at_us: u128,
+        propagation_latency_us: i128,
+        propagation_latency_ms: f64,
     },
 }
 
@@ -150,6 +165,8 @@ impl NodeState {
             content,
             version: 1,
             updated_at_us: now,
+            origin_updated_at_us: now, // Track when this client created it
+            origin_node_id: self.node_id.clone(), // Track which client created it
         };
 
         self.documents.write().await.insert(doc_id.clone(), doc);
@@ -216,7 +233,7 @@ impl NodeState {
             let is_new = !docs.contains_key(&received_doc.doc_id);
 
             if is_new {
-                // Emit document received metric
+                // Emit document received metric (server timestamp based)
                 emit_metric(&MetricsEvent::DocumentReceived {
                     node_id: self.node_id.clone(),
                     doc_id: received_doc.doc_id.clone(),
@@ -226,6 +243,21 @@ impl NodeState {
                     latency_ms: ((now as i128) - (received_doc.updated_at_us as i128)) as f64
                         / 1000.0,
                 });
+
+                // Emit end-to-end propagation metric if document originated from different client
+                if received_doc.origin_node_id != self.node_id {
+                    let propagation_latency =
+                        (now as i128) - (received_doc.origin_updated_at_us as i128);
+                    emit_metric(&MetricsEvent::PropagationReceived {
+                        node_id: self.node_id.clone(),
+                        doc_id: received_doc.doc_id.clone(),
+                        origin_node_id: received_doc.origin_node_id.clone(),
+                        origin_updated_at_us: received_doc.origin_updated_at_us,
+                        received_at_us: now,
+                        propagation_latency_us: propagation_latency,
+                        propagation_latency_ms: propagation_latency as f64 / 1000.0,
+                    });
+                }
 
                 println!(
                     "[{}] ✓ Document received: {} (latency: {:.1}ms)",

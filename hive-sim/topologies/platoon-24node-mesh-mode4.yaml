@@ -78,7 +78,7 @@ topology:
         ROLE: rifleman
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
-        MODE: reader
+        MODE: hierarchical
         SQUAD_ID: "squad-alpha"
         TCP_LISTEN: "12347"
         TCP_CONNECT: "squad-alpha-leader:12346,alpha-soldier-2:12348,alpha-soldier-3:12349,alpha-soldier-4:12350,alpha-uav-1:12351,alpha-ugv-1:12352"
@@ -95,7 +95,7 @@ topology:
         ROLE: grenadier
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
-        MODE: reader
+        MODE: hierarchical
         SQUAD_ID: "squad-alpha"
         TCP_LISTEN: "12348"
         TCP_CONNECT: "squad-alpha-leader:12346,alpha-soldier-1:12347,alpha-soldier-3:12349,alpha-soldier-4:12350,alpha-uav-1:12351,alpha-ugv-1:12352"
@@ -112,7 +112,7 @@ topology:
         ROLE: automatic_rifleman
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
-        MODE: reader
+        MODE: hierarchical
         SQUAD_ID: "squad-alpha"
         TCP_LISTEN: "12349"
         TCP_CONNECT: "squad-alpha-leader:12346,alpha-soldier-1:12347,alpha-soldier-2:12348,alpha-soldier-4:12350,alpha-uav-1:12351,alpha-ugv-1:12352"
@@ -129,7 +129,7 @@ topology:
         ROLE: rifleman
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
-        MODE: reader
+        MODE: hierarchical
         SQUAD_ID: "squad-alpha"
         TCP_LISTEN: "12350"
         TCP_CONNECT: "squad-alpha-leader:12346,alpha-soldier-1:12347,alpha-soldier-2:12348,alpha-soldier-3:12349,alpha-uav-1:12351,alpha-ugv-1:12352"
@@ -146,7 +146,7 @@ topology:
         ROLE: reconnaissance
         PLATFORM_TYPE: uav
         NODE_TYPE: uav
-        MODE: reader
+        MODE: hierarchical
         SQUAD_ID: "squad-alpha"
         TCP_LISTEN: "12351"
         TCP_CONNECT: "squad-alpha-leader:12346,alpha-soldier-1:12347,alpha-soldier-2:12348,alpha-soldier-3:12349,alpha-soldier-4:12350,alpha-ugv-1:12352"
@@ -163,7 +163,7 @@ topology:
         ROLE: resupply_isr
         PLATFORM_TYPE: ugv
         NODE_TYPE: ugv
-        MODE: reader
+        MODE: hierarchical
         SQUAD_ID: "squad-alpha"
         TCP_LISTEN: "12352"
         TCP_CONNECT: "squad-alpha-leader:12346,alpha-soldier-1:12347,alpha-soldier-2:12348,alpha-soldier-3:12349,alpha-soldier-4:12350,alpha-uav-1:12351"
@@ -202,7 +202,7 @@ topology:
         ROLE: rifleman
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
-        MODE: reader
+        MODE: hierarchical
         SQUAD_ID: "squad-bravo"
         TCP_LISTEN: "12354"
         TCP_CONNECT: "squad-bravo-leader:12353,bravo-soldier-2:12355,bravo-soldier-3:12356,bravo-soldier-4:12357,bravo-soldier-5:12358,bravo-uav-1:12359,bravo-ugv-1:12360"
@@ -219,7 +219,7 @@ topology:
         ROLE: grenadier
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
-        MODE: reader
+        MODE: hierarchical
         SQUAD_ID: "squad-bravo"
         TCP_LISTEN: "12355"
         TCP_CONNECT: "squad-bravo-leader:12353,bravo-soldier-1:12354,bravo-soldier-3:12356,bravo-soldier-4:12357,bravo-soldier-5:12358,bravo-uav-1:12359,bravo-ugv-1:12360"
@@ -236,7 +236,7 @@ topology:
         ROLE: automatic_rifleman
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
-        MODE: reader
+        MODE: hierarchical
         SQUAD_ID: "squad-bravo"
         TCP_LISTEN: "12356"
         TCP_CONNECT: "squad-bravo-leader:12353,bravo-soldier-1:12354,bravo-soldier-2:12355,bravo-soldier-4:12357,bravo-soldier-5:12358,bravo-uav-1:12359,bravo-ugv-1:12360"
@@ -253,7 +253,7 @@ topology:
         ROLE: team_leader
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
-        MODE: reader
+        MODE: hierarchical
         SQUAD_ID: "squad-bravo"
         TCP_LISTEN: "12357"
         TCP_CONNECT: "squad-bravo-leader:12353,bravo-soldier-1:12354,bravo-soldier-2:12355,bravo-soldier-3:12356,bravo-soldier-5:12358,bravo-uav-1:12359,bravo-ugv-1:12360"
@@ -270,7 +270,7 @@ topology:
         ROLE: rifleman
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
-        MODE: reader
+        MODE: hierarchical
         SQUAD_ID: "squad-bravo"
         TCP_LISTEN: "12358"
         TCP_CONNECT: "squad-bravo-leader:12353,bravo-soldier-1:12354,bravo-soldier-2:12355,bravo-soldier-3:12356,bravo-soldier-4:12357,bravo-uav-1:12359,bravo-ugv-1:12360"
@@ -287,7 +287,7 @@ topology:
         ROLE: reconnaissance
         PLATFORM_TYPE: uav
         NODE_TYPE: uav
-        MODE: reader
+        MODE: hierarchical
         SQUAD_ID: "squad-bravo"
         TCP_LISTEN: "12359"
         TCP_CONNECT: "squad-bravo-leader:12353,bravo-soldier-1:12354,bravo-soldier-2:12355,bravo-soldier-3:12356,bravo-soldier-4:12357,bravo-soldier-5:12358,bravo-ugv-1:12360"
@@ -304,7 +304,7 @@ topology:
         ROLE: resupply_isr
         PLATFORM_TYPE: ugv
         NODE_TYPE: ugv
-        MODE: reader
+        MODE: hierarchical
         SQUAD_ID: "squad-bravo"
         TCP_LISTEN: "12360"
         TCP_CONNECT: "squad-bravo-leader:12353,bravo-soldier-1:12354,bravo-soldier-2:12355,bravo-soldier-3:12356,bravo-soldier-4:12357,bravo-soldier-5:12358,bravo-uav-1:12359"
@@ -343,7 +343,7 @@ topology:
         ROLE: rifleman
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
-        MODE: reader
+        MODE: hierarchical
         SQUAD_ID: "squad-charlie"
         TCP_LISTEN: "12362"
         TCP_CONNECT: "squad-charlie-leader:12361,charlie-soldier-2:12363,charlie-soldier-3:12364,charlie-soldier-4:12365,charlie-soldier-5:12366,charlie-uav-1:12367,charlie-ugv-1:12368"
@@ -360,7 +360,7 @@ topology:
         ROLE: grenadier
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
-        MODE: reader
+        MODE: hierarchical
         SQUAD_ID: "squad-charlie"
         TCP_LISTEN: "12363"
         TCP_CONNECT: "squad-charlie-leader:12361,charlie-soldier-1:12362,charlie-soldier-3:12364,charlie-soldier-4:12365,charlie-soldier-5:12366,charlie-uav-1:12367,charlie-ugv-1:12368"
@@ -377,7 +377,7 @@ topology:
         ROLE: automatic_rifleman
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
-        MODE: reader
+        MODE: hierarchical
         SQUAD_ID: "squad-charlie"
         TCP_LISTEN: "12364"
         TCP_CONNECT: "squad-charlie-leader:12361,charlie-soldier-1:12362,charlie-soldier-2:12363,charlie-soldier-4:12365,charlie-soldier-5:12366,charlie-uav-1:12367,charlie-ugv-1:12368"
@@ -394,7 +394,7 @@ topology:
         ROLE: team_leader
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
-        MODE: reader
+        MODE: hierarchical
         SQUAD_ID: "squad-charlie"
         TCP_LISTEN: "12365"
         TCP_CONNECT: "squad-charlie-leader:12361,charlie-soldier-1:12362,charlie-soldier-2:12363,charlie-soldier-3:12364,charlie-soldier-5:12366,charlie-uav-1:12367,charlie-ugv-1:12368"
@@ -411,7 +411,7 @@ topology:
         ROLE: rifleman
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
-        MODE: reader
+        MODE: hierarchical
         SQUAD_ID: "squad-charlie"
         TCP_LISTEN: "12366"
         TCP_CONNECT: "squad-charlie-leader:12361,charlie-soldier-1:12362,charlie-soldier-2:12363,charlie-soldier-3:12364,charlie-soldier-4:12365,charlie-uav-1:12367,charlie-ugv-1:12368"
@@ -428,7 +428,7 @@ topology:
         ROLE: reconnaissance
         PLATFORM_TYPE: uav
         NODE_TYPE: uav
-        MODE: reader
+        MODE: hierarchical
         SQUAD_ID: "squad-charlie"
         TCP_LISTEN: "12367"
         TCP_CONNECT: "squad-charlie-leader:12361,charlie-soldier-1:12362,charlie-soldier-2:12363,charlie-soldier-3:12364,charlie-soldier-4:12365,charlie-soldier-5:12366,charlie-ugv-1:12368"
@@ -445,7 +445,7 @@ topology:
         ROLE: resupply_isr
         PLATFORM_TYPE: ugv
         NODE_TYPE: ugv
-        MODE: reader
+        MODE: hierarchical
         SQUAD_ID: "squad-charlie"
         TCP_LISTEN: "12368"
         TCP_CONNECT: "squad-charlie-leader:12361,charlie-soldier-1:12362,charlie-soldier-2:12363,charlie-soldier-3:12364,charlie-soldier-4:12365,charlie-soldier-5:12366,charlie-uav-1:12367"

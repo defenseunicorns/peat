@@ -174,7 +174,10 @@ async fn squad_leader_aggregation_loop(
             match StateAggregator::aggregate_squad(&squad_id, &node_id, member_states) {
                 Ok(squad_summary) => {
                     // Publish to squad_summaries collection
-                    if let Err(e) = store.upsert_squad_summary(&squad_id, &squad_summary).await {
+                    if let Err(e) = store
+                        .upsert_squad_summary(&squad_id, &squad_summary, None)
+                        .await
+                    {
                         eprintln!("[{}] Failed to upsert squad summary: {}", node_id, e);
                     } else {
                         println!(
@@ -235,7 +238,7 @@ async fn platoon_leader_aggregation_loop(
             let mut squad_summaries = Vec::new();
 
             for squad_id in &squad_ids_clone {
-                if let Ok(Some(summary)) = store_clone.get_squad_summary(squad_id).await {
+                if let Ok(Some(summary)) = store_clone.get_squad_summary(squad_id, None).await {
                     squad_summaries.push(summary);
                 }
             }
@@ -250,7 +253,7 @@ async fn platoon_leader_aggregation_loop(
                     Ok(platoon_summary) => {
                         // Publish to platoon_summaries collection
                         if let Err(e) = store_clone
-                            .upsert_platoon_summary(&platoon_id_clone, &platoon_summary)
+                            .upsert_platoon_summary(&platoon_id_clone, &platoon_summary, None)
                             .await
                         {
                             eprintln!(
@@ -540,27 +543,71 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sync_engine = backend.sync_engine();
 
     // Create subscription for the test collection
-    // Use capability-filtered query if CAP filtering is enabled
+    // Use tier-scoped filtering in hierarchical mode, capability filtering otherwise
     println!("[{}] Creating sync subscription...", node_id);
-    let subscription_query = if cap_filter_enabled {
-        if hierarchical_mode && std::env::var("ROLE").unwrap_or_default() == "platoon_leader" {
-            // Platoon leaders ONLY subscribe to squad_summaries, not individual NodeStates
-            println!(
-                "[{}]   → Subscribing to squad_summaries (hierarchical mode)",
-                node_id
-            );
-            Query::Custom("collection_name == 'squad_summaries'".to_string())
-        } else {
-            // Existing CAP-filtered query for soldiers and squad leaders
-            println!(
-                "[{}]   → Using CAP-filtered query for role: {}",
-                node_id, node_type
-            );
-            Query::Custom(format!(
-                "public == true OR CONTAINS(authorized_roles, '{}')",
-                node_type
-            ))
+    let subscription_query = if hierarchical_mode && cap_filter_enabled {
+        // Tier-scoped replication: Each tier only syncs within-tier + summaries from below
+        let role = std::env::var("ROLE").unwrap_or_default();
+        let squad_id = std::env::var("SQUAD_ID").unwrap_or_else(|_| "unknown".to_string());
+        let platoon_id = std::env::var("PLATOON_ID").unwrap_or_else(|_| "unknown".to_string());
+
+        match role.as_str() {
+            "soldier" | "rifleman" => {
+                // Soldiers/riflemen only see their own squad's documents
+                println!(
+                    "[{}]   → Tier-scoped: {} in squad {}",
+                    node_id, role, squad_id
+                );
+                Query::Custom(format!(
+                    "collection_name STARTS WITH 'squad-{}' OR type == 'node_state'",
+                    squad_id
+                ))
+            }
+            "squad_leader" => {
+                // Squad leaders see their squad + platoon summaries
+                println!(
+                    "[{}]   → Tier-scoped: squad_leader for squad {} in platoon {}",
+                    node_id, squad_id, platoon_id
+                );
+                Query::Custom(format!(
+                    "(collection_name STARTS WITH 'squad-{}') OR \
+                     (collection_name STARTS WITH 'platoon-{}') OR \
+                     (type == 'node_state')",
+                    squad_id, platoon_id
+                ))
+            }
+            "platoon_leader" => {
+                // Platoon leaders see all squad summaries + platoon/battalion summaries
+                println!(
+                    "[{}]   → Tier-scoped: platoon_leader for platoon {}",
+                    node_id, platoon_id
+                );
+                Query::Custom(
+                    "collection_name ENDS WITH '.summaries' OR type == 'squad_summary' OR type == 'platoon_summary'".to_string()
+                )
+            }
+            _ => {
+                // Unknown role - fall back to CAP filtering
+                println!(
+                    "[{}]   → Unknown role '{}', using CAP filtering",
+                    node_id, role
+                );
+                Query::Custom(format!(
+                    "public == true OR CONTAINS(authorized_roles, '{}')",
+                    node_type
+                ))
+            }
         }
+    } else if cap_filter_enabled {
+        // CAP filtering without hierarchical mode
+        println!(
+            "[{}]   → Using CAP-filtered query for role: {}",
+            node_id, node_type
+        );
+        Query::Custom(format!(
+            "public == true OR CONTAINS(authorized_roles, '{}')",
+            node_type
+        ))
     } else {
         // Full replication mode: Subscribe to all documents (current behavior)
         println!("[{}]   → Using full replication (Query::All)", node_id);

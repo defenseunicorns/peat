@@ -75,6 +75,7 @@ topology:
         NODE_TYPE: soldier
         MODE: hierarchical
         SQUAD_ID: "squad-1A"
+        PLATOON_ID: "platoon-1"
         SQUAD_MEMBERS: "soldier-1A-1,soldier-1A-2,soldier-1A-3,soldier-1A-4"
         TCP_LISTEN: "12347"
         TCP_CONNECT: "platoon-1-leader:12346,soldier-1A-1:12348,soldier-1A-2:12349,soldier-1A-3:12350,soldier-1A-4:12351"
@@ -162,6 +163,7 @@ topology:
         NODE_TYPE: soldier
         MODE: hierarchical
         SQUAD_ID: "squad-1B"
+        PLATOON_ID: "platoon-1"
         SQUAD_MEMBERS: "soldier-1B-1,soldier-1B-2,soldier-1B-3,soldier-1B-4"
         TCP_LISTEN: "12352"
         TCP_CONNECT: "platoon-1-leader:12346,soldier-1B-1:12353,soldier-1B-2:12354,soldier-1B-3:12355,soldier-1B-4:12356"
@@ -267,6 +269,7 @@ topology:
         NODE_TYPE: soldier
         MODE: hierarchical
         SQUAD_ID: "squad-2A"
+        PLATOON_ID: "platoon-2"
         SQUAD_MEMBERS: "soldier-2A-1,soldier-2A-2,soldier-2A-3,soldier-2A-4"
         TCP_LISTEN: "12358"
         TCP_CONNECT: "platoon-2-leader:12347,soldier-2A-1:12359,soldier-2A-2:12360,soldier-2A-3:12361,soldier-2A-4:12362"
@@ -354,6 +357,7 @@ topology:
         NODE_TYPE: soldier
         MODE: hierarchical
         SQUAD_ID: "squad-2B"
+        PLATOON_ID: "platoon-2"
         SQUAD_MEMBERS: "soldier-2B-1,soldier-2B-2,soldier-2B-3,soldier-2B-4"
         TCP_LISTEN: "12363"
         TCP_CONNECT: "platoon-2-leader:12347,soldier-2B-1:12364,soldier-2B-2:12365,soldier-2B-3:12366,soldier-2B-4:12367"
@@ -459,6 +463,7 @@ topology:
         NODE_TYPE: soldier
         MODE: hierarchical
         SQUAD_ID: "squad-3A"
+        PLATOON_ID: "platoon-3"
         SQUAD_MEMBERS: "soldier-3A-1,soldier-3A-2,soldier-3A-3,soldier-3A-4"
         TCP_LISTEN: "12369"
         TCP_CONNECT: "platoon-3-leader:12348,soldier-3A-1:12370,soldier-3A-2:12371,soldier-3A-3:12372,soldier-3A-4:12373"
@@ -546,6 +551,7 @@ topology:
         NODE_TYPE: soldier
         MODE: hierarchical
         SQUAD_ID: "squad-3B"
+        PLATOON_ID: "platoon-3"
         SQUAD_MEMBERS: "soldier-3B-1,soldier-3B-2,soldier-3B-3,soldier-3B-4"
         TCP_LISTEN: "12374"
         TCP_CONNECT: "platoon-3-leader:12348,soldier-3B-1:12375,soldier-3B-2:12376,soldier-3B-3:12377,soldier-3B-4:12378"
@@ -651,6 +657,7 @@ topology:
         NODE_TYPE: soldier
         MODE: hierarchical
         SQUAD_ID: "squad-4A"
+        PLATOON_ID: "platoon-4"
         SQUAD_MEMBERS: "soldier-4A-1,soldier-4A-2,soldier-4A-3,soldier-4A-4"
         TCP_LISTEN: "12380"
         TCP_CONNECT: "platoon-4-leader:12349,soldier-4A-1:12381,soldier-4A-2:12382,soldier-4A-3:12383,soldier-4A-4:12384"
@@ -738,6 +745,7 @@ topology:
         NODE_TYPE: soldier
         MODE: hierarchical
         SQUAD_ID: "squad-4B"
+        PLATOON_ID: "platoon-4"
         SQUAD_MEMBERS: "soldier-4B-1,soldier-4B-2,soldier-4B-3,soldier-4B-4,soldier-4B-5"
         TCP_LISTEN: "12385"
         TCP_CONNECT: "platoon-4-leader:12349,soldier-4B-1:12386,soldier-4B-2:12387,soldier-4B-3:12388,soldier-4B-4:12389,soldier-4B-5:12390"

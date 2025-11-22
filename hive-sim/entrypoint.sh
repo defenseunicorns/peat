@@ -67,6 +67,16 @@ if [ -n "$TCP_CONNECT" ]; then
     echo "[${NODE_ID}] TCP: Will connect to ${TCP_CONNECT}"
 fi
 
+# Apply bandwidth constraints if specified
+if [ -n "$BANDWIDTH" ]; then
+    echo "[${NODE_ID}] Applying bandwidth constraint: $BANDWIDTH"
+    # Convert bandwidth string to tc format (e.g., "256kbps" -> "256kbit")
+    TC_RATE=$(echo "$BANDWIDTH" | sed 's/bps/bit/g')
+    # Apply Token Bucket Filter (TBF) on eth0
+    tc qdisc add dev eth0 root tbf rate "$TC_RATE" burst 32kbit latency 400ms 2>/dev/null || \
+        echo "[${NODE_ID}] Warning: Failed to apply bandwidth constraint (may already exist or no permission)"
+fi
+
 # Export Ditto environment variables
 export DITTO_APP_ID
 export DITTO_OFFLINE_TOKEN
@@ -95,7 +105,13 @@ if [ "$USE_TRADITIONAL" = "true" ]; then
     TRAD_ARGS="$TRAD_ARGS --node-type ${NODE_TYPE}"
 
     exec /usr/local/bin/traditional_baseline $TRAD_ARGS
+elif [ "$MODE" = "hierarchical" ]; then
+    echo "[${NODE_ID}] Running Hierarchical Simulation (protocol-based implementation)"
+    # Use hive-sim binary which properly uses the protocol API for hierarchical aggregation
+    # This avoids coupling to Ditto-specific SDK details
+    export MODE="hierarchical"  # Ensure MODE environment variable is set
+    exec /usr/local/bin/hive-sim $ARGS
 else
-    echo "[${NODE_ID}] Running HIVE Protocol (hive-sim reference implementation)"
+    echo "[${NODE_ID}] Running HIVE Protocol Simulation"
     exec /usr/local/bin/hive-sim $ARGS
 fi

@@ -51,16 +51,16 @@ impl SummaryStorage for DittoSummaryStorage {
         initial_state: &SquadSummary,
     ) -> Result<String> {
         self.store
-            .create_squad_summary(squad_id, initial_state)
+            .create_squad_summary(squad_id, initial_state, None)
             .await
     }
 
     async fn update_squad_summary(&self, squad_id: &str, delta: SquadDelta) -> Result<()> {
-        self.store.update_squad_summary(squad_id, delta).await
+        self.store.update_squad_summary(squad_id, delta, None).await
     }
 
     async fn get_squad_summary(&self, squad_id: &str) -> Result<Option<SquadSummary>> {
-        self.store.get_squad_summary(squad_id).await
+        self.store.get_squad_summary(squad_id, None).await
     }
 
     async fn delete_squad_summary(&self, _squad_id: &str) -> Result<()> {
@@ -79,16 +79,18 @@ impl SummaryStorage for DittoSummaryStorage {
         initial_state: &PlatoonSummary,
     ) -> Result<String> {
         self.store
-            .create_platoon_summary(platoon_id, initial_state)
+            .create_platoon_summary(platoon_id, initial_state, None)
             .await
     }
 
     async fn update_platoon_summary(&self, platoon_id: &str, delta: PlatoonDelta) -> Result<()> {
-        self.store.update_platoon_summary(platoon_id, delta).await
+        self.store
+            .update_platoon_summary(platoon_id, delta, None)
+            .await
     }
 
     async fn get_platoon_summary(&self, platoon_id: &str) -> Result<Option<PlatoonSummary>> {
-        self.store.get_platoon_summary(platoon_id).await
+        self.store.get_platoon_summary(platoon_id, None).await
     }
 
     async fn delete_platoon_summary(&self, _platoon_id: &str) -> Result<()> {
