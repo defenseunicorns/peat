@@ -20,8 +20,8 @@ use tracing::{debug, info, warn};
 /// # Architecture
 ///
 /// - Subscribes to topology events from TopologyBuilder
-/// - Reacts to ParentSelected/Changed/Lost events
-/// - Establishes parent connections via MeshTransport
+/// - Reacts to PeerSelected/Changed/Lost events
+/// - Establishes peer connections via MeshTransport
 /// - Tears down stale connections
 ///
 /// # Example
@@ -37,17 +37,17 @@ use tracing::{debug, info, warn};
 /// manager.start().await?;
 /// ```
 pub struct TopologyManager {
-    /// Topology builder for parent selection
+    /// Topology builder for peer selection
     builder: TopologyBuilder,
 
     /// Transport abstraction for connections
     transport: Arc<dyn MeshTransport>,
 
-    /// Current parent connection (if any)
-    parent_connection: Arc<RwLock<Option<Box<dyn MeshConnection>>>>,
+    /// Current peer connection (if any)
+    peer_connection: Arc<RwLock<Option<Box<dyn MeshConnection>>>>,
 
-    /// Current parent node ID (if any)
-    parent_id: Arc<RwLock<Option<NodeId>>>,
+    /// Current selected peer node ID (if any)
+    selected_peer_id: Arc<RwLock<Option<NodeId>>>,
 
     /// Background task handle
     task_handle: RwLock<Option<JoinHandle<()>>>,
@@ -58,14 +58,14 @@ impl TopologyManager {
     ///
     /// # Arguments
     ///
-    /// * `builder` - TopologyBuilder for parent selection
+    /// * `builder` - TopologyBuilder for peer selection
     /// * `transport` - Transport abstraction for connections
     pub fn new(builder: TopologyBuilder, transport: Arc<dyn MeshTransport>) -> Self {
         Self {
             builder,
             transport,
-            parent_connection: Arc::new(RwLock::new(None)),
-            parent_id: Arc::new(RwLock::new(None)),
+            peer_connection: Arc::new(RwLock::new(None)),
+            selected_peer_id: Arc::new(RwLock::new(None)),
             task_handle: RwLock::new(None),
         }
     }
@@ -83,11 +83,11 @@ impl TopologyManager {
         // Subscribe to topology events
         if let Some(rx) = self.builder.subscribe() {
             let transport = self.transport.clone();
-            let parent_connection = self.parent_connection.clone();
-            let parent_id = self.parent_id.clone();
+            let peer_connection = self.peer_connection.clone();
+            let selected_peer_id = self.selected_peer_id.clone();
 
             let handle = tokio::spawn(async move {
-                Self::event_loop(rx, transport, parent_connection, parent_id).await;
+                Self::event_loop(rx, transport, peer_connection, selected_peer_id).await;
             });
 
             *self.task_handle.write().unwrap() = Some(handle);
@@ -98,7 +98,7 @@ impl TopologyManager {
 
     /// Stop topology management
     ///
-    /// Stops the topology builder and disconnects from parent.
+    /// Stops the topology builder and disconnects from selected peer.
     pub async fn stop(&self) -> Result<(), Box<dyn std::error::Error>> {
         // Abort the event loop task
         if let Some(handle) = self.task_handle.write().unwrap().take() {
@@ -108,11 +108,11 @@ impl TopologyManager {
         // Stop the topology builder
         self.builder.stop().await;
 
-        // Disconnect from current parent
-        let current_parent_id = self.parent_id.write().unwrap().take();
-        if let Some(parent_id) = current_parent_id {
-            if let Err(e) = self.transport.disconnect(&parent_id).await {
-                warn!("Failed to disconnect from parent during stop: {}", e);
+        // Disconnect from current selected peer
+        let current_selected_peer_id = self.selected_peer_id.write().unwrap().take();
+        if let Some(selected_peer_id) = current_selected_peer_id {
+            if let Err(e) = self.transport.disconnect(&selected_peer_id).await {
+                warn!("Failed to disconnect from selected peer during stop: {}", e);
             }
         }
 
@@ -122,14 +122,14 @@ impl TopologyManager {
         Ok(())
     }
 
-    /// Get current parent node ID
-    pub fn get_parent_id(&self) -> Option<NodeId> {
-        self.parent_id.read().unwrap().clone()
+    /// Get current selected peer node ID
+    pub fn get_selected_peer_id(&self) -> Option<NodeId> {
+        self.selected_peer_id.read().unwrap().clone()
     }
 
-    /// Check if currently connected to a specific parent
-    pub fn is_connected_to_parent(&self, node_id: &NodeId) -> bool {
-        self.parent_id
+    /// Check if currently connected to a specific peer
+    pub fn is_connected_to_peer(&self, node_id: &NodeId) -> bool {
+        self.selected_peer_id
             .read()
             .unwrap()
             .as_ref()
@@ -148,90 +148,85 @@ impl TopologyManager {
     async fn event_loop(
         mut rx: mpsc::UnboundedReceiver<TopologyEvent>,
         transport: Arc<dyn MeshTransport>,
-        parent_connection: Arc<RwLock<Option<Box<dyn MeshConnection>>>>,
-        parent_id: Arc<RwLock<Option<NodeId>>>,
+        peer_connection: Arc<RwLock<Option<Box<dyn MeshConnection>>>>,
+        selected_peer_id: Arc<RwLock<Option<NodeId>>>,
     ) {
         while let Some(event) = rx.recv().await {
             match event {
-                TopologyEvent::ParentSelected {
-                    parent_id: new_parent_id,
+                TopologyEvent::PeerSelected {
+                    selected_peer_id: new_peer_id,
                     ..
                 } => {
-                    info!("Parent selected: {}", new_parent_id);
-                    let node_id = NodeId::new(new_parent_id.clone());
+                    info!("Peer selected: {}", new_peer_id);
+                    let node_id = NodeId::new(new_peer_id.clone());
 
-                    // Connect to the selected parent
+                    // Connect to the selected peer
                     match transport.connect(&node_id).await {
                         Ok(conn) => {
-                            *parent_connection.write().unwrap() = Some(conn);
-                            *parent_id.write().unwrap() = Some(node_id);
-                            info!("Successfully connected to parent: {}", new_parent_id);
+                            *peer_connection.write().unwrap() = Some(conn);
+                            *selected_peer_id.write().unwrap() = Some(node_id);
+                            info!("Successfully connected to peer: {}", new_peer_id);
                         }
                         Err(e) => {
-                            warn!("Failed to connect to parent {}: {}", new_parent_id, e);
+                            warn!("Failed to connect to peer {}: {}", new_peer_id, e);
                         }
                     }
                 }
 
-                TopologyEvent::ParentChanged {
-                    old_parent_id,
-                    new_parent_id,
+                TopologyEvent::PeerChanged {
+                    old_peer_id,
+                    new_peer_id,
                     ..
                 } => {
-                    info!("Parent changed: {} -> {}", old_parent_id, new_parent_id);
+                    info!("Selected peer changed: {} -> {}", old_peer_id, new_peer_id);
 
-                    // Disconnect from old parent
-                    let old_id = NodeId::new(old_parent_id.clone());
+                    // Disconnect from old peer
+                    let old_id = NodeId::new(old_peer_id.clone());
                     if let Err(e) = transport.disconnect(&old_id).await {
-                        warn!(
-                            "Failed to disconnect from old parent {}: {}",
-                            old_parent_id, e
-                        );
+                        warn!("Failed to disconnect from old peer {}: {}", old_peer_id, e);
                     }
 
-                    // Connect to new parent
-                    let new_id = NodeId::new(new_parent_id.clone());
+                    // Connect to new peer
+                    let new_id = NodeId::new(new_peer_id.clone());
                     match transport.connect(&new_id).await {
                         Ok(conn) => {
-                            *parent_connection.write().unwrap() = Some(conn);
-                            *parent_id.write().unwrap() = Some(new_id);
-                            info!("Successfully re-parented to: {}", new_parent_id);
+                            *peer_connection.write().unwrap() = Some(conn);
+                            *selected_peer_id.write().unwrap() = Some(new_id);
+                            info!("Successfully changed to peer: {}", new_peer_id);
                         }
                         Err(e) => {
-                            warn!("Failed to connect to new parent {}: {}", new_parent_id, e);
+                            warn!("Failed to connect to new peer {}: {}", new_peer_id, e);
                         }
                     }
                 }
 
-                TopologyEvent::ParentLost {
-                    parent_id: lost_parent_id,
-                } => {
-                    info!("Parent lost: {}", lost_parent_id);
+                TopologyEvent::PeerLost { lost_peer_id } => {
+                    info!("Selected peer lost: {}", lost_peer_id);
 
-                    // Clear parent connection
-                    *parent_connection.write().unwrap() = None;
-                    *parent_id.write().unwrap() = None;
+                    // Clear peer connection
+                    *peer_connection.write().unwrap() = None;
+                    *selected_peer_id.write().unwrap() = None;
 
-                    // Disconnect
-                    let node_id = NodeId::new(lost_parent_id.clone());
+                    // Disconnect from lost peer
+                    let node_id = NodeId::new(lost_peer_id.clone());
                     if let Err(e) = transport.disconnect(&node_id).await {
                         warn!(
-                            "Failed to disconnect from lost parent {}: {}",
-                            lost_parent_id, e
+                            "Failed to disconnect from lost peer {}: {}",
+                            lost_peer_id, e
                         );
                     }
 
-                    debug!("Cleared connection to lost parent: {}", lost_parent_id);
+                    debug!("Cleared connection to lost peer: {}", lost_peer_id);
                 }
 
-                TopologyEvent::ChildAdded { child_id } => {
-                    debug!("Child added: {}", child_id);
-                    // Future: Track child connections if needed
+                TopologyEvent::PeerAdded { linked_peer_id } => {
+                    debug!("Linked peer added: {}", linked_peer_id);
+                    // Future: Track linked peer connections if needed
                 }
 
-                TopologyEvent::ChildRemoved { child_id } => {
-                    debug!("Child removed: {}", child_id);
-                    // Future: Clean up child connections if needed
+                TopologyEvent::PeerRemoved { linked_peer_id } => {
+                    debug!("Linked peer removed: {}", linked_peer_id);
+                    // Future: Clean up linked peer connections if needed
                 }
             }
         }
