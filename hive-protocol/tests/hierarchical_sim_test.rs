@@ -16,7 +16,10 @@ mod tests {
         let success = updates_published > 0;
 
         // THEN: It should be considered successful
-        assert!(success, "Simulation should succeed if any updates were published");
+        assert!(
+            success,
+            "Simulation should succeed if any updates were published"
+        );
     }
 
     /// Test: Verification should succeed with reasonable document counts
@@ -45,11 +48,11 @@ mod tests {
     fn test_verification_should_accept_any_positive_count() {
         // GIVEN: Various roles with different document counts
         let test_cases = vec![
-            ("battalion_commander", 96, true),  // All battalion docs
-            ("platoon_leader", 24, true),       // All platoon docs
-            ("squad_leader", 8, true),          // All squad docs
-            ("soldier", 1, true),               // At least own doc
-            ("any_role", 0, false),             // Zero docs = failure
+            ("battalion_commander", 96, true), // All battalion docs
+            ("platoon_leader", 24, true),      // All platoon docs
+            ("squad_leader", 8, true),         // All squad docs
+            ("soldier", 1, true),              // At least own doc
+            ("any_role", 0, false),            // Zero docs = failure
         ];
 
         for (role, doc_count, expected_success) in test_cases {
@@ -58,9 +61,16 @@ mod tests {
 
             // THEN: Success should only depend on having documents
             assert_eq!(
-                success, expected_success,
+                success,
+                expected_success,
                 "Role {} with {} docs should be {}",
-                role, doc_count, if expected_success { "success" } else { "failure" }
+                role,
+                doc_count,
+                if expected_success {
+                    "success"
+                } else {
+                    "failure"
+                }
             );
         }
     }
@@ -78,7 +88,11 @@ mod tests {
                 let success = doc_count > 0;
 
                 // THEN: Any positive count should succeed
-                assert!(success, "With CAP filter disabled, {} docs should succeed", doc_count);
+                assert!(
+                    success,
+                    "With CAP filter disabled, {} docs should succeed",
+                    doc_count
+                );
             }
         }
     }

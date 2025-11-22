@@ -56,9 +56,7 @@ impl SummaryStorage for DittoSummaryStorage {
     }
 
     async fn update_squad_summary(&self, squad_id: &str, delta: SquadDelta) -> Result<()> {
-        self.store
-            .update_squad_summary(squad_id, delta, None)
-            .await
+        self.store.update_squad_summary(squad_id, delta, None).await
     }
 
     async fn get_squad_summary(&self, squad_id: &str) -> Result<Option<SquadSummary>> {

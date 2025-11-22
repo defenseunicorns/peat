@@ -197,19 +197,19 @@ enum MetricsEvent {
     // Phase 4: Propagation latency tracking events
     AggregationStarted {
         node_id: String,
-        tier: String,              // "squad", "platoon", "company"
-        input_doc_type: String,    // What we're aggregating (NodeState, SquadSummary, etc.)
-        input_count: usize,        // How many documents we're aggregating
+        tier: String,           // "squad", "platoon", "company"
+        input_doc_type: String, // What we're aggregating (NodeState, SquadSummary, etc.)
+        input_count: usize,     // How many documents we're aggregating
         timestamp_us: u128,
     },
     AggregationCompleted {
         node_id: String,
         tier: String,
         input_doc_type: String,
-        output_doc_type: String,   // What we produced (SquadSummary, PlatoonSummary, etc.)
+        output_doc_type: String, // What we produced (SquadSummary, PlatoonSummary, etc.)
         output_doc_id: String,
         input_count: usize,
-        processing_time_us: u128,  // Time spent aggregating
+        processing_time_us: u128, // Time spent aggregating
         timestamp_us: u128,
     },
 }
@@ -704,7 +704,9 @@ async fn platoon_leader_aggregation_loop(
                             let delta =
                                 PlatoonDelta::from_summary(&platoon_summary, timestamp_us as u64);
 
-                            if let Err(e) = coordinator.update_platoon_summary(&platoon_id, delta).await {
+                            if let Err(e) =
+                                coordinator.update_platoon_summary(&platoon_id, delta).await
+                            {
                                 eprintln!("[{}] Failed to update platoon summary: {}", node_id, e);
                             } else {
                                 println!(
@@ -786,7 +788,9 @@ async fn platoon_leader_aggregation_loop(
                                         1
                                     };
 
-                                    if created_at_us > 0 && !test_doc_timestamps.contains(&created_at_us) {
+                                    if created_at_us > 0
+                                        && !test_doc_timestamps.contains(&created_at_us)
+                                    {
                                         test_doc_timestamps.insert(created_at_us);
 
                                         // This is Initial event, so it's always first reception
@@ -813,14 +817,26 @@ async fn platoon_leader_aggregation_loop(
                                         });
 
                                         // EVENT-DRIVEN: Aggregate immediately when squad summary arrives
-                                        do_aggregation(Arc::clone(&coordinator), platoon_id.clone(), node_id.clone(), squad_ids.clone()).await;
+                                        do_aggregation(
+                                            Arc::clone(&coordinator),
+                                            platoon_id.clone(),
+                                            node_id.clone(),
+                                            squad_ids.clone(),
+                                        )
+                                        .await;
                                     }
                                 }
                             }
                         }
 
                         // Also aggregate after processing initial snapshot
-                        do_aggregation(Arc::clone(&coordinator), platoon_id.clone(), node_id.clone(), squad_ids.clone()).await;
+                        do_aggregation(
+                            Arc::clone(&coordinator),
+                            platoon_id.clone(),
+                            node_id.clone(),
+                            squad_ids.clone(),
+                        )
+                        .await;
                     }
                     ChangeEvent::Updated { document, .. } => {
                         // Process document update (this is where P2P propagation is measured)
@@ -850,7 +866,9 @@ async fn platoon_leader_aggregation_loop(
                                     1
                                 };
 
-                                if created_at_us > 0 && !test_doc_timestamps.contains(&created_at_us) {
+                                if created_at_us > 0
+                                    && !test_doc_timestamps.contains(&created_at_us)
+                                {
                                     test_doc_timestamps.insert(created_at_us);
 
                                     // Assume update since this is ChangeEvent::Updated
@@ -877,7 +895,13 @@ async fn platoon_leader_aggregation_loop(
                                     });
 
                                     // EVENT-DRIVEN: Aggregate immediately when squad summary updated
-                                    do_aggregation(Arc::clone(&coordinator), platoon_id.clone(), node_id.clone(), squad_ids.clone()).await;
+                                    do_aggregation(
+                                        Arc::clone(&coordinator),
+                                        platoon_id.clone(),
+                                        node_id.clone(),
+                                        squad_ids.clone(),
+                                    )
+                                    .await;
                                 }
                             }
                         }
@@ -1440,15 +1464,16 @@ async fn hierarchical_mode(
     let role = std::env::var("ROLE").unwrap_or_else(|_| "soldier".to_string());
 
     match role.as_str() {
-        "soldier" => {
-            soldier_capability_mode(backend, node_id, node_type, update_rate_ms).await
-        }
+        "soldier" => soldier_capability_mode(backend, node_id, node_type, update_rate_ms).await,
         "squad_leader" | "platoon_leader" | "company_commander" => {
             // Leaders run aggregation loops spawned earlier, just publish status updates
             leader_status_mode(backend, node_id, node_type, update_rate_ms, &role).await
         }
         _ => {
-            println!("[{}] Unknown role: {}, defaulting to soldier mode", node_id, role);
+            println!(
+                "[{}] Unknown role: {}, defaulting to soldier mode",
+                node_id, role
+            );
             soldier_capability_mode(backend, node_id, node_type, update_rate_ms).await
         }
     }
@@ -1474,7 +1499,11 @@ async fn soldier_capability_mode(
 
     // Generate soldier capabilities (simple test data for now)
     let capabilities = generate_soldier_capabilities(node_id);
-    println!("[{}] Generated {} capabilities:", node_id, capabilities.len());
+    println!(
+        "[{}] Generated {} capabilities:",
+        node_id,
+        capabilities.len()
+    );
     for cap in &capabilities {
         println!("[{}]   - {} (confidence: {:.2})", node_id, cap, 0.85);
     }
@@ -1487,19 +1516,36 @@ async fn soldier_capability_mode(
         // Create update message with capabilities
         let message_content = format!(
             "Status update #{} from {} - Capabilities: {}",
-            message_number, node_id, capabilities.join(", ")
+            message_number,
+            node_id,
+            capabilities.join(", ")
         );
 
         // Create document fields including capabilities
         let mut fields = HashMap::new();
-        fields.insert("message".to_string(), Value::String(message_content.clone()));
+        fields.insert(
+            "message".to_string(),
+            Value::String(message_content.clone()),
+        );
         fields.insert("timestamp_us".to_string(), serde_json::json!(timestamp_us));
         fields.insert("created_by".to_string(), Value::String(node_id.to_string()));
-        fields.insert("node_type".to_string(), Value::String(node_type.to_string()));
-        fields.insert("message_number".to_string(), serde_json::json!(message_number));
-        fields.insert("capabilities".to_string(), Value::Array(
-            capabilities.iter().map(|c| Value::String(c.clone())).collect()
-        ));
+        fields.insert(
+            "node_type".to_string(),
+            Value::String(node_type.to_string()),
+        );
+        fields.insert(
+            "message_number".to_string(),
+            serde_json::json!(message_number),
+        );
+        fields.insert(
+            "capabilities".to_string(),
+            Value::Array(
+                capabilities
+                    .iter()
+                    .map(|c| Value::String(c.clone()))
+                    .collect(),
+            ),
+        );
         fields.insert("public".to_string(), Value::Bool(true));
 
         let document = Document::with_id(doc_id.clone(), fields.clone());
@@ -1512,7 +1558,11 @@ async fn soldier_capability_mode(
 
         println!(
             "[{}] ✓ Status update #{}/{} sent ({} bytes, {} capabilities)",
-            node_id, message_number, TARGET_UPDATES, message_size_bytes, capabilities.len()
+            node_id,
+            message_number,
+            TARGET_UPDATES,
+            message_size_bytes,
+            capabilities.len()
         );
 
         log_metrics(&MetricsEvent::MessageSent {
@@ -1544,15 +1594,21 @@ async fn soldier_capability_mode(
 
     loop {
         // Try to fetch squad summary
-        if let Ok(Some(_summary)) = backend.document_store().get("sim_poc", &summary_doc_id).await {
+        if let Ok(Some(_summary)) = backend
+            .document_store()
+            .get("sim_poc", &summary_doc_id)
+            .await
+        {
             println!("[{}] ✓ Squad summary observed! Mission complete.", node_id);
             return Ok(());
         }
 
         // Check timeout
         if wait_start.elapsed().as_secs() > SQUAD_SUMMARY_TIMEOUT_SECS {
-            println!("[{}] ⚠ Squad summary not observed after {}s, exiting anyway",
-                node_id, SQUAD_SUMMARY_TIMEOUT_SECS);
+            println!(
+                "[{}] ⚠ Squad summary not observed after {}s, exiting anyway",
+                node_id, SQUAD_SUMMARY_TIMEOUT_SECS
+            );
             return Ok(());
         }
 
@@ -1568,7 +1624,11 @@ async fn leader_status_mode(
     update_rate_ms: u64,
     role: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("[{}] Running as {} with status heartbeat", node_id, role.to_uppercase());
+    println!(
+        "[{}] Running as {} with status heartbeat",
+        node_id,
+        role.to_uppercase()
+    );
 
     // Leaders run for longer as they aggregate
     let test_duration = match role {
@@ -1596,9 +1656,15 @@ async fn leader_status_mode(
         fields.insert("message".to_string(), Value::String(message_content));
         fields.insert("timestamp_us".to_string(), serde_json::json!(timestamp_us));
         fields.insert("created_by".to_string(), Value::String(node_id.to_string()));
-        fields.insert("node_type".to_string(), Value::String(node_type.to_string()));
+        fields.insert(
+            "node_type".to_string(),
+            Value::String(node_type.to_string()),
+        );
         fields.insert("role".to_string(), Value::String(role.to_string()));
-        fields.insert("message_number".to_string(), serde_json::json!(message_number));
+        fields.insert(
+            "message_number".to_string(),
+            serde_json::json!(message_number),
+        );
         fields.insert("public".to_string(), Value::Bool(true));
 
         let document = Document::with_id(doc_id.clone(), fields);
@@ -1611,7 +1677,12 @@ async fn leader_status_mode(
         sleep(update_interval).await;
     }
 
-    println!("[{}] {} simulation complete after {:?}", node_id, role, start_time.elapsed());
+    println!(
+        "[{}] {} simulation complete after {:?}",
+        node_id,
+        role,
+        start_time.elapsed()
+    );
     Ok(())
 }
 
@@ -1619,7 +1690,9 @@ async fn leader_status_mode(
 fn generate_soldier_capabilities(node_id: &str) -> Vec<String> {
     // Simple capability generation based on node ID hash
     // In production, this would be based on actual platform specs
-    let hash = node_id.chars().fold(0u32, |acc, c| acc.wrapping_add(c as u32));
+    let hash = node_id
+        .chars()
+        .fold(0u32, |acc, c| acc.wrapping_add(c as u32));
 
     let mut caps = vec![];
 
@@ -2147,8 +2220,11 @@ async fn process_document(
         }
     }
     // Check if this is a platoon summary document
-    else if doc_id.starts_with("platoon-") && doc_id.ends_with("-summary")
-        && created_at_us > 0 && !test_doc_timestamps.contains(&created_at_us) {
+    else if doc_id.starts_with("platoon-")
+        && doc_id.ends_with("-summary")
+        && created_at_us > 0
+        && !test_doc_timestamps.contains(&created_at_us)
+    {
         test_doc_timestamps.insert(created_at_us);
 
         println!(

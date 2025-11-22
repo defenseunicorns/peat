@@ -165,7 +165,7 @@ impl NodeState {
             content,
             version: 1,
             updated_at_us: now,
-            origin_updated_at_us: now,        // Track when this client created it
+            origin_updated_at_us: now, // Track when this client created it
             origin_node_id: self.node_id.clone(), // Track which client created it
         };
 
@@ -246,7 +246,8 @@ impl NodeState {
 
                 // Emit end-to-end propagation metric if document originated from different client
                 if received_doc.origin_node_id != self.node_id {
-                    let propagation_latency = (now as i128) - (received_doc.origin_updated_at_us as i128);
+                    let propagation_latency =
+                        (now as i128) - (received_doc.origin_updated_at_us as i128);
                     emit_metric(&MetricsEvent::PropagationReceived {
                         node_id: self.node_id.clone(),
                         doc_id: received_doc.doc_id.clone(),

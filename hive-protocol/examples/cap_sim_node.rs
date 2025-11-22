@@ -174,7 +174,10 @@ async fn squad_leader_aggregation_loop(
             match StateAggregator::aggregate_squad(&squad_id, &node_id, member_states) {
                 Ok(squad_summary) => {
                     // Publish to squad_summaries collection
-                    if let Err(e) = store.upsert_squad_summary(&squad_id, &squad_summary, None).await {
+                    if let Err(e) = store
+                        .upsert_squad_summary(&squad_id, &squad_summary, None)
+                        .await
+                    {
                         eprintln!("[{}] Failed to upsert squad summary: {}", node_id, e);
                     } else {
                         println!(
