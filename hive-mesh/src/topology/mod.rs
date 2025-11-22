@@ -4,7 +4,9 @@
 //! including parent selection algorithms and topology state management.
 
 mod builder;
+mod manager;
 mod selection;
 
 pub use builder::{ParentInfo, TopologyBuilder, TopologyConfig, TopologyEvent, TopologyState};
+pub use manager::TopologyManager;
 pub use selection::{ParentCandidate, ParentSelector, SelectionConfig};
