@@ -5,7 +5,7 @@
 
 use crate::beacon::{BeaconObserver, GeoPosition, GeographicBeacon, HierarchyLevel, NodeProfile};
 use crate::topology::selection::{PeerSelector, SelectionConfig};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
@@ -167,6 +167,15 @@ impl TopologyBuilder {
                     }
                 }
 
+                // Track linked peers (peers that could select us)
+                Self::update_linked_peers(
+                    &mut state_lock,
+                    &config,
+                    &nearby,
+                    hierarchy_level,
+                    &event_tx,
+                );
+
                 drop(state_lock);
             }
         });
@@ -306,6 +315,62 @@ impl TopologyBuilder {
 
         let _ = event_tx.send(event);
     }
+
+    /// Update linked peers (peers that could select us as their peer)
+    fn update_linked_peers(
+        state: &mut TopologyState,
+        config: &TopologyConfig,
+        nearby: &[GeographicBeacon],
+        own_level: HierarchyLevel,
+        event_tx: &mpsc::UnboundedSender<TopologyEvent>,
+    ) {
+        let now = Instant::now();
+
+        // Identify potential linked peers (peers at lower hierarchy level that could select us)
+        let potential_linked: Vec<&GeographicBeacon> = nearby
+            .iter()
+            .filter(|beacon| {
+                // Peer must be at lower hierarchy level (could select us)
+                own_level.can_be_parent_of(&beacon.hierarchy_level)
+            })
+            .collect();
+
+        // Update last_seen for existing linked peers that are still visible
+        for beacon in &potential_linked {
+            if let Some(last_seen) = state.linked_peers.get_mut(&beacon.node_id) {
+                *last_seen = now;
+            } else {
+                // New linked peer discovered
+                state.linked_peers.insert(beacon.node_id.clone(), now);
+                let _ = event_tx.send(TopologyEvent::PeerAdded {
+                    linked_peer_id: beacon.node_id.clone(),
+                });
+            }
+        }
+
+        // Check for expired linked peers (not seen recently)
+        let potential_linked_ids: HashSet<_> =
+            potential_linked.iter().map(|b| &b.node_id).collect();
+
+        let mut expired_peers = Vec::new();
+        for (peer_id, last_seen) in &state.linked_peers {
+            // Peer is expired if:
+            // 1. Not in current nearby beacons
+            // 2. Last seen longer than peer_timeout ago
+            if !potential_linked_ids.contains(peer_id) && last_seen.elapsed() > config.peer_timeout
+            {
+                expired_peers.push(peer_id.clone());
+            }
+        }
+
+        // Remove expired linked peers
+        for peer_id in expired_peers {
+            state.linked_peers.remove(&peer_id);
+            let _ = event_tx.send(TopologyEvent::PeerRemoved {
+                linked_peer_id: peer_id,
+            });
+        }
+    }
 }
 
 #[cfg(test)]
@@ -378,5 +443,101 @@ mod tests {
         let updated_pos = *builder.position.lock().unwrap();
         assert_eq!(updated_pos.lat, 37.8000);
         assert_eq!(updated_pos.lon, -122.4000);
+    }
+
+    #[test]
+    fn test_linked_peer_tracking() {
+        use crate::beacon::GeoPosition;
+
+        // Create test beacons
+        let mut nearby_beacons = Vec::new();
+
+        // Beacon from lower hierarchy level (Platform < Platoon)
+        // This should be tracked as a linked peer
+        let mut linked_beacon = GeographicBeacon::new(
+            "linked-peer".to_string(),
+            GeoPosition::new(37.7750, -122.4195),
+            HierarchyLevel::Platform,
+        );
+        linked_beacon.can_parent = false; // Lower level nodes typically don't parent
+        nearby_beacons.push(linked_beacon);
+
+        // Beacon from same hierarchy level
+        // This should NOT be tracked (not a valid linked peer)
+        let mut same_level_beacon = GeographicBeacon::new(
+            "same-level".to_string(),
+            GeoPosition::new(37.7751, -122.4196),
+            HierarchyLevel::Platoon,
+        );
+        same_level_beacon.can_parent = true;
+        nearby_beacons.push(same_level_beacon);
+
+        let mut state = TopologyState::default();
+        let config = TopologyConfig::default();
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        // Initial update - should add linked peer
+        TopologyBuilder::update_linked_peers(
+            &mut state,
+            &config,
+            &nearby_beacons,
+            HierarchyLevel::Platoon, // We are Platoon level
+            &event_tx,
+        );
+
+        // Check state
+        assert_eq!(state.linked_peers.len(), 1);
+        assert!(state.linked_peers.contains_key("linked-peer"));
+
+        // Check event
+        let event = event_rx.try_recv().unwrap();
+        match event {
+            TopologyEvent::PeerAdded { linked_peer_id } => {
+                assert_eq!(linked_peer_id, "linked-peer");
+            }
+            _ => panic!("Expected PeerAdded event"),
+        }
+    }
+
+    #[test]
+    fn test_linked_peer_expiry() {
+        use std::time::Duration;
+
+        let mut state = TopologyState::default();
+        let config = TopologyConfig {
+            peer_timeout: Duration::from_millis(100), // Short timeout for test
+            ..Default::default()
+        };
+
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        // Manually add a linked peer with old timestamp
+        let old_time = Instant::now() - Duration::from_millis(200);
+        state
+            .linked_peers
+            .insert("stale-peer".to_string(), old_time);
+
+        // Update with empty nearby beacons (peer disappeared)
+        let nearby_beacons = Vec::new();
+
+        TopologyBuilder::update_linked_peers(
+            &mut state,
+            &config,
+            &nearby_beacons,
+            HierarchyLevel::Platoon,
+            &event_tx,
+        );
+
+        // Check state - stale peer should be removed
+        assert_eq!(state.linked_peers.len(), 0);
+
+        // Check event
+        let event = event_rx.try_recv().unwrap();
+        match event {
+            TopologyEvent::PeerRemoved { linked_peer_id } => {
+                assert_eq!(linked_peer_id, "stale-peer");
+            }
+            _ => panic!("Expected PeerRemoved event"),
+        }
     }
 }
