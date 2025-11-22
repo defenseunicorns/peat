@@ -4,11 +4,11 @@ set -euo pipefail
 #####################################################################
 # Scaling Validation Test Script
 #
-# Tests Traditional Baseline at various node scales (96, 192, 384)
-# with comprehensive resource monitoring and metrics collection.
+# Tests network topologies at various node scales with metrics collection
 #
-# Usage: ./test-scaling-validation.sh <node_count>
+# Usage: ./test-scaling-validation.sh <node_count> [topology_file]
 # Example: ./test-scaling-validation.sh 192
+# Example: ./test-scaling-validation.sh 24 topologies/test-mesh-24node.yaml
 #####################################################################
 
 # Colors for output
@@ -18,48 +18,69 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Load Ditto credentials if available
+if [ -f ../.env ]; then
+    set -a
+    source ../.env
+    set +a
+elif [ -f .env ]; then
+    set -a
+    source .env
+    set +a
+fi
+
 # Configuration
 NODE_COUNT="${1:-96}"
+TOPOLOGY_FILE_OVERRIDE="${2:-}"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 RESULTS_DIR="scaling-results-${NODE_COUNT}node-${TIMESTAMP}"
-TEST_DURATION=60  # seconds
+TEST_DURATION=120  # seconds (increased for larger deployments)
 RESOURCE_SAMPLE_INTERVAL=5  # seconds
 
-# Topology file mapping
-case $NODE_COUNT in
-    48)
-        TOPOLOGY_FILE="topologies/traditional-battalion-48node.yaml"
-        ;;
-    96)
-        TOPOLOGY_FILE="topologies/traditional-battalion-96node.yaml"
-        ;;
-    192)
-        TOPOLOGY_FILE="topologies/traditional-battalion-192node.yaml"
-        ;;
-    384)
-        TOPOLOGY_FILE="topologies/traditional-battalion-384node.yaml"
-        ;;
-    500)
-        TOPOLOGY_FILE="topologies/traditional-battalion-500node.yaml"
-        ;;
-    750)
-        TOPOLOGY_FILE="topologies/traditional-battalion-750node.yaml"
-        ;;
-    1000)
-        TOPOLOGY_FILE="topologies/traditional-battalion-1000node.yaml"
-        ;;
-    1500)
-        TOPOLOGY_FILE="topologies/traditional-battalion-1500node.yaml"
-        ;;
-    2000)
-        TOPOLOGY_FILE="topologies/traditional-battalion-2000node.yaml"
-        ;;
-    *)
-        echo -e "${RED}❌ Error: Unsupported node count: $NODE_COUNT${NC}"
-        echo "Supported: 48, 96, 192, 384, 500, 750, 1000, 1500, 2000"
-        exit 1
-        ;;
-esac
+# Topology file selection
+if [ -n "$TOPOLOGY_FILE_OVERRIDE" ]; then
+    # Use provided topology file
+    TOPOLOGY_FILE="$TOPOLOGY_FILE_OVERRIDE"
+else
+    # Default topology file mapping (traditional client-server)
+    case $NODE_COUNT in
+        24)
+            TOPOLOGY_FILE="topologies/traditional-battalion-24node.yaml"
+            ;;
+        48)
+            TOPOLOGY_FILE="topologies/traditional-battalion-48node.yaml"
+            ;;
+        96)
+            TOPOLOGY_FILE="topologies/traditional-battalion-96node.yaml"
+            ;;
+        192)
+            TOPOLOGY_FILE="topologies/traditional-battalion-192node.yaml"
+            ;;
+        384)
+            TOPOLOGY_FILE="topologies/traditional-battalion-384node.yaml"
+            ;;
+        500)
+            TOPOLOGY_FILE="topologies/traditional-battalion-500node.yaml"
+            ;;
+        750)
+            TOPOLOGY_FILE="topologies/traditional-battalion-750node.yaml"
+            ;;
+        1000)
+            TOPOLOGY_FILE="topologies/traditional-battalion-1000node.yaml"
+            ;;
+        1500)
+            TOPOLOGY_FILE="topologies/traditional-battalion-1500node.yaml"
+            ;;
+        2000)
+            TOPOLOGY_FILE="topologies/traditional-battalion-2000node.yaml"
+            ;;
+        *)
+            echo -e "${RED}❌ Error: Unsupported node count: $NODE_COUNT${NC}"
+            echo "Supported: 24, 48, 96, 192, 384, 500, 750, 1000, 1500, 2000"
+            exit 1
+            ;;
+    esac
+fi
 
 # Validate topology file exists
 if [ ! -f "$TOPOLOGY_FILE" ]; then
@@ -70,6 +91,10 @@ fi
 # Create results directory
 mkdir -p "$RESULTS_DIR"
 
+# Set up log file for tailing
+LOG_FILE="$RESULTS_DIR/test.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║  Scaling Validation - ${NODE_COUNT} Nodes${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
@@ -79,6 +104,7 @@ echo "   • Node count: $NODE_COUNT"
 echo "   • Topology: $TOPOLOGY_FILE"
 echo "   • Test duration: ${TEST_DURATION}s"
 echo "   • Results directory: $RESULTS_DIR"
+echo "   • Log file: $LOG_FILE (tail -f $LOG_FILE)"
 echo ""
 
 #####################################################################
@@ -142,7 +168,7 @@ cleanup() {
 
     # Destroy topology with force cleanup on timeout
     echo "   Destroying topology..."
-    timeout 30 containerlab destroy --all --cleanup 2>/dev/null || {
+    timeout 30 containerlab destroy -t "$TOPOLOGY_FILE" --cleanup 2>/dev/null || {
         echo -e "${YELLOW}   ⚠️  Normal destroy timed out, forcing cleanup...${NC}"
         docker ps -a --filter "name=clab-traditional-battalion" -q | xargs -r docker rm -f 2>/dev/null || true
     }
@@ -179,12 +205,15 @@ DEPLOY_START=$(date +%s)
 
 # Use --max-workers to control concurrent deployment
 # For large topologies, limit workers to avoid overwhelming the system
+# Lower worker count reduces network namespace race conditions
 if [ "$NODE_COUNT" -ge 384 ]; then
-    MAX_WORKERS=16
+    MAX_WORKERS=12
 elif [ "$NODE_COUNT" -ge 192 ]; then
-    MAX_WORKERS=24
+    MAX_WORKERS=16
+elif [ "$NODE_COUNT" -ge 96 ]; then
+    MAX_WORKERS=20
 else
-    MAX_WORKERS=32
+    MAX_WORKERS=24
 fi
 
 echo "   Max workers: $MAX_WORKERS"
@@ -193,10 +222,23 @@ echo "   Max workers: $MAX_WORKERS"
 CLAB_TIMEOUT="5m"
 echo "   Containerlab timeout: $CLAB_TIMEOUT"
 
-if ! timeout 600 containerlab deploy -t "$TOPOLOGY_FILE" --max-workers "$MAX_WORKERS" --timeout "$CLAB_TIMEOUT"; then
+# Deploy with error capture
+DEPLOY_OUTPUT=$(mktemp)
+if ! timeout 600 containerlab deploy -t "$TOPOLOGY_FILE" --max-workers "$MAX_WORKERS" --timeout "$CLAB_TIMEOUT" --reconfigure 2>&1 | tee "$DEPLOY_OUTPUT"; then
     echo -e "${RED}❌ Deployment failed or timed out${NC}"
+    rm -f "$DEPLOY_OUTPUT"
     exit 1
 fi
+
+# Check for critical errors (ignore Statfs warnings which are non-fatal)
+CRITICAL_ERRORS=$(grep -v "failed to Statfs" "$DEPLOY_OUTPUT" 2>/dev/null | grep -c "ERRO" 2>/dev/null || echo "0")
+CRITICAL_ERRORS=$(echo "$CRITICAL_ERRORS" | head -1)  # Take first line only
+if [ "$CRITICAL_ERRORS" -gt 0 ] 2>/dev/null; then
+    echo -e "${YELLOW}⚠️  Warning: $CRITICAL_ERRORS critical errors detected during deployment${NC}"
+    grep "ERRO" "$DEPLOY_OUTPUT" | grep -v "failed to Statfs" || true
+fi
+
+rm -f "$DEPLOY_OUTPUT"
 
 DEPLOY_END=$(date +%s)
 DEPLOY_TIME=$((DEPLOY_END - DEPLOY_START))
@@ -212,23 +254,45 @@ sleep 10
 echo ""
 echo -e "${GREEN}🔍 Verifying container health...${NC}"
 EXPECTED_CONTAINERS=$NODE_COUNT
-ACTUAL_CONTAINERS=$(docker ps --filter "name=clab-traditional-battalion-${NODE_COUNT}node" -q | wc -l)
+
+# Try multiple times to get accurate count (allow for startup lag)
+for i in {1..3}; do
+    ACTUAL_CONTAINERS=$(docker ps --filter "name=clab-traditional-battalion-${NODE_COUNT}node" -q | wc -l)
+
+    if [ "$ACTUAL_CONTAINERS" -eq "$EXPECTED_CONTAINERS" ]; then
+        break
+    fi
+
+    if [ $i -lt 3 ]; then
+        echo "   Waiting for containers to start ($ACTUAL_CONTAINERS/$EXPECTED_CONTAINERS)..."
+        sleep 2
+    fi
+done
 
 echo "   Expected containers: $EXPECTED_CONTAINERS"
 echo "   Running containers: $ACTUAL_CONTAINERS"
 
 if [ "$ACTUAL_CONTAINERS" -ne "$EXPECTED_CONTAINERS" ]; then
     echo -e "${YELLOW}⚠️  Warning: Container count mismatch${NC}"
+    echo "   Checking for failed containers..."
+
+    # List any failed/exited containers
+    FAILED=$(docker ps -a --filter "name=clab-traditional-battalion-${NODE_COUNT}node" --filter "status=exited" --format "{{.Names}}" | wc -l)
+    if [ "$FAILED" -gt 0 ]; then
+        echo -e "${RED}   ❌ $FAILED containers failed to start${NC}"
+        docker ps -a --filter "name=clab-traditional-battalion-${NODE_COUNT}node" --filter "status=exited" --format "   - {{.Names}}"
+    fi
 fi
 
 echo "$ACTUAL_CONTAINERS" > "$RESULTS_DIR/container-count.txt"
 
-# 6. Collect baseline Docker stats
-echo ""
-echo -e "${GREEN}📊 Collecting Docker resource stats...${NC}"
-docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}" \
-    --filter "name=clab-traditional-battalion-${NODE_COUNT}node" \
-    > "$RESULTS_DIR/docker-stats-initial.txt" 2>/dev/null || echo "Failed to collect Docker stats"
+# 6. Get lab name for log collection
+# Get the actual lab name from the topology file
+LAB_NAME=$(grep "^name:" "$TOPOLOGY_FILE" | awk '{print $2}' | tr -d '"')
+
+if [ -z "$LAB_NAME" ]; then
+    LAB_NAME="traditional-battalion-${NODE_COUNT}node"
+fi
 
 # 7. Run test for specified duration
 echo ""
@@ -238,7 +302,7 @@ echo "   Monitoring container logs for metrics..."
 TEST_START=$(date +%s)
 
 # Collect logs from a sample of containers (first 5 soldiers + HQ)
-SAMPLE_CONTAINERS=$(docker ps --filter "name=clab-traditional-battalion-${NODE_COUNT}node" --format "{{.Names}}" | head -6)
+SAMPLE_CONTAINERS=$(docker ps --filter "name=clab-${LAB_NAME}" --format "{{.Names}}" | head -6)
 
 for container in $SAMPLE_CONTAINERS; do
     echo "   Sampling logs from: $container"
@@ -250,43 +314,30 @@ sleep "$TEST_DURATION"
 TEST_END=$(date +%s)
 TEST_TIME=$((TEST_END - TEST_START))
 
-# 8. Collect final Docker stats
-echo ""
-echo -e "${GREEN}📊 Collecting final Docker resource stats...${NC}"
-docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}" \
-    --filter "name=clab-traditional-battalion-${NODE_COUNT}node" \
-    > "$RESULTS_DIR/docker-stats-final.txt" 2>/dev/null || echo "Failed to collect Docker stats"
-
-# 9. Collect container logs for metrics analysis
+# 8. Collect container logs for metrics analysis
 echo ""
 echo -e "${GREEN}📝 Collecting container logs...${NC}"
 
 # Collect logs from all containers (JSONL metrics)
 mkdir -p "$RESULTS_DIR/logs"
 
-CONTAINER_LIST=$(docker ps --filter "name=clab-traditional-battalion-${NODE_COUNT}node" --format "{{.Names}}")
+CONTAINER_LIST=$(docker ps --filter "name=clab-${LAB_NAME}" --format "{{.Names}}")
 CONTAINER_ARRAY=($CONTAINER_LIST)
 TOTAL_CONTAINERS=${#CONTAINER_ARRAY[@]}
 
-echo "   Collecting logs from $TOTAL_CONTAINERS containers..."
+if [ "$TOTAL_CONTAINERS" -eq 0 ]; then
+    echo "   ⚠️  Warning: No containers found to collect logs from"
+    echo "   Lab name: $LAB_NAME"
+else
+    echo "   Collecting logs from $TOTAL_CONTAINERS containers..."
+fi
 
-# Use parallel collection with limit to avoid overwhelming system
-BATCH_SIZE=20
-for ((i=0; i<$TOTAL_CONTAINERS; i+=$BATCH_SIZE)); do
-    BATCH_END=$((i + BATCH_SIZE))
-    if [ $BATCH_END -gt $TOTAL_CONTAINERS ]; then
-        BATCH_END=$TOTAL_CONTAINERS
-    fi
-
-    echo "   Processing containers $i-$BATCH_END..."
-
-    for ((j=i; j<BATCH_END; j++)); do
-        container="${CONTAINER_ARRAY[$j]}"
-        docker logs "$container" > "$RESULTS_DIR/logs/${container}.log" 2>&1 &
-    done
-
-    # Wait for this batch to complete
-    wait
+# Collect logs sequentially with progress indication
+COLLECTED=0
+for container in "${CONTAINER_ARRAY[@]}"; do
+    COLLECTED=$((COLLECTED + 1))
+    echo "   [$COLLECTED/$TOTAL_CONTAINERS] $container"
+    docker logs "$container" > "$RESULTS_DIR/logs/${container}.log" 2>&1
 done
 
 echo "   ✅ Log collection complete"
@@ -320,7 +371,6 @@ $(free -h | grep -E "Mem:|Swap:")
 Results Location:
   • Directory: $RESULTS_DIR
   • System resources: system-resources.csv
-  • Docker stats: docker-stats-*.txt
   • Container logs: logs/
 
 EOF

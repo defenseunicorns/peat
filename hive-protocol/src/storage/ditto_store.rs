@@ -465,7 +465,12 @@ impl DittoStore {
         &self,
         squad_id: &str,
         summary: &hive_schema::hierarchy::v1::SquadSummary,
+        collection: Option<&str>,
     ) -> Result<String> {
+        // Use provided collection or default to "sim_poc" for backward compatibility
+        let target_collection = collection.unwrap_or("sim_poc");
+        let collection_name = collection.unwrap_or("squad_summaries");
+
         // Full JSON expansion for CRDT field-level merging
         // This allows Ditto to:
         // 1. Merge member_ids array with OR-Set semantics (track additions/removals)
@@ -484,7 +489,7 @@ impl DittoStore {
         let doc_id = format!("{}-summary", squad_id);
         doc["_id"] = serde_json::Value::String(doc_id.clone());
         doc["type"] = serde_json::Value::String("squad_summary".to_string());
-        doc["collection_name"] = serde_json::Value::String("squad_summaries".to_string());
+        doc["collection_name"] = serde_json::Value::String(collection_name.to_string());
 
         // Get current timestamp in microseconds for latency tracking
         let timestamp_us = std::time::SystemTime::now()
@@ -493,7 +498,7 @@ impl DittoStore {
             .as_micros() as u64;
         doc["timestamp_us"] = serde_json::Value::Number(timestamp_us.into());
 
-        self.upsert("sim_poc", doc).await
+        self.upsert(target_collection, doc).await
     }
 
     /// Retrieve a SquadSummary from the squad_summaries collection
@@ -501,6 +506,7 @@ impl DittoStore {
     /// # Arguments
     ///
     /// * `squad_id` - Unique squad identifier
+    /// * `collection` - Optional collection name (defaults to "sim_poc")
     ///
     /// # Returns
     ///
@@ -509,11 +515,14 @@ impl DittoStore {
     pub async fn get_squad_summary(
         &self,
         squad_id: &str,
+        collection: Option<&str>,
     ) -> Result<Option<hive_schema::hierarchy::v1::SquadSummary>> {
+        let target_collection = collection.unwrap_or("sim_poc");
+
         // Query with -summary suffix
         let doc_id = format!("{}-summary", squad_id);
         let results = self
-            .query("sim_poc", &format!("_id == '{}'", doc_id))
+            .query(target_collection, &format!("_id == '{}'", doc_id))
             .await?;
 
         if results.is_empty() {
@@ -557,11 +566,12 @@ impl DittoStore {
         &self,
         squad_id: &str,
         initial_state: &hive_schema::hierarchy::v1::SquadSummary,
+        collection: Option<&str>,
     ) -> Result<String> {
         let doc_id = format!("{}-summary", squad_id);
 
         // Check if already exists (enforce create-once invariant)
-        if self.get_squad_summary(squad_id).await?.is_some() {
+        if self.get_squad_summary(squad_id, None).await?.is_some() {
             return Err(Error::storage_error(
                 format!(
                     "Squad summary {} already exists (cannot recreate - violates ADR-021)",
@@ -645,13 +655,14 @@ impl DittoStore {
         &self,
         squad_id: &str,
         delta: crate::hierarchy::deltas::SquadDelta,
+        collection: Option<&str>,
     ) -> Result<()> {
         use crate::hierarchy::deltas::SquadFieldUpdate;
 
         let doc_id = format!("{}-summary", squad_id);
 
         // Verify document exists (enforce must-create-first invariant)
-        if self.get_squad_summary(squad_id).await?.is_none() {
+        if self.get_squad_summary(squad_id, None).await?.is_none() {
             return Err(Error::storage_error(
                 format!(
                     "Squad summary {} does not exist (must create first)",
@@ -871,6 +882,7 @@ impl DittoStore {
         &self,
         platoon_id: &str,
         summary: &hive_schema::hierarchy::v1::PlatoonSummary,
+        collection: Option<&str>,
     ) -> Result<String> {
         // Full JSON expansion for CRDT field-level merging
         let mut doc = serde_json::to_value(summary).map_err(|e| {
@@ -881,12 +893,15 @@ impl DittoStore {
             )
         })?;
 
+        let target_collection = collection.unwrap_or("sim_poc");
+        let collection_name = collection.unwrap_or("platoon_summaries");
+
         // Add Ditto-required metadata
         // CRITICAL: Append -summary suffix for hierarchical aggregation detection
         let doc_id = format!("{}-summary", platoon_id);
         doc["_id"] = serde_json::Value::String(doc_id);
         doc["type"] = serde_json::Value::String("platoon_summary".to_string());
-        doc["collection_name"] = serde_json::Value::String("sim_poc".to_string());
+        doc["collection_name"] = serde_json::Value::String(collection_name.to_string());
 
         // Get current timestamp in microseconds for latency tracking
         let timestamp_us = std::time::SystemTime::now()
@@ -895,7 +910,7 @@ impl DittoStore {
             .as_micros() as u64;
         doc["timestamp_us"] = serde_json::Value::Number(timestamp_us.into());
 
-        self.upsert("sim_poc", doc).await
+        self.upsert(target_collection, doc).await
     }
 
     /// Retrieve a PlatoonSummary from the platoon_summaries collection
@@ -911,6 +926,7 @@ impl DittoStore {
     pub async fn get_platoon_summary(
         &self,
         platoon_id: &str,
+        collection: Option<&str>,
     ) -> Result<Option<hive_schema::hierarchy::v1::PlatoonSummary>> {
         // Query with -summary suffix
         let doc_id = format!("{}-summary", platoon_id);
@@ -946,11 +962,12 @@ impl DittoStore {
         &self,
         platoon_id: &str,
         initial_state: &hive_schema::hierarchy::v1::PlatoonSummary,
+        collection: Option<&str>,
     ) -> Result<String> {
         let doc_id = format!("{}-summary", platoon_id);
 
         // Check if already exists (enforce create-once invariant)
-        if self.get_platoon_summary(platoon_id).await?.is_some() {
+        if self.get_platoon_summary(platoon_id, None).await?.is_some() {
             return Err(Error::storage_error(
                 format!(
                     "Platoon summary {} already exists (cannot recreate - violates ADR-021)",
@@ -984,7 +1001,9 @@ impl DittoStore {
         doc["last_update_us"] = serde_json::Value::Number(timestamp_us.into());
         doc["sequence"] = serde_json::Value::Number(0.into());
 
-        self.upsert("sim_poc", doc).await?;
+        let target_collection = collection.unwrap_or("sim_poc");
+
+        self.upsert(target_collection, doc).await?;
 
         // Initialize PN_COUNTER fields AFTER document creation
         // This ensures they are created as PN_COUNTERs, not REGISTERs
@@ -1006,13 +1025,14 @@ impl DittoStore {
         &self,
         platoon_id: &str,
         delta: crate::hierarchy::deltas::PlatoonDelta,
+        collection: Option<&str>,
     ) -> Result<()> {
         use crate::hierarchy::deltas::PlatoonFieldUpdate;
 
         let doc_id = format!("{}-summary", platoon_id);
 
         // Verify document exists
-        if self.get_platoon_summary(platoon_id).await?.is_none() {
+        if self.get_platoon_summary(platoon_id, None).await?.is_none() {
             return Err(Error::storage_error(
                 format!(
                     "Platoon summary {} does not exist (must create first)",
@@ -2587,14 +2607,14 @@ mod tests {
 
         // Test upsert
         let doc_id = store
-            .upsert_squad_summary("squad-alpha", &squad_summary)
+            .upsert_squad_summary("squad-alpha", &squad_summary, None)
             .await
             .expect("Failed to upsert squad summary");
         assert_eq!(doc_id, "squad-alpha-summary");
 
         // Test retrieval
         let retrieved = store
-            .get_squad_summary("squad-alpha")
+            .get_squad_summary("squad-alpha", None)
             .await
             .expect("Failed to get squad summary");
 
@@ -2608,7 +2628,7 @@ mod tests {
 
         // Test non-existent retrieval
         let not_found = store
-            .get_squad_summary("squad-nonexistent")
+            .get_squad_summary("squad-nonexistent", None)
             .await
             .expect("Query should succeed");
         assert!(not_found.is_none());
@@ -2700,14 +2720,14 @@ mod tests {
 
         // Test upsert
         let doc_id = store
-            .upsert_platoon_summary("platoon-1", &platoon_summary)
+            .upsert_platoon_summary("platoon-1", &platoon_summary, None)
             .await
             .expect("Failed to upsert platoon summary");
         assert_eq!(doc_id, "platoon-1-summary");
 
         // Test retrieval
         let retrieved = store
-            .get_platoon_summary("platoon-1")
+            .get_platoon_summary("platoon-1", None)
             .await
             .expect("Failed to get platoon summary");
 
@@ -2722,7 +2742,7 @@ mod tests {
 
         // Test non-existent retrieval
         let not_found = store
-            .get_platoon_summary("platoon-nonexistent")
+            .get_platoon_summary("platoon-nonexistent", None)
             .await
             .expect("Query should succeed");
         assert!(not_found.is_none());
@@ -3003,7 +3023,7 @@ mod tests {
         };
 
         store1
-            .upsert_squad_summary("delta-test-squad", &initial_summary)
+            .upsert_squad_summary("delta-test-squad", &initial_summary, None)
             .await
             .expect("Failed to upsert initial summary");
 
@@ -3019,7 +3039,7 @@ mod tests {
             sleep(Duration::from_millis(500)).await;
 
             let retrieved = store2
-                .get_squad_summary("delta-test-squad")
+                .get_squad_summary("delta-test-squad", None)
                 .await
                 .expect("Failed to query");
 
@@ -3048,7 +3068,7 @@ mod tests {
         println!("All other fields unchanged (testing delta sync)");
 
         store1
-            .upsert_squad_summary("delta-test-squad", &updated_summary)
+            .upsert_squad_summary("delta-test-squad", &updated_summary, None)
             .await
             .expect("Failed to update summary");
 
@@ -3060,7 +3080,7 @@ mod tests {
             sleep(Duration::from_millis(500)).await;
 
             let retrieved = store2
-                .get_squad_summary("delta-test-squad")
+                .get_squad_summary("delta-test-squad", None)
                 .await
                 .expect("Failed to query")
                 .expect("Document should exist");
@@ -3101,7 +3121,7 @@ mod tests {
         println!("Adding node-3 to member_ids array");
 
         store1
-            .upsert_squad_summary("delta-test-squad", &array_updated)
+            .upsert_squad_summary("delta-test-squad", &array_updated, None)
             .await
             .expect("Failed to update array");
 
@@ -3111,7 +3131,7 @@ mod tests {
             sleep(Duration::from_millis(500)).await;
 
             let retrieved = store2
-                .get_squad_summary("delta-test-squad")
+                .get_squad_summary("delta-test-squad", None)
                 .await
                 .expect("Failed to query")
                 .expect("Document should exist");
@@ -3142,7 +3162,7 @@ mod tests {
         println!("Updating position latitude: 37.7749 → 37.7800");
 
         store1
-            .upsert_squad_summary("delta-test-squad", &position_updated)
+            .upsert_squad_summary("delta-test-squad", &position_updated, None)
             .await
             .expect("Failed to update position");
 
@@ -3152,7 +3172,7 @@ mod tests {
             sleep(Duration::from_millis(500)).await;
 
             let retrieved = store2
-                .get_squad_summary("delta-test-squad")
+                .get_squad_summary("delta-test-squad", None)
                 .await
                 .expect("Failed to query")
                 .expect("Document should exist");
