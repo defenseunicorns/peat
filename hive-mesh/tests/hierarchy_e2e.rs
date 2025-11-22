@@ -205,7 +205,7 @@ async fn test_lateral_peer_discovery() {
         node1_profile,
     );
 
-    let nearby_beacons = vec![
+    let nearby_beacons = [
         lateral_peer1.clone(),
         lateral_peer2.clone(),
         higher_level_peer,
