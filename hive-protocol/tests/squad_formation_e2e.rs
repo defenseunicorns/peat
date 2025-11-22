@@ -565,13 +565,35 @@ async fn test_e2e_role_assignment_sync() {
     let mut observer2_leader = harness.observe_cell(&store2, &cell_id).await.unwrap();
 
     // Give observer time to fully register before mutation
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    // Increased from 500ms to 2000ms to ensure observer is fully active
+    tokio::time::sleep(Duration::from_millis(2000)).await;
 
     // Set leader on peer1
     cell_store1
         .set_leader(&cell_id, "node_leader".to_string())
         .await
         .unwrap();
+
+    // Verify leader was set on peer1 before waiting for sync to peer2
+    println!("  3a. Verifying leader set on peer1...");
+    let mut leader_set_on_peer1 = false;
+    for attempt in 1..=10 {
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        if let Some(cell) = cell_store1.get_cell(&cell_id).await.ok().flatten() {
+            if cell.leader_id == Some("node_leader".to_string()) {
+                leader_set_on_peer1 = true;
+                println!("  ✓ Leader confirmed on peer1 (attempt {})", attempt);
+                break;
+            }
+        }
+    }
+
+    if !leader_set_on_peer1 {
+        println!("  ✗ Leader not set on peer1 - test setup failed");
+        harness.shutdown_store(store1).await;
+        harness.shutdown_store(store2).await;
+        panic!("Leader update failed on peer1 (originating peer)");
+    }
 
     println!("  4. Waiting for leader sync to peer2 (observer-based)...");
 
