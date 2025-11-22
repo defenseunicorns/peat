@@ -218,14 +218,23 @@ impl DocumentStore for DittoBackend {
 
         // Create channel for change events
         let (tx, rx) = mpsc::unbounded_channel();
-        let collection = collection.to_string();
+        let collection_name = collection.to_string();
+        let collection_for_closure = collection_name.clone();
+        let collection_for_error = collection_name.clone();
+
+        // Track previous document IDs to detect changes
+        let previous_doc_ids = Arc::new(Mutex::new(std::collections::HashSet::<String>::new()));
+        let is_initial = Arc::new(Mutex::new(true));
+
+        let prev_ids = previous_doc_ids.clone();
+        let initial_flag = is_initial.clone();
 
         // Register observer with Ditto
         let _observer = store
             .ditto()
             .store()
             .register_observer_v2(&dql_query, move |result| {
-                // Convert Ditto result to our ChangeEvent
+                // Convert Ditto result to documents
                 let documents: Vec<Document> = result
                     .iter()
                     .map(|item| {
@@ -254,14 +263,60 @@ impl DocumentStore for DittoBackend {
                     })
                     .collect();
 
-                // Send initial snapshot or update
-                let _ = tx.send(crate::sync::ChangeEvent::Initial { documents });
+                let mut is_first = initial_flag.lock().unwrap();
+                let mut prev = prev_ids.lock().unwrap();
+
+                if *is_first {
+                    // First callback - send initial snapshot
+                    let _ = tx.send(crate::sync::ChangeEvent::Initial {
+                        documents: documents.clone(),
+                    });
+
+                    // Track document IDs
+                    prev.clear();
+                    for doc in &documents {
+                        if let Some(ref id) = doc.id {
+                            prev.insert(id.clone());
+                        }
+                    }
+
+                    *is_first = false;
+                } else {
+                    // Subsequent callback - detect changes
+                    let mut current_ids = std::collections::HashSet::new();
+
+                    // Send Updated events for new or modified documents
+                    for doc in documents {
+                        if let Some(ref id) = doc.id {
+                            current_ids.insert(id.clone());
+
+                            // Send update event (could be insert or update)
+                            let _ = tx.send(crate::sync::ChangeEvent::Updated {
+                                collection: collection_for_closure.clone(),
+                                document: doc.clone(),
+                            });
+                        }
+                    }
+
+                    // Send Removed events for documents no longer in results
+                    for old_id in prev.iter() {
+                        if !current_ids.contains(old_id) {
+                            let _ = tx.send(crate::sync::ChangeEvent::Removed {
+                                collection: collection_for_closure.clone(),
+                                doc_id: old_id.clone(),
+                            });
+                        }
+                    }
+
+                    // Update tracked IDs
+                    *prev = current_ids;
+                }
             })
             .map_err(|e| {
                 Error::storage_error(
                     format!("Failed to register observer: {}", e),
                     "observe",
-                    Some(collection.clone()),
+                    Some(collection_for_error),
                 )
             })?;
 

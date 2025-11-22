@@ -41,6 +41,7 @@ tokio-test = "0.4"
 reqwest = { version = "0.12", features = ["json"] }
 tracing-subscriber = { workspace = true }
 dotenvy = { workspace = true }
+serial_test = "3.2"
 
 [features]
 default = ["external-api"]

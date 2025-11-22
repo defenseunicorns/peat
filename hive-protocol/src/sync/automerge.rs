@@ -31,6 +31,7 @@ use automerge::{sync, sync::SyncDoc, transaction::Transactable, Automerge};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use tokio::sync::mpsc;
 
 use crate::error::{Error, Result};
 use crate::sync::traits::*;
@@ -53,6 +54,9 @@ pub struct AutomergeBackend {
 
     /// Initialized flag
     initialized: Arc<Mutex<bool>>,
+
+    /// Change notification channels for observers
+    observers: Arc<Mutex<Vec<mpsc::UnboundedSender<ChangeEvent>>>>,
 }
 
 impl AutomergeBackend {
@@ -71,6 +75,7 @@ impl AutomergeBackend {
             sync_states: Arc::new(Mutex::new(HashMap::new())),
             config: Arc::new(Mutex::new(None)),
             initialized: Arc::new(Mutex::new(false)),
+            observers: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -441,6 +446,18 @@ impl DocumentStore for AutomergeBackend {
         }
 
         document.id = Some(doc_id.clone());
+
+        // Notify observers
+        drop(docs); // Release lock before notifying
+        let observers = self.observers.lock().unwrap();
+        for observer in observers.iter() {
+            let _ = observer.send(ChangeEvent::Updated {
+                collection: collection.to_string(),
+                document: document.clone(),
+            });
+        }
+        drop(observers);
+
         Ok(doc_id)
     }
 
@@ -478,6 +495,17 @@ impl DocumentStore for AutomergeBackend {
             id: doc_id.clone(),
         })?;
 
+        // Notify observers
+        drop(docs); // Release lock before notifying
+        let observers = self.observers.lock().unwrap();
+        for observer in observers.iter() {
+            let _ = observer.send(ChangeEvent::Removed {
+                collection: collection.to_string(),
+                doc_id: doc_id.clone(),
+            });
+        }
+        drop(observers);
+
         Ok(())
     }
 
@@ -498,8 +526,36 @@ impl DocumentStore for AutomergeBackend {
         Ok(results.len())
     }
 
-    fn observe(&self, _collection: &str, _query: &Query) -> Result<ChangeStream> {
-        let (_tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    fn observe(&self, collection: &str, query: &Query) -> Result<ChangeStream> {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+
+        // Send initial snapshot of matching documents
+        let docs = self.documents.lock().unwrap();
+        let mut initial_docs = Vec::new();
+
+        for (key, automerge_doc) in docs.iter() {
+            if !key.starts_with(&format!("{}:", collection)) {
+                continue;
+            }
+
+            let doc_id = key.split(':').nth(1).unwrap_or("").to_string();
+            if let Ok(document) = Self::automerge_to_document(automerge_doc, doc_id) {
+                if self.matches_query(&document, query).unwrap_or(false) {
+                    initial_docs.push(document);
+                }
+            }
+        }
+
+        drop(docs); // Release lock
+
+        // Send initial snapshot
+        let _ = tx.send(ChangeEvent::Initial {
+            documents: initial_docs,
+        });
+
+        // Register this observer for future updates
+        self.observers.lock().unwrap().push(tx.clone());
+
         Ok(ChangeStream { receiver: rx })
     }
 }
@@ -845,9 +901,42 @@ impl DocumentStore for IrohDocumentStore {
         Ok(())
     }
 
-    fn observe(&self, _collection: &str, _query: &Query) -> Result<ChangeStream> {
+    fn observe(&self, collection: &str, query: &Query) -> Result<ChangeStream> {
+        use crate::storage::traits::StorageBackend;
+
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-        let _ = tx.send(ChangeEvent::Initial { documents: vec![] });
+
+        // Get initial snapshot
+        let coll = self.backend.collection(collection);
+        let all_items = coll.scan().map_err(|e| Error::Storage {
+            message: e.to_string(),
+            operation: Some("scan".to_string()),
+            key: None,
+            source: None,
+        })?;
+
+        let mut initial_docs = Vec::new();
+        for (doc_id, bytes) in all_items {
+            if let Ok(mut doc) = serde_json::from_slice::<Document>(&bytes) {
+                if doc.id.is_none() {
+                    doc.id = Some(doc_id);
+                }
+
+                if matches_query(&doc, query) {
+                    initial_docs.push(doc);
+                }
+            }
+        }
+
+        // Send initial snapshot
+        let _ = tx.send(ChangeEvent::Initial {
+            documents: initial_docs,
+        });
+
+        // Note: AutomergeIroh doesn't have built-in change notification yet
+        // This implementation provides initial snapshot but won't emit updates
+        // TODO: Implement proper change notification when Automerge sync supports it
+
         Ok(ChangeStream { receiver: rx })
     }
 }
