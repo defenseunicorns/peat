@@ -1,18 +1,18 @@
-//! Parent selection algorithm for topology formation
+//! Peer selection algorithm for topology formation
 //!
-//! This module implements the logic for evaluating and selecting parent nodes
+//! This module implements the logic for evaluating and selecting peers
 //! based on node profiles, resources, geographic proximity, and hierarchy levels.
 
 use crate::beacon::{GeoPosition, GeographicBeacon, HierarchyLevel, NodeMobility};
 
-/// Candidate parent with selection score
+/// Candidate peer with selection score
 #[derive(Debug, Clone)]
-pub struct ParentCandidate {
+pub struct PeerCandidate {
     pub beacon: GeographicBeacon,
     pub score: f64,
 }
 
-/// Parent selection configuration
+/// Peer selection configuration
 #[derive(Debug, Clone)]
 pub struct SelectionConfig {
     /// Weight for mobility factor (0.0-1.0)
@@ -25,7 +25,7 @@ pub struct SelectionConfig {
     pub proximity_weight: f64,
     /// Maximum distance in meters (None = unlimited)
     pub max_distance_meters: Option<f64>,
-    /// Maximum number of children per parent (None = unlimited)
+    /// Maximum number of linked peers per node (None = unlimited)
     pub max_children_per_parent: Option<usize>,
 }
 
@@ -68,15 +68,15 @@ impl SelectionConfig {
     }
 }
 
-/// Parent selection algorithm
-pub struct ParentSelector {
+/// Peer selection algorithm
+pub struct PeerSelector {
     config: SelectionConfig,
     own_position: GeoPosition,
     own_level: HierarchyLevel,
 }
 
-impl ParentSelector {
-    /// Create a new parent selector
+impl PeerSelector {
+    /// Create a new peer selector
     pub fn new(
         config: SelectionConfig,
         own_position: GeoPosition,
@@ -89,14 +89,14 @@ impl ParentSelector {
         }
     }
 
-    /// Select the best parent from nearby beacons
+    /// Select the best peer from nearby beacons
     ///
-    /// Returns None if no suitable parent found
-    pub fn select_parent(&self, candidates: &[GeographicBeacon]) -> Option<ParentCandidate> {
-        let mut scored: Vec<ParentCandidate> = candidates
+    /// Returns None if no suitable peer found
+    pub fn select_peer(&self, candidates: &[GeographicBeacon]) -> Option<PeerCandidate> {
+        let mut scored: Vec<PeerCandidate> = candidates
             .iter()
-            .filter(|beacon| self.is_valid_parent(beacon))
-            .map(|beacon| ParentCandidate {
+            .filter(|beacon| self.is_valid_peer(beacon))
+            .map(|beacon| PeerCandidate {
                 beacon: beacon.clone(),
                 score: self.score_candidate(beacon),
             })
@@ -108,8 +108,8 @@ impl ParentSelector {
         scored.into_iter().next()
     }
 
-    /// Check if a beacon is a valid parent candidate
-    fn is_valid_parent(&self, beacon: &GeographicBeacon) -> bool {
+    /// Check if a beacon is a valid peer candidate
+    fn is_valid_peer(&self, beacon: &GeographicBeacon) -> bool {
         // Must be at least one level higher in hierarchy
         if !beacon.hierarchy_level.can_be_parent_of(&self.own_level) {
             return false;
@@ -123,7 +123,7 @@ impl ParentSelector {
             }
         }
 
-        // Check if node can be a parent
+        // Check if node can accept linked peers
         if !beacon.can_parent {
             return false;
         }
@@ -131,7 +131,7 @@ impl ParentSelector {
         true
     }
 
-    /// Score a candidate parent (higher is better)
+    /// Score a candidate peer (higher is better)
     fn score_candidate(&self, beacon: &GeographicBeacon) -> f64 {
         let mut score = 0.0;
 
@@ -216,14 +216,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_select_best_parent_prefers_static_nodes() {
-        let selector = ParentSelector::new(
+    fn test_select_best_peer_prefers_static_nodes() {
+        let selector = PeerSelector::new(
             SelectionConfig::default(),
             GeoPosition::new(37.7749, -122.4194),
             HierarchyLevel::Squad,
         );
 
-        let static_parent = create_test_beacon(
+        let static_peer = create_test_beacon(
             "static",
             GeoPosition::new(37.7750, -122.4195),
             HierarchyLevel::Platoon,
@@ -231,7 +231,7 @@ mod tests {
             50, // 50% resource usage
         );
 
-        let mobile_parent = create_test_beacon(
+        let mobile_peer = create_test_beacon(
             "mobile",
             GeoPosition::new(37.7751, -122.4196),
             HierarchyLevel::Platoon,
@@ -239,7 +239,7 @@ mod tests {
             30, // 30% resource usage (better resources)
         );
 
-        let result = selector.select_parent(&[static_parent, mobile_parent]);
+        let result = selector.select_peer(&[static_peer, mobile_peer]);
 
         assert!(result.is_some());
         let winner = result.unwrap();
@@ -247,15 +247,15 @@ mod tests {
     }
 
     #[test]
-    fn test_select_parent_respects_hierarchy() {
-        let selector = ParentSelector::new(
+    fn test_select_peer_respects_hierarchy() {
+        let selector = PeerSelector::new(
             SelectionConfig::default(),
             GeoPosition::new(37.7749, -122.4194),
             HierarchyLevel::Squad,
         );
 
-        // Platoon can be parent of Squad  (Platoon > Squad in hierarchy)
-        let valid_parent = create_test_beacon(
+        // Platoon can be selected peer of Squad  (Platoon > Squad in hierarchy)
+        let valid_peer = create_test_beacon(
             "valid",
             GeoPosition::new(37.7750, -122.4195),
             HierarchyLevel::Platoon,
@@ -263,8 +263,8 @@ mod tests {
             50,
         );
 
-        // Platform cannot be parent of Squad (Platform < Squad in hierarchy)
-        let invalid_parent = create_test_beacon(
+        // Platform cannot be selected peer of Squad (Platform < Squad in hierarchy)
+        let invalid_peer = create_test_beacon(
             "invalid",
             GeoPosition::new(37.7751, -122.4196),
             HierarchyLevel::Platform,
@@ -272,7 +272,7 @@ mod tests {
             30,
         );
 
-        let result = selector.select_parent(&[valid_parent.clone(), invalid_parent]);
+        let result = selector.select_peer(&[valid_peer.clone(), invalid_peer]);
 
         assert!(result.is_some());
         let winner = result.unwrap();
@@ -280,8 +280,8 @@ mod tests {
     }
 
     #[test]
-    fn test_select_parent_prefers_closer_nodes() {
-        let selector = ParentSelector::new(
+    fn test_select_peer_prefers_closer_nodes() {
+        let selector = PeerSelector::new(
             SelectionConfig {
                 proximity_weight: 0.9, // Heavy weight on proximity
                 mobility_weight: 0.1,
@@ -309,7 +309,7 @@ mod tests {
             30,
         );
 
-        let result = selector.select_parent(&[nearby, far]);
+        let result = selector.select_peer(&[nearby, far]);
 
         assert!(result.is_some());
         let winner = result.unwrap();
@@ -317,8 +317,8 @@ mod tests {
     }
 
     #[test]
-    fn test_select_parent_respects_distance_limit() {
-        let selector = ParentSelector::new(
+    fn test_select_peer_respects_distance_limit() {
+        let selector = PeerSelector::new(
             SelectionConfig {
                 max_distance_meters: Some(1_000.0), // 1km limit
                 ..Default::default()
@@ -335,13 +335,13 @@ mod tests {
             30,
         );
 
-        let result = selector.select_parent(&[too_far]);
+        let result = selector.select_peer(&[too_far]);
         assert!(result.is_none());
     }
 
     #[test]
-    fn test_select_parent_prefers_better_resources() {
-        let selector = ParentSelector::new(
+    fn test_select_peer_prefers_better_resources() {
+        let selector = PeerSelector::new(
             SelectionConfig {
                 resource_weight: 0.9, // Heavy weight on resources
                 mobility_weight: 0.1,
@@ -369,7 +369,7 @@ mod tests {
             20, // 20% resource usage
         );
 
-        let result = selector.select_parent(&[low_resources, high_resources]);
+        let result = selector.select_peer(&[low_resources, high_resources]);
 
         assert!(result.is_some());
         let winner = result.unwrap();

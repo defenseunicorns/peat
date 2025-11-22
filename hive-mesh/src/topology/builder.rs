@@ -1,10 +1,10 @@
 //! Topology builder for beacon-driven mesh formation
 //!
 //! This module implements the TopologyBuilder which coordinates topology formation
-//! by observing nearby beacons, selecting parents, and maintaining hierarchy state.
+//! by observing nearby beacons, selecting peers, and maintaining topology state.
 
 use crate::beacon::{BeaconObserver, GeoPosition, GeographicBeacon, HierarchyLevel, NodeProfile};
-use crate::topology::selection::{ParentSelector, SelectionConfig};
+use crate::topology::selection::{PeerSelector, SelectionConfig};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -13,37 +13,38 @@ use tokio::task::JoinHandle;
 
 /// Topology change events
 #[derive(Debug, Clone)]
+#[allow(clippy::enum_variant_names)] // "Peer" prefix adds clarity to event names
 pub enum TopologyEvent {
-    /// Parent selected for the first time
-    ParentSelected {
-        parent_id: String,
-        parent_beacon: GeographicBeacon,
+    /// Peer selected for the first time
+    PeerSelected {
+        selected_peer_id: String,
+        peer_beacon: GeographicBeacon,
     },
-    /// Parent changed (re-parenting occurred)
-    ParentChanged {
-        old_parent_id: String,
-        new_parent_id: String,
-        new_parent_beacon: GeographicBeacon,
+    /// Selected peer changed (peer change occurred)
+    PeerChanged {
+        old_peer_id: String,
+        new_peer_id: String,
+        new_peer_beacon: GeographicBeacon,
     },
-    /// Parent lost (became unavailable)
-    ParentLost { parent_id: String },
-    /// Child node joined under this node as parent
-    ChildAdded { child_id: String },
-    /// Child node left
-    ChildRemoved { child_id: String },
+    /// Selected peer lost (became unavailable)
+    PeerLost { lost_peer_id: String },
+    /// Linked peer joined under this node
+    PeerAdded { linked_peer_id: String },
+    /// Linked peer left
+    PeerRemoved { linked_peer_id: String },
 }
 
 /// Current topology state
 #[derive(Debug, Clone, Default)]
 pub struct TopologyState {
-    /// Current parent node (if any)
-    pub parent: Option<ParentInfo>,
-    /// Current children nodes (node_id -> last_seen)
-    pub children: HashMap<String, Instant>,
+    /// Current selected peer (if any)
+    pub selected_peer: Option<SelectedPeer>,
+    /// Current linked peers (node_id -> last_seen)
+    pub linked_peers: HashMap<String, Instant>,
 }
 
 #[derive(Debug, Clone)]
-pub struct ParentInfo {
+pub struct SelectedPeer {
     pub node_id: String,
     pub beacon: GeographicBeacon,
     pub selected_at: Instant,
@@ -52,14 +53,14 @@ pub struct ParentInfo {
 /// Configuration for topology builder
 #[derive(Debug, Clone)]
 pub struct TopologyConfig {
-    /// Parent selection configuration
+    /// Peer selection configuration
     pub selection: SelectionConfig,
-    /// How often to re-evaluate parent selection (None = only on beacon changes)
+    /// How often to re-evaluate peer selection (None = only on beacon changes)
     pub reevaluation_interval: Option<Duration>,
-    /// Minimum time before re-parenting (prevents thrashing)
-    pub reparent_cooldown: Duration,
-    /// Time before considering parent lost if no beacon received
-    pub parent_timeout: Duration,
+    /// Minimum time before peer change (prevents thrashing)
+    pub peer_change_cooldown: Duration,
+    /// Time before considering peer lost if no beacon received
+    pub peer_timeout: Duration,
 }
 
 impl Default for TopologyConfig {
@@ -67,8 +68,8 @@ impl Default for TopologyConfig {
         Self {
             selection: SelectionConfig::default(),
             reevaluation_interval: Some(Duration::from_secs(30)),
-            reparent_cooldown: Duration::from_secs(60),
-            parent_timeout: Duration::from_secs(180), // 3 minutes
+            peer_change_cooldown: Duration::from_secs(60),
+            peer_timeout: Duration::from_secs(180), // 3 minutes
         }
     }
 }
@@ -77,9 +78,9 @@ impl Default for TopologyConfig {
 ///
 /// Coordinates topology formation by:
 /// - Observing nearby beacons
-/// - Selecting optimal parents
-/// - Managing parent/child relationships
-/// - Handling dynamic re-parenting
+/// - Selecting optimal peers
+/// - Managing peer relationships
+/// - Handling dynamic peer changes
 pub struct TopologyBuilder {
     config: TopologyConfig,
     #[allow(dead_code)]
@@ -149,19 +150,20 @@ impl TopologyBuilder {
                 // Evaluate topology
                 let current_pos = *position.lock().unwrap();
                 let selector =
-                    ParentSelector::new(config.selection.clone(), current_pos, hierarchy_level);
+                    PeerSelector::new(config.selection.clone(), current_pos, hierarchy_level);
 
                 // Get nearby beacons
                 let nearby = observer.get_nearby_beacons().await;
 
-                // Check current parent status
+                // Check current peer status
                 let mut state_lock = state.lock().unwrap();
-                let needs_parent = Self::check_parent_status(&mut state_lock, &config, &nearby);
+                let needs_peer =
+                    Self::check_peer_status(&mut state_lock, &config, &nearby, &event_tx);
 
-                if needs_parent {
-                    // Select new parent
-                    if let Some(candidate) = selector.select_parent(&nearby) {
-                        Self::update_parent(&mut state_lock, &event_tx, candidate.beacon);
+                if needs_peer {
+                    // Select new peer
+                    if let Some(candidate) = selector.select_peer(&nearby) {
+                        Self::update_selected_peer(&mut state_lock, &event_tx, candidate.beacon);
                     }
                 }
 
@@ -184,9 +186,9 @@ impl TopologyBuilder {
         self.state.lock().unwrap().clone()
     }
 
-    /// Get current parent
-    pub fn get_parent(&self) -> Option<ParentInfo> {
-        self.state.lock().unwrap().parent.clone()
+    /// Get current selected peer
+    pub fn get_selected_peer(&self) -> Option<SelectedPeer> {
+        self.state.lock().unwrap().selected_peer.clone()
     }
 
     /// Get event receiver for topology changes
@@ -201,10 +203,10 @@ impl TopologyBuilder {
         *self.position.lock().unwrap() = position;
     }
 
-    /// Force immediate re-evaluation of parent selection
-    pub async fn reevaluate_parent(&self) {
+    /// Force immediate re-evaluation of peer selection
+    pub async fn reevaluate_peer(&self) {
         let current_pos = *self.position.lock().unwrap();
-        let selector = ParentSelector::new(
+        let selector = PeerSelector::new(
             self.config.selection.clone(),
             current_pos,
             self.hierarchy_level,
@@ -213,89 +215,92 @@ impl TopologyBuilder {
         let nearby = self.observer.get_nearby_beacons().await;
         let mut state_lock = self.state.lock().unwrap();
 
-        if let Some(candidate) = selector.select_parent(&nearby) {
-            // Check if this is better than current parent
-            let should_switch = if let Some(ref current) = state_lock.parent {
+        if let Some(candidate) = selector.select_peer(&nearby) {
+            // Check if this is better than current selected peer
+            let should_switch = if let Some(ref current) = state_lock.selected_peer {
                 // Only switch if cooldown period has passed
                 let elapsed = current.selected_at.elapsed();
-                if elapsed < self.config.reparent_cooldown {
+                if elapsed < self.config.peer_change_cooldown {
                     false
                 } else {
-                    // Re-score current parent and compare
+                    // Re-score current selected peer and compare
                     let current_score = if let Some(current_beacon) =
                         nearby.iter().find(|b| b.node_id == current.node_id)
                     {
                         selector
-                            .select_parent(std::slice::from_ref(current_beacon))
+                            .select_peer(std::slice::from_ref(current_beacon))
                             .map(|c| c.score)
                             .unwrap_or(0.0)
                     } else {
-                        0.0 // Current parent not visible anymore
+                        0.0 // Current selected peer not visible anymore
                     };
 
                     candidate.score > current_score * 1.1 // 10% hysteresis
                 }
             } else {
-                true // No current parent, definitely select
+                true // No current selected peer, definitely select
             };
 
             if should_switch {
-                Self::update_parent(&mut state_lock, &self.event_tx, candidate.beacon);
+                Self::update_selected_peer(&mut state_lock, &self.event_tx, candidate.beacon);
             }
         }
     }
 
-    /// Check parent status and determine if new parent needed
-    fn check_parent_status(
+    /// Check peer status and determine if new peer needed
+    fn check_peer_status(
         state: &mut TopologyState,
         config: &TopologyConfig,
         nearby: &[GeographicBeacon],
+        event_tx: &mpsc::UnboundedSender<TopologyEvent>,
     ) -> bool {
-        if let Some(ref parent) = state.parent {
-            // Check if parent is still visible
-            if nearby.iter().any(|b| b.node_id == parent.node_id) {
-                // Parent still visible
+        if let Some(ref selected_peer) = state.selected_peer {
+            // Check if selected peer is still visible
+            if nearby.iter().any(|b| b.node_id == selected_peer.node_id) {
+                // Selected peer still visible
                 false
             } else {
                 // Check timeout
-                if parent.selected_at.elapsed() > config.parent_timeout {
-                    // Parent lost
-                    state.parent = None;
+                if selected_peer.selected_at.elapsed() > config.peer_timeout {
+                    // Selected peer lost - emit event before clearing state
+                    let lost_peer_id = selected_peer.node_id.clone();
+                    state.selected_peer = None;
+                    let _ = event_tx.send(TopologyEvent::PeerLost { lost_peer_id });
                     true
                 } else {
                     false
                 }
             }
         } else {
-            // No parent, need one
+            // No selected peer, need one
             true
         }
     }
 
-    /// Update current parent
-    fn update_parent(
+    /// Update current selected peer
+    fn update_selected_peer(
         state: &mut TopologyState,
         event_tx: &mpsc::UnboundedSender<TopologyEvent>,
-        new_parent_beacon: GeographicBeacon,
+        new_peer_beacon: GeographicBeacon,
     ) {
-        let new_parent_id = new_parent_beacon.node_id.clone();
+        let new_peer_id = new_peer_beacon.node_id.clone();
 
-        let event = if let Some(ref current) = state.parent {
-            TopologyEvent::ParentChanged {
-                old_parent_id: current.node_id.clone(),
-                new_parent_id: new_parent_id.clone(),
-                new_parent_beacon: new_parent_beacon.clone(),
+        let event = if let Some(ref current) = state.selected_peer {
+            TopologyEvent::PeerChanged {
+                old_peer_id: current.node_id.clone(),
+                new_peer_id: new_peer_id.clone(),
+                new_peer_beacon: new_peer_beacon.clone(),
             }
         } else {
-            TopologyEvent::ParentSelected {
-                parent_id: new_parent_id.clone(),
-                parent_beacon: new_parent_beacon.clone(),
+            TopologyEvent::PeerSelected {
+                selected_peer_id: new_peer_id.clone(),
+                peer_beacon: new_peer_beacon.clone(),
             }
         };
 
-        state.parent = Some(ParentInfo {
-            node_id: new_parent_id,
-            beacon: new_parent_beacon,
+        state.selected_peer = Some(SelectedPeer {
+            node_id: new_peer_id,
+            beacon: new_peer_beacon,
             selected_at: Instant::now(),
         });
 
@@ -325,8 +330,8 @@ mod tests {
         );
 
         let state = builder.get_state();
-        assert!(state.parent.is_none());
-        assert!(state.children.is_empty());
+        assert!(state.selected_peer.is_none());
+        assert!(state.linked_peers.is_empty());
     }
 
     #[tokio::test]
