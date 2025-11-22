@@ -23,6 +23,7 @@ geohash = "0.13"
 
 # Internal dependencies
 hive-discovery = { path = "../hive-discovery" }
+hive-protocol = { path = "../hive-protocol" }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "macros"] }
