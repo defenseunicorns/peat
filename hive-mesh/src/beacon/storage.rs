@@ -131,6 +131,9 @@ pub enum BeaconChangeEvent {
 }
 
 #[cfg(test)]
+pub use tests::MockBeaconStorage;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::beacon::types::{GeoPosition, HierarchyLevel};
@@ -139,12 +142,18 @@ mod tests {
     use tokio::sync::Mutex;
 
     /// Mock in-memory beacon storage for testing
-    struct MockBeaconStorage {
+    pub struct MockBeaconStorage {
         beacons: Arc<Mutex<Vec<GeographicBeacon>>>,
     }
 
+    impl Default for MockBeaconStorage {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     impl MockBeaconStorage {
-        fn new() -> Self {
+        pub fn new() -> Self {
             Self {
                 beacons: Arc::new(Mutex::new(Vec::new())),
             }

@@ -77,6 +77,12 @@ impl HierarchyLevel {
             HierarchyLevel::Company => Some(HierarchyLevel::Platoon),
         }
     }
+
+    /// Check if this level can be a parent of another level
+    /// A level can be parent if it's at least one level higher in hierarchy
+    pub fn can_be_parent_of(&self, child: &HierarchyLevel) -> bool {
+        self > child
+    }
 }
 
 impl std::fmt::Display for HierarchyLevel {
