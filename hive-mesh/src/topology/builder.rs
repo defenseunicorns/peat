@@ -4,6 +4,7 @@
 //! by observing nearby beacons, selecting peers, and maintaining topology state.
 
 use crate::beacon::{BeaconObserver, GeoPosition, GeographicBeacon, HierarchyLevel, NodeProfile};
+use crate::hierarchy::NodeRole;
 use crate::topology::selection::{PeerSelector, SelectionConfig};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
@@ -28,19 +29,54 @@ pub enum TopologyEvent {
     },
     /// Selected peer lost (became unavailable)
     PeerLost { lost_peer_id: String },
-    /// Linked peer joined under this node
+    /// Linked peer joined under this node (lower hierarchy level)
     PeerAdded { linked_peer_id: String },
-    /// Linked peer left
+    /// Linked peer left (lower hierarchy level)
     PeerRemoved { linked_peer_id: String },
+    /// Lateral peer discovered (same hierarchy level)
+    LateralPeerDiscovered {
+        peer_id: String,
+        peer_beacon: GeographicBeacon,
+    },
+    /// Lateral peer lost (same hierarchy level)
+    LateralPeerLost { peer_id: String },
+    /// Node role changed within hierarchy level
+    RoleChanged {
+        old_role: NodeRole,
+        new_role: NodeRole,
+    },
+    /// Node hierarchy level changed
+    LevelChanged {
+        old_level: HierarchyLevel,
+        new_level: HierarchyLevel,
+    },
 }
 
 /// Current topology state
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct TopologyState {
     /// Current selected peer (if any)
     pub selected_peer: Option<SelectedPeer>,
-    /// Current linked peers (node_id -> last_seen)
+    /// Current linked peers - lower hierarchy level (node_id -> last_seen)
     pub linked_peers: HashMap<String, Instant>,
+    /// Current lateral peers - same hierarchy level (node_id -> last_seen)
+    pub lateral_peers: HashMap<String, Instant>,
+    /// Current node role within hierarchy level
+    pub role: NodeRole,
+    /// Current hierarchy level
+    pub hierarchy_level: HierarchyLevel,
+}
+
+impl Default for TopologyState {
+    fn default() -> Self {
+        Self {
+            selected_peer: None,
+            linked_peers: HashMap::new(),
+            lateral_peers: HashMap::new(),
+            role: NodeRole::default(),
+            hierarchy_level: HierarchyLevel::Squad, // Default level
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -169,6 +205,15 @@ impl TopologyBuilder {
 
                 // Track linked peers (peers that could select us)
                 Self::update_linked_peers(
+                    &mut state_lock,
+                    &config,
+                    &nearby,
+                    hierarchy_level,
+                    &event_tx,
+                );
+
+                // Track lateral peers (peers at same hierarchy level)
+                Self::update_lateral_peers(
                     &mut state_lock,
                     &config,
                     &nearby,
@@ -369,6 +414,61 @@ impl TopologyBuilder {
             let _ = event_tx.send(TopologyEvent::PeerRemoved {
                 linked_peer_id: peer_id,
             });
+        }
+    }
+
+    /// Update lateral peers (same hierarchy level)
+    ///
+    /// Tracks peers at the same hierarchy level for potential coordination.
+    /// Emits LateralPeerDiscovered/Lost events as peers appear and disappear.
+    fn update_lateral_peers(
+        state: &mut TopologyState,
+        config: &TopologyConfig,
+        nearby: &[GeographicBeacon],
+        own_level: HierarchyLevel,
+        event_tx: &mpsc::UnboundedSender<TopologyEvent>,
+    ) {
+        let now = Instant::now();
+
+        // Identify potential lateral peers (same hierarchy level)
+        let potential_lateral: Vec<&GeographicBeacon> = nearby
+            .iter()
+            .filter(|beacon| beacon.hierarchy_level == own_level)
+            .collect();
+
+        // Update last_seen for existing lateral peers that are still visible
+        for beacon in &potential_lateral {
+            if let Some(last_seen) = state.lateral_peers.get_mut(&beacon.node_id) {
+                *last_seen = now;
+            } else {
+                // New lateral peer discovered
+                state.lateral_peers.insert(beacon.node_id.clone(), now);
+                let _ = event_tx.send(TopologyEvent::LateralPeerDiscovered {
+                    peer_id: beacon.node_id.clone(),
+                    peer_beacon: (*beacon).clone(),
+                });
+            }
+        }
+
+        // Check for expired lateral peers (not seen recently)
+        let potential_lateral_ids: HashSet<_> =
+            potential_lateral.iter().map(|b| &b.node_id).collect();
+
+        let mut expired_peers = Vec::new();
+        for (peer_id, last_seen) in &state.lateral_peers {
+            // Peer is expired if:
+            // 1. Not in current nearby beacons
+            // 2. Last seen longer than peer_timeout ago
+            if !potential_lateral_ids.contains(peer_id) && last_seen.elapsed() > config.peer_timeout
+            {
+                expired_peers.push(peer_id.clone());
+            }
+        }
+
+        // Remove expired lateral peers
+        for peer_id in expired_peers {
+            state.lateral_peers.remove(&peer_id);
+            let _ = event_tx.send(TopologyEvent::LateralPeerLost { peer_id });
         }
     }
 }

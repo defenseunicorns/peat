@@ -241,6 +241,33 @@ impl TopologyManager {
                         }
                     }
                 }
+
+                TopologyEvent::LateralPeerDiscovered { peer_id, .. } => {
+                    info!("Lateral peer discovered: {}", peer_id);
+                    // Lateral peers are at the same hierarchy level
+                    // Connection management depends on coordination mode (future work)
+                }
+
+                TopologyEvent::LateralPeerLost { peer_id } => {
+                    info!("Lateral peer lost: {}", peer_id);
+                    // Clean up any lateral peer connections if needed
+                }
+
+                TopologyEvent::RoleChanged { old_role, new_role } => {
+                    info!("Role changed: {:?} -> {:?}", old_role, new_role);
+                    // Role changes may affect connection patterns (future work)
+                }
+
+                TopologyEvent::LevelChanged {
+                    old_level,
+                    new_level,
+                } => {
+                    info!(
+                        "Hierarchy level changed: {:?} -> {:?}",
+                        old_level, new_level
+                    );
+                    // Level changes may require connection reorganization (future work)
+                }
             }
         }
     }
