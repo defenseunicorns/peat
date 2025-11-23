@@ -1802,8 +1802,10 @@ async fn flat_mesh_mode(
 
         let document = Document::with_id(doc_id.clone(), fields);
 
-        // Upsert document to CRDT
+        // Upsert document to CRDT with timing
+        let upsert_start = std::time::Instant::now();
         backend.document_store().upsert(collection_name, document).await?;
+        let upsert_latency_ms = upsert_start.elapsed().as_secs_f64() * 1000.0;
 
         // Log metrics
         log_metrics(&MetricsEvent::DocumentInserted {
@@ -1813,8 +1815,8 @@ async fn flat_mesh_mode(
         });
 
         println!(
-            "[{}] Published state update {}/{} to flat mesh",
-            node_id, sequence, TARGET_UPDATES
+            "[{}] Published state update {}/{} to flat mesh, CRDT_latency: {:.3}ms",
+            node_id, sequence, TARGET_UPDATES, upsert_latency_ms
         );
 
         // Check current role

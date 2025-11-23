@@ -69,11 +69,11 @@ for NODE_COUNT in "${NODE_COUNTS[@]}"; do
         TOTAL_UPDATES=0
         STATUS="PASS"
 
-        # Extract CRDT sync latencies (look for NodeState or document updates)
-        if grep -q "NodeState" "${LOG_DIR}/${TEST_NAME}-peer-1.log" 2>/dev/null; then
-            # Extract latency from CRDT updates
-            grep -E "(NodeState|updated)" "${LOG_DIR}/${TEST_NAME}-peer-1.log" 2>/dev/null | \
-                grep -o 'latency[_:][a-z]*[: ]*[0-9.]*' | \
+        # Extract CRDT sync latencies (look for CRDT_latency pattern)
+        if grep -q "CRDT_latency" "${LOG_DIR}/${TEST_NAME}-peer-1.log" 2>/dev/null; then
+            # Extract latency from CRDT upsert operations
+            grep "CRDT_latency" "${LOG_DIR}/${TEST_NAME}-peer-1.log" 2>/dev/null | \
+                grep -o 'CRDT_latency: [0-9.]*' | \
                 grep -o '[0-9.]*' | sort -n > /tmp/crdt_lat_$$.txt || true
 
             if [ -s /tmp/crdt_lat_$$.txt ]; then
@@ -81,15 +81,18 @@ for NODE_COUNT in "${NODE_COUNTS[@]}"; do
                 CRDT_P95=$(awk 'BEGIN{c=0} {a[c++]=$1} END{print a[int(c*0.95)]}' /tmp/crdt_lat_$$.txt)
                 CRDT_P99=$(awk 'BEGIN{c=0} {a[c++]=$1} END{print a[int(c*0.99)]}' /tmp/crdt_lat_$$.txt)
                 CRDT_MAX=$(tail -1 /tmp/crdt_lat_$$.txt)
+                TOTAL_UPDATES=$(wc -l < /tmp/crdt_lat_$$.txt)
             fi
             rm -f /tmp/crdt_lat_$$.txt
         else
-            # If no specific latency metrics, use generic approach
-            STATUS="PASS"  # Still pass if CRDT is working
+            # If no specific latency metrics, still pass functional tests
+            STATUS="PASS"
         fi
 
-        # Count total updates from log
-        TOTAL_UPDATES=$(grep -c "NodeState\|document" "${LOG_DIR}/${TEST_NAME}-peer-1.log" 2>/dev/null || echo "0")
+        # If we didn't get total updates from latency logs, count from other patterns
+        if [ "$TOTAL_UPDATES" = "0" ]; then
+            TOTAL_UPDATES=$(grep -c "Published state update" "${LOG_DIR}/${TEST_NAME}-peer-1.log" 2>/dev/null || echo "0")
+        fi
 
         echo "${NODE_COUNT},${BANDWIDTH},${CONNECTIONS},${CRDT_P50},${CRDT_P95},${CRDT_P99},${CRDT_MAX},${TOTAL_UPDATES},${STATUS}" >> "$RESULTS_CSV"
 
