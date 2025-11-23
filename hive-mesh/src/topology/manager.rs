@@ -4,12 +4,265 @@
 //! connection establishment by listening to topology events and managing transport
 //! connections accordingly.
 
-use super::{TopologyBuilder, TopologyEvent};
+use super::{TopologyBuilder, TopologyConfig, TopologyEvent};
+use crate::routing::DataPacket;
 use hive_protocol::transport::{MeshConnection, MeshTransport, NodeId};
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
+use tokio::time::sleep;
 use tracing::{debug, info, warn};
+
+/// Retry state for a specific peer connection
+#[derive(Debug, Clone)]
+struct RetryState {
+    /// Number of retry attempts made so far
+    attempts: u32,
+    /// When the next retry should be attempted
+    next_retry: Instant,
+}
+
+/// Calculate exponential backoff delay for a given retry attempt
+///
+/// Uses the formula: min(initial_backoff * multiplier^attempts, max_backoff)
+fn calculate_backoff(
+    initial_backoff: Duration,
+    max_backoff: Duration,
+    backoff_multiplier: f64,
+    attempts: u32,
+) -> Duration {
+    let multiplier = backoff_multiplier.powi(attempts as i32);
+    let backoff_secs = initial_backoff.as_secs_f64() * multiplier;
+    let capped_secs = backoff_secs.min(max_backoff.as_secs_f64());
+    Duration::from_secs_f64(capped_secs)
+}
+
+/// Spawn a background task to retry selected peer connection with exponential backoff
+fn spawn_peer_connection_retry(
+    peer_id: String,
+    transport: Arc<dyn MeshTransport>,
+    peer_connection: Arc<RwLock<Option<Box<dyn MeshConnection>>>>,
+    selected_peer_id: Arc<RwLock<Option<NodeId>>>,
+    peer_retry_state: Arc<RwLock<Option<RetryState>>>,
+    telemetry_buffer: Arc<RwLock<Vec<DataPacket>>>,
+    config: TopologyConfig,
+) {
+    tokio::spawn(async move {
+        let node_id = NodeId::new(peer_id.clone());
+
+        loop {
+            // Check current retry state
+            let (attempts, sleep_duration) = {
+                let retry_state = peer_retry_state.read().unwrap();
+                match retry_state.as_ref() {
+                    None => {
+                        // No retry needed (might have been cleared by another task)
+                        return;
+                    }
+                    Some(state) => {
+                        if state.attempts >= config.max_retries {
+                            warn!(
+                                "Max retries ({}) reached for peer {}, giving up",
+                                config.max_retries, peer_id
+                            );
+                            peer_retry_state.write().unwrap().take();
+                            return;
+                        }
+
+                        // Calculate sleep duration until next retry
+                        let now = Instant::now();
+                        let sleep_duration = if now < state.next_retry {
+                            state.next_retry.duration_since(now)
+                        } else {
+                            Duration::from_secs(0)
+                        };
+
+                        (state.attempts, sleep_duration)
+                    }
+                }
+            };
+
+            // Sleep until it's time to retry
+            if sleep_duration > Duration::from_secs(0) {
+                sleep(sleep_duration).await;
+            }
+
+            // Attempt connection
+            info!(
+                "Retrying connection to peer {} (attempt {}/{})",
+                peer_id,
+                attempts + 1,
+                config.max_retries
+            );
+
+            match transport.connect(&node_id).await {
+                Ok(conn) => {
+                    *peer_connection.write().unwrap() = Some(conn);
+                    *selected_peer_id.write().unwrap() = Some(node_id);
+                    peer_retry_state.write().unwrap().take();
+                    info!(
+                        "Successfully connected to peer {} after {} retries",
+                        peer_id, attempts
+                    );
+
+                    // Flush any buffered telemetry packets now that parent is available
+                    TopologyManager::flush_buffer(&telemetry_buffer);
+
+                    return;
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to connect to peer {} (attempt {}/{}): {}",
+                        peer_id,
+                        attempts + 1,
+                        config.max_retries,
+                        e
+                    );
+
+                    // Update retry state
+                    let new_attempts = attempts + 1;
+                    if new_attempts >= config.max_retries {
+                        warn!(
+                            "Max retries ({}) reached for peer {}, giving up",
+                            config.max_retries, peer_id
+                        );
+                        peer_retry_state.write().unwrap().take();
+                        return;
+                    }
+
+                    let backoff = calculate_backoff(
+                        config.initial_backoff,
+                        config.max_backoff,
+                        config.backoff_multiplier,
+                        new_attempts,
+                    );
+
+                    let next_retry = Instant::now() + backoff;
+                    *peer_retry_state.write().unwrap() = Some(RetryState {
+                        attempts: new_attempts,
+                        next_retry,
+                    });
+
+                    debug!("Next retry for peer {} in {:?}", peer_id, backoff);
+                }
+            }
+        }
+    });
+}
+
+/// Spawn a background task to retry lateral peer connection with exponential backoff
+fn spawn_lateral_connection_retry(
+    peer_id: String,
+    transport: Arc<dyn MeshTransport>,
+    lateral_connections: Arc<RwLock<HashMap<String, Box<dyn MeshConnection>>>>,
+    lateral_retry_state: Arc<RwLock<HashMap<String, RetryState>>>,
+    config: TopologyConfig,
+) {
+    tokio::spawn(async move {
+        let node_id = NodeId::new(peer_id.clone());
+
+        loop {
+            // Check current retry state
+            let (attempts, sleep_duration) = {
+                let retry_states = lateral_retry_state.read().unwrap();
+                match retry_states.get(&peer_id) {
+                    None => {
+                        // No retry needed (might have been cleared)
+                        return;
+                    }
+                    Some(state) => {
+                        if state.attempts >= config.max_retries {
+                            warn!(
+                                "Max retries ({}) reached for lateral peer {}, giving up",
+                                config.max_retries, peer_id
+                            );
+                            lateral_retry_state.write().unwrap().remove(&peer_id);
+                            return;
+                        }
+
+                        // Calculate sleep duration until next retry
+                        let now = Instant::now();
+                        let sleep_duration = if now < state.next_retry {
+                            state.next_retry.duration_since(now)
+                        } else {
+                            Duration::from_secs(0)
+                        };
+
+                        (state.attempts, sleep_duration)
+                    }
+                }
+            };
+
+            // Sleep until it's time to retry
+            if sleep_duration > Duration::from_secs(0) {
+                sleep(sleep_duration).await;
+            }
+
+            // Attempt connection
+            info!(
+                "Retrying connection to lateral peer {} (attempt {}/{})",
+                peer_id,
+                attempts + 1,
+                config.max_retries
+            );
+
+            match transport.connect(&node_id).await {
+                Ok(conn) => {
+                    lateral_connections
+                        .write()
+                        .unwrap()
+                        .insert(peer_id.clone(), conn);
+                    lateral_retry_state.write().unwrap().remove(&peer_id);
+                    info!(
+                        "Successfully connected to lateral peer {} after {} retries",
+                        peer_id, attempts
+                    );
+                    return;
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to connect to lateral peer {} (attempt {}/{}): {}",
+                        peer_id,
+                        attempts + 1,
+                        config.max_retries,
+                        e
+                    );
+
+                    // Update retry state
+                    let new_attempts = attempts + 1;
+                    if new_attempts >= config.max_retries {
+                        warn!(
+                            "Max retries ({}) reached for lateral peer {}, giving up",
+                            config.max_retries, peer_id
+                        );
+                        lateral_retry_state.write().unwrap().remove(&peer_id);
+                        return;
+                    }
+
+                    let backoff = calculate_backoff(
+                        config.initial_backoff,
+                        config.max_backoff,
+                        config.backoff_multiplier,
+                        new_attempts,
+                    );
+
+                    let next_retry = Instant::now() + backoff;
+                    lateral_retry_state.write().unwrap().insert(
+                        peer_id.clone(),
+                        RetryState {
+                            attempts: new_attempts,
+                            next_retry,
+                        },
+                    );
+
+                    debug!("Next retry for lateral peer {} in {:?}", peer_id, backoff);
+                }
+            }
+        }
+    });
+}
 
 /// Topology Manager
 ///
@@ -23,6 +276,7 @@ use tracing::{debug, info, warn};
 /// - Reacts to PeerSelected/Changed/Lost events
 /// - Establishes peer connections via MeshTransport
 /// - Tears down stale connections
+/// - Implements exponential backoff for connection retries
 ///
 /// # Example
 ///
@@ -49,6 +303,18 @@ pub struct TopologyManager {
     /// Current selected peer node ID (if any)
     selected_peer_id: Arc<RwLock<Option<NodeId>>>,
 
+    /// Lateral peer connections (same hierarchy level)
+    lateral_connections: Arc<RwLock<HashMap<String, Box<dyn MeshConnection>>>>,
+
+    /// Retry state for selected peer
+    peer_retry_state: Arc<RwLock<Option<RetryState>>>,
+
+    /// Retry state for lateral peers
+    lateral_retry_state: Arc<RwLock<HashMap<String, RetryState>>>,
+
+    /// Telemetry buffer for packets during parent transitions
+    telemetry_buffer: Arc<RwLock<Vec<DataPacket>>>,
+
     /// Background task handle
     task_handle: RwLock<Option<JoinHandle<()>>>,
 }
@@ -66,6 +332,10 @@ impl TopologyManager {
             transport,
             peer_connection: Arc::new(RwLock::new(None)),
             selected_peer_id: Arc::new(RwLock::new(None)),
+            lateral_connections: Arc::new(RwLock::new(HashMap::new())),
+            peer_retry_state: Arc::new(RwLock::new(None)),
+            lateral_retry_state: Arc::new(RwLock::new(HashMap::new())),
+            telemetry_buffer: Arc::new(RwLock::new(Vec::new())),
             task_handle: RwLock::new(None),
         }
     }
@@ -85,9 +355,27 @@ impl TopologyManager {
             let transport = self.transport.clone();
             let peer_connection = self.peer_connection.clone();
             let selected_peer_id = self.selected_peer_id.clone();
+            let lateral_connections = self.lateral_connections.clone();
+            let peer_retry_state = self.peer_retry_state.clone();
+            let lateral_retry_state = self.lateral_retry_state.clone();
+            let telemetry_buffer = self.telemetry_buffer.clone();
+            let builder = self.builder.clone();
+            let config = self.builder.config().clone();
 
             let handle = tokio::spawn(async move {
-                Self::event_loop(rx, transport, peer_connection, selected_peer_id).await;
+                Self::event_loop(
+                    rx,
+                    transport,
+                    peer_connection,
+                    selected_peer_id,
+                    lateral_connections,
+                    peer_retry_state,
+                    lateral_retry_state,
+                    telemetry_buffer,
+                    builder,
+                    config,
+                )
+                .await;
             });
 
             *self.task_handle.write().unwrap() = Some(handle);
@@ -98,7 +386,7 @@ impl TopologyManager {
 
     /// Stop topology management
     ///
-    /// Stops the topology builder and disconnects from selected peer.
+    /// Stops the topology builder and disconnects from all peers.
     pub async fn stop(&self) -> Result<(), Box<dyn std::error::Error>> {
         // Abort the event loop task
         if let Some(handle) = self.task_handle.write().unwrap().take() {
@@ -115,6 +403,27 @@ impl TopologyManager {
                 warn!("Failed to disconnect from selected peer during stop: {}", e);
             }
         }
+
+        // Disconnect from all lateral peers
+        let lateral_peer_ids: Vec<String> = self
+            .lateral_connections
+            .read()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+
+        for peer_id in lateral_peer_ids {
+            let node_id = NodeId::new(peer_id.clone());
+            if let Err(e) = self.transport.disconnect(&node_id).await {
+                warn!(
+                    "Failed to disconnect from lateral peer {} during stop: {}",
+                    peer_id, e
+                );
+            }
+        }
+
+        self.lateral_connections.write().unwrap().clear();
 
         // Stop the transport
         self.transport.stop().await?;
@@ -142,14 +451,130 @@ impl TopologyManager {
         &self.builder
     }
 
+    /// Get all current lateral peer node IDs
+    pub fn get_lateral_peer_ids(&self) -> Vec<String> {
+        self.lateral_connections
+            .read()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect()
+    }
+
+    /// Get the number of lateral peer connections
+    pub fn lateral_peer_count(&self) -> usize {
+        self.lateral_connections.read().unwrap().len()
+    }
+
+    /// Send a telemetry packet
+    ///
+    /// If parent connection is available, sends immediately.
+    /// Otherwise, buffers the packet for later delivery (up to max_telemetry_buffer_size).
+    ///
+    /// # Arguments
+    ///
+    /// * `packet` - The telemetry packet to send
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(true)` if packet was sent immediately
+    /// - `Ok(false)` if packet was buffered
+    /// - `Err` if buffer is full and buffering is disabled
+    pub fn send_telemetry(&self, packet: DataPacket) -> Result<bool, String> {
+        let has_parent = self.selected_peer_id.read().unwrap().is_some();
+
+        if has_parent {
+            // Parent connection available - attempt to send immediately
+            // For now, just return true (actual sending would go through MeshConnection)
+            // TODO: Implement actual packet sending through MeshConnection
+            info!(
+                "Sending telemetry packet {} immediately to parent",
+                packet.packet_id
+            );
+            Ok(true)
+        } else {
+            // No parent connection - buffer the packet
+            let max_buffer_size = self.builder.config().max_telemetry_buffer_size;
+
+            if max_buffer_size == 0 {
+                return Err(
+                    "Telemetry buffering is disabled (max_telemetry_buffer_size = 0)".to_string(),
+                );
+            }
+
+            let mut buffer = self.telemetry_buffer.write().unwrap();
+
+            if buffer.len() >= max_buffer_size {
+                // Buffer is full - drop oldest packet (FIFO)
+                buffer.remove(0);
+                warn!(
+                    "Telemetry buffer full ({}), dropping oldest packet",
+                    max_buffer_size
+                );
+            }
+
+            info!(
+                "Buffering telemetry packet {} (buffer size: {}/{})",
+                packet.packet_id,
+                buffer.len() + 1,
+                max_buffer_size
+            );
+            buffer.push(packet);
+            Ok(false)
+        }
+    }
+
+    /// Get current telemetry buffer size
+    pub fn telemetry_buffer_size(&self) -> usize {
+        self.telemetry_buffer.read().unwrap().len()
+    }
+
+    /// Flush telemetry buffer (helper for event_loop)
+    fn flush_buffer(telemetry_buffer: &Arc<RwLock<Vec<DataPacket>>>) {
+        let buffer_size = {
+            let buffer = telemetry_buffer.read().unwrap();
+            buffer.len()
+        };
+
+        if buffer_size == 0 {
+            return;
+        }
+
+        info!(
+            "Flushing {} buffered telemetry packets to new parent",
+            buffer_size
+        );
+
+        // Take all buffered packets
+        let buffered_packets: Vec<DataPacket> = {
+            let mut buffer = telemetry_buffer.write().unwrap();
+            buffer.drain(..).collect()
+        };
+
+        // TODO: Implement actual packet sending through MeshConnection
+        // For now, just log that we would send them
+        for packet in buffered_packets {
+            debug!("Flushing telemetry packet {} to parent", packet.packet_id);
+        }
+
+        info!("Successfully flushed {} telemetry packets", buffer_size);
+    }
+
     /// Event processing loop
     ///
     /// Listens to topology events and manages connections accordingly.
+    #[allow(clippy::too_many_arguments)]
     async fn event_loop(
         mut rx: mpsc::UnboundedReceiver<TopologyEvent>,
         transport: Arc<dyn MeshTransport>,
         peer_connection: Arc<RwLock<Option<Box<dyn MeshConnection>>>>,
         selected_peer_id: Arc<RwLock<Option<NodeId>>>,
+        lateral_connections: Arc<RwLock<HashMap<String, Box<dyn MeshConnection>>>>,
+        peer_retry_state: Arc<RwLock<Option<RetryState>>>,
+        lateral_retry_state: Arc<RwLock<HashMap<String, RetryState>>>,
+        telemetry_buffer: Arc<RwLock<Vec<DataPacket>>>,
+        builder: TopologyBuilder,
+        config: TopologyConfig,
     ) {
         while let Some(event) = rx.recv().await {
             match event {
@@ -165,10 +590,41 @@ impl TopologyManager {
                         Ok(conn) => {
                             *peer_connection.write().unwrap() = Some(conn);
                             *selected_peer_id.write().unwrap() = Some(node_id);
+                            peer_retry_state.write().unwrap().take(); // Clear any retry state
                             info!("Successfully connected to peer: {}", new_peer_id);
+
+                            // Flush any buffered telemetry packets now that parent is available
+                            Self::flush_buffer(&telemetry_buffer);
                         }
                         Err(e) => {
                             warn!("Failed to connect to peer {}: {}", new_peer_id, e);
+
+                            // Initialize retry state and spawn retry task
+                            if config.max_retries > 0 {
+                                let backoff = calculate_backoff(
+                                    config.initial_backoff,
+                                    config.max_backoff,
+                                    config.backoff_multiplier,
+                                    0, // First attempt
+                                );
+
+                                *peer_retry_state.write().unwrap() = Some(RetryState {
+                                    attempts: 0,
+                                    next_retry: Instant::now() + backoff,
+                                });
+
+                                debug!("Scheduled retry for peer {} in {:?}", new_peer_id, backoff);
+
+                                spawn_peer_connection_retry(
+                                    new_peer_id,
+                                    transport.clone(),
+                                    peer_connection.clone(),
+                                    selected_peer_id.clone(),
+                                    peer_retry_state.clone(),
+                                    telemetry_buffer.clone(),
+                                    config.clone(),
+                                );
+                            }
                         }
                     }
                 }
@@ -179,6 +635,9 @@ impl TopologyManager {
                     ..
                 } => {
                     info!("Selected peer changed: {} -> {}", old_peer_id, new_peer_id);
+
+                    // Clear any existing retry state for old peer
+                    peer_retry_state.write().unwrap().take();
 
                     // Disconnect from old peer
                     let old_id = NodeId::new(old_peer_id.clone());
@@ -193,9 +652,42 @@ impl TopologyManager {
                             *peer_connection.write().unwrap() = Some(conn);
                             *selected_peer_id.write().unwrap() = Some(new_id);
                             info!("Successfully changed to peer: {}", new_peer_id);
+
+                            // Flush any buffered telemetry packets now that new parent is available
+                            Self::flush_buffer(&telemetry_buffer);
                         }
                         Err(e) => {
                             warn!("Failed to connect to new peer {}: {}", new_peer_id, e);
+
+                            // Initialize retry state and spawn retry task
+                            if config.max_retries > 0 {
+                                let backoff = calculate_backoff(
+                                    config.initial_backoff,
+                                    config.max_backoff,
+                                    config.backoff_multiplier,
+                                    0, // First attempt
+                                );
+
+                                *peer_retry_state.write().unwrap() = Some(RetryState {
+                                    attempts: 0,
+                                    next_retry: Instant::now() + backoff,
+                                });
+
+                                debug!(
+                                    "Scheduled retry for new peer {} in {:?}",
+                                    new_peer_id, backoff
+                                );
+
+                                spawn_peer_connection_retry(
+                                    new_peer_id,
+                                    transport.clone(),
+                                    peer_connection.clone(),
+                                    selected_peer_id.clone(),
+                                    peer_retry_state.clone(),
+                                    telemetry_buffer.clone(),
+                                    config.clone(),
+                                );
+                            }
                         }
                     }
                 }
@@ -215,6 +707,13 @@ impl TopologyManager {
                             lost_peer_id, e
                         );
                     }
+
+                    // Notify about telemetry buffering during parent transition
+                    info!("Telemetry will be buffered until new parent connection is established");
+
+                    // Trigger immediate parent re-selection
+                    info!("Triggering immediate parent re-selection after peer loss");
+                    builder.reevaluate_peer().await;
 
                     debug!("Cleared connection to lost peer: {}", lost_peer_id);
                 }
@@ -244,13 +743,93 @@ impl TopologyManager {
 
                 TopologyEvent::LateralPeerDiscovered { peer_id, .. } => {
                     info!("Lateral peer discovered: {}", peer_id);
-                    // Lateral peers are at the same hierarchy level
-                    // Connection management depends on coordination mode (future work)
+
+                    // Check if we've reached the maximum lateral connections limit
+                    let max_lateral = builder.config().max_lateral_connections;
+                    let current_count = lateral_connections.read().unwrap().len();
+
+                    if let Some(max) = max_lateral {
+                        if current_count >= max {
+                            debug!(
+                                "Skipping lateral peer {} - at connection limit ({}/{})",
+                                peer_id, current_count, max
+                            );
+                            return;
+                        }
+                    }
+
+                    // Connect to lateral peer for O(n²) mesh within same hierarchy level
+                    let node_id = NodeId::new(peer_id.clone());
+                    match transport.connect(&node_id).await {
+                        Ok(conn) => {
+                            lateral_connections
+                                .write()
+                                .unwrap()
+                                .insert(peer_id.clone(), conn);
+                            lateral_retry_state.write().unwrap().remove(&peer_id); // Clear any retry state
+                            info!(
+                                "Connected to lateral peer: {} ({}/{})",
+                                peer_id,
+                                current_count + 1,
+                                max_lateral
+                                    .map(|m| m.to_string())
+                                    .unwrap_or_else(|| "unlimited".to_string())
+                            );
+                        }
+                        Err(e) => {
+                            warn!("Failed to connect to lateral peer {}: {}", peer_id, e);
+
+                            // Initialize retry state and spawn retry task
+                            if config.max_retries > 0 {
+                                let backoff = calculate_backoff(
+                                    config.initial_backoff,
+                                    config.max_backoff,
+                                    config.backoff_multiplier,
+                                    0, // First attempt
+                                );
+
+                                lateral_retry_state.write().unwrap().insert(
+                                    peer_id.clone(),
+                                    RetryState {
+                                        attempts: 0,
+                                        next_retry: Instant::now() + backoff,
+                                    },
+                                );
+
+                                debug!(
+                                    "Scheduled retry for lateral peer {} in {:?}",
+                                    peer_id, backoff
+                                );
+
+                                spawn_lateral_connection_retry(
+                                    peer_id,
+                                    transport.clone(),
+                                    lateral_connections.clone(),
+                                    lateral_retry_state.clone(),
+                                    config.clone(),
+                                );
+                            }
+                        }
+                    }
                 }
 
                 TopologyEvent::LateralPeerLost { peer_id } => {
                     info!("Lateral peer lost: {}", peer_id);
-                    // Clean up any lateral peer connections if needed
+
+                    // Clear any retry state for this peer
+                    lateral_retry_state.write().unwrap().remove(&peer_id);
+
+                    // Disconnect from lost lateral peer
+                    if lateral_connections.read().unwrap().contains_key(&peer_id) {
+                        lateral_connections.write().unwrap().remove(&peer_id);
+
+                        let node_id = NodeId::new(peer_id.clone());
+                        if let Err(e) = transport.disconnect(&node_id).await {
+                            warn!("Failed to disconnect from lateral peer {}: {}", peer_id, e);
+                        } else {
+                            debug!("Disconnected from lateral peer: {}", peer_id);
+                        }
+                    }
                 }
 
                 TopologyEvent::RoleChanged { old_role, new_role } => {
@@ -388,5 +967,68 @@ mod tests {
         assert!(!transport.is_started());
         assert!(!transport.is_stopped());
         assert_eq!(transport.peer_count(), 0);
+    }
+
+    // Tests for exponential backoff calculation
+    #[test]
+    fn test_calculate_backoff_first_attempt() {
+        let initial = Duration::from_secs(1);
+        let max = Duration::from_secs(60);
+        let multiplier = 2.0;
+
+        let backoff = calculate_backoff(initial, max, multiplier, 0);
+        assert_eq!(backoff, initial);
+    }
+
+    #[test]
+    fn test_calculate_backoff_exponential_growth() {
+        let initial = Duration::from_secs(1);
+        let max = Duration::from_secs(60);
+        let multiplier = 2.0;
+
+        let backoff1 = calculate_backoff(initial, max, multiplier, 1);
+        assert_eq!(backoff1, Duration::from_secs(2));
+
+        let backoff2 = calculate_backoff(initial, max, multiplier, 2);
+        assert_eq!(backoff2, Duration::from_secs(4));
+
+        let backoff3 = calculate_backoff(initial, max, multiplier, 3);
+        assert_eq!(backoff3, Duration::from_secs(8));
+    }
+
+    #[test]
+    fn test_calculate_backoff_max_cap() {
+        let initial = Duration::from_secs(1);
+        let max = Duration::from_secs(10);
+        let multiplier = 2.0;
+
+        // After several attempts, should cap at max
+        let backoff = calculate_backoff(initial, max, multiplier, 10);
+        assert_eq!(backoff, max);
+    }
+
+    #[test]
+    fn test_calculate_backoff_custom_multiplier() {
+        let initial = Duration::from_secs(1);
+        let max = Duration::from_secs(100);
+        let multiplier = 3.0;
+
+        let backoff1 = calculate_backoff(initial, max, multiplier, 1);
+        assert_eq!(backoff1, Duration::from_secs(3));
+
+        let backoff2 = calculate_backoff(initial, max, multiplier, 2);
+        assert_eq!(backoff2, Duration::from_secs(9));
+    }
+
+    // Test for TopologyConfig defaults
+    #[test]
+    fn test_topology_config_defaults() {
+        let config = TopologyConfig::default();
+        assert_eq!(config.max_telemetry_buffer_size, 100);
+        assert_eq!(config.max_retries, 3);
+        assert_eq!(config.initial_backoff, Duration::from_secs(1));
+        assert_eq!(config.max_backoff, Duration::from_secs(60));
+        assert_eq!(config.backoff_multiplier, 2.0);
+        assert_eq!(config.max_lateral_connections, Some(10));
     }
 }
