@@ -103,6 +103,7 @@ enum MetricsEvent {
 }
 
 /// Shared peer state
+#[allow(dead_code)]
 struct PeerState {
     node_id: String,
     documents: HashMap<String, Document>,
@@ -145,7 +146,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .iter()
         .position(|x| x == "--peers")
         .and_then(|i| args.get(i + 1))
-        .map(|s| s.clone())
+        .cloned()
         .unwrap_or_default();
 
     let update_frequency = args
@@ -321,13 +322,7 @@ async fn handle_inbound(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut length_buf = [0u8; 4];
 
-    loop {
-        // Read message length
-        match socket.read_exact(&mut length_buf).await {
-            Ok(_) => {}
-            Err(_) => break, // Peer disconnected
-        }
-
+    while socket.read_exact(&mut length_buf).await.is_ok() {
         let message_len = u32::from_be_bytes(length_buf) as usize;
 
         // Read message

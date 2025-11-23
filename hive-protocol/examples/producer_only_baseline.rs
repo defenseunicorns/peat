@@ -231,13 +231,7 @@ async fn handle_client(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut length_buf = [0u8; 4];
 
-    loop {
-        // Read message length
-        match socket.read_exact(&mut length_buf).await {
-            Ok(_) => {}
-            Err(_) => break, // Client disconnected
-        }
-
+    while socket.read_exact(&mut length_buf).await.is_ok() {
         let message_len = u32::from_be_bytes(length_buf) as usize;
 
         // Read message
