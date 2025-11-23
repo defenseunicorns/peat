@@ -16,6 +16,7 @@ pub use routing::{
     SelectiveRouter, TelemetryPayload,
 };
 pub use topology::{
-    PeerCandidate, PeerSelector, SelectedPeer, SelectionConfig, TopologyBuilder, TopologyConfig,
-    TopologyEvent, TopologyState,
+    InMemoryMetricsCollector, MetricsCollector, NoOpMetricsCollector, PeerCandidate, PeerSelector,
+    SelectedPeer, SelectionConfig, TopologyBuilder, TopologyConfig, TopologyEvent,
+    TopologyMetricsSnapshot, TopologyState,
 };
