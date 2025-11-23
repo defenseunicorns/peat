@@ -23,6 +23,12 @@ pub enum RoutingDecision {
     /// Consume locally AND forward to peer
     ConsumeAndForward { next_hop: String },
 
+    /// Forward the data to multiple peers (multicast/broadcast)
+    ForwardMulticast { next_hops: Vec<String> },
+
+    /// Consume locally AND forward to multiple peers (multicast/broadcast)
+    ConsumeAndForwardMulticast { next_hops: Vec<String> },
+
     /// Drop the packet (reached max hops or no route)
     Drop,
 }
@@ -118,21 +124,35 @@ impl SelectiveRouter {
         let should_forward = self.should_forward(packet, state);
 
         if should_consume && should_forward {
-            // Both consume and forward
-            if let Some(next_hop) = self.next_hop(packet, state) {
-                if self.verbose {
-                    debug!(
-                        "Packet {}: Consume and forward to {}",
-                        packet.packet_id, next_hop
-                    );
-                }
-                RoutingDecision::ConsumeAndForward { next_hop }
-            } else {
+            // Both consume and forward - check if multicast needed
+            let next_hops = self.next_hops(packet, state);
+            if next_hops.is_empty() {
                 // Can't forward without next hop, just consume
                 if self.verbose {
                     debug!("Packet {}: Consume only (no next hop)", packet.packet_id);
                 }
                 RoutingDecision::Consume
+            } else if next_hops.len() == 1 {
+                // Single next hop - use unicast variant
+                if self.verbose {
+                    debug!(
+                        "Packet {}: Consume and forward to {}",
+                        packet.packet_id, next_hops[0]
+                    );
+                }
+                RoutingDecision::ConsumeAndForward {
+                    next_hop: next_hops[0].clone(),
+                }
+            } else {
+                // Multiple next hops - use multicast variant
+                if self.verbose {
+                    debug!(
+                        "Packet {}: Consume and multicast to {} peers",
+                        packet.packet_id,
+                        next_hops.len()
+                    );
+                }
+                RoutingDecision::ConsumeAndForwardMulticast { next_hops }
             }
         } else if should_consume {
             if self.verbose {
@@ -140,12 +160,8 @@ impl SelectiveRouter {
             }
             RoutingDecision::Consume
         } else if should_forward {
-            if let Some(next_hop) = self.next_hop(packet, state) {
-                if self.verbose {
-                    debug!("Packet {}: Forward to {}", packet.packet_id, next_hop);
-                }
-                RoutingDecision::Forward { next_hop }
-            } else {
+            let next_hops = self.next_hops(packet, state);
+            if next_hops.is_empty() {
                 if self.verbose {
                     warn!(
                         "Packet {}: Should forward but no next hop, dropping",
@@ -153,6 +169,24 @@ impl SelectiveRouter {
                     );
                 }
                 RoutingDecision::Drop
+            } else if next_hops.len() == 1 {
+                // Single next hop - use unicast variant
+                if self.verbose {
+                    debug!("Packet {}: Forward to {}", packet.packet_id, next_hops[0]);
+                }
+                RoutingDecision::Forward {
+                    next_hop: next_hops[0].clone(),
+                }
+            } else {
+                // Multiple next hops - use multicast variant
+                if self.verbose {
+                    debug!(
+                        "Packet {}: Multicast to {} peers",
+                        packet.packet_id,
+                        next_hops.len()
+                    );
+                }
+                RoutingDecision::ForwardMulticast { next_hops }
             }
         } else {
             if self.verbose {
@@ -308,9 +342,8 @@ impl SelectiveRouter {
                     }
                 }
 
-                // Otherwise, route to all linked peers (broadcast)
-                // For now, return first linked peer
-                // TODO: In Week 10, implement multicast/broadcast forwarding
+                // Otherwise, return first linked peer for backward compatibility
+                // For multicast/broadcast, use next_hops() instead
                 state.linked_peers.keys().next().cloned()
             }
 
@@ -323,8 +356,67 @@ impl SelectiveRouter {
                     }
                 }
 
-                // Otherwise, route to first lateral peer (broadcast)
+                // Otherwise, route to first lateral peer for backward compatibility
                 state.lateral_peers.keys().next().cloned()
+            }
+        }
+    }
+
+    /// Determine all next hops for multicast/broadcast forwarding
+    ///
+    /// Returns all appropriate peers for scenarios requiring multicast:
+    /// - Downward command dissemination to all children
+    /// - Lateral coordination broadcast to all peers at same level
+    ///
+    /// # Next Hops Selection
+    ///
+    /// **Upward**: Returns selected_peer (parent) as single-element vector
+    /// **Downward**: Returns all linked_peers (children) for broadcast
+    /// **Lateral**: Returns all lateral_peers for broadcast
+    ///
+    /// # Arguments
+    ///
+    /// * `packet` - The data packet
+    /// * `state` - Current topology state
+    ///
+    /// # Returns
+    ///
+    /// Vector of node IDs to forward to (empty if no valid hops)
+    pub fn next_hops(&self, packet: &DataPacket, state: &TopologyState) -> Vec<String> {
+        match packet.direction {
+            DataDirection::Upward => {
+                // Upward: Return selected peer (parent) as single-element vector
+                state
+                    .selected_peer
+                    .as_ref()
+                    .map(|peer| vec![peer.node_id.clone()])
+                    .unwrap_or_default()
+            }
+
+            DataDirection::Downward => {
+                // Downward: Route to all linked peers (children) for broadcast
+                // If addressed to specific child, route only there
+                if let Some(ref dest) = packet.destination_node_id {
+                    if state.linked_peers.contains_key(dest) {
+                        return vec![dest.clone()];
+                    }
+                }
+
+                // Otherwise, route to ALL linked peers (multicast/broadcast)
+                state.linked_peers.keys().cloned().collect()
+            }
+
+            DataDirection::Lateral => {
+                // Lateral: Route to all lateral peers for broadcast
+                if let Some(ref dest) = packet.destination_node_id {
+                    // Route to specific lateral peer if we track them
+                    if state.lateral_peers.contains_key(dest) {
+                        return vec![dest.clone()];
+                    }
+                }
+
+                // Otherwise, route to ALL lateral peers (broadcast)
+                state.lateral_peers.keys().cloned().collect()
             }
         }
     }
@@ -423,6 +515,7 @@ impl Default for SelectiveRouter {
 mod tests {
     use super::*;
     use crate::beacon::{GeoPosition, GeographicBeacon};
+    use crate::routing::packet::{DataDirection, DataType};
     use crate::topology::SelectedPeer;
     use std::collections::HashMap;
     use std::time::Instant;
@@ -652,5 +745,297 @@ mod tests {
 
         // Should NOT aggregate: Command packets don't require aggregation
         assert!(!router.should_aggregate(&packet, &decision, &state));
+    }
+
+    // ============================================================================
+    // Week 10: Multicast/Broadcast Routing Tests
+    // ============================================================================
+
+    #[test]
+    fn test_next_hops_upward_single_parent() {
+        let router = SelectiveRouter::new();
+        let state = create_test_state(HierarchyLevel::Squad, NodeRole::Member, true, 0, 0);
+        let packet = DataPacket::telemetry("sensor-1", vec![1, 2, 3]);
+
+        // Upward should return selected_peer as single-element vector
+        let next_hops = router.next_hops(&packet, &state);
+        assert_eq!(next_hops.len(), 1);
+        assert_eq!(next_hops[0], "parent-node");
+    }
+
+    #[test]
+    fn test_next_hops_upward_no_parent() {
+        let router = SelectiveRouter::new();
+        // HQ node with no parent
+        let state = create_test_state(HierarchyLevel::Company, NodeRole::Leader, false, 3, 0);
+        let packet = DataPacket::telemetry("sensor-1", vec![1, 2, 3]);
+
+        // No parent means empty vector
+        let next_hops = router.next_hops(&packet, &state);
+        assert_eq!(next_hops.len(), 0);
+    }
+
+    #[test]
+    fn test_next_hops_downward_multicast() {
+        let router = SelectiveRouter::new();
+        // Platoon leader with 5 linked peers (children)
+        let state = create_test_state(HierarchyLevel::Platoon, NodeRole::Leader, true, 5, 0);
+        // Create broadcast command packet (no specific destination)
+        let packet = DataPacket {
+            packet_id: uuid::Uuid::new_v4().to_string(),
+            source_node_id: "hq".to_string(),
+            destination_node_id: None, // Broadcast
+            data_type: DataType::Command,
+            direction: DataDirection::Downward,
+            hop_count: 0,
+            max_hops: 10,
+            payload: vec![4, 5, 6],
+        };
+
+        // Downward broadcast should return ALL linked peers
+        let next_hops = router.next_hops(&packet, &state);
+        assert_eq!(next_hops.len(), 5);
+        for i in 0..5 {
+            assert!(next_hops.contains(&format!("linked-peer-{}", i)));
+        }
+    }
+
+    #[test]
+    fn test_next_hops_downward_targeted() {
+        let router = SelectiveRouter::new();
+        // Platoon leader with 3 linked peers
+        let state = create_test_state(HierarchyLevel::Platoon, NodeRole::Leader, true, 3, 0);
+        let packet = DataPacket::command("hq", "linked-peer-1", vec![4, 5, 6]);
+
+        // Targeted downward should return only the specific child
+        let next_hops = router.next_hops(&packet, &state);
+        assert_eq!(next_hops.len(), 1);
+        assert_eq!(next_hops[0], "linked-peer-1");
+    }
+
+    #[test]
+    fn test_next_hops_lateral_multicast() {
+        let router = SelectiveRouter::new();
+        // Leader with 4 lateral peers
+        let state = create_test_state(HierarchyLevel::Platoon, NodeRole::Leader, true, 2, 4);
+        // Create broadcast coordination packet (no specific destination)
+        let packet = DataPacket {
+            packet_id: uuid::Uuid::new_v4().to_string(),
+            source_node_id: "platoon-1".to_string(),
+            destination_node_id: None, // Broadcast
+            data_type: DataType::Coordination,
+            direction: DataDirection::Lateral,
+            hop_count: 0,
+            max_hops: 3,
+            payload: vec![7, 8, 9],
+        };
+
+        // Lateral broadcast should return ALL lateral peers
+        let next_hops = router.next_hops(&packet, &state);
+        assert_eq!(next_hops.len(), 4);
+        for i in 0..4 {
+            assert!(next_hops.contains(&format!("lateral-peer-{}", i)));
+        }
+    }
+
+    #[test]
+    fn test_next_hops_lateral_targeted() {
+        let router = SelectiveRouter::new();
+        // Leader with 3 lateral peers
+        let state = create_test_state(HierarchyLevel::Platoon, NodeRole::Leader, true, 2, 3);
+        let packet = DataPacket::coordination("platoon-1", "lateral-peer-2", vec![7, 8, 9]);
+
+        // Targeted lateral should return only specific peer
+        let next_hops = router.next_hops(&packet, &state);
+        assert_eq!(next_hops.len(), 1);
+        assert_eq!(next_hops[0], "lateral-peer-2");
+    }
+
+    #[test]
+    fn test_route_downward_multicast() {
+        let router = SelectiveRouter::new();
+        // HQ node (Leader) with 3 children, broadcasting command
+        let state = create_test_state(HierarchyLevel::Company, NodeRole::Leader, false, 3, 0);
+        // Create broadcast command packet (no specific destination)
+        let packet = DataPacket {
+            packet_id: uuid::Uuid::new_v4().to_string(),
+            source_node_id: "hq".to_string(),
+            destination_node_id: None, // Broadcast
+            data_type: DataType::Command,
+            direction: DataDirection::Downward,
+            hop_count: 0,
+            max_hops: 10,
+            payload: vec![4, 5, 6],
+        };
+
+        let decision = router.route(&packet, &state, "hq-node");
+
+        // Leaders should consume broadcast commands AND multicast to all children
+        match decision {
+            RoutingDecision::ConsumeAndForwardMulticast { next_hops } => {
+                assert_eq!(next_hops.len(), 3);
+                assert!(next_hops.contains(&"linked-peer-0".to_string()));
+                assert!(next_hops.contains(&"linked-peer-1".to_string()));
+                assert!(next_hops.contains(&"linked-peer-2".to_string()));
+            }
+            _ => panic!("Expected ConsumeAndForwardMulticast, got {:?}", decision),
+        }
+    }
+
+    #[test]
+    fn test_route_downward_consume_and_multicast() {
+        let router = SelectiveRouter::new();
+        // Platoon leader with 4 children, receiving command addressed to them
+        let state = create_test_state(HierarchyLevel::Platoon, NodeRole::Leader, true, 4, 0);
+        let packet = DataPacket::command("hq", "platoon-leader", vec![4, 5, 6]);
+
+        let decision = router.route(&packet, &state, "platoon-leader");
+
+        // Should consume (addressed to us) AND multicast to all children
+        match decision {
+            RoutingDecision::ConsumeAndForwardMulticast { next_hops } => {
+                assert_eq!(next_hops.len(), 4);
+                for i in 0..4 {
+                    assert!(next_hops.contains(&format!("linked-peer-{}", i)));
+                }
+            }
+            _ => panic!("Expected ConsumeAndForwardMulticast, got {:?}", decision),
+        }
+    }
+
+    #[test]
+    fn test_route_lateral_multicast() {
+        let router = SelectiveRouter::new();
+        // Leader with 3 lateral peers, broadcasting coordination
+        let state = create_test_state(HierarchyLevel::Platoon, NodeRole::Leader, true, 0, 3);
+        // Create broadcast coordination packet (no specific destination)
+        let packet = DataPacket {
+            packet_id: uuid::Uuid::new_v4().to_string(),
+            source_node_id: "platoon-1".to_string(),
+            destination_node_id: None, // Broadcast
+            data_type: DataType::Coordination,
+            direction: DataDirection::Lateral,
+            hop_count: 0,
+            max_hops: 3,
+            payload: vec![7, 8, 9],
+        };
+
+        let decision = router.route(&packet, &state, "platoon-3");
+
+        // Leaders should consume broadcast coordination AND forward to all lateral peers
+        match decision {
+            RoutingDecision::ConsumeAndForwardMulticast { next_hops } => {
+                assert_eq!(next_hops.len(), 3);
+                assert!(next_hops.contains(&"lateral-peer-0".to_string()));
+                assert!(next_hops.contains(&"lateral-peer-1".to_string()));
+                assert!(next_hops.contains(&"lateral-peer-2".to_string()));
+            }
+            _ => panic!("Expected ConsumeAndForwardMulticast, got {:?}", decision),
+        }
+    }
+
+    #[test]
+    fn test_route_downward_single_child_unicast() {
+        let router = SelectiveRouter::new();
+        // Leader with only 1 child
+        let state = create_test_state(HierarchyLevel::Platoon, NodeRole::Leader, false, 1, 0);
+        // Create broadcast command packet (no specific destination)
+        let packet = DataPacket {
+            packet_id: uuid::Uuid::new_v4().to_string(),
+            source_node_id: "hq".to_string(),
+            destination_node_id: None, // Broadcast
+            data_type: DataType::Command,
+            direction: DataDirection::Downward,
+            hop_count: 0,
+            max_hops: 10,
+            payload: vec![4, 5, 6],
+        };
+
+        let decision = router.route(&packet, &state, "platoon-leader");
+
+        // Leaders consume broadcast commands, and with only 1 child use unicast variant
+        match decision {
+            RoutingDecision::ConsumeAndForward { next_hop } => {
+                assert_eq!(next_hop, "linked-peer-0");
+            }
+            _ => panic!("Expected ConsumeAndForward (unicast), got {:?}", decision),
+        }
+    }
+
+    #[test]
+    fn test_route_lateral_single_peer_unicast() {
+        let router = SelectiveRouter::new();
+        // Leader with only 1 lateral peer
+        let state = create_test_state(HierarchyLevel::Platoon, NodeRole::Leader, true, 0, 1);
+        // Create broadcast coordination packet (no specific destination)
+        let packet = DataPacket {
+            packet_id: uuid::Uuid::new_v4().to_string(),
+            source_node_id: "platoon-1".to_string(),
+            destination_node_id: None, // Broadcast
+            data_type: DataType::Coordination,
+            direction: DataDirection::Lateral,
+            hop_count: 0,
+            max_hops: 3,
+            payload: vec![7, 8, 9],
+        };
+
+        let decision = router.route(&packet, &state, "platoon-3");
+
+        // Leaders consume broadcast coordination, and with only 1 lateral peer use unicast variant
+        match decision {
+            RoutingDecision::ConsumeAndForward { next_hop } => {
+                assert_eq!(next_hop, "lateral-peer-0");
+            }
+            _ => panic!("Expected ConsumeAndForward (unicast), got {:?}", decision),
+        }
+    }
+
+    #[test]
+    fn test_route_downward_no_children_drop() {
+        let router = SelectiveRouter::new();
+        // Leaf node with no children
+        let state = create_test_state(HierarchyLevel::Squad, NodeRole::Member, true, 0, 0);
+        // Create broadcast command packet (no specific destination)
+        let packet = DataPacket {
+            packet_id: uuid::Uuid::new_v4().to_string(),
+            source_node_id: "hq".to_string(),
+            destination_node_id: None, // Broadcast
+            data_type: DataType::Command,
+            direction: DataDirection::Downward,
+            hop_count: 0,
+            max_hops: 10,
+            payload: vec![4, 5, 6],
+        };
+
+        let decision = router.route(&packet, &state, "squad-member");
+
+        // With no children, downward broadcast should drop (or consume if addressed)
+        // In this case, not addressed to us, so should drop
+        assert_eq!(decision, RoutingDecision::Drop);
+    }
+
+    #[test]
+    fn test_multicast_preserves_backward_compatibility() {
+        let router = SelectiveRouter::new();
+        // Intermediate node with parent (upward routing)
+        let state = create_test_state(HierarchyLevel::Platoon, NodeRole::Leader, true, 3, 0);
+        let packet = DataPacket::telemetry("sensor-1", vec![1, 2, 3]);
+
+        let decision = router.route(&packet, &state, "platoon-leader");
+
+        // Upward routing should still use ConsumeAndForward (unicast)
+        match decision {
+            RoutingDecision::ConsumeAndForward { next_hop } => {
+                assert_eq!(next_hop, "parent-node");
+            }
+            _ => panic!(
+                "Expected ConsumeAndForward (backward compat), got {:?}",
+                decision
+            ),
+        }
+
+        // next_hop() should still work for backward compatibility
+        let next_hop = router.next_hop(&packet, &state);
+        assert_eq!(next_hop, Some("parent-node".to_string()));
     }
 }
