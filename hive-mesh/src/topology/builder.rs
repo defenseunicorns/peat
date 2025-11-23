@@ -115,6 +115,8 @@ pub struct TopologyConfig {
     pub backoff_multiplier: f64,
     /// Maximum number of telemetry packets to buffer during parent transitions (0 = no buffering)
     pub max_telemetry_buffer_size: usize,
+    /// Optional metrics collector for observability (None = no metrics collected)
+    pub metrics_collector: Option<Arc<dyn crate::topology::metrics::MetricsCollector>>,
 }
 
 impl Default for TopologyConfig {
@@ -131,6 +133,7 @@ impl Default for TopologyConfig {
             max_backoff: Duration::from_secs(60), // Cap at 1 minute
             backoff_multiplier: 2.0,           // Standard exponential backoff (2^n)
             max_telemetry_buffer_size: 100,    // Buffer up to 100 telemetry packets during failover
+            metrics_collector: None,           // No metrics collection by default
         }
     }
 }
