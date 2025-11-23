@@ -337,6 +337,80 @@ impl SelectiveRouter {
     fn is_hq_level(&self, level: HierarchyLevel) -> bool {
         matches!(level, HierarchyLevel::Company)
     }
+
+    /// Check if a packet should be aggregated before forwarding
+    ///
+    /// Aggregation is appropriate when:
+    /// - Packet data type requires aggregation (Telemetry, Status)
+    /// - Routing decision is ConsumeAndForward (intermediate node)
+    /// - Node is a Leader (squad leader aggregating member data)
+    ///
+    /// # Integration with PacketAggregator
+    ///
+    /// When this returns true, the application should:
+    /// 1. Collect telemetry packets from squad members (batching)
+    /// 2. Use PacketAggregator::aggregate_telemetry() to create aggregated packet
+    /// 3. Route the aggregated packet upward using this router
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use hive_mesh::routing::{SelectiveRouter, PacketAggregator, DataPacket};
+    ///
+    /// let router = SelectiveRouter::new();
+    /// let aggregator = PacketAggregator::new();
+    ///
+    /// // Collect telemetry from squad members
+    /// let mut squad_telemetry = Vec::new();
+    /// for packet in incoming_packets {
+    ///     let decision = router.route(&packet, &state, "platoon-leader");
+    ///     if router.should_aggregate(&packet, &decision, &state) {
+    ///         squad_telemetry.push(packet);
+    ///     }
+    /// }
+    ///
+    /// // Aggregate when we have enough data
+    /// if squad_telemetry.len() >= 3 {
+    ///     let aggregated = aggregator.aggregate_telemetry(
+    ///         "squad-1",
+    ///         "platoon-leader",
+    ///         squad_telemetry,
+    ///     )?;
+    ///
+    ///     // Route aggregated packet upward
+    ///     let decision = router.route(&aggregated, &state, "platoon-leader");
+    ///     // ... forward to parent
+    /// }
+    /// ```
+    ///
+    /// # Arguments
+    ///
+    /// * `packet` - The data packet to check
+    /// * `decision` - The routing decision for this packet
+    /// * `state` - Current topology state
+    ///
+    /// # Returns
+    ///
+    /// `true` if this packet should be aggregated before forwarding
+    pub fn should_aggregate(
+        &self,
+        packet: &DataPacket,
+        decision: &RoutingDecision,
+        state: &TopologyState,
+    ) -> bool {
+        // Only aggregate if we're consuming and forwarding (intermediate node)
+        if !matches!(decision, RoutingDecision::ConsumeAndForward { .. }) {
+            return false;
+        }
+
+        // Only aggregate data types that require it
+        if !packet.data_type.requires_aggregation() {
+            return false;
+        }
+
+        // Only Leaders aggregate squad member data
+        matches!(state.role, NodeRole::Leader)
+    }
 }
 
 impl Default for SelectiveRouter {
@@ -526,5 +600,57 @@ mod tests {
         // Should not route our own packets back to us
         let decision = router.route(&packet, &state, "this-node");
         assert_eq!(decision, RoutingDecision::Drop);
+    }
+
+    #[test]
+    fn test_should_aggregate_intermediate_leader() {
+        let router = SelectiveRouter::new();
+        // Intermediate Leader node (has parent and children)
+        let state = create_test_state(HierarchyLevel::Platoon, NodeRole::Leader, true, 3, 0);
+        let packet = DataPacket::telemetry("squad-member-1", vec![1, 2, 3]);
+
+        let decision = router.route(&packet, &state, "platoon-leader");
+
+        // Should aggregate: Leader with ConsumeAndForward decision
+        assert!(router.should_aggregate(&packet, &decision, &state));
+    }
+
+    #[test]
+    fn test_should_not_aggregate_hq_node() {
+        let router = SelectiveRouter::new();
+        // HQ node (no parent, just consumes)
+        let state = create_test_state(HierarchyLevel::Company, NodeRole::Leader, false, 3, 0);
+        let packet = DataPacket::telemetry("platoon-1", vec![1, 2, 3]);
+
+        let decision = router.route(&packet, &state, "hq-node");
+
+        // Should NOT aggregate: Decision is Consume only (not ConsumeAndForward)
+        assert!(!router.should_aggregate(&packet, &decision, &state));
+    }
+
+    #[test]
+    fn test_should_not_aggregate_non_leader() {
+        let router = SelectiveRouter::new();
+        // Member node (not a Leader)
+        let state = create_test_state(HierarchyLevel::Squad, NodeRole::Member, true, 0, 0);
+        let packet = DataPacket::telemetry("sensor-1", vec![1, 2, 3]);
+
+        let decision = router.route(&packet, &state, "squad-member");
+
+        // Should NOT aggregate: Not a Leader
+        assert!(!router.should_aggregate(&packet, &decision, &state));
+    }
+
+    #[test]
+    fn test_should_not_aggregate_command_packet() {
+        let router = SelectiveRouter::new();
+        // Leader node
+        let state = create_test_state(HierarchyLevel::Platoon, NodeRole::Leader, true, 3, 0);
+        let packet = DataPacket::command("hq", "platoon-leader", vec![4, 5, 6]);
+
+        let decision = router.route(&packet, &state, "platoon-leader");
+
+        // Should NOT aggregate: Command packets don't require aggregation
+        assert!(!router.should_aggregate(&packet, &decision, &state));
     }
 }
