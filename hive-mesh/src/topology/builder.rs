@@ -99,6 +99,22 @@ pub struct TopologyConfig {
     pub peer_timeout: Duration,
     /// Hierarchy strategy for role and level determination
     pub hierarchy_strategy: Option<Arc<dyn HierarchyStrategy>>,
+    /// Maximum lateral peer connections (None = unlimited)
+    ///
+    /// For backends like Ditto that optimize mesh internally, set to None.
+    /// For explicit transports like Iroh, use a reasonable limit (e.g., 10-20)
+    /// to avoid O(n²) connection overhead with large groups.
+    pub max_lateral_connections: Option<usize>,
+    /// Maximum number of connection retry attempts (0 = no retries)
+    pub max_retries: u32,
+    /// Initial delay before first retry attempt
+    pub initial_backoff: Duration,
+    /// Maximum backoff delay (caps exponential growth)
+    pub max_backoff: Duration,
+    /// Exponential backoff multiplier (typically 2.0)
+    pub backoff_multiplier: f64,
+    /// Maximum number of telemetry packets to buffer during parent transitions (0 = no buffering)
+    pub max_telemetry_buffer_size: usize,
 }
 
 impl Default for TopologyConfig {
@@ -109,6 +125,12 @@ impl Default for TopologyConfig {
             peer_change_cooldown: Duration::from_secs(60),
             peer_timeout: Duration::from_secs(180), // 3 minutes
             hierarchy_strategy: None, // No strategy by default (uses fixed hierarchy_level)
+            max_lateral_connections: Some(10), // Conservative default for explicit transports like Iroh
+            max_retries: 3,                    // Retry up to 3 times before giving up
+            initial_backoff: Duration::from_secs(1), // Start with 1 second
+            max_backoff: Duration::from_secs(60), // Cap at 1 minute
+            backoff_multiplier: 2.0,           // Standard exponential backoff (2^n)
+            max_telemetry_buffer_size: 100,    // Buffer up to 100 telemetry packets during failover
         }
     }
 }
@@ -133,6 +155,23 @@ pub struct TopologyBuilder {
     event_tx: mpsc::UnboundedSender<TopologyEvent>,
     event_rx: Mutex<Option<mpsc::UnboundedReceiver<TopologyEvent>>>,
     task_handle: Mutex<Option<JoinHandle<()>>>,
+}
+
+impl Clone for TopologyBuilder {
+    fn clone(&self) -> Self {
+        Self {
+            config: self.config.clone(),
+            node_id: self.node_id.clone(),
+            position: self.position.clone(),
+            hierarchy_level: self.hierarchy_level,
+            profile: self.profile.clone(),
+            observer: self.observer.clone(),
+            state: self.state.clone(),
+            event_tx: self.event_tx.clone(),
+            event_rx: Mutex::new(None), // Don't clone receiver, only sender clones
+            task_handle: Mutex::new(None), // Don't clone task handle
+        }
+    }
 }
 
 impl TopologyBuilder {
@@ -278,6 +317,11 @@ impl TopologyBuilder {
     /// Get current selected peer
     pub fn get_selected_peer(&self) -> Option<SelectedPeer> {
         self.state.lock().unwrap().selected_peer.clone()
+    }
+
+    /// Get topology configuration
+    pub fn config(&self) -> &TopologyConfig {
+        &self.config
     }
 
     /// Get event receiver for topology changes
