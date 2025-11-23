@@ -25,6 +25,7 @@ uuid = { version = "1.0", features = ["v4", "serde"] }
 # Internal dependencies
 hive-discovery = { path = "../hive-discovery" }
 hive-protocol = { path = "../hive-protocol" }
+hive-schema = { path = "../hive-schema" }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "macros"] }
