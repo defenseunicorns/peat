@@ -55,8 +55,10 @@
 //! }
 //! ```
 
+mod aggregator;
 mod packet;
 mod router;
 
+pub use aggregator::{AggregationError, PacketAggregator, TelemetryPayload};
 pub use packet::{DataDirection, DataPacket, DataType};
 pub use router::{RoutingDecision, SelectiveRouter};
