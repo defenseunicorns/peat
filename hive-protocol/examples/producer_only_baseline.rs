@@ -180,7 +180,10 @@ async fn run_server(
     node_id: String,
     listen_addr: SocketAddr,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("[{}] Starting producer-only server on {}", node_id, listen_addr);
+    println!(
+        "[{}] Starting producer-only server on {}",
+        node_id, listen_addr
+    );
 
     let state = Arc::new(RwLock::new(ServerState {
         documents: HashMap::new(),
@@ -257,7 +260,9 @@ async fn handle_client(
         // Update server state (aggregate)
         let mut state = state.write().await;
         state.total_messages += 1;
-        state.clients_seen.insert(msg.node_id.clone(), msg.sequence_number);
+        state
+            .clients_seen
+            .insert(msg.node_id.clone(), msg.sequence_number);
 
         for doc in msg.documents {
             state.documents.insert(doc.doc_id.clone(), doc);
@@ -325,7 +330,10 @@ async fn run_client(
         sleep(Duration::from_secs(update_frequency)).await;
     }
 
-    println!("[{}] Completed {} updates, idling...", node_id, TARGET_UPDATES);
+    println!(
+        "[{}] Completed {} updates, idling...",
+        node_id, TARGET_UPDATES
+    );
 
     // Keep connection alive but idle
     loop {

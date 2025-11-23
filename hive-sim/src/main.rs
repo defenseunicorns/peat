@@ -88,8 +88,8 @@ use hive_schema::command::v1::{
 use hive_schema::common::v1::Timestamp;
 
 // Lab 3b: Flat mesh coordination with CRDT
+use hive_mesh::beacon::{NodeMobility, NodeProfile, NodeResources};
 use hive_mesh::FlatMeshCoordinator;
-use hive_mesh::beacon::{NodeProfile, NodeMobility, NodeResources};
 
 /// Test document structure
 #[allow(dead_code)]
@@ -1792,11 +1792,20 @@ async fn flat_mesh_mode(
 
         let mut fields = HashMap::new();
         fields.insert("node_id".to_string(), Value::String(node_id.to_string()));
-        fields.insert("node_type".to_string(), Value::String(node_type.to_string()));
+        fields.insert(
+            "node_type".to_string(),
+            Value::String(node_type.to_string()),
+        );
         fields.insert("timestamp_us".to_string(), serde_json::json!(timestamp_us));
         fields.insert("sequence_number".to_string(), serde_json::json!(sequence));
-        fields.insert("status".to_string(), Value::String("operational".to_string()));
-        fields.insert("squad_id".to_string(), Value::String("flat-mesh".to_string()));
+        fields.insert(
+            "status".to_string(),
+            Value::String("operational".to_string()),
+        );
+        fields.insert(
+            "squad_id".to_string(),
+            Value::String("flat-mesh".to_string()),
+        );
         fields.insert("battery_percent".to_string(), serde_json::json!(80));
         fields.insert("public".to_string(), Value::Bool(true));
 
@@ -1804,7 +1813,10 @@ async fn flat_mesh_mode(
 
         // Upsert document to CRDT with timing
         let upsert_start = std::time::Instant::now();
-        backend.document_store().upsert(collection_name, document).await?;
+        backend
+            .document_store()
+            .upsert(collection_name, document)
+            .await?;
         let upsert_latency_ms = upsert_start.elapsed().as_secs_f64() * 1000.0;
 
         // Log metrics

@@ -302,12 +302,18 @@ async fn run_peer(
 
         state.write().await.total_sent += send_count as u64;
 
-        println!("[{}] Sent update {}/{} to {} peers", node_id, sequence, TARGET_UPDATES, send_count);
+        println!(
+            "[{}] Sent update {}/{} to {} peers",
+            node_id, sequence, TARGET_UPDATES, send_count
+        );
 
         sleep(Duration::from_secs(update_frequency)).await;
     }
 
-    println!("[{}] Completed {} updates, idling...", node_id, TARGET_UPDATES);
+    println!(
+        "[{}] Completed {} updates, idling...",
+        node_id, TARGET_UPDATES
+    );
 
     // Keep running to receive from other peers
     loop {

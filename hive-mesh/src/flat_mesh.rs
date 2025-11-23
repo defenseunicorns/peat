@@ -134,7 +134,8 @@ mod tests {
         position: GeoPosition,
         profile: NodeProfile,
     ) -> GeographicBeacon {
-        let mut beacon = GeographicBeacon::new(node_id.to_string(), position, HierarchyLevel::Squad);
+        let mut beacon =
+            GeographicBeacon::new(node_id.to_string(), position, HierarchyLevel::Squad);
         beacon.mobility = Some(profile.mobility);
         beacon.resources = Some(profile.resources.clone());
         beacon.can_parent = profile.can_parent;
@@ -145,11 +146,7 @@ mod tests {
     #[tokio::test]
     async fn test_flat_mesh_single_node() {
         let profile = create_test_profile(NodeMobility::Static, 30);
-        let coordinator = FlatMeshCoordinator::new(
-            "node1".to_string(),
-            profile,
-            None,
-        );
+        let coordinator = FlatMeshCoordinator::new("node1".to_string(), profile, None);
 
         // With no peers, should be Standalone
         let role = coordinator.update_peers(vec![]).await;
@@ -164,24 +161,14 @@ mod tests {
         let node2_profile = create_test_profile(NodeMobility::SemiMobile, 40); // Medium
         let node3_profile = create_test_profile(NodeMobility::Mobile, 70); // Worst
 
-        let node1 = FlatMeshCoordinator::new(
-            "node1".to_string(),
-            node1_profile.clone(),
-            None,
-        );
+        let node1 = FlatMeshCoordinator::new("node1".to_string(), node1_profile.clone(), None);
 
         // Create beacons for peers
-        let node2_beacon = create_test_beacon(
-            "node2",
-            GeoPosition::new(37.7750, -122.4195),
-            node2_profile,
-        );
+        let node2_beacon =
+            create_test_beacon("node2", GeoPosition::new(37.7750, -122.4195), node2_profile);
 
-        let node3_beacon = create_test_beacon(
-            "node3",
-            GeoPosition::new(37.7760, -122.4185),
-            node3_profile,
-        );
+        let node3_beacon =
+            create_test_beacon("node3", GeoPosition::new(37.7760, -122.4185), node3_profile);
 
         // Node1 sees node2 and node3
         let role = node1.update_peers(vec![node2_beacon, node3_beacon]).await;
@@ -197,19 +184,12 @@ mod tests {
         // Node with lower capability
         let node2_profile = create_test_profile(NodeMobility::Mobile, 60);
 
-        let node2 = FlatMeshCoordinator::new(
-            "node2".to_string(),
-            node2_profile.clone(),
-            None,
-        );
+        let node2 = FlatMeshCoordinator::new("node2".to_string(), node2_profile.clone(), None);
 
         // Create beacon for higher-capability peer
         let node1_profile = create_test_profile(NodeMobility::Static, 20);
-        let node1_beacon = create_test_beacon(
-            "node1",
-            GeoPosition::new(37.7749, -122.4194),
-            node1_profile,
-        );
+        let node1_beacon =
+            create_test_beacon("node1", GeoPosition::new(37.7749, -122.4194), node1_profile);
 
         // Node2 sees node1 (better capability)
         let role = node2.update_peers(vec![node1_beacon]).await;
