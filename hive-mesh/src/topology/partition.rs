@@ -101,7 +101,7 @@ pub enum PartitionEvent {
 /// Handler for partition events
 ///
 /// Follows Ports & Adapters pattern like BeaconStorage and HierarchyStrategy.
-pub trait PartitionHandler: Send + Sync {
+pub trait PartitionHandler: Send + Sync + std::fmt::Debug {
     /// Handle partition detected event
     fn on_partition_detected(&self, event: &PartitionEvent);
 
@@ -112,6 +112,7 @@ pub trait PartitionHandler: Send + Sync {
 /// Network partition detector
 ///
 /// Monitors beacon visibility to detect isolation from higher hierarchy levels.
+#[derive(Debug)]
 pub struct PartitionDetector {
     config: PartitionConfig,
     current_level: HierarchyLevel,

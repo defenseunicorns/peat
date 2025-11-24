@@ -63,6 +63,7 @@ pub enum AutonomousState {
 /// and healing events. When a partition is detected, the handler enters
 /// autonomous mode, allowing the node to continue local operations while
 /// buffering data for eventual synchronization.
+#[derive(Debug)]
 pub struct AutonomousOperationHandler {
     state: Arc<RwLock<AutonomousState>>,
 }
