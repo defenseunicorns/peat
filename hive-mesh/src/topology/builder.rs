@@ -5,6 +5,7 @@
 
 use crate::beacon::{BeaconObserver, GeoPosition, GeographicBeacon, HierarchyLevel, NodeProfile};
 use crate::hierarchy::{HierarchyStrategy, NodeRole};
+use crate::topology::partition::PartitionDetector;
 use crate::topology::selection::{PeerSelector, SelectionConfig};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
@@ -117,6 +118,8 @@ pub struct TopologyConfig {
     pub max_telemetry_buffer_size: usize,
     /// Optional metrics collector for observability (None = no metrics collected)
     pub metrics_collector: Option<Arc<dyn crate::topology::metrics::MetricsCollector>>,
+    /// Optional partition detector for autonomous operation (None = no partition detection)
+    pub partition_detector: Option<Arc<Mutex<PartitionDetector>>>,
 }
 
 impl Default for TopologyConfig {
@@ -134,6 +137,7 @@ impl Default for TopologyConfig {
             backoff_multiplier: 2.0,           // Standard exponential backoff (2^n)
             max_telemetry_buffer_size: 100,    // Buffer up to 100 telemetry packets during failover
             metrics_collector: None,           // No metrics collection by default
+            partition_detector: None,          // No partition detection by default
         }
     }
 }
@@ -299,6 +303,25 @@ impl TopologyBuilder {
                 );
 
                 drop(state_lock);
+
+                // Check for network partition if detector is configured
+                if let Some(ref partition_detector) = config.partition_detector {
+                    // Convert Vec to HashMap for PartitionDetector
+                    let beacons_map: HashMap<String, GeographicBeacon> = nearby
+                        .iter()
+                        .map(|beacon| (beacon.node_id.clone(), beacon.clone()))
+                        .collect();
+
+                    // Check partition and emit events if state changed
+                    if let Some(_event) = partition_detector
+                        .lock()
+                        .unwrap()
+                        .check_partition(&beacons_map)
+                    {
+                        // PartitionDetector already notifies the PartitionHandler
+                        // No additional action needed here
+                    }
+                }
             }
         });
 
