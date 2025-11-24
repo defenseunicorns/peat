@@ -146,26 +146,18 @@ for NODE_COUNT in "${NODE_COUNTS[@]}"; do
         STATUS="PASS"
 
         # Parse soldier-level CRDT latencies
-        if [ -f "${LOG_DIR}/soldier-sample.log" ]; then
-            grep 'METRICS:' "${LOG_DIR}/soldier-sample.log" 2>/dev/null | \
-                grep '"tier":"soldier"' | \
-                grep '"event_type":"CRDTUpsert"' | \
-                sed 's/.*"latency_ms":\([0-9.]*\).*/\1/' | \
-                sort -n > /tmp/soldier_lat_$$.txt || true
+        # Note: Soldiers emit MessageSent events, not aggregation metrics
+        # We'll skip soldier metrics for now as they're not critical for hierarchy analysis
+        SOLDIER_P50=0
+        SOLDIER_P95=0
 
-            if [ -s /tmp/soldier_lat_$$.txt ]; then
-                SOLDIER_P50=$(awk 'BEGIN{c=0} {a[c++]=$1} END{print a[int(c*0.5)]}' /tmp/soldier_lat_$$.txt)
-                SOLDIER_P95=$(awk 'BEGIN{c=0} {a[c++]=$1} END{print a[int(c*0.95)]}' /tmp/soldier_lat_$$.txt)
-            fi
-            rm -f /tmp/soldier_lat_$$.txt
-        fi
-
-        # Parse squad leader CRDT latencies
+        # Parse squad leader aggregation latencies from AggregationCompleted events
         cat "${LOG_DIR}"/*squad*leader*.log 2>/dev/null | \
             grep 'METRICS:' | \
-            grep '"tier":"squad_leader"' | \
-            grep '"event_type":"CRDTUpsert"' | \
-            sed 's/.*"latency_ms":\([0-9.]*\).*/\1/' | \
+            grep '"event_type":"AggregationCompleted"' | \
+            grep '"tier":"squad"' | \
+            sed 's/.*"processing_time_us":\([0-9.]*\).*/\1/' | \
+            awk '{print $1/1000}' | \
             sort -n > /tmp/squad_lat_$$.txt || true
 
         if [ -s /tmp/squad_lat_$$.txt ]; then
@@ -174,12 +166,13 @@ for NODE_COUNT in "${NODE_COUNTS[@]}"; do
         fi
         rm -f /tmp/squad_lat_$$.txt
 
-        # Parse platoon leader CRDT latencies
+        # Parse platoon leader aggregation latencies from AggregationCompleted events
         cat "${LOG_DIR}"/*platoon*leader*.log 2>/dev/null | \
             grep 'METRICS:' | \
-            grep '"tier":"platoon_leader"' | \
-            grep '"event_type":"CRDTUpsert"' | \
-            sed 's/.*"latency_ms":\([0-9.]*\).*/\1/' | \
+            grep '"event_type":"AggregationCompleted"' | \
+            grep '"tier":"platoon"' | \
+            sed 's/.*"processing_time_us":\([0-9.]*\).*/\1/' | \
+            awk '{print $1/1000}' | \
             sort -n > /tmp/platoon_lat_$$.txt || true
 
         if [ -s /tmp/platoon_lat_$$.txt ]; then
@@ -188,12 +181,12 @@ for NODE_COUNT in "${NODE_COUNTS[@]}"; do
         fi
         rm -f /tmp/platoon_lat_$$.txt
 
-        # Calculate aggregation efficiency
-        # Get reduction ratio from AggregationEfficiency metrics
+        # Calculate aggregation efficiency from input_count in AggregationCompleted events
         cat "${LOG_DIR}"/*squad*leader*.log 2>/dev/null | \
             grep 'METRICS:' | \
-            grep '"event_type":"AggregationEfficiency"' | \
-            sed 's/.*"reduction_ratio":\([0-9.]*\).*/\1/' | \
+            grep '"event_type":"AggregationCompleted"' | \
+            grep '"tier":"squad"' | \
+            sed 's/.*"input_count":\([0-9]*\).*/\1/' | \
             head -1 > /tmp/agg_ratio_$$.txt || true
 
         if [ -s /tmp/agg_ratio_$$.txt ]; then

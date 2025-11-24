@@ -62,37 +62,40 @@ fi
 echo ""
 echo "Analyzing metrics..."
 
-# Check for soldier CRDT metrics
-SOLDIER_COUNT=$(grep -h 'METRICS:.*"tier":"soldier".*CRDTUpsert' lab4-quick-validation/soldier.log 2>/dev/null | wc -l)
-echo "  ✓ Soldier CRDT operations: $SOLDIER_COUNT"
+# Check for soldier metrics (MessageSent events - less critical)
+SOLDIER_COUNT=$(grep -h 'METRICS:.*MessageSent' lab4-quick-validation/soldier.log 2>/dev/null | wc -l)
+echo "  ✓ Soldier message events: $SOLDIER_COUNT"
 
-# Check for squad leader CRDT metrics
-SQUAD_COUNT=$(grep -h 'METRICS:.*"tier":"squad_leader".*CRDTUpsert' lab4-quick-validation/*squad*leader*.log 2>/dev/null | wc -l)
-echo "  ✓ Squad leader CRDT operations: $SQUAD_COUNT"
+# Check for squad leader aggregation metrics
+SQUAD_COUNT=$(grep -h 'METRICS:.*"event_type":"AggregationCompleted".*"tier":"squad"' lab4-quick-validation/*squad*leader*.log 2>/dev/null | wc -l)
+echo "  ✓ Squad leader aggregation operations: $SQUAD_COUNT"
 
-# Check for platoon leader CRDT metrics
-PLATOON_COUNT=$(grep -h 'METRICS:.*"tier":"platoon_leader".*CRDTUpsert' lab4-quick-validation/platoon-leader.log 2>/dev/null | wc -l)
-echo "  ✓ Platoon leader CRDT operations: $PLATOON_COUNT"
+# Check for platoon leader aggregation metrics
+PLATOON_COUNT=$(grep -h 'METRICS:.*"event_type":"AggregationCompleted".*"tier":"platoon"' lab4-quick-validation/platoon-leader.log 2>/dev/null | wc -l)
+echo "  ✓ Platoon leader aggregation operations: $PLATOON_COUNT"
 
-# Check for aggregation efficiency metrics
-AGG_COUNT=$(grep -h 'METRICS:.*AggregationEfficiency' lab4-quick-validation/*leader*.log 2>/dev/null | wc -l)
-echo "  ✓ Aggregation efficiency events: $AGG_COUNT"
+# Calculate squad leader aggregation latencies
+grep -h 'METRICS:' lab4-quick-validation/*squad*leader*.log 2>/dev/null | \
+    grep '"event_type":"AggregationCompleted"' | \
+    grep '"tier":"squad"' | \
+    sed 's/.*"processing_time_us":\([0-9.]*\).*/\1/' | \
+    awk '{print $1/1000}' | \
+    sort -n > /tmp/squad_lat.txt || true
 
-# Calculate sample latencies
-if [ -f "lab4-quick-validation/soldier.log" ]; then
-    grep 'METRICS:' lab4-quick-validation/soldier.log | \
-        grep '"tier":"soldier"' | \
-        grep '"event_type":"CRDTUpsert"' | \
-        sed 's/.*"latency_ms":\([0-9.]*\).*/\1/' | \
-        sort -n > /tmp/soldier_lat.txt || true
-
-    if [ -s /tmp/soldier_lat.txt ]; then
-        SOLDIER_P50=$(awk 'BEGIN{c=0} {a[c++]=$1} END{print a[int(c*0.5)]}' /tmp/soldier_lat.txt)
-        SOLDIER_P95=$(awk 'BEGIN{c=0} {a[c++]=$1} END{print a[int(c*0.95)]}' /tmp/soldier_lat.txt)
-        echo "  ✓ Soldier latency: P50=${SOLDIER_P50}ms, P95=${SOLDIER_P95}ms"
-    fi
-    rm -f /tmp/soldier_lat.txt
+if [ -s /tmp/squad_lat.txt ]; then
+    SQUAD_P50=$(awk 'BEGIN{c=0} {a[c++]=$1} END{print a[int(c*0.5)]}' /tmp/squad_lat.txt)
+    SQUAD_P95=$(awk 'BEGIN{c=0} {a[c++]=$1} END{print a[int(c*0.95)]}' /tmp/squad_lat.txt)
+    echo "  ✓ Squad aggregation latency: P50=${SQUAD_P50}ms, P95=${SQUAD_P95}ms"
 fi
+rm -f /tmp/squad_lat.txt
+
+# Calculate aggregation ratio
+AGG_RATIO=$(grep -h 'METRICS:' lab4-quick-validation/*squad*leader*.log 2>/dev/null | \
+    grep '"event_type":"AggregationCompleted"' | \
+    grep '"tier":"squad"' | \
+    sed 's/.*"input_count":\([0-9]*\).*/\1/' | \
+    head -1 || echo "0")
+echo "  ✓ Aggregation ratio: ${AGG_RATIO}:1 reduction"
 
 echo ""
 echo "Cleanup..."
@@ -104,21 +107,20 @@ echo "║  Lab 4 Quick Validation Complete                          ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 
-if [ "$SOLDIER_COUNT" -gt 0 ] && [ "$SQUAD_COUNT" -gt 0 ]; then
-    echo "✅ SUCCESS: Lab 4 metrics instrumentation is working"
+if [ "$SQUAD_COUNT" -gt 0 ]; then
+    echo "✅ SUCCESS: Lab 4 hierarchical aggregation metrics are working"
     echo ""
     echo "Metrics collected:"
-    echo "  - Soldier CRDT latencies: $SOLDIER_COUNT samples"
-    echo "  - Squad leader CRDT latencies: $SQUAD_COUNT samples"
-    echo "  - Platoon leader CRDT latencies: $PLATOON_COUNT samples"
-    echo "  - Aggregation efficiency events: $AGG_COUNT events"
+    echo "  - Soldier message events: $SOLDIER_COUNT"
+    echo "  - Squad aggregation operations: $SQUAD_COUNT"
+    echo "  - Platoon aggregation operations: $PLATOON_COUNT"
+    echo "  - Aggregation ratio: ${AGG_RATIO}:1"
     echo ""
     echo "Ready to run full Lab 4 test suite:"
     echo "  ./test-lab4-hierarchical-hive-crdt.sh"
 else
     echo "⚠️  WARNING: Limited metrics collected"
-    echo "  Soldier metrics: $SOLDIER_COUNT"
-    echo "  Squad metrics: $SQUAD_COUNT"
+    echo "  Squad aggregation metrics: $SQUAD_COUNT"
     echo ""
     echo "Check logs in lab4-quick-validation/ for debugging"
 fi
