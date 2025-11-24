@@ -41,9 +41,10 @@ use std::time::Instant;
 use tracing::{info, warn};
 
 /// Autonomous operation state
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum AutonomousState {
     /// Normal operation with connectivity to higher levels
+    #[default]
     Normal,
 
     /// Autonomous operation mode (partitioned from higher levels)
@@ -54,12 +55,6 @@ pub enum AutonomousState {
         /// Number of detection attempts before partition was confirmed
         detection_attempts: u32,
     },
-}
-
-impl Default for AutonomousState {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 
 /// Handler for autonomous operation during network partitions
