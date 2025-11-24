@@ -65,18 +65,18 @@ build-docker:
 test: clean-ditto
 	@echo "Running tests..."
 	@if [ -f .env ]; then \
-		export $$(grep -v '^#' .env | xargs) && cargo test -- --test-threads=1; \
+		export $$(grep -v '^#' .env | xargs) && cargo test; \
 	else \
-		cargo test -- --test-threads=1; \
+		cargo test; \
 	fi
 
 # Run functional/unit tests only (fast, for CI)
 test-functional: clean-ditto
 	@echo "Running functional/unit tests only..."
 	@if [ -f .env ]; then \
-		export $$(grep -v '^#' .env | xargs) && cargo test -- --test-threads=1; \
+		export $$(grep -v '^#' .env | xargs) && cargo test; \
 	else \
-		cargo test -- --test-threads=1; \
+		cargo test; \
 	fi
 
 # Run baseline comparison tests only (Containerlab-based)
@@ -91,7 +91,7 @@ test-e2e: clean-ditto
 		echo "⚠️  Warning: .env file not found. Ditto tests may be skipped."; \
 		echo "   Create .env with DITTO_APP_ID, DITTO_OFFLINE_TOKEN, DITTO_SHARED_KEY"; \
 	fi
-	cd hive-protocol && export $$(grep -v '^#' ../.env | xargs) && cargo test --test squad_formation_e2e -- --test-threads=1 --nocapture
+	cd hive-protocol && export $$(grep -v '^#' ../.env | xargs) && cargo test --test squad_formation_e2e --nocapture
 
 fmt:
 	@echo "Formatting code..."
@@ -109,9 +109,9 @@ pre-commit: clean-ditto
 	@cargo fmt --all
 	@cargo clippy --all-targets --all-features -- -D warnings
 	@if [ -f .env ]; then \
-		export $$(grep -v '^#' .env | xargs) && cargo test -- --test-threads=1; \
+		export $$(grep -v '^#' .env | xargs) && cargo test; \
 	else \
-		cargo test -- --test-threads=1; \
+		cargo test; \
 	fi
 	@echo "✅ Pre-commit checks passed!"
 
@@ -120,9 +120,9 @@ ci: clean-ditto
 	@cargo fmt --all -- --check
 	@cargo clippy --all-targets --all-features -- -D warnings
 	@if [ -f .env ]; then \
-		export $$(grep -v '^#' .env | xargs) && cargo test -- --test-threads=1; \
+		export $$(grep -v '^#' .env | xargs) && cargo test; \
 	else \
-		cargo test -- --test-threads=1; \
+		cargo test; \
 	fi
 	@echo "✅ CI pipeline passed!"
 
