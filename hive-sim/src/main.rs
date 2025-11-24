@@ -471,6 +471,7 @@ async fn handle_acknowledgment_collection(
 /// states and create summary documents that get replicated via P2P mesh.
 async fn squad_leader_aggregation_loop(
     coordinator: Arc<HierarchicalAggregator>,
+    backend: Arc<Box<dyn DataSyncBackend>>,
     squad_id: String,
     node_id: String,
     member_ids: Vec<String>,
@@ -480,6 +481,74 @@ async fn squad_leader_aggregation_loop(
         node_id, squad_id
     );
     println!("[{}] Squad members: {:?}", node_id, member_ids);
+
+    // Spawn observer for soldier NodeState documents (Lab 4 upward propagation tracking)
+    let observer_backend = backend.clone();
+    let observer_node_id = node_id.clone();
+    let observer_member_ids = member_ids.clone();
+    tokio::spawn(async move {
+        println!(
+            "METRICS: [{}] Starting soldier NodeState observer...",
+            observer_node_id
+        );
+
+        let query = Query::All;
+        if let Ok(mut change_stream) = observer_backend
+            .as_ref()
+            .document_store()
+            .observe("sim_poc", &query)
+        {
+            loop {
+                let event_result =
+                    tokio::time::timeout(Duration::from_millis(100), change_stream.receiver.recv())
+                        .await;
+
+                match event_result {
+                    Ok(Some(change_event)) => {
+                        if let ChangeEvent::Updated { document, .. } = change_event {
+                            let received_at_us = now_micros();
+                            if let Some(doc_id) = &document.id {
+                                // Track soldier documents from squad members
+                                if doc_id.starts_with("sim_doc_") {
+                                    // Check if this is from a squad member
+                                    let is_squad_member = observer_member_ids
+                                        .iter()
+                                        .any(|member| doc_id == &format!("sim_doc_{}", member));
+
+                                    if is_squad_member {
+                                        if let Some(created_at_us) = document
+                                            .get("timestamp_us")
+                                            .and_then(|v| v.as_u64())
+                                            .map(|v| v as u128)
+                                        {
+                                            let latency_us =
+                                                received_at_us.saturating_sub(created_at_us);
+                                            let latency_ms = latency_us as f64 / 1000.0;
+
+                                            log_metrics(&MetricsEvent::DocumentReceived {
+                                                node_id: observer_node_id.clone(),
+                                                doc_id: doc_id.clone(),
+                                                created_at_us,
+                                                last_modified_us: created_at_us,
+                                                received_at_us,
+                                                latency_us,
+                                                latency_ms,
+                                                version: 1,
+                                                is_first_reception: false,
+                                                latency_type: "soldier_to_squad_leader".to_string(),
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Ok(None) => break,  // Channel closed
+                    Err(_) => continue, // Timeout, continue loop
+                }
+            }
+        }
+    });
 
     loop {
         // Collect member states using synthetic NodeConfig/NodeState
@@ -537,13 +606,15 @@ async fn squad_leader_aggregation_loop(
                     // Check if squad summary document exists (create-once pattern)
                     match coordinator.get_squad_summary(&squad_id).await {
                         Ok(None) => {
-                            // First time - create document
+                            // First time - create document with latency tracking
+                            let crdt_start = Instant::now();
                             if let Err(e) = coordinator
                                 .create_squad_summary(&squad_id, &squad_summary)
                                 .await
                             {
                                 eprintln!("[{}] Failed to create squad summary: {}", node_id, e);
                             } else {
+                                let crdt_latency_ms = crdt_start.elapsed().as_secs_f64() * 1000.0;
                                 println!(
                                     "[{}] ✓ Created squad {} ({} members, readiness: {:.2})",
                                     node_id,
@@ -551,24 +622,36 @@ async fn squad_leader_aggregation_loop(
                                     squad_summary.member_count,
                                     squad_summary.readiness_score
                                 );
+                                // Log CRDT create latency for Lab 4 analysis
+                                println!(
+                                    "METRICS: {{\"event_type\":\"CRDTUpsert\",\"node_id\":\"{}\",\"tier\":\"squad_leader\",\"squad_id\":\"{}\",\"operation\":\"create\",\"members_aggregated\":{},\"latency_ms\":{:.3},\"timestamp_us\":{}}}",
+                                    node_id, squad_id, squad_summary.member_count, crdt_latency_ms, timestamp_us
+                                );
                             }
                         }
                         Ok(Some(_existing)) => {
-                            // Document exists - send delta update
+                            // Document exists - send delta update with latency tracking
                             use hive_protocol::hierarchy::deltas::SquadDelta;
                             let delta =
                                 SquadDelta::from_summary(&squad_summary, timestamp_us as u64);
 
+                            let crdt_start = Instant::now();
                             if let Err(e) = coordinator.update_squad_summary(&squad_id, delta).await
                             {
                                 eprintln!("[{}] Failed to update squad summary: {}", node_id, e);
                             } else {
+                                let crdt_latency_ms = crdt_start.elapsed().as_secs_f64() * 1000.0;
                                 println!(
                                     "[{}] ✓ Updated squad {} ({} members, readiness: {:.2})",
                                     node_id,
                                     squad_id,
                                     squad_summary.member_count,
                                     squad_summary.readiness_score
+                                );
+                                // Log CRDT update latency for Lab 4 analysis
+                                println!(
+                                    "METRICS: {{\"event_type\":\"CRDTUpsert\",\"node_id\":\"{}\",\"tier\":\"squad_leader\",\"squad_id\":\"{}\",\"operation\":\"update\",\"members_aggregated\":{},\"latency_ms\":{:.3},\"timestamp_us\":{}}}",
+                                    node_id, squad_id, squad_summary.member_count, crdt_latency_ms, timestamp_us
                                 );
                             }
                         }
@@ -597,6 +680,13 @@ async fn squad_leader_aggregation_loop(
                         processing_time_us,
                         timestamp_us,
                     });
+
+                    // Log aggregation efficiency for Lab 4 analysis
+                    let reduction_ratio = squad_summary.member_count as f64;
+                    println!(
+                        "METRICS: {{\"event_type\":\"AggregationEfficiency\",\"node_id\":\"{}\",\"tier\":\"squad\",\"input_docs\":{},\"output_docs\":1,\"reduction_ratio\":{:.1},\"timestamp_us\":{}}}",
+                        node_id, squad_summary.member_count, reduction_ratio, timestamp_us
+                    );
                 }
                 Err(e) => {
                     eprintln!("[{}] Failed to aggregate squad: {}", node_id, e);
@@ -686,13 +776,15 @@ async fn platoon_leader_aggregation_loop(
                     // Check if platoon summary document exists (create-once pattern)
                     match coordinator.get_platoon_summary(&platoon_id).await {
                         Ok(None) => {
-                            // First time - create document
+                            // First time - create document with latency tracking
+                            let crdt_start = Instant::now();
                             if let Err(e) = coordinator
                                 .create_platoon_summary(&platoon_id, &platoon_summary)
                                 .await
                             {
                                 eprintln!("[{}] Failed to create platoon summary: {}", node_id, e);
                             } else {
+                                let crdt_latency_ms = crdt_start.elapsed().as_secs_f64() * 1000.0;
                                 println!(
                                     "[{}] ✓ Created platoon {} ({} squads, {} total members)",
                                     node_id,
@@ -700,25 +792,37 @@ async fn platoon_leader_aggregation_loop(
                                     platoon_summary.squad_count,
                                     platoon_summary.total_member_count
                                 );
+                                // Log CRDT create latency for Lab 4 analysis
+                                println!(
+                                    "METRICS: {{\"event_type\":\"CRDTUpsert\",\"node_id\":\"{}\",\"tier\":\"platoon_leader\",\"platoon_id\":\"{}\",\"operation\":\"create\",\"squads_aggregated\":{},\"total_members\":{},\"latency_ms\":{:.3},\"timestamp_us\":{}}}",
+                                    node_id, platoon_id, platoon_summary.squad_count, platoon_summary.total_member_count, crdt_latency_ms, timestamp_us
+                                );
                             }
                         }
                         Ok(Some(_existing)) => {
-                            // Document exists - send delta update
+                            // Document exists - send delta update with latency tracking
                             use hive_protocol::hierarchy::deltas::PlatoonDelta;
                             let delta =
                                 PlatoonDelta::from_summary(&platoon_summary, timestamp_us as u64);
 
+                            let crdt_start = Instant::now();
                             if let Err(e) =
                                 coordinator.update_platoon_summary(&platoon_id, delta).await
                             {
                                 eprintln!("[{}] Failed to update platoon summary: {}", node_id, e);
                             } else {
+                                let crdt_latency_ms = crdt_start.elapsed().as_secs_f64() * 1000.0;
                                 println!(
                                     "[{}] ✓ Updated platoon {} ({} squads, {} total members)",
                                     node_id,
                                     platoon_id,
                                     platoon_summary.squad_count,
                                     platoon_summary.total_member_count
+                                );
+                                // Log CRDT update latency for Lab 4 analysis
+                                println!(
+                                    "METRICS: {{\"event_type\":\"CRDTUpsert\",\"node_id\":\"{}\",\"tier\":\"platoon_leader\",\"platoon_id\":\"{}\",\"operation\":\"update\",\"squads_aggregated\":{},\"total_members\":{},\"latency_ms\":{:.3},\"timestamp_us\":{}}}",
+                                    node_id, platoon_id, platoon_summary.squad_count, platoon_summary.total_member_count, crdt_latency_ms, timestamp_us
                                 );
                             }
                         }
@@ -747,6 +851,14 @@ async fn platoon_leader_aggregation_loop(
                         processing_time_us,
                         timestamp_us: now_micros(),
                     });
+
+                    // Log aggregation efficiency for Lab 4 analysis
+                    let reduction_ratio = platoon_summary.total_member_count as f64
+                        / platoon_summary.squad_count as f64;
+                    println!(
+                        "METRICS: {{\"event_type\":\"AggregationEfficiency\",\"node_id\":\"{}\",\"tier\":\"platoon\",\"input_docs\":{},\"output_docs\":1,\"reduction_ratio\":{:.1},\"total_members\":{},\"timestamp_us\":{}}}",
+                        node_id, platoon_summary.squad_count, reduction_ratio, platoon_summary.total_member_count, now_micros()
+                    );
                 }
                 Err(e) => {
                     eprintln!("[{}] Failed to aggregate platoon: {}", node_id, e);
@@ -1139,21 +1251,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             );
 
                             // Spawn aggregation loop
-                            tokio::spawn(async move {
-                                if let Err(e) = squad_leader_aggregation_loop(
-                                    coordinator,
-                                    squad_id,
-                                    node_id_clone.clone(),
-                                    member_ids,
-                                )
-                                .await
-                                {
-                                    eprintln!(
-                                        "[{}] Squad leader aggregation error: {}",
-                                        node_id_clone, e
-                                    );
-                                }
-                            });
+                            if let Some(ditto_backend) =
+                                backend.as_any().downcast_ref::<DittoBackend>()
+                            {
+                                let backend_for_aggregation: Arc<Box<dyn DataSyncBackend>> =
+                                    Arc::new(Box::new(ditto_backend.clone()));
+                                tokio::spawn(async move {
+                                    if let Err(e) = squad_leader_aggregation_loop(
+                                        coordinator,
+                                        backend_for_aggregation,
+                                        squad_id,
+                                        node_id_clone.clone(),
+                                        member_ids,
+                                    )
+                                    .await
+                                    {
+                                        eprintln!(
+                                            "[{}] Squad leader aggregation error: {}",
+                                            node_id_clone, e
+                                        );
+                                    }
+                                });
+                            } else {
+                                eprintln!(
+                                    "[{}] WARNING: Could not clone backend for squad aggregation",
+                                    node_id
+                                );
+                            }
 
                             // Phase 3: Spawn command demo task (issue one command every 30 seconds)
                             let cmd_node_id = node_id.clone();
@@ -1558,11 +1682,19 @@ async fn soldier_capability_mode(
 
         let document = Document::with_id(doc_id.clone(), fields.clone());
 
-        // Insert/update document
+        // Insert/update document with latency tracking
+        let crdt_start = Instant::now();
         backend.document_store().upsert("sim_poc", document).await?;
+        let crdt_latency_ms = crdt_start.elapsed().as_secs_f64() * 1000.0;
 
         let message_json = serde_json::to_string(&fields)?;
         let message_size_bytes = message_json.len();
+
+        // Log CRDT upsert latency for Lab 4 analysis
+        println!(
+            "METRICS: {{\"event_type\":\"CRDTUpsert\",\"node_id\":\"{}\",\"tier\":\"soldier\",\"message_number\":{},\"latency_ms\":{:.3},\"timestamp_us\":{}}}",
+            node_id, message_number, crdt_latency_ms, timestamp_us
+        );
 
         println!(
             "[{}] ✓ Status update #{}/{} sent ({} bytes, {} capabilities)",
@@ -1591,6 +1723,105 @@ async fn soldier_capability_mode(
     }
 
     println!("[{}] ✓ All {} status updates sent", node_id, TARGET_UPDATES);
+
+    // Spawn observer for document reception tracking (Lab 4 comprehensive latency)
+    let observer_backend: Arc<Box<dyn DataSyncBackend>> =
+        if let Some(ditto_backend) = backend.as_any().downcast_ref::<DittoBackend>() {
+            Arc::new(Box::new(ditto_backend.clone()))
+        } else {
+            eprintln!(
+                "[{}] WARNING: Could not clone backend for observation",
+                node_id
+            );
+            return Ok(());
+        };
+    let observer_node_id = node_id.to_string();
+    let own_doc_id = doc_id.clone();
+    tokio::spawn(async move {
+        println!(
+            "METRICS: [{}] Starting document reception observer...",
+            observer_node_id
+        );
+
+        let query = Query::All;
+        if let Ok(mut change_stream) = observer_backend
+            .as_ref()
+            .document_store()
+            .observe("sim_poc", &query)
+        {
+            loop {
+                let event_result =
+                    tokio::time::timeout(Duration::from_millis(100), change_stream.receiver.recv())
+                        .await;
+
+                match event_result {
+                    Ok(Some(change_event)) => {
+                        if let ChangeEvent::Updated { document, .. } = change_event {
+                            let received_at_us = now_micros();
+                            if let Some(received_doc_id) = &document.id {
+                                // Track peer soldier documents (lateral propagation)
+                                if received_doc_id.starts_with("sim_doc_")
+                                    && received_doc_id != &own_doc_id
+                                {
+                                    if let Some(created_at_us) = document
+                                        .get("timestamp_us")
+                                        .and_then(|v| v.as_u64())
+                                        .map(|v| v as u128)
+                                    {
+                                        let latency_us =
+                                            received_at_us.saturating_sub(created_at_us);
+                                        let latency_ms = latency_us as f64 / 1000.0;
+
+                                        log_metrics(&MetricsEvent::DocumentReceived {
+                                            node_id: observer_node_id.clone(),
+                                            doc_id: received_doc_id.clone(),
+                                            created_at_us,
+                                            last_modified_us: created_at_us,
+                                            received_at_us,
+                                            latency_us,
+                                            latency_ms,
+                                            version: 1,
+                                            is_first_reception: false,
+                                            latency_type: "peer_soldier".to_string(),
+                                        });
+                                    }
+                                }
+
+                                // Track squad summary from leader (downward propagation)
+                                if received_doc_id.contains("-summary") {
+                                    if let Some(created_at_us) = document
+                                        .get("created_at_us")
+                                        .or_else(|| document.get("timestamp_us"))
+                                        .and_then(|v| v.as_u64())
+                                        .map(|v| v as u128)
+                                    {
+                                        let latency_us =
+                                            received_at_us.saturating_sub(created_at_us);
+                                        let latency_ms = latency_us as f64 / 1000.0;
+
+                                        log_metrics(&MetricsEvent::DocumentReceived {
+                                            node_id: observer_node_id.clone(),
+                                            doc_id: received_doc_id.clone(),
+                                            created_at_us,
+                                            last_modified_us: created_at_us,
+                                            received_at_us,
+                                            latency_us,
+                                            latency_ms,
+                                            version: 1,
+                                            is_first_reception: false,
+                                            latency_type: "squad_summary_downward".to_string(),
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Ok(None) => break,  // Channel closed
+                    Err(_) => continue, // Timeout, continue loop
+                }
+            }
+        }
+    });
 
     // Now wait to observe squad summary (event-driven exit)
     println!("[{}] Waiting to observe squad summary...", node_id);
