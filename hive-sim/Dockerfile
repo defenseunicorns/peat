@@ -21,12 +21,14 @@ WORKDIR /build
 # Copy entire workspace (needed for workspace dependencies)
 COPY . .
 
-# Build the hive-sim binary with both backends enabled, and the traditional baseline
+# Build the hive-sim binary with both backends enabled, traditional baseline, and producer-only baseline
 # Always build with automerge-backend feature for maximum flexibility
-# Note: We only build hive-sim (protocol-based) and traditional_baseline
+# Note: We only build hive-sim (protocol-based) and baseline examples
 # The hierarchical_sim_node examples are Ditto-specific and should not be used
 RUN cargo build --release -p hive-sim --features automerge-backend && \
-    cargo build --release --example traditional_baseline -p hive-protocol
+    cargo build --release --example traditional_baseline -p hive-protocol && \
+    cargo build --release --example producer_only_baseline -p hive-protocol && \
+    cargo build --release --example p2p_mesh_baseline -p hive-protocol
 
 # ============================================================================
 # Stage 2: Runtime - Minimal runtime image
@@ -50,6 +52,8 @@ RUN mkdir -p /data/ditto
 # Copy the compiled binaries from builder stage
 COPY --from=builder /build/target/release/hive-sim /usr/local/bin/hive-sim
 COPY --from=builder /build/target/release/examples/traditional_baseline /usr/local/bin/traditional_baseline
+COPY --from=builder /build/target/release/examples/producer_only_baseline /usr/local/bin/producer_only_baseline
+COPY --from=builder /build/target/release/examples/p2p_mesh_baseline /usr/local/bin/p2p_mesh_baseline
 
 # Copy entrypoint script (relative to build context which is parent dir)
 COPY hive-sim/entrypoint.sh /entrypoint.sh

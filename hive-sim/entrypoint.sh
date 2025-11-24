@@ -10,9 +10,16 @@ echo "[${NODE_ID}] Container IP: $(hostname -I)"
 
 # Check if we're using traditional baseline (no Ditto required)
 USE_TRADITIONAL=${USE_TRADITIONAL:-false}
+USE_PRODUCER_ONLY=${USE_PRODUCER_ONLY:-false}
+USE_P2P_MESH=${USE_P2P_MESH:-false}
 
-# Check required environment variables (skip for traditional baseline)
-if [ "$USE_TRADITIONAL" != "true" ]; then
+# Check if MODE is p2p_mesh, set flag
+if [ "$MODE" = "p2p_mesh" ]; then
+    USE_P2P_MESH=true
+fi
+
+# Check required environment variables (skip for traditional/producer-only/p2p-mesh baseline)
+if [ "$USE_TRADITIONAL" != "true" ] && [ "$USE_PRODUCER_ONLY" != "true" ] && [ "$USE_P2P_MESH" != "true" ]; then
     if [ -z "$DITTO_APP_ID" ]; then
         echo "[${NODE_ID}] ERROR: DITTO_APP_ID not set"
         exit 1
@@ -83,8 +90,43 @@ export DITTO_OFFLINE_TOKEN
 export DITTO_SHARED_KEY
 
 # Run the appropriate simulation node
-if [ "$USE_TRADITIONAL" = "true" ]; then
-    echo "[${NODE_ID}] Running Traditional Baseline (NO CRDT - periodic full messages)"
+if [ "$USE_P2P_MESH" = "true" ] || [ "$MODE" = "p2p_mesh" ]; then
+    echo "[${NODE_ID}] Running P2P Mesh Baseline (Lab 3 - full mesh connectivity)"
+
+    # P2P mesh baseline arguments
+    MESH_ARGS="--node-id ${NODE_ID}"
+    MESH_ARGS="$MESH_ARGS --listen-port ${LISTEN_PORT:-12345}"
+
+    if [ -n "$PEERS" ]; then
+        MESH_ARGS="$MESH_ARGS --peers ${PEERS}"
+    fi
+
+    MESH_ARGS="$MESH_ARGS --update-frequency ${UPDATE_FREQUENCY_SECS}"
+
+    exec /usr/local/bin/p2p_mesh_baseline $MESH_ARGS
+elif [ "$USE_PRODUCER_ONLY" = "true" ]; then
+    echo "[${NODE_ID}] Running Producer-Only Baseline (Lab 1 - upload only, no broadcast)"
+
+    # Producer-only baseline uses same argument format as traditional
+    PROD_ARGS="--node-id ${NODE_ID}"
+
+    if [ "$MODE" = "writer" ]; then
+        PROD_ARGS="$PROD_ARGS --mode server"
+        if [ -n "$TCP_LISTEN" ]; then
+            PROD_ARGS="$PROD_ARGS --listen 0.0.0.0:${TCP_LISTEN}"
+        fi
+    else
+        PROD_ARGS="$PROD_ARGS --mode client"
+        if [ -n "$TCP_CONNECT" ]; then
+            PROD_ARGS="$PROD_ARGS --connect ${TCP_CONNECT}"
+        fi
+    fi
+
+    PROD_ARGS="$PROD_ARGS --update-frequency ${UPDATE_FREQUENCY_SECS}"
+
+    exec /usr/local/bin/producer_only_baseline $PROD_ARGS
+elif [ "$USE_TRADITIONAL" = "true" ]; then
+    echo "[${NODE_ID}] Running Traditional Baseline (Lab 2 - full replication with broadcast)"
 
     # Traditional baseline uses different arguments
     TRAD_ARGS="--node-id ${NODE_ID}"

@@ -87,6 +87,10 @@ use hive_schema::command::v1::{
 };
 use hive_schema::common::v1::Timestamp;
 
+// Lab 3b: Flat mesh coordination with CRDT
+use hive_mesh::beacon::{NodeMobility, NodeProfile, NodeResources};
+use hive_mesh::FlatMeshCoordinator;
+
 /// Test document structure
 #[allow(dead_code)]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -1329,6 +1333,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // In hierarchical mode, nodes run aggregation simulation without ack test
             hierarchical_mode(&*backend, &node_id, &node_type, update_rate_ms).await
         }
+        "flat_mesh" => {
+            // Lab 3b: Flat P2P mesh with HIVE CRDT (all nodes at same tier)
+            flat_mesh_mode(&*backend, &node_id, &node_type, update_rate_ms).await
+        }
         _ => {
             eprintln!("[{}] ✗ Invalid mode: {}", node_id, mode);
             std::process::exit(1);
@@ -1720,6 +1728,148 @@ fn generate_soldier_capabilities(node_id: &str) -> Vec<String> {
     }
 
     caps
+}
+
+/// Lab 3b: Flat P2P mesh mode with HIVE CRDT
+///
+/// All nodes operate at the same hierarchy level (Squad) using DynamicHierarchyStrategy
+/// for leader election and CRDT for state synchronization.
+///
+/// This mode tests pure CRDT overhead in a flat mesh topology for comparison with Lab 3 (raw TCP).
+async fn flat_mesh_mode(
+    backend: &dyn DataSyncBackend,
+    node_id: &str,
+    node_type: &str,
+    update_rate_ms: u64,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("[{}] === FLAT MESH MODE (Lab 3b) ===", node_id);
+    println!("[{}] Node type: {}", node_id, node_type);
+    println!("[{}] Update rate: {}ms", node_id, update_rate_ms);
+
+    // Create node profile (all nodes at Squad level)
+    let profile = NodeProfile {
+        mobility: NodeMobility::SemiMobile,
+        resources: NodeResources {
+            cpu_cores: 4,
+            memory_mb: 2048,
+            bandwidth_mbps: 100,
+            cpu_usage_percent: 30,
+            memory_usage_percent: 40,
+            battery_percent: Some(80),
+        },
+        can_parent: true,
+        prefer_leaf: false,
+        parent_priority: 128,
+    };
+
+    // Create flat mesh coordinator
+    let coordinator = Arc::new(FlatMeshCoordinator::new(
+        node_id.to_string(),
+        profile,
+        None, // Use default election config
+    ));
+
+    println!(
+        "[{}] Initialized as flat mesh peer at level: {:?}",
+        node_id,
+        coordinator.hierarchy_level()
+    );
+
+    // Collection for node states (all peers sync here)
+    let collection_name = "node_states";
+
+    // Create or update this node's state document
+    let update_interval = Duration::from_millis(update_rate_ms);
+    let mut sequence = 0u64;
+    const TARGET_UPDATES: u64 = 20;
+
+    for _ in 0..TARGET_UPDATES {
+        sequence += 1;
+
+        // Create state update document
+        let timestamp_us = now_micros();
+        let doc_id = format!("flat_mesh_state_{}", node_id);
+
+        let mut fields = HashMap::new();
+        fields.insert("node_id".to_string(), Value::String(node_id.to_string()));
+        fields.insert(
+            "node_type".to_string(),
+            Value::String(node_type.to_string()),
+        );
+        fields.insert("timestamp_us".to_string(), serde_json::json!(timestamp_us));
+        fields.insert("sequence_number".to_string(), serde_json::json!(sequence));
+        fields.insert(
+            "status".to_string(),
+            Value::String("operational".to_string()),
+        );
+        fields.insert(
+            "squad_id".to_string(),
+            Value::String("flat-mesh".to_string()),
+        );
+        fields.insert("battery_percent".to_string(), serde_json::json!(80));
+        fields.insert("public".to_string(), Value::Bool(true));
+
+        let document = Document::with_id(doc_id.clone(), fields);
+
+        // Upsert document to CRDT with timing
+        let upsert_start = std::time::Instant::now();
+        backend
+            .document_store()
+            .upsert(collection_name, document)
+            .await?;
+        let upsert_latency_ms = upsert_start.elapsed().as_secs_f64() * 1000.0;
+
+        // Log metrics
+        log_metrics(&MetricsEvent::DocumentInserted {
+            node_id: node_id.to_string(),
+            doc_id: doc_id.clone(),
+            timestamp_us: now_micros(),
+        });
+
+        println!(
+            "[{}] Published state update {}/{} to flat mesh, CRDT_latency: {:.3}ms",
+            node_id, sequence, TARGET_UPDATES, upsert_latency_ms
+        );
+
+        // Check current role
+        let role = coordinator.current_role().await;
+        if sequence % 5 == 0 {
+            println!(
+                "[{}] Current role: {:?}, {} peers",
+                node_id,
+                role,
+                coordinator.peer_count().await
+            );
+        }
+
+        sleep(update_interval).await;
+    }
+
+    println!(
+        "[{}] Completed {} updates, keeping process alive for CRDT sync monitoring...",
+        node_id, TARGET_UPDATES
+    );
+
+    // Keep running to allow CRDT synchronization to continue
+    // The CRDT backend handles peer-to-peer sync automatically
+    let monitor_duration = Duration::from_secs(60);
+    println!(
+        "[{}] Monitoring flat mesh CRDT sync for {}s...",
+        node_id,
+        monitor_duration.as_secs()
+    );
+
+    sleep(monitor_duration).await;
+
+    println!(
+        "[{}] Flat mesh mode complete - process staying alive for continued sync",
+        node_id
+    );
+
+    // Keep process running indefinitely for long-running tests
+    loop {
+        sleep(Duration::from_secs(300)).await;
+    }
 }
 
 /// Writer mode: Send periodic updates at configured rate
