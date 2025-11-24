@@ -537,13 +537,15 @@ async fn squad_leader_aggregation_loop(
                     // Check if squad summary document exists (create-once pattern)
                     match coordinator.get_squad_summary(&squad_id).await {
                         Ok(None) => {
-                            // First time - create document
+                            // First time - create document with latency tracking
+                            let crdt_start = Instant::now();
                             if let Err(e) = coordinator
                                 .create_squad_summary(&squad_id, &squad_summary)
                                 .await
                             {
                                 eprintln!("[{}] Failed to create squad summary: {}", node_id, e);
                             } else {
+                                let crdt_latency_ms = crdt_start.elapsed().as_secs_f64() * 1000.0;
                                 println!(
                                     "[{}] ✓ Created squad {} ({} members, readiness: {:.2})",
                                     node_id,
@@ -551,24 +553,36 @@ async fn squad_leader_aggregation_loop(
                                     squad_summary.member_count,
                                     squad_summary.readiness_score
                                 );
+                                // Log CRDT create latency for Lab 4 analysis
+                                println!(
+                                    "METRICS: {{\"event_type\":\"CRDTUpsert\",\"node_id\":\"{}\",\"tier\":\"squad_leader\",\"squad_id\":\"{}\",\"operation\":\"create\",\"members_aggregated\":{},\"latency_ms\":{:.3},\"timestamp_us\":{}}}",
+                                    node_id, squad_id, squad_summary.member_count, crdt_latency_ms, timestamp_us
+                                );
                             }
                         }
                         Ok(Some(_existing)) => {
-                            // Document exists - send delta update
+                            // Document exists - send delta update with latency tracking
                             use hive_protocol::hierarchy::deltas::SquadDelta;
                             let delta =
                                 SquadDelta::from_summary(&squad_summary, timestamp_us as u64);
 
+                            let crdt_start = Instant::now();
                             if let Err(e) = coordinator.update_squad_summary(&squad_id, delta).await
                             {
                                 eprintln!("[{}] Failed to update squad summary: {}", node_id, e);
                             } else {
+                                let crdt_latency_ms = crdt_start.elapsed().as_secs_f64() * 1000.0;
                                 println!(
                                     "[{}] ✓ Updated squad {} ({} members, readiness: {:.2})",
                                     node_id,
                                     squad_id,
                                     squad_summary.member_count,
                                     squad_summary.readiness_score
+                                );
+                                // Log CRDT update latency for Lab 4 analysis
+                                println!(
+                                    "METRICS: {{\"event_type\":\"CRDTUpsert\",\"node_id\":\"{}\",\"tier\":\"squad_leader\",\"squad_id\":\"{}\",\"operation\":\"update\",\"members_aggregated\":{},\"latency_ms\":{:.3},\"timestamp_us\":{}}}",
+                                    node_id, squad_id, squad_summary.member_count, crdt_latency_ms, timestamp_us
                                 );
                             }
                         }
@@ -597,6 +611,13 @@ async fn squad_leader_aggregation_loop(
                         processing_time_us,
                         timestamp_us,
                     });
+
+                    // Log aggregation efficiency for Lab 4 analysis
+                    let reduction_ratio = squad_summary.member_count as f64;
+                    println!(
+                        "METRICS: {{\"event_type\":\"AggregationEfficiency\",\"node_id\":\"{}\",\"tier\":\"squad\",\"input_docs\":{},\"output_docs\":1,\"reduction_ratio\":{:.1},\"timestamp_us\":{}}}",
+                        node_id, squad_summary.member_count, reduction_ratio, timestamp_us
+                    );
                 }
                 Err(e) => {
                     eprintln!("[{}] Failed to aggregate squad: {}", node_id, e);
@@ -686,13 +707,15 @@ async fn platoon_leader_aggregation_loop(
                     // Check if platoon summary document exists (create-once pattern)
                     match coordinator.get_platoon_summary(&platoon_id).await {
                         Ok(None) => {
-                            // First time - create document
+                            // First time - create document with latency tracking
+                            let crdt_start = Instant::now();
                             if let Err(e) = coordinator
                                 .create_platoon_summary(&platoon_id, &platoon_summary)
                                 .await
                             {
                                 eprintln!("[{}] Failed to create platoon summary: {}", node_id, e);
                             } else {
+                                let crdt_latency_ms = crdt_start.elapsed().as_secs_f64() * 1000.0;
                                 println!(
                                     "[{}] ✓ Created platoon {} ({} squads, {} total members)",
                                     node_id,
@@ -700,25 +723,37 @@ async fn platoon_leader_aggregation_loop(
                                     platoon_summary.squad_count,
                                     platoon_summary.total_member_count
                                 );
+                                // Log CRDT create latency for Lab 4 analysis
+                                println!(
+                                    "METRICS: {{\"event_type\":\"CRDTUpsert\",\"node_id\":\"{}\",\"tier\":\"platoon_leader\",\"platoon_id\":\"{}\",\"operation\":\"create\",\"squads_aggregated\":{},\"total_members\":{},\"latency_ms\":{:.3},\"timestamp_us\":{}}}",
+                                    node_id, platoon_id, platoon_summary.squad_count, platoon_summary.total_member_count, crdt_latency_ms, timestamp_us
+                                );
                             }
                         }
                         Ok(Some(_existing)) => {
-                            // Document exists - send delta update
+                            // Document exists - send delta update with latency tracking
                             use hive_protocol::hierarchy::deltas::PlatoonDelta;
                             let delta =
                                 PlatoonDelta::from_summary(&platoon_summary, timestamp_us as u64);
 
+                            let crdt_start = Instant::now();
                             if let Err(e) =
                                 coordinator.update_platoon_summary(&platoon_id, delta).await
                             {
                                 eprintln!("[{}] Failed to update platoon summary: {}", node_id, e);
                             } else {
+                                let crdt_latency_ms = crdt_start.elapsed().as_secs_f64() * 1000.0;
                                 println!(
                                     "[{}] ✓ Updated platoon {} ({} squads, {} total members)",
                                     node_id,
                                     platoon_id,
                                     platoon_summary.squad_count,
                                     platoon_summary.total_member_count
+                                );
+                                // Log CRDT update latency for Lab 4 analysis
+                                println!(
+                                    "METRICS: {{\"event_type\":\"CRDTUpsert\",\"node_id\":\"{}\",\"tier\":\"platoon_leader\",\"platoon_id\":\"{}\",\"operation\":\"update\",\"squads_aggregated\":{},\"total_members\":{},\"latency_ms\":{:.3},\"timestamp_us\":{}}}",
+                                    node_id, platoon_id, platoon_summary.squad_count, platoon_summary.total_member_count, crdt_latency_ms, timestamp_us
                                 );
                             }
                         }
@@ -747,6 +782,13 @@ async fn platoon_leader_aggregation_loop(
                         processing_time_us,
                         timestamp_us: now_micros(),
                     });
+
+                    // Log aggregation efficiency for Lab 4 analysis
+                    let reduction_ratio = platoon_summary.total_member_count as f64 / platoon_summary.squad_count as f64;
+                    println!(
+                        "METRICS: {{\"event_type\":\"AggregationEfficiency\",\"node_id\":\"{}\",\"tier\":\"platoon\",\"input_docs\":{},\"output_docs\":1,\"reduction_ratio\":{:.1},\"total_members\":{},\"timestamp_us\":{}}}",
+                        node_id, platoon_summary.squad_count, reduction_ratio, platoon_summary.total_member_count, now_micros()
+                    );
                 }
                 Err(e) => {
                     eprintln!("[{}] Failed to aggregate platoon: {}", node_id, e);
@@ -1558,11 +1600,19 @@ async fn soldier_capability_mode(
 
         let document = Document::with_id(doc_id.clone(), fields.clone());
 
-        // Insert/update document
+        // Insert/update document with latency tracking
+        let crdt_start = Instant::now();
         backend.document_store().upsert("sim_poc", document).await?;
+        let crdt_latency_ms = crdt_start.elapsed().as_secs_f64() * 1000.0;
 
         let message_json = serde_json::to_string(&fields)?;
         let message_size_bytes = message_json.len();
+
+        // Log CRDT upsert latency for Lab 4 analysis
+        println!(
+            "METRICS: {{\"event_type\":\"CRDTUpsert\",\"node_id\":\"{}\",\"tier\":\"soldier\",\"message_number\":{},\"latency_ms\":{:.3},\"timestamp_us\":{}}}",
+            node_id, message_number, crdt_latency_ms, timestamp_us
+        );
 
         println!(
             "[{}] ✓ Status update #{}/{} sent ({} bytes, {} capabilities)",
