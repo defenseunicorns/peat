@@ -33,9 +33,7 @@ use hive_protocol::models::{
     Capability, CapabilityExt, CapabilityType, CellConfigExt, CellStateExt, NodeConfigExt,
 };
 use hive_protocol::storage::{CellStore, NodeStore};
-use hive_protocol::sync::ditto::DittoBackend;
 use hive_protocol::testing::E2EHarness;
-use std::sync::Arc;
 use std::time::Duration;
 
 /// Test 1: NodeStore CRDT Sync - G-Set Semantics
@@ -54,16 +52,27 @@ async fn test_e2e_nodestore_gset_sync() {
 
     println!("=== E2E: NodeStore G-Set CRDT Sync ===");
 
-    // Create two DittoBackends (each wraps a DittoStore in Arc)
-    let backend1: Arc<DittoBackend> = harness.create_ditto_store().await.unwrap().into();
-    let backend2: Arc<DittoBackend> = harness.create_ditto_store().await.unwrap().into();
+    // Allocate TCP port and create two DittoBackends with TCP peer-to-peer sync
+    let tcp_port = E2EHarness::allocate_tcp_port().unwrap();
+    let backend1 = harness
+        .create_ditto_backend_with_tcp(Some(tcp_port), None)
+        .await
+        .unwrap();
+    let backend2 = harness
+        .create_ditto_backend_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
+        .await
+        .unwrap();
 
-    let node_store1: NodeStore<DittoBackend> = NodeStore::new(backend1.clone()).await.unwrap();
-    let node_store2: NodeStore<DittoBackend> = NodeStore::new(backend2.clone()).await.unwrap();
+    let node_store1 = NodeStore::new(backend1.clone()).await.unwrap();
+    let node_store2 = NodeStore::new(backend2.clone()).await.unwrap();
 
     // Get the underlying DittoStores for peer connection checking
     let store1 = backend1.get_ditto_store().unwrap();
     let store2 = backend2.get_ditto_store().unwrap();
+
+    // Start sync on both stores (required for peer-to-peer sync)
+    store1.start_sync().unwrap();
+    store2.start_sync().unwrap();
 
     println!("  1. Waiting for peer connection...");
 
@@ -169,9 +178,16 @@ async fn test_e2e_cellstore_orset_operations() {
 
     println!("=== E2E: CellStore OR-Set CRDT Operations ===");
 
-    // Create two DittoBackends (each wraps a DittoStore in Arc)
-    let backend1: Arc<DittoBackend> = harness.create_ditto_store().await.unwrap().into();
-    let backend2: Arc<DittoBackend> = harness.create_ditto_store().await.unwrap().into();
+    // Allocate TCP port and create two DittoBackends with TCP peer-to-peer sync
+    let tcp_port = E2EHarness::allocate_tcp_port().unwrap();
+    let backend1 = harness
+        .create_ditto_backend_with_tcp(Some(tcp_port), None)
+        .await
+        .unwrap();
+    let backend2 = harness
+        .create_ditto_backend_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
+        .await
+        .unwrap();
 
     let cell_store1 = CellStore::new(backend1.clone()).await.unwrap();
     let cell_store2 = CellStore::new(backend2.clone()).await.unwrap();
@@ -179,6 +195,10 @@ async fn test_e2e_cellstore_orset_operations() {
     // Get the underlying DittoStores for peer connection checking
     let store1 = backend1.get_ditto_store().unwrap();
     let store2 = backend2.get_ditto_store().unwrap();
+
+    // Start sync on both stores (required for peer-to-peer sync)
+    store1.start_sync().unwrap();
+    store2.start_sync().unwrap();
 
     println!("  1. Waiting for peer connection...");
 
@@ -282,9 +302,16 @@ async fn test_e2e_concurrent_writes_lww_resolution() {
 
     println!("=== E2E: Concurrent Writes LWW-Register Resolution ===");
 
-    // Create two DittoBackends (each wraps a DittoStore in Arc)
-    let backend1: Arc<DittoBackend> = harness.create_ditto_store().await.unwrap().into();
-    let backend2: Arc<DittoBackend> = harness.create_ditto_store().await.unwrap().into();
+    // Allocate TCP port and create two DittoBackends with TCP peer-to-peer sync
+    let tcp_port = E2EHarness::allocate_tcp_port().unwrap();
+    let backend1 = harness
+        .create_ditto_backend_with_tcp(Some(tcp_port), None)
+        .await
+        .unwrap();
+    let backend2 = harness
+        .create_ditto_backend_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
+        .await
+        .unwrap();
 
     let cell_store1 = CellStore::new(backend1.clone()).await.unwrap();
     let cell_store2 = CellStore::new(backend2.clone()).await.unwrap();
@@ -292,6 +319,10 @@ async fn test_e2e_concurrent_writes_lww_resolution() {
     // Get the underlying DittoStores for peer connection checking
     let store1 = backend1.get_ditto_store().unwrap();
     let store2 = backend2.get_ditto_store().unwrap();
+
+    // Start sync on both stores (required for peer-to-peer sync)
+    store1.start_sync().unwrap();
+    store2.start_sync().unwrap();
 
     println!("  1. Waiting for peer connection...");
 
