@@ -36,12 +36,18 @@
 //! ```
 
 mod authenticator;
+mod authorization;
 mod device_id;
 mod error;
 mod keypair;
 mod transport;
 
 pub use authenticator::{DeviceAuthenticator, VerifiedPeer};
+pub use authorization::{
+    AuthenticatedEntity, AuthorizationContext, AuthorizationController, AuthorizationPolicy,
+    CellMembershipContext, DeviceIdentityInfo, DeviceType, HierarchyLevel, Permission, Role,
+    UserIdentityInfo,
+};
 pub use device_id::DeviceId;
 pub use error::SecurityError;
 pub use keypair::DeviceKeypair;
@@ -49,8 +55,9 @@ pub use transport::{AuthenticatedConnection, AuthenticationChannel, SecureMeshTr
 
 // Re-export protobuf types for convenience
 pub use hive_schema::security::v1::{
-    Challenge, DeviceIdentity, DeviceType, HierarchyLevel, SecurityError as ProtoSecurityError,
-    SignedBeacon, SignedChallengeResponse,
+    Challenge, DeviceIdentity, DeviceType as ProtoDeviceType,
+    HierarchyLevel as ProtoHierarchyLevel, SecurityError as ProtoSecurityError, SignedBeacon,
+    SignedChallengeResponse,
 };
 
 /// Default challenge timeout in seconds
