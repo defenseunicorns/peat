@@ -24,7 +24,7 @@
 //!
 //! ## Usage
 //!
-//! ```rust,ignore
+//! ```text
 //! use hive_protocol::discovery::peer::*;
 //!
 //! // Create discovery manager

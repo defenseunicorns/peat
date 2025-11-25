@@ -68,7 +68,8 @@ impl<B: DataSyncBackend> NodeStore<B> {
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect::<HashMap<String, Value>>();
 
-        Ok(Document::new(fields))
+        // Use the config's id as the document ID to enable proper updates
+        Ok(Document::with_id(&config.id, fields))
     }
 
     /// Convert Document to NodeConfig
@@ -90,7 +91,8 @@ impl<B: DataSyncBackend> NodeStore<B> {
         // Add node_id field for querying
         fields.insert("node_id".to_string(), Value::String(node_id.to_string()));
 
-        Ok(Document::new(fields))
+        // Use the node_id as the document ID to enable proper updates
+        Ok(Document::with_id(node_id, fields))
     }
 
     /// Convert Document to NodeState
