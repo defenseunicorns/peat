@@ -49,3 +49,11 @@ criterion = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }
 tempfile = "3.13"
 serial_test = "3.1"  # Force serial execution of Ditto-based E2E tests
+
+[[bench]]
+name = "backend_comparison"
+harness = false
+
+[[bench]]
+name = "cap_benchmarks"
+harness = false
