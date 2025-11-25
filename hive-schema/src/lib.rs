@@ -113,6 +113,12 @@ pub mod cap {
             include!(concat!(env!("OUT_DIR"), "/cap.command.v1.rs"));
         }
     }
+
+    pub mod security {
+        pub mod v1 {
+            include!(concat!(env!("OUT_DIR"), "/cap.security.v1.rs"));
+        }
+    }
 }
 
 // Re-export for convenience

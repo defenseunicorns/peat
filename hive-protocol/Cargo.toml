@@ -27,6 +27,11 @@ tempfile = "3.13"
 base64 = "0.22"
 prost = "0.13"
 
+# Security/Crypto dependencies (ADR-006)
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+sha2 = "0.10"
+rand_core = { version = "0.6", features = ["getrandom"] }
+
 # CRDT Backends (E8 Evaluation - ADR-007)
 automerge = { version = "0.7.1", optional = true }  # Automerge CRDT library for evaluation
 

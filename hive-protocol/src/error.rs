@@ -114,6 +114,10 @@ pub enum Error {
     /// Command conflict detected
     #[error("Command conflict detected: {0}")]
     ConflictDetected(String),
+
+    /// Security/Authentication errors
+    #[error("Security error: {0}")]
+    Security(String),
 }
 
 impl Error {
