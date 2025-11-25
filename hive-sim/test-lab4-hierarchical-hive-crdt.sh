@@ -32,7 +32,8 @@ validate_environment
 mkdir -p "${RESULTS_DIR}/logs"
 
 # CSV header with hierarchical metrics
-echo "NodeCount,Bandwidth,Topology,Soldier_P50_ms,Soldier_P95_ms,Squad_P50_ms,Squad_P95_ms,Platoon_P50_ms,Platoon_P95_ms,Aggregation_Ratio,Total_Operations,Status" > "$RESULTS_CSV"
+# Note: Latencies are CROSS-TIER PROPAGATION times (network sync), not local processing
+echo "NodeCount,Bandwidth,Topology,Soldier_to_Squad_P50_ms,Soldier_to_Squad_P95_ms,Squad_to_Platoon_P50_ms,Squad_to_Platoon_P95_ms,Aggregation_Ratio,Total_Operations,Status" > "$RESULTS_CSV"
 
 TOTAL_TESTS=$((${#NODE_COUNTS[@]} * ${#BANDWIDTHS[@]}))
 CURRENT_TEST=0
@@ -134,52 +135,49 @@ for NODE_COUNT in "${NODE_COUNTS[@]}"; do
             docker logs "$CONTAINER" 2>&1 > "${LOG_DIR}/${LEADER_NAME}.log"
         done
 
-        # Extract metrics from METRICS: JSON logs
-        SOLDIER_P50=0
-        SOLDIER_P95=0
-        SQUAD_P50=0
-        SQUAD_P95=0
-        PLATOON_P50=0
-        PLATOON_P95=0
+        # Extract CROSS-TIER PROPAGATION latencies from DocumentReceived events
+        # These measure actual network sync time, not local processing
+        SOLDIER_TO_SQUAD_P50=0
+        SOLDIER_TO_SQUAD_P95=0
+        SQUAD_TO_PLATOON_P50=0
+        SQUAD_TO_PLATOON_P95=0
         AGGREGATION_RATIO=0
         TOTAL_OPS=0
         STATUS="PASS"
 
-        # Parse soldier-level CRDT latencies
-        # Note: Soldiers emit MessageSent events, not aggregation metrics
-        # We'll skip soldier metrics for now as they're not critical for hierarchy analysis
-        SOLDIER_P50=0
-        SOLDIER_P95=0
-
-        # Parse squad leader aggregation latencies from AggregationCompleted events
+        # Parse Soldier → Squad propagation latency
+        # Squad leaders receive soldier NodeState documents via CRDT sync
+        # Look for DocumentReceived events in squad leader logs for sim_doc_ documents
         cat "${LOG_DIR}"/*squad*leader*.log 2>/dev/null | \
             grep 'METRICS:' | \
-            grep '"event_type":"AggregationCompleted"' | \
-            grep '"tier":"squad"' | \
-            sed 's/.*"processing_time_us":\([0-9.]*\).*/\1/' | \
-            awk '{print $1/1000}' | \
-            sort -n > /tmp/squad_lat_$$.txt || true
+            grep '"event_type":"DocumentReceived"' | \
+            grep -v '"latency_type":"creation"' | \
+            grep 'sim_doc_' | \
+            sed 's/.*"latency_ms":\([0-9.]*\).*/\1/' | \
+            sort -n > /tmp/soldier_to_squad_lat_$$.txt || true
 
-        if [ -s /tmp/squad_lat_$$.txt ]; then
-            SQUAD_P50=$(awk 'BEGIN{c=0} {a[c++]=$1} END{print a[int(c*0.5)]}' /tmp/squad_lat_$$.txt)
-            SQUAD_P95=$(awk 'BEGIN{c=0} {a[c++]=$1} END{print a[int(c*0.95)]}' /tmp/squad_lat_$$.txt)
+        if [ -s /tmp/soldier_to_squad_lat_$$.txt ]; then
+            SOLDIER_TO_SQUAD_P50=$(awk 'BEGIN{c=0} {a[c++]=$1} END{if(c>0) print a[int(c*0.5)]; else print 0}' /tmp/soldier_to_squad_lat_$$.txt)
+            SOLDIER_TO_SQUAD_P95=$(awk 'BEGIN{c=0} {a[c++]=$1} END{if(c>0) print a[int(c*0.95)]; else print 0}' /tmp/soldier_to_squad_lat_$$.txt)
         fi
-        rm -f /tmp/squad_lat_$$.txt
+        rm -f /tmp/soldier_to_squad_lat_$$.txt
 
-        # Parse platoon leader aggregation latencies from AggregationCompleted events
+        # Parse Squad → Platoon propagation latency
+        # Platoon leaders receive SquadSummary documents via CRDT sync
+        # Look for DocumentReceived events in platoon leader logs for squad-*-summary documents
         cat "${LOG_DIR}"/*platoon*leader*.log 2>/dev/null | \
             grep 'METRICS:' | \
-            grep '"event_type":"AggregationCompleted"' | \
-            grep '"tier":"platoon"' | \
-            sed 's/.*"processing_time_us":\([0-9.]*\).*/\1/' | \
-            awk '{print $1/1000}' | \
-            sort -n > /tmp/platoon_lat_$$.txt || true
+            grep '"event_type":"DocumentReceived"' | \
+            grep -v '"latency_type":"creation"' | \
+            grep 'squad-.*-summary' | \
+            sed 's/.*"latency_ms":\([0-9.]*\).*/\1/' | \
+            sort -n > /tmp/squad_to_platoon_lat_$$.txt || true
 
-        if [ -s /tmp/platoon_lat_$$.txt ]; then
-            PLATOON_P50=$(awk 'BEGIN{c=0} {a[c++]=$1} END{print a[int(c*0.5)]}' /tmp/platoon_lat_$$.txt)
-            PLATOON_P95=$(awk 'BEGIN{c=0} {a[c++]=$1} END{print a[int(c*0.95)]}' /tmp/platoon_lat_$$.txt)
+        if [ -s /tmp/squad_to_platoon_lat_$$.txt ]; then
+            SQUAD_TO_PLATOON_P50=$(awk 'BEGIN{c=0} {a[c++]=$1} END{if(c>0) print a[int(c*0.5)]; else print 0}' /tmp/squad_to_platoon_lat_$$.txt)
+            SQUAD_TO_PLATOON_P95=$(awk 'BEGIN{c=0} {a[c++]=$1} END{if(c>0) print a[int(c*0.95)]; else print 0}' /tmp/squad_to_platoon_lat_$$.txt)
         fi
-        rm -f /tmp/platoon_lat_$$.txt
+        rm -f /tmp/squad_to_platoon_lat_$$.txt
 
         # Calculate aggregation efficiency from input_count in AggregationCompleted events
         cat "${LOG_DIR}"/*squad*leader*.log 2>/dev/null | \
@@ -198,15 +196,15 @@ for NODE_COUNT in "${NODE_COUNTS[@]}"; do
         TOTAL_OPS=$(cat "${LOG_DIR}"/*.log 2>/dev/null | grep -c 'METRICS:' || echo "0")
 
         # Determine status based on whether we got metrics
-        if [ "$SOLDIER_P50" = "0" ] && [ "$SQUAD_P50" = "0" ]; then
+        if [ "$SQUAD_TO_PLATOON_P50" = "0" ] && [ "$SOLDIER_TO_SQUAD_P50" = "0" ]; then
             STATUS="WARN"
-            echo "    ⚠️  No metrics collected"
+            echo "    ⚠️  No propagation metrics collected"
         else
-            echo "    ✅ PASS (Soldier P95: ${SOLDIER_P95}ms, Squad P95: ${SQUAD_P95}ms)"
+            echo "    ✅ PASS (Soldier→Squad P95: ${SOLDIER_TO_SQUAD_P95}ms, Squad→Platoon P95: ${SQUAD_TO_PLATOON_P95}ms)"
         fi
 
         # Write results
-        echo "${NODE_COUNT},${BANDWIDTH},${TOPOLOGY},${SOLDIER_P50},${SOLDIER_P95},${SQUAD_P50},${SQUAD_P95},${PLATOON_P50},${PLATOON_P95},${AGGREGATION_RATIO},${TOTAL_OPS},${STATUS}" >> "$RESULTS_CSV"
+        echo "${NODE_COUNT},${BANDWIDTH},${TOPOLOGY},${SOLDIER_TO_SQUAD_P50},${SOLDIER_TO_SQUAD_P95},${SQUAD_TO_PLATOON_P50},${SQUAD_TO_PLATOON_P95},${AGGREGATION_RATIO},${TOTAL_OPS},${STATUS}" >> "$RESULTS_CSV"
 
         # Cleanup
         containerlab destroy -t "$TOPO_FILE" --cleanup > /dev/null 2>&1 || true
@@ -230,10 +228,11 @@ echo "Lab 4 tests hierarchical topology WITH HIVE CRDT"
 echo "Compare to Lab 3b (flat mesh) to measure hierarchy scaling benefit"
 echo ""
 echo "Analysis:"
-echo "  - Soldier tier: Edge node CRDT performance"
-echo "  - Squad tier: First-level aggregation (N soldiers → 1 summary)"
-echo "  - Platoon tier: Second-level aggregation (N squads → 1 summary)"
+echo "  - Soldier→Squad latency: Cross-tier CRDT propagation from soldier to squad leader"
+echo "  - Squad→Platoon latency: Cross-tier CRDT propagation from squad to platoon leader"
 echo "  - Aggregation ratio: Documents reduced at each tier"
+echo ""
+echo "Note: Latencies are NETWORK PROPAGATION times (actual sync delay), not local processing"
 echo ""
 
 # Generate comparison if Lab 3b results exist
