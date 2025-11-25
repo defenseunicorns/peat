@@ -616,6 +616,17 @@ impl EncryptionManager {
 
 Security must integrate with the abstraction layer from ADR-005.
 
+**Critical Requirement**: Following the Ports & Adapters pattern from ADR-005/ADR-011, the security layer **must be backend-agnostic**. The HIVE Protocol API should work identically regardless of whether Ditto or AutomergeIroh is the underlying backend.
+
+#### Backend Implementation Notes
+
+| Backend | Security Integration |
+|---------|---------------------|
+| **Ditto** | Ditto has built-in APP ID/license authentication. Our PKI layer adds device identity verification on top of Ditto's mesh authentication. |
+| **AutomergeIroh** | Iroh uses QUIC/TLS 1.3 for transport encryption. We integrate PKI certificate validation with Iroh's connection establishment. |
+
+The `SecurityManager` trait abstracts these differences, allowing protocol code to remain backend-agnostic:
+
 ```rust
 /// Extend DataSyncBackend trait with security
 pub trait SecureDataSyncBackend: DataSyncBackend {
