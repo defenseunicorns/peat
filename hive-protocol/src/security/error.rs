@@ -52,6 +52,30 @@ pub enum SecurityError {
     /// Peer not found
     #[error("peer not found: {0}")]
     PeerNotFound(String),
+
+    /// Permission denied for operation
+    #[error("permission denied: {permission} for entity {entity_id} with roles [{roles:?}]")]
+    PermissionDenied {
+        permission: String,
+        entity_id: String,
+        roles: Vec<String>,
+    },
+
+    /// Certificate validation failed
+    #[error("certificate error: {0}")]
+    CertificateError(String),
+
+    /// Certificate chain invalid
+    #[error("invalid certificate chain: {0}")]
+    InvalidCertificateChain(String),
+
+    /// Certificate expired
+    #[error("certificate expired: {0}")]
+    CertificateExpired(String),
+
+    /// Certificate revoked
+    #[error("certificate revoked: {0}")]
+    CertificateRevoked(String),
 }
 
 impl SecurityError {
@@ -70,6 +94,11 @@ impl SecurityError {
             SecurityError::SerializationError(_) => "SERIALIZATION_ERROR",
             SecurityError::Internal(_) => "INTERNAL_ERROR",
             SecurityError::PeerNotFound(_) => "PEER_NOT_FOUND",
+            SecurityError::PermissionDenied { .. } => "PERMISSION_DENIED",
+            SecurityError::CertificateError(_) => "CERTIFICATE_ERROR",
+            SecurityError::InvalidCertificateChain(_) => "INVALID_CERT_CHAIN",
+            SecurityError::CertificateExpired(_) => "CERTIFICATE_EXPIRED",
+            SecurityError::CertificateRevoked(_) => "CERTIFICATE_REVOKED",
         }
     }
 
