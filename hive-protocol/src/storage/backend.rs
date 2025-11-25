@@ -165,31 +165,55 @@ pub fn create_storage_backend(config: &StorageConfig) -> Result<Arc<dyn StorageB
 
     match config.backend.as_str() {
         "ditto" => {
-            // Import DittoStore (existing implementation)
+            // Import DittoStore and DittoBackend
+            use crate::storage::ditto_backend::DittoBackend;
             use crate::storage::ditto_store::DittoStore;
 
             // Create DittoStore from environment (loads config internally)
-            let _ditto = DittoStore::from_env()
+            let ditto_store = DittoStore::from_env()
                 .context("Failed to create Ditto backend from environment")?;
 
-            // Wrap in Arc (we'll create DittoBackend trait wrapper in Day 2)
-            // For now, this won't compile - placeholder for Day 2 work
-            todo!("DittoBackend trait wrapper not yet implemented (Day 2)")
+            // Wrap in DittoBackend trait adapter
+            let backend = DittoBackend::new(Arc::new(ditto_store));
+
+            Ok(Arc::new(backend))
         }
         "automerge-memory" => {
-            // Will implement in E11.2 Week 2 (after RocksDB)
-            Err(anyhow!(
-                "Automerge in-memory backend not yet implemented.\n\
-                 This will be available in E11.2 Week 2.\n\
-                 For now, use CAP_STORAGE_BACKEND=ditto"
-            ))
+            #[cfg(feature = "automerge-backend")]
+            {
+                use crate::storage::automerge_backend::AutomergeBackend;
+                use crate::storage::automerge_store::AutomergeStore;
+
+                // Determine storage path (use data_path if provided, otherwise temp)
+                let path = config.data_path.as_deref().ok_or_else(|| {
+                    anyhow!("Automerge backend requires CAP_DATA_PATH to be set for persistence")
+                })?;
+
+                // Create AutomergeStore with persistence
+                let automerge_store =
+                    AutomergeStore::open(path).context("Failed to create Automerge backend")?;
+
+                // Wrap in AutomergeBackend trait adapter (without transport for now)
+                let backend = AutomergeBackend::new(Arc::new(automerge_store));
+
+                Ok(Arc::new(backend))
+            }
+            #[cfg(not(feature = "automerge-backend"))]
+            {
+                Err(anyhow!(
+                    "Automerge backend not enabled.\n\
+                     Rebuild with --features automerge-backend to use this backend.\n\
+                     For now, use CAP_STORAGE_BACKEND=ditto"
+                ))
+            }
         }
         "rocksdb" => {
-            // Will implement in E11.2 Week 2
+            // RocksDB is used internally by automerge-backend
+            // There's no standalone RocksDB backend - use automerge-memory instead
             Err(anyhow!(
-                "RocksDB backend not yet implemented.\n\
-                 This will be available in E11.2 Week 2.\n\
-                 For now, use CAP_STORAGE_BACKEND=ditto"
+                "Direct RocksDB backend not available.\n\
+                 Use CAP_STORAGE_BACKEND=automerge-memory for RocksDB-backed storage,\n\
+                 or CAP_STORAGE_BACKEND=ditto for production use."
             ))
         }
         other => Err(anyhow!(
@@ -263,7 +287,7 @@ mod tests {
     }
 
     #[test]
-    fn test_create_backend_automerge_not_implemented() {
+    fn test_create_backend_automerge_requires_data_path() {
         let config = StorageConfig {
             backend: "automerge-memory".to_string(),
             data_path: None,
@@ -271,13 +295,16 @@ mod tests {
         let result = create_storage_backend(&config);
         assert!(result.is_err());
         match result {
-            Err(e) => assert!(e.to_string().contains("not yet implemented")),
+            #[cfg(feature = "automerge-backend")]
+            Err(e) => assert!(e.to_string().contains("CAP_DATA_PATH")),
+            #[cfg(not(feature = "automerge-backend"))]
+            Err(e) => assert!(e.to_string().contains("not enabled")),
             Ok(_) => panic!("Expected error but got Ok"),
         }
     }
 
     #[test]
-    fn test_create_backend_rocksdb_not_implemented() {
+    fn test_create_backend_rocksdb_not_available() {
         let config = StorageConfig {
             backend: "rocksdb".to_string(),
             data_path: Some(PathBuf::from("/tmp/test")),
@@ -285,7 +312,7 @@ mod tests {
         let result = create_storage_backend(&config);
         assert!(result.is_err());
         match result {
-            Err(e) => assert!(e.to_string().contains("not yet implemented")),
+            Err(e) => assert!(e.to_string().contains("not available")),
             Ok(_) => panic!("Expected error but got Ok"),
         }
     }

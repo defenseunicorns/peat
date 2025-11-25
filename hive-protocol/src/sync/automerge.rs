@@ -11,7 +11,7 @@
 //!
 //! # Example
 //!
-//! ```ignore
+//! ```text
 //! use hive_protocol::sync::automerge::AutomergeBackend;
 //! use hive_protocol::sync::traits::*;
 //! use hive_protocol::sync::types::*;

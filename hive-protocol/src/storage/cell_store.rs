@@ -49,19 +49,21 @@ impl<B: DataSyncBackend> CellStore<B> {
     /// Convert CellState to Document
     fn cell_to_document(cell: &CellState) -> Result<Document> {
         let json_val = serde_json::to_value(cell)?;
-        let fields = json_val
+        let mut fields = json_val
             .as_object()
             .ok_or_else(|| Error::Internal("Failed to serialize cell to object".into()))?
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect::<HashMap<String, Value>>();
 
-        let mut doc = Document::new(fields);
         // Add cell_id field for querying
         if let Some(id) = cell.get_id() {
-            doc.set("cell_id".to_string(), Value::String(id.to_string()));
+            fields.insert("cell_id".to_string(), Value::String(id.to_string()));
+            // Use cell_id as document ID to enable proper updates
+            Ok(Document::with_id(id, fields))
+        } else {
+            Ok(Document::new(fields))
         }
-        Ok(doc)
     }
 
     /// Convert Document to CellState
@@ -396,15 +398,16 @@ mod tests {
             }
         };
 
-        // Create a valid cell (meets minimum size)
-        let config = CellConfig::new(5);
-        let mut valid_cell = CellState::new(config.clone());
+        // Create a valid cell (meets minimum size) with unique config
+        let valid_config = CellConfig::new(5);
+        let mut valid_cell = CellState::new(valid_config);
         valid_cell.add_member("node_1".to_string());
         valid_cell.add_member("node_2".to_string());
         store.store_cell(&valid_cell).await.unwrap();
 
-        // Create an invalid cell (too few members)
-        let invalid_cell = CellState::new(config);
+        // Create an invalid cell (too few members) with separate unique config
+        let invalid_config = CellConfig::new(5);
+        let invalid_cell = CellState::new(invalid_config);
         // Don't add any members - will be invalid
         store.store_cell(&invalid_cell).await.unwrap();
 
@@ -425,12 +428,14 @@ mod tests {
             }
         };
 
-        let config = CellConfig::new(5);
-        let mut cell1 = CellState::new(config.clone());
+        // Each cell needs its own config to have unique IDs
+        let config1 = CellConfig::new(5);
+        let mut cell1 = CellState::new(config1);
         cell1.platoon_id = Some("platoon_alpha".to_string());
         store.store_cell(&cell1).await.unwrap();
 
-        let mut cell2 = CellState::new(config);
+        let config2 = CellConfig::new(5);
+        let mut cell2 = CellState::new(config2);
         cell2.platoon_id = Some("platoon_beta".to_string());
         store.store_cell(&cell2).await.unwrap();
 
@@ -451,8 +456,9 @@ mod tests {
             }
         };
 
-        let config = CellConfig::new(5);
-        let mut cell_with_sensor = CellState::new(config.clone());
+        // Each cell needs its own config to have unique IDs
+        let config1 = CellConfig::new(5);
+        let mut cell_with_sensor = CellState::new(config1);
         cell_with_sensor.add_capability(Capability::new(
             "sensor1".to_string(),
             "EO/IR".to_string(),
@@ -461,7 +467,8 @@ mod tests {
         ));
         store.store_cell(&cell_with_sensor).await.unwrap();
 
-        let mut cell_with_comms = CellState::new(config);
+        let config2 = CellConfig::new(5);
+        let mut cell_with_comms = CellState::new(config2);
         cell_with_comms.add_capability(Capability::new(
             "radio1".to_string(),
             "Radio".to_string(),
@@ -490,14 +497,15 @@ mod tests {
             }
         };
 
-        // Create an available cell (not full)
-        let config = CellConfig::new(5);
-        let mut available_cell = CellState::new(config.clone());
+        // Create an available cell (not full) with unique config
+        let config1 = CellConfig::new(5);
+        let mut available_cell = CellState::new(config1);
         available_cell.add_member("node_1".to_string());
         store.store_cell(&available_cell).await.unwrap();
 
-        // Create a full cell
-        let mut full_cell = CellState::new(config);
+        // Create a full cell with separate unique config
+        let config2 = CellConfig::new(5);
+        let mut full_cell = CellState::new(config2);
         for i in 0..5 {
             full_cell.add_member(format!("node_{}", i));
         }
