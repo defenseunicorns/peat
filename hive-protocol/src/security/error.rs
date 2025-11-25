@@ -125,6 +125,27 @@ pub enum SecurityError {
     /// TOTP generation/verification error
     #[error("TOTP error: {message}")]
     TotpError { message: String },
+
+    // Encryption errors (Phase 4: Encryption & Audit)
+    /// Encryption operation failed
+    #[error("encryption error: {0}")]
+    EncryptionError(String),
+
+    /// Decryption operation failed
+    #[error("decryption error: {0}")]
+    DecryptionError(String),
+
+    /// Key exchange failed
+    #[error("key exchange error: {0}")]
+    KeyExchangeError(String),
+
+    /// No group key for cell
+    #[error("no group key for cell: {cell_id}")]
+    NoGroupKey { cell_id: String },
+
+    /// Key generation mismatch
+    #[error("key generation mismatch: expected {expected}, got {actual}")]
+    KeyGenerationMismatch { expected: u64, actual: u64 },
 }
 
 impl SecurityError {
@@ -161,6 +182,12 @@ impl SecurityError {
             SecurityError::UnsupportedAuthMethod { .. } => "UNSUPPORTED_AUTH",
             SecurityError::PasswordHashError { .. } => "PASSWORD_HASH_ERROR",
             SecurityError::TotpError { .. } => "TOTP_ERROR",
+            // Encryption errors
+            SecurityError::EncryptionError(_) => "ENCRYPTION_ERROR",
+            SecurityError::DecryptionError(_) => "DECRYPTION_ERROR",
+            SecurityError::KeyExchangeError(_) => "KEY_EXCHANGE_ERROR",
+            SecurityError::NoGroupKey { .. } => "NO_GROUP_KEY",
+            SecurityError::KeyGenerationMismatch { .. } => "KEY_GENERATION_MISMATCH",
         }
     }
 
