@@ -35,14 +35,20 @@
 //! let peer_id = authenticator.verify_response(&response)?;
 //! ```
 
+mod audit;
 mod authenticator;
 mod authorization;
 mod device_id;
+mod encryption;
 mod error;
 mod keypair;
 mod transport;
 mod user_auth;
 
+pub use audit::{
+    AuditEventType, AuditLogEntry, AuditLogger, FileAuditLogger, MemoryAuditLogger,
+    NullAuditLogger, SecurityViolation,
+};
 pub use authenticator::{DeviceAuthenticator, VerifiedPeer};
 pub use authorization::{
     AuthenticatedEntity, AuthorizationContext, AuthorizationController, AuthorizationPolicy,
@@ -50,6 +56,10 @@ pub use authorization::{
     UserIdentityInfo,
 };
 pub use device_id::DeviceId;
+pub use encryption::{
+    EncryptedCellMessage, EncryptedData, EncryptedDocument, EncryptionKeypair, EncryptionManager,
+    GroupKey, SecureChannel, SymmetricKey, NONCE_SIZE, SYMMETRIC_KEY_SIZE, X25519_PUBLIC_KEY_SIZE,
+};
 pub use error::SecurityError;
 pub use keypair::DeviceKeypair;
 pub use transport::{AuthenticatedConnection, AuthenticationChannel, SecureMeshTransport};

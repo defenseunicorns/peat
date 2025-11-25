@@ -33,6 +33,10 @@ sha2 = "0.10"
 rand_core = { version = "0.6", features = ["getrandom"] }
 argon2 = "0.5"  # Password hashing (Phase 3: User Auth)
 hmac = "0.12"   # TOTP implementation (Phase 3: User Auth)
+# Encryption (Phase 4: Encryption & Audit)
+chacha20poly1305 = "0.10"  # AEAD encryption (ChaCha20-Poly1305)
+x25519-dalek = { version = "2", features = ["static_secrets"] }  # X25519 key exchange
+hkdf = "0.12"              # HKDF key derivation
 
 # CRDT Backends (E8 Evaluation - ADR-007)
 automerge = { version = "0.7.1", optional = true }  # Automerge CRDT library for evaluation
@@ -42,13 +46,13 @@ iroh = { version = "0.95", optional = true }  # QUIC-based P2P networking
 rocksdb = { version = "0.22", optional = true }  # Persistent storage
 lru = { version = "0.12", optional = true }  # LRU cache for hot documents
 toml = { version = "0.8", optional = true }  # Static peer configuration
-hex = { version = "0.4", optional = true }  # Hex encoding for PublicKeys
+hex = "0.4"  # Hex encoding for PublicKeys and encryption keys
 mdns-sd = { version = "0.11", optional = true }  # mDNS service discovery (ADR-011 Phase 3)
 rand = { version = "0.9", optional = true }  # Random number generation for retry jitter
 
 [features]
 default = []
-automerge-backend = ["automerge", "iroh", "rocksdb", "lru", "toml", "hex", "mdns-sd", "rand"]
+automerge-backend = ["automerge", "iroh", "rocksdb", "lru", "toml", "mdns-sd", "rand"]
 
 [dev-dependencies]
 proptest = { workspace = true }
