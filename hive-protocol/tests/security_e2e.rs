@@ -14,7 +14,8 @@
 
 use hive_protocol::security::{
     AuthenticatedEntity, AuthorizationContext, AuthorizationController, CellMembershipContext,
-    DeviceAuthenticator, DeviceKeypair, Permission,
+    DeviceAuthenticator, DeviceKeypair, LocalUserStore, MilitaryRank, OrganizationUnit, Permission,
+    Role, SecurityClearance, UserAuthenticator, UserIdentity,
 };
 use std::collections::HashSet;
 
@@ -429,4 +430,311 @@ fn test_permission_denied_error_details() {
         }
         _ => panic!("Expected PermissionDenied error"),
     }
+}
+
+// ============================================================================
+// User Authentication E2E Tests (Phase 3: #162)
+// ============================================================================
+
+/// Test: Human commander authenticates and approves cell formation
+#[test]
+fn test_commander_authentication_and_approval() {
+    // Setup: Create a local user store and authenticator
+    let store = LocalUserStore::new();
+    let authenticator = UserAuthenticator::new(Box::new(store));
+
+    // Register a mission commander
+    let commander_identity = UserIdentity::builder("alpha_6")
+        .display_name("CPT John Smith")
+        .rank(MilitaryRank::Captain)
+        .clearance(SecurityClearance::Secret)
+        .unit(OrganizationUnit::new("1st Plt", "A Co"))
+        .role(Role::Commander)
+        .build();
+
+    // Register the commander (returns TOTP secret for authenticator app)
+    let totp_secret = authenticator
+        .register_user("alpha_6", "tactical_password_123", commander_identity)
+        .expect("Should register commander");
+
+    println!("Commander registered. TOTP secret: {}", totp_secret);
+
+    // Authenticate the commander (using password-only for test)
+    let session = authenticator
+        .authenticate_password_only("alpha_6", "tactical_password_123")
+        .expect("Commander should authenticate");
+
+    println!("Commander authenticated. Session: {}", session.session_id);
+    println!(
+        "  Identity: {} ({})",
+        session.identity.display_name, session.identity.rank
+    );
+    println!("  Clearance: {}", session.identity.clearance);
+    println!("  Unit: {}", session.identity.unit);
+    assert!(!session.is_expired());
+
+    // Validate session
+    let validated_identity = authenticator
+        .validate_session(&session.session_id)
+        .expect("Session should be valid");
+    assert_eq!(validated_identity.username, "alpha_6");
+
+    // Check commander has approval permission
+    let controller = AuthorizationController::with_default_policy();
+    let mut roles = HashSet::new();
+    roles.insert(Role::Commander);
+
+    let commander_entity = AuthenticatedEntity::User(hive_protocol::security::UserIdentityInfo {
+        username: validated_identity.username.clone(),
+        roles,
+    });
+
+    let context = AuthorizationContext::for_cell("bravo-cell");
+
+    // Commander should be able to approve formation
+    let result =
+        controller.check_permission(&commander_entity, Permission::ApproveFormation, &context);
+    assert!(result.is_ok(), "Commander should approve cell formation");
+    println!("Commander approved formation for bravo-cell: ALLOWED");
+
+    // Commander should be able to veto commands
+    let result = controller.check_permission(&commander_entity, Permission::VetoCommand, &context);
+    assert!(result.is_ok(), "Commander should be able to veto");
+    println!("Commander veto capability: ALLOWED");
+
+    // Commander should be able to form platoons
+    let result = controller.check_permission(&commander_entity, Permission::FormPlatoon, &context);
+    assert!(result.is_ok(), "Commander should form platoons");
+    println!("Commander form platoon: ALLOWED");
+
+    // Commander should NOT have admin permissions
+    let result =
+        controller.check_permission(&commander_entity, Permission::ConfigureNetwork, &context);
+    assert!(result.is_err(), "Commander should NOT configure network");
+    println!("Commander configure network: DENIED (correct)");
+
+    println!("\nCommander authentication and approval scenario complete!");
+}
+
+/// Test: Multiple users with different roles and clearances
+#[test]
+fn test_multi_user_authorization_hierarchy() {
+    let store = LocalUserStore::new();
+    let authenticator = UserAuthenticator::new(Box::new(store));
+    let controller = AuthorizationController::with_default_policy();
+
+    // Register multiple users with different roles
+    let users = [
+        (
+            "cmd_alpha",
+            "commander_pass",
+            UserIdentity::builder("cmd_alpha")
+                .display_name("MAJ Williams")
+                .rank(MilitaryRank::Major)
+                .clearance(SecurityClearance::TopSecret)
+                .unit(OrganizationUnit::new("HQ", "Bn HQ"))
+                .role(Role::Commander)
+                .build(),
+        ),
+        (
+            "admin_ops",
+            "admin_pass",
+            UserIdentity::builder("admin_ops")
+                .display_name("SSG Martinez")
+                .rank(MilitaryRank::StaffSergeant)
+                .clearance(SecurityClearance::Secret)
+                .unit(OrganizationUnit::new("S6", "Bn HQ"))
+                .role(Role::Admin)
+                .build(),
+        ),
+        (
+            "observer_1",
+            "observer_pass",
+            UserIdentity::builder("observer_1")
+                .display_name("CIV Analyst")
+                .rank(MilitaryRank::Civilian)
+                .clearance(SecurityClearance::Secret)
+                .unit(OrganizationUnit::top_level("Contractor"))
+                .role(Role::Observer)
+                .build(),
+        ),
+    ];
+
+    // Register and authenticate all users
+    let mut sessions = Vec::new();
+    for (username, password, identity) in users {
+        authenticator
+            .register_user(username, password, identity)
+            .unwrap();
+        let session = authenticator
+            .authenticate_password_only(username, password)
+            .unwrap();
+        sessions.push(session);
+    }
+
+    assert_eq!(authenticator.active_session_count(), 3);
+    println!("Registered and authenticated 3 users");
+
+    let context = AuthorizationContext::for_cell("test-cell");
+
+    // Check permissions for each user
+    for session in &sessions {
+        let entity = AuthenticatedEntity::User(hive_protocol::security::UserIdentityInfo {
+            username: session.identity.username.clone(),
+            roles: session.identity.roles.clone(),
+        });
+
+        let can_approve = controller
+            .check_permission(&entity, Permission::ApproveFormation, &context)
+            .is_ok();
+        let can_admin = controller
+            .check_permission(&entity, Permission::ConfigureNetwork, &context)
+            .is_ok();
+        let can_read = controller
+            .check_permission(&entity, Permission::ReadCellState, &context)
+            .is_ok();
+
+        println!(
+            "User: {} ({}) - Approve: {}, Admin: {}, Read: {}",
+            session.identity.username,
+            session
+                .identity
+                .roles
+                .iter()
+                .next()
+                .unwrap_or(&Role::Observer),
+            can_approve,
+            can_admin,
+            can_read
+        );
+    }
+
+    // Verify expected permissions
+    // Commander can approve but not admin
+    let cmd_entity = AuthenticatedEntity::User(hive_protocol::security::UserIdentityInfo {
+        username: sessions[0].identity.username.clone(),
+        roles: sessions[0].identity.roles.clone(),
+    });
+    assert!(controller
+        .check_permission(&cmd_entity, Permission::ApproveFormation, &context)
+        .is_ok());
+    assert!(controller
+        .check_permission(&cmd_entity, Permission::ConfigureNetwork, &context)
+        .is_err());
+
+    // Admin can configure but not approve
+    let admin_entity = AuthenticatedEntity::User(hive_protocol::security::UserIdentityInfo {
+        username: sessions[1].identity.username.clone(),
+        roles: sessions[1].identity.roles.clone(),
+    });
+    assert!(controller
+        .check_permission(&admin_entity, Permission::ConfigureNetwork, &context)
+        .is_ok());
+    assert!(controller
+        .check_permission(&admin_entity, Permission::ApproveFormation, &context)
+        .is_err());
+
+    // Observer can only read
+    let obs_entity = AuthenticatedEntity::User(hive_protocol::security::UserIdentityInfo {
+        username: sessions[2].identity.username.clone(),
+        roles: sessions[2].identity.roles.clone(),
+    });
+    assert!(controller
+        .check_permission(&obs_entity, Permission::ReadCellState, &context)
+        .is_ok());
+    assert!(controller
+        .check_permission(&obs_entity, Permission::WriteCellState, &context)
+        .is_err());
+
+    println!("\nMulti-user authorization hierarchy test complete!");
+}
+
+/// Test: Session lifecycle management
+#[test]
+fn test_session_lifecycle() {
+    let store = LocalUserStore::new();
+    let authenticator = UserAuthenticator::new(Box::new(store));
+
+    // Register a user
+    let identity = UserIdentity::builder("session_test_user")
+        .rank(MilitaryRank::Sergeant)
+        .role(Role::Member)
+        .build();
+
+    authenticator
+        .register_user("session_test_user", "password123", identity)
+        .unwrap();
+
+    // Create multiple sessions
+    let session1 = authenticator
+        .authenticate_password_only("session_test_user", "password123")
+        .unwrap();
+    let session2 = authenticator
+        .authenticate_password_only("session_test_user", "password123")
+        .unwrap();
+
+    assert_eq!(authenticator.active_session_count(), 2);
+    assert_ne!(session1.session_id, session2.session_id);
+    println!("Created 2 sessions for same user");
+
+    // Validate both sessions
+    assert!(authenticator.validate_session(&session1.session_id).is_ok());
+    assert!(authenticator.validate_session(&session2.session_id).is_ok());
+
+    // Invalidate one session
+    authenticator.invalidate_session(&session1.session_id);
+    assert_eq!(authenticator.active_session_count(), 1);
+    assert!(authenticator
+        .validate_session(&session1.session_id)
+        .is_err());
+    assert!(authenticator.validate_session(&session2.session_id).is_ok());
+    println!("Invalidated session 1, session 2 still valid");
+
+    // Invalidate all sessions for user
+    authenticator.invalidate_user_sessions("session_test_user");
+    assert_eq!(authenticator.active_session_count(), 0);
+    println!("Invalidated all sessions for user");
+
+    println!("\nSession lifecycle test complete!");
+}
+
+/// Test: Bind user session to device
+#[test]
+fn test_user_session_device_binding() {
+    let store = LocalUserStore::new();
+    let authenticator = UserAuthenticator::new(Box::new(store));
+
+    // Register a user (operator using a C2 tablet)
+    let identity = UserIdentity::builder("tablet_operator")
+        .display_name("SGT Operator")
+        .rank(MilitaryRank::Sergeant)
+        .role(Role::Member)
+        .build();
+
+    authenticator
+        .register_user("tablet_operator", "password", identity)
+        .unwrap();
+
+    // Authenticate
+    let session = authenticator
+        .authenticate_password_only("tablet_operator", "password")
+        .unwrap();
+    assert!(session.device_id.is_none());
+    println!("User authenticated without device binding");
+
+    // Bind to a device (C2 tablet)
+    let tablet_keypair = DeviceKeypair::generate();
+    let tablet_id = tablet_keypair.device_id();
+
+    authenticator
+        .bind_session_to_device(&session.session_id, tablet_id)
+        .unwrap();
+
+    // Verify binding
+    let updated_session = authenticator.get_session(&session.session_id).unwrap();
+    assert!(updated_session.device_id.is_some());
+    assert_eq!(updated_session.device_id.unwrap(), tablet_id);
+    println!("Session bound to device: {}", tablet_id.to_hex());
+
+    println!("\nUser session device binding test complete!");
 }

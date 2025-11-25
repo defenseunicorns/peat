@@ -76,6 +76,55 @@ pub enum SecurityError {
     /// Certificate revoked
     #[error("certificate revoked: {0}")]
     CertificateRevoked(String),
+
+    // User Authentication errors (Phase 3)
+    /// User not found in database
+    #[error("user not found: {username}")]
+    UserNotFound { username: String },
+
+    /// User already exists
+    #[error("user already exists: {username}")]
+    UserAlreadyExists { username: String },
+
+    /// Invalid credential (wrong password)
+    #[error("invalid credential for user: {username}")]
+    InvalidCredential { username: String },
+
+    /// Invalid MFA code (TOTP)
+    #[error("invalid MFA code")]
+    InvalidMfaCode,
+
+    /// Account is locked (too many failed attempts)
+    #[error("account locked: {username}")]
+    AccountLocked { username: String },
+
+    /// Account is disabled by admin
+    #[error("account disabled: {username}")]
+    AccountDisabled { username: String },
+
+    /// Account is pending activation
+    #[error("account pending activation: {username}")]
+    AccountPending { username: String },
+
+    /// Session not found
+    #[error("session not found")]
+    SessionNotFound,
+
+    /// Session expired
+    #[error("session expired")]
+    SessionExpired,
+
+    /// Unsupported authentication method
+    #[error("unsupported auth method: {method}")]
+    UnsupportedAuthMethod { method: String },
+
+    /// Password hashing error
+    #[error("password hash error: {message}")]
+    PasswordHashError { message: String },
+
+    /// TOTP generation/verification error
+    #[error("TOTP error: {message}")]
+    TotpError { message: String },
 }
 
 impl SecurityError {
@@ -99,6 +148,19 @@ impl SecurityError {
             SecurityError::InvalidCertificateChain(_) => "INVALID_CERT_CHAIN",
             SecurityError::CertificateExpired(_) => "CERTIFICATE_EXPIRED",
             SecurityError::CertificateRevoked(_) => "CERTIFICATE_REVOKED",
+            // User auth errors
+            SecurityError::UserNotFound { .. } => "USER_NOT_FOUND",
+            SecurityError::UserAlreadyExists { .. } => "USER_EXISTS",
+            SecurityError::InvalidCredential { .. } => "INVALID_CREDENTIAL",
+            SecurityError::InvalidMfaCode => "INVALID_MFA",
+            SecurityError::AccountLocked { .. } => "ACCOUNT_LOCKED",
+            SecurityError::AccountDisabled { .. } => "ACCOUNT_DISABLED",
+            SecurityError::AccountPending { .. } => "ACCOUNT_PENDING",
+            SecurityError::SessionNotFound => "SESSION_NOT_FOUND",
+            SecurityError::SessionExpired => "SESSION_EXPIRED",
+            SecurityError::UnsupportedAuthMethod { .. } => "UNSUPPORTED_AUTH",
+            SecurityError::PasswordHashError { .. } => "PASSWORD_HASH_ERROR",
+            SecurityError::TotpError { .. } => "TOTP_ERROR",
         }
     }
 

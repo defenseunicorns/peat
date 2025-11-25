@@ -41,6 +41,7 @@ mod device_id;
 mod error;
 mod keypair;
 mod transport;
+mod user_auth;
 
 pub use authenticator::{DeviceAuthenticator, VerifiedPeer};
 pub use authorization::{
@@ -52,6 +53,11 @@ pub use device_id::DeviceId;
 pub use error::SecurityError;
 pub use keypair::DeviceKeypair;
 pub use transport::{AuthenticatedConnection, AuthenticationChannel, SecureMeshTransport};
+pub use user_auth::{
+    AccountStatus, AuthMethod, Credential, LocalUserStore, MilitaryRank, OrganizationUnit,
+    SecurityClearance, SessionId, UserAuthenticator, UserIdentity, UserIdentityBuilder, UserRecord,
+    UserSession, UserStore,
+};
 
 // Re-export protobuf types for convenience
 pub use hive_schema::security::v1::{
