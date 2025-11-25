@@ -738,8 +738,9 @@ async fn platoon_leader_aggregation_loop(
         vec!["squad-alpha".to_string(), "squad-bravo".to_string()]
     };
 
-    // Track unique document receptions by timestamp (for metrics deduplication)
-    let mut test_doc_timestamps = HashSet::new();
+    // Track unique document receptions by (doc_id, last_modified_us) for metrics deduplication
+    // Using last_modified_us instead of created_at_us because created_at_us is immutable
+    let mut seen_doc_updates: HashSet<(String, u128)> = HashSet::new();
 
     // Helper function to perform aggregation (called when squad summaries change)
     let do_aggregation = |coordinator: Arc<HierarchicalAggregator>,
@@ -891,8 +892,11 @@ async fn platoon_leader_aggregation_loop(
                                         0
                                     };
 
+                                    // Note: Storage writes "last_update_us", so check that first
                                     let last_modified_us =
-                                        if let Some(ts) = doc.get("last_modified_us") {
+                                        if let Some(ts) = doc.get("last_update_us") {
+                                            ts.as_u64().unwrap_or(0) as u128
+                                        } else if let Some(ts) = doc.get("last_modified_us") {
                                             ts.as_u64().unwrap_or(0) as u128
                                         } else {
                                             created_at_us
@@ -904,14 +908,22 @@ async fn platoon_leader_aggregation_loop(
                                         1
                                     };
 
-                                    if created_at_us > 0
-                                        && !test_doc_timestamps.contains(&created_at_us)
+                                    // Track by (doc_id, last_modified_us) to catch each unique update
+                                    let update_key = (doc_id.clone(), last_modified_us);
+                                    if last_modified_us > 0
+                                        && !seen_doc_updates.contains(&update_key)
                                     {
-                                        test_doc_timestamps.insert(created_at_us);
+                                        seen_doc_updates.insert(update_key);
 
-                                        // This is Initial event, so it's always first reception
+                                        // For Initial events, determine if this is truly first reception
+                                        // by checking if we've seen this doc_id before with ANY timestamp
+                                        let is_first = !seen_doc_updates.iter().any(|(id, ts)| {
+                                            id.as_str() == doc_id && *ts != last_modified_us
+                                        });
+
+                                        // Calculate latency from last_modified for accurate propagation measurement
                                         let latency_us =
-                                            received_at_us.saturating_sub(created_at_us);
+                                            received_at_us.saturating_sub(last_modified_us);
                                         let latency_ms = latency_us as f64 / 1000.0;
 
                                         println!(
@@ -928,8 +940,12 @@ async fn platoon_leader_aggregation_loop(
                                             latency_us,
                                             latency_ms,
                                             version,
-                                            is_first_reception: true,
-                                            latency_type: "creation".to_string(),
+                                            is_first_reception: is_first,
+                                            latency_type: if is_first {
+                                                "creation".to_string()
+                                            } else {
+                                                "update".to_string()
+                                            },
                                         });
 
                                         // EVENT-DRIVEN: Aggregate immediately when squad summary arrives
@@ -969,8 +985,11 @@ async fn platoon_leader_aggregation_loop(
                                     0
                                 };
 
+                                // Note: Storage writes "last_update_us", so check that first
                                 let last_modified_us =
-                                    if let Some(ts) = document.get("last_modified_us") {
+                                    if let Some(ts) = document.get("last_update_us") {
+                                        ts.as_u64().unwrap_or(0) as u128
+                                    } else if let Some(ts) = document.get("last_modified_us") {
                                         ts.as_u64().unwrap_or(0) as u128
                                     } else {
                                         created_at_us
@@ -982,12 +1001,12 @@ async fn platoon_leader_aggregation_loop(
                                     1
                                 };
 
-                                if created_at_us > 0
-                                    && !test_doc_timestamps.contains(&created_at_us)
-                                {
-                                    test_doc_timestamps.insert(created_at_us);
+                                // Track by (doc_id, last_modified_us) to catch each unique update
+                                let update_key = (doc_id.clone(), last_modified_us);
+                                if last_modified_us > 0 && !seen_doc_updates.contains(&update_key) {
+                                    seen_doc_updates.insert(update_key);
 
-                                    // Assume update since this is ChangeEvent::Updated
+                                    // This is ChangeEvent::Updated, so it's always an update
                                     let latency_us =
                                         received_at_us.saturating_sub(last_modified_us);
                                     let latency_ms = latency_us as f64 / 1000.0;
@@ -2416,7 +2435,10 @@ async fn process_document(
         0
     };
 
-    let last_modified_us = if let Some(ts) = doc.get("last_modified_us") {
+    // Note: Storage writes "last_update_us", so check that first
+    let last_modified_us = if let Some(ts) = doc.get("last_update_us") {
+        ts.as_u64().unwrap_or(0) as u128
+    } else if let Some(ts) = doc.get("last_modified_us") {
         ts.as_u64().unwrap_or(0) as u128
     } else {
         created_at_us

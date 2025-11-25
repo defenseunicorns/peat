@@ -63,6 +63,18 @@ def generate_lab4_topology(name, total_nodes, bandwidth):
 
     actual_total = soldiers + squad_leaders + platoon_leaders + company_commanders
 
+    # Determine subnet size based on node count
+    # /24 = 254 hosts, /20 = 4094 hosts, /16 = 65534 hosts
+    if actual_total > 4000:
+        subnet = "172.30.0.0/16"
+        ipv6_subnet = "3fff:172:30::/48"
+    elif actual_total > 250:
+        subnet = "172.30.0.0/20"
+        ipv6_subnet = "3fff:172:30::/52"
+    else:
+        subnet = "172.20.20.0/24"
+        ipv6_subnet = "3fff:172:20:20::/64"
+
     lines = [
         f"# Lab 4: Hierarchical HIVE CRDT - {name}",
         f"# Target nodes: {total_nodes}, Actual: {actual_total}",
@@ -70,6 +82,11 @@ def generate_lab4_topology(name, total_nodes, bandwidth):
         f"# Bandwidth: {bandwidth}",
         "",
         f"name: {name}",
+        "",
+        "mgmt:",
+        f"  network: {name}",
+        f"  ipv4-subnet: {subnet}",
+        f"  ipv6-subnet: {ipv6_subnet}",
         "",
         "topology:",
         "  nodes:",
