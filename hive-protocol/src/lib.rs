@@ -28,6 +28,7 @@ pub mod hierarchy;
 pub mod models;
 pub mod network;
 pub mod policy; // Generic policy engine for conflict resolution
+pub mod security; // Device authentication and PKI (ADR-006)
 pub mod storage;
 pub mod sync; // Data synchronization abstraction layer
 pub mod testing;
