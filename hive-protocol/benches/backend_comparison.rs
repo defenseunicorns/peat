@@ -1,45 +1,50 @@
-//! Backend Comparison Benchmarks (E8 - ADR-007)
+//! Backend Comparison Benchmarks (Issue #154)
 //!
-//! Compares Automerge vs Ditto backend performance for CAP-specific operations:
-//! - Document size (bandwidth efficiency)
-//! - Sync message size (network cost)
-//! - Update latency (operation speed)
-//! - CellState/NodeConfig encoding overhead
+//! Compares Ditto vs Automerge backend performance for CAP-specific operations:
+//! - Document operations (insert, update, query)
+//! - Serialization overhead (wire size)
+//! - Update latency
 //!
 //! These benchmarks measure the actual cost of CRDT operations for our domain models,
-//! not just generic CRDT performance. This helps make an evidence-based decision
-//! between Automerge and Ditto for the HIVE Protocol.
+//! helping make an evidence-based decision between backends for the HIVE Protocol.
 //!
-//! Run with: `cargo bench --bench backend_comparison --features automerge-backend`
+//! Run with:
+//!   cargo bench --bench backend_comparison                           # Ditto only
+//!   cargo bench --bench backend_comparison --features automerge-backend # Both backends
 
-#![cfg(feature = "automerge-backend")]
-
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use hive_protocol::models::capability::{Capability, CapabilityExt, CapabilityType};
 use hive_protocol::models::cell::{CellConfig, CellConfigExt, CellState, CellStateExt};
 use hive_protocol::models::node::{NodeConfig, NodeConfigExt};
-use hive_protocol::sync::automerge::AutomergeBackend;
 use hive_protocol::sync::{BackendConfig, DataSyncBackend, Document, TransportConfig, Value};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tokio::runtime::Runtime;
 
-/// Helper to create a CellState document
+// Ditto backend (always available)
+use hive_protocol::sync::ditto::DittoBackend;
+
+// Automerge backend (optional)
+#[cfg(feature = "automerge-backend")]
+use hive_protocol::sync::automerge::AutomergeBackend;
+
+// ============================================================================
+// Document Creation Helpers
+// ============================================================================
+
+/// Create a CellState document with specified complexity
 fn create_cell_document(member_count: usize, capability_count: usize) -> Document {
     let config = CellConfig::with_id("benchmark_cell".to_string(), (member_count * 2) as u32);
     let mut cell = CellState::new(config);
 
-    // Add members
     for i in 0..member_count {
         cell.add_member(format!("node_{}", i));
     }
 
-    // Set leader
     if member_count > 0 {
         cell.set_leader("node_0".to_string()).ok();
     }
 
-    // Add capabilities
     for i in 0..capability_count {
         cell.add_capability(Capability::new(
             format!("cap_{}", i),
@@ -54,16 +59,15 @@ fn create_cell_document(member_count: usize, capability_count: usize) -> Documen
         ));
     }
 
-    // Convert to Document
     let json = serde_json::to_value(&cell).unwrap();
     let fields: HashMap<String, Value> = serde_json::from_value(json).unwrap();
-    Document::new(fields)
+    Document::with_id(format!("cell_{}", member_count), fields)
 }
 
-/// Helper to create a NodeConfig document
+/// Create a NodeConfig document with specified complexity
 fn create_node_document(capability_count: usize) -> Document {
     let mut node = NodeConfig::new("UAV".to_string());
-    node.id = "benchmark_node".to_string();
+    node.id = format!("benchmark_node_{}", capability_count);
 
     for i in 0..capability_count {
         node.add_capability(Capability::new(
@@ -74,17 +78,42 @@ fn create_node_document(capability_count: usize) -> Document {
         ));
     }
 
-    // Convert to Document
     let json = serde_json::to_value(&node).unwrap();
     let fields: HashMap<String, Value> = serde_json::from_value(json).unwrap();
-    Document::new(fields)
+    Document::with_id(&node.id, fields)
 }
 
-/// Helper to create test AutomergeBackend
-fn create_automerge_backend() -> AutomergeBackend {
+// ============================================================================
+// Backend Creation Helpers
+// ============================================================================
+
+/// Create Ditto backend for benchmarking
+fn create_ditto_backend(suffix: &str) -> DittoBackend {
+    dotenvy::dotenv().ok();
+
+    let app_id = std::env::var("DITTO_APP_ID").unwrap_or_else(|_| "benchmark_app".to_string());
+    let shared_key =
+        std::env::var("DITTO_SHARED_KEY").unwrap_or_else(|_| "benchmark_key".to_string());
+
+    let config = BackendConfig {
+        app_id,
+        persistence_dir: PathBuf::from(format!("/tmp/ditto_bench_{}", suffix)),
+        shared_key: Some(shared_key),
+        transport: TransportConfig::default(),
+        extra: HashMap::new(),
+    };
+
+    let backend = DittoBackend::new();
+    let rt = Runtime::new().unwrap();
+    rt.block_on(backend.initialize(config)).unwrap();
+    backend
+}
+
+#[cfg(feature = "automerge-backend")]
+fn create_automerge_backend(suffix: &str) -> AutomergeBackend {
     let config = BackendConfig {
         app_id: "benchmark_app".to_string(),
-        persistence_dir: PathBuf::from("/tmp/automerge_bench"),
+        persistence_dir: PathBuf::from(format!("/tmp/automerge_bench_{}", suffix)),
         shared_key: None,
         transport: TransportConfig::default(),
         extra: HashMap::new(),
@@ -96,187 +125,408 @@ fn create_automerge_backend() -> AutomergeBackend {
     backend
 }
 
-/// Benchmark 1: Document Size - CellState
-///
-/// Measures the serialized size of CellState documents with varying complexity.
-/// Smaller documents = better bandwidth efficiency.
-fn bench_cellstate_document_size(c: &mut Criterion) {
-    let mut group = c.benchmark_group("cellstate_document_size");
+// ============================================================================
+// Benchmark 1: Document Insert Performance
+// ============================================================================
 
-    // Test configurations: (members, capabilities)
-    for (members, caps) in [(5, 3), (10, 10), (20, 20)].iter() {
-        let id = format!("{}members_{}caps", members, caps);
+fn bench_document_insert(c: &mut Criterion) {
+    let mut group = c.benchmark_group("document_insert");
 
-        group.bench_function(format!("json/{}", id), |b| {
-            let doc = create_cell_document(*members, *caps);
-            b.iter(|| {
-                let json_bytes = serde_json::to_vec(&doc).unwrap();
-                black_box(json_bytes.len())
-            });
-        });
+    for doc_count in [10, 100, 1000].iter() {
+        group.throughput(Throughput::Elements(*doc_count as u64));
 
-        group.bench_function(format!("automerge/{}", id), |b| {
-            let backend = create_automerge_backend();
-            let doc = create_cell_document(*members, *caps);
-            let doc_store = backend.document_store();
-            let rt = Runtime::new().unwrap();
+        // Ditto benchmark
+        group.bench_with_input(
+            BenchmarkId::new("ditto", doc_count),
+            doc_count,
+            |b, &count| {
+                let backend = create_ditto_backend(&format!("insert_{}", count));
+                let doc_store = backend.document_store();
+                let rt = Runtime::new().unwrap();
 
-            b.iter(|| {
-                // Measure the size of the Automerge document
-                let doc_id = rt
-                    .block_on(doc_store.upsert("benchmark_cells", doc.clone()))
-                    .unwrap();
+                b.iter(|| {
+                    for i in 0..count {
+                        let doc = create_node_document(3);
+                        let mut doc_with_id = doc.clone();
+                        doc_with_id.id = Some(format!("node_insert_{}_{}", count, i));
+                        rt.block_on(doc_store.upsert("benchmark_nodes", doc_with_id))
+                            .unwrap();
+                    }
+                    black_box(count)
+                });
 
-                // Generate sync message to get actual wire size
-                let sync_msg = backend
-                    .generate_sync_message("benchmark_cells", &doc_id, "peer")
-                    .unwrap();
+                rt.block_on(backend.shutdown()).ok();
+            },
+        );
 
-                black_box(sync_msg.len())
-            });
-        });
+        // Automerge benchmark
+        #[cfg(feature = "automerge-backend")]
+        group.bench_with_input(
+            BenchmarkId::new("automerge", doc_count),
+            doc_count,
+            |b, &count| {
+                let backend = create_automerge_backend(&format!("insert_{}", count));
+                let doc_store = backend.document_store();
+                let rt = Runtime::new().unwrap();
+
+                b.iter(|| {
+                    for i in 0..count {
+                        let doc = create_node_document(3);
+                        let mut doc_with_id = doc.clone();
+                        doc_with_id.id = Some(format!("node_insert_{}_{}", count, i));
+                        rt.block_on(doc_store.upsert("benchmark_nodes", doc_with_id))
+                            .unwrap();
+                    }
+                    black_box(count)
+                });
+
+                rt.block_on(backend.shutdown()).ok();
+            },
+        );
     }
 
     group.finish();
 }
 
-/// Benchmark 2: Document Size - NodeConfig
-///
-/// Measures the serialized size of NodeConfig documents.
-fn bench_nodeconfig_document_size(c: &mut Criterion) {
-    let mut group = c.benchmark_group("nodeconfig_document_size");
+// ============================================================================
+// Benchmark 2: Document Update Performance
+// ============================================================================
 
-    for cap_count in [1, 5, 10, 20].iter() {
-        let id = format!("{}caps", cap_count);
+fn bench_document_update(c: &mut Criterion) {
+    let mut group = c.benchmark_group("document_update");
 
-        group.bench_function(format!("json/{}", id), |b| {
-            let doc = create_node_document(*cap_count);
-            b.iter(|| {
-                let json_bytes = serde_json::to_vec(&doc).unwrap();
-                black_box(json_bytes.len())
-            });
-        });
-
-        group.bench_function(format!("automerge/{}", id), |b| {
-            let backend = create_automerge_backend();
-            let doc = create_node_document(*cap_count);
-            let doc_store = backend.document_store();
-            let rt = Runtime::new().unwrap();
-
-            b.iter(|| {
-                let doc_id = rt
-                    .block_on(doc_store.upsert("benchmark_nodes", doc.clone()))
-                    .unwrap();
-
-                let sync_msg = backend
-                    .generate_sync_message("benchmark_nodes", &doc_id, "peer")
-                    .unwrap();
-
-                black_box(sync_msg.len())
-            });
-        });
-    }
-
-    group.finish();
-}
-
-/// Benchmark 3: Update Latency
-///
-/// Measures the time to perform a single document update.
-/// Lower latency = faster operations.
-fn bench_update_latency(c: &mut Criterion) {
-    let mut group = c.benchmark_group("update_latency");
-
-    group.bench_function("automerge/add_member", |b| {
-        let backend = create_automerge_backend();
+    // Ditto benchmark
+    group.bench_function("ditto/cell_state_update", |b| {
+        let backend = create_ditto_backend("update");
         let doc_store = backend.document_store();
         let rt = Runtime::new().unwrap();
 
-        // Create initial cell
+        // Initial insert
         let doc = create_cell_document(5, 3);
-
-        b.iter(|| {
-            // Upsert (update) operation
-            let doc_id = rt
-                .block_on(doc_store.upsert("benchmark_cells", doc.clone()))
-                .unwrap();
-
-            black_box(doc_id)
-        });
-    });
-
-    group.bench_function("automerge/add_capability", |b| {
-        let backend = create_automerge_backend();
-        let doc_store = backend.document_store();
-        let rt = Runtime::new().unwrap();
-
-        let doc = create_node_document(5);
-
-        b.iter(|| {
-            let doc_id = rt
-                .block_on(doc_store.upsert("benchmark_nodes", doc.clone()))
-                .unwrap();
-
-            black_box(doc_id)
-        });
-    });
-
-    group.finish();
-}
-
-/// Benchmark 4: Sync Message Size
-///
-/// Measures the size of sync messages for incremental updates.
-/// This is critical for bandwidth-constrained tactical networks.
-fn bench_sync_message_size(c: &mut Criterion) {
-    let mut group = c.benchmark_group("sync_message_size");
-
-    group.bench_function("automerge/initial_sync", |b| {
-        let backend = create_automerge_backend();
-        let doc_store = backend.document_store();
-        let doc = create_cell_document(10, 10);
-        let rt = Runtime::new().unwrap();
-
-        let doc_id = rt
-            .block_on(doc_store.upsert("sync_test", doc.clone()))
+        rt.block_on(doc_store.upsert("benchmark_cells", doc.clone()))
             .unwrap();
 
+        let mut update_counter = 0;
         b.iter(|| {
-            // Generate sync message for new peer (full state)
-            let msg = backend
-                .generate_sync_message("sync_test", &doc_id, "new_peer")
+            // Update document (simulating state change)
+            let mut updated_doc = doc.clone();
+            if let Some(members) = updated_doc.fields.get_mut("members") {
+                if let Some(arr) = members.as_array_mut() {
+                    arr.push(Value::String(format!("new_member_{}", update_counter)));
+                }
+            }
+            update_counter += 1;
+            rt.block_on(doc_store.upsert("benchmark_cells", updated_doc))
                 .unwrap();
-
-            black_box(msg.len())
+            black_box(update_counter)
         });
+
+        rt.block_on(backend.shutdown()).ok();
+    });
+
+    // Automerge benchmark
+    #[cfg(feature = "automerge-backend")]
+    group.bench_function("automerge/cell_state_update", |b| {
+        let backend = create_automerge_backend("update");
+        let doc_store = backend.document_store();
+        let rt = Runtime::new().unwrap();
+
+        // Initial insert
+        let doc = create_cell_document(5, 3);
+        rt.block_on(doc_store.upsert("benchmark_cells", doc.clone()))
+            .unwrap();
+
+        let mut update_counter = 0;
+        b.iter(|| {
+            let mut updated_doc = doc.clone();
+            if let Some(members) = updated_doc.fields.get_mut("members") {
+                if let Some(arr) = members.as_array_mut() {
+                    arr.push(Value::String(format!("new_member_{}", update_counter)));
+                }
+            }
+            update_counter += 1;
+            rt.block_on(doc_store.upsert("benchmark_cells", updated_doc))
+                .unwrap();
+            black_box(update_counter)
+        });
+
+        rt.block_on(backend.shutdown()).ok();
     });
 
     group.finish();
 }
 
-/// Benchmark 5: Memory Overhead
-///
-/// Measures the memory overhead of maintaining CRDT metadata.
+// ============================================================================
+// Benchmark 3: Document Query Performance
+// ============================================================================
+
+fn bench_document_query(c: &mut Criterion) {
+    let mut group = c.benchmark_group("document_query");
+
+    for doc_count in [10, 100].iter() {
+        // Ditto benchmark
+        group.bench_with_input(
+            BenchmarkId::new("ditto", doc_count),
+            doc_count,
+            |b, &count| {
+                let backend = create_ditto_backend(&format!("query_{}", count));
+                let doc_store = backend.document_store();
+                let rt = Runtime::new().unwrap();
+
+                // Pre-populate with documents
+                for i in 0..count {
+                    let mut doc = create_node_document(3);
+                    doc.id = Some(format!("query_node_{}", i));
+                    rt.block_on(doc_store.upsert("benchmark_nodes", doc))
+                        .unwrap();
+                }
+
+                b.iter(|| {
+                    let query = hive_protocol::sync::Query::All;
+                    let results = rt
+                        .block_on(doc_store.query("benchmark_nodes", &query))
+                        .unwrap();
+                    black_box(results.len())
+                });
+
+                rt.block_on(backend.shutdown()).ok();
+            },
+        );
+
+        // Automerge benchmark
+        #[cfg(feature = "automerge-backend")]
+        group.bench_with_input(
+            BenchmarkId::new("automerge", doc_count),
+            doc_count,
+            |b, &count| {
+                let backend = create_automerge_backend(&format!("query_{}", count));
+                let doc_store = backend.document_store();
+                let rt = Runtime::new().unwrap();
+
+                // Pre-populate with documents
+                for i in 0..count {
+                    let mut doc = create_node_document(3);
+                    doc.id = Some(format!("query_node_{}", i));
+                    rt.block_on(doc_store.upsert("benchmark_nodes", doc))
+                        .unwrap();
+                }
+
+                b.iter(|| {
+                    let query = hive_protocol::sync::Query::All;
+                    let results = rt
+                        .block_on(doc_store.query("benchmark_nodes", &query))
+                        .unwrap();
+                    black_box(results.len())
+                });
+
+                rt.block_on(backend.shutdown()).ok();
+            },
+        );
+    }
+
+    group.finish();
+}
+
+// ============================================================================
+// Benchmark 4: Serialization Size (JSON baseline)
+// ============================================================================
+
+fn bench_serialization_size(c: &mut Criterion) {
+    let mut group = c.benchmark_group("serialization_size");
+
+    for (members, caps) in [(5, 3), (10, 10), (20, 20)].iter() {
+        let id = format!("{}m_{}c", members, caps);
+
+        // JSON baseline (for comparison)
+        group.bench_function(format!("json/{}", id), |b| {
+            let doc = create_cell_document(*members, *caps);
+            b.iter(|| {
+                let json_bytes = serde_json::to_vec(&doc.fields).unwrap();
+                black_box(json_bytes.len())
+            });
+        });
+
+        // Ditto serialization (measure via upsert latency as proxy)
+        group.bench_function(format!("ditto/{}", id), |b| {
+            let backend = create_ditto_backend(&format!("serial_{}_{}", members, caps));
+            let doc_store = backend.document_store();
+            let rt = Runtime::new().unwrap();
+            let doc = create_cell_document(*members, *caps);
+
+            b.iter(|| {
+                rt.block_on(doc_store.upsert("benchmark_serial", doc.clone()))
+                    .unwrap();
+                black_box(())
+            });
+
+            rt.block_on(backend.shutdown()).ok();
+        });
+
+        // Automerge serialization
+        #[cfg(feature = "automerge-backend")]
+        group.bench_function(format!("automerge/{}", id), |b| {
+            let backend = create_automerge_backend(&format!("serial_{}_{}", members, caps));
+            let doc_store = backend.document_store();
+            let rt = Runtime::new().unwrap();
+            let doc = create_cell_document(*members, *caps);
+
+            b.iter(|| {
+                rt.block_on(doc_store.upsert("benchmark_serial", doc.clone()))
+                    .unwrap();
+                black_box(())
+            });
+
+            rt.block_on(backend.shutdown()).ok();
+        });
+    }
+
+    group.finish();
+}
+
+// ============================================================================
+// Benchmark 5: Memory Overhead (Document Count)
+// ============================================================================
+
 fn bench_memory_overhead(c: &mut Criterion) {
     let mut group = c.benchmark_group("memory_overhead");
 
+    // Ditto: 100 documents
+    group.bench_function("ditto/100_documents", |b| {
+        let rt = Runtime::new().unwrap();
+
+        b.iter(|| {
+            let backend = create_ditto_backend("memory_100");
+            let doc_store = backend.document_store();
+
+            for i in 0..100 {
+                let mut doc = create_cell_document(5, 3);
+                doc.id = Some(format!("cell_{}", i));
+                rt.block_on(doc_store.upsert("memory_test", doc)).unwrap();
+            }
+
+            rt.block_on(backend.shutdown()).ok();
+            black_box(())
+        });
+    });
+
+    // Automerge: 100 documents
+    #[cfg(feature = "automerge-backend")]
     group.bench_function("automerge/100_documents", |b| {
         let rt = Runtime::new().unwrap();
 
         b.iter(|| {
-            let backend = create_automerge_backend();
+            let backend = create_automerge_backend("memory_100");
             let doc_store = backend.document_store();
 
-            // Create 100 documents
             for i in 0..100 {
                 let mut doc = create_cell_document(5, 3);
                 doc.id = Some(format!("cell_{}", i));
-
                 rt.block_on(doc_store.upsert("memory_test", doc)).unwrap();
             }
 
-            black_box(backend)
+            rt.block_on(backend.shutdown()).ok();
+            black_box(())
         });
+    });
+
+    group.finish();
+}
+
+// ============================================================================
+// Benchmark 6: Realistic Workload - Squad Telemetry
+// ============================================================================
+
+fn bench_squad_telemetry(c: &mut Criterion) {
+    let mut group = c.benchmark_group("squad_telemetry");
+    group.sample_size(20); // Reduce sample size for slower benchmarks
+
+    // Simulate: 10 nodes updating position every second for 10 iterations
+    let node_count = 10;
+    let iterations = 10;
+
+    // Ditto workload
+    group.bench_function("ditto/10_nodes_10_updates", |b| {
+        let backend = create_ditto_backend("telemetry");
+        let doc_store = backend.document_store();
+        let rt = Runtime::new().unwrap();
+
+        b.iter(|| {
+            for iter in 0..iterations {
+                for node_id in 0..node_count {
+                    let mut fields = HashMap::new();
+                    fields.insert(
+                        "node_id".to_string(),
+                        Value::String(format!("node_{}", node_id)),
+                    );
+                    fields.insert(
+                        "lat".to_string(),
+                        Value::Number(
+                            serde_json::Number::from_f64(37.7749 + iter as f64 * 0.001).unwrap(),
+                        ),
+                    );
+                    fields.insert(
+                        "lon".to_string(),
+                        Value::Number(
+                            serde_json::Number::from_f64(-122.4194 + node_id as f64 * 0.001)
+                                .unwrap(),
+                        ),
+                    );
+                    fields.insert(
+                        "timestamp".to_string(),
+                        Value::Number(serde_json::Number::from(iter * 1000)),
+                    );
+
+                    let doc = Document::with_id(format!("telemetry_node_{}", node_id), fields);
+                    rt.block_on(doc_store.upsert("telemetry", doc)).unwrap();
+                }
+            }
+            black_box(node_count * iterations)
+        });
+
+        rt.block_on(backend.shutdown()).ok();
+    });
+
+    // Automerge workload
+    #[cfg(feature = "automerge-backend")]
+    group.bench_function("automerge/10_nodes_10_updates", |b| {
+        let backend = create_automerge_backend("telemetry");
+        let doc_store = backend.document_store();
+        let rt = Runtime::new().unwrap();
+
+        b.iter(|| {
+            for iter in 0..iterations {
+                for node_id in 0..node_count {
+                    let mut fields = HashMap::new();
+                    fields.insert(
+                        "node_id".to_string(),
+                        Value::String(format!("node_{}", node_id)),
+                    );
+                    fields.insert(
+                        "lat".to_string(),
+                        Value::Number(
+                            serde_json::Number::from_f64(37.7749 + iter as f64 * 0.001).unwrap(),
+                        ),
+                    );
+                    fields.insert(
+                        "lon".to_string(),
+                        Value::Number(
+                            serde_json::Number::from_f64(-122.4194 + node_id as f64 * 0.001)
+                                .unwrap(),
+                        ),
+                    );
+                    fields.insert(
+                        "timestamp".to_string(),
+                        Value::Number(serde_json::Number::from(iter * 1000)),
+                    );
+
+                    let doc = Document::with_id(format!("telemetry_node_{}", node_id), fields);
+                    rt.block_on(doc_store.upsert("telemetry", doc)).unwrap();
+                }
+            }
+            black_box(node_count * iterations)
+        });
+
+        rt.block_on(backend.shutdown()).ok();
     });
 
     group.finish();
@@ -284,11 +534,12 @@ fn bench_memory_overhead(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    bench_cellstate_document_size,
-    bench_nodeconfig_document_size,
-    bench_update_latency,
-    bench_sync_message_size,
-    bench_memory_overhead
+    bench_document_insert,
+    bench_document_update,
+    bench_document_query,
+    bench_serialization_size,
+    bench_memory_overhead,
+    bench_squad_telemetry,
 );
 
 criterion_main!(benches);
