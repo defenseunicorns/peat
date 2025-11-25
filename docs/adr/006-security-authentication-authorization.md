@@ -981,6 +981,55 @@ HIVE Protocol security must align with:
 - **FIPS 140-2/3** - Cryptographic Module Validation (for tactical systems)
 - **Common Criteria EAL** - Evaluation Assurance Level for security evaluation
 
+## Multi-Hop Synchronization Trust Model
+
+### Decision (2025-11-24)
+
+**Phase 1: Trust All Mesh Members**
+
+For MVP, all peers in the mesh are trusted to read any document they encounter during synchronization. This matches Ditto's apparent model and enables CRDT-based sync to function correctly.
+
+### Rationale
+
+1. **CRDT Sync Requirement**: Intermediate nodes performing aggregation or relay must read documents to merge CRDT states correctly
+2. **Hierarchical Aggregation**: Squad leaders aggregating data to platoon level need document visibility
+3. **Ditto Parity**: This matches Ditto's apparent trust model (all nodes share APP ID)
+4. **Complexity Deferral**: End-to-end encryption with untrusted relays requires solving CRDT merge on encrypted data
+
+### Multi-Hop Topology
+
+```
+Squad A ←→ Squad B (relay) ←→ Squad C
+           ↓
+    B can read A↔C data
+```
+
+In this topology:
+- Squad B's leader acts as relay for A↔C communication
+- B's leader can read, modify, and store documents passing through
+- This is acceptable because B is part of the trusted mesh
+
+### Security Implications
+
+| Aspect | Phase 1 (MVP) | Phase 2 (Future) |
+|--------|---------------|------------------|
+| Relay visibility | Full access | Selective E2E encryption |
+| Trust boundary | Mesh membership | Per-document policies |
+| Compromised node | Sees all synced data | Sees only authorized data |
+| Key management | Mesh-level PKI | Per-cell group keys |
+
+### Phase 2 Considerations (Future)
+
+For scenarios requiring untrusted relays:
+- **Selective Document Encryption**: Encrypt sensitive fields before sync
+- **Group Keys**: Cell-level encryption keys for authorized readers
+- **Encrypted Sync Blobs**: Full document encryption with metadata visible
+- **Key Rotation**: Re-key when cell membership changes
+
+### Related Investigation
+
+See `docs/research/MULTI_HOP_SYNC_INVESTIGATION.md` for full analysis of Ditto flood-fill and Iroh gossip protocols.
+
 ## Open Questions
 
 1. **How to handle certificate distribution in disconnected environments?**
@@ -1016,7 +1065,8 @@ HIVE Protocol security must align with:
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2025-11-04 | Proposed multi-layer security architecture | Comprehensive defense for tactical systems |
-| TBD | Approved/Rejected | After team and security review |
+| 2025-11-24 | Multi-hop trust: Trust all mesh members (Phase 1) | CRDT sync requires relay nodes to read documents; E2E encryption deferred to Phase 2 |
+| TBD | Full ADR approval | After team and security review |
 
 ---
 
