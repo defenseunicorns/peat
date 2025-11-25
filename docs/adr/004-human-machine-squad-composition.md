@@ -441,7 +441,6 @@ cell_variants:
 
 ## References
 
-- [Design Document: Human-Machine Teaming Architecture](../human-machine-teaming-design.md)
 - [E4.2: Leader Election Algorithm](https://github.com/kitplummer/hive/pull/24)
 - DARPA OFFSET program - Human-swarm interfaces
 - NATO STANAG 4586 - UAV interoperability
@@ -462,3 +461,228 @@ cell_variants:
 This is a foundational architectural decision that affects all subsequent work. Taking 2-3 days now to implement properly will save weeks of refactoring later and enable realistic demonstrations of the HIVE protocol in human-machine teaming scenarios.
 
 The tunable configuration system is critical for research - allows experimentation with different authority policies to find optimal human-machine teaming strategies.
+
+---
+
+## Appendix A: Cell Composition Scenarios
+
+### Scenario A: Traditional Infantry Cell (9 humans, 9 nodes, 1:1)
+
+```
+Cell Leader (E-7) + Node A (leader)
+├─ Team Leader (E-5) + Node B (follower)
+│  ├─ Rifleman (E-3) + Node C (follower)
+│  └─ Grenadier (E-4) + Node D (follower)
+└─ Team Leader (E-5) + Node E (follower)
+   ├─ SAW Gunner (E-4) + Node F (follower)
+   └─ Rifleman (E-3) + Node G (follower)
+```
+
+**Leader Election**:
+- E-7's node has highest authority score → becomes cell leader
+- Technical capabilities are secondary
+- E-7 provides tactical decisions, node coordinates execution
+
+**Interfaces**:
+- **Leader (E-7)**: Situational awareness dashboard, cell status, voice command input, approval UI for critical decisions
+- **Followers (E-3 to E-5)**: Cell leader's intent display, individual status, local autonomy for movement
+
+### Scenario B: Robot-Augmented Cell (4 humans, 6 robots)
+
+```
+Cell Leader (E-7) + Node A (leader)
+├─ Team Leader (E-5) + Node B (follower)
+│  ├─ Robot Node C (autonomous follower)
+│  └─ Robot Node D (autonomous follower)
+└─ Team Leader (E-5) + Node E (follower)
+   ├─ Robot Node F (autonomous follower)
+   ├─ Robot Node G (autonomous follower)
+   └─ Specialist (E-4) + Node H (follower)
+```
+
+**Leader Election**:
+- E-7's node becomes leader (human authority)
+- Robots have high technical scores but no human authority
+- Hybrid cell with mixed autonomy levels
+
+**Decision-Making**:
+- **Tactical decisions**: E-7 commands
+- **Coordination/execution**: Node A manages robot positioning
+- **Local navigation**: Each robot autonomous within intent bounds
+
+### Scenario C: Single Operator, Multiple Robots (1:N)
+
+```
+Operator (E-6) + Node A (command node, leader)
+├─ Robot 1 (follower)
+├─ Robot 2 (follower)
+├─ Robot 3 (follower)
+├─ Robot 4 (follower)
+└─ Robot 5 (follower)
+```
+
+**Leader Election**:
+- Node A is leader (only human-operated)
+- Robots automatically follow
+
+**Interface**:
+- Operator needs **supervisory control**: set waypoints, approve engagements, monitor status
+- Cannot micromanage 5 robots → node autonomy is high
+- Operator sets intent, robots execute with coordination from Node A
+
+### Scenario D: Command Vehicle (N:1)
+
+```
+Node A (command vehicle, high compute/comms)
+├─ Commander (O-3) - primary authority
+├─ NCO (E-7) - tactical advisor
+└─ RTO (E-4) - communications
+
+Commanding:
+├─ Cell 1 (9 nodes)
+├─ Cell 2 (9 nodes)
+└─ Cell 3 (9 nodes)
+```
+
+**Leader Election**:
+- Node A has highest technical capabilities
+- O-3 has ultimate authority
+- Node provides C2 infrastructure
+
+**Interface**:
+- **O-3**: Multi-cell dashboard, intent planning, approval workflows
+- **E-7**: Tactical recommendations, cell status details
+- **E-4**: Comms management, message routing
+
+---
+
+## Appendix B: Interface Contracts
+
+### Leader Interface (Human is Cell Leader)
+
+**Required UI Components**:
+- Cell member status (health, fuel, position)
+- Emergent capability summary
+- Mission objective overlay
+- Voice command input
+- Critical decision approval (e.g., weapon engagement)
+- Intent specification (natural language or gesture)
+
+**Data Flow**:
+```
+Human Intent → Node Interpretation → Cell Message Bus → Followers Execute
+                ↓
+         Continuous Feedback (visual/haptic)
+```
+
+### Follower Interface (Human is Cell Member)
+
+**Required UI Components**:
+- Cell leader's intent (text or voice)
+- Own node status
+- Immediate local environment (AR overlay)
+- Quick action buttons (report contact, request support)
+- Simplified situational awareness (leader's position, team positions)
+
+**Data Flow**:
+```
+Cell Leader Intent → Cell Message Bus → Node Receives → Human Display
+                                                ↓
+                        Human Override (if needed) → Node Executes
+```
+
+### Autonomous Node (No Human)
+
+**Behavior**:
+- Full participation in cell protocols
+- Receives orders via Cell Message Bus
+- Reports status and observations
+- No human interface, pure machine-to-machine
+- May have higher technical capabilities than human-worn platforms
+
+---
+
+## Appendix C: Authority Policies
+
+### Required Human Approval (by default)
+- Use of lethal force
+- Entry into restricted areas
+- Communications with higher HQ
+- Mission plan changes
+
+### Machine Autonomous
+- Movement within intent bounds
+- Obstacle avoidance
+- Formation maintenance
+- Sensor fusion and reporting
+- Inter-node coordination
+
+### Configurable per Mission
+- Engagement rules (ROE)
+- Autonomous vs supervised mode per platform
+- Cognitive load-based handoff (if human is overloaded, increase autonomy)
+
+---
+
+## Appendix D: Leadership Scoring Example
+
+### Scenario: Cell with 3 members
+
+**Node A** (autonomous robot):
+- Compute: 1.0
+- Communication: 1.0
+- Sensors: 4 (maxed)
+- No human operator
+- **Technical Score**: 0.95
+- **Authority Score**: 0.0
+- **Total (pure technical)**: 0.95 * 1.0 = **0.95**
+
+**Node B** (E-5 Team Leader):
+- Compute: 0.6
+- Communication: 0.7
+- Sensors: 1
+- Operator: E-5, Commander authority, low cognitive load
+- **Technical Score**: 0.55
+- **Authority Score**: (0.4 rank + 0.9 authority + 0.9 cognitive + 0.95 fatigue) * weights ≈ 0.65
+- **Total (hybrid 40/60)**: 0.55 * 0.4 + 0.65 * 0.6 = **0.61**
+
+**Node C** (E-7 Cell Leader):
+- Compute: 0.5
+- Communication: 0.6
+- Sensors: 1
+- Operator: E-7, Commander authority, moderate cognitive load
+- **Technical Score**: 0.48
+- **Authority Score**: (0.6 rank + 0.9 authority + 0.7 cognitive + 0.8 fatigue) * weights ≈ 0.75
+- **Total (hybrid 40/60)**: 0.48 * 0.4 + 0.75 * 0.6 = **0.64**
+
+**Result**: Node C (E-7) becomes leader, despite lower technical capabilities than Node A (robot).
+
+---
+
+## Appendix E: Open Questions
+
+1. **What happens if cell leader (human) is incapacitated?**
+   - Automatic re-election based on next-highest rank?
+   - Node continues last-known intent until new leader elected?
+   - Transition to autonomous mode?
+
+2. **How do we handle rank disagreements in distributed system?**
+   - Rank should be cryptographically signed by C2
+   - Nodes verify rank claims via certificate chain
+   - Conflict resolution: defer to higher HQ
+
+3. **What is the cognitive load measurement mechanism?**
+   - Physiological sensors (heart rate, eye tracking)
+   - Task performance (response time, accuracy)
+   - Self-reported (scale 1-10 from human)
+
+4. **Can a human override leader election and force leadership?**
+   - Yes, via C2-directed assignment
+   - Emergency override protocol (safety-critical)
+   - Logged and reported to higher HQ for accountability
+
+5. **How do we represent human capabilities?**
+   - Training level (basic, advanced, expert)
+   - Experience (time in service, combat deployments)
+   - Physical fitness (impacts mobility, endurance)
+   - Add as new `CapabilityType::HumanSkill`?
