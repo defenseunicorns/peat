@@ -1,7 +1,10 @@
-//! BlobStore E2E Tests
+//! BlobStore Unit/Integration Tests (Single-Node)
 //!
 //! These tests validate that both DittoBlobStore and IrohBlobStore implementations
 //! conform to the BlobStore trait and produce identical behavior.
+//!
+//! **NOTE**: These are NOT end-to-end tests. They only test single-node operations.
+//! For actual multi-node blob sync tests, see `blob_sync_e2e.rs`.
 //!
 //! # Test Strategy
 //!
@@ -15,6 +18,12 @@
 //! 2. **Content Addressing**: Blobs are identified by content hash
 //! 3. **Metadata Handling**: Both backends preserve metadata correctly
 //! 4. **CRUD Operations**: Create, read, delete operations work identically
+//!
+//! # What This Does NOT Prove
+//!
+//! - Blob transfer between mesh peers
+//! - Attachment sync via Ditto's mesh protocol
+//! - Remote blob fetch capabilities
 
 use hive_protocol::storage::ditto_store::DittoConfig;
 use hive_protocol::storage::{BlobMetadata, BlobStore, BlobStoreExt};
