@@ -30,13 +30,8 @@ use tempfile::TempDir;
 async fn test_ditto_blob_store_basic_operations() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id = match std::env::var("DITTO_APP_ID") {
-        Ok(id) if !id.is_empty() => id,
-        _ => {
-            eprintln!("DITTO_APP_ID not set - skipping Ditto blob store test");
-            return;
-        }
-    };
+    let ditto_app_id =
+        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for Ditto tests");
 
     println!("=== BlobStore E2E: Ditto Basic Operations ===");
 
@@ -45,10 +40,7 @@ async fn test_ditto_blob_store_basic_operations() {
     let blob_dir = temp_dir.path().join("ditto_blobs");
     std::fs::create_dir_all(&blob_dir).unwrap();
 
-    let ditto_store = match create_ditto_store(&ditto_app_id, temp_dir.path()) {
-        Some(store) => store,
-        None => return, // Skip test if credentials not available
-    };
+    let ditto_store = create_ditto_store(&ditto_app_id, temp_dir.path());
     let blob_store =
         hive_protocol::storage::DittoBlobStore::with_blob_dir(Arc::new(ditto_store), blob_dir);
 
@@ -60,13 +52,8 @@ async fn test_ditto_blob_store_basic_operations() {
 async fn test_ditto_blob_store_metadata() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id = match std::env::var("DITTO_APP_ID") {
-        Ok(id) if !id.is_empty() => id,
-        _ => {
-            eprintln!("DITTO_APP_ID not set - skipping Ditto blob store test");
-            return;
-        }
-    };
+    let ditto_app_id =
+        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for Ditto tests");
 
     println!("=== BlobStore E2E: Ditto Metadata ===");
 
@@ -74,10 +61,7 @@ async fn test_ditto_blob_store_metadata() {
     let blob_dir = temp_dir.path().join("ditto_blobs");
     std::fs::create_dir_all(&blob_dir).unwrap();
 
-    let ditto_store = match create_ditto_store(&ditto_app_id, temp_dir.path()) {
-        Some(store) => store,
-        None => return,
-    };
+    let ditto_store = create_ditto_store(&ditto_app_id, temp_dir.path());
     let blob_store =
         hive_protocol::storage::DittoBlobStore::with_blob_dir(Arc::new(ditto_store), blob_dir);
 
@@ -89,13 +73,8 @@ async fn test_ditto_blob_store_metadata() {
 async fn test_ditto_blob_store_from_file() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id = match std::env::var("DITTO_APP_ID") {
-        Ok(id) if !id.is_empty() => id,
-        _ => {
-            eprintln!("DITTO_APP_ID not set - skipping Ditto blob store test");
-            return;
-        }
-    };
+    let ditto_app_id =
+        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for Ditto tests");
 
     println!("=== BlobStore E2E: Ditto From File ===");
 
@@ -103,10 +82,7 @@ async fn test_ditto_blob_store_from_file() {
     let blob_dir = temp_dir.path().join("ditto_blobs");
     std::fs::create_dir_all(&blob_dir).unwrap();
 
-    let ditto_store = match create_ditto_store(&ditto_app_id, temp_dir.path()) {
-        Some(store) => store,
-        None => return,
-    };
+    let ditto_store = create_ditto_store(&ditto_app_id, temp_dir.path());
     let blob_store =
         hive_protocol::storage::DittoBlobStore::with_blob_dir(Arc::new(ditto_store), blob_dir);
 
@@ -193,14 +169,8 @@ async fn test_both_backends_content_addressing() {
 
     println!("=== BlobStore E2E: Content Addressing Comparison ===");
 
-    // Skip if DITTO_APP_ID not set (Iroh-only test)
-    let ditto_app_id = match std::env::var("DITTO_APP_ID") {
-        Ok(id) if !id.is_empty() => id,
-        _ => {
-            println!("  Skipping Ditto comparison (DITTO_APP_ID not set)");
-            return;
-        }
-    };
+    let ditto_app_id =
+        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for Ditto tests");
 
     let test_data = b"Test content for both backends";
     let metadata = BlobMetadata::with_name("test.txt");
@@ -209,10 +179,7 @@ async fn test_both_backends_content_addressing() {
     let temp_dir_ditto = TempDir::new().unwrap();
     let blob_dir_ditto = temp_dir_ditto.path().join("ditto_blobs");
     std::fs::create_dir_all(&blob_dir_ditto).unwrap();
-    let ditto_store = match create_ditto_store(&ditto_app_id, temp_dir_ditto.path()) {
-        Some(store) => store,
-        None => return,
-    };
+    let ditto_store = create_ditto_store(&ditto_app_id, temp_dir_ditto.path());
     let ditto_blob_store = hive_protocol::storage::DittoBlobStore::with_blob_dir(
         Arc::new(ditto_store),
         blob_dir_ditto,
@@ -484,28 +451,22 @@ async fn run_storage_summary_test<B: BlobStore + 'static>(blob_store: Arc<B>, ba
 // ============================================================================
 
 /// Create a Ditto store for testing
-/// Returns None if DITTO_SHARED_KEY is not set
+/// Panics if DITTO_SHARED_KEY is not set (tests must fail, not skip)
 fn create_ditto_store(
     app_id: &str,
     base_path: &std::path::Path,
-) -> Option<hive_protocol::storage::DittoStore> {
+) -> hive_protocol::storage::DittoStore {
     use hive_protocol::storage::DittoStore;
 
     // Get shared key from environment (required for Ditto)
-    let shared_key = match std::env::var("DITTO_SHARED_KEY") {
-        Ok(key) => {
-            let trimmed = key.trim();
-            if trimmed.is_empty() {
-                eprintln!("DITTO_SHARED_KEY is empty - skipping Ditto tests");
-                return None;
-            }
-            trimmed.to_string()
-        }
-        Err(_) => {
-            eprintln!("DITTO_SHARED_KEY not set - skipping Ditto tests");
-            return None;
-        }
-    };
+    let shared_key =
+        std::env::var("DITTO_SHARED_KEY").expect("DITTO_SHARED_KEY must be set for Ditto tests");
+
+    assert!(
+        !shared_key.trim().is_empty(),
+        "DITTO_SHARED_KEY must not be empty"
+    );
+    let shared_key = shared_key.trim().to_string();
 
     let persistence_dir = base_path.join("ditto_data");
     std::fs::create_dir_all(&persistence_dir).unwrap();
@@ -518,5 +479,5 @@ fn create_ditto_store(
         tcp_connect_address: None,
     };
 
-    Some(DittoStore::new(config).expect("Failed to create DittoStore"))
+    DittoStore::new(config).expect("Failed to create DittoStore")
 }
