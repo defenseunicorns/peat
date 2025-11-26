@@ -958,6 +958,8 @@ impl BlobStore for IrohBlobStore {
 
 ## Open Questions
 
+### General Blob Transfer
+
 1. **Chunk Size for Large Models**: Should we chunk models >1GB into multiple blobs, or rely on backend chunking?
 
 2. **Metadata Storage for Iroh**: iroh-blobs doesn't support metadata natively. Store in separate collection or embed in filename?
@@ -967,6 +969,48 @@ impl BlobStore for IrohBlobStore {
 4. **Encryption**: Should blob content be encrypted at rest? In transit? Defer to Phase 2?
 
 5. **Bandwidth Throttling**: How to implement transfer priority? Backend-specific or application-level?
+
+### ModelDistribution API Design (Phase 4)
+
+These questions must be answered before implementing Phase 4:
+
+6. **Model Selection Strategy**: How should nodes select which model variant to fetch?
+   - Device capability matching (GPU type, memory, CPU arch)?
+   - Should we support fallback chains (try CUDA → TensorRT → CPU)?
+   - Automatic selection vs explicit operator control?
+
+7. **Push vs Pull Distribution**:
+   - **Push model**: Operator deploys model, system pushes to capable nodes
+   - **Pull model**: Node requests capability, fetches appropriate model on demand
+   - **Hybrid**: Proactive distribution based on mission profile + reactive fetch?
+
+8. **Model Lifecycle Management**:
+   - Hot-swapping models during operation without service interruption?
+   - Version management and rollback to previous versions?
+   - Model validation before activation (hash verification, format check)?
+
+9. **Integration Hooks**: What callbacks should the API provide?
+   - Pre-load callbacks (validate model, allocate GPU memory)?
+   - Post-load callbacks (register with inference engine, run warmup)?
+   - Failure handlers (fallback to CPU, alert operator)?
+
+10. **API Abstraction Depth**:
+    - Thin wrapper over FileDistribution (minimal model-specific logic)?
+    - Rich model-specific API (variant selection, convergence tracking)?
+    - How much should be in hive-protocol vs inference runtime integration?
+
+11. **NodeCapabilities Schema**: What capabilities should nodes advertise?
+    ```rust
+    pub struct NodeCapabilities {
+        pub gpu_memory_gb: Option<f64>,
+        pub gpu_type: Option<String>,  // "nvidia", "amd", "apple"
+        pub cpu_arch: String,          // "x86_64", "aarch64"
+        pub available_storage_mb: u64,
+        pub execution_providers: Vec<String>,  // "CUDAExecutionProvider", "CPUExecutionProvider"
+    }
+    ```
+    - How to discover these capabilities at runtime?
+    - How to handle capability changes (storage fills up)?
 
 ---
 

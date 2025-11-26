@@ -66,22 +66,17 @@ use uuid::Uuid;
 ///
 /// Higher priority transfers are scheduled first and may preempt lower priority
 /// transfers when bandwidth is limited.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TransferPriority {
     /// ROE updates, safety-critical fixes - immediate transfer
     Critical,
     /// Operational model updates - next available window
     High,
     /// Routine updates - best effort
+    #[default]
     Normal,
     /// Non-urgent - defer to low-bandwidth periods
     Low,
-}
-
-impl Default for TransferPriority {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 
 impl TransferPriority {
@@ -99,9 +94,10 @@ impl TransferPriority {
 /// Target scope for file distribution
 ///
 /// Determines which nodes receive the distributed file.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub enum DistributionScope {
     /// All connected nodes in the mesh
+    #[default]
     AllNodes,
 
     /// Specific formation (cell, platoon, company)
@@ -132,16 +128,11 @@ pub enum DistributionScope {
     },
 }
 
-impl Default for DistributionScope {
-    fn default() -> Self {
-        Self::AllNodes
-    }
-}
-
 /// State of a transfer to a single node
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TransferState {
     /// Transfer not yet started
+    #[default]
     Pending,
     /// Establishing connection to node
     Connecting,
@@ -151,12 +142,6 @@ pub enum TransferState {
     Completed,
     /// Transfer failed
     Failed,
-}
-
-impl Default for TransferState {
-    fn default() -> Self {
-        Self::Pending
-    }
 }
 
 /// Status of transfer to a single node
