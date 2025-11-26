@@ -35,6 +35,8 @@
 #[cfg(feature = "automerge-backend")]
 use super::automerge_store::AutomergeStore;
 #[cfg(feature = "automerge-backend")]
+use super::flow_control::{FlowControlConfig, FlowControlStats, FlowController};
+#[cfg(feature = "automerge-backend")]
 use super::partition_detection::PartitionDetector;
 #[cfg(feature = "automerge-backend")]
 use super::sync_errors::{SyncError, SyncErrorHandler};
@@ -88,7 +90,7 @@ pub struct PeerSyncStats {
 /// - ✅ Sync statistics tracking (bytes, counts, timestamps)
 /// - ✅ Error handling with retry logic and circuit breaker (Phase 5)
 /// - ✅ Partition detection with heartbeat mechanism (Phase 6.3)
-/// - ⏭ Flow control and backpressure (TODO)
+/// - ✅ Flow control and backpressure (Issue #97)
 #[cfg(feature = "automerge-backend")]
 pub struct AutomergeSyncCoordinator {
     /// Reference to the AutomergeStore
@@ -109,6 +111,8 @@ pub struct AutomergeSyncCoordinator {
     error_handler: Arc<SyncErrorHandler>,
     /// Partition detector for heartbeat tracking
     partition_detector: Arc<PartitionDetector>,
+    /// Flow controller for rate limiting and backpressure
+    flow_controller: Arc<FlowController>,
 }
 
 #[cfg(feature = "automerge-backend")]
@@ -120,6 +124,21 @@ impl AutomergeSyncCoordinator {
     /// * `store` - The AutomergeStore managing documents
     /// * `transport` - The IrohTransport for P2P connections
     pub fn new(store: Arc<AutomergeStore>, transport: Arc<IrohTransport>) -> Self {
+        Self::with_flow_control(store, transport, FlowControlConfig::default())
+    }
+
+    /// Create a new sync coordinator with custom flow control configuration
+    ///
+    /// # Arguments
+    ///
+    /// * `store` - The AutomergeStore managing documents
+    /// * `transport` - The IrohTransport for P2P connections
+    /// * `flow_config` - Custom flow control configuration
+    pub fn with_flow_control(
+        store: Arc<AutomergeStore>,
+        transport: Arc<IrohTransport>,
+        flow_config: FlowControlConfig,
+    ) -> Self {
         Self {
             store,
             transport,
@@ -129,6 +148,7 @@ impl AutomergeSyncCoordinator {
             total_bytes_received: Arc::new(AtomicU64::new(0)),
             error_handler: Arc::new(SyncErrorHandler::new()),
             partition_detector: Arc::new(PartitionDetector::new()),
+            flow_controller: Arc::new(FlowController::with_config(flow_config)),
         }
     }
 
@@ -148,6 +168,17 @@ impl AutomergeSyncCoordinator {
             return Err(anyhow::anyhow!("{}", err));
         }
 
+        // Check flow control (rate limit + cooldown)
+        if let Err(flow_err) = self.flow_controller.check_sync_allowed(&peer_id, doc_key) {
+            tracing::debug!(
+                "Sync blocked by flow control for peer {:?}, doc {}: {}",
+                peer_id,
+                doc_key,
+                flow_err
+            );
+            return Err(anyhow::anyhow!("{}", flow_err));
+        }
+
         // Attempt sync operation
         let result = self.initiate_sync_inner(doc_key, peer_id).await;
 
@@ -155,6 +186,8 @@ impl AutomergeSyncCoordinator {
         match &result {
             Ok(_) => {
                 self.error_handler.record_success(&peer_id);
+                // Record sync for cooldown tracking
+                self.flow_controller.record_sync(&peer_id, doc_key);
                 tracing::debug!("Sync initiated successfully with peer {:?}", peer_id);
             }
             Err(e) => {
@@ -509,6 +542,16 @@ impl AutomergeSyncCoordinator {
     /// Get reference to the partition detector
     pub fn partition_detector(&self) -> &PartitionDetector {
         &self.partition_detector
+    }
+
+    /// Get reference to the flow controller
+    pub fn flow_controller(&self) -> &FlowController {
+        &self.flow_controller
+    }
+
+    /// Get flow control statistics
+    pub fn flow_control_stats(&self) -> FlowControlStats {
+        self.flow_controller.stats()
     }
 
     /// Send a heartbeat to a peer
