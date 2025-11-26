@@ -43,6 +43,7 @@ automerge = { version = "0.7.1", optional = true }  # Automerge CRDT library for
 
 # AutomergeIrohBackend dependencies (ADR-011)
 iroh = { version = "0.95", optional = true }  # QUIC-based P2P networking
+iroh-blobs = { version = "0.97", optional = true }  # Content-addressed blob storage (ADR-025)
 rocksdb = { version = "0.22", optional = true }  # Persistent storage
 lru = { version = "0.12", optional = true }  # LRU cache for hot documents
 toml = { version = "0.8", optional = true }  # Static peer configuration
@@ -52,7 +53,7 @@ rand = { version = "0.9", optional = true }  # Random number generation for retr
 
 [features]
 default = []
-automerge-backend = ["automerge", "iroh", "rocksdb", "lru", "toml", "mdns-sd", "rand"]
+automerge-backend = ["automerge", "iroh", "iroh-blobs", "rocksdb", "lru", "toml", "mdns-sd", "rand"]
 
 [dev-dependencies]
 proptest = { workspace = true }

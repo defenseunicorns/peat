@@ -32,6 +32,8 @@ pub mod automerge_store;
 #[cfg(feature = "automerge-backend")]
 pub mod automerge_sync;
 #[cfg(feature = "automerge-backend")]
+pub mod iroh_blob_store;
+#[cfg(feature = "automerge-backend")]
 pub mod partition_detection;
 #[cfg(feature = "automerge-backend")]
 pub mod sync_errors;
@@ -52,6 +54,8 @@ pub use automerge_backend::AutomergeBackend;
 pub use automerge_store::AutomergeStore;
 #[cfg(feature = "automerge-backend")]
 pub use automerge_sync::AutomergeSyncCoordinator;
+#[cfg(feature = "automerge-backend")]
+pub use iroh_blob_store::IrohBlobStore;
 #[cfg(feature = "automerge-backend")]
 pub use partition_detection::{
     PartitionConfig, PartitionDetector, PartitionEvent, PeerHeartbeat, PeerPartitionState,
