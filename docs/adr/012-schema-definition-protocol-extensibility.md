@@ -1446,6 +1446,248 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
    - [ ] Validation catches 90%+ of schema errors at compile-time
    - [ ] Documentation rated "good" or better by external developers
 
+## Appendix: HIVE Protocol Schemas (v1)
+
+> **Added 2025-11-25**: These schemas define the core HIVE Protocol primitives for software distribution, capability advertisement, and event routing. They supersede the earlier example schemas above and represent the canonical protocol definitions.
+>
+> **Design Principle**: HIVE Protocol defines the envelope, applications define the contents. All payloads use `google.protobuf.Any` or `google.protobuf.Struct` to remain application-agnostic.
+
+### A.1 Blob Reference (ADR-025)
+
+```protobuf
+syntax = "proto3";
+package hive.blob.v1;
+
+// Content-addressed blob reference
+message BlobReference {
+  string hash = 1;              // Content hash (hex)
+  string hash_algorithm = 2;    // "sha256", "blake3"
+  uint64 size_bytes = 3;
+
+  // Application-defined metadata (opaque to HIVE)
+  map<string, string> metadata = 10;
+}
+```
+
+### A.2 Capability Advertisement
+
+```protobuf
+syntax = "proto3";
+package hive.capability.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+message CapabilityAdvertisement {
+  string node_id = 1;
+  string formation_id = 2;
+  google.protobuf.Timestamp advertised_at = 3;
+  repeated Capability capabilities = 4;
+  ResourceStatus resources = 5;
+}
+
+message Capability {
+  string capability_type = 1;   // "inference", "sensor", "comms", "software"
+  string capability_id = 2;     // "target_recognition", "gps", "mesh_radio"
+  string version = 3;
+  CapabilityState state = 4;
+  google.protobuf.Struct attributes = 10;  // Application-defined
+}
+
+enum CapabilityState {
+  CAPABILITY_STATE_UNSPECIFIED = 0;
+  CAPABILITY_STATE_AVAILABLE = 1;
+  CAPABILITY_STATE_DEGRADED = 2;
+  CAPABILITY_STATE_OFFLINE = 3;
+  CAPABILITY_STATE_STARTING = 4;
+}
+
+message ResourceStatus {
+  double cpu_available = 1;
+  uint64 memory_available_bytes = 2;
+  uint64 gpu_memory_available_bytes = 3;
+  uint64 storage_available_bytes = 4;
+  map<string, double> custom = 10;
+}
+
+message FormationCapabilitySummary {
+  string formation_id = 1;
+  string formation_type = 2;    // "squad", "platoon", "company"
+  google.protobuf.Timestamp summarized_at = 3;
+  uint32 total_members = 4;
+  uint32 members_available = 5;
+  uint32 members_degraded = 6;
+  uint32 members_offline = 7;
+  repeated AggregatedCapability capabilities = 10;
+}
+
+message AggregatedCapability {
+  string capability_type = 1;
+  string capability_id = 2;
+  uint32 count_available = 3;
+  uint32 count_degraded = 4;
+  uint32 count_total = 5;
+  google.protobuf.Struct aggregated_attributes = 10;
+}
+```
+
+### A.3 HIVE Event (Products, Anomalies, Telemetry)
+
+```protobuf
+syntax = "proto3";
+package hive.event.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
+
+message HiveEvent {
+  string event_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  string source_node_id = 3;
+  string source_formation_id = 4;
+  optional string source_instance_id = 5;
+  EventClass event_class = 6;
+  string event_type = 7;        // Application-defined type identifier
+  AggregationPolicy routing = 8;
+  google.protobuf.Any payload = 10;  // Application-defined payload
+}
+
+enum EventClass {
+  EVENT_CLASS_UNSPECIFIED = 0;
+  EVENT_CLASS_PRODUCT = 1;      // Outputs from software (detections, decisions)
+  EVENT_CLASS_ANOMALY = 2;      // Anomalies requiring attention
+  EVENT_CLASS_TELEMETRY = 3;    // Metrics, health, diagnostics
+  EVENT_CLASS_COMMAND = 4;      // Downward directives
+}
+
+message AggregationPolicy {
+  PropagationMode propagation = 1;
+  EventPriority priority = 2;
+  uint32 ttl_seconds = 3;
+  uint32 aggregation_window_ms = 4;
+}
+
+enum PropagationMode {
+  PROPAGATION_FULL = 0;         // Forward complete event upward
+  PROPAGATION_SUMMARY = 1;      // Aggregate events, forward summary
+  PROPAGATION_QUERY = 2;        // Store locally, respond to queries
+  PROPAGATION_LOCAL = 3;        // No propagation, local only
+}
+
+enum EventPriority {
+  PRIORITY_CRITICAL = 0;        // Immediate, preempts other traffic
+  PRIORITY_HIGH = 1;
+  PRIORITY_NORMAL = 2;
+  PRIORITY_LOW = 3;
+}
+
+message EventSummary {
+  string formation_id = 1;
+  google.protobuf.Timestamp window_start = 2;
+  google.protobuf.Timestamp window_end = 3;
+  EventClass event_class = 4;
+  string event_type = 5;
+  uint32 event_count = 6;
+  repeated string source_node_ids = 7;
+  google.protobuf.Any summary_payload = 10;
+}
+```
+
+### A.4 Deployment Directive (Commands Through Hierarchy)
+
+```protobuf
+syntax = "proto3";
+package hive.deployment.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+import "hive/blob/v1/blob.proto";
+
+message DeploymentDirective {
+  string directive_id = 1;
+  google.protobuf.Timestamp issued_at = 2;
+  string issuer_node_id = 3;
+  string issuer_formation_id = 4;
+  DeploymentScope scope = 5;
+  hive.blob.v1.BlobReference artifact = 6;
+  string artifact_type = 7;     // "onnx_model", "container", "config_package"
+  google.protobuf.Struct config = 10;  // Application-defined
+  DeploymentOptions options = 11;
+}
+
+message DeploymentScope {
+  oneof target {
+    string formation_id = 1;
+    NodeList specific_nodes = 2;
+    CapabilityFilter capability_filter = 3;
+    bool broadcast = 4;
+  }
+}
+
+message NodeList {
+  repeated string node_ids = 1;
+}
+
+message CapabilityFilter {
+  optional double min_cpu = 1;
+  optional uint64 min_memory_bytes = 2;
+  optional uint64 min_gpu_memory_bytes = 3;
+  optional uint64 min_storage_bytes = 4;
+  repeated string required_capability_ids = 10;
+  map<string, string> custom_filters = 20;
+}
+
+message DeploymentOptions {
+  hive.event.v1.EventPriority priority = 1;
+  uint32 timeout_seconds = 2;
+  bool replace_existing = 3;
+  optional uint32 rollback_threshold_percent = 4;
+}
+
+message DeploymentStatus {
+  string directive_id = 1;
+  string node_id = 2;
+  google.protobuf.Timestamp reported_at = 3;
+  DeploymentState state = 4;
+  uint32 progress_percent = 5;
+  optional string error_message = 6;
+  optional string instance_id = 7;
+}
+
+enum DeploymentState {
+  DEPLOYMENT_STATE_UNSPECIFIED = 0;
+  DEPLOYMENT_STATE_PENDING = 1;
+  DEPLOYMENT_STATE_DOWNLOADING = 2;
+  DEPLOYMENT_STATE_ACTIVATING = 3;
+  DEPLOYMENT_STATE_ACTIVE = 4;
+  DEPLOYMENT_STATE_FAILED = 5;
+  DEPLOYMENT_STATE_ROLLED_BACK = 6;
+}
+```
+
+### A.5 Protocol Behavior Summary
+
+| Schema | Direction | Aggregation | HIVE Responsibility |
+|--------|-----------|-------------|---------------------|
+| BlobReference | N/A | N/A | Transfer bytes, verify hash |
+| CapabilityAdvertisement | ↑ Upward | Summarize at echelons | Route through hierarchy |
+| HiveEvent | ↑ Upward | Per AggregationPolicy | Apply routing policy |
+| DeploymentDirective | ↓ Downward | Scope filtering | Route to matching nodes |
+| DeploymentStatus | ↑ Upward | Aggregate per directive | Collect status reports |
+
+### A.6 Extension Points
+
+Applications extend HIVE by:
+1. **Defining capability attributes** (`Capability.attributes`)
+2. **Defining event payloads** (`HiveEvent.payload`)
+3. **Defining artifact types** (`DeploymentDirective.artifact_type`)
+4. **Defining deployment config** (`DeploymentDirective.config`)
+5. **Defining custom filters** (`CapabilityFilter.custom_filters`)
+
+HIVE routes, aggregates, and enforces policies without understanding application semantics.
+
+---
+
 ## References
 
 1. [Protocol Buffers Documentation](https://protobuf.dev/)
