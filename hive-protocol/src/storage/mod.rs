@@ -32,6 +32,8 @@ pub mod automerge_store;
 #[cfg(feature = "automerge-backend")]
 pub mod automerge_sync;
 #[cfg(feature = "automerge-backend")]
+pub mod flow_control;
+#[cfg(feature = "automerge-backend")]
 pub mod geohash_index;
 #[cfg(feature = "automerge-backend")]
 pub mod iroh_blob_store;
@@ -41,6 +43,8 @@ pub mod partition_detection;
 pub mod query;
 #[cfg(feature = "automerge-backend")]
 pub mod sync_errors;
+#[cfg(feature = "automerge-backend")]
+pub mod sync_persistence;
 #[cfg(feature = "automerge-backend")]
 pub mod ttl_manager;
 
@@ -72,6 +76,17 @@ pub use ttl_manager::TtlManager;
 pub use geohash_index::{GeohashIndex, DEFAULT_GEOHASH_PRECISION};
 #[cfg(feature = "automerge-backend")]
 pub use query::{extract_field, Query, SortOrder, Value};
+
+// Flow control & persistence (Issue #97 - ADR-011 Production Hardening)
+#[cfg(feature = "automerge-backend")]
+pub use flow_control::{
+    BoundedQueue, FlowControlConfig, FlowControlError, FlowControlStats, FlowController,
+    PeerResourceTracker, SyncCooldownTracker, TokenBucket,
+};
+#[cfg(feature = "automerge-backend")]
+pub use sync_persistence::{
+    Checkpoint, PersistedSyncState, PersistenceStats, SyncStatePersistence,
+};
 
 // Trait abstractions (E11.2)
 pub use backend::{create_storage_backend, StorageConfig};
