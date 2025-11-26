@@ -5,6 +5,12 @@ pub mod backend;
 pub mod capabilities;
 pub mod traits;
 
+// Blob storage trait abstraction (ADR-025)
+pub mod blob_document_integration;
+pub mod blob_traits;
+pub mod ditto_blob_store;
+pub mod file_distribution;
+
 // Backend implementations (E11.2)
 pub mod ditto_backend;
 
@@ -58,6 +64,21 @@ pub use backend::{create_storage_backend, StorageConfig};
 pub use capabilities::{CrdtCapable, SyncCapable, SyncStats, TypedCollection};
 pub use ditto_backend::DittoBackend;
 pub use traits::{Collection, DocumentPredicate, StorageBackend};
+
+// Blob storage (ADR-025)
+pub use blob_document_integration::{
+    BlobDocumentIntegration, BlobReference, BlobReferenceMetadata, DittoBlobDocumentIntegration,
+    ModelProvenance, ModelRegistryDocument, ModelVariantBlob,
+};
+pub use blob_traits::{
+    BlobHandle, BlobHash, BlobMetadata, BlobProgress, BlobStorageSummary, BlobStore, BlobStoreExt,
+    BlobToken, SharedBlobStore,
+};
+pub use ditto_blob_store::DittoBlobStore;
+pub use file_distribution::{
+    DistributionHandle, DistributionScope, DistributionStatus, DittoFileDistribution,
+    FileDistribution, NodeTransferStatus, TransferPriority, TransferState,
+};
 
 // Legacy compatibility aliases
 pub use cell_store::CellStore as SquadStore;
