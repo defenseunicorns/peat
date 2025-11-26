@@ -52,7 +52,7 @@ pub use registry::QoSRegistry;
 /// Critical messages are handled with highest priority and may preempt lower
 /// priority transfers. The numeric values enable `PartialOrd` comparisons
 /// where lower values indicate higher priority.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum QoSClass {
     /// P1: Mission-critical, immediate sync
@@ -71,6 +71,7 @@ pub enum QoSClass {
     ///
     /// Health status, capability changes, formation updates.
     /// Default priority for most operational messages.
+    #[default]
     #[serde(alias = "default")]
     Normal = 3,
 
@@ -85,12 +86,6 @@ pub enum QoSClass {
     /// Model updates, debug logs, historical data.
     /// Background transfer, lowest priority.
     Bulk = 5,
-}
-
-impl Default for QoSClass {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 
 impl QoSClass {
