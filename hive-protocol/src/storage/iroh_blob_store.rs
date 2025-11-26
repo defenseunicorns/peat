@@ -439,19 +439,26 @@ impl BlobStore for IrohBlobStore {
     }
 
     fn local_storage_bytes(&self) -> u64 {
-        // Sum up sizes from local blobs
-        let mut total = 0u64;
+        // Sum up sizes from cache (matches DittoBlobStore behavior)
+        // This represents logical storage used by blobs we know about,
+        // regardless of whether they've been exported to disk yet.
+        if let Ok(cache) = self.token_cache.read() {
+            if !cache.is_empty() {
+                return cache.values().map(|t| t.size_bytes).sum();
+            }
+        }
 
+        // Fallback: scan metadata sidecars for size info
+        let mut total = 0u64;
         if let Ok(entries) = std::fs::read_dir(&self.blob_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.is_file() {
-                    // Only count actual blob files (not .meta.json)
-                    if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-                        if !filename.ends_with(".meta.json") {
-                            if let Ok(meta) = std::fs::metadata(&path) {
-                                total += meta.len();
-                            }
+                if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
+                    if filename.ends_with(".meta.json") {
+                        let hash_hex = filename.trim_end_matches(".meta.json");
+                        let hash = BlobHash::from_hex(hash_hex);
+                        if let Some(sidecar) = self.load_metadata(&hash) {
+                            total += sidecar.size_bytes;
                         }
                     }
                 }
@@ -613,20 +620,18 @@ mod tests {
         // Initially zero
         assert_eq!(store.local_storage_bytes(), 0);
 
-        // Create blobs and export them
+        // Create blobs (no need to export them - cache tracks sizes)
         let data1 = b"Small";
-        let token1 = store
+        let _token1 = store
             .create_blob_from_bytes(data1, BlobMetadata::default())
             .await
             .unwrap();
-        let _ = store.fetch_blob(&token1, |_| {}).await.unwrap();
 
         let data2 = b"Larger blob content";
-        let token2 = store
+        let _token2 = store
             .create_blob_from_bytes(data2, BlobMetadata::default())
             .await
             .unwrap();
-        let _ = store.fetch_blob(&token2, |_| {}).await.unwrap();
 
         let total = store.local_storage_bytes();
         assert_eq!(total, (data1.len() + data2.len()) as u64);
