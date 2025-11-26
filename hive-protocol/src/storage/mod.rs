@@ -6,6 +6,7 @@ pub mod capabilities;
 pub mod traits;
 
 // Blob storage trait abstraction (ADR-025)
+pub mod blob_document_integration;
 pub mod blob_traits;
 pub mod ditto_blob_store;
 
@@ -64,6 +65,10 @@ pub use ditto_backend::DittoBackend;
 pub use traits::{Collection, DocumentPredicate, StorageBackend};
 
 // Blob storage (ADR-025)
+pub use blob_document_integration::{
+    BlobDocumentIntegration, BlobReference, BlobReferenceMetadata, DittoBlobDocumentIntegration,
+    ModelProvenance, ModelRegistryDocument, ModelVariantBlob,
+};
 pub use blob_traits::{
     BlobHandle, BlobHash, BlobMetadata, BlobProgress, BlobStorageSummary, BlobStore, BlobStoreExt,
     BlobToken, SharedBlobStore,
