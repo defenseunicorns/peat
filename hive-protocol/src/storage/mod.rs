@@ -32,9 +32,13 @@ pub mod automerge_store;
 #[cfg(feature = "automerge-backend")]
 pub mod automerge_sync;
 #[cfg(feature = "automerge-backend")]
+pub mod geohash_index;
+#[cfg(feature = "automerge-backend")]
 pub mod iroh_blob_store;
 #[cfg(feature = "automerge-backend")]
 pub mod partition_detection;
+#[cfg(feature = "automerge-backend")]
+pub mod query;
 #[cfg(feature = "automerge-backend")]
 pub mod sync_errors;
 #[cfg(feature = "automerge-backend")]
@@ -62,6 +66,12 @@ pub use partition_detection::{
 };
 #[cfg(feature = "automerge-backend")]
 pub use ttl_manager::TtlManager;
+
+// Query engine (Issue #80 - ADR-011 Phase 4)
+#[cfg(feature = "automerge-backend")]
+pub use geohash_index::{GeohashIndex, DEFAULT_GEOHASH_PRECISION};
+#[cfg(feature = "automerge-backend")]
+pub use query::{extract_field, Query, SortOrder, Value};
 
 // Trait abstractions (E11.2)
 pub use backend::{create_storage_backend, StorageConfig};
