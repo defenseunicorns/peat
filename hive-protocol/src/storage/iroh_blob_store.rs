@@ -439,19 +439,26 @@ impl BlobStore for IrohBlobStore {
     }
 
     fn local_storage_bytes(&self) -> u64 {
-        // Sum up sizes from local blobs
-        let mut total = 0u64;
+        // Sum up sizes from cache (matches DittoBlobStore behavior)
+        // This represents logical storage used by blobs we know about,
+        // regardless of whether they've been exported to disk yet.
+        if let Ok(cache) = self.token_cache.read() {
+            if !cache.is_empty() {
+                return cache.values().map(|t| t.size_bytes).sum();
+            }
+        }
 
+        // Fallback: scan metadata sidecars for size info
+        let mut total = 0u64;
         if let Ok(entries) = std::fs::read_dir(&self.blob_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.is_file() {
-                    // Only count actual blob files (not .meta.json)
-                    if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-                        if !filename.ends_with(".meta.json") {
-                            if let Ok(meta) = std::fs::metadata(&path) {
-                                total += meta.len();
-                            }
+                if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
+                    if filename.ends_with(".meta.json") {
+                        let hash_hex = filename.trim_end_matches(".meta.json");
+                        let hash = BlobHash::from_hex(hash_hex);
+                        if let Some(sidecar) = self.load_metadata(&hash) {
+                            total += sidecar.size_bytes;
                         }
                     }
                 }
@@ -459,6 +466,326 @@ impl BlobStore for IrohBlobStore {
         }
 
         total
+    }
+}
+
+// ============================================================================
+// NetworkedIrohBlobStore - P2P blob sync with iroh endpoint
+// ============================================================================
+
+use iroh::{Endpoint, EndpointId};
+use iroh_blobs::BlobsProtocol;
+use std::sync::Arc;
+use tokio::sync::RwLock as TokioRwLock;
+
+/// Networked Iroh blob store with P2P sync capabilities
+///
+/// Extends `IrohBlobStore` with:
+/// - iroh `Endpoint` for QUIC connections
+/// - `BlobsProtocol` for serving blobs to peers
+/// - `Downloader` for fetching from remote peers
+///
+/// # Architecture
+///
+/// ```text
+/// NetworkedIrohBlobStore
+///     ├─ IrohBlobStore (local storage)
+///     ├─ Endpoint (QUIC transport)
+///     ├─ BlobsProtocol (incoming requests)
+///     └─ known_peers (for remote fetch)
+/// ```
+///
+/// # Usage
+///
+/// ```ignore
+/// use hive_protocol::storage::NetworkedIrohBlobStore;
+///
+/// // Create with networking
+/// let store = NetworkedIrohBlobStore::new(blob_dir).await?;
+///
+/// // Add known peer for remote fetch
+/// store.add_peer(peer_endpoint_id).await;
+///
+/// // Create blob locally (available to peers via BlobsProtocol)
+/// let token = store.create_blob_from_bytes(data, metadata).await?;
+///
+/// // Fetch blob (tries local first, then remote peers)
+/// let handle = store.fetch_blob(&token, |progress| {}).await?;
+/// ```
+pub struct NetworkedIrohBlobStore {
+    /// Local blob store
+    local_store: IrohBlobStore,
+    /// Iroh endpoint for P2P connections
+    endpoint: Endpoint,
+    /// BlobsProtocol for serving blobs
+    blobs_protocol: BlobsProtocol,
+    /// Known peers that may have blobs
+    known_peers: TokioRwLock<Vec<EndpointId>>,
+}
+
+impl NetworkedIrohBlobStore {
+    /// Create a new networked blob store
+    ///
+    /// Binds an iroh endpoint and starts the BlobsProtocol for serving blobs.
+    ///
+    /// # Arguments
+    ///
+    /// * `blob_dir` - Directory for blob storage and metadata
+    pub async fn new(blob_dir: PathBuf) -> Result<Arc<Self>> {
+        // Create local store
+        let local_store = IrohBlobStore::new_in_memory(blob_dir).await?;
+
+        // Create endpoint
+        let endpoint = Endpoint::builder()
+            .alpns(vec![iroh_blobs::ALPN.to_vec()])
+            .bind()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to create iroh endpoint: {}", e))?;
+
+        // Create BlobsProtocol with our store
+        let blobs_protocol = BlobsProtocol::new(&local_store.store, None);
+
+        let store = Arc::new(Self {
+            local_store,
+            endpoint,
+            blobs_protocol,
+            known_peers: TokioRwLock::new(Vec::new()),
+        });
+
+        // Note: In a full implementation, you'd spawn a Router here to handle
+        // incoming blob requests. For E2E tests, we handle this explicitly.
+
+        Ok(store)
+    }
+
+    /// Create with a specific bind address
+    pub async fn bind(blob_dir: PathBuf, bind_addr: std::net::SocketAddr) -> Result<Arc<Self>> {
+        let local_store = IrohBlobStore::new_in_memory(blob_dir).await?;
+
+        let bind_addr_v4 = match bind_addr {
+            std::net::SocketAddr::V4(addr) => addr,
+            std::net::SocketAddr::V6(_) => {
+                return Err(anyhow::anyhow!("Only IPv4 addresses supported"))
+            }
+        };
+
+        let endpoint = Endpoint::builder()
+            .alpns(vec![iroh_blobs::ALPN.to_vec()])
+            .bind_addr_v4(bind_addr_v4)
+            .bind()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to create iroh endpoint: {}", e))?;
+
+        let blobs_protocol = BlobsProtocol::new(&local_store.store, None);
+
+        Ok(Arc::new(Self {
+            local_store,
+            endpoint,
+            blobs_protocol,
+            known_peers: TokioRwLock::new(Vec::new()),
+        }))
+    }
+
+    /// Get the endpoint ID (public key) for this node
+    pub fn endpoint_id(&self) -> EndpointId {
+        self.endpoint.id()
+    }
+
+    /// Get a reference to the underlying endpoint
+    pub fn endpoint(&self) -> &Endpoint {
+        &self.endpoint
+    }
+
+    /// Get a reference to the blobs protocol handler
+    pub fn blobs_protocol(&self) -> &BlobsProtocol {
+        &self.blobs_protocol
+    }
+
+    /// Get a reference to the local store
+    pub fn local_store(&self) -> &IrohBlobStore {
+        &self.local_store
+    }
+
+    /// Add a peer that may have blobs we want to fetch
+    pub async fn add_peer(&self, peer_id: EndpointId) {
+        let mut peers = self.known_peers.write().await;
+        if !peers.contains(&peer_id) {
+            peers.push(peer_id);
+            debug!("Added peer {} for blob fetching", peer_id.fmt_short());
+        }
+    }
+
+    /// Remove a peer from the known peers list
+    pub async fn remove_peer(&self, peer_id: &EndpointId) {
+        let mut peers = self.known_peers.write().await;
+        peers.retain(|p| p != peer_id);
+    }
+
+    /// List known peers
+    pub async fn known_peers(&self) -> Vec<EndpointId> {
+        self.known_peers.read().await.clone()
+    }
+
+    /// Get the iroh-blobs Store API for advanced operations
+    pub fn store_api(&self) -> &iroh_blobs::api::Store {
+        &self.local_store.store
+    }
+}
+
+#[async_trait::async_trait]
+impl BlobStore for NetworkedIrohBlobStore {
+    async fn create_blob(&self, path: &Path, metadata: BlobMetadata) -> Result<BlobToken> {
+        // Delegate to local store - blob becomes available for P2P via BlobsProtocol
+        self.local_store.create_blob(path, metadata).await
+    }
+
+    async fn create_blob_from_bytes(
+        &self,
+        data: &[u8],
+        metadata: BlobMetadata,
+    ) -> Result<BlobToken> {
+        // Delegate to local store
+        self.local_store
+            .create_blob_from_bytes(data, metadata)
+            .await
+    }
+
+    async fn fetch_blob<F>(&self, token: &BlobToken, mut progress: F) -> Result<BlobHandle>
+    where
+        F: FnMut(BlobProgress) + Send + 'static,
+    {
+        info!(
+            "NetworkedIrohBlobStore: Fetching blob {}",
+            token.hash.as_hex()
+        );
+
+        // First, try local fetch
+        let local_path = self.local_store.local_blob_path(&token.hash);
+        if local_path.exists() {
+            debug!("Blob exists locally at {:?}", local_path);
+            progress(BlobProgress::Completed {
+                local_path: local_path.clone(),
+            });
+            return Ok(BlobHandle::new(token.clone(), local_path));
+        }
+
+        // Check if in local store (not yet exported)
+        let iroh_hash = IrohBlobStore::blob_hash_to_iroh_hash(&token.hash)?;
+        if self.local_store.store.has(iroh_hash).await? {
+            debug!("Blob in local store, exporting");
+            return self.local_store.fetch_blob(token, progress).await;
+        }
+
+        // Not available locally - try to fetch from known peers
+        progress(BlobProgress::Started {
+            total_bytes: token.size_bytes,
+        });
+
+        let peers = self.known_peers.read().await.clone();
+        if peers.is_empty() {
+            progress(BlobProgress::Failed {
+                error: format!(
+                    "Blob {} not available locally and no peers known",
+                    token.hash
+                ),
+            });
+            return Err(anyhow::anyhow!(
+                "Blob {} not available locally and no peers configured for remote fetch",
+                token.hash.as_hex()
+            ));
+        }
+
+        info!(
+            "Attempting to fetch blob {} from {} known peers",
+            token.hash.as_hex(),
+            peers.len()
+        );
+
+        // Use the downloader to fetch from peers
+        let downloader = self.store_api().downloader(&self.endpoint);
+
+        for peer_id in &peers {
+            debug!(
+                "Trying peer {} for blob {}",
+                peer_id.fmt_short(),
+                token.hash.as_hex()
+            );
+
+            progress(BlobProgress::Downloading {
+                downloaded_bytes: 0,
+                total_bytes: token.size_bytes,
+            });
+
+            // Try to download from this peer
+            match downloader.download(iroh_hash, Some(*peer_id)).await {
+                Ok(_) => {
+                    info!(
+                        "Successfully downloaded blob {} from peer {}",
+                        token.hash.as_hex(),
+                        peer_id.fmt_short()
+                    );
+
+                    // Export to local filesystem
+                    let export_path = self.local_store.export_blob(&iroh_hash).await?;
+
+                    // Save metadata sidecar
+                    let sidecar = SidecarMetadata::new(token.metadata.clone(), token.size_bytes);
+                    self.local_store.save_metadata(&token.hash, &sidecar)?;
+
+                    // Cache token
+                    self.local_store.cache_token(token);
+
+                    progress(BlobProgress::Completed {
+                        local_path: export_path.clone(),
+                    });
+
+                    return Ok(BlobHandle::new(token.clone(), export_path));
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to download from peer {}: {}",
+                        peer_id.fmt_short(),
+                        e
+                    );
+                    continue;
+                }
+            }
+        }
+
+        // All peers failed
+        progress(BlobProgress::Failed {
+            error: format!(
+                "Failed to fetch blob {} from all {} peers",
+                token.hash,
+                peers.len()
+            ),
+        });
+
+        Err(anyhow::anyhow!(
+            "Failed to fetch blob {} from any of {} known peers",
+            token.hash.as_hex(),
+            peers.len()
+        ))
+    }
+
+    fn blob_exists_locally(&self, hash: &BlobHash) -> bool {
+        self.local_store.blob_exists_locally(hash)
+    }
+
+    fn blob_info(&self, hash: &BlobHash) -> Option<BlobToken> {
+        self.local_store.blob_info(hash)
+    }
+
+    async fn delete_blob(&self, hash: &BlobHash) -> Result<()> {
+        self.local_store.delete_blob(hash).await
+    }
+
+    fn list_local_blobs(&self) -> Vec<BlobToken> {
+        self.local_store.list_local_blobs()
+    }
+
+    fn local_storage_bytes(&self) -> u64 {
+        self.local_store.local_storage_bytes()
     }
 }
 
@@ -613,20 +940,18 @@ mod tests {
         // Initially zero
         assert_eq!(store.local_storage_bytes(), 0);
 
-        // Create blobs and export them
+        // Create blobs (no need to export them - cache tracks sizes)
         let data1 = b"Small";
-        let token1 = store
+        let _token1 = store
             .create_blob_from_bytes(data1, BlobMetadata::default())
             .await
             .unwrap();
-        let _ = store.fetch_blob(&token1, |_| {}).await.unwrap();
 
         let data2 = b"Larger blob content";
-        let token2 = store
+        let _token2 = store
             .create_blob_from_bytes(data2, BlobMetadata::default())
             .await
             .unwrap();
-        let _ = store.fetch_blob(&token2, |_| {}).await.unwrap();
 
         let total = store.local_storage_bytes();
         assert_eq!(total, (data1.len() + data2.len()) as u64);

@@ -55,7 +55,7 @@ pub use automerge_store::AutomergeStore;
 #[cfg(feature = "automerge-backend")]
 pub use automerge_sync::AutomergeSyncCoordinator;
 #[cfg(feature = "automerge-backend")]
-pub use iroh_blob_store::IrohBlobStore;
+pub use iroh_blob_store::{IrohBlobStore, NetworkedIrohBlobStore};
 #[cfg(feature = "automerge-backend")]
 pub use partition_detection::{
     PartitionConfig, PartitionDetector, PartitionEvent, PeerHeartbeat, PeerPartitionState,
