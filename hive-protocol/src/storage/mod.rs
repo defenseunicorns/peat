@@ -9,6 +9,7 @@ pub mod traits;
 pub mod blob_document_integration;
 pub mod blob_traits;
 pub mod ditto_blob_store;
+pub mod file_distribution;
 
 // Backend implementations (E11.2)
 pub mod ditto_backend;
@@ -74,6 +75,10 @@ pub use blob_traits::{
     BlobToken, SharedBlobStore,
 };
 pub use ditto_blob_store::DittoBlobStore;
+pub use file_distribution::{
+    DistributionHandle, DistributionScope, DistributionStatus, DittoFileDistribution,
+    FileDistribution, NodeTransferStatus, TransferPriority, TransferState,
+};
 
 // Legacy compatibility aliases
 pub use cell_store::CellStore as SquadStore;
