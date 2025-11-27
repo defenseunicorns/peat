@@ -204,12 +204,27 @@ pub struct ProtocolConfig {
 
 #[derive(Debug, Clone, Copy)]
 pub enum TakProtocolVersion {
-    /// CoT XML over TCP (legacy)
+    /// CoT XML over TCP (legacy, Version 0)
+    /// Header: 0xbf 0x00 0xbf <xml_payload>
+    /// Use for: debugging, legacy TAK Server compatibility
     XmlTcp,
 
-    /// TAK Protocol v1 (Protobuf with framing)
-    /// Format: [magic: u8][version: u8][magic: u8][payload_len: varint][payload]
+    /// TAK Protocol v1 (Protobuf) - PREFERRED
+    /// Header: 0xbf 0x01 0xbf <protobuf_payload> (Mesh SA)
+    /// Header: 0xbf <varint_length> <protobuf_payload> (TAK Server TCP)
+    ///
+    /// Protobuf is 3-5x smaller than XML, critical for DIL/tactical networks.
+    /// Modern TAK products (ATAK, WinTAK, iTAK) default to Protobuf.
+    ///
+    /// Proto files: https://github.com/deptofdefense/AndroidTacticalAssaultKit-CIV/tree/main/takproto
     ProtobufV1,
+}
+
+impl Default for TakProtocolVersion {
+    fn default() -> Self {
+        // Prefer Protobuf for bandwidth efficiency
+        Self::ProtobufV1
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -899,14 +914,55 @@ pub struct QueueDepthMetrics {
 3. Priority message delivery order
 4. Mesh SA multicast
 
+## TAK Protocol v1 (Protobuf) - Preferred Format
+
+### Why Protobuf is Preferred
+
+TAK Server and modern TAK clients (ATAK, WinTAK, iTAK) support **TAK Protocol Version 1** which uses Google Protocol Buffers instead of XML. This is critical for HIVE's tactical/DIL environments:
+
+| Metric | XML | Protobuf | Benefit |
+|--------|-----|----------|---------|
+| Position update | ~500-2000 bytes | ~100-300 bytes | **3-5x smaller** |
+| Parsing speed | Slower (text) | Faster (binary) | Lower latency |
+| Schema validation | XSD (optional) | Built-in | Stronger typing |
+
+### Protocol Framing
+
+**Mesh SA (UDP multicast)**:
+```
+[0xbf][version][0xbf][payload]
+```
+- Version `0x00` = XML payload
+- Version `0x01` = Protobuf payload (preferred)
+
+**TAK Server (TCP stream)**:
+```
+[0xbf][varint_length][protobuf_payload]
+```
+
+### Proto Files
+
+The official TAK Protocol Buffers definitions are available at:
+- [AndroidTacticalAssaultKit-CIV/takproto](https://github.com/deptofdefense/AndroidTacticalAssaultKit-CIV/tree/main/takproto)
+
+Key message type: `atakmap.commoncommo.v1.TakMessage`
+
+### HIVE Extension in Protobuf
+
+The `_hive_` XML extension (ADR-028) can be embedded in Protobuf via:
+1. **`xmlDetail` field** - Embed XML string in Protobuf detail (initial approach, maximum compatibility)
+2. **Native Protobuf extension** - Define custom proto messages (future optimization)
+
+Initial implementation will use `xmlDetail` for compatibility with all TAK products.
+
 ## Dependencies
 
 ### Rust Crates
 
 - `tokio` - Async runtime
 - `tokio-rustls` - TLS support
-- `quick-xml` - CoT XML encoding
-- `prost` - Protobuf encoding (TAK Protocol v1)
+- `prost` - **Protobuf encoding (TAK Protocol v1)** - Primary
+- `quick-xml` - CoT XML encoding (legacy/debug/xmlDetail)
 - `socket2` - Multicast socket options
 
 ### External
@@ -922,6 +978,8 @@ pub struct QueueDepthMetrics {
 3. [cottak Rust crate](https://docs.rs/cottak/latest/cottak/)
 4. [M1 POC TAK Integration Requirements](TAK_INTEGRATION_REQUIREMENTS.md)
 5. [ADR-019 QoS](019-qos-and-data-prioritization.md)
+6. [TAK Protocol Protobuf Definitions](https://github.com/deptofdefense/AndroidTacticalAssaultKit-CIV/tree/main/takproto)
+7. [takproto Python library](https://github.com/snstac/takproto) - Reference implementation
 
 ## Decision Log
 
