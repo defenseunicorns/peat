@@ -59,6 +59,7 @@
 //! ```
 
 use crate::cell::messaging::MessagePriority;
+use crate::qos::QoSClass;
 use crate::Result;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -370,6 +371,52 @@ impl FlowController {
         state.active
     }
 
+    /// Acquire permit using QoSClass instead of MessagePriority
+    ///
+    /// This method provides QoS-aware flow control by converting QoSClass
+    /// to MessagePriority for the underlying rate limiter. Higher QoS classes
+    /// (Critical, High) receive preferential treatment with lower token consumption.
+    ///
+    /// # Arguments
+    ///
+    /// * `level` - The routing level (Cell or Zone)
+    /// * `message_size` - Size of the message in bytes
+    /// * `qos_class` - The QoS classification for priority handling
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use hive_protocol::hierarchy::flow_control::{FlowController, RoutingLevel};
+    /// use hive_protocol::qos::QoSClass;
+    ///
+    /// let controller = FlowController::new(/* ... */);
+    /// let permit = controller.acquire_permit_qos(
+    ///     RoutingLevel::Cell,
+    ///     1024,
+    ///     QoSClass::Critical,
+    /// ).await?;
+    /// ```
+    #[instrument(skip(self))]
+    pub async fn acquire_permit_qos(
+        &self,
+        level: RoutingLevel,
+        message_size: usize,
+        qos_class: QoSClass,
+    ) -> Result<Permit> {
+        // Convert QoSClass to MessagePriority for the underlying implementation
+        let priority: MessagePriority = qos_class.into();
+        self.acquire_permit(level, message_size, priority).await
+    }
+
+    /// Determine if a message should be dropped based on QoS class
+    ///
+    /// Higher priority classes (Critical, High) are never dropped.
+    /// Lower priority classes may be dropped under backpressure.
+    pub fn should_drop_qos(&self, qos_class: QoSClass) -> bool {
+        let priority: MessagePriority = qos_class.into();
+        self.should_drop(priority)
+    }
+
     /// Apply backpressure at a specific routing level
     async fn apply_backpressure_internal(&self, level: RoutingLevel) {
         let mut state = self.backpressure.lock().await;
@@ -674,5 +721,79 @@ mod tests {
 
         // Give it time to process
         tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+
+    #[tokio::test]
+    async fn test_acquire_permit_qos() {
+        let controller = FlowController::new(
+            BandwidthLimit::new(10, 1000),
+            BandwidthLimit::new(5, 500),
+            MessageDropPolicy::DropLowPriority,
+        );
+
+        // Acquire permit using QoSClass
+        let _permit = controller
+            .acquire_permit_qos(RoutingLevel::Cell, 100, QoSClass::Critical)
+            .await
+            .unwrap();
+
+        let metrics = controller.get_metrics();
+        assert_eq!(metrics.cell_messages_sent, 1);
+        assert_eq!(metrics.cell_bytes_sent, 100);
+    }
+
+    #[tokio::test]
+    async fn test_qos_class_preferential_treatment() {
+        let controller = FlowController::new(
+            BandwidthLimit::new(10, 1000),
+            BandwidthLimit::new(5, 500),
+            MessageDropPolicy::DropLowPriority,
+        );
+
+        // Critical QoS class should work
+        let _p1 = controller
+            .acquire_permit_qos(RoutingLevel::Cell, 100, QoSClass::Critical)
+            .await
+            .unwrap();
+
+        // Bulk QoS class should also work (consumes more tokens)
+        let _p2 = controller
+            .acquire_permit_qos(RoutingLevel::Cell, 100, QoSClass::Bulk)
+            .await
+            .unwrap();
+
+        let metrics = controller.get_metrics();
+        assert_eq!(metrics.cell_messages_sent, 2);
+    }
+
+    #[test]
+    fn test_should_drop_qos() {
+        let controller = FlowController::new(
+            BandwidthLimit::cell_default(),
+            BandwidthLimit::zone_default(),
+            MessageDropPolicy::DropLowPriority,
+        );
+
+        // Critical and High should never be dropped
+        assert!(!controller.should_drop_qos(QoSClass::Critical));
+        assert!(!controller.should_drop_qos(QoSClass::High));
+
+        // Normal and below may be dropped under policy
+        assert!(controller.should_drop_qos(QoSClass::Normal));
+        assert!(controller.should_drop_qos(QoSClass::Low));
+        assert!(controller.should_drop_qos(QoSClass::Bulk));
+    }
+
+    #[test]
+    fn test_should_drop_qos_never_drop_policy() {
+        let controller = FlowController::new(
+            BandwidthLimit::cell_default(),
+            BandwidthLimit::zone_default(),
+            MessageDropPolicy::NeverDrop,
+        );
+
+        // With NeverDrop policy, nothing should be dropped
+        assert!(!controller.should_drop_qos(QoSClass::Critical));
+        assert!(!controller.should_drop_qos(QoSClass::Bulk));
     }
 }
