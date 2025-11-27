@@ -37,19 +37,29 @@
 //! | P4 Low | Position updates, heartbeats | 300s | 8% |
 //! | P5 Bulk | Model updates, debug logs | None | 2% |
 
+pub mod bandwidth;
 pub mod classification;
 pub mod context;
 pub mod context_manager;
+pub mod preemption;
+pub mod recovery;
 pub mod registry;
+pub mod sync_queue;
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
 // Re-exports
+pub use bandwidth::{
+    BandwidthAllocation, BandwidthConfig, BandwidthPermit, BandwidthQuota, QuotaConfig,
+};
 pub use classification::DataType;
 pub use context::{ContextProfile, MissionContext, QoSClassAdjustment};
 pub use context_manager::{ContextChangeListener, ContextChangeLog, ContextManager};
+pub use preemption::{ActiveTransfer, PreemptionController, PreemptionStats, TransferId};
+pub use recovery::{RecoveryStats, SyncRecovery, UpdateBatch};
 pub use registry::QoSRegistry;
+pub use sync_queue::{PendingSync, PrioritySyncQueue, QueueStats};
 
 /// 5-level priority classification (ADR-019)
 ///
