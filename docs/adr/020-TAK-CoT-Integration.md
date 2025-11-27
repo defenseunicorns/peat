@@ -1,13 +1,21 @@
 # ADR-020: TAK (Team Awareness Kit) and Cursor-on-Target Integration
 
-**Status**: Proposed  
-**Date**: 2025-11-17  
-**Authors**: Kit Plummer  
-**Related ADRs**: 
+**Status**: Proposed
+**Date**: 2025-11-17
+**Updated**: 2025-11-26 (M1 POC integrator feedback)
+**Authors**: Kit Plummer
+**Related ADRs**:
 - [ADR-012](012-schema-definition-protocol-extensibility.md) (Schema Definition & Protocol Extensibility)
 - [ADR-006](006-security-authentication-authorization.md) (Security, Authentication, Authorization)
 - [ADR-009](009-bidirectional-hierarchical-flows.md) (Bidirectional Hierarchical Flows)
 - [ADR-010](010-transport-layer-udp-tcp.md) (Transport Layer)
+- [ADR-019](019-qos-and-data-prioritization.md) (QoS and Data Prioritization)
+- [ADR-028](028-cot-detail-extension-schema.md) (CoT Custom Detail Extension Schema) - NEW
+- [ADR-029](029-tak-transport-adapter.md) (TAK Transport Adapter) - NEW
+
+**Integrator Input**:
+- [TAK Integration Requirements](TAK_INTEGRATION_REQUIREMENTS.md) (M1 POC feedback)
+- [CoT Schema Mapping](COT_SCHEMA_MAPPING.md) (Field-level mappings)
 
 ## Context
 
@@ -133,6 +141,45 @@ cap-schema/
 | Geofence/ROZ | CoT Event (type: u-d-r) | TAK → HIVE | Operational boundaries |
 | Chat/Text | CoT Event (type: b-t-f) | Bidirectional | Text messaging |
 
+**MIL-STD-2525 Entity Type Mappings** (from M1 POC):
+
+| HIVE Entity | CoT Type | MIL-STD-2525 Description |
+|-------------|----------|--------------------------|
+| Tracked Person (POI) | `a-f-G-E-S` | Friendly Ground Equipment - Sensor |
+| Tracked Vehicle | `a-f-G-E-V` | Friendly Ground Equipment - Vehicle |
+| Unknown Track | `a-u-G` | Unknown Ground |
+| Hostile Track | `a-h-G` | Hostile Ground |
+| HIVE Platform (UGV) | `a-f-G-U-C` | Friendly Ground Unit - Combat |
+| HIVE Platform (UAV) | `a-f-A-M-F-Q` | Friendly Air - Military Fixed Wing - UAV |
+| HIVE Operator | `a-f-G-U-C-I` | Friendly Ground Unit - Infantry |
+| HIVE Cell/Team | `a-f-G-U-C` + links | Friendly Ground Unit with subordinates |
+| Formation | `a-f-G-U-C` + links | Higher echelon unit |
+| Geofence/ROZ | `u-d-r` | Drawing - Route/Area |
+| Mission Tasking | `t-x-m-c` | Tasking - Mission - Track |
+| Handoff Event | `a-x-h-h` | Custom - HIVE Handoff |
+
+**Hierarchy Encoding via CoT Links:**
+
+HIVE's hierarchical relationships map to CoT `<link>` elements with relation types:
+
+```xml
+<!-- Platform belongs to cell -->
+<link uid="Alpha-Team" type="a-f-G-U-C" relation="p-p" remarks="parent-cell"/>
+
+<!-- Cell belongs to formation -->
+<link uid="Formation-1" type="a-f-G-U-C" relation="p-p" remarks="parent-formation"/>
+
+<!-- Track handoff relationship -->
+<link uid="Bravo-Team" type="a-f-G-U-C" relation="h-h" remarks="handoff-target"/>
+```
+
+| Relation | Meaning | Usage |
+|----------|---------|-------|
+| `p-p` | Parent | Hierarchical ownership (platform→cell→formation) |
+| `h-h` | Handoff | Track transfer between cells |
+| `s-s` | Sibling | Same echelon coordination |
+| `o-o` | Observing | Sensor→track relationship |
+
 **Key Design Principles:**
 1. **Semantic Preservation**: HIVE capabilities map to appropriate CoT detail sub-schemas
 2. **Minimal Overhead**: Only send necessary data; leverage CoT's extensible detail fields
@@ -237,16 +284,56 @@ pub struct HiveTakBridge {
 pub enum AggregationPolicy {
     /// Send all individual platform positions (O(n²) - use cautiously)
     FullFidelity,
-    
+
     /// Send only squad leader positions + squad aggregate capabilities
     SquadLeaderOnly,
-    
+
     /// Send hierarchical summaries: company → platoon → squad → platforms
     /// Recipients see detail appropriate to their echelon
     HierarchicalFiltering,
-    
+
     /// Custom filtering based on CoT type, recipient, and HIVE cell membership
     CustomFilters(Vec<FilterRule>),
+
+    // === Additional policies from M1 POC feedback ===
+
+    /// Track-focused: Only active tracks visible, not platform positions
+    /// Useful when operators care about targets, not HIVE assets
+    TracksOnly,
+
+    /// Capability-focused: Formation capabilities only, not positions
+    /// For high-level C2 that needs capability awareness without clutter
+    CapabilitySummaryOnly,
+
+    /// Time-windowed: Aggregate position updates over N seconds
+    /// Reduces message rate while maintaining accuracy
+    TimeWindowed { window_secs: u32 },
+
+    /// Bandwidth-adaptive: Dynamically adjust based on link quality
+    /// Integrates with ADR-019 QoS bandwidth monitoring
+    BandwidthAdaptive { target_kbps: u32 },
+}
+
+/// QoS Priority to CoT Flow-Tags Mapping (ADR-019 integration)
+///
+/// Maps HIVE QoS priorities to CoT `_flow-tags_` for TAK-side prioritization.
+/// TAK servers that honor flow-tags will process messages accordingly.
+///
+/// | HIVE Priority | CoT Flow-Tag | TAK Behavior |
+/// |---------------|--------------|--------------|
+/// | P1 (Critical) | `priority=flash` | Immediate delivery |
+/// | P2 (High) | `priority=immediate` | High priority queue |
+/// | P3 (Normal) | `priority=routine` | Normal delivery |
+/// | P4 (Low) | `priority=deferred` | Best effort |
+/// | P5 (Bulk) | `priority=bulk` | Background delivery |
+pub fn priority_to_flow_tag(priority: Priority) -> &'static str {
+    match priority {
+        Priority::Critical => "flash",
+        Priority::High => "immediate",
+        Priority::Normal => "routine",
+        Priority::Low => "deferred",
+        Priority::Bulk => "bulk",
+    }
 }
 
 impl HiveTakBridge {
@@ -623,17 +710,53 @@ impl HiveTakBridge {
 | 2025-11-17 | Proposed TAK/CoT integration | AUKUS interoperability requirement |
 | 2025-11-17 | Selected Hybrid deployment model (Model 3) | Maximum flexibility, aligns with cap-transport |
 | 2025-11-17 | Hierarchical filtering mandatory | Prevents O(n²) message explosion |
+| 2025-11-26 | Added `_hive_` CoT extension schema (ADR-028) | M1 POC integrator feedback - preserve HIVE semantics |
+| 2025-11-26 | Added MIL-STD-2525 entity type mappings | M1 POC integrator feedback - concrete type codes |
+| 2025-11-26 | Added QoS→flow-tags mapping | ADR-019 integration for TAK-side prioritization |
+| 2025-11-26 | Resolved Q5: No model distribution via TAK | Keep on HIVE blob transport (size limits, hash verification) |
+| 2025-11-26 | Resolved Q7: Yes, cells as TAK groups | Natural fit for operator workflow |
+| 2025-11-26 | Formation-level track correlation | Hierarchical aggregation before TAK bridge |
+| 2025-11-26 | Created ADR-029 for TAK Transport Adapter | DIL message queuing, separate architectural component |
 | TBD | Approved/Rejected | After AUKUS stakeholder review |
 
 ## Open Questions
 
+### Resolved (M1 POC Feedback - 2025-11-26)
+
+**Q5: Should HIVE AI models distribute via TAK data packages?**
+- **Answer**: **No** - Keep model distribution on HIVE's content-addressed blob transport.
+- **Rationale**:
+  - TAK data packages have size limits (~50MB typical)
+  - HIVE's Iroh-based blob transport provides hash verification, resumable transfers
+  - Model updates are P5 (bulk) priority - shouldn't compete with tactical data on TAK
+  - Separation of concerns: TAK for SA, HIVE for autonomy coordination
+
+**Q7: Should HIVE cells appear as TAK "groups"?**
+- **Answer**: **Yes** - Map HIVE cells to TAK contact groups.
+- **Rationale**:
+  - Natural fit for operators managing multiple teams
+  - Enables group messaging to cells
+  - Supports TAK's existing group management UI
+- **Implementation**:
+  ```xml
+  <detail>
+    <__group name="Alpha-Team" role="Team Member"/>
+    <contact callsign="Alpha-Team"/>
+  </detail>
+  ```
+
+**Q (New): How to handle track correlation across teams?**
+- **Answer**: **Formation correlates** (Option 3)
+- **Context**: In M1 vignette, Alpha and Bravo teams may independently detect the same POI.
+- **Rationale**: Aligns with HIVE's hierarchical aggregation philosophy - coordinator correlates before bridge, single track to TAK.
+
+### Still Open
+
 1. **Should HIVE support TAK federation directly?** Or only single TAK server connections?
-2. **How do we handle TAK server outages?** Should HIVE cache messages for retry?
+2. ~~How do we handle TAK server outages?~~ → Resolved: DIL Message Queuing (see ADR-029)
 3. **What is the priority for ATAK plugin vs standalone bridge?** Resource allocation?
 4. **Should we support TAK's video streaming features?** Integration with HIVE sensor data?
-5. **How do we handle TAK data packages?** (HIVE AI models distributed via TAK?)
 6. **Do we need CoT→HIVE conversion for all CoT types?** Or subset initially?
-7. **Should HIVE cells appear as TAK "groups"?** Or custom overlay?
 
 ## Next Steps
 
