@@ -38,6 +38,8 @@
 //! | P5 Bulk | Model updates, debug logs | None | 2% |
 
 pub mod classification;
+pub mod context;
+pub mod context_manager;
 pub mod registry;
 
 use serde::{Deserialize, Serialize};
@@ -45,6 +47,8 @@ use std::fmt;
 
 // Re-exports
 pub use classification::DataType;
+pub use context::{ContextProfile, MissionContext, QoSClassAdjustment};
+pub use context_manager::{ContextChangeListener, ContextChangeLog, ContextManager};
 pub use registry::QoSRegistry;
 
 /// 5-level priority classification (ADR-019)

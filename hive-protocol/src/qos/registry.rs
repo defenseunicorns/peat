@@ -4,6 +4,7 @@
 //! custom policy overrides and runtime configuration.
 
 use super::classification::DataType;
+use super::context_manager::ContextManager;
 use super::{QoSClass, QoSPolicy};
 use std::collections::HashMap;
 
@@ -134,6 +135,31 @@ impl QoSRegistry {
     /// Get the QoS class for a data type
     pub fn classify(&self, data_type: DataType) -> QoSClass {
         self.get_policy(data_type).base_class
+    }
+
+    /// Get the effective policy for a data type considering the current mission context
+    ///
+    /// This applies context-aware adjustments to the base policy, enabling
+    /// dynamic priority changes based on mission phase.
+    pub fn get_effective_policy(
+        &self,
+        data_type: DataType,
+        context_manager: &ContextManager,
+    ) -> QoSPolicy {
+        let base = self.get_policy(data_type.clone());
+        context_manager.adjust_policy(&base, &data_type)
+    }
+
+    /// Get the effective QoS class for a data type in the current context
+    ///
+    /// This is a convenience method that combines registry lookup with context adjustment.
+    pub fn classify_with_context(
+        &self,
+        data_type: DataType,
+        context_manager: &ContextManager,
+    ) -> QoSClass {
+        self.get_effective_policy(data_type, context_manager)
+            .base_class
     }
 
     /// Override the policy for a specific data type
@@ -346,5 +372,100 @@ mod tests {
         assert_eq!(overridden.len(), 2);
         assert!(overridden.contains(&&DataType::HealthStatus));
         assert!(overridden.contains(&&DataType::Heartbeat));
+    }
+
+    #[test]
+    fn test_get_effective_policy_standby() {
+        use super::super::context::MissionContext;
+
+        let registry = QoSRegistry::default_military();
+        let ctx_manager = ContextManager::with_context(MissionContext::Standby);
+
+        // In standby, no adjustments - effective policy matches base
+        let effective = registry.get_effective_policy(DataType::TargetImage, &ctx_manager);
+        let base = registry.get_policy(DataType::TargetImage);
+
+        assert_eq!(effective.base_class, base.base_class);
+        assert_eq!(effective.max_latency_ms, base.max_latency_ms);
+    }
+
+    #[test]
+    fn test_get_effective_policy_execution() {
+        use super::super::context::MissionContext;
+
+        let registry = QoSRegistry::default_military();
+        let ctx_manager = ContextManager::with_context(MissionContext::Execution);
+
+        // In execution, target images are elevated to P1
+        let effective = registry.get_effective_policy(DataType::TargetImage, &ctx_manager);
+
+        assert_eq!(effective.base_class, QoSClass::Critical);
+    }
+
+    #[test]
+    fn test_get_effective_policy_emergency() {
+        use super::super::context::MissionContext;
+
+        let registry = QoSRegistry::default_military();
+        let ctx_manager = ContextManager::with_context(MissionContext::Emergency);
+
+        // In emergency, health status is elevated to critical
+        let effective = registry.get_effective_policy(DataType::HealthStatus, &ctx_manager);
+
+        assert_eq!(effective.base_class, QoSClass::Critical);
+    }
+
+    #[test]
+    fn test_classify_with_context() {
+        use super::super::context::MissionContext;
+
+        let registry = QoSRegistry::default_military();
+        let ctx_manager = ContextManager::with_context(MissionContext::Execution);
+
+        // TargetImage: P2 base → P1 in execution
+        assert_eq!(
+            registry.classify_with_context(DataType::TargetImage, &ctx_manager),
+            QoSClass::Critical
+        );
+
+        // ContactReport: P1 base → P1 (no change, already at max)
+        assert_eq!(
+            registry.classify_with_context(DataType::ContactReport, &ctx_manager),
+            QoSClass::Critical
+        );
+
+        // DebugLog: P5 base → P5 (unchanged in execution)
+        assert_eq!(
+            registry.classify_with_context(DataType::DebugLog, &ctx_manager),
+            QoSClass::Bulk
+        );
+    }
+
+    #[test]
+    fn test_effective_policy_with_override() {
+        use super::super::context::MissionContext;
+
+        let mut registry = QoSRegistry::new();
+        let ctx_manager = ContextManager::with_context(MissionContext::Execution);
+
+        // Override PositionUpdate to be High priority
+        registry.override_policy(
+            DataType::PositionUpdate,
+            QoSPolicy {
+                base_class: QoSClass::High,
+                max_latency_ms: Some(1000),
+                max_size_bytes: Some(1024),
+                ttl_seconds: Some(60),
+                retention_priority: 4,
+                preemptable: true,
+            },
+        );
+
+        // Now get effective policy - should apply context adjustment to our override
+        let effective = registry.get_effective_policy(DataType::PositionUpdate, &ctx_manager);
+
+        // Our override set it to High (P2), and execution profile elevates position
+        // updates, so we should see the context-adjusted result
+        assert!(effective.base_class <= QoSClass::High);
     }
 }
