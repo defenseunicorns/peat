@@ -124,7 +124,7 @@ impl fmt::Display for MissionContext {
 }
 
 /// Priority adjustment for a data type within a context
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum QoSClassAdjustment {
     /// Elevate priority by N levels (toward Critical)
     ///
@@ -140,6 +140,7 @@ pub enum QoSClassAdjustment {
     Override(QoSClass),
 
     /// No change from base priority
+    #[default]
     NoChange,
 }
 
@@ -188,12 +189,6 @@ impl QoSClassAdjustment {
             self,
             Self::Demote(_) | Self::Override(QoSClass::Low | QoSClass::Bulk)
         )
-    }
-}
-
-impl Default for QoSClassAdjustment {
-    fn default() -> Self {
-        Self::NoChange
     }
 }
 
