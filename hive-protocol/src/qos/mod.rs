@@ -10,6 +10,13 @@
 //! - **QoSPolicy**: Per-data-type policy with latency, TTL, retention parameters
 //! - **QoSRegistry**: Maps HIVE data types to their QoS policies
 //!
+//! # Storage Management (Phase 4)
+//!
+//! - **RetentionPolicy**: Per-class retention with min/max retention times
+//! - **QoSAwareStorage**: Storage tracking with eviction candidate selection
+//! - **EvictionController**: Automated eviction with audit logging
+//! - **LifecyclePolicy**: Combined QoS + TTL (ADR-016) decision making
+//!
 //! # Example
 //!
 //! ```
@@ -36,29 +43,63 @@
 //! | P3 Normal | Health status, capability changes | 60s | 20% |
 //! | P4 Low | Position updates, heartbeats | 300s | 8% |
 //! | P5 Bulk | Model updates, debug logs | None | 2% |
+//!
+//! # Storage Management Example
+//!
+//! ```
+//! use hive_protocol::qos::{
+//!     QoSClass,
+//!     storage::{QoSAwareStorage, StoredDocument},
+//!     retention::RetentionPolicies,
+//! };
+//! use std::sync::Arc;
+//!
+//! // Create storage manager with 1GB capacity
+//! let storage = Arc::new(QoSAwareStorage::new(1024 * 1024 * 1024));
+//!
+//! // Register a document
+//! storage.register_document(StoredDocument::new("doc-123", QoSClass::Normal, 1024));
+//!
+//! // Check storage pressure
+//! let pressure = storage.storage_pressure();
+//! ```
 
+pub mod audit;
 pub mod bandwidth;
 pub mod classification;
 pub mod context;
 pub mod context_manager;
+pub mod eviction;
+pub mod lifecycle;
 pub mod preemption;
 pub mod recovery;
 pub mod registry;
+pub mod retention;
+pub mod storage;
 pub mod sync_queue;
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
 // Re-exports
+pub use audit::{AuditAction, AuditEntry, AuditSummary, EvictionAuditLog};
 pub use bandwidth::{
     BandwidthAllocation, BandwidthConfig, BandwidthPermit, BandwidthQuota, QuotaConfig,
 };
 pub use classification::DataType;
 pub use context::{ContextProfile, MissionContext, QoSClassAdjustment};
 pub use context_manager::{ContextChangeListener, ContextChangeLog, ContextManager};
+pub use eviction::{EvictionConfig, EvictionController, EvictionResult};
+pub use lifecycle::{
+    make_lifecycle_decision, LifecycleDecision, LifecyclePolicies, LifecyclePolicy,
+};
 pub use preemption::{ActiveTransfer, PreemptionController, PreemptionStats, TransferId};
 pub use recovery::{RecoveryStats, SyncRecovery, UpdateBatch};
 pub use registry::QoSRegistry;
+pub use retention::{RetentionPolicies, RetentionPolicy};
+pub use storage::{
+    ClassStorageMetrics, EvictionCandidate, QoSAwareStorage, StorageMetrics, StoredDocument,
+};
 pub use sync_queue::{PendingSync, PrioritySyncQueue, QueueStats};
 
 /// 5-level priority classification (ADR-019)
