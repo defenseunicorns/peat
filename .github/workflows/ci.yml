@@ -40,18 +40,18 @@ jobs:
         with:
           cache-on-failure: true
 
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
-
       - name: Check formatting
         run: cargo fmt --all -- --check
 
       - name: Run clippy (also builds test artifacts)
         run: cargo clippy --all-targets --all-features --workspace -- -D warnings
 
-      - name: Run tests with nextest
+      - name: Check disk space before tests
+        run: df -h
+
+      - name: Run tests
         env:
           DITTO_APP_ID: ${{ secrets.DITTO_APP_ID }}
           DITTO_OFFLINE_TOKEN: ${{ secrets.DITTO_OFFLINE_TOKEN }}
           DITTO_SHARED_KEY: ${{ secrets.DITTO_SHARED_KEY }}
-        run: cargo nextest run --all-features --workspace
+        run: cargo test --all-features --workspace
