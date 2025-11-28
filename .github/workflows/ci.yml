@@ -33,15 +33,18 @@ jobs:
           cache-on-failure: true
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      - name: Run clippy
+      - name: Run clippy (also builds test artifacts)
         run: cargo clippy --all-targets --all-features --workspace -- -D warnings
 
-      - name: Run tests
+      - name: Run tests with nextest
         env:
           DITTO_APP_ID: ${{ secrets.DITTO_APP_ID }}
           DITTO_OFFLINE_TOKEN: ${{ secrets.DITTO_OFFLINE_TOKEN }}
           DITTO_SHARED_KEY: ${{ secrets.DITTO_SHARED_KEY }}
-        run: cargo test --lib --all-features --workspace
+        run: cargo nextest run --all-features --workspace
