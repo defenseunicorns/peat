@@ -51,6 +51,9 @@ hex = "0.4"  # Hex encoding for PublicKeys and encryption keys
 mdns-sd = { version = "0.11", optional = true }  # mDNS service discovery (ADR-011 Phase 3)
 rand = { version = "0.9", optional = true }  # Random number generation for retry jitter
 
+# TAK/CoT Integration (ADR-020, ADR-028)
+quick-xml = { version = "0.37", features = ["serialize"] }  # CoT XML encoding/decoding
+
 [features]
 default = []
 automerge-backend = ["automerge", "iroh", "iroh-blobs", "rocksdb", "lru", "toml", "mdns-sd", "rand"]
