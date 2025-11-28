@@ -80,10 +80,17 @@
 
 pub mod error;
 pub mod http;
+pub mod tak;
 
 // Re-export commonly used types
 pub use error::{Error, Result};
 pub use http::Server;
+
+// Re-export TAK transport types
+pub use tak::{
+    MeshSaTransport, TakError, TakMessageQueue, TakMetrics, TakServerTransport, TakTransport,
+    TakTransportConfig, TakTransportMode,
+};
 
 #[cfg(test)]
 mod tests {
