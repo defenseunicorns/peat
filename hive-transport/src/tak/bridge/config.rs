@@ -3,9 +3,10 @@
 use std::time::Duration;
 
 /// Echelon level in military hierarchy
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub enum EchelonLevel {
     /// Individual platform/asset
+    #[default]
     Platform,
     /// Squad (4-12 platforms)
     Squad,
@@ -19,20 +20,15 @@ pub enum EchelonLevel {
     Formation,
 }
 
-impl Default for EchelonLevel {
-    fn default() -> Self {
-        Self::Platform
-    }
-}
-
 /// Aggregation policy for TAK publishing
 ///
 /// Controls how HIVE messages are filtered and aggregated before
 /// being sent to TAK, optimizing bandwidth usage.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum AggregationPolicy {
     /// Full fidelity - all platforms visible (O(n) bandwidth)
     /// Use for small formations or high-bandwidth links
+    #[default]
     FullFidelity,
 
     /// Squad leader only - cell leaders + formation aggregates
@@ -64,12 +60,6 @@ pub enum AggregationPolicy {
         /// Target bandwidth in kbps
         target_kbps: u32,
     },
-}
-
-impl Default for AggregationPolicy {
-    fn default() -> Self {
-        Self::FullFidelity
-    }
 }
 
 impl AggregationPolicy {
