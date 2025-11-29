@@ -12,12 +12,16 @@ pub mod transport;
 
 // Real P2P transport (Phase 3: Iroh integration)
 #[cfg(feature = "automerge-backend")]
+pub mod formation_handshake;
+#[cfg(feature = "automerge-backend")]
 pub mod iroh_transport;
 #[cfg(feature = "automerge-backend")]
 pub mod peer_config;
 
 // Re-exports
 #[cfg(feature = "automerge-backend")]
+pub use formation_handshake::{perform_initiator_handshake, perform_responder_handshake};
+#[cfg(feature = "automerge-backend")]
 pub use iroh_transport::IrohTransport;
 #[cfg(feature = "automerge-backend")]
-pub use peer_config::{LocalConfig, PeerConfig, PeerInfo};
+pub use peer_config::{FormationConfig, LocalConfig, PeerConfig, PeerInfo};
