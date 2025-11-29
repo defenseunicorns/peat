@@ -461,22 +461,27 @@ async fn run_storage_summary_test<B: BlobStore + 'static>(blob_store: Arc<B>, ba
 // ============================================================================
 
 /// Create a Ditto store for testing
-/// Panics if DITTO_SHARED_KEY is not set (tests must fail, not skip)
+/// Panics if credentials are not set (tests must fail, not skip)
 fn create_ditto_store(
     app_id: &str,
     base_path: &std::path::Path,
 ) -> hive_protocol::storage::DittoStore {
+    use hive_protocol::credentials::HiveCredentials;
     use hive_protocol::storage::DittoStore;
 
-    // Get shared key from environment (required for Ditto)
-    let shared_key =
-        std::env::var("DITTO_SHARED_KEY").expect("DITTO_SHARED_KEY must be set for Ditto tests");
-
-    assert!(
-        !shared_key.trim().is_empty(),
-        "DITTO_SHARED_KEY must not be empty"
+    // Load credentials via HiveCredentials (supports HIVE_* with DITTO_* fallback)
+    let credentials = HiveCredentials::from_env().expect(
+        "Credentials required (HIVE_APP_ID/HIVE_SECRET_KEY or DITTO_APP_ID/DITTO_SHARED_KEY)",
     );
-    let shared_key = shared_key.trim().to_string();
+
+    let shared_key = credentials
+        .require_secret_key()
+        .expect("Secret key required for Ditto tests")
+        .to_string();
+    let offline_token = credentials
+        .require_offline_token()
+        .expect("Offline token required for Ditto tests")
+        .to_string();
 
     let persistence_dir = base_path.join("ditto_data");
     std::fs::create_dir_all(&persistence_dir).unwrap();
@@ -485,6 +490,7 @@ fn create_ditto_store(
         app_id: app_id.to_string(),
         persistence_dir,
         shared_key,
+        offline_token,
         tcp_listen_port: None,
         tcp_connect_address: None,
     };

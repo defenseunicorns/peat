@@ -22,6 +22,7 @@
 //! assert_eq!(event.status, FormationStatus::Ready);
 //! ```
 
+use crate::credentials::HiveCredentials;
 use crate::storage::ditto_store::{DittoConfig, DittoStore};
 use crate::sync::ditto::DittoBackend;
 use crate::sync::{BackendConfig, DataSyncBackend, TransportConfig};
@@ -105,15 +106,25 @@ impl E2EHarness {
             )
         })?;
 
-        let app_id = std::env::var("DITTO_APP_ID")
-            .unwrap_or_else(|_| "00000000-0000-0000-0000-000000000000".to_string());
-        let shared_key = std::env::var("DITTO_SHARED_KEY")
-            .unwrap_or_else(|_| "shared_key_for_testing".to_string());
+        // Load credentials via HiveCredentials (supports HIVE_* with DITTO_* fallback)
+        let credentials = HiveCredentials::from_env()
+            .map_err(|e| Error::config_error(format!("{}", e), Some("credentials".to_string())))?;
+
+        let app_id = credentials.app_id().to_string();
+        let shared_key = credentials
+            .require_secret_key()
+            .map_err(|e| Error::config_error(format!("{}", e), Some("secret_key".to_string())))?
+            .to_string();
+        let offline_token = credentials
+            .require_offline_token()
+            .map_err(|e| Error::config_error(format!("{}", e), Some("offline_token".to_string())))?
+            .to_string();
 
         let config = DittoConfig {
             app_id,
             persistence_dir: temp_dir.path().to_path_buf(),
             shared_key,
+            offline_token,
             tcp_listen_port,
             tcp_connect_address,
         };

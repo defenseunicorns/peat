@@ -41,6 +41,7 @@ mod authorization;
 mod device_id;
 mod encryption;
 mod error;
+mod formation_key;
 mod keypair;
 mod transport;
 mod user_auth;
@@ -61,6 +62,10 @@ pub use encryption::{
     GroupKey, SecureChannel, SymmetricKey, NONCE_SIZE, SYMMETRIC_KEY_SIZE, X25519_PUBLIC_KEY_SIZE,
 };
 pub use error::SecurityError;
+pub use formation_key::{
+    FormationAuthResult, FormationChallenge, FormationChallengeResponse, FormationKey,
+    FORMATION_CHALLENGE_SIZE, FORMATION_RESPONSE_SIZE,
+};
 pub use keypair::DeviceKeypair;
 pub use transport::{AuthenticatedConnection, AuthenticationChannel, SecureMeshTransport};
 pub use user_auth::{

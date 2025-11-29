@@ -14,12 +14,19 @@
 //! [local]
 //! bind_address = "127.0.0.1:9000"
 //!
+//! # Formation key for shared secret authentication (similar to Ditto SharedKey)
+//! [formation]
+//! id = "alpha-company"
+//! shared_key = "base64-encoded-32-byte-key"
+//!
 //! [[peers]]
 //! name = "node-1"
 //! node_id = "6eb2a534751444f1353b29aa307c78c1f72acfbb06bb8696103dfeede1f4f854"
 //! addresses = ["127.0.0.1:9001"]
 //! ```
 
+#[cfg(feature = "automerge-backend")]
+use crate::security::FormationKey;
 #[cfg(feature = "automerge-backend")]
 use anyhow::{Context, Result};
 #[cfg(feature = "automerge-backend")]
@@ -38,9 +45,25 @@ pub struct PeerConfig {
     /// Optional local node configuration
     #[serde(default)]
     pub local: LocalConfig,
+    /// Optional formation configuration for shared secret authentication
+    #[serde(default)]
+    pub formation: Option<FormationConfig>,
     /// List of static peers to connect to
     #[serde(default)]
     pub peers: Vec<PeerInfo>,
+}
+
+/// Formation configuration for shared secret authentication
+///
+/// Similar to Ditto's SharedKey identity - all nodes in the formation
+/// must have the same formation ID and shared key to sync.
+#[cfg(feature = "automerge-backend")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FormationConfig {
+    /// Formation identifier (e.g., "alpha-company")
+    pub id: String,
+    /// Base64-encoded 32-byte shared secret
+    pub shared_key: String,
 }
 
 /// Local node configuration
@@ -111,8 +134,29 @@ impl PeerConfig {
     pub fn empty() -> Self {
         Self {
             local: LocalConfig::default(),
+            formation: None,
             peers: Vec::new(),
         }
+    }
+
+    /// Get the formation key if configured
+    ///
+    /// Returns `None` if no formation is configured, or an error if the
+    /// shared key is invalid.
+    pub fn formation_key(&self) -> Result<Option<FormationKey>> {
+        match &self.formation {
+            Some(config) => {
+                let key = FormationKey::from_base64(&config.id, &config.shared_key)
+                    .map_err(|e| anyhow::anyhow!("Invalid formation key: {}", e))?;
+                Ok(Some(key))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Check if formation authentication is required
+    pub fn requires_formation_auth(&self) -> bool {
+        self.formation.is_some()
     }
 
     /// Parse bind address as SocketAddr
@@ -251,5 +295,71 @@ mod tests {
         assert!(config.get_peer("alice").is_some());
         assert!(config.get_peer("bob").is_some());
         assert!(config.get_peer("charlie").is_none());
+    }
+
+    #[test]
+    fn test_parse_formation_config() {
+        // Generate a valid base64 secret for testing
+        let secret = FormationKey::generate_secret();
+
+        let toml = format!(
+            r#"
+            [formation]
+            id = "alpha-company"
+            shared_key = "{}"
+
+            [local]
+            bind_address = "127.0.0.1:9000"
+        "#,
+            secret
+        );
+
+        let config = PeerConfig::from_toml(&toml).unwrap();
+
+        assert!(config.formation.is_some());
+        let formation = config.formation.as_ref().unwrap();
+        assert_eq!(formation.id, "alpha-company");
+        assert!(config.requires_formation_auth());
+    }
+
+    #[test]
+    fn test_formation_key_creation() {
+        let secret = FormationKey::generate_secret();
+
+        let toml = format!(
+            r#"
+            [formation]
+            id = "bravo-team"
+            shared_key = "{}"
+        "#,
+            secret
+        );
+
+        let config = PeerConfig::from_toml(&toml).unwrap();
+        let key = config.formation_key().unwrap();
+
+        assert!(key.is_some());
+        assert_eq!(key.unwrap().formation_id(), "bravo-team");
+    }
+
+    #[test]
+    fn test_no_formation_config() {
+        let config = PeerConfig::empty();
+
+        assert!(config.formation.is_none());
+        assert!(!config.requires_formation_auth());
+        assert!(config.formation_key().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_invalid_formation_key() {
+        let toml = r#"
+            [formation]
+            id = "test"
+            shared_key = "not-valid-base64!!!"
+        "#;
+
+        let config = PeerConfig::from_toml(toml).unwrap();
+        assert!(config.formation_key().is_err());
     }
 }

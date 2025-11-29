@@ -108,31 +108,24 @@ impl CommandStorage for MockCommandStorage {
 
 /// Helper to create a test DittoStore
 async fn create_test_store(test_name: &str) -> DittoStore {
+    use hive_protocol::credentials::HiveCredentials;
+
     dotenvy::dotenv().ok();
 
-    let app_id = std::env::var("DITTO_APP_ID")
-        .ok()
-        .and_then(|v| {
-            let trimmed = v.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        })
-        .expect("DITTO_APP_ID required for test");
+    // Load credentials via HiveCredentials (supports HIVE_* with DITTO_* fallback)
+    let credentials = HiveCredentials::from_env().expect(
+        "Credentials required (HIVE_APP_ID/HIVE_SECRET_KEY or DITTO_APP_ID/DITTO_SHARED_KEY)",
+    );
 
-    let shared_key = std::env::var("DITTO_SHARED_KEY")
-        .ok()
-        .and_then(|v| {
-            let trimmed = v.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        })
-        .expect("DITTO_SHARED_KEY required for test");
+    let app_id = credentials.app_id().to_string();
+    let shared_key = credentials
+        .require_secret_key()
+        .expect("Secret key required for test")
+        .to_string();
+    let offline_token = credentials
+        .require_offline_token()
+        .expect("Offline token required for test")
+        .to_string();
 
     let persistence_dir =
         std::path::PathBuf::from(format!("/tmp/cap-persistence-test-{}", test_name));
@@ -143,6 +136,7 @@ async fn create_test_store(test_name: &str) -> DittoStore {
         app_id,
         persistence_dir,
         shared_key,
+        offline_token,
         tcp_listen_port: None,
         tcp_connect_address: None,
     };
