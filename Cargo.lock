@@ -2167,9 +2167,14 @@ dependencies = [
 name = "hive-ffi"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "chrono",
+ "hex",
  "hive-protocol",
+ "serde_json",
+ "tempfile",
  "thiserror 1.0.69",
+ "tokio",
  "uniffi",
 ]
 
@@ -6121,6 +6126,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc7687007d2546c454d8ae609b105daceb88175477dac280707ad6d95bcd6f1f"
 dependencies = [
  "anyhow",
+ "async-compat",
  "bytes",
  "log",
  "once_cell",

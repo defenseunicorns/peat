@@ -3,13 +3,30 @@
 //! This crate provides UniFFI bindings to expose HIVE functionality
 //! to Kotlin (Android/ATAK) and Swift (iOS) applications.
 //!
+//! ## Features
+//!
+//! - **CoT Encoding**: Convert track data to Cursor-on-Target XML
+//! - **Sync** (optional): P2P document sync via AutomergeIroh backend
+//!
 //! Uses proc-macro only UniFFI approach (no UDL file).
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use hive_protocol::cot::{
     CotEncoder, Position as CotPosition, TrackUpdate, Velocity as CotVelocity,
 };
+
+#[cfg(feature = "sync")]
+use hive_protocol::network::{IrohTransport, PeerInfo as HivePeerInfo};
+#[cfg(feature = "sync")]
+use hive_protocol::storage::{AutomergeBackend, AutomergeStore, StorageBackend, SyncCapable};
+#[cfg(feature = "sync")]
+use std::net::SocketAddr;
+#[cfg(feature = "sync")]
+use std::path::PathBuf;
+#[cfg(feature = "sync")]
+use tokio::sync::RwLock;
 
 // Setup UniFFI scaffolding
 uniffi::setup_scaffolding!();
@@ -68,6 +85,12 @@ pub enum HiveError {
     EncodingError { msg: String },
     #[error("Invalid input: {msg}")]
     InvalidInput { msg: String },
+    #[error("Storage error: {msg}")]
+    StorageError { msg: String },
+    #[error("Connection error: {msg}")]
+    ConnectionError { msg: String },
+    #[error("Sync error: {msg}")]
+    SyncError { msg: String },
 }
 
 /// Encode a track to CoT XML string
@@ -129,6 +152,319 @@ pub fn create_position(lat: f64, lon: f64, hae: Option<f64>) -> Position {
 #[uniffi::export]
 pub fn create_velocity(bearing: f64, speed_mps: f64) -> Velocity {
     Velocity { bearing, speed_mps }
+}
+
+// =============================================================================
+// HiveNode - P2P Sync Support (requires "sync" feature)
+// =============================================================================
+
+/// Configuration for creating a HiveNode
+#[cfg(feature = "sync")]
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct NodeConfig {
+    /// Bind address for P2P connections (e.g., "127.0.0.1:0" for auto-assign)
+    pub bind_address: Option<String>,
+    /// Storage path for Automerge documents
+    pub storage_path: String,
+}
+
+/// Information about a peer node for connection
+#[cfg(feature = "sync")]
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct PeerInfo {
+    /// Human-readable peer name
+    pub name: String,
+    /// Hex-encoded node ID (Iroh endpoint ID)
+    pub node_id: String,
+    /// List of addresses (e.g., "127.0.0.1:19001")
+    pub addresses: Vec<String>,
+    /// Optional relay URL
+    pub relay_url: Option<String>,
+}
+
+/// Sync statistics
+#[cfg(feature = "sync")]
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct SyncStats {
+    /// Whether sync is currently active
+    pub sync_active: bool,
+    /// Number of connected peers
+    pub connected_peers: u32,
+    /// Total bytes sent
+    pub bytes_sent: u64,
+    /// Total bytes received
+    pub bytes_received: u64,
+}
+
+/// A HIVE network node with P2P sync capabilities
+///
+/// Wraps AutomergeBackend + IrohTransport for document sync.
+#[cfg(feature = "sync")]
+#[derive(uniffi::Object)]
+pub struct HiveNode {
+    backend: Arc<RwLock<AutomergeBackend>>,
+    transport: Arc<IrohTransport>,
+    #[allow(dead_code)] // Kept for potential future use (e.g., storage cleanup)
+    storage_path: PathBuf,
+    /// Tokio runtime for async operations
+    runtime: Arc<tokio::runtime::Runtime>,
+}
+
+#[cfg(feature = "sync")]
+#[uniffi::export]
+impl HiveNode {
+    /// Get this node's unique identifier (hex-encoded)
+    pub fn node_id(&self) -> String {
+        hex::encode(self.transport.endpoint_id().as_bytes())
+    }
+
+    /// Get this node's endpoint address for peer connections
+    pub fn endpoint_addr(&self) -> String {
+        format!("{:?}", self.transport.endpoint_addr())
+    }
+
+    /// Get the number of connected peers
+    pub fn peer_count(&self) -> u32 {
+        self.transport.peer_count() as u32
+    }
+
+    /// Get list of connected peer IDs
+    pub fn connected_peers(&self) -> Vec<String> {
+        self.transport
+            .connected_peers()
+            .iter()
+            .map(|id| hex::encode(id.as_bytes()))
+            .collect()
+    }
+
+    /// Start sync operations
+    pub fn start_sync(&self) -> Result<(), HiveError> {
+        self.runtime.block_on(async {
+            let backend = self.backend.read().await;
+            backend
+                .start_sync()
+                .map_err(|e| HiveError::SyncError { msg: e.to_string() })
+        })
+    }
+
+    /// Stop sync operations
+    pub fn stop_sync(&self) -> Result<(), HiveError> {
+        self.runtime.block_on(async {
+            let backend = self.backend.read().await;
+            backend
+                .stop_sync()
+                .map_err(|e| HiveError::SyncError { msg: e.to_string() })
+        })
+    }
+
+    /// Get sync statistics
+    pub fn sync_stats(&self) -> Result<SyncStats, HiveError> {
+        self.runtime.block_on(async {
+            let backend = self.backend.read().await;
+            let stats = backend
+                .sync_stats()
+                .map_err(|e| HiveError::SyncError { msg: e.to_string() })?;
+
+            Ok(SyncStats {
+                sync_active: stats.peer_count > 0, // Infer from peer count
+                connected_peers: self.transport.peer_count() as u32,
+                bytes_sent: stats.bytes_sent,
+                bytes_received: stats.bytes_received,
+            })
+        })
+    }
+
+    /// Connect to a peer node
+    pub fn connect_peer(&self, peer: PeerInfo) -> Result<(), HiveError> {
+        let hive_peer = HivePeerInfo {
+            name: peer.name,
+            node_id: peer.node_id,
+            addresses: peer.addresses,
+            relay_url: peer.relay_url,
+        };
+
+        self.runtime.block_on(async {
+            self.transport
+                .connect_peer(&hive_peer)
+                .await
+                .map_err(|e| HiveError::ConnectionError { msg: e.to_string() })?;
+
+            Ok(())
+        })
+    }
+
+    /// Disconnect from a peer by node ID
+    ///
+    /// Note: Currently disconnects matching peer from internal connection map.
+    pub fn disconnect_peer(&self, node_id: &str) -> Result<(), HiveError> {
+        // Find the matching endpoint ID from connected peers
+        let connected = self.transport.connected_peers();
+        for endpoint_id in connected {
+            if hex::encode(endpoint_id.as_bytes()) == node_id {
+                return self
+                    .transport
+                    .disconnect(&endpoint_id)
+                    .map_err(|e| HiveError::ConnectionError { msg: e.to_string() });
+            }
+        }
+
+        Err(HiveError::ConnectionError {
+            msg: format!("Peer {} not found in connected peers", node_id),
+        })
+    }
+
+    /// Store a JSON document in a collection
+    pub fn put_document(
+        &self,
+        collection: &str,
+        doc_id: &str,
+        json_data: &str,
+    ) -> Result<(), HiveError> {
+        // Parse JSON to validate it
+        let _: serde_json::Value =
+            serde_json::from_str(json_data).map_err(|e| HiveError::InvalidInput {
+                msg: format!("Invalid JSON: {}", e),
+            })?;
+
+        self.runtime.block_on(async {
+            let backend = self.backend.read().await;
+            let coll = backend.collection(collection);
+
+            coll.upsert(doc_id, json_data.as_bytes().to_vec())
+                .map_err(|e| HiveError::StorageError { msg: e.to_string() })
+        })
+    }
+
+    /// Retrieve a document from a collection as JSON
+    pub fn get_document(
+        &self,
+        collection: &str,
+        doc_id: &str,
+    ) -> Result<Option<String>, HiveError> {
+        self.runtime.block_on(async {
+            let backend = self.backend.read().await;
+            let coll = backend.collection(collection);
+
+            match coll.get(doc_id) {
+                Ok(Some(bytes)) => {
+                    let json = String::from_utf8(bytes).map_err(|e| HiveError::StorageError {
+                        msg: format!("Invalid UTF-8: {}", e),
+                    })?;
+                    Ok(Some(json))
+                }
+                Ok(None) => Ok(None),
+                Err(e) => Err(HiveError::StorageError { msg: e.to_string() }),
+            }
+        })
+    }
+
+    /// Delete a document from a collection
+    pub fn delete_document(&self, collection: &str, doc_id: &str) -> Result<(), HiveError> {
+        self.runtime.block_on(async {
+            let backend = self.backend.read().await;
+            let coll = backend.collection(collection);
+
+            coll.delete(doc_id)
+                .map_err(|e| HiveError::StorageError { msg: e.to_string() })
+        })
+    }
+
+    /// List all document IDs in a collection
+    pub fn list_documents(&self, collection: &str) -> Result<Vec<String>, HiveError> {
+        self.runtime.block_on(async {
+            let backend = self.backend.read().await;
+            let coll = backend.collection(collection);
+
+            let docs = coll
+                .scan()
+                .map_err(|e| HiveError::StorageError { msg: e.to_string() })?;
+
+            Ok(docs.into_iter().map(|(id, _)| id).collect())
+        })
+    }
+
+    /// Manually trigger sync for a specific document
+    pub fn sync_document(&self, collection: &str, doc_id: &str) -> Result<(), HiveError> {
+        let doc_key = format!("{}:{}", collection, doc_id);
+
+        self.runtime.block_on(async {
+            let backend = self.backend.read().await;
+
+            backend
+                .sync_document(&doc_key)
+                .await
+                .map_err(|e| HiveError::SyncError { msg: e.to_string() })
+        })
+    }
+}
+
+/// Create a new HiveNode
+///
+/// Note: This function is NOT async because we manage our own Tokio runtime
+/// to ensure proper context for Iroh transport operations.
+#[cfg(feature = "sync")]
+#[uniffi::export]
+pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
+    // Create a dedicated Tokio runtime for this node
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .map_err(|e| HiveError::SyncError {
+            msg: format!("Failed to create runtime: {}", e),
+        })?;
+
+    // Parse bind address
+    let bind_addr: SocketAddr = config
+        .bind_address
+        .as_deref()
+        .unwrap_or("127.0.0.1:0")
+        .parse()
+        .map_err(|e| HiveError::InvalidInput {
+            msg: format!("Invalid bind address: {}", e),
+        })?;
+
+    // Create storage path
+    let storage_path = PathBuf::from(&config.storage_path);
+    std::fs::create_dir_all(&storage_path).map_err(|e| HiveError::StorageError {
+        msg: format!("Failed to create storage directory: {}", e),
+    })?;
+
+    // Create AutomergeStore
+    let store =
+        Arc::new(
+            AutomergeStore::open(&storage_path).map_err(|e| HiveError::StorageError {
+                msg: format!("Failed to open store: {}", e),
+            })?,
+        );
+
+    // Create IrohTransport within our runtime context
+    let transport = runtime.block_on(async {
+        IrohTransport::bind(bind_addr)
+            .await
+            .map_err(|e| HiveError::ConnectionError {
+                msg: format!("Failed to bind transport: {}", e),
+            })
+    })?;
+    let transport = Arc::new(transport);
+
+    // Create backend with transport
+    let backend = AutomergeBackend::with_transport(store, Arc::clone(&transport));
+
+    Ok(Arc::new(HiveNode {
+        backend: Arc::new(RwLock::new(backend)),
+        transport,
+        storage_path,
+        runtime: Arc::new(runtime),
+    }))
+}
+
+// Add new error variants for sync operations
+#[cfg(feature = "sync")]
+impl From<anyhow::Error> for HiveError {
+    fn from(e: anyhow::Error) -> Self {
+        HiveError::SyncError { msg: e.to_string() }
+    }
 }
 
 #[cfg(test)]
