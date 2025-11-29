@@ -83,6 +83,19 @@ impl Default for DittoBackend {
 #[async_trait]
 impl DataSyncBackend for DittoBackend {
     async fn initialize(&self, config: BackendConfig) -> Result<()> {
+        // Get offline_token from extra config or environment (via HiveCredentials)
+        let offline_token = config.extra.get("offline_token").cloned()
+            .or_else(|| {
+                crate::credentials::HiveCredentials::try_from_env()
+                    .and_then(|c| c.offline_token().map(|s| s.to_string()))
+            })
+            .ok_or_else(|| {
+                Error::config_error(
+                    "offline_token required for Ditto backend (set HIVE_OFFLINE_TOKEN or DITTO_OFFLINE_TOKEN)",
+                    Some("offline_token".to_string()),
+                )
+            })?;
+
         // Map abstraction BackendConfig to DittoConfig
         let ditto_config = DittoConfig {
             app_id: config.app_id,
@@ -93,6 +106,7 @@ impl DataSyncBackend for DittoBackend {
                     Some("shared_key".to_string()),
                 )
             })?,
+            offline_token,
             tcp_listen_port: config.transport.tcp_listen_port,
             tcp_connect_address: config.transport.tcp_connect_address,
         };
@@ -574,37 +588,29 @@ impl SyncEngine for DittoBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::credentials::HiveCredentials;
     use crate::sync::TransportConfig;
     use std::path::PathBuf;
 
     /// Helper to create test backend config
+    ///
+    /// Uses HiveCredentials to load credentials (supports both HIVE_* and DITTO_* env vars)
     fn create_test_config() -> BackendConfig {
-        // Load environment for Ditto credentials
+        // Load environment for credentials
         dotenvy::dotenv().ok();
 
-        let app_id = std::env::var("DITTO_APP_ID")
-            .ok()
-            .and_then(|v| {
-                let trimmed = v.trim();
-                if trimmed.is_empty() {
-                    None
-                } else {
-                    Some(trimmed.to_string())
-                }
-            })
-            .unwrap_or_else(|| "test-app-id".to_string());
-
-        let shared_key = std::env::var("DITTO_SHARED_KEY")
-            .ok()
-            .and_then(|v| {
-                let trimmed = v.trim();
-                if trimmed.is_empty() {
-                    None
-                } else {
-                    Some(trimmed.to_string())
-                }
-            })
-            .unwrap_or_else(|| "test-shared-key".to_string());
+        // Use HiveCredentials to load app_id and shared_key (with DITTO_* fallback)
+        let (app_id, shared_key) = if let Ok(creds) = HiveCredentials::from_env() {
+            (
+                creds.app_id().to_string(),
+                creds.secret_key().map(|s| s.to_string()),
+            )
+        } else {
+            (
+                "test-app-id".to_string(),
+                Some("test-shared-key".to_string()),
+            )
+        };
 
         BackendConfig {
             app_id,
@@ -613,7 +619,7 @@ mod tests {
                     .expect("Failed to create temp dir")
                     .path(),
             ),
-            shared_key: Some(shared_key),
+            shared_key,
             transport: TransportConfig::default(),
             extra: HashMap::new(),
         }
@@ -638,11 +644,14 @@ mod tests {
         let backend = DittoBackend::new();
         assert!(!backend.is_ready().await);
 
-        // Skip actual initialization if Ditto credentials not available
-        if std::env::var("DITTO_OFFLINE_TOKEN").is_ok() {
-            let config = create_test_config();
-            backend.initialize(config).await.ok();
-            assert!(backend.is_ready().await);
+        // Skip actual initialization if credentials not available
+        // HiveCredentials checks for HIVE_OFFLINE_TOKEN with fallback to DITTO_OFFLINE_TOKEN
+        if let Ok(creds) = HiveCredentials::from_env() {
+            if creds.has_offline_token() {
+                let config = create_test_config();
+                backend.initialize(config).await.ok();
+                assert!(backend.is_ready().await);
+            }
         }
     }
 
@@ -806,31 +815,17 @@ mod tests {
 
         dotenvy::dotenv().ok();
 
-        // Skip test if Ditto credentials not available
-        let app_id = std::env::var("DITTO_APP_ID").ok().and_then(|v| {
-            let trimmed = v.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
+        // Skip test if credentials not available (checks HIVE_* with DITTO_* fallback)
+        let credentials = match HiveCredentials::from_env() {
+            Ok(creds) if creds.has_secret_key() => creds,
+            _ => {
+                eprintln!("Skipping test: credentials not available (need HIVE_APP_ID/HIVE_SECRET_KEY or DITTO_APP_ID/DITTO_SHARED_KEY)");
+                return;
             }
-        });
-        let shared_key = std::env::var("DITTO_SHARED_KEY").ok().and_then(|v| {
-            let trimmed = v.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        });
+        };
 
-        if app_id.is_none() || shared_key.is_none() {
-            eprintln!("Skipping test: Ditto credentials not available");
-            return;
-        }
-
-        let app_id = app_id.unwrap();
-        let shared_key = shared_key.unwrap();
+        let app_id = credentials.app_id().to_string();
+        let shared_key = credentials.secret_key().unwrap().to_string();
 
         // Create temp directories
         let temp_dir1 = tempdir().expect("Failed to create temp dir 1");

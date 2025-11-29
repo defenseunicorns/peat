@@ -120,14 +120,21 @@ impl CommandStorage for MockCommandStorage {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Bidirectional Hierarchical Command Flow Example ===\n");
 
-    // Load Ditto credentials from environment
+    // Load credentials from environment via HiveCredentials (supports HIVE_* with DITTO_* fallback)
     dotenvy::dotenv().ok();
 
-    let app_id = std::env::var("DITTO_APP_ID")
-        .map_err(|_| "DITTO_APP_ID not set. Please set it in .env or environment variables.")?;
+    let credentials = hive_protocol::credentials::HiveCredentials::from_env()
+        .map_err(|e| format!("Credentials error: {}. Please set HIVE_APP_ID/HIVE_SECRET_KEY or DITTO_APP_ID/DITTO_SHARED_KEY in .env", e))?;
 
-    let shared_key = std::env::var("DITTO_SHARED_KEY")
-        .map_err(|_| "DITTO_SHARED_KEY not set. Please set it in .env or environment variables.")?;
+    let app_id = credentials.app_id().to_string();
+    let shared_key = credentials
+        .require_secret_key()
+        .map_err(|e| format!("{}", e))?
+        .to_string();
+    let offline_token = credentials
+        .require_offline_token()
+        .map_err(|e| format!("{}", e))?
+        .to_string();
 
     // Create temporary directory for Ditto persistence
     let temp_dir = tempdir()?;
@@ -142,6 +149,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         app_id,
         persistence_dir: temp_dir.path().join("bidirectional_example"),
         shared_key,
+        offline_token,
         tcp_listen_port: None,
         tcp_connect_address: None,
     };
