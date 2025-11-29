@@ -1,0 +1,24 @@
+# ATAK Plugin Local Configuration Template
+# Copy this file to local.properties and update paths for your environment
+
+# Android SDK path
+sdk.dir=/home/YOUR_USER/Android/Sdk
+
+# ATAK SDK path (download from tak.gov)
+# Extract the SDK and point to the atak-civ directory
+atak.sdk.dir=/path/to/atak-civ-sdk
+
+# Debug signing key (generate with keytool if needed)
+# keytool -genkeypair -dname "CN=Android Debug,O=Android,C=US" \
+#   -validity 9999 -keystore debug.keystore \
+#   -alias androiddebugkey -keypass android -storepass android
+takDebugKeyFile=/path/to/debug.keystore
+takDebugKeyFilePassword=android
+takDebugKeyAlias=androiddebugkey
+takDebugKeyPassword=android
+
+# Release signing key (for production builds)
+takReleaseKeyFile=/path/to/release.keystore
+takReleaseKeyFilePassword=YOUR_PASSWORD
+takReleaseKeyAlias=YOUR_ALIAS
+takReleaseKeyPassword=YOUR_PASSWORD
