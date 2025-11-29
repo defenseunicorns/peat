@@ -1,0 +1,23 @@
+[package]
+name = "hive-ffi"
+version = "0.1.0"
+edition = "2021"
+description = "FFI bindings for HIVE protocol (Kotlin/Swift via UniFFI)"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "hive_ffi"
+
+[dependencies]
+# UniFFI for cross-language bindings (proc-macro only mode)
+uniffi = { version = "0.28", features = ["cli"] }
+
+# HIVE crates
+hive-protocol = { path = "../hive-protocol" }
+
+# Time handling
+chrono = "0.4"
+
+# Error handling
+thiserror = "1.0"
