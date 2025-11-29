@@ -44,17 +44,28 @@
 //! println!("Completed: {}/{}", status.completed, status.total_targets);
 //! ```
 
+#[cfg(feature = "ditto-backend")]
 use super::blob_document_integration::BlobReference;
-use super::blob_traits::{BlobHash, BlobStore, BlobToken};
+#[cfg(feature = "ditto-backend")]
+use super::blob_traits::BlobStore;
+use super::blob_traits::{BlobHash, BlobToken};
+#[cfg(feature = "ditto-backend")]
 use super::ditto_store::DittoStore;
-use anyhow::{Context, Result};
+#[cfg(feature = "ditto-backend")]
+use anyhow::Context;
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "ditto-backend")]
 use serde_json::json;
 use std::collections::HashMap;
+#[cfg(feature = "ditto-backend")]
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::broadcast;
+#[cfg(feature = "ditto-backend")]
+use tokio::sync::RwLock;
+#[cfg(feature = "ditto-backend")]
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
@@ -379,6 +390,7 @@ pub trait FileDistribution: Send + Sync {
 // ============================================================================
 
 /// Distribution collection name for storing distribution metadata
+#[cfg(feature = "ditto-backend")]
 const DISTRIBUTION_COLLECTION: &str = "file_distributions";
 
 /// Ditto-based file distribution implementation
@@ -386,6 +398,7 @@ const DISTRIBUTION_COLLECTION: &str = "file_distributions";
 /// Uses Ditto's document sync to propagate distribution requests.
 /// Target nodes subscribe to the distribution collection and fetch
 /// blobs when they see relevant distribution documents.
+#[cfg(feature = "ditto-backend")]
 pub struct DittoFileDistribution<B: BlobStore> {
     /// Underlying Ditto store
     store: Arc<DittoStore>,
@@ -399,11 +412,13 @@ pub struct DittoFileDistribution<B: BlobStore> {
 }
 
 /// Internal state for tracking a distribution
+#[cfg(feature = "ditto-backend")]
 struct DistributionState {
     status: DistributionStatus,
     cancelled: bool,
 }
 
+#[cfg(feature = "ditto-backend")]
 impl<B: BlobStore + 'static> DittoFileDistribution<B> {
     /// Create a new Ditto file distribution service
     pub fn new(store: Arc<DittoStore>, blob_store: Arc<B>) -> Self {
@@ -609,6 +624,7 @@ impl<B: BlobStore + 'static> DittoFileDistribution<B> {
     }
 }
 
+#[cfg(feature = "ditto-backend")]
 #[async_trait::async_trait]
 impl<B: BlobStore + 'static> FileDistribution for DittoFileDistribution<B> {
     async fn distribute(
@@ -747,6 +763,7 @@ impl<B: BlobStore + 'static> FileDistribution for DittoFileDistribution<B> {
 // ============================================================================
 
 /// Type alias for Arc-wrapped BlobStore
+#[cfg(feature = "ditto-backend")]
 pub type SharedBlobStore = Arc<dyn BlobStore>;
 
 // ============================================================================

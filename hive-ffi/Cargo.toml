@@ -9,15 +9,22 @@ license = "Apache-2.0"
 crate-type = ["cdylib", "lib"]
 name = "hive_ffi"
 
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/uniffi_bindgen.rs"
+
 [dependencies]
 # UniFFI for cross-language bindings (proc-macro only mode)
 uniffi = { version = "0.28", features = ["cli"] }
 
-# HIVE crates
-hive-protocol = { path = "../hive-protocol" }
+# HIVE crates - no ditto-backend for Android cross-compilation
+hive-protocol = { path = "../hive-protocol", default-features = false }
 
 # Time handling
 chrono = "0.4"
 
 # Error handling
 thiserror = "1.0"
+
+[build-dependencies]
+uniffi = { version = "0.28", features = ["build"] }

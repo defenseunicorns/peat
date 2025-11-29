@@ -8,6 +8,7 @@ pub mod deltas;
 pub mod flow_control;
 pub mod maintenance;
 pub mod router;
+#[cfg(feature = "ditto-backend")]
 pub mod routing_cache;
 pub mod routing_table;
 pub mod state_aggregation;
@@ -27,6 +28,7 @@ pub use maintenance::{
     HierarchyMaintainer, MaintenanceMetrics, RebalanceAction, RebalancingCoordinator,
 };
 pub use router::{HierarchicalRouter, RouterStats};
+#[cfg(feature = "ditto-backend")]
 pub use routing_cache::{CacheStats, RoutingCache};
 pub use routing_table::{RoutingTable, RoutingTableStats};
 pub use state_aggregation::StateAggregator;

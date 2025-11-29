@@ -10,7 +10,8 @@ repository.workspace = true
 # CAP dependencies
 hive-schema = { path = "../hive-schema" }
 
-dittolive-ditto = { workspace = true }
+# Ditto is optional - only needed for DittoBackend (not for CoT/FFI)
+dittolive-ditto = { workspace = true, optional = true }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -55,7 +56,10 @@ rand = { version = "0.9", optional = true }  # Random number generation for retr
 quick-xml = { version = "0.37", features = ["serialize"] }  # CoT XML encoding/decoding
 
 [features]
-default = []
+default = ["ditto-backend"]
+# Ditto backend - requires dittolive-ditto SDK (not available on Android)
+ditto-backend = ["dittolive-ditto"]
+# Automerge/Iroh backend - pure Rust, works on Android
 automerge-backend = ["automerge", "iroh", "iroh-blobs", "rocksdb", "lru", "toml", "mdns-sd", "rand"]
 
 [dev-dependencies]
