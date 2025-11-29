@@ -47,7 +47,8 @@ jobs:
           cache-on-failure: true
           shared-key: clippy
 
-      - run: cargo clippy --all-targets --all-features --workspace -- -D warnings
+      # Exclude hive-ffi: its cdylib conflicts with dittoffi symbols during linking
+      - run: cargo clippy --all-targets --all-features --workspace --exclude hive-ffi -- -D warnings
 
   test:
     name: Test
@@ -75,4 +76,5 @@ jobs:
           DITTO_APP_ID: ${{ secrets.DITTO_APP_ID }}
           DITTO_OFFLINE_TOKEN: ${{ secrets.DITTO_OFFLINE_TOKEN }}
           DITTO_SHARED_KEY: ${{ secrets.DITTO_SHARED_KEY }}
-        run: cargo test --all-features --workspace
+        # Exclude hive-ffi: its cdylib conflicts with dittoffi symbols during linking
+        run: cargo test --all-features --workspace --exclude hive-ffi
