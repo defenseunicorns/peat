@@ -11,6 +11,7 @@ pub mod blob_traits;
 #[cfg(feature = "ditto-backend")]
 pub mod ditto_blob_store;
 pub mod file_distribution;
+pub mod model_distribution;
 
 // Backend implementations (E11.2)
 #[cfg(feature = "ditto-backend")]
@@ -121,6 +122,11 @@ pub use file_distribution::DittoFileDistribution;
 pub use file_distribution::{
     DistributionHandle, DistributionScope, DistributionStatus, FileDistribution,
     NodeTransferStatus, TransferPriority, TransferState,
+};
+pub use model_distribution::{
+    BlockerReason, ConvergenceBlocker, ModelConvergenceStatus, ModelDeploymentTracker,
+    ModelDistribution, ModelDistributionHandle, ModelOperationalStatus, NodeModelStatus,
+    VariantSelector,
 };
 
 // Legacy compatibility aliases
