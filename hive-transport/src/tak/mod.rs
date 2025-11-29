@@ -29,6 +29,7 @@ mod queue;
 mod reconnect;
 mod traits;
 
+pub mod bridge;
 pub mod mesh;
 pub mod server;
 
