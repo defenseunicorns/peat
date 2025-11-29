@@ -27,7 +27,9 @@
 //! ```
 
 use super::traits::StorageBackend;
-use anyhow::{anyhow, Context, Result};
+#[cfg(any(feature = "ditto-backend", feature = "automerge-backend"))]
+use anyhow::Context;
+use anyhow::{anyhow, Result};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -164,6 +166,7 @@ pub fn create_storage_backend(config: &StorageConfig) -> Result<Arc<dyn StorageB
     config.validate()?;
 
     match config.backend.as_str() {
+        #[cfg(feature = "ditto-backend")]
         "ditto" => {
             // Import DittoStore and DittoBackend
             use crate::storage::ditto_backend::DittoBackend;
@@ -178,6 +181,12 @@ pub fn create_storage_backend(config: &StorageConfig) -> Result<Arc<dyn StorageB
 
             Ok(Arc::new(backend))
         }
+        #[cfg(not(feature = "ditto-backend"))]
+        "ditto" => Err(anyhow!(
+            "Ditto backend not enabled.\n\
+                 Rebuild with --features ditto-backend to use this backend.\n\
+                 For now, use CAP_STORAGE_BACKEND=automerge-memory"
+        )),
         "automerge-memory" => {
             #[cfg(feature = "automerge-backend")]
             {

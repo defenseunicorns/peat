@@ -46,13 +46,21 @@
 //! }
 //! ```
 
-use super::blob_traits::{BlobHash, BlobMetadata, BlobProgress, BlobStore, BlobToken};
+#[cfg(feature = "ditto-backend")]
+use super::blob_traits::BlobStore;
+use super::blob_traits::{BlobHash, BlobMetadata, BlobProgress, BlobToken};
+#[cfg(feature = "ditto-backend")]
 use super::ditto_store::DittoStore;
-use anyhow::{Context, Result};
+#[cfg(feature = "ditto-backend")]
+use anyhow::Context;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "ditto-backend")]
 use serde_json::json;
 use std::collections::HashMap;
+#[cfg(feature = "ditto-backend")]
 use std::sync::Arc;
+#[cfg(feature = "ditto-backend")]
 use tracing::{debug, info, warn};
 
 /// Serializable blob reference for storage in documents
@@ -209,11 +217,13 @@ pub trait BlobDocumentIntegration: Send + Sync {
 /// After retrieving a token from a synced document, use
 /// `DittoBlobStore::fetch_blob()` to download the actual content.
 /// Ditto's Attachment API handles the blob transfer automatically.
+#[cfg(feature = "ditto-backend")]
 pub struct DittoBlobDocumentIntegration<B: BlobStore> {
     store: Arc<DittoStore>,
     blob_store: Arc<B>,
 }
 
+#[cfg(feature = "ditto-backend")]
 impl<B: BlobStore> DittoBlobDocumentIntegration<B> {
     /// Create new integration layer
     ///
@@ -235,6 +245,7 @@ impl<B: BlobStore> DittoBlobDocumentIntegration<B> {
     }
 }
 
+#[cfg(feature = "ditto-backend")]
 #[async_trait::async_trait]
 impl<B: BlobStore + 'static> BlobDocumentIntegration for DittoBlobDocumentIntegration<B> {
     async fn store_blob_reference(
