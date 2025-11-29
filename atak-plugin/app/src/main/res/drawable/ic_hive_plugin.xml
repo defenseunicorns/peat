@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- HIVE Plugin Icon - Hexagonal honeycomb pattern representing HIVE cells -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!-- Background circle -->
+    <path
+        android:fillColor="#1B5E20"
+        android:pathData="M24,24m-22,0a22,22 0,1 1,44 0a22,22 0,1 1,-44 0"/>
+
+    <!-- Center hexagon -->
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M24,14 L31,18.5 L31,27.5 L24,32 L17,27.5 L17,18.5 Z"/>
+
+    <!-- Top hexagon -->
+    <path
+        android:fillColor="#66BB6A"
+        android:pathData="M24,4 L29,7 L29,13 L24,16 L19,13 L19,7 Z"/>
+
+    <!-- Bottom left hexagon -->
+    <path
+        android:fillColor="#66BB6A"
+        android:pathData="M13,25 L18,28 L18,34 L13,37 L8,34 L8,28 Z"/>
+
+    <!-- Bottom right hexagon -->
+    <path
+        android:fillColor="#66BB6A"
+        android:pathData="M35,25 L40,28 L40,34 L35,37 L30,34 L30,28 Z"/>
+
+    <!-- Connection lines -->
+    <path
+        android:strokeColor="#A5D6A7"
+        android:strokeWidth="1"
+        android:pathData="M24,16 L24,14"/>
+
+    <path
+        android:strokeColor="#A5D6A7"
+        android:strokeWidth="1"
+        android:pathData="M17,27.5 L18,28"/>
+
+    <path
+        android:strokeColor="#A5D6A7"
+        android:strokeWidth="1"
+        android:pathData="M31,27.5 L30,28"/>
+
+</vector>

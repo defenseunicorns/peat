@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Permissions required for HIVE plugin functionality -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@drawable/ic_hive_plugin"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        tools:ignore="AllowBackup">
+
+        <!-- ATAK Plugin Metadata -->
+        <meta-data
+            android:name="plugin-api"
+            android:value="gov.tak.api.plugin.IPlugin" />
+
+        <!-- Plugin entry point -->
+        <activity
+            android:name="com.atakmap.android.hive.plugin.HivePluginActivity"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+
+            <intent-filter>
+                <action android:name="com.atakmap.android.hive.SHOW_PLUGIN" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- ATAK Plugin Tool (toolbar button) -->
+        <receiver
+            android:name="com.atakmap.android.hive.plugin.HivePluginTool"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.atakmap.android.maps.TOOLBARS_CREATED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Main Plugin MapComponent (entry point) -->
+        <receiver
+            android:name="com.atakmap.android.hive.plugin.HiveMapComponent"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.atakmap.android.maps.COMPONENTS_CREATED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Plugin DropDownReceiver for side panel UI -->
+        <receiver
+            android:name="com.atakmap.android.hive.plugin.HiveDropDownReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.atakmap.android.hive.SHOW_DROPDOWN" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+
+</manifest>
