@@ -338,6 +338,7 @@ mod tests {
         // Create config with one peer
         let peer_config = PeerConfig {
             local: LocalConfig::default(),
+            formation: None,
             peers: vec![PeerInfo {
                 name: "test-peer".to_string(),
                 node_id: hex::encode(endpoint_id.as_bytes()),
