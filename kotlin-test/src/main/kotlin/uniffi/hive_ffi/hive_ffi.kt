@@ -30,6 +30,7 @@ import java.nio.CharBuffer
 import java.nio.charset.CodingErrorAction
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 // This is a helper for safely working with byte buffers returned from the Rust code.
 // A rust-owned buffer is represented by its capacity, its current length, and a
@@ -719,6 +720,38 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -732,8 +765,46 @@ internal interface UniffiLib : Library {
                 }
         }
         
+        // The Cleaner for the whole library
+        internal val CLEANER: UniffiCleaner by lazy {
+            UniffiCleaner.create()
+        }
     }
 
+    fun uniffi_hive_ffi_fn_clone_hivenode(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): Pointer
+    fun uniffi_hive_ffi_fn_free_hivenode(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    fun uniffi_hive_ffi_fn_method_hivenode_connect_peer(`ptr`: Pointer,`peer`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    fun uniffi_hive_ffi_fn_method_hivenode_connected_peers(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_hive_ffi_fn_method_hivenode_delete_document(`ptr`: Pointer,`collection`: RustBuffer.ByValue,`docId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    fun uniffi_hive_ffi_fn_method_hivenode_disconnect_peer(`ptr`: Pointer,`nodeId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    fun uniffi_hive_ffi_fn_method_hivenode_endpoint_addr(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_hive_ffi_fn_method_hivenode_get_document(`ptr`: Pointer,`collection`: RustBuffer.ByValue,`docId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_hive_ffi_fn_method_hivenode_list_documents(`ptr`: Pointer,`collection`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_hive_ffi_fn_method_hivenode_node_id(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_hive_ffi_fn_method_hivenode_peer_count(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): Int
+    fun uniffi_hive_ffi_fn_method_hivenode_put_document(`ptr`: Pointer,`collection`: RustBuffer.ByValue,`docId`: RustBuffer.ByValue,`jsonData`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    fun uniffi_hive_ffi_fn_method_hivenode_start_sync(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    fun uniffi_hive_ffi_fn_method_hivenode_stop_sync(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    fun uniffi_hive_ffi_fn_method_hivenode_sync_document(`ptr`: Pointer,`collection`: RustBuffer.ByValue,`docId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    fun uniffi_hive_ffi_fn_method_hivenode_sync_stats(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_hive_ffi_fn_func_create_node(`config`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Pointer
     fun uniffi_hive_ffi_fn_func_create_position(`lat`: Double,`lon`: Double,`hae`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_hive_ffi_fn_func_create_velocity(`bearing`: Double,`speedMps`: Double,uniffi_out_err: UniffiRustCallStatus, 
@@ -854,6 +925,8 @@ internal interface UniffiLib : Library {
     ): Unit
     fun ffi_hive_ffi_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
+    fun uniffi_hive_ffi_checksum_func_create_node(
+    ): Short
     fun uniffi_hive_ffi_checksum_func_create_position(
     ): Short
     fun uniffi_hive_ffi_checksum_func_create_velocity(
@@ -861,6 +934,34 @@ internal interface UniffiLib : Library {
     fun uniffi_hive_ffi_checksum_func_encode_track_to_cot(
     ): Short
     fun uniffi_hive_ffi_checksum_func_hive_version(
+    ): Short
+    fun uniffi_hive_ffi_checksum_method_hivenode_connect_peer(
+    ): Short
+    fun uniffi_hive_ffi_checksum_method_hivenode_connected_peers(
+    ): Short
+    fun uniffi_hive_ffi_checksum_method_hivenode_delete_document(
+    ): Short
+    fun uniffi_hive_ffi_checksum_method_hivenode_disconnect_peer(
+    ): Short
+    fun uniffi_hive_ffi_checksum_method_hivenode_endpoint_addr(
+    ): Short
+    fun uniffi_hive_ffi_checksum_method_hivenode_get_document(
+    ): Short
+    fun uniffi_hive_ffi_checksum_method_hivenode_list_documents(
+    ): Short
+    fun uniffi_hive_ffi_checksum_method_hivenode_node_id(
+    ): Short
+    fun uniffi_hive_ffi_checksum_method_hivenode_peer_count(
+    ): Short
+    fun uniffi_hive_ffi_checksum_method_hivenode_put_document(
+    ): Short
+    fun uniffi_hive_ffi_checksum_method_hivenode_start_sync(
+    ): Short
+    fun uniffi_hive_ffi_checksum_method_hivenode_stop_sync(
+    ): Short
+    fun uniffi_hive_ffi_checksum_method_hivenode_sync_document(
+    ): Short
+    fun uniffi_hive_ffi_checksum_method_hivenode_sync_stats(
     ): Short
     fun ffi_hive_ffi_uniffi_contract_version(
     ): Int
@@ -879,6 +980,9 @@ private fun uniffiCheckContractApiVersion(lib: UniffiLib) {
 
 @Suppress("UNUSED_PARAMETER")
 private fun uniffiCheckApiChecksums(lib: UniffiLib) {
+    if (lib.uniffi_hive_ffi_checksum_func_create_node() != 29170.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_hive_ffi_checksum_func_create_position() != 9099.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -889,6 +993,48 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_hive_ffi_checksum_func_hive_version() != 4025.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_hive_ffi_checksum_method_hivenode_connect_peer() != 53841.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_hive_ffi_checksum_method_hivenode_connected_peers() != 17872.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_hive_ffi_checksum_method_hivenode_delete_document() != 54161.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_hive_ffi_checksum_method_hivenode_disconnect_peer() != 18098.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_hive_ffi_checksum_method_hivenode_endpoint_addr() != 18629.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_hive_ffi_checksum_method_hivenode_get_document() != 52513.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_hive_ffi_checksum_method_hivenode_list_documents() != 49925.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_hive_ffi_checksum_method_hivenode_node_id() != 30929.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_hive_ffi_checksum_method_hivenode_peer_count() != 32712.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_hive_ffi_checksum_method_hivenode_put_document() != 13821.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_hive_ffi_checksum_method_hivenode_start_sync() != 44390.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_hive_ffi_checksum_method_hivenode_stop_sync() != 33902.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_hive_ffi_checksum_method_hivenode_sync_document() != 29736.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_hive_ffi_checksum_method_hivenode_sync_stats() != 23036.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
 }
@@ -941,6 +1087,52 @@ object NoPointer
 /**
  * @suppress
  */
+public object FfiConverterUInt: FfiConverter<UInt, Int> {
+    override fun lift(value: Int): UInt {
+        return value.toUInt()
+    }
+
+    override fun read(buf: ByteBuffer): UInt {
+        return lift(buf.getInt())
+    }
+
+    override fun lower(value: UInt): Int {
+        return value.toInt()
+    }
+
+    override fun allocationSize(value: UInt) = 4UL
+
+    override fun write(value: UInt, buf: ByteBuffer) {
+        buf.putInt(value.toInt())
+    }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterULong: FfiConverter<ULong, Long> {
+    override fun lift(value: Long): ULong {
+        return value.toULong()
+    }
+
+    override fun read(buf: ByteBuffer): ULong {
+        return lift(buf.getLong())
+    }
+
+    override fun lower(value: ULong): Long {
+        return value.toLong()
+    }
+
+    override fun allocationSize(value: ULong) = 8UL
+
+    override fun write(value: ULong, buf: ByteBuffer) {
+        buf.putLong(value.toLong())
+    }
+}
+
+/**
+ * @suppress
+ */
 public object FfiConverterDouble: FfiConverter<Double, Double> {
     override fun lift(value: Double): Double {
         return value
@@ -958,6 +1150,29 @@ public object FfiConverterDouble: FfiConverter<Double, Double> {
 
     override fun write(value: Double, buf: ByteBuffer) {
         buf.putDouble(value)
+    }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterBoolean: FfiConverter<Boolean, Byte> {
+    override fun lift(value: Byte): Boolean {
+        return value.toInt() != 0
+    }
+
+    override fun read(buf: ByteBuffer): Boolean {
+        return lift(buf.get())
+    }
+
+    override fun lower(value: Boolean): Byte {
+        return if (value) 1.toByte() else 0.toByte()
+    }
+
+    override fun allocationSize(value: Boolean) = 1UL
+
+    override fun write(value: Boolean, buf: ByteBuffer) {
+        buf.put(lower(value))
     }
 }
 
@@ -1019,6 +1234,683 @@ public object FfiConverterString: FfiConverter<String, RustBuffer.ByValue> {
 }
 
 
+// This template implements a class for working with a Rust struct via a Pointer/Arc<T>
+// to the live Rust struct on the other side of the FFI.
+//
+// Each instance implements core operations for working with the Rust `Arc<T>` and the
+// Kotlin Pointer to work with the live Rust struct on the other side of the FFI.
+//
+// There's some subtlety here, because we have to be careful not to operate on a Rust
+// struct after it has been dropped, and because we must expose a public API for freeing
+// theq Kotlin wrapper object in lieu of reliable finalizers. The core requirements are:
+//
+//   * Each instance holds an opaque pointer to the underlying Rust struct.
+//     Method calls need to read this pointer from the object's state and pass it in to
+//     the Rust FFI.
+//
+//   * When an instance is no longer needed, its pointer should be passed to a
+//     special destructor function provided by the Rust FFI, which will drop the
+//     underlying Rust struct.
+//
+//   * Given an instance, calling code is expected to call the special
+//     `destroy` method in order to free it after use, either by calling it explicitly
+//     or by using a higher-level helper like the `use` method. Failing to do so risks
+//     leaking the underlying Rust struct.
+//
+//   * We can't assume that calling code will do the right thing, and must be prepared
+//     to handle Kotlin method calls executing concurrently with or even after a call to
+//     `destroy`, and to handle multiple (possibly concurrent!) calls to `destroy`.
+//
+//   * We must never allow Rust code to operate on the underlying Rust struct after
+//     the destructor has been called, and must never call the destructor more than once.
+//     Doing so may trigger memory unsafety.
+//
+//   * To mitigate many of the risks of leaking memory and use-after-free unsafety, a `Cleaner`
+//     is implemented to call the destructor when the Kotlin object becomes unreachable.
+//     This is done in a background thread. This is not a panacea, and client code should be aware that
+//      1. the thread may starve if some there are objects that have poorly performing
+//     `drop` methods or do significant work in their `drop` methods.
+//      2. the thread is shared across the whole library. This can be tuned by using `android_cleaner = true`,
+//         or `android = true` in the [`kotlin` section of the `uniffi.toml` file](https://mozilla.github.io/uniffi-rs/kotlin/configuration.html).
+//
+// If we try to implement this with mutual exclusion on access to the pointer, there is the
+// possibility of a race between a method call and a concurrent call to `destroy`:
+//
+//    * Thread A starts a method call, reads the value of the pointer, but is interrupted
+//      before it can pass the pointer over the FFI to Rust.
+//    * Thread B calls `destroy` and frees the underlying Rust struct.
+//    * Thread A resumes, passing the already-read pointer value to Rust and triggering
+//      a use-after-free.
+//
+// One possible solution would be to use a `ReadWriteLock`, with each method call taking
+// a read lock (and thus allowed to run concurrently) and the special `destroy` method
+// taking a write lock (and thus blocking on live method calls). However, we aim not to
+// generate methods with any hidden blocking semantics, and a `destroy` method that might
+// block if called incorrectly seems to meet that bar.
+//
+// So, we achieve our goals by giving each instance an associated `AtomicLong` counter to track
+// the number of in-flight method calls, and an `AtomicBoolean` flag to indicate whether `destroy`
+// has been called. These are updated according to the following rules:
+//
+//    * The initial value of the counter is 1, indicating a live object with no in-flight calls.
+//      The initial value for the flag is false.
+//
+//    * At the start of each method call, we atomically check the counter.
+//      If it is 0 then the underlying Rust struct has already been destroyed and the call is aborted.
+//      If it is nonzero them we atomically increment it by 1 and proceed with the method call.
+//
+//    * At the end of each method call, we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+//    * When `destroy` is called, we atomically flip the flag from false to true.
+//      If the flag was already true we silently fail.
+//      Otherwise we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+// Astute readers may observe that this all sounds very similar to the way that Rust's `Arc<T>` works,
+// and indeed it is, with the addition of a flag to guard against multiple calls to `destroy`.
+//
+// The overall effect is that the underlying Rust struct is destroyed only when `destroy` has been
+// called *and* all in-flight method calls have completed, avoiding violating any of the expectations
+// of the underlying Rust code.
+//
+// This makes a cleaner a better alternative to _not_ calling `destroy()` as
+// and when the object is finished with, but the abstraction is not perfect: if the Rust object's `drop`
+// method is slow, and/or there are many objects to cleanup, and it's on a low end Android device, then the cleaner
+// thread may be starved, and the app will leak memory.
+//
+// In this case, `destroy`ing manually may be a better solution.
+//
+// The cleaner can live side by side with the manual calling of `destroy`. In the order of responsiveness, uniffi objects
+// with Rust peers are reclaimed:
+//
+// 1. By calling the `destroy` method of the object, which calls `rustObject.free()`. If that doesn't happen:
+// 2. When the object becomes unreachable, AND the Cleaner thread gets to call `rustObject.free()`. If the thread is starved then:
+// 3. The memory is reclaimed when the process terminates.
+//
+// [1] https://stackoverflow.com/questions/24376768/can-java-finalize-an-object-when-it-is-still-in-scope/24380219
+//
+
+
+/**
+ * The cleaner interface for Object finalization code to run.
+ * This is the entry point to any implementation that we're using.
+ *
+ * The cleaner registers objects and returns cleanables, so now we are
+ * defining a `UniffiCleaner` with a `UniffiClenaer.Cleanable` to abstract the
+ * different implmentations available at compile time.
+ *
+ * @suppress
+ */
+interface UniffiCleaner {
+    interface Cleanable {
+        fun clean()
+    }
+
+    fun register(value: Any, cleanUpTask: Runnable): UniffiCleaner.Cleanable
+
+    companion object
+}
+
+// The fallback Jna cleaner, which is available for both Android, and the JVM.
+private class UniffiJnaCleaner : UniffiCleaner {
+    private val cleaner = com.sun.jna.internal.Cleaner.getCleaner()
+
+    override fun register(value: Any, cleanUpTask: Runnable): UniffiCleaner.Cleanable =
+        UniffiJnaCleanable(cleaner.register(value, cleanUpTask))
+}
+
+private class UniffiJnaCleanable(
+    private val cleanable: com.sun.jna.internal.Cleaner.Cleanable,
+) : UniffiCleaner.Cleanable {
+    override fun clean() = cleanable.clean()
+}
+
+// We decide at uniffi binding generation time whether we were
+// using Android or not.
+// There are further runtime checks to chose the correct implementation
+// of the cleaner.
+private fun UniffiCleaner.Companion.create(): UniffiCleaner =
+    try {
+        // For safety's sake: if the library hasn't been run in android_cleaner = true
+        // mode, but is being run on Android, then we still need to think about
+        // Android API versions.
+        // So we check if java.lang.ref.Cleaner is there, and use that…
+        java.lang.Class.forName("java.lang.ref.Cleaner")
+        JavaLangRefCleaner()
+    } catch (e: ClassNotFoundException) {
+        // … otherwise, fallback to the JNA cleaner.
+        UniffiJnaCleaner()
+    }
+
+private class JavaLangRefCleaner : UniffiCleaner {
+    val cleaner = java.lang.ref.Cleaner.create()
+
+    override fun register(value: Any, cleanUpTask: Runnable): UniffiCleaner.Cleanable =
+        JavaLangRefCleanable(cleaner.register(value, cleanUpTask))
+}
+
+private class JavaLangRefCleanable(
+    val cleanable: java.lang.ref.Cleaner.Cleanable
+) : UniffiCleaner.Cleanable {
+    override fun clean() = cleanable.clean()
+}
+/**
+ * A HIVE network node with P2P sync capabilities
+ *
+ * Wraps AutomergeBackend + IrohTransport for document sync.
+ */
+public interface HiveNodeInterface {
+    
+    /**
+     * Connect to a peer node
+     */
+    fun `connectPeer`(`peer`: PeerInfo)
+    
+    /**
+     * Get list of connected peer IDs
+     */
+    fun `connectedPeers`(): List<kotlin.String>
+    
+    /**
+     * Delete a document from a collection
+     */
+    fun `deleteDocument`(`collection`: kotlin.String, `docId`: kotlin.String)
+    
+    /**
+     * Disconnect from a peer by node ID
+     *
+     * Note: Currently disconnects matching peer from internal connection map.
+     */
+    fun `disconnectPeer`(`nodeId`: kotlin.String)
+    
+    /**
+     * Get this node's endpoint address for peer connections
+     */
+    fun `endpointAddr`(): kotlin.String
+    
+    /**
+     * Retrieve a document from a collection as JSON
+     */
+    fun `getDocument`(`collection`: kotlin.String, `docId`: kotlin.String): kotlin.String?
+    
+    /**
+     * List all document IDs in a collection
+     */
+    fun `listDocuments`(`collection`: kotlin.String): List<kotlin.String>
+    
+    /**
+     * Get this node's unique identifier (hex-encoded)
+     */
+    fun `nodeId`(): kotlin.String
+    
+    /**
+     * Get the number of connected peers
+     */
+    fun `peerCount`(): kotlin.UInt
+    
+    /**
+     * Store a JSON document in a collection
+     */
+    fun `putDocument`(`collection`: kotlin.String, `docId`: kotlin.String, `jsonData`: kotlin.String)
+    
+    /**
+     * Start sync operations
+     */
+    fun `startSync`()
+    
+    /**
+     * Stop sync operations
+     */
+    fun `stopSync`()
+    
+    /**
+     * Manually trigger sync for a specific document
+     */
+    fun `syncDocument`(`collection`: kotlin.String, `docId`: kotlin.String)
+    
+    /**
+     * Get sync statistics
+     */
+    fun `syncStats`(): SyncStats
+    
+    companion object
+}
+
+/**
+ * A HIVE network node with P2P sync capabilities
+ *
+ * Wraps AutomergeBackend + IrohTransport for document sync.
+ */
+open class HiveNode: Disposable, AutoCloseable, HiveNodeInterface {
+
+    constructor(pointer: Pointer) {
+        this.pointer = pointer
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(pointer))
+    }
+
+    /**
+     * This constructor can be used to instantiate a fake object. Only used for tests. Any
+     * attempt to actually use an object constructed this way will fail as there is no
+     * connected Rust object.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    constructor(noPointer: NoPointer) {
+        this.pointer = null
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(pointer))
+    }
+
+    protected val pointer: Pointer?
+    protected val cleanable: UniffiCleaner.Cleanable
+
+    private val wasDestroyed = AtomicBoolean(false)
+    private val callCounter = AtomicLong(1)
+
+    override fun destroy() {
+        // Only allow a single call to this method.
+        // TODO: maybe we should log a warning if called more than once?
+        if (this.wasDestroyed.compareAndSet(false, true)) {
+            // This decrement always matches the initial count of 1 given at creation time.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable.clean()
+            }
+        }
+    }
+
+    @Synchronized
+    override fun close() {
+        this.destroy()
+    }
+
+    internal inline fun <R> callWithPointer(block: (ptr: Pointer) -> R): R {
+        // Check and increment the call counter, to keep the object alive.
+        // This needs a compare-and-set retry loop in case of concurrent updates.
+        do {
+            val c = this.callCounter.get()
+            if (c == 0L) {
+                throw IllegalStateException("${this.javaClass.simpleName} object has already been destroyed")
+            }
+            if (c == Long.MAX_VALUE) {
+                throw IllegalStateException("${this.javaClass.simpleName} call counter would overflow")
+            }
+        } while (! this.callCounter.compareAndSet(c, c + 1L))
+        // Now we can safely do the method call without the pointer being freed concurrently.
+        try {
+            return block(this.uniffiClonePointer())
+        } finally {
+            // This decrement always matches the increment we performed above.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable.clean()
+            }
+        }
+    }
+
+    // Use a static inner class instead of a closure so as not to accidentally
+    // capture `this` as part of the cleanable's action.
+    private class UniffiCleanAction(private val pointer: Pointer?) : Runnable {
+        override fun run() {
+            pointer?.let { ptr ->
+                uniffiRustCall { status ->
+                    UniffiLib.INSTANCE.uniffi_hive_ffi_fn_free_hivenode(ptr, status)
+                }
+            }
+        }
+    }
+
+    fun uniffiClonePointer(): Pointer {
+        return uniffiRustCall() { status ->
+            UniffiLib.INSTANCE.uniffi_hive_ffi_fn_clone_hivenode(pointer!!, status)
+        }
+    }
+
+    
+    /**
+     * Connect to a peer node
+     */
+    @Throws(HiveException::class)override fun `connectPeer`(`peer`: PeerInfo)
+        = 
+    callWithPointer {
+    uniffiRustCallWithError(HiveException) { _status ->
+    UniffiLib.INSTANCE.uniffi_hive_ffi_fn_method_hivenode_connect_peer(
+        it, FfiConverterTypePeerInfo.lower(`peer`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Get list of connected peer IDs
+     */override fun `connectedPeers`(): List<kotlin.String> {
+            return FfiConverterSequenceString.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_hive_ffi_fn_method_hivenode_connected_peers(
+        it, _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Delete a document from a collection
+     */
+    @Throws(HiveException::class)override fun `deleteDocument`(`collection`: kotlin.String, `docId`: kotlin.String)
+        = 
+    callWithPointer {
+    uniffiRustCallWithError(HiveException) { _status ->
+    UniffiLib.INSTANCE.uniffi_hive_ffi_fn_method_hivenode_delete_document(
+        it, FfiConverterString.lower(`collection`),FfiConverterString.lower(`docId`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Disconnect from a peer by node ID
+     *
+     * Note: Currently disconnects matching peer from internal connection map.
+     */
+    @Throws(HiveException::class)override fun `disconnectPeer`(`nodeId`: kotlin.String)
+        = 
+    callWithPointer {
+    uniffiRustCallWithError(HiveException) { _status ->
+    UniffiLib.INSTANCE.uniffi_hive_ffi_fn_method_hivenode_disconnect_peer(
+        it, FfiConverterString.lower(`nodeId`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Get this node's endpoint address for peer connections
+     */override fun `endpointAddr`(): kotlin.String {
+            return FfiConverterString.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_hive_ffi_fn_method_hivenode_endpoint_addr(
+        it, _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Retrieve a document from a collection as JSON
+     */
+    @Throws(HiveException::class)override fun `getDocument`(`collection`: kotlin.String, `docId`: kotlin.String): kotlin.String? {
+            return FfiConverterOptionalString.lift(
+    callWithPointer {
+    uniffiRustCallWithError(HiveException) { _status ->
+    UniffiLib.INSTANCE.uniffi_hive_ffi_fn_method_hivenode_get_document(
+        it, FfiConverterString.lower(`collection`),FfiConverterString.lower(`docId`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * List all document IDs in a collection
+     */
+    @Throws(HiveException::class)override fun `listDocuments`(`collection`: kotlin.String): List<kotlin.String> {
+            return FfiConverterSequenceString.lift(
+    callWithPointer {
+    uniffiRustCallWithError(HiveException) { _status ->
+    UniffiLib.INSTANCE.uniffi_hive_ffi_fn_method_hivenode_list_documents(
+        it, FfiConverterString.lower(`collection`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Get this node's unique identifier (hex-encoded)
+     */override fun `nodeId`(): kotlin.String {
+            return FfiConverterString.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_hive_ffi_fn_method_hivenode_node_id(
+        it, _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Get the number of connected peers
+     */override fun `peerCount`(): kotlin.UInt {
+            return FfiConverterUInt.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_hive_ffi_fn_method_hivenode_peer_count(
+        it, _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Store a JSON document in a collection
+     */
+    @Throws(HiveException::class)override fun `putDocument`(`collection`: kotlin.String, `docId`: kotlin.String, `jsonData`: kotlin.String)
+        = 
+    callWithPointer {
+    uniffiRustCallWithError(HiveException) { _status ->
+    UniffiLib.INSTANCE.uniffi_hive_ffi_fn_method_hivenode_put_document(
+        it, FfiConverterString.lower(`collection`),FfiConverterString.lower(`docId`),FfiConverterString.lower(`jsonData`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Start sync operations
+     */
+    @Throws(HiveException::class)override fun `startSync`()
+        = 
+    callWithPointer {
+    uniffiRustCallWithError(HiveException) { _status ->
+    UniffiLib.INSTANCE.uniffi_hive_ffi_fn_method_hivenode_start_sync(
+        it, _status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Stop sync operations
+     */
+    @Throws(HiveException::class)override fun `stopSync`()
+        = 
+    callWithPointer {
+    uniffiRustCallWithError(HiveException) { _status ->
+    UniffiLib.INSTANCE.uniffi_hive_ffi_fn_method_hivenode_stop_sync(
+        it, _status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Manually trigger sync for a specific document
+     */
+    @Throws(HiveException::class)override fun `syncDocument`(`collection`: kotlin.String, `docId`: kotlin.String)
+        = 
+    callWithPointer {
+    uniffiRustCallWithError(HiveException) { _status ->
+    UniffiLib.INSTANCE.uniffi_hive_ffi_fn_method_hivenode_sync_document(
+        it, FfiConverterString.lower(`collection`),FfiConverterString.lower(`docId`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Get sync statistics
+     */
+    @Throws(HiveException::class)override fun `syncStats`(): SyncStats {
+            return FfiConverterTypeSyncStats.lift(
+    callWithPointer {
+    uniffiRustCallWithError(HiveException) { _status ->
+    UniffiLib.INSTANCE.uniffi_hive_ffi_fn_method_hivenode_sync_stats(
+        it, _status)
+}
+    }
+    )
+    }
+    
+
+    
+
+    
+    
+    companion object
+    
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeHiveNode: FfiConverter<HiveNode, Pointer> {
+
+    override fun lower(value: HiveNode): Pointer {
+        return value.uniffiClonePointer()
+    }
+
+    override fun lift(value: Pointer): HiveNode {
+        return HiveNode(value)
+    }
+
+    override fun read(buf: ByteBuffer): HiveNode {
+        // The Rust code always writes pointers as 8 bytes, and will
+        // fail to compile if they don't fit.
+        return lift(Pointer(buf.getLong()))
+    }
+
+    override fun allocationSize(value: HiveNode) = 8UL
+
+    override fun write(value: HiveNode, buf: ByteBuffer) {
+        // The Rust code always expects pointers written as 8 bytes,
+        // and will fail to compile if they don't fit.
+        buf.putLong(Pointer.nativeValue(lower(value)))
+    }
+}
+
+
+
+/**
+ * Configuration for creating a HiveNode
+ */
+data class NodeConfig (
+    /**
+     * Bind address for P2P connections (e.g., "127.0.0.1:0" for auto-assign)
+     */
+    var `bindAddress`: kotlin.String?, 
+    /**
+     * Storage path for Automerge documents
+     */
+    var `storagePath`: kotlin.String
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeNodeConfig: FfiConverterRustBuffer<NodeConfig> {
+    override fun read(buf: ByteBuffer): NodeConfig {
+        return NodeConfig(
+            FfiConverterOptionalString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: NodeConfig) = (
+            FfiConverterOptionalString.allocationSize(value.`bindAddress`) +
+            FfiConverterString.allocationSize(value.`storagePath`)
+    )
+
+    override fun write(value: NodeConfig, buf: ByteBuffer) {
+            FfiConverterOptionalString.write(value.`bindAddress`, buf)
+            FfiConverterString.write(value.`storagePath`, buf)
+    }
+}
+
+
+
+/**
+ * Information about a peer node for connection
+ */
+data class PeerInfo (
+    /**
+     * Human-readable peer name
+     */
+    var `name`: kotlin.String, 
+    /**
+     * Hex-encoded node ID (Iroh endpoint ID)
+     */
+    var `nodeId`: kotlin.String, 
+    /**
+     * List of addresses (e.g., "127.0.0.1:19001")
+     */
+    var `addresses`: List<kotlin.String>, 
+    /**
+     * Optional relay URL
+     */
+    var `relayUrl`: kotlin.String?
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypePeerInfo: FfiConverterRustBuffer<PeerInfo> {
+    override fun read(buf: ByteBuffer): PeerInfo {
+        return PeerInfo(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterOptionalString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: PeerInfo) = (
+            FfiConverterString.allocationSize(value.`name`) +
+            FfiConverterString.allocationSize(value.`nodeId`) +
+            FfiConverterSequenceString.allocationSize(value.`addresses`) +
+            FfiConverterOptionalString.allocationSize(value.`relayUrl`)
+    )
+
+    override fun write(value: PeerInfo, buf: ByteBuffer) {
+            FfiConverterString.write(value.`name`, buf)
+            FfiConverterString.write(value.`nodeId`, buf)
+            FfiConverterSequenceString.write(value.`addresses`, buf)
+            FfiConverterOptionalString.write(value.`relayUrl`, buf)
+    }
+}
+
+
 
 /**
  * Geographic position for FFI
@@ -1063,6 +1955,61 @@ public object FfiConverterTypePosition: FfiConverterRustBuffer<Position> {
             FfiConverterDouble.write(value.`lat`, buf)
             FfiConverterDouble.write(value.`lon`, buf)
             FfiConverterOptionalDouble.write(value.`hae`, buf)
+    }
+}
+
+
+
+/**
+ * Sync statistics
+ */
+data class SyncStats (
+    /**
+     * Whether sync is currently active
+     */
+    var `syncActive`: kotlin.Boolean, 
+    /**
+     * Number of connected peers
+     */
+    var `connectedPeers`: kotlin.UInt, 
+    /**
+     * Total bytes sent
+     */
+    var `bytesSent`: kotlin.ULong, 
+    /**
+     * Total bytes received
+     */
+    var `bytesReceived`: kotlin.ULong
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSyncStats: FfiConverterRustBuffer<SyncStats> {
+    override fun read(buf: ByteBuffer): SyncStats {
+        return SyncStats(
+            FfiConverterBoolean.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SyncStats) = (
+            FfiConverterBoolean.allocationSize(value.`syncActive`) +
+            FfiConverterUInt.allocationSize(value.`connectedPeers`) +
+            FfiConverterULong.allocationSize(value.`bytesSent`) +
+            FfiConverterULong.allocationSize(value.`bytesReceived`)
+    )
+
+    override fun write(value: SyncStats, buf: ByteBuffer) {
+            FfiConverterBoolean.write(value.`syncActive`, buf)
+            FfiConverterUInt.write(value.`connectedPeers`, buf)
+            FfiConverterULong.write(value.`bytesSent`, buf)
+            FfiConverterULong.write(value.`bytesReceived`, buf)
     }
 }
 
@@ -1215,6 +2162,30 @@ sealed class HiveException: kotlin.Exception() {
             get() = "msg=${ `msg` }"
     }
     
+    class StorageException(
+        
+        val `msg`: kotlin.String
+        ) : HiveException() {
+        override val message
+            get() = "msg=${ `msg` }"
+    }
+    
+    class ConnectionException(
+        
+        val `msg`: kotlin.String
+        ) : HiveException() {
+        override val message
+            get() = "msg=${ `msg` }"
+    }
+    
+    class SyncException(
+        
+        val `msg`: kotlin.String
+        ) : HiveException() {
+        override val message
+            get() = "msg=${ `msg` }"
+    }
+    
 
     companion object ErrorHandler : UniffiRustCallStatusErrorHandler<HiveException> {
         override fun lift(error_buf: RustBuffer.ByValue): HiveException = FfiConverterTypeHiveError.lift(error_buf)
@@ -1237,6 +2208,15 @@ public object FfiConverterTypeHiveError : FfiConverterRustBuffer<HiveException> 
             2 -> HiveException.InvalidInput(
                 FfiConverterString.read(buf),
                 )
+            3 -> HiveException.StorageException(
+                FfiConverterString.read(buf),
+                )
+            4 -> HiveException.ConnectionException(
+                FfiConverterString.read(buf),
+                )
+            5 -> HiveException.SyncException(
+                FfiConverterString.read(buf),
+                )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
         }
     }
@@ -1253,6 +2233,21 @@ public object FfiConverterTypeHiveError : FfiConverterRustBuffer<HiveException> 
                 4UL
                 + FfiConverterString.allocationSize(value.`msg`)
             )
+            is HiveException.StorageException -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.`msg`)
+            )
+            is HiveException.ConnectionException -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.`msg`)
+            )
+            is HiveException.SyncException -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.`msg`)
+            )
         }
     }
 
@@ -1265,6 +2260,21 @@ public object FfiConverterTypeHiveError : FfiConverterRustBuffer<HiveException> 
             }
             is HiveException.InvalidInput -> {
                 buf.putInt(2)
+                FfiConverterString.write(value.`msg`, buf)
+                Unit
+            }
+            is HiveException.StorageException -> {
+                buf.putInt(3)
+                FfiConverterString.write(value.`msg`, buf)
+                Unit
+            }
+            is HiveException.ConnectionException -> {
+                buf.putInt(4)
+                FfiConverterString.write(value.`msg`, buf)
+                Unit
+            }
+            is HiveException.SyncException -> {
+                buf.putInt(5)
                 FfiConverterString.write(value.`msg`, buf)
                 Unit
             }
@@ -1368,6 +2378,50 @@ public object FfiConverterOptionalTypeVelocity: FfiConverterRustBuffer<Velocity?
         }
     }
 }
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.String>> {
+    override fun read(buf: ByteBuffer): List<kotlin.String> {
+        val len = buf.getInt()
+        return List<kotlin.String>(len) {
+            FfiConverterString.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<kotlin.String>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterString.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<kotlin.String>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterString.write(it, buf)
+        }
+    }
+}
+        /**
+         * Create a new HiveNode
+         *
+         * Note: This function is NOT async because we manage our own Tokio runtime
+         * to ensure proper context for Iroh transport operations.
+         */
+    @Throws(HiveException::class) fun `createNode`(`config`: NodeConfig): HiveNode {
+            return FfiConverterTypeHiveNode.lift(
+    uniffiRustCallWithError(HiveException) { _status ->
+    UniffiLib.INSTANCE.uniffi_hive_ffi_fn_func_create_node(
+        FfiConverterTypeNodeConfig.lower(`config`),_status)
+}
+    )
+    }
+    
+
         /**
          * Create a position from coordinates
          */ fun `createPosition`(`lat`: kotlin.Double, `lon`: kotlin.Double, `hae`: kotlin.Double?): Position {
