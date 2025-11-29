@@ -404,6 +404,7 @@ async fn run_file_blob_test<B: BlobStore + 'static>(
 }
 
 /// Shared test logic for storage summary
+#[allow(dead_code)]
 async fn run_storage_summary_test<B: BlobStore + 'static>(blob_store: Arc<B>, backend_name: &str) {
     println!("  Testing storage summary with {} backend", backend_name);
 
