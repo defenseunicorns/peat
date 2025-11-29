@@ -3,3 +3,18 @@
 [target.x86_64-unknown-linux-gnu]
 linker = "clang"
 rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+
+# Android NDK toolchain configuration
+# Requires: ANDROID_HOME and NDK_HOME environment variables
+# Default NDK path: $ANDROID_HOME/ndk/<version>/toolchains/llvm/prebuilt/linux-x86_64/bin
+[target.aarch64-linux-android]
+linker = "aarch64-linux-android24-clang"
+
+[target.armv7-linux-androideabi]
+linker = "armv7a-linux-androideabi24-clang"
+
+[target.x86_64-linux-android]
+linker = "x86_64-linux-android24-clang"
+
+[target.i686-linux-android]
+linker = "i686-linux-android24-clang"
