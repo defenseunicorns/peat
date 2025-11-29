@@ -77,8 +77,8 @@ impl CotEncoder {
         &mut self.type_mapper
     }
 
-    /// Encode a TrackUpdate to CoT XML
-    pub fn encode_track_update(&self, track: &TrackUpdate) -> Result<String, CotError> {
+    /// Build a CotEvent from a TrackUpdate
+    pub fn track_update_to_event(&self, track: &TrackUpdate) -> Result<CotEvent, CotError> {
         let cot_type = self
             .type_mapper
             .map(&track.classification, self.config.default_affiliation);
@@ -146,15 +146,16 @@ impl CotEncoder {
             );
         }
 
-        let event = builder.build()?;
-        event.to_xml()
+        builder.build()
     }
 
-    /// Encode a CapabilityAdvertisement to CoT XML
-    pub fn encode_capability_advertisement(
-        &self,
-        cap: &CapabilityAdvertisement,
-    ) -> Result<String, CotError> {
+    /// Encode a TrackUpdate to CoT XML
+    pub fn encode_track_update(&self, track: &TrackUpdate) -> Result<String, CotError> {
+        self.track_update_to_event(track)?.to_xml()
+    }
+
+    /// Build a CotEvent from a CapabilityAdvertisement
+    pub fn capability_to_event(&self, cap: &CapabilityAdvertisement) -> Result<CotEvent, CotError> {
         let cot_type = self
             .type_mapper
             .map_platform(&cap.platform_type, self.config.default_affiliation);
@@ -216,12 +217,19 @@ impl CotEncoder {
             );
         }
 
-        let event = builder.build()?;
-        event.to_xml()
+        builder.build()
     }
 
-    /// Encode a HandoffMessage to CoT XML
-    pub fn encode_handoff(&self, handoff: &HandoffMessage) -> Result<String, CotError> {
+    /// Encode a CapabilityAdvertisement to CoT XML
+    pub fn encode_capability_advertisement(
+        &self,
+        cap: &CapabilityAdvertisement,
+    ) -> Result<String, CotError> {
+        self.capability_to_event(cap)?.to_xml()
+    }
+
+    /// Build a CotEvent from a HandoffMessage
+    pub fn handoff_to_event(&self, handoff: &HandoffMessage) -> Result<CotEvent, CotError> {
         let cot_type = CotTypeMapper::handoff_type();
 
         let mut builder = CotEvent::builder()
@@ -278,15 +286,19 @@ impl CotEncoder {
                     .with_remarks("handoff-track"),
             );
 
-        let event = builder.build()?;
-        event.to_xml()
+        builder.build()
     }
 
-    /// Encode a FormationCapabilitySummary to CoT XML
-    pub fn encode_formation_summary(
+    /// Encode a HandoffMessage to CoT XML
+    pub fn encode_handoff(&self, handoff: &HandoffMessage) -> Result<String, CotError> {
+        self.handoff_to_event(handoff)?.to_xml()
+    }
+
+    /// Build a CotEvent from a FormationCapabilitySummary
+    pub fn formation_summary_to_event(
         &self,
         summary: &FormationCapabilitySummary,
-    ) -> Result<String, CotError> {
+    ) -> Result<CotEvent, CotError> {
         let cot_type = CotTypeMapper::formation_marker_type(self.config.default_affiliation);
 
         let mut builder = CotEvent::builder()
@@ -338,8 +350,15 @@ impl CotEncoder {
             builder = builder.hive_extension(ext);
         }
 
-        let event = builder.build()?;
-        event.to_xml()
+        builder.build()
+    }
+
+    /// Encode a FormationCapabilitySummary to CoT XML
+    pub fn encode_formation_summary(
+        &self,
+        summary: &FormationCapabilitySummary,
+    ) -> Result<String, CotError> {
+        self.formation_summary_to_event(summary)?.to_xml()
     }
 
     fn format_track_remarks(&self, track: &TrackUpdate) -> String {
