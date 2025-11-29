@@ -1,19 +1,21 @@
 name: Android Build
 
+# Manual trigger only - not ready for CI yet
+# When ready, uncomment push/pull_request triggers
 on:
-  push:
-    branches: [ main, develop ]
-    paths:
-      - 'hive-ffi/**'
-      - 'hive-protocol/**'
-      - '.github/workflows/android.yml'
-  pull_request:
-    branches: [ main, develop ]
-    paths:
-      - 'hive-ffi/**'
-      - 'hive-protocol/**'
-      - '.github/workflows/android.yml'
   workflow_dispatch:
+  # push:
+  #   branches: [ main, develop ]
+  #   paths:
+  #     - 'hive-ffi/**'
+  #     - 'hive-protocol/**'
+  #     - '.github/workflows/android.yml'
+  # pull_request:
+  #   branches: [ main, develop ]
+  #   paths:
+  #     - 'hive-ffi/**'
+  #     - 'hive-protocol/**'
+  #     - '.github/workflows/android.yml'
 
 env:
   CARGO_TERM_COLOR: always
@@ -40,6 +42,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install protobuf compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -97,6 +102,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install protobuf compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
