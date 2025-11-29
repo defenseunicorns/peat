@@ -22,10 +22,17 @@
 //!
 //! ## Required Environment Variables
 //!
-//! - `DITTO_APP_ID`: Application ID from Ditto portal (UUID format)
-//! - `DITTO_OFFLINE_TOKEN`: Base64-encoded offline license token from Ditto portal
-//! - `DITTO_SHARED_KEY`: Base64-encoded shared encryption key
-//! - `DITTO_PERSISTENCE_DIR`: Directory for Ditto data storage (optional, defaults to ".ditto")
+//! Primary (recommended):
+//! - `HIVE_APP_ID`: Application ID (UUID format)
+//! - `HIVE_SECRET_KEY`: Base64-encoded shared encryption key
+//! - `HIVE_OFFLINE_TOKEN`: Base64-encoded offline license token
+//! - `HIVE_PERSISTENCE_DIR`: Directory for data storage (optional, defaults to ".ditto")
+//!
+//! Legacy (backwards compatible fallback):
+//! - `DITTO_APP_ID` → `HIVE_APP_ID`
+//! - `DITTO_SHARED_KEY` → `HIVE_SECRET_KEY`
+//! - `DITTO_OFFLINE_TOKEN` → `HIVE_OFFLINE_TOKEN`
+//! - `DITTO_PERSISTENCE_DIR` → `HIVE_PERSISTENCE_DIR`
 //!
 //! ## Peer Discovery
 //!
@@ -36,6 +43,7 @@
 //!
 //! See `examples/ditto_spike.rs` for an example of TCP transport configuration.
 
+use crate::credentials::HiveCredentials;
 use crate::sync::ditto::DittoBackend;
 use crate::{Error, Result};
 use dittolive_ditto::prelude::*;
@@ -43,6 +51,7 @@ use dittolive_ditto::AppId;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{debug, error, info, instrument, warn};
+use uuid::Uuid;
 
 /// Configuration for Ditto storage
 #[derive(Debug, Clone)]
@@ -53,6 +62,8 @@ pub struct DittoConfig {
     pub persistence_dir: PathBuf,
     /// Shared key for local-only syncing (base64 encoded)
     pub shared_key: String,
+    /// Offline license token (base64 encoded, required for SharedKey identity)
+    pub offline_token: String,
     /// Optional TCP listen port (for explicit peer discovery)
     pub tcp_listen_port: Option<u16>,
     /// Optional TCP connect address (for explicit peer discovery)
@@ -78,14 +89,21 @@ impl DittoStore {
             })?,
         );
 
+        // Parse AppId from config (UUID format)
+        let app_uuid = Uuid::parse_str(&config.app_id).map_err(|e| {
+            error!("Invalid app_id format (expected UUID): {}", e);
+            Error::config_error(
+                format!("Invalid app_id format (expected UUID): {}", e),
+                Some("app_id".to_string()),
+            )
+        })?;
+        let app_id = AppId::from_uuid(app_uuid);
+
         // Step 1: Create Ditto instance with SharedKey identity
         // This configures the identity type but does NOT activate sync capabilities yet
         let ditto = Ditto::builder()
             .with_root(root)
             .with_identity(|ditto_root| {
-                // Get AppId from environment
-                let app_id = AppId::from_env("DITTO_APP_ID")?;
-
                 // Create SharedKey identity for offline P2P sync
                 // SharedKey uses symmetric encryption for secure peer-to-peer communication
                 // Trim the shared_key to handle potential whitespace from environment variables
@@ -108,17 +126,11 @@ impl DittoStore {
         // before any sync operations can be performed. Without this step, calling start_sync()
         // will fail with a NotActivated error.
         //
-        // The offline license token must be obtained from the Ditto portal and stored in
-        // the DITTO_OFFLINE_TOKEN environment variable. This token proves you have a valid
+        // The offline license token is now passed via DittoConfig (loaded from HIVE_OFFLINE_TOKEN
+        // or DITTO_OFFLINE_TOKEN env vars via HiveCredentials). This token proves you have a valid
         // license without requiring an online connection to Ditto's servers.
-        let offline_token = std::env::var("DITTO_OFFLINE_TOKEN").map_err(|_| {
-            Error::config_error(
-                "DITTO_OFFLINE_TOKEN not set",
-                Some("DITTO_OFFLINE_TOKEN".to_string()),
-            )
-        })?;
         ditto
-            .set_offline_only_license_token(&offline_token)
+            .set_offline_only_license_token(&config.offline_token)
             .map_err(|e| {
                 error!("Failed to activate Ditto with offline license: {}", e);
                 Error::storage_error("Failed to activate Ditto", "activate", None)
@@ -202,6 +214,10 @@ impl DittoStore {
 
     /// Create a Ditto store from environment variables
     ///
+    /// Uses HiveCredentials to load credentials, which supports both:
+    /// - HIVE_APP_ID, HIVE_SECRET_KEY, HIVE_OFFLINE_TOKEN (preferred)
+    /// - DITTO_APP_ID, DITTO_SHARED_KEY, DITTO_OFFLINE_TOKEN (legacy fallback)
+    ///
     /// # Test Mode Isolation
     ///
     /// When running tests (detected via `RUST_TEST_THREADS` env var or `cfg(test)`),
@@ -209,8 +225,8 @@ impl DittoStore {
     /// instance to prevent file locking conflicts. The temporary directories are
     /// cleaned up automatically when the process exits.
     ///
-    /// In production mode, uses `DITTO_PERSISTENCE_DIR` environment variable or
-    /// defaults to `.ditto` in the current directory.
+    /// In production mode, uses `HIVE_PERSISTENCE_DIR` (or `DITTO_PERSISTENCE_DIR`)
+    /// environment variable or defaults to `.ditto` in the current directory.
     #[instrument]
     pub fn from_env() -> Result<Self> {
         info!("Creating DittoStore from environment variables");
@@ -218,22 +234,18 @@ impl DittoStore {
         // Load environment variables
         dotenvy::dotenv().ok();
 
-        // Trim all values to handle potential whitespace from environment variables
-        let app_id = std::env::var("DITTO_APP_ID")
-            .map_err(|_| {
-                Error::config_error("DITTO_APP_ID not set", Some("DITTO_APP_ID".to_string()))
-            })?
-            .trim()
-            .to_string();
+        // Load credentials via HiveCredentials (handles HIVE_* -> DITTO_* fallback)
+        let credentials = HiveCredentials::from_env()
+            .map_err(|e| Error::config_error(format!("{}", e), Some("credentials".to_string())))?;
 
-        let shared_key = std::env::var("DITTO_SHARED_KEY")
-            .map_err(|_| {
-                Error::config_error(
-                    "DITTO_SHARED_KEY not set",
-                    Some("DITTO_SHARED_KEY".to_string()),
-                )
-            })?
-            .trim()
+        let app_id = credentials.app_id().to_string();
+        let shared_key = credentials
+            .require_secret_key()
+            .map_err(|e| Error::config_error(format!("{}", e), Some("secret_key".to_string())))?
+            .to_string();
+        let offline_token = credentials
+            .require_offline_token()
+            .map_err(|e| Error::config_error(format!("{}", e), Some("offline_token".to_string())))?
             .to_string();
 
         // In test mode (detected via RUST_TEST_THREADS or cfg(test)), use unique temp directory
@@ -252,8 +264,10 @@ impl DittoStore {
             debug!("Test mode: Using isolated temp directory: {:?}", path);
             path
         } else {
+            // Try HIVE_PERSISTENCE_DIR first, fall back to DITTO_PERSISTENCE_DIR
             PathBuf::from(
-                std::env::var("DITTO_PERSISTENCE_DIR")
+                std::env::var("HIVE_PERSISTENCE_DIR")
+                    .or_else(|_| std::env::var("DITTO_PERSISTENCE_DIR"))
                     .unwrap_or_else(|_| ".ditto".to_string())
                     .trim(),
             )
@@ -263,6 +277,7 @@ impl DittoStore {
             app_id,
             persistence_dir,
             shared_key,
+            offline_token,
             tcp_listen_port: None,
             tcp_connect_address: None,
         };
@@ -2116,44 +2131,37 @@ impl From<DittoStore> for Arc<DittoBackend> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::credentials::HiveCredentials;
     use std::time::Duration;
     use tempfile::tempdir;
     use tokio::time::sleep;
 
     /// Helper function to create a test DittoStore with credentials
+    /// Uses HiveCredentials to load HIVE_* (with DITTO_* fallback)
     /// Returns (DittoStore, TempDir) - the TempDir must be kept alive for the duration of the test
     async fn create_test_store(test_name: &str) -> (DittoStore, tempfile::TempDir) {
         dotenvy::dotenv().ok();
 
-        let app_id = std::env::var("DITTO_APP_ID")
-            .ok()
-            .and_then(|v| {
-                let trimmed = v.trim();
-                if trimmed.is_empty() {
-                    None
-                } else {
-                    Some(trimmed.to_string())
-                }
-            })
-            .expect("DITTO_APP_ID required for test");
+        let credentials = HiveCredentials::from_env().expect(
+            "Credentials required (HIVE_APP_ID/HIVE_SECRET_KEY or DITTO_APP_ID/DITTO_SHARED_KEY)",
+        );
 
-        let shared_key = std::env::var("DITTO_SHARED_KEY")
-            .ok()
-            .and_then(|v| {
-                let trimmed = v.trim();
-                if trimmed.is_empty() {
-                    None
-                } else {
-                    Some(trimmed.to_string())
-                }
-            })
-            .expect("DITTO_SHARED_KEY required for test");
+        let app_id = credentials.app_id().to_string();
+        let shared_key = credentials
+            .require_secret_key()
+            .expect("Secret key required")
+            .to_string();
+        let offline_token = credentials
+            .require_offline_token()
+            .expect("Offline token required")
+            .to_string();
 
         let temp_dir = tempdir().expect("Failed to create temp dir");
         let config = DittoConfig {
             app_id,
             persistence_dir: temp_dir.path().join(test_name),
             shared_key,
+            offline_token,
             tcp_listen_port: None,
             tcp_connect_address: None,
         };
@@ -2163,40 +2171,33 @@ mod tests {
         (store, temp_dir)
     }
 
+    /// Helper function to get test credentials (returns None if not available)
+    fn get_test_credentials() -> Option<(String, String, String)> {
+        dotenvy::dotenv().ok();
+        HiveCredentials::from_env().ok().and_then(|c| {
+            let app_id = c.app_id().to_string();
+            let shared_key = c.secret_key()?.to_string();
+            let offline_token = c.offline_token()?.to_string();
+            Some((app_id, shared_key, offline_token))
+        })
+    }
+
     #[tokio::test]
     async fn test_ditto_initialization() {
-        dotenvy::dotenv().ok();
-
-        // Skip test if Ditto credentials not available (e.g., in CI without secrets)
-        let app_id = std::env::var("DITTO_APP_ID").ok().and_then(|v| {
-            let trimmed = v.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        });
-        let shared_key = std::env::var("DITTO_SHARED_KEY").ok().and_then(|v| {
-            let trimmed = v.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        });
-
-        if app_id.is_none() || shared_key.is_none() {
-            eprintln!("Skipping test: Ditto credentials not available (required: DITTO_APP_ID, DITTO_SHARED_KEY, DITTO_OFFLINE_TOKEN)");
+        // Skip test if credentials not available
+        let Some((app_id, shared_key, offline_token)) = get_test_credentials() else {
+            eprintln!("Skipping test: credentials not available (need HIVE_APP_ID/HIVE_SECRET_KEY/HIVE_OFFLINE_TOKEN or DITTO_* equivalents)");
             return;
-        }
+        };
 
         // Create unique temp directory for this test
         let temp_dir = tempdir().expect("Failed to create temp dir");
 
         let config = DittoConfig {
-            app_id: app_id.unwrap(),
+            app_id,
             persistence_dir: temp_dir.path().to_path_buf(),
-            shared_key: shared_key.unwrap(),
+            shared_key,
+            offline_token,
             tcp_listen_port: None,
             tcp_connect_address: None,
         };
@@ -2216,38 +2217,20 @@ mod tests {
 
     #[tokio::test]
     async fn test_basic_crud_operations() {
-        dotenvy::dotenv().ok();
-
-        // Skip test if Ditto credentials not available
-        let app_id = std::env::var("DITTO_APP_ID").ok().and_then(|v| {
-            let trimmed = v.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        });
-        let shared_key = std::env::var("DITTO_SHARED_KEY").ok().and_then(|v| {
-            let trimmed = v.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        });
-
-        if app_id.is_none() || shared_key.is_none() {
-            eprintln!("Skipping test: Ditto credentials not available");
+        // Skip test if credentials not available
+        let Some((app_id, shared_key, offline_token)) = get_test_credentials() else {
+            eprintln!("Skipping test: credentials not available");
             return;
-        }
+        };
 
         // Create unique temp directory for this test
         let temp_dir = tempdir().expect("Failed to create temp dir");
 
         let config = DittoConfig {
-            app_id: app_id.unwrap(),
+            app_id,
             persistence_dir: temp_dir.path().to_path_buf(),
-            shared_key: shared_key.unwrap(),
+            shared_key,
+            offline_token,
             tcp_listen_port: None,
             tcp_connect_address: None,
         };
@@ -2324,33 +2307,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_two_instance_sync() {
-        dotenvy::dotenv().ok();
-
-        // Skip test if Ditto credentials not available
-        let app_id = std::env::var("DITTO_APP_ID").ok().and_then(|v| {
-            let trimmed = v.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        });
-        let shared_key = std::env::var("DITTO_SHARED_KEY").ok().and_then(|v| {
-            let trimmed = v.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        });
-
-        if app_id.is_none() || shared_key.is_none() {
-            eprintln!("Skipping test: Ditto credentials not available");
+        // Skip test if credentials not available
+        let Some((app_id, shared_key, offline_token)) = get_test_credentials() else {
+            eprintln!("Skipping test: credentials not available");
             return;
-        }
-
-        let app_id = app_id.unwrap();
-        let shared_key = shared_key.unwrap();
+        };
 
         // Create unique temp directories for both stores
         let temp_dir1 = tempdir().expect("Failed to create temp dir 1");
@@ -2364,6 +2325,7 @@ mod tests {
             app_id: app_id.clone(),
             persistence_dir: temp_dir1.path().to_path_buf(),
             shared_key: shared_key.clone(),
+            offline_token: offline_token.clone(),
             tcp_listen_port: Some(tcp_port), // Store1 listens
             tcp_connect_address: None,
         };
@@ -2374,6 +2336,7 @@ mod tests {
             app_id,
             persistence_dir: temp_dir2.path().to_path_buf(),
             shared_key,
+            offline_token,
             tcp_listen_port: None, // Store2 doesn't listen
             tcp_connect_address: Some(format!("127.0.0.1:{}", tcp_port)),
         };
@@ -2532,35 +2495,18 @@ mod tests {
         use hive_schema::hierarchy::v1::{BoundingBox, SquadSummary};
         use hive_schema::node::v1::HealthStatus;
 
-        dotenvy::dotenv().ok();
-
-        let app_id = std::env::var("DITTO_APP_ID").ok().and_then(|v| {
-            let trimmed = v.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        });
-        let shared_key = std::env::var("DITTO_SHARED_KEY").ok().and_then(|v| {
-            let trimmed = v.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        });
-
-        if app_id.is_none() || shared_key.is_none() {
-            eprintln!("Skipping test: Ditto credentials not available");
+        // Skip test if credentials not available
+        let Some((app_id, shared_key, offline_token)) = get_test_credentials() else {
+            eprintln!("Skipping test: credentials not available");
             return;
-        }
+        };
 
         let temp_dir = tempdir().expect("Failed to create temp dir");
         let config = DittoConfig {
-            app_id: app_id.unwrap(),
+            app_id,
             persistence_dir: temp_dir.path().to_path_buf(),
-            shared_key: shared_key.unwrap(),
+            shared_key,
+            offline_token,
             tcp_listen_port: None,
             tcp_connect_address: None,
         };
@@ -2644,35 +2590,18 @@ mod tests {
         use hive_schema::hierarchy::v1::{BoundingBox, PlatoonSummary};
         use hive_schema::node::v1::HealthStatus;
 
-        dotenvy::dotenv().ok();
-
-        let app_id = std::env::var("DITTO_APP_ID").ok().and_then(|v| {
-            let trimmed = v.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        });
-        let shared_key = std::env::var("DITTO_SHARED_KEY").ok().and_then(|v| {
-            let trimmed = v.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        });
-
-        if app_id.is_none() || shared_key.is_none() {
-            eprintln!("Skipping test: Ditto credentials not available");
+        // Skip test if credentials not available
+        let Some((app_id, shared_key, offline_token)) = get_test_credentials() else {
+            eprintln!("Skipping test: credentials not available");
             return;
-        }
+        };
 
         let temp_dir = tempdir().expect("Failed to create temp dir");
         let config = DittoConfig {
-            app_id: app_id.unwrap(),
+            app_id,
             persistence_dir: temp_dir.path().to_path_buf(),
-            shared_key: shared_key.unwrap(),
+            shared_key,
+            offline_token,
             tcp_listen_port: None,
             tcp_connect_address: None,
         };
@@ -2902,32 +2831,11 @@ mod tests {
         use hive_schema::hierarchy::v1::SquadSummary;
         use hive_schema::node::v1::HealthStatus;
 
-        dotenvy::dotenv().ok();
-
-        let app_id = std::env::var("DITTO_APP_ID").ok().and_then(|v| {
-            let trimmed = v.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        });
-        let shared_key = std::env::var("DITTO_SHARED_KEY").ok().and_then(|v| {
-            let trimmed = v.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        });
-
-        if app_id.is_none() || shared_key.is_none() {
-            eprintln!("Skipping test: Ditto credentials not available");
+        // Skip test if credentials not available
+        let Some((app_id, shared_key, offline_token)) = get_test_credentials() else {
+            eprintln!("Skipping test: credentials not available");
             return;
-        }
-
-        let app_id = app_id.unwrap();
-        let shared_key = shared_key.unwrap();
+        };
 
         // Create two temp directories for two Ditto instances
         let temp_dir1 = tempdir().expect("Failed to create temp dir 1");
@@ -2940,6 +2848,7 @@ mod tests {
             app_id: app_id.clone(),
             persistence_dir: temp_dir1.path().to_path_buf(),
             shared_key: shared_key.clone(),
+            offline_token: offline_token.clone(),
             tcp_listen_port: Some(tcp_port),
             tcp_connect_address: None,
         };
@@ -2949,6 +2858,7 @@ mod tests {
             app_id,
             persistence_dir: temp_dir2.path().to_path_buf(),
             shared_key,
+            offline_token,
             tcp_listen_port: None,
             tcp_connect_address: Some(format!("127.0.0.1:{}", tcp_port)),
         };
