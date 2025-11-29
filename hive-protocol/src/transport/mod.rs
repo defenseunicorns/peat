@@ -42,6 +42,7 @@ use std::fmt;
 #[cfg(feature = "automerge-backend")]
 pub mod iroh;
 
+#[cfg(feature = "ditto-backend")]
 pub mod ditto;
 
 /// Node identifier in the mesh network

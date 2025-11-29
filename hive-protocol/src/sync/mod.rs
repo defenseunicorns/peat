@@ -78,6 +78,7 @@ pub mod types;
 // Backend implementations
 #[cfg(feature = "automerge-backend")]
 pub mod automerge; // Automerge CRDT backend (E8 evaluation)
+#[cfg(feature = "ditto-backend")]
 pub mod ditto; // Wraps existing Ditto SDK
 
 // Re-export core types and traits for convenience

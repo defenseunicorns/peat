@@ -1,0 +1,174 @@
+name: Android Build
+
+# Manual trigger only - not ready for CI yet
+# When ready, uncomment push/pull_request triggers
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: [ main, develop ]
+  #   paths:
+  #     - 'hive-ffi/**'
+  #     - 'hive-protocol/**'
+  #     - '.github/workflows/android.yml'
+  # pull_request:
+  #   branches: [ main, develop ]
+  #   paths:
+  #     - 'hive-ffi/**'
+  #     - 'hive-protocol/**'
+  #     - '.github/workflows/android.yml'
+
+env:
+  CARGO_TERM_COLOR: always
+  ANDROID_NDK_VERSION: "26.3.11579264"
+  # Reduce debug info for smaller binaries
+  CARGO_PROFILE_RELEASE_DEBUG: 0
+  CARGO_PROFILE_RELEASE_LTO: thin
+
+jobs:
+  build-android:
+    name: Build Android (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-linux-android
+            abi: arm64-v8a
+          - target: armv7-linux-androideabi
+            abi: armeabi-v7a
+          - target: x86_64-linux-android
+            abi: x86_64
+          - target: i686-linux-android
+            abi: x86
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protobuf compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r26d
+          add-to-path: true
+
+      - name: Configure cargo for Android
+        run: |
+          mkdir -p ~/.cargo
+          cat >> ~/.cargo/config.toml << EOF
+          [target.aarch64-linux-android]
+          linker = "${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
+          ar = "${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+
+          [target.armv7-linux-androideabi]
+          linker = "${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi24-clang"
+          ar = "${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+
+          [target.x86_64-linux-android]
+          linker = "${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android24-clang"
+          ar = "${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+
+          [target.i686-linux-android]
+          linker = "${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/i686-linux-android24-clang"
+          ar = "${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+          EOF
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          key: android-${{ matrix.target }}
+
+      - name: Build hive-ffi for Android
+        run: |
+          cargo build -p hive-ffi --release --target ${{ matrix.target }}
+
+      - name: Upload native library
+        uses: actions/upload-artifact@v4
+        with:
+          name: libhive_ffi-${{ matrix.abi }}
+          path: target/${{ matrix.target }}/release/libhive_ffi.so
+          if-no-files-found: error
+
+  generate-bindings:
+    name: Generate Kotlin bindings
+    runs-on: ubuntu-latest
+    needs: build-android
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protobuf compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          key: bindings
+
+      - name: Build hive-ffi (host)
+        run: cargo build -p hive-ffi --release
+
+      - name: Generate Kotlin bindings
+        run: |
+          cargo run -p hive-ffi --release --bin uniffi-bindgen -- \
+            generate \
+            --library target/release/libhive_ffi.so \
+            --language kotlin \
+            --out-dir bindings/kotlin
+
+      - name: Upload Kotlin bindings
+        uses: actions/upload-artifact@v4
+        with:
+          name: kotlin-bindings
+          path: bindings/kotlin/
+          if-no-files-found: error
+
+  package:
+    name: Package Android AAR
+    runs-on: ubuntu-latest
+    needs: [build-android, generate-bindings]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare JNI structure
+        run: |
+          mkdir -p android/jniLibs/arm64-v8a
+          mkdir -p android/jniLibs/armeabi-v7a
+          mkdir -p android/jniLibs/x86_64
+          mkdir -p android/jniLibs/x86
+          mkdir -p android/kotlin
+
+          # Copy native libraries
+          cp artifacts/libhive_ffi-arm64-v8a/libhive_ffi.so android/jniLibs/arm64-v8a/
+          cp artifacts/libhive_ffi-armeabi-v7a/libhive_ffi.so android/jniLibs/armeabi-v7a/
+          cp artifacts/libhive_ffi-x86_64/libhive_ffi.so android/jniLibs/x86_64/
+          cp artifacts/libhive_ffi-x86/libhive_ffi.so android/jniLibs/x86/
+
+          # Copy Kotlin bindings
+          cp -r artifacts/kotlin-bindings/* android/kotlin/
+
+          # Show structure
+          echo "=== Android package structure ==="
+          find android -type f
+
+      - name: Upload complete Android package
+        uses: actions/upload-artifact@v4
+        with:
+          name: hive-android-package
+          path: android/
+          if-no-files-found: error
