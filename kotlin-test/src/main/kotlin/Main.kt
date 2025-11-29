@@ -165,8 +165,73 @@ fun main() {
         tempDir.deleteRecursively()
     }
 
-    // Test 10: Two-node sync test
-    println("10. Testing two-node sync...")
+    // Test 10: Subscription callbacks
+    println("10. Testing subscription callbacks...")
+    val tempDirSub = createTempDir("hive-sub-test-${UUID.randomUUID()}")
+    try {
+        val subNodeConfig = NodeConfig(
+            bindAddress = "127.0.0.1:0",
+            storagePath = tempDirSub.absolutePath
+        )
+        val subNode = createNode(subNodeConfig)
+
+        // Track received changes
+        val receivedChanges = mutableListOf<DocumentChange>()
+        var errorMessage: String? = null
+
+        // Create callback implementation
+        val callback = object : DocumentCallback {
+            override fun onChange(change: DocumentChange) {
+                println("   Callback received: ${change.collection}/${change.docId} (${change.changeType})")
+                synchronized(receivedChanges) {
+                    receivedChanges.add(change)
+                }
+            }
+
+            override fun onError(message: String) {
+                println("   Callback error: $message")
+                errorMessage = message
+            }
+        }
+
+        // Subscribe to changes
+        val subscription = subNode.subscribe(callback)
+        println("   Subscribed to document changes (active: ${subscription.isActive()})")
+
+        // Write some documents - these should trigger callbacks
+        println("   Writing test documents...")
+        subNode.putDocument("callbacks", "doc-1", """{"test": 1}""")
+        subNode.putDocument("callbacks", "doc-2", """{"test": 2}""")
+        subNode.putDocument("other", "doc-3", """{"test": 3}""")
+
+        // Give callbacks time to be delivered
+        Thread.sleep(500)
+
+        // Check results
+        synchronized(receivedChanges) {
+            println("   Received ${receivedChanges.size} change notifications")
+            if (receivedChanges.size >= 3) {
+                println("   ✓ Subscription callbacks passed!\n")
+            } else {
+                println("   ⚠ Expected 3 callbacks, got ${receivedChanges.size}")
+                println("   ⚠ Subscription callbacks incomplete\n")
+            }
+        }
+
+        // Cancel subscription
+        subscription.cancel()
+        check(!subscription.isActive()) { "Subscription should be inactive after cancel" }
+        println("   Subscription cancelled")
+
+        // Cleanup
+        subNode.destroy()
+
+    } finally {
+        tempDirSub.deleteRecursively()
+    }
+
+    // Test 11: Two-node sync test
+    println("11. Testing two-node sync...")
     val tempDir1 = createTempDir("hive-node1-${UUID.randomUUID()}")
     val tempDir2 = createTempDir("hive-node2-${UUID.randomUUID()}")
 
@@ -244,7 +309,7 @@ fun main() {
         }
 
         // Test 11: Bidirectional sync test
-        println("11. Testing bidirectional sync...")
+        println("12. Testing bidirectional sync...")
 
         // Write different documents on each node
         val doc1 = """{"source": "node1", "data": "alpha", "seq": 1}"""
@@ -287,7 +352,7 @@ fun main() {
         }
 
         // Test 12: CRDT conflict resolution (concurrent writes to same document)
-        println("12. Testing CRDT conflict resolution...")
+        println("13. Testing CRDT conflict resolution...")
 
         // Both nodes write to the same document simultaneously
         val conflictDoc1 = """{"value": "from-node1", "counter": 100}"""

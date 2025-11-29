@@ -26,6 +26,8 @@ use std::net::SocketAddr;
 #[cfg(feature = "sync")]
 use std::path::PathBuf;
 #[cfg(feature = "sync")]
+use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(feature = "sync")]
 use tokio::sync::RwLock;
 
 // Setup UniFFI scaffolding
@@ -196,6 +198,79 @@ pub struct SyncStats {
     pub bytes_received: u64,
 }
 
+/// Type of document change event
+#[cfg(feature = "sync")]
+#[derive(Debug, Clone, uniffi::Enum)]
+pub enum ChangeType {
+    /// Document was created or updated
+    Upsert,
+    /// Document was deleted
+    Delete,
+}
+
+/// Document change event for subscriptions
+#[cfg(feature = "sync")]
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct DocumentChange {
+    /// Collection name
+    pub collection: String,
+    /// Document ID
+    pub doc_id: String,
+    /// Type of change
+    pub change_type: ChangeType,
+}
+
+/// Callback interface for document change notifications
+///
+/// Implement this interface in Kotlin/Swift to receive document updates.
+#[cfg(feature = "sync")]
+#[uniffi::export(callback_interface)]
+pub trait DocumentCallback: Send + Sync {
+    /// Called when a document changes
+    fn on_change(&self, change: DocumentChange);
+
+    /// Called when an error occurs in the subscription
+    fn on_error(&self, message: String);
+}
+
+/// Handle for an active document subscription
+///
+/// Drop this handle to unsubscribe from document changes.
+#[cfg(feature = "sync")]
+#[derive(uniffi::Object)]
+pub struct SubscriptionHandle {
+    /// Flag to signal the subscription should stop
+    active: Arc<AtomicBool>,
+}
+
+#[cfg(feature = "sync")]
+impl SubscriptionHandle {
+    fn new(active: Arc<AtomicBool>) -> Self {
+        Self { active }
+    }
+}
+
+#[cfg(feature = "sync")]
+#[uniffi::export]
+impl SubscriptionHandle {
+    /// Check if the subscription is still active
+    pub fn is_active(&self) -> bool {
+        self.active.load(Ordering::SeqCst)
+    }
+
+    /// Cancel the subscription
+    pub fn cancel(&self) {
+        self.active.store(false, Ordering::SeqCst);
+    }
+}
+
+#[cfg(feature = "sync")]
+impl Drop for SubscriptionHandle {
+    fn drop(&mut self) {
+        self.active.store(false, Ordering::SeqCst);
+    }
+}
+
 /// A HIVE network node with P2P sync capabilities
 ///
 /// Wraps AutomergeBackend + IrohTransport for document sync.
@@ -204,6 +279,8 @@ pub struct SyncStats {
 pub struct HiveNode {
     backend: Arc<RwLock<AutomergeBackend>>,
     transport: Arc<IrohTransport>,
+    /// Store reference for subscriptions
+    store: Arc<AutomergeStore>,
     #[allow(dead_code)] // Kept for potential future use (e.g., storage cleanup)
     storage_path: PathBuf,
     /// Tokio runtime for async operations
@@ -396,6 +473,80 @@ impl HiveNode {
                 .map_err(|e| HiveError::SyncError { msg: e.to_string() })
         })
     }
+
+    /// Subscribe to document changes
+    ///
+    /// Returns a SubscriptionHandle that must be kept alive to receive callbacks.
+    /// When the handle is dropped or cancel() is called, the subscription stops.
+    ///
+    /// The callback will receive DocumentChange events for all documents.
+    /// Filter by collection in your callback implementation if needed.
+    ///
+    /// Note: Only one subscription per node is supported. Calling subscribe again
+    /// will fail if a subscription is already active.
+    pub fn subscribe(
+        &self,
+        callback: Box<dyn DocumentCallback>,
+    ) -> Result<Arc<SubscriptionHandle>, HiveError> {
+        // Get the change receiver from the store
+        let change_rx = self
+            .store
+            .subscribe_to_changes()
+            .ok_or_else(|| HiveError::SyncError {
+                msg: "Subscription already active or store not available".to_string(),
+            })?;
+
+        // Create active flag for the subscription
+        let active = Arc::new(AtomicBool::new(true));
+        let active_clone = Arc::clone(&active);
+
+        // Spawn a task to listen for changes and call the callback
+        let callback = Arc::new(callback);
+        self.runtime.spawn(async move {
+            let mut rx = change_rx;
+
+            while active_clone.load(Ordering::SeqCst) {
+                tokio::select! {
+                    result = rx.recv() => {
+                        match result {
+                            Some(doc_key) => {
+                                // Parse the document key (format: "collection:doc_id")
+                                let change = if let Some((collection, doc_id)) = doc_key.split_once(':') {
+                                    DocumentChange {
+                                        collection: collection.to_string(),
+                                        doc_id: doc_id.to_string(),
+                                        change_type: ChangeType::Upsert, // We only get notifications on upsert currently
+                                    }
+                                } else {
+                                    // Key without colon - treat as collection with doc_id
+                                    DocumentChange {
+                                        collection: "default".to_string(),
+                                        doc_id: doc_key,
+                                        change_type: ChangeType::Upsert,
+                                    }
+                                };
+
+                                callback.on_change(change);
+                            }
+                            None => {
+                                // Channel closed
+                                callback.on_error("Document change channel closed".to_string());
+                                break;
+                            }
+                        }
+                    }
+                    _ = tokio::time::sleep(tokio::time::Duration::from_millis(100)) => {
+                        // Periodic check if we should stop
+                        if !active_clone.load(Ordering::SeqCst) {
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+
+        Ok(Arc::new(SubscriptionHandle::new(active)))
+    }
 }
 
 /// Create a new HiveNode
@@ -448,12 +599,13 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
     })?;
     let transport = Arc::new(transport);
 
-    // Create backend with transport
-    let backend = AutomergeBackend::with_transport(store, Arc::clone(&transport));
+    // Create backend with transport (clone store Arc so we can keep a reference)
+    let backend = AutomergeBackend::with_transport(Arc::clone(&store), Arc::clone(&transport));
 
     Ok(Arc::new(HiveNode {
         backend: Arc::new(RwLock::new(backend)),
         transport,
+        store,
         storage_path,
         runtime: Arc::new(runtime),
     }))
