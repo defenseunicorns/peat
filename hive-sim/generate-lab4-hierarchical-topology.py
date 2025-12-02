@@ -45,9 +45,11 @@ def calculate_hierarchy(total_nodes):
         # Adjust: 8 soldiers × 4 squads × 4 platoons × 3 companies = 384 (just soldiers)
         return (8, 4, 4, 3)
     else:
-        # Battalion: 8 companies, 4 platoons, 4 squads, 8 soldiers
-        # 8 × 4 × 4 × 8 = 1024 soldiers
-        return (8, 4, 4, 8)
+        # Battalion: Need to stay under ~1000 TOTAL nodes (including leaders)
+        # 6 companies × 4 platoons × 4 squads × 8 soldiers = 768 soldiers
+        # + 96 squad leaders + 24 platoon leaders + 6 company commanders = 894 total
+        # This stays safely under the 1024 network interface limit
+        return (8, 4, 4, 6)
 
 
 def generate_lab4_topology(name, total_nodes, bandwidth):

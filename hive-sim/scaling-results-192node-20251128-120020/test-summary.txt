@@ -1,0 +1,27 @@
+Scaling Validation Test Summary
+================================
+
+Test Configuration:
+  • Node count: 192
+  • Topology file: topologies/traditional-battalion-192node.yaml
+  • Test duration: 120s
+  • Timestamp: 20251128-120020
+
+Deployment:
+  • Deployment time: 7s
+  • Max workers: 16
+  • Expected containers: 192
+  • Actual containers: 192
+  • Status: ✅ SUCCESS
+
+System Resources (at test end):
+Mem:           124Gi        13Gi        16Gi       127Mi        95Gi       109Gi
+Swap:          2.0Gi       0.0Ki       2.0Gi
+  • CPU cores: 32
+  • Active containers: 192
+
+Results Location:
+  • Directory: scaling-results-192node-20251128-120020
+  • System resources: system-resources.csv
+  • Container logs: logs/
+

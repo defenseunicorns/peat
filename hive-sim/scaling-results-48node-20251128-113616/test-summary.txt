@@ -1,0 +1,27 @@
+Scaling Validation Test Summary
+================================
+
+Test Configuration:
+  • Node count: 48
+  • Topology file: topologies/traditional-battalion-48node.yaml
+  • Test duration: 120s
+  • Timestamp: 20251128-113616
+
+Deployment:
+  • Deployment time: 2s
+  • Max workers: 24
+  • Expected containers: 48
+  • Actual containers: 48
+  • Status: ✅ SUCCESS
+
+System Resources (at test end):
+Mem:           124Gi        12Gi        17Gi       109Mi        95Gi       110Gi
+Swap:          2.0Gi       0.0Ki       2.0Gi
+  • CPU cores: 32
+  • Active containers: 48
+
+Results Location:
+  • Directory: scaling-results-48node-20251128-113616
+  • System resources: system-resources.csv
+  • Container logs: logs/
+
