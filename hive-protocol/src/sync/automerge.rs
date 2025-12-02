@@ -722,6 +722,10 @@ pub struct AutomergeIrohBackend {
     /// Initialization state
     initialized: Arc<Mutex<bool>>,
 
+    /// Formation key for peer authentication (ADR-030)
+    /// Peers must share the same app_id and secret_key to connect
+    formation_key: Arc<std::sync::RwLock<Option<crate::security::FormationKey>>>,
+
     /// Peer discovery manager (ADR-011 Phase 3)
     #[cfg(feature = "automerge-backend")]
     discovery_manager: Arc<tokio::sync::RwLock<crate::discovery::peer::DiscoveryManager>>,
@@ -738,11 +742,26 @@ impl AutomergeIrohBackend {
             transport,
             peer_callbacks: Arc::new(Mutex::new(Vec::new())),
             initialized: Arc::new(Mutex::new(false)),
+            formation_key: Arc::new(std::sync::RwLock::new(None)),
             #[cfg(feature = "automerge-backend")]
             discovery_manager: Arc::new(tokio::sync::RwLock::new(
                 crate::discovery::peer::DiscoveryManager::default(),
             )),
         }
+    }
+
+    /// Get the formation key (if initialized with credentials)
+    pub fn formation_key(&self) -> Option<crate::security::FormationKey> {
+        self.formation_key.read().unwrap().clone()
+    }
+
+    /// Get the formation ID (app_id used as formation identifier)
+    pub fn formation_id(&self) -> Option<String> {
+        self.formation_key
+            .read()
+            .unwrap()
+            .as_ref()
+            .map(|k| k.formation_id().to_string())
     }
 
     /// Create from store and transport (convenience method)
@@ -947,19 +966,67 @@ struct IrohPeerDiscovery {
     peer_callbacks: PeerCallbacks,
     #[cfg(feature = "automerge-backend")]
     discovery_manager: Arc<tokio::sync::RwLock<crate::discovery::peer::DiscoveryManager>>,
+    /// Formation key for peer authentication (required for secure connections)
+    #[cfg(feature = "automerge-backend")]
+    formation_key: Arc<std::sync::RwLock<Option<crate::security::FormationKey>>>,
 }
 
 #[async_trait]
 impl PeerDiscovery for IrohPeerDiscovery {
     async fn start(&self) -> Result<()> {
-        // Start Iroh transport accept loop
-        self.transport
-            .start_accept_loop()
-            .map_err(|e| Error::Network {
-                message: format!("Failed to start accept loop: {}", e),
-                peer_id: None,
-                source: None,
-            })?;
+        // Get formation key for authentication (required)
+        let formation_key = self
+            .formation_key
+            .read()
+            .unwrap()
+            .clone()
+            .ok_or_else(|| Error::Internal("Formation key not initialized".to_string()))?;
+
+        // Start authenticated accept loop (replaces simple start_accept_loop)
+        // This spawns a background task that accepts connections and performs handshake
+        #[cfg(feature = "automerge-backend")]
+        {
+            let transport = Arc::clone(&self.transport);
+            let formation_key_accept = formation_key.clone();
+
+            tokio::spawn(async move {
+                use crate::network::formation_handshake::perform_responder_handshake;
+
+                loop {
+                    // Accept incoming connection
+                    match transport.accept().await {
+                        Ok(conn) => {
+                            let peer_id = conn.remote_id();
+                            tracing::debug!("Accepted connection from: {:?}", peer_id);
+
+                            // Perform formation handshake to authenticate peer
+                            match perform_responder_handshake(&conn, &formation_key_accept).await {
+                                Ok(()) => {
+                                    tracing::info!("Peer {:?} authenticated successfully", peer_id);
+                                    // Connection is already stored by transport.accept()
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        "Peer {:?} failed authentication: {}. Closing connection.",
+                                        peer_id,
+                                        e
+                                    );
+                                    // Close the unauthenticated connection
+                                    conn.close(1u32.into(), b"authentication failed");
+                                    transport.disconnect(&peer_id).ok();
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            // Accept loop stopped or endpoint closed
+                            tracing::debug!("Accept loop ended: {}", e);
+                            break;
+                        }
+                    }
+                }
+                tracing::debug!("Authenticated accept loop stopped");
+            });
+        }
 
         // Start discovery manager
         #[cfg(feature = "automerge-backend")]
@@ -970,13 +1037,15 @@ impl PeerDiscovery for IrohPeerDiscovery {
             })?;
         }
 
-        // Spawn background task to connect to discovered peers
+        // Spawn background task to connect to discovered peers (with authentication)
         #[cfg(feature = "automerge-backend")]
         {
             let discovery_manager = Arc::clone(&self.discovery_manager);
             let transport = Arc::clone(&self.transport);
+            let formation_key_connect = formation_key;
 
             tokio::spawn(async move {
+                use crate::network::formation_handshake::perform_initiator_handshake;
                 use crate::network::PeerInfo as NetworkPeerInfo;
 
                 loop {
@@ -1000,14 +1069,40 @@ impl PeerDiscovery for IrohPeerDiscovery {
                         // Only attempt connection if not already connected
                         if let Ok(endpoint_id) = peer.endpoint_id() {
                             if transport.get_connection(&endpoint_id).is_none() {
-                                if let Err(e) = transport.connect_peer(&network_peer_info).await {
-                                    tracing::debug!(
-                                        "Failed to connect to discovered peer {}: {}",
-                                        peer.name,
-                                        e
-                                    );
-                                } else {
-                                    tracing::info!("Connected to discovered peer: {}", peer.name);
+                                match transport.connect_peer(&network_peer_info).await {
+                                    Ok(conn) => {
+                                        // Perform formation handshake to authenticate
+                                        match perform_initiator_handshake(
+                                            &conn,
+                                            &formation_key_connect,
+                                        )
+                                        .await
+                                        {
+                                            Ok(()) => {
+                                                tracing::info!(
+                                                    "Connected and authenticated with peer: {}",
+                                                    peer.name
+                                                );
+                                            }
+                                            Err(e) => {
+                                                tracing::warn!(
+                                                    "Peer {} failed authentication: {}. Disconnecting.",
+                                                    peer.name,
+                                                    e
+                                                );
+                                                // Disconnect unauthenticated peer
+                                                conn.close(1u32.into(), b"authentication failed");
+                                                transport.disconnect(&endpoint_id).ok();
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        tracing::debug!(
+                                            "Failed to connect to discovered peer {}: {}",
+                                            peer.name,
+                                            e
+                                        );
+                                    }
                                 }
                             }
                         }
@@ -1066,6 +1161,14 @@ impl PeerDiscovery for IrohPeerDiscovery {
     async fn add_peer(&self, address: &str, _transport: TransportType) -> Result<()> {
         use crate::network::PeerInfo as NetworkPeerInfo;
 
+        // Get formation key for authentication
+        let formation_key = self
+            .formation_key
+            .read()
+            .unwrap()
+            .clone()
+            .ok_or_else(|| Error::Internal("Formation key not initialized".to_string()))?;
+
         let peer_info = NetworkPeerInfo {
             name: "manual-peer".to_string(),
             node_id: address.to_string(),
@@ -1073,7 +1176,9 @@ impl PeerDiscovery for IrohPeerDiscovery {
             relay_url: None,
         };
 
-        self.transport
+        // Connect to peer
+        let conn = self
+            .transport
             .connect_peer(&peer_info)
             .await
             .map_err(|e| Error::Network {
@@ -1081,6 +1186,26 @@ impl PeerDiscovery for IrohPeerDiscovery {
                 peer_id: None,
                 source: None,
             })?;
+
+        // Perform formation handshake to authenticate
+        #[cfg(feature = "automerge-backend")]
+        {
+            use crate::network::formation_handshake::perform_initiator_handshake;
+
+            if let Err(e) = perform_initiator_handshake(&conn, &formation_key).await {
+                // Authentication failed - disconnect
+                let endpoint_id = conn.remote_id();
+                conn.close(1u32.into(), b"authentication failed");
+                self.transport.disconnect(&endpoint_id).ok();
+
+                return Err(Error::Network {
+                    message: format!("Peer authentication failed: {}", e),
+                    peer_id: Some(address.to_string()),
+                    source: None,
+                });
+            }
+        }
+
         Ok(())
     }
 
@@ -1163,7 +1288,31 @@ impl SyncEngine for IrohSyncEngine {
 // DataSyncBackend implementation
 #[async_trait]
 impl DataSyncBackend for AutomergeIrohBackend {
-    async fn initialize(&self, _config: BackendConfig) -> Result<()> {
+    async fn initialize(&self, config: BackendConfig) -> Result<()> {
+        // Require shared_key for peer authentication
+        let shared_key = config.shared_key.as_ref().ok_or_else(|| {
+            Error::config_error(
+                "AutomergeIroh backend requires HIVE_SECRET_KEY (or DITTO_SHARED_KEY) for peer authentication",
+                Some("shared_key".to_string()),
+            )
+        })?;
+
+        // Create FormationKey from app_id (formation_id) and shared_key
+        // This ensures only peers with matching credentials can sync
+        let formation_key = crate::security::FormationKey::from_base64(&config.app_id, shared_key)
+            .map_err(|e| {
+                Error::config_error(
+                    format!(
+                        "Invalid shared_key format: {}. Expected base64-encoded 32-byte key.",
+                        e
+                    ),
+                    Some("shared_key".to_string()),
+                )
+            })?;
+
+        // Store the formation key for peer authentication
+        *self.formation_key.write().unwrap() = Some(formation_key);
+
         *self.initialized.lock().unwrap() = true;
         self.peer_discovery().start().await?;
         Ok(())
@@ -1190,6 +1339,8 @@ impl DataSyncBackend for AutomergeIrohBackend {
             peer_callbacks: Arc::clone(&self.peer_callbacks),
             #[cfg(feature = "automerge-backend")]
             discovery_manager: Arc::clone(&self.discovery_manager),
+            #[cfg(feature = "automerge-backend")]
+            formation_key: Arc::clone(&self.formation_key),
         })
     }
 
@@ -1279,12 +1430,14 @@ mod tests {
     use std::collections::HashMap;
     use std::path::PathBuf;
 
-    /// Helper: Create test BackendConfig
+    /// Helper: Create test BackendConfig with valid credentials
     fn test_config() -> BackendConfig {
+        // Generate a valid test secret key (base64-encoded 32 bytes)
+        let test_secret = crate::security::FormationKey::generate_secret();
         BackendConfig {
             app_id: "test_app".to_string(),
             persistence_dir: PathBuf::from("/tmp/automerge_test"),
-            shared_key: None,
+            shared_key: Some(test_secret),
             transport: TransportConfig::default(),
             extra: HashMap::new(),
         }
@@ -1405,5 +1558,111 @@ mod tests {
             .unwrap();
 
         assert!(retrieved.is_none());
+    }
+}
+
+/// Tests for AutomergeIrohBackend credential requirements
+#[cfg(all(test, feature = "automerge-backend"))]
+mod iroh_credential_tests {
+    use super::*;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+
+    /// Test that AutomergeIrohBackend initialization fails without shared_key
+    #[tokio::test]
+    async fn test_automerge_iroh_requires_credentials() {
+        // Create backend components
+        let temp_dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(crate::storage::AutomergeStore::open(temp_dir.path()).unwrap());
+        let transport = Arc::new(crate::network::IrohTransport::new().await.unwrap());
+
+        let backend = AutomergeIrohBackend::from_parts(store, transport);
+
+        // Config without shared_key should fail
+        let config = BackendConfig {
+            app_id: "test_app".to_string(),
+            persistence_dir: PathBuf::from("/tmp/test"),
+            shared_key: None, // Missing!
+            transport: TransportConfig::default(),
+            extra: HashMap::new(),
+        };
+
+        let result = backend.initialize(config).await;
+        assert!(result.is_err());
+
+        let error = result.unwrap_err();
+        let error_msg = error.to_string();
+        assert!(
+            error_msg.contains("HIVE_SECRET_KEY") || error_msg.contains("shared_key"),
+            "Error should mention missing credentials: {}",
+            error_msg
+        );
+    }
+
+    /// Test that AutomergeIrohBackend initializes successfully with valid credentials
+    #[tokio::test]
+    async fn test_automerge_iroh_with_valid_credentials() {
+        // Create backend components
+        let temp_dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(crate::storage::AutomergeStore::open(temp_dir.path()).unwrap());
+        let transport = Arc::new(crate::network::IrohTransport::new().await.unwrap());
+
+        let backend = AutomergeIrohBackend::from_parts(store, transport);
+
+        // Generate valid test credentials
+        let test_secret = crate::security::FormationKey::generate_secret();
+
+        let config = BackendConfig {
+            app_id: "test_formation".to_string(),
+            persistence_dir: temp_dir.path().to_path_buf(),
+            shared_key: Some(test_secret),
+            transport: TransportConfig::default(),
+            extra: HashMap::new(),
+        };
+
+        let result = backend.initialize(config).await;
+        assert!(result.is_ok(), "Should initialize with valid credentials");
+
+        // Verify formation key was stored
+        let formation_key = backend.formation_key();
+        assert!(
+            formation_key.is_some(),
+            "Formation key should be set after initialization"
+        );
+        assert_eq!(
+            formation_key.unwrap().formation_id(),
+            "test_formation",
+            "Formation ID should match app_id"
+        );
+    }
+
+    /// Test that invalid shared_key format is rejected
+    #[tokio::test]
+    async fn test_automerge_iroh_rejects_invalid_key_format() {
+        // Create backend components
+        let temp_dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(crate::storage::AutomergeStore::open(temp_dir.path()).unwrap());
+        let transport = Arc::new(crate::network::IrohTransport::new().await.unwrap());
+
+        let backend = AutomergeIrohBackend::from_parts(store, transport);
+
+        // Invalid base64 key
+        let config = BackendConfig {
+            app_id: "test_app".to_string(),
+            persistence_dir: PathBuf::from("/tmp/test"),
+            shared_key: Some("not-valid-base64!!!".to_string()),
+            transport: TransportConfig::default(),
+            extra: HashMap::new(),
+        };
+
+        let result = backend.initialize(config).await;
+        assert!(result.is_err(), "Should reject invalid base64 key");
+
+        let error_msg = result.unwrap_err().to_string();
+        assert!(
+            error_msg.contains("Invalid shared_key format"),
+            "Error should mention invalid format: {}",
+            error_msg
+        );
     }
 }
