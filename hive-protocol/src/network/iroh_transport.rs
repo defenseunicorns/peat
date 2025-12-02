@@ -56,12 +56,27 @@ pub struct IrohTransport {
 
 #[cfg(feature = "automerge-backend")]
 impl IrohTransport {
-    /// Create a new Iroh transport (binds to any available port)
+    /// Create a new Iroh transport (binds to ALL available interfaces)
+    ///
+    /// This is the recommended constructor for production use. Iroh automatically
+    /// discovers all local network interfaces and advertises them to peers,
+    /// enabling multi-network connectivity without additional configuration.
+    ///
+    /// # Multi-Interface Support (ADR-030)
+    ///
+    /// When using this constructor, peers will receive addresses for all interfaces:
+    /// - LAN IPv4 addresses (e.g., 192.168.1.x)
+    /// - External/VPN addresses (e.g., Tailscale)
+    /// - IPv6 addresses
+    ///
+    /// Peers can connect via any advertised address, enabling seamless
+    /// operation across multiple networks.
     ///
     /// # Example
     ///
     /// ```ignore
     /// let transport = IrohTransport::new().await?;
+    /// // transport.endpoint_addr() now contains ALL interface addresses
     /// ```
     pub async fn new() -> Result<Self> {
         let endpoint = Endpoint::builder()
@@ -78,15 +93,25 @@ impl IrohTransport {
         })
     }
 
-    /// Create a new Iroh transport bound to a specific address
+    /// Create a new Iroh transport bound to a SINGLE specific address
+    ///
+    /// **Warning**: This limits the transport to one interface only!
+    ///
+    /// Use this method only when you need to:
+    /// - Run tests with deterministic ports
+    /// - Restrict connectivity to a specific network interface (security isolation)
+    /// - Debug with a known address
+    ///
+    /// For production multi-network deployments, use [`IrohTransport::new()`] instead.
     ///
     /// # Arguments
     ///
-    /// * `bind_addr` - Socket address to bind to (e.g., "127.0.0.1:9000")
+    /// * `bind_addr` - Socket address to bind to (IPv4 only, e.g., "127.0.0.1:9000")
     ///
     /// # Example
     ///
     /// ```ignore
+    /// // For testing only - limits to single interface
     /// let addr = "127.0.0.1:9000".parse()?;
     /// let transport = IrohTransport::bind(addr).await?;
     /// ```

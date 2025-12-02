@@ -718,3 +718,191 @@ async fn run_concurrent_updates_test<B: DataSyncBackend>(
         .await
         .expect("Should stop sync on backend2");
 }
+
+// ============================================================================
+// Security Tests - Credential-Based Access Control
+// ============================================================================
+
+/// Test that AutomergeIroh backends with DIFFERENT credentials cannot connect
+///
+/// This validates the FormationKey authentication:
+/// - Peers with different secret keys should be rejected
+/// - Connection should fail or be closed after handshake failure
+#[cfg(feature = "automerge-backend")]
+#[tokio::test]
+async fn test_automerge_different_credentials_rejected() {
+    use hive_protocol::network::IrohTransport;
+    use hive_protocol::security::FormationKey;
+    use hive_protocol::storage::AutomergeStore;
+    use hive_protocol::sync::automerge::AutomergeIrohBackend;
+    use hive_protocol::sync::types::{BackendConfig, TransportConfig};
+    use std::collections::HashMap;
+
+    println!("=== Security Test: Different Credentials Rejected ===\n");
+
+    // Create two separate temp directories
+    let temp_dir1 = tempfile::tempdir().unwrap();
+    let temp_dir2 = tempfile::tempdir().unwrap();
+
+    // Create two backends with DIFFERENT credentials
+    let secret1 = FormationKey::generate_secret();
+    let secret2 = FormationKey::generate_secret(); // Different secret!
+
+    println!("  Creating backend1 with secret1...");
+    let store1 = Arc::new(AutomergeStore::open(temp_dir1.path()).unwrap());
+    let transport1 = Arc::new(IrohTransport::new().await.unwrap());
+    let backend1 = Arc::new(AutomergeIrohBackend::from_parts(store1, transport1));
+
+    let config1 = BackendConfig {
+        app_id: "test-formation".to_string(),
+        persistence_dir: temp_dir1.path().to_path_buf(),
+        shared_key: Some(secret1),
+        transport: TransportConfig::default(),
+        extra: HashMap::new(),
+    };
+    backend1.initialize(config1).await.unwrap();
+
+    println!("  Creating backend2 with secret2 (DIFFERENT)...");
+    let store2 = Arc::new(AutomergeStore::open(temp_dir2.path()).unwrap());
+    let transport2 = Arc::new(IrohTransport::new().await.unwrap());
+    let backend2 = Arc::new(AutomergeIrohBackend::from_parts(store2, transport2));
+
+    let config2 = BackendConfig {
+        app_id: "test-formation".to_string(), // Same app_id
+        persistence_dir: temp_dir2.path().to_path_buf(),
+        shared_key: Some(secret2), // Different secret!
+        transport: TransportConfig::default(),
+        extra: HashMap::new(),
+    };
+    backend2.initialize(config2).await.unwrap();
+
+    // Try to connect backend1 -> backend2
+    println!("\n  Attempting connection with mismatched credentials...");
+
+    let addr2 = backend2.transport().endpoint_addr();
+    let transport1 = backend1.transport();
+
+    // The connection itself may succeed (QUIC level), but the handshake should fail
+    match transport1.connect(addr2).await {
+        Ok(conn) => {
+            // Connection established, now try handshake
+            use hive_protocol::network::formation_handshake::perform_initiator_handshake;
+
+            let formation_key1 = backend1.formation_key().expect("Should have formation key");
+
+            match perform_initiator_handshake(&conn, &formation_key1).await {
+                Ok(()) => {
+                    panic!("❌ SECURITY FAILURE: Handshake should have been rejected with different credentials!");
+                }
+                Err(e) => {
+                    println!("  ✓ Handshake correctly rejected: {}", e);
+                    // Close and remove the connection after failed handshake
+                    conn.close(1u32.into(), b"authentication failed");
+                    transport1.disconnect(&conn.remote_id()).ok();
+                }
+            }
+        }
+        Err(e) => {
+            // Connection failed - this is also acceptable
+            println!("  ✓ Connection rejected: {}", e);
+        }
+    }
+
+    // Verify no peers are connected
+    let connected_peers = backend1.transport().connected_peers();
+    assert!(
+        connected_peers.is_empty(),
+        "Backend1 should have no connected peers after rejected handshake"
+    );
+
+    println!("\n  ✅ Security test passed: Different credentials correctly rejected!\n");
+
+    // Cleanup
+    let _ = backend1.shutdown().await;
+    let _ = backend2.shutdown().await;
+}
+
+/// Test that AutomergeIroh backends with SAME credentials CAN connect
+///
+/// This is the positive case - confirming authentication works when credentials match
+#[cfg(feature = "automerge-backend")]
+#[tokio::test]
+async fn test_automerge_same_credentials_accepted() {
+    use hive_protocol::network::IrohTransport;
+    use hive_protocol::security::FormationKey;
+    use hive_protocol::storage::AutomergeStore;
+    use hive_protocol::sync::automerge::AutomergeIrohBackend;
+    use hive_protocol::sync::types::{BackendConfig, TransportConfig};
+    use std::collections::HashMap;
+
+    println!("=== Security Test: Same Credentials Accepted ===\n");
+
+    // Create two separate temp directories
+    let temp_dir1 = tempfile::tempdir().unwrap();
+    let temp_dir2 = tempfile::tempdir().unwrap();
+
+    // Create two backends with SAME credentials
+    let shared_secret = FormationKey::generate_secret();
+
+    println!("  Creating backend1 with shared_secret...");
+    let store1 = Arc::new(AutomergeStore::open(temp_dir1.path()).unwrap());
+    let transport1 = Arc::new(IrohTransport::new().await.unwrap());
+    let backend1 = Arc::new(AutomergeIrohBackend::from_parts(store1, transport1));
+
+    let config1 = BackendConfig {
+        app_id: "test-formation".to_string(),
+        persistence_dir: temp_dir1.path().to_path_buf(),
+        shared_key: Some(shared_secret.clone()),
+        transport: TransportConfig::default(),
+        extra: HashMap::new(),
+    };
+    backend1.initialize(config1).await.unwrap();
+
+    println!("  Creating backend2 with shared_secret (SAME)...");
+    let store2 = Arc::new(AutomergeStore::open(temp_dir2.path()).unwrap());
+    let transport2 = Arc::new(IrohTransport::new().await.unwrap());
+    let backend2 = Arc::new(AutomergeIrohBackend::from_parts(store2, transport2));
+
+    let config2 = BackendConfig {
+        app_id: "test-formation".to_string(),
+        persistence_dir: temp_dir2.path().to_path_buf(),
+        shared_key: Some(shared_secret), // Same secret!
+        transport: TransportConfig::default(),
+        extra: HashMap::new(),
+    };
+    backend2.initialize(config2).await.unwrap();
+
+    // Connect backend1 -> backend2
+    println!("\n  Attempting connection with matching credentials...");
+
+    let addr2 = backend2.transport().endpoint_addr();
+    let transport1_ref = backend1.transport();
+
+    let conn = transport1_ref
+        .connect(addr2)
+        .await
+        .expect("Should connect at QUIC level");
+
+    // Perform handshake
+    use hive_protocol::network::formation_handshake::perform_initiator_handshake;
+    let formation_key1 = backend1.formation_key().expect("Should have formation key");
+
+    perform_initiator_handshake(&conn, &formation_key1)
+        .await
+        .expect("Handshake should succeed with matching credentials");
+
+    println!("  ✓ Handshake succeeded with matching credentials");
+
+    // Verify peer is connected
+    let connected_peers = backend1.transport().connected_peers();
+    assert!(
+        !connected_peers.is_empty(),
+        "Backend1 should have connected peer after successful handshake"
+    );
+
+    println!("\n  ✅ Security test passed: Same credentials correctly accepted!\n");
+
+    // Cleanup
+    let _ = backend1.shutdown().await;
+    let _ = backend2.shutdown().await;
+}
