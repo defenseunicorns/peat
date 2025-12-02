@@ -92,12 +92,36 @@ async fn test_automerge_three_node_mesh() {
 
     println!("  ✓ 3 backends created");
 
-    // Explicitly connect peers for Automerge (full mesh topology)
-    println!("  Connecting Automerge peers in full mesh...");
+    // Start peer discovery first (starts authenticated accept loops)
+    println!("  Starting peer discovery on all nodes...");
+    backend1
+        .peer_discovery()
+        .start()
+        .await
+        .expect("Should start discovery on backend1");
+    backend2
+        .peer_discovery()
+        .start()
+        .await
+        .expect("Should start discovery on backend2");
+    backend3
+        .peer_discovery()
+        .start()
+        .await
+        .expect("Should start discovery on backend3");
+    println!("  ✓ Peer discovery started");
 
-    // Get transports and endpoint IDs
+    // Give accept loops time to start
+    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+    // Explicitly connect peers for Automerge (full mesh topology)
+    println!("  Connecting Automerge peers in full mesh with authentication...");
+
+    // Get transports, formation keys, and endpoint IDs
     let transport1 = backend1.transport();
     let transport2 = backend2.transport();
+    let formation_key1 = backend1.formation_key().expect("Should have formation key");
+    let formation_key2 = backend2.formation_key().expect("Should have formation key");
 
     let endpoint2_id = backend2.endpoint_id();
     let endpoint3_id = backend3.endpoint_id();
@@ -117,24 +141,37 @@ async fn test_automerge_three_node_mesh() {
         relay_url: None,
     };
 
-    // Full mesh: Connect each node to the other two
-    // Node 1 → Node 2, Node 3
-    transport1
+    // Full mesh: Connect each node to the other two with authenticated handshakes
+    use hive_protocol::network::formation_handshake::perform_initiator_handshake;
+
+    // Node 1 → Node 2
+    let conn1_2 = transport1
         .connect_peer(&peer2_info)
         .await
         .expect("Should connect node1 to node2");
-    transport1
+    perform_initiator_handshake(&conn1_2, &formation_key1)
+        .await
+        .expect("Should authenticate node1 to node2");
+
+    // Node 1 → Node 3
+    let conn1_3 = transport1
         .connect_peer(&peer3_info)
         .await
         .expect("Should connect node1 to node3");
+    perform_initiator_handshake(&conn1_3, &formation_key1)
+        .await
+        .expect("Should authenticate node1 to node3");
 
     // Node 2 → Node 3 (already connected to Node 1 from above)
-    transport2
+    let conn2_3 = transport2
         .connect_peer(&peer3_info)
         .await
         .expect("Should connect node2 to node3");
+    perform_initiator_handshake(&conn2_3, &formation_key2)
+        .await
+        .expect("Should authenticate node2 to node3");
 
-    println!("  ✓ Full mesh connected (3 connections)");
+    println!("  ✓ Full mesh connected with authentication (3 connections)");
 
     run_three_node_mesh_test(backend1, backend2, backend3, "Automerge+Iroh").await;
 }

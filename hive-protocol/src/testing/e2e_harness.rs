@@ -47,6 +47,10 @@ pub struct E2EHarness {
     pub name: String,
     /// Temporary directories for test isolation (kept alive for test duration)
     temp_dirs: Vec<tempfile::TempDir>,
+    /// Shared test secret for AutomergeIroh peer authentication
+    /// All backends created by this harness will share this secret
+    #[cfg(feature = "automerge-backend")]
+    test_secret: String,
 }
 
 impl E2EHarness {
@@ -55,6 +59,8 @@ impl E2EHarness {
         Self {
             name: name.into(),
             temp_dirs: Vec::new(),
+            #[cfg(feature = "automerge-backend")]
+            test_secret: crate::security::FormationKey::generate_secret(),
         }
     }
 
@@ -257,10 +263,11 @@ impl E2EHarness {
         let backend = Arc::new(AutomergeIrohBackend::from_parts(store, transport));
 
         // Initialize the backend with config (this also starts the accept loop via peer_discovery().start())
+        // All backends in this harness share the same test_secret for peer authentication
         let config = BackendConfig {
             app_id: "automerge-test".to_string(),
             persistence_dir: temp_dir.path().to_path_buf(),
-            shared_key: None,
+            shared_key: Some(self.test_secret.clone()),
             transport: TransportConfig::default(),
             extra: HashMap::new(),
         };

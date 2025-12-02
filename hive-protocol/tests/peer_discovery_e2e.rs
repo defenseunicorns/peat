@@ -279,9 +279,13 @@ async fn test_e2e_discovery_and_connection() {
     let temp_a = TempDir::new().expect("Failed to create temp dir");
     let temp_b = TempDir::new().expect("Failed to create temp dir");
 
+    // Use specific bind addresses for deterministic connection
+    let addr_a: std::net::SocketAddr = "127.0.0.1:19501".parse().unwrap();
+    let addr_b: std::net::SocketAddr = "127.0.0.1:19502".parse().unwrap();
+
     // Create Node A
     let transport_a = Arc::new(
-        IrohTransport::new()
+        IrohTransport::bind(addr_a)
             .await
             .expect("Failed to create transport A"),
     );
@@ -293,7 +297,7 @@ async fn test_e2e_discovery_and_connection() {
 
     // Create Node B
     let transport_b = Arc::new(
-        IrohTransport::new()
+        IrohTransport::bind(addr_b)
             .await
             .expect("Failed to create transport B"),
     );
@@ -307,9 +311,9 @@ async fn test_e2e_discovery_and_connection() {
     let endpoint_a = transport_a.endpoint_id();
     let endpoint_b = transport_b.endpoint_id();
 
-    // Use dummy addresses since we're using Iroh's built-in relay/QUIC
-    let addrs_a: Vec<String> = vec![];
-    let addrs_b: Vec<String> = vec![];
+    // Use actual bind addresses for peer discovery
+    let addrs_a: Vec<String> = vec![addr_a.to_string()];
+    let addrs_b: Vec<String> = vec![addr_b.to_string()];
 
     // Configure Node A to discover Node B
     let peer_b_info = PeerInfo {
@@ -340,10 +344,13 @@ async fn test_e2e_discovery_and_connection() {
     use hive_protocol::sync::types::{BackendConfig, TransportConfig};
     use std::collections::HashMap;
 
+    // Generate shared test credentials - both nodes must share the same secret
+    let test_secret = hive_protocol::security::FormationKey::generate_secret();
+
     let config_a = BackendConfig {
         app_id: "test-app".to_string(),
         persistence_dir: temp_a.path().to_path_buf(),
-        shared_key: None,
+        shared_key: Some(test_secret.clone()),
         transport: TransportConfig::default(),
         extra: HashMap::new(),
     };
@@ -351,7 +358,7 @@ async fn test_e2e_discovery_and_connection() {
     let config_b = BackendConfig {
         app_id: "test-app".to_string(),
         persistence_dir: temp_b.path().to_path_buf(),
-        shared_key: None,
+        shared_key: Some(test_secret),
         transport: TransportConfig::default(),
         extra: HashMap::new(),
     };
@@ -493,10 +500,13 @@ async fn test_mdns_zero_config_discovery() {
     use hive_protocol::sync::types::{BackendConfig, TransportConfig};
     use std::collections::HashMap;
 
+    // Generate shared test credentials - both nodes must share the same secret
+    let test_secret = hive_protocol::security::FormationKey::generate_secret();
+
     let config_a = BackendConfig {
         app_id: "test-app-mdns".to_string(),
         persistence_dir: temp_a.path().to_path_buf(),
-        shared_key: None,
+        shared_key: Some(test_secret.clone()),
         transport: TransportConfig::default(),
         extra: HashMap::new(),
     };
@@ -504,7 +514,7 @@ async fn test_mdns_zero_config_discovery() {
     let config_b = BackendConfig {
         app_id: "test-app-mdns".to_string(),
         persistence_dir: temp_b.path().to_path_buf(),
-        shared_key: None,
+        shared_key: Some(test_secret),
         transport: TransportConfig::default(),
         extra: HashMap::new(),
     };
