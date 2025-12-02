@@ -1,0 +1,6 @@
+NodeCount,Bandwidth,Topology,Soldier_to_Squad_P50_ms,Soldier_to_Squad_P95_ms,Squad_to_Platoon_P50_ms,Squad_to_Platoon_P95_ms,Aggregation_Ratio,Total_Ops,Status
+24,1gbps,1_platoon_3_squads,0,0,0,0,0,0,0,0,FAIL
+24,100mbps,1_platoon_3_squads,0,0,0,0,0,0,0,0,FAIL
+24,1mbps,1_platoon_3_squads,0,0,0,0,0,0,0,0,FAIL
+24,256kbps,1_platoon_3_squads,0,0,0,0,0,0,0,0,FAIL
+48,1gbps,2_platoons_6_squads,0,0,0,0,0,0,0,0,FAIL

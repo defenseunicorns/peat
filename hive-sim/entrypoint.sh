@@ -18,10 +18,19 @@ if [ "$MODE" = "p2p_mesh" ]; then
     USE_P2P_MESH=true
 fi
 
-# Check required environment variables (skip for traditional/producer-only/p2p-mesh baseline)
-if [ "$USE_TRADITIONAL" != "true" ] && [ "$USE_PRODUCER_ONLY" != "true" ] && [ "$USE_P2P_MESH" != "true" ]; then
-    if [ -z "$DITTO_APP_ID" ]; then
-        echo "[${NODE_ID}] ERROR: DITTO_APP_ID not set"
+# Check required environment variables (skip for traditional/producer-only/p2p-mesh baseline or automerge backend)
+# BACKEND defaults to "ditto" but can be overridden to "automerge" which doesn't need Ditto credentials
+BACKEND=${BACKEND:-ditto}
+
+# Support both DITTO_APP_ID (legacy) and HIVE_APP_ID (new) for the Ditto backend
+# If HIVE_APP_ID is set but DITTO_APP_ID is not, use HIVE_APP_ID
+if [ -n "$HIVE_APP_ID" ] && [ -z "$DITTO_APP_ID" ]; then
+    DITTO_APP_ID="$HIVE_APP_ID"
+fi
+
+if [ "$USE_TRADITIONAL" != "true" ] && [ "$USE_PRODUCER_ONLY" != "true" ] && [ "$USE_P2P_MESH" != "true" ] && [ "$BACKEND" != "automerge" ]; then
+    if [ -z "$DITTO_APP_ID" ] && [ -z "$HIVE_APP_ID" ]; then
+        echo "[${NODE_ID}] ERROR: DITTO_APP_ID or HIVE_APP_ID not set"
         exit 1
     fi
 
@@ -84,10 +93,11 @@ if [ -n "$BANDWIDTH" ]; then
         echo "[${NODE_ID}] Warning: Failed to apply bandwidth constraint (may already exist or no permission)"
 fi
 
-# Export Ditto environment variables
+# Export Ditto/HIVE environment variables
 export DITTO_APP_ID
 export DITTO_OFFLINE_TOKEN
 export DITTO_SHARED_KEY
+export HIVE_APP_ID
 
 # Run the appropriate simulation node
 if [ "$USE_P2P_MESH" = "true" ] || [ "$MODE" = "p2p_mesh" ]; then

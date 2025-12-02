@@ -1,0 +1,2501 @@
+---
+b1-soldier-1:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.213
+b1-soldier-10:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.172
+b1-soldier-100:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.105
+b1-soldier-101:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.117
+b1-soldier-102:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-103:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.154
+b1-soldier-104:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.118
+b1-soldier-105:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.138
+b1-soldier-106:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-107:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.12
+b1-soldier-108:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.23
+b1-soldier-109:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-11:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.119
+b1-soldier-110:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.217
+b1-soldier-111:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.108
+b1-soldier-112:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.254
+b1-soldier-113:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.224
+b1-soldier-114:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.40
+b1-soldier-115:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.155
+b1-soldier-116:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.3
+b1-soldier-117:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.180
+b1-soldier-118:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.33
+b1-soldier-119:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.165
+b1-soldier-12:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.193
+b1-soldier-120:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.242
+b1-soldier-121:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.170
+b1-soldier-122:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.86
+b1-soldier-123:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.122
+b1-soldier-124:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.43
+b1-soldier-125:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-126:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-127:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-128:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-129:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.26
+b1-soldier-13:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.255
+b1-soldier-130:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.40
+b1-soldier-131:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.134
+b1-soldier-132:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.47
+b1-soldier-133:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.67
+b1-soldier-134:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.178
+b1-soldier-135:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.139
+b1-soldier-136:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.148
+b1-soldier-137:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.168
+b1-soldier-138:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.206
+b1-soldier-139:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-14:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.84
+b1-soldier-140:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.205
+b1-soldier-141:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.128
+b1-soldier-142:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.175
+b1-soldier-143:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.235
+b1-soldier-144:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.68
+b1-soldier-145:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.100
+b1-soldier-146:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.49
+b1-soldier-147:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.158
+b1-soldier-148:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-149:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-15:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.81
+b1-soldier-150:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.97
+b1-soldier-151:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.48
+b1-soldier-152:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.210
+b1-soldier-153:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.47
+b1-soldier-154:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-155:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-156:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-157:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.70
+b1-soldier-158:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.197
+b1-soldier-159:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.66
+b1-soldier-16:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.86
+b1-soldier-160:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.177
+b1-soldier-161:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.9
+b1-soldier-162:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.123
+b1-soldier-163:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.71
+b1-soldier-164:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.60
+b1-soldier-165:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-166:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-167:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.3
+b1-soldier-168:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.66
+b1-soldier-169:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.72
+b1-soldier-17:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.107
+b1-soldier-170:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.32
+b1-soldier-171:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.174
+b1-soldier-172:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.73
+b1-soldier-173:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.16
+b1-soldier-174:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.202
+b1-soldier-175:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.94
+b1-soldier-176:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-177:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.96
+b1-soldier-178:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.110
+b1-soldier-179:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.30
+b1-soldier-18:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.170
+b1-soldier-180:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.41
+b1-soldier-181:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.33
+b1-soldier-182:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.6
+b1-soldier-183:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.103
+b1-soldier-184:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.8
+b1-soldier-185:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.64
+b1-soldier-186:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.31
+b1-soldier-187:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.172
+b1-soldier-188:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.10
+b1-soldier-189:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.174
+b1-soldier-19:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.69
+b1-soldier-190:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.20
+b1-soldier-191:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.46
+b1-soldier-192:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.140
+b1-soldier-193:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.117
+b1-soldier-194:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.71
+b1-soldier-195:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.141
+b1-soldier-196:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.154
+b1-soldier-197:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.96
+b1-soldier-198:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.114
+b1-soldier-199:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.78
+b1-soldier-2:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.134
+b1-soldier-20:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.128
+b1-soldier-200:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.153
+b1-soldier-201:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.77
+b1-soldier-202:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.98
+b1-soldier-203:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.51
+b1-soldier-204:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.251
+b1-soldier-205:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.34
+b1-soldier-206:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.164
+b1-soldier-207:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-208:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.168
+b1-soldier-209:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.11
+b1-soldier-21:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.52
+b1-soldier-210:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.58
+b1-soldier-211:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.169
+b1-soldier-212:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.136
+b1-soldier-213:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.34
+b1-soldier-214:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.204
+b1-soldier-215:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-216:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.107
+b1-soldier-217:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.153
+b1-soldier-218:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.184
+b1-soldier-219:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.234
+b1-soldier-22:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-220:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.90
+b1-soldier-221:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.177
+b1-soldier-222:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.61
+b1-soldier-223:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.215
+b1-soldier-224:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.142
+b1-soldier-225:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.105
+b1-soldier-226:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.116
+b1-soldier-227:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.122
+b1-soldier-228:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.2
+b1-soldier-229:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.179
+b1-soldier-23:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.183
+b1-soldier-230:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.157
+b1-soldier-231:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.24
+b1-soldier-232:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.228
+b1-soldier-233:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.161
+b1-soldier-234:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.104
+b1-soldier-235:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.129
+b1-soldier-236:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.93
+b1-soldier-237:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.221
+b1-soldier-238:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.53
+b1-soldier-239:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.88
+b1-soldier-24:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.65
+b1-soldier-240:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.24
+b1-soldier-241:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-242:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.26
+b1-soldier-243:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.79
+b1-soldier-244:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.73
+b1-soldier-245:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.162
+b1-soldier-246:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.208
+b1-soldier-247:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.87
+b1-soldier-248:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.56
+b1-soldier-249:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.243
+b1-soldier-25:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.123
+b1-soldier-250:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.19
+b1-soldier-251:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.108
+b1-soldier-252:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.138
+b1-soldier-253:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.22
+b1-soldier-254:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.252
+b1-soldier-255:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.155
+b1-soldier-256:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.106
+b1-soldier-257:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.36
+b1-soldier-258:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.92
+b1-soldier-259:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.58
+b1-soldier-26:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.15
+b1-soldier-260:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.90
+b1-soldier-261:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.77
+b1-soldier-262:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.20
+b1-soldier-263:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.54
+b1-soldier-264:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.226
+b1-soldier-265:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-266:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.80
+b1-soldier-267:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.82
+b1-soldier-268:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-269:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.109
+b1-soldier-27:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.30
+b1-soldier-270:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.129
+b1-soldier-271:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.79
+b1-soldier-272:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.225
+b1-soldier-273:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.104
+b1-soldier-274:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.176
+b1-soldier-275:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.115
+b1-soldier-276:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.75
+b1-soldier-277:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.44
+b1-soldier-278:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.250
+b1-soldier-279:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.68
+b1-soldier-28:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.25
+b1-soldier-280:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.166
+b1-soldier-281:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-282:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.2
+b1-soldier-283:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.16
+b1-soldier-284:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.11
+b1-soldier-285:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.5
+b1-soldier-286:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.127
+b1-soldier-287:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.161
+b1-soldier-288:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.10
+b1-soldier-289:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-29:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.63
+b1-soldier-290:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-291:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-292:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-293:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.135
+b1-soldier-294:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.112
+b1-soldier-295:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.147
+b1-soldier-296:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.232
+b1-soldier-297:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.150
+b1-soldier-298:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.222
+b1-soldier-299:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.41
+b1-soldier-3:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.88
+b1-soldier-30:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.116
+b1-soldier-300:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.101
+b1-soldier-301:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.28
+b1-soldier-302:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.25
+b1-soldier-303:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.121
+b1-soldier-304:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.173
+b1-soldier-305:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-306:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.203
+b1-soldier-307:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.182
+b1-soldier-308:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.7
+b1-soldier-309:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-31:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.57
+b1-soldier-310:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.78
+b1-soldier-311:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.91
+b1-soldier-312:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.141
+b1-soldier-313:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.44
+b1-soldier-314:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.61
+b1-soldier-315:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.143
+b1-soldier-316:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.156
+b1-soldier-317:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.209
+b1-soldier-318:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.120
+b1-soldier-319:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.59
+b1-soldier-32:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.130
+b1-soldier-320:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.89
+b1-soldier-321:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.196
+b1-soldier-322:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.140
+b1-soldier-323:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.236
+b1-soldier-324:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.42
+b1-soldier-325:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.75
+b1-soldier-326:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-327:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.111
+b1-soldier-328:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.130
+b1-soldier-329:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.49
+b1-soldier-33:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.74
+b1-soldier-330:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.114
+b1-soldier-331:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.144
+b1-soldier-332:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.207
+b1-soldier-333:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.13
+b1-soldier-334:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.169
+b1-soldier-335:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.97
+b1-soldier-336:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-337:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.159
+b1-soldier-338:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.29
+b1-soldier-339:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-34:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.188
+b1-soldier-340:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.127
+b1-soldier-341:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.12
+b1-soldier-342:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-343:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.83
+b1-soldier-344:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.132
+b1-soldier-345:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.233
+b1-soldier-346:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.38
+b1-soldier-347:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.191
+b1-soldier-348:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.199
+b1-soldier-349:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.50
+b1-soldier-35:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-350:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-351:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.13
+b1-soldier-352:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.175
+b1-soldier-353:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.48
+b1-soldier-354:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.158
+b1-soldier-355:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.95
+b1-soldier-356:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-357:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.167
+b1-soldier-358:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.76
+b1-soldier-359:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.111
+b1-soldier-36:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-360:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.91
+b1-soldier-361:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.29
+b1-soldier-362:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.245
+b1-soldier-363:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-364:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.173
+b1-soldier-365:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.151
+b1-soldier-366:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.212
+b1-soldier-367:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.142
+b1-soldier-368:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.21
+b1-soldier-369:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.218
+b1-soldier-37:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.63
+b1-soldier-370:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.100
+b1-soldier-371:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.126
+b1-soldier-372:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-373:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.163
+b1-soldier-374:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.118
+b1-soldier-375:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.19
+b1-soldier-376:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.55
+b1-soldier-377:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.81
+b1-soldier-378:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.145
+b1-soldier-379:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.5
+b1-soldier-38:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-380:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.110
+b1-soldier-381:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.85
+b1-soldier-382:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-383:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.103
+b1-soldier-384:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.35
+b1-soldier-385:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-386:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.244
+b1-soldier-387:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.38
+b1-soldier-388:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.72
+b1-soldier-389:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.241
+b1-soldier-39:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.131
+b1-soldier-390:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.109
+b1-soldier-391:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.152
+b1-soldier-392:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.152
+b1-soldier-393:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.151
+b1-soldier-394:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.14
+b1-soldier-395:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-396:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.230
+b1-soldier-397:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.160
+b1-soldier-398:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-399:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.39
+b1-soldier-4:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.6
+b1-soldier-40:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.239
+b1-soldier-400:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.0
+b1-soldier-401:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-402:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.37
+b1-soldier-403:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.185
+b1-soldier-404:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.31
+b1-soldier-405:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.167
+b1-soldier-406:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.159
+b1-soldier-407:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-408:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.156
+b1-soldier-409:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.7
+b1-soldier-41:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.59
+b1-soldier-410:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.102
+b1-soldier-411:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.76
+b1-soldier-412:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.195
+b1-soldier-413:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.55
+b1-soldier-414:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.131
+b1-soldier-415:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.139
+b1-soldier-416:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.136
+b1-soldier-417:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.4
+b1-soldier-418:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.98
+b1-soldier-419:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.15
+b1-soldier-42:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-420:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.146
+b1-soldier-421:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-422:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.62
+b1-soldier-423:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-424:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.157
+b1-soldier-425:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.42
+b1-soldier-426:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.23
+b1-soldier-427:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.149
+b1-soldier-428:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.237
+b1-soldier-429:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-43:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.137
+b1-soldier-430:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.186
+b1-soldier-431:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.248
+b1-soldier-432:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-433:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.106
+b1-soldier-434:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.133
+b1-soldier-435:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.249
+b1-soldier-436:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.126
+b1-soldier-437:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.95
+b1-soldier-438:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.214
+b1-soldier-439:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-44:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.253
+b1-soldier-440:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.192
+b1-soldier-441:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.247
+b1-soldier-442:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.4
+b1-soldier-443:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.35
+b1-soldier-444:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.22
+b1-soldier-445:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.219
+b1-soldier-446:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.9
+b1-soldier-447:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.39
+b1-soldier-448:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.189
+b1-soldier-449:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.32
+b1-soldier-45:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.165
+b1-soldier-450:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.223
+b1-soldier-451:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.178
+b1-soldier-452:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.171
+b1-soldier-453:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.36
+b1-soldier-454:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.124
+b1-soldier-455:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.121
+b1-soldier-456:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.231
+b1-soldier-457:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.1
+b1-soldier-458:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.17
+b1-soldier-459:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.125
+b1-soldier-46:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.190
+b1-soldier-460:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.211
+b1-soldier-461:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.163
+b1-soldier-462:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.53
+b1-soldier-463:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.179
+b1-soldier-464:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.166
+b1-soldier-465:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.201
+b1-soldier-466:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.119
+b1-soldier-467:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.51
+b1-soldier-468:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.99
+b1-soldier-469:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.194
+b1-soldier-47:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.67
+b1-soldier-470:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.147
+b1-soldier-471:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-472:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.101
+b1-soldier-473:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.176
+b1-soldier-474:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.82
+b1-soldier-475:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.113
+b1-soldier-476:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.198
+b1-soldier-477:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.45
+b1-soldier-478:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.148
+b1-soldier-479:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.164
+b1-soldier-48:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.52
+b1-soldier-480:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.43
+b1-soldier-481:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.65
+b1-soldier-482:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.113
+b1-soldier-483:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.150
+b1-soldier-484:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.69
+b1-soldier-485:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.162
+b1-soldier-486:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.220
+b1-soldier-487:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.120
+b1-soldier-488:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.64
+b1-soldier-489:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.125
+b1-soldier-49:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.89
+b1-soldier-490:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-491:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.133
+b1-soldier-492:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.93
+b1-soldier-493:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.80
+b1-soldier-494:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-495:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.70
+b1-soldier-496:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.27
+b1-soldier-497:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-498:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-499:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.85
+b1-soldier-5:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.46
+b1-soldier-50:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.18
+b1-soldier-51:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.135
+b1-soldier-52:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-53:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.145
+b1-soldier-54:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.56
+b1-soldier-55:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.240
+b1-soldier-56:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.144
+b1-soldier-57:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.83
+b1-soldier-58:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.137
+b1-soldier-59:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.8
+b1-soldier-6:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.187
+b1-soldier-60:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-61:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.146
+b1-soldier-62:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.143
+b1-soldier-63:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.45
+b1-soldier-64:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.14
+b1-soldier-65:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.84
+b1-soldier-66:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.99
+b1-soldier-67:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.54
+b1-soldier-68:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.181
+b1-soldier-69:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.160
+b1-soldier-7:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.115
+b1-soldier-70:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.246
+b1-soldier-71:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.112
+b1-soldier-72:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-73:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.18
+b1-soldier-74:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.27
+b1-soldier-75:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.62
+b1-soldier-76:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.21
+b1-soldier-77:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.227
+b1-soldier-78:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.132
+b1-soldier-79:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.74
+b1-soldier-8:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.87
+b1-soldier-80:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.28
+b1-soldier-81:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-82:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.171
+b1-soldier-83:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.37
+b1-soldier-84:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-85:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.94
+b1-soldier-86:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.149
+b1-soldier-87:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.216
+b1-soldier-88:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.124
+b1-soldier-89:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-9:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.17
+b1-soldier-90:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-91:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.57
+b1-soldier-92:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.1.50
+b1-soldier-93:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-94:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.200
+b1-soldier-95:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.102
+b1-soldier-96:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+b1-soldier-97:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.92
+b1-soldier-98:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.229
+b1-soldier-99:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.238
+battalion-1-hq:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.21.0.60

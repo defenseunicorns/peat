@@ -1,0 +1,187 @@
+Loading E12 Comprehensive Validation Results...
+Loaded 30 test results
+
+================================================================================
+DETAILED COMPARISON TABLE
+================================================================================
+
+Test                                      Nodes       BW   Avg Lat   P99 Lat     Msgs
+------------------------------------------------------------------------------------------
+
+CAP Full Mesh:
+  cap-full-12node-1gbps                      12   1 Gbps   216.80m  1714.24m        6
+  cap-full-12node-100mbps                    12 100 Mbps   221.72m  1748.34m        6
+  cap-full-12node-1mbps                      12   1 Mbps   368.86m  2979.64m        9
+  cap-full-12node-256kbps                    12 256 Kbps   423.97m  3306.08m        9
+  cap-full-24node-1gbps                      24   1 Gbps  1263.72m  6538.36m        9
+  cap-full-24node-100mbps                    24 100 Mbps   712.25m  6492.37m        9
+  cap-full-24node-1mbps                      24   1 Mbps   782.23m  6547.34m       12
+  cap-full-24node-256kbps                    24 256 Kbps   498.23m  3506.97m        9
+  cap-full-48node-1gbps                      48   1 Gbps  1415.17m  9032.28m       11
+  cap-full-96node-1gbps                      96   1 Gbps  1123.42m  9778.28m       10
+
+
+CAP Hierarchical:
+  cap-hierarchical-24node-1gbps              24   1 Gbps   442.59m  3385.78m       24
+  cap-hierarchical-24node-100mbps            24 100 Mbps   347.19m  2878.57m       24
+  cap-hierarchical-24node-1mbps              24   1 Mbps   345.27m  2915.71m       36
+  cap-hierarchical-24node-256kbps            24 256 Kbps   358.14m  3069.45m       36
+  cap-hierarchical-48node-1gbps              48   1 Gbps     0.00m     0.00m      325
+  cap-hierarchical-96node-1gbps              96   1 Gbps     0.00m     0.00m      678
+
+
+Traditional IoT:
+  traditional-2node-1gbps                     2   1 Gbps   477.97m  5001.62m       42
+  traditional-2node-100mbps                   2 100 Mbps   476.38m  5001.24m       42
+  traditional-2node-1mbps                     2   1 Mbps   360.48m  5001.88m       53
+  traditional-2node-256kbps                   2 256 Kbps   395.70m  5001.46m       54
+  traditional-12node-1gbps                   12   1 Gbps   459.04m  5002.32m      250
+  traditional-12node-100mbps                 12 100 Mbps   458.34m  5001.68m      252
+  traditional-12node-1mbps                   12   1 Mbps   374.60m  5002.57m      313
+  traditional-12node-256kbps                 12 256 Kbps   427.18m  5001.69m      322
+  traditional-24node-1gbps                   24   1 Gbps    18.43m    14.33m     4789
+  traditional-24node-100mbps                 24 100 Mbps    17.60m    23.62m     4797
+  traditional-24node-1mbps                   24   1 Mbps    42.97m    85.97m     6307
+  traditional-24node-256kbps                 24 256 Kbps   166.30m   353.24m     6278
+  traditional-48node-1gbps                   48   1 Gbps    18.08m    16.47m     9653
+  traditional-96node-1gbps                   96   1 Gbps    14.61m    35.32m    19898
+
+================================================================================
+ANALYSIS BY ARCHITECTURE
+================================================================================
+
+CAP Full Mesh
+------------------------------------------------------------
+Tests run: 10
+Average latency (mean):   702.64 ms
+Average latency (median): 605.24 ms
+P99 latency (mean):       5164.39 ms
+P99 latency (median):     4999.67 ms
+Total messages sent:      90
+Total documents inserted: 58
+
+CAP Hierarchical
+------------------------------------------------------------
+Tests run: 6
+Average latency (mean):   373.29 ms
+Average latency (median): 352.66 ms
+P99 latency (mean):       3062.38 ms
+P99 latency (median):     2992.58 ms
+Total messages sent:      1,123
+Total documents inserted: 740
+
+Traditional IoT
+------------------------------------------------------------
+Tests run: 14
+Average latency (mean):   264.83 ms
+Average latency (median): 367.54 ms
+P99 latency (mean):       2895.96 ms
+P99 latency (median):     5001.35 ms
+Total messages sent:      53,050
+Total documents inserted: 28
+
+================================================================================
+ANALYSIS BY SCALE
+================================================================================
+
+2 Nodes
+------------------------------------------------------------
+Tests run: 4
+  Traditional IoT           - Avg latency:  427.63 ms
+
+12 Nodes
+------------------------------------------------------------
+Tests run: 8
+  CAP Full Mesh             - Avg latency:  307.84 ms
+  Traditional IoT           - Avg latency:  429.79 ms
+
+24 Nodes
+------------------------------------------------------------
+Tests run: 12
+  CAP Full Mesh             - Avg latency:  814.11 ms
+  CAP Hierarchical          - Avg latency:  373.29 ms
+  Traditional IoT           - Avg latency:   61.32 ms
+
+48 Nodes
+------------------------------------------------------------
+Tests run: 3
+  CAP Full Mesh             - Avg latency: 1415.17 ms
+  Traditional IoT           - Avg latency:   18.08 ms
+
+96 Nodes
+------------------------------------------------------------
+Tests run: 3
+  CAP Full Mesh             - Avg latency: 1123.42 ms
+  Traditional IoT           - Avg latency:   14.61 ms
+
+================================================================================
+ANALYSIS BY BANDWIDTH CONSTRAINT
+================================================================================
+
+1 Gbps
+------------------------------------------------------------
+Tests run: 12
+  CAP Full Mesh             - Avg: 1004.77 ms, P99: 6765.79 ms
+  CAP Hierarchical          - Avg:  442.59 ms, P99: 3385.78 ms
+  Traditional IoT           - Avg:  197.63 ms, P99: 2014.01 ms
+
+100 Mbps
+------------------------------------------------------------
+Tests run: 6
+  CAP Full Mesh             - Avg:  466.99 ms, P99: 4120.35 ms
+  CAP Hierarchical          - Avg:  347.19 ms, P99: 2878.57 ms
+  Traditional IoT           - Avg:  317.44 ms, P99: 3342.18 ms
+
+1 Mbps
+------------------------------------------------------------
+Tests run: 6
+  CAP Full Mesh             - Avg:  575.54 ms, P99: 4763.49 ms
+  CAP Hierarchical          - Avg:  345.27 ms, P99: 2915.71 ms
+  Traditional IoT           - Avg:  259.35 ms, P99: 3363.47 ms
+
+256 Kbps
+------------------------------------------------------------
+Tests run: 6
+  CAP Full Mesh             - Avg:  461.10 ms, P99: 3406.53 ms
+  CAP Hierarchical          - Avg:  358.14 ms, P99: 3069.45 ms
+  Traditional IoT           - Avg:  329.73 ms, P99: 3452.13 ms
+
+================================================================================
+KEY FINDINGS
+================================================================================
+
+1. LATENCY COMPARISON ACROSS ARCHITECTURES
+------------------------------------------------------------
+CAP Full Mesh             - Mean Avg:  702.64 ms, Mean P99:   5164.39 ms
+CAP Hierarchical          - Mean Avg:  373.29 ms, Mean P99:   3062.38 ms
+Traditional IoT           - Mean Avg:  264.83 ms, Mean P99:   2895.96 ms
+
+2. SCALING BEHAVIOR
+------------------------------------------------------------
+
+CAP Full Mesh:
+   12 nodes:  307.84 ms avg latency
+   24 nodes:  814.11 ms avg latency
+   48 nodes: 1415.17 ms avg latency
+   96 nodes: 1123.42 ms avg latency
+
+CAP Hierarchical:
+   24 nodes:  373.29 ms avg latency
+
+Traditional IoT:
+    2 nodes:  427.63 ms avg latency
+   12 nodes:  429.79 ms avg latency
+   24 nodes:   61.32 ms avg latency
+   48 nodes:   18.08 ms avg latency
+   96 nodes:   14.61 ms avg latency
+
+3. BANDWIDTH CONSTRAINT IMPACT
+------------------------------------------------------------
+1 Gbps     - Mean latency:  544.98 ms
+100 Mbps   - Mean latency:  372.25 ms
+1 Mbps     - Mean latency:  379.07 ms
+256 Kbps   - Mean latency:  378.25 ms
+
+================================================================================
+ANALYSIS COMPLETE
+================================================================================

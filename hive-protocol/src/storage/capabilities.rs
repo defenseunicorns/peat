@@ -162,6 +162,8 @@
 //! - `TransactionCapable` - Multi-document ACID transactions
 //! - `EncryptionCapable` - At-rest encryption
 
+use crate::command::CommandStorage;
+use crate::hierarchy::SummaryStorage;
 use anyhow::Result;
 use prost::Message;
 use serde::{de::DeserializeOwned, Serialize};
@@ -291,6 +293,42 @@ pub struct SyncStats {
     pub bytes_received: u64,
     /// Last sync timestamp (if applicable)
     pub last_sync: Option<std::time::SystemTime>,
+}
+
+/// Hierarchical storage capability trait - Backend provides summary and command storage
+///
+/// Backends that implement this trait can provide SummaryStorage and CommandStorage
+/// implementations for hierarchical aggregation and command dissemination.
+///
+/// # Implementations
+///
+/// - ✅ `DittoBackend` - Returns DittoSummaryStorage and DittoCommandStorage
+/// - ✅ `AutomergeBackend` - Returns AutomergeSummaryStorage and AutomergeCommandStorage
+/// - ❌ `SimpleBackend` - Not supported (no CRDT, no hierarchy)
+///
+/// # Example
+///
+/// ```ignore
+/// use hive_protocol::storage::{HierarchicalStorageCapable, StorageBackend};
+///
+/// fn setup_hierarchical_mode(backend: &dyn HierarchicalStorageCapable) {
+///     let summary_storage = backend.summary_storage();
+///     let command_storage = backend.command_storage();
+///
+///     let aggregator = HierarchicalAggregator::new(summary_storage);
+///     let cmd_coordinator = CommandCoordinator::new(..., command_storage);
+/// }
+/// ```
+pub trait HierarchicalStorageCapable: Send + Sync {
+    /// Create a SummaryStorage implementation for hierarchical aggregation
+    ///
+    /// Returns a thread-safe handle to the summary storage.
+    fn summary_storage(&self) -> Arc<dyn SummaryStorage>;
+
+    /// Create a CommandStorage implementation for command dissemination
+    ///
+    /// Returns a thread-safe handle to the command storage.
+    fn command_storage(&self) -> Arc<dyn CommandStorage>;
 }
 
 #[cfg(test)]
