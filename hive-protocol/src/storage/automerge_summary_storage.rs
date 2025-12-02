@@ -8,6 +8,8 @@ use crate::hierarchy::deltas::{CompanyDelta, PlatoonDelta, SquadDelta};
 #[cfg(feature = "automerge-backend")]
 use crate::hierarchy::storage_trait::{DocumentMetrics, SummaryStorage};
 #[cfg(feature = "automerge-backend")]
+use crate::hierarchy::SquadFieldUpdate;
+#[cfg(feature = "automerge-backend")]
 use crate::storage::automerge_conversion::{automerge_to_message, message_to_automerge};
 #[cfg(feature = "automerge-backend")]
 use crate::storage::automerge_store::AutomergeStore;
@@ -564,7 +566,7 @@ impl SummaryStorage for AutomergeSummaryStorage {
 // ============================================================================
 
 #[cfg(feature = "automerge-backend")]
-use crate::hierarchy::deltas::{CompanyFieldUpdate, PlatoonFieldUpdate, SquadFieldUpdate};
+use crate::hierarchy::deltas::{CompanyFieldUpdate, PlatoonFieldUpdate};
 
 /// Apply squad delta to summary, returns approximate delta size in bytes
 #[cfg(feature = "automerge-backend")]
@@ -896,10 +898,12 @@ mod tests {
             .unwrap();
 
         // Apply some updates
-        for _ in 0..5 {
+        for i in 0..5 {
             let delta = SquadDelta {
-                avg_fuel_minutes: Some(55.0),
-                ..Default::default()
+                squad_id: "squad-1".to_string(),
+                timestamp_us: crate::hierarchy::deltas::current_timestamp_us(),
+                sequence: i + 1,
+                updates: vec![SquadFieldUpdate::SetAvgFuelMinutes(55.0)],
             };
             storage
                 .update_squad_summary("squad-1", delta)

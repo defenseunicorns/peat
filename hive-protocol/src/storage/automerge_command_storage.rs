@@ -544,7 +544,7 @@ struct StatusWrapper {
 #[cfg(all(test, feature = "automerge-backend"))]
 mod tests {
     use super::*;
-    use hive_schema::command::v1::{CommandTarget, CommandTargetScope};
+    use hive_schema::command::v1::{command_target, CommandTarget};
     use tempfile::TempDir;
 
     fn create_test_storage() -> (AutomergeCommandStorage, TempDir) {
@@ -558,7 +558,7 @@ mod tests {
             command_id: command_id.to_string(),
             originator_id: "test-originator".to_string(),
             target: Some(CommandTarget {
-                scope: CommandTargetScope::Individual as i32,
+                scope: command_target::Scope::Individual as i32,
                 target_ids,
                 ..Default::default()
             }),
