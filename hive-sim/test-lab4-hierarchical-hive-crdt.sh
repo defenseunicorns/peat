@@ -31,9 +31,13 @@ echo ""
 validate_environment
 mkdir -p "${RESULTS_DIR}/logs"
 
+# Pre-test cleanup: remove any stale lab4 Docker networks that could cause subnet conflicts
+echo "Cleaning up any stale Docker networks..."
+docker network ls --format '{{.Name}}' | grep "lab4-hierarchical" | xargs -r docker network rm 2>/dev/null || true
+
 # CSV header with hierarchical metrics
 # Note: Latencies are CROSS-TIER PROPAGATION times (network sync), not local processing
-echo "NodeCount,Bandwidth,Topology,Soldier_to_Squad_P50_ms,Soldier_to_Squad_P95_ms,Squad_to_Platoon_P50_ms,Squad_to_Platoon_P95_ms,Aggregation_Ratio,Total_Operations,Status" > "$RESULTS_CSV"
+echo "NodeCount,Bandwidth,Topology,Soldier_to_Squad_P50_ms,Soldier_to_Squad_P95_ms,Squad_to_Platoon_P50_ms,Squad_to_Platoon_P95_ms,Aggregation_Ratio,Total_Ops,Status" > "$RESULTS_CSV"
 
 TOTAL_TESTS=$((${#NODE_COUNTS[@]} * ${#BANDWIDTHS[@]}))
 CURRENT_TEST=0
@@ -45,26 +49,27 @@ for NODE_COUNT in "${NODE_COUNTS[@]}"; do
     echo "═══════════════════════════════════════════════════════════"
 
     # Determine topology structure based on node count
+    # Use existing mode4 mesh topologies which have hierarchical aggregation
     case $NODE_COUNT in
         24)
             TOPOLOGY="1_platoon_3_squads"
-            TOPO_BASE="test-backend-ditto-24n-hierarchical"
+            TOPO_FILE="topologies/platoon-24node-mesh-mode4.yaml"
             ;;
         48)
             TOPOLOGY="2_platoons_6_squads"
-            TOPO_BASE="test-backend-ditto-48n-hierarchical"
+            TOPO_FILE="topologies/battalion-48node-mesh-mode4.yaml"
             ;;
         96)
             TOPOLOGY="4_platoons_12_squads"
-            TOPO_BASE="test-backend-ditto-96n-hierarchical"
+            TOPO_FILE="topologies/battalion-96node-mesh-mode4.yaml"
             ;;
         384)
             TOPOLOGY="multi_company_384n"
-            TOPO_BASE="hierarchical-384n"
+            TOPO_FILE=""  # Will be generated
             ;;
         1000)
             TOPOLOGY="battalion_1000n"
-            TOPO_BASE="hierarchical-1000n"
+            TOPO_FILE=""  # Will be generated
             ;;
     esac
 
@@ -75,12 +80,11 @@ for NODE_COUNT in "${NODE_COUNTS[@]}"; do
         echo "  [${CURRENT_TEST}/${TOTAL_TESTS}] ${TEST_NAME}"
 
         # Check if topology exists, otherwise generate it
-        if [ "$NODE_COUNT" -le 96 ]; then
-            # Use existing pre-generated topologies
-            TOPO_FILE="topologies/${TOPO_BASE}-${BANDWIDTH}.yaml"
+        if [ "$NODE_COUNT" -le 96 ] && [ -n "$TOPO_FILE" ]; then
+            # Use existing pre-generated topologies (same topology for all bandwidths)
             if [ ! -f "$TOPO_FILE" ]; then
                 echo "    ⚠️  Topology not found: $TOPO_FILE"
-                echo "${NODE_COUNT},${BANDWIDTH},${TOPOLOGY},0,0,0,0,0,0,0,0,SKIP" >> "$RESULTS_CSV"
+                echo "${NODE_COUNT},${BANDWIDTH},${TOPOLOGY},0,0,0,0,0,0,SKIP" >> "$RESULTS_CSV"
                 continue
             fi
         else
@@ -99,23 +103,36 @@ for NODE_COUNT in "${NODE_COUNTS[@]}"; do
             }
         fi
 
+        # Get lab name and count expected nodes from topology file
+        LAB_NAME=$(grep '^name:' "$TOPO_FILE" | awk '{print $2}')
+        EXPECTED_NODES=$(grep -c "kind: linux" "$TOPO_FILE")
+
         # Deploy topology
-        echo "    Deploying topology..."
+        echo "    Deploying topology (${EXPECTED_NODES} nodes)..."
         if ! containerlab deploy -t "$TOPO_FILE" --reconfigure > /dev/null 2>&1; then
             echo "    ❌ Deployment failed"
             echo "${NODE_COUNT},${BANDWIDTH},${TOPOLOGY},0,0,0,0,0,0,0,0,FAIL" >> "$RESULTS_CSV"
             continue
         fi
 
-        echo "    Running for ${TEST_DURATION_SECS}s..."
+        # Wait for all containers to be running
+        echo "    Waiting for all ${EXPECTED_NODES} containers to be running..."
+        while true; do
+            RUNNING_COUNT=$(docker ps --filter "name=clab-${LAB_NAME}" --format "{{.Names}}" 2>/dev/null | wc -l)
+            if [ "$RUNNING_COUNT" -ge "$EXPECTED_NODES" ]; then
+                echo "    All ${RUNNING_COUNT} containers running"
+                break
+            fi
+            sleep 2
+        done
+
+        # Wait for nodes to initialize and generate metrics
+        echo "    Running test for ${TEST_DURATION_SECS}s..."
         sleep "$TEST_DURATION_SECS"
 
         # Collect logs from different tiers
         LOG_DIR="${RESULTS_DIR}/logs/${TEST_NAME}"
         mkdir -p "$LOG_DIR"
-
-        # Get container name prefix from topology file
-        LAB_NAME=$(grep '^name:' "$TOPO_FILE" | awk '{print $2}')
 
         # Collect soldier logs (sample)
         SOLDIER_CONTAINER=$(docker ps --format '{{.Names}}' | grep "${LAB_NAME}" | grep -E "(soldier|alpha-soldier)" | head -1)
@@ -145,9 +162,9 @@ for NODE_COUNT in "${NODE_COUNTS[@]}"; do
         TOTAL_OPS=0
         STATUS="PASS"
 
-        # Parse Soldier → Squad propagation latency
-        # Squad leaders receive soldier NodeState documents via CRDT sync
-        # Look for DocumentReceived events in squad leader logs for sim_doc_ documents
+        # Parse Soldier → Squad aggregation latency
+        # Squad leaders aggregate soldier NodeState documents - use CRDTUpsert latency
+        # First try DocumentReceived (pre-built topologies), then fall back to CRDTUpsert (generated topologies)
         cat "${LOG_DIR}"/*squad*leader*.log 2>/dev/null | \
             grep 'METRICS:' | \
             grep '"event_type":"DocumentReceived"' | \
@@ -155,6 +172,16 @@ for NODE_COUNT in "${NODE_COUNTS[@]}"; do
             grep 'sim_doc_' | \
             sed 's/.*"latency_ms":\([0-9.]*\).*/\1/' | \
             sort -n > /tmp/soldier_to_squad_lat_$$.txt || true
+
+        # Fall back to CRDTUpsert events for generated topologies (384n, 1000n)
+        if [ ! -s /tmp/soldier_to_squad_lat_$$.txt ]; then
+            cat "${LOG_DIR}"/*squad*leader*.log 2>/dev/null | \
+                grep 'METRICS:' | \
+                grep '"event_type":"CRDTUpsert"' | \
+                grep '"tier":"squad_leader"' | \
+                sed 's/.*"latency_ms":\([0-9.]*\).*/\1/' | \
+                sort -n > /tmp/soldier_to_squad_lat_$$.txt || true
+        fi
 
         if [ -s /tmp/soldier_to_squad_lat_$$.txt ]; then
             SOLDIER_TO_SQUAD_P50=$(awk 'BEGIN{c=0} {a[c++]=$1} END{if(c>0) print a[int(c*0.5)]; else print 0}' /tmp/soldier_to_squad_lat_$$.txt)
@@ -164,7 +191,7 @@ for NODE_COUNT in "${NODE_COUNTS[@]}"; do
 
         # Parse Squad → Platoon propagation latency
         # Platoon leaders receive SquadSummary documents via CRDT sync
-        # Look for DocumentReceived events in platoon leader logs for squad-*-summary documents
+        # First try DocumentReceived (pre-built topologies), then fall back to CRDTUpsert (generated topologies)
         cat "${LOG_DIR}"/*platoon*leader*.log 2>/dev/null | \
             grep 'METRICS:' | \
             grep '"event_type":"DocumentReceived"' | \
@@ -172,6 +199,16 @@ for NODE_COUNT in "${NODE_COUNTS[@]}"; do
             grep 'squad-.*-summary' | \
             sed 's/.*"latency_ms":\([0-9.]*\).*/\1/' | \
             sort -n > /tmp/squad_to_platoon_lat_$$.txt || true
+
+        # Fall back to CRDTUpsert events from platoon leaders (generated topologies)
+        if [ ! -s /tmp/squad_to_platoon_lat_$$.txt ]; then
+            cat "${LOG_DIR}"/*platoon*leader*.log 2>/dev/null | \
+                grep 'METRICS:' | \
+                grep '"event_type":"CRDTUpsert"' | \
+                grep '"tier":"platoon_leader"' | \
+                sed 's/.*"latency_ms":\([0-9.]*\).*/\1/' | \
+                sort -n > /tmp/squad_to_platoon_lat_$$.txt || true
+        fi
 
         if [ -s /tmp/squad_to_platoon_lat_$$.txt ]; then
             SQUAD_TO_PLATOON_P50=$(awk 'BEGIN{c=0} {a[c++]=$1} END{if(c>0) print a[int(c*0.5)]; else print 0}' /tmp/squad_to_platoon_lat_$$.txt)
@@ -206,8 +243,10 @@ for NODE_COUNT in "${NODE_COUNTS[@]}"; do
         # Write results
         echo "${NODE_COUNT},${BANDWIDTH},${TOPOLOGY},${SOLDIER_TO_SQUAD_P50},${SOLDIER_TO_SQUAD_P95},${SQUAD_TO_PLATOON_P50},${SQUAD_TO_PLATOON_P95},${AGGREGATION_RATIO},${TOTAL_OPS},${STATUS}" >> "$RESULTS_CSV"
 
-        # Cleanup
+        # Cleanup - destroy topology and remove any orphaned Docker networks
         containerlab destroy -t "$TOPO_FILE" --cleanup > /dev/null 2>&1 || true
+        # Clean up any stale Docker networks from this test
+        docker network ls --format '{{.Name}}' | grep "lab4-hierarchical" | xargs -r docker network rm 2>/dev/null || true
         sleep 2
     done
 done

@@ -32,9 +32,13 @@ pub mod ttl;
 #[cfg(feature = "automerge-backend")]
 pub mod automerge_backend;
 #[cfg(feature = "automerge-backend")]
+pub mod automerge_command_storage;
+#[cfg(feature = "automerge-backend")]
 pub mod automerge_conversion;
 #[cfg(feature = "automerge-backend")]
 pub mod automerge_store;
+#[cfg(feature = "automerge-backend")]
+pub mod automerge_summary_storage;
 #[cfg(feature = "automerge-backend")]
 pub mod automerge_sync;
 #[cfg(feature = "automerge-backend")]
@@ -68,7 +72,11 @@ pub use ttl::{EvictionStrategy, OfflineRetentionPolicy, TtlConfig};
 #[cfg(feature = "automerge-backend")]
 pub use automerge_backend::AutomergeBackend;
 #[cfg(feature = "automerge-backend")]
+pub use automerge_command_storage::AutomergeCommandStorage;
+#[cfg(feature = "automerge-backend")]
 pub use automerge_store::AutomergeStore;
+#[cfg(feature = "automerge-backend")]
+pub use automerge_summary_storage::AutomergeSummaryStorage;
 #[cfg(feature = "automerge-backend")]
 pub use automerge_sync::AutomergeSyncCoordinator;
 #[cfg(feature = "automerge-backend")]
@@ -99,7 +107,9 @@ pub use sync_persistence::{
 
 // Trait abstractions (E11.2)
 pub use backend::{create_storage_backend, StorageConfig};
-pub use capabilities::{CrdtCapable, SyncCapable, SyncStats, TypedCollection};
+pub use capabilities::{
+    CrdtCapable, HierarchicalStorageCapable, SyncCapable, SyncStats, TypedCollection,
+};
 #[cfg(feature = "ditto-backend")]
 pub use ditto_backend::DittoBackend;
 pub use traits::{Collection, DocumentPredicate, StorageBackend};

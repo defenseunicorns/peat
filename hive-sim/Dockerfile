@@ -9,10 +9,14 @@
 FROM rust:1.89-bookworm AS builder
 
 # Install build dependencies
-# libclang-dev required for automerge-backend's bindgen dependency
+# clang and libclang-dev required for automerge-backend's bindgen dependency
+# mold is the fast linker specified in .cargo/config.toml
 RUN apt-get update && apt-get install -y \
     protobuf-compiler \
+    clang \
     libclang-dev \
+    cmake \
+    mold \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
