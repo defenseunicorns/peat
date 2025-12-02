@@ -560,7 +560,6 @@ mod tests {
             target: Some(CommandTarget {
                 scope: command_target::Scope::Individual as i32,
                 target_ids,
-                ..Default::default()
             }),
             ..Default::default()
         }

@@ -1,0 +1,1009 @@
+all:
+  vars:
+    # The generated inventory is assumed to be used from the clab host.
+    # Hence no http proxy should be used. Therefore we make sure the http
+    # module does not attempt using any global http proxy.
+    ansible_httpapi_use_proxy: false
+  children:
+    linux:
+      hosts:
+        clab-traditional-battalion-500node-b1-soldier-1:
+          ansible_host: 172.21.0.213
+        clab-traditional-battalion-500node-b1-soldier-10:
+          ansible_host: 172.21.0.172
+        clab-traditional-battalion-500node-b1-soldier-100:
+          ansible_host: 172.21.1.105
+        clab-traditional-battalion-500node-b1-soldier-101:
+          ansible_host: 172.21.1.117
+        clab-traditional-battalion-500node-b1-soldier-102:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-103:
+          ansible_host: 172.21.1.154
+        clab-traditional-battalion-500node-b1-soldier-104:
+          ansible_host: 172.21.0.118
+        clab-traditional-battalion-500node-b1-soldier-105:
+          ansible_host: 172.21.0.138
+        clab-traditional-battalion-500node-b1-soldier-106:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-107:
+          ansible_host: 172.21.1.12
+        clab-traditional-battalion-500node-b1-soldier-108:
+          ansible_host: 172.21.1.23
+        clab-traditional-battalion-500node-b1-soldier-109:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-11:
+          ansible_host: 172.21.0.119
+        clab-traditional-battalion-500node-b1-soldier-110:
+          ansible_host: 172.21.0.217
+        clab-traditional-battalion-500node-b1-soldier-111:
+          ansible_host: 172.21.1.108
+        clab-traditional-battalion-500node-b1-soldier-112:
+          ansible_host: 172.21.0.254
+        clab-traditional-battalion-500node-b1-soldier-113:
+          ansible_host: 172.21.0.224
+        clab-traditional-battalion-500node-b1-soldier-114:
+          ansible_host: 172.21.1.40
+        clab-traditional-battalion-500node-b1-soldier-115:
+          ansible_host: 172.21.0.155
+        clab-traditional-battalion-500node-b1-soldier-116:
+          ansible_host: 172.21.0.3
+        clab-traditional-battalion-500node-b1-soldier-117:
+          ansible_host: 172.21.0.180
+        clab-traditional-battalion-500node-b1-soldier-118:
+          ansible_host: 172.21.0.33
+        clab-traditional-battalion-500node-b1-soldier-119:
+          ansible_host: 172.21.0.165
+        clab-traditional-battalion-500node-b1-soldier-12:
+          ansible_host: 172.21.0.193
+        clab-traditional-battalion-500node-b1-soldier-120:
+          ansible_host: 172.21.0.242
+        clab-traditional-battalion-500node-b1-soldier-121:
+          ansible_host: 172.21.0.170
+        clab-traditional-battalion-500node-b1-soldier-122:
+          ansible_host: 172.21.1.86
+        clab-traditional-battalion-500node-b1-soldier-123:
+          ansible_host: 172.21.1.122
+        clab-traditional-battalion-500node-b1-soldier-124:
+          ansible_host: 172.21.1.43
+        clab-traditional-battalion-500node-b1-soldier-125:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-126:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-127:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-128:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-129:
+          ansible_host: 172.21.0.26
+        clab-traditional-battalion-500node-b1-soldier-13:
+          ansible_host: 172.21.0.255
+        clab-traditional-battalion-500node-b1-soldier-130:
+          ansible_host: 172.21.0.40
+        clab-traditional-battalion-500node-b1-soldier-131:
+          ansible_host: 172.21.0.134
+        clab-traditional-battalion-500node-b1-soldier-132:
+          ansible_host: 172.21.1.47
+        clab-traditional-battalion-500node-b1-soldier-133:
+          ansible_host: 172.21.1.67
+        clab-traditional-battalion-500node-b1-soldier-134:
+          ansible_host: 172.21.1.178
+        clab-traditional-battalion-500node-b1-soldier-135:
+          ansible_host: 172.21.1.139
+        clab-traditional-battalion-500node-b1-soldier-136:
+          ansible_host: 172.21.1.148
+        clab-traditional-battalion-500node-b1-soldier-137:
+          ansible_host: 172.21.0.168
+        clab-traditional-battalion-500node-b1-soldier-138:
+          ansible_host: 172.21.0.206
+        clab-traditional-battalion-500node-b1-soldier-139:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-14:
+          ansible_host: 172.21.0.84
+        clab-traditional-battalion-500node-b1-soldier-140:
+          ansible_host: 172.21.0.205
+        clab-traditional-battalion-500node-b1-soldier-141:
+          ansible_host: 172.21.0.128
+        clab-traditional-battalion-500node-b1-soldier-142:
+          ansible_host: 172.21.1.175
+        clab-traditional-battalion-500node-b1-soldier-143:
+          ansible_host: 172.21.0.235
+        clab-traditional-battalion-500node-b1-soldier-144:
+          ansible_host: 172.21.0.68
+        clab-traditional-battalion-500node-b1-soldier-145:
+          ansible_host: 172.21.1.100
+        clab-traditional-battalion-500node-b1-soldier-146:
+          ansible_host: 172.21.0.49
+        clab-traditional-battalion-500node-b1-soldier-147:
+          ansible_host: 172.21.1.158
+        clab-traditional-battalion-500node-b1-soldier-148:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-149:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-15:
+          ansible_host: 172.21.1.81
+        clab-traditional-battalion-500node-b1-soldier-150:
+          ansible_host: 172.21.1.97
+        clab-traditional-battalion-500node-b1-soldier-151:
+          ansible_host: 172.21.0.48
+        clab-traditional-battalion-500node-b1-soldier-152:
+          ansible_host: 172.21.0.210
+        clab-traditional-battalion-500node-b1-soldier-153:
+          ansible_host: 172.21.0.47
+        clab-traditional-battalion-500node-b1-soldier-154:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-155:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-156:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-157:
+          ansible_host: 172.21.1.70
+        clab-traditional-battalion-500node-b1-soldier-158:
+          ansible_host: 172.21.0.197
+        clab-traditional-battalion-500node-b1-soldier-159:
+          ansible_host: 172.21.1.66
+        clab-traditional-battalion-500node-b1-soldier-16:
+          ansible_host: 172.21.0.86
+        clab-traditional-battalion-500node-b1-soldier-160:
+          ansible_host: 172.21.1.177
+        clab-traditional-battalion-500node-b1-soldier-161:
+          ansible_host: 172.21.0.9
+        clab-traditional-battalion-500node-b1-soldier-162:
+          ansible_host: 172.21.0.123
+        clab-traditional-battalion-500node-b1-soldier-163:
+          ansible_host: 172.21.1.71
+        clab-traditional-battalion-500node-b1-soldier-164:
+          ansible_host: 172.21.1.60
+        clab-traditional-battalion-500node-b1-soldier-165:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-166:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-167:
+          ansible_host: 172.21.1.3
+        clab-traditional-battalion-500node-b1-soldier-168:
+          ansible_host: 172.21.0.66
+        clab-traditional-battalion-500node-b1-soldier-169:
+          ansible_host: 172.21.0.72
+        clab-traditional-battalion-500node-b1-soldier-17:
+          ansible_host: 172.21.0.107
+        clab-traditional-battalion-500node-b1-soldier-170:
+          ansible_host: 172.21.0.32
+        clab-traditional-battalion-500node-b1-soldier-171:
+          ansible_host: 172.21.0.174
+        clab-traditional-battalion-500node-b1-soldier-172:
+          ansible_host: 172.21.1.73
+        clab-traditional-battalion-500node-b1-soldier-173:
+          ansible_host: 172.21.0.16
+        clab-traditional-battalion-500node-b1-soldier-174:
+          ansible_host: 172.21.0.202
+        clab-traditional-battalion-500node-b1-soldier-175:
+          ansible_host: 172.21.1.94
+        clab-traditional-battalion-500node-b1-soldier-176:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-177:
+          ansible_host: 172.21.0.96
+        clab-traditional-battalion-500node-b1-soldier-178:
+          ansible_host: 172.21.1.110
+        clab-traditional-battalion-500node-b1-soldier-179:
+          ansible_host: 172.21.0.30
+        clab-traditional-battalion-500node-b1-soldier-18:
+          ansible_host: 172.21.1.170
+        clab-traditional-battalion-500node-b1-soldier-180:
+          ansible_host: 172.21.0.41
+        clab-traditional-battalion-500node-b1-soldier-181:
+          ansible_host: 172.21.1.33
+        clab-traditional-battalion-500node-b1-soldier-182:
+          ansible_host: 172.21.0.6
+        clab-traditional-battalion-500node-b1-soldier-183:
+          ansible_host: 172.21.1.103
+        clab-traditional-battalion-500node-b1-soldier-184:
+          ansible_host: 172.21.1.8
+        clab-traditional-battalion-500node-b1-soldier-185:
+          ansible_host: 172.21.0.64
+        clab-traditional-battalion-500node-b1-soldier-186:
+          ansible_host: 172.21.0.31
+        clab-traditional-battalion-500node-b1-soldier-187:
+          ansible_host: 172.21.1.172
+        clab-traditional-battalion-500node-b1-soldier-188:
+          ansible_host: 172.21.1.10
+        clab-traditional-battalion-500node-b1-soldier-189:
+          ansible_host: 172.21.1.174
+        clab-traditional-battalion-500node-b1-soldier-19:
+          ansible_host: 172.21.1.69
+        clab-traditional-battalion-500node-b1-soldier-190:
+          ansible_host: 172.21.1.20
+        clab-traditional-battalion-500node-b1-soldier-191:
+          ansible_host: 172.21.0.46
+        clab-traditional-battalion-500node-b1-soldier-192:
+          ansible_host: 172.21.0.140
+        clab-traditional-battalion-500node-b1-soldier-193:
+          ansible_host: 172.21.0.117
+        clab-traditional-battalion-500node-b1-soldier-194:
+          ansible_host: 172.21.0.71
+        clab-traditional-battalion-500node-b1-soldier-195:
+          ansible_host: 172.21.1.141
+        clab-traditional-battalion-500node-b1-soldier-196:
+          ansible_host: 172.21.0.154
+        clab-traditional-battalion-500node-b1-soldier-197:
+          ansible_host: 172.21.1.96
+        clab-traditional-battalion-500node-b1-soldier-198:
+          ansible_host: 172.21.1.114
+        clab-traditional-battalion-500node-b1-soldier-199:
+          ansible_host: 172.21.1.78
+        clab-traditional-battalion-500node-b1-soldier-2:
+          ansible_host: 172.21.1.134
+        clab-traditional-battalion-500node-b1-soldier-20:
+          ansible_host: 172.21.1.128
+        clab-traditional-battalion-500node-b1-soldier-200:
+          ansible_host: 172.21.0.153
+        clab-traditional-battalion-500node-b1-soldier-201:
+          ansible_host: 172.21.1.77
+        clab-traditional-battalion-500node-b1-soldier-202:
+          ansible_host: 172.21.0.98
+        clab-traditional-battalion-500node-b1-soldier-203:
+          ansible_host: 172.21.0.51
+        clab-traditional-battalion-500node-b1-soldier-204:
+          ansible_host: 172.21.0.251
+        clab-traditional-battalion-500node-b1-soldier-205:
+          ansible_host: 172.21.1.34
+        clab-traditional-battalion-500node-b1-soldier-206:
+          ansible_host: 172.21.1.164
+        clab-traditional-battalion-500node-b1-soldier-207:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-208:
+          ansible_host: 172.21.1.168
+        clab-traditional-battalion-500node-b1-soldier-209:
+          ansible_host: 172.21.1.11
+        clab-traditional-battalion-500node-b1-soldier-21:
+          ansible_host: 172.21.1.52
+        clab-traditional-battalion-500node-b1-soldier-210:
+          ansible_host: 172.21.0.58
+        clab-traditional-battalion-500node-b1-soldier-211:
+          ansible_host: 172.21.1.169
+        clab-traditional-battalion-500node-b1-soldier-212:
+          ansible_host: 172.21.1.136
+        clab-traditional-battalion-500node-b1-soldier-213:
+          ansible_host: 172.21.0.34
+        clab-traditional-battalion-500node-b1-soldier-214:
+          ansible_host: 172.21.0.204
+        clab-traditional-battalion-500node-b1-soldier-215:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-216:
+          ansible_host: 172.21.1.107
+        clab-traditional-battalion-500node-b1-soldier-217:
+          ansible_host: 172.21.1.153
+        clab-traditional-battalion-500node-b1-soldier-218:
+          ansible_host: 172.21.0.184
+        clab-traditional-battalion-500node-b1-soldier-219:
+          ansible_host: 172.21.0.234
+        clab-traditional-battalion-500node-b1-soldier-22:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-220:
+          ansible_host: 172.21.0.90
+        clab-traditional-battalion-500node-b1-soldier-221:
+          ansible_host: 172.21.0.177
+        clab-traditional-battalion-500node-b1-soldier-222:
+          ansible_host: 172.21.1.61
+        clab-traditional-battalion-500node-b1-soldier-223:
+          ansible_host: 172.21.0.215
+        clab-traditional-battalion-500node-b1-soldier-224:
+          ansible_host: 172.21.1.142
+        clab-traditional-battalion-500node-b1-soldier-225:
+          ansible_host: 172.21.0.105
+        clab-traditional-battalion-500node-b1-soldier-226:
+          ansible_host: 172.21.0.116
+        clab-traditional-battalion-500node-b1-soldier-227:
+          ansible_host: 172.21.0.122
+        clab-traditional-battalion-500node-b1-soldier-228:
+          ansible_host: 172.21.1.2
+        clab-traditional-battalion-500node-b1-soldier-229:
+          ansible_host: 172.21.0.179
+        clab-traditional-battalion-500node-b1-soldier-23:
+          ansible_host: 172.21.0.183
+        clab-traditional-battalion-500node-b1-soldier-230:
+          ansible_host: 172.21.1.157
+        clab-traditional-battalion-500node-b1-soldier-231:
+          ansible_host: 172.21.0.24
+        clab-traditional-battalion-500node-b1-soldier-232:
+          ansible_host: 172.21.0.228
+        clab-traditional-battalion-500node-b1-soldier-233:
+          ansible_host: 172.21.1.161
+        clab-traditional-battalion-500node-b1-soldier-234:
+          ansible_host: 172.21.1.104
+        clab-traditional-battalion-500node-b1-soldier-235:
+          ansible_host: 172.21.1.129
+        clab-traditional-battalion-500node-b1-soldier-236:
+          ansible_host: 172.21.1.93
+        clab-traditional-battalion-500node-b1-soldier-237:
+          ansible_host: 172.21.0.221
+        clab-traditional-battalion-500node-b1-soldier-238:
+          ansible_host: 172.21.1.53
+        clab-traditional-battalion-500node-b1-soldier-239:
+          ansible_host: 172.21.1.88
+        clab-traditional-battalion-500node-b1-soldier-24:
+          ansible_host: 172.21.1.65
+        clab-traditional-battalion-500node-b1-soldier-240:
+          ansible_host: 172.21.1.24
+        clab-traditional-battalion-500node-b1-soldier-241:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-242:
+          ansible_host: 172.21.1.26
+        clab-traditional-battalion-500node-b1-soldier-243:
+          ansible_host: 172.21.1.79
+        clab-traditional-battalion-500node-b1-soldier-244:
+          ansible_host: 172.21.0.73
+        clab-traditional-battalion-500node-b1-soldier-245:
+          ansible_host: 172.21.0.162
+        clab-traditional-battalion-500node-b1-soldier-246:
+          ansible_host: 172.21.0.208
+        clab-traditional-battalion-500node-b1-soldier-247:
+          ansible_host: 172.21.0.87
+        clab-traditional-battalion-500node-b1-soldier-248:
+          ansible_host: 172.21.1.56
+        clab-traditional-battalion-500node-b1-soldier-249:
+          ansible_host: 172.21.0.243
+        clab-traditional-battalion-500node-b1-soldier-25:
+          ansible_host: 172.21.1.123
+        clab-traditional-battalion-500node-b1-soldier-250:
+          ansible_host: 172.21.0.19
+        clab-traditional-battalion-500node-b1-soldier-251:
+          ansible_host: 172.21.0.108
+        clab-traditional-battalion-500node-b1-soldier-252:
+          ansible_host: 172.21.1.138
+        clab-traditional-battalion-500node-b1-soldier-253:
+          ansible_host: 172.21.1.22
+        clab-traditional-battalion-500node-b1-soldier-254:
+          ansible_host: 172.21.0.252
+        clab-traditional-battalion-500node-b1-soldier-255:
+          ansible_host: 172.21.1.155
+        clab-traditional-battalion-500node-b1-soldier-256:
+          ansible_host: 172.21.1.106
+        clab-traditional-battalion-500node-b1-soldier-257:
+          ansible_host: 172.21.0.36
+        clab-traditional-battalion-500node-b1-soldier-258:
+          ansible_host: 172.21.1.92
+        clab-traditional-battalion-500node-b1-soldier-259:
+          ansible_host: 172.21.1.58
+        clab-traditional-battalion-500node-b1-soldier-26:
+          ansible_host: 172.21.1.15
+        clab-traditional-battalion-500node-b1-soldier-260:
+          ansible_host: 172.21.1.90
+        clab-traditional-battalion-500node-b1-soldier-261:
+          ansible_host: 172.21.0.77
+        clab-traditional-battalion-500node-b1-soldier-262:
+          ansible_host: 172.21.0.20
+        clab-traditional-battalion-500node-b1-soldier-263:
+          ansible_host: 172.21.0.54
+        clab-traditional-battalion-500node-b1-soldier-264:
+          ansible_host: 172.21.0.226
+        clab-traditional-battalion-500node-b1-soldier-265:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-266:
+          ansible_host: 172.21.1.80
+        clab-traditional-battalion-500node-b1-soldier-267:
+          ansible_host: 172.21.0.82
+        clab-traditional-battalion-500node-b1-soldier-268:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-269:
+          ansible_host: 172.21.0.109
+        clab-traditional-battalion-500node-b1-soldier-27:
+          ansible_host: 172.21.1.30
+        clab-traditional-battalion-500node-b1-soldier-270:
+          ansible_host: 172.21.0.129
+        clab-traditional-battalion-500node-b1-soldier-271:
+          ansible_host: 172.21.0.79
+        clab-traditional-battalion-500node-b1-soldier-272:
+          ansible_host: 172.21.0.225
+        clab-traditional-battalion-500node-b1-soldier-273:
+          ansible_host: 172.21.0.104
+        clab-traditional-battalion-500node-b1-soldier-274:
+          ansible_host: 172.21.0.176
+        clab-traditional-battalion-500node-b1-soldier-275:
+          ansible_host: 172.21.1.115
+        clab-traditional-battalion-500node-b1-soldier-276:
+          ansible_host: 172.21.1.75
+        clab-traditional-battalion-500node-b1-soldier-277:
+          ansible_host: 172.21.0.44
+        clab-traditional-battalion-500node-b1-soldier-278:
+          ansible_host: 172.21.0.250
+        clab-traditional-battalion-500node-b1-soldier-279:
+          ansible_host: 172.21.1.68
+        clab-traditional-battalion-500node-b1-soldier-28:
+          ansible_host: 172.21.1.25
+        clab-traditional-battalion-500node-b1-soldier-280:
+          ansible_host: 172.21.1.166
+        clab-traditional-battalion-500node-b1-soldier-281:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-282:
+          ansible_host: 172.21.0.2
+        clab-traditional-battalion-500node-b1-soldier-283:
+          ansible_host: 172.21.1.16
+        clab-traditional-battalion-500node-b1-soldier-284:
+          ansible_host: 172.21.0.11
+        clab-traditional-battalion-500node-b1-soldier-285:
+          ansible_host: 172.21.0.5
+        clab-traditional-battalion-500node-b1-soldier-286:
+          ansible_host: 172.21.0.127
+        clab-traditional-battalion-500node-b1-soldier-287:
+          ansible_host: 172.21.0.161
+        clab-traditional-battalion-500node-b1-soldier-288:
+          ansible_host: 172.21.0.10
+        clab-traditional-battalion-500node-b1-soldier-289:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-29:
+          ansible_host: 172.21.0.63
+        clab-traditional-battalion-500node-b1-soldier-290:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-291:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-292:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-293:
+          ansible_host: 172.21.1.135
+        clab-traditional-battalion-500node-b1-soldier-294:
+          ansible_host: 172.21.0.112
+        clab-traditional-battalion-500node-b1-soldier-295:
+          ansible_host: 172.21.1.147
+        clab-traditional-battalion-500node-b1-soldier-296:
+          ansible_host: 172.21.0.232
+        clab-traditional-battalion-500node-b1-soldier-297:
+          ansible_host: 172.21.0.150
+        clab-traditional-battalion-500node-b1-soldier-298:
+          ansible_host: 172.21.0.222
+        clab-traditional-battalion-500node-b1-soldier-299:
+          ansible_host: 172.21.1.41
+        clab-traditional-battalion-500node-b1-soldier-3:
+          ansible_host: 172.21.0.88
+        clab-traditional-battalion-500node-b1-soldier-30:
+          ansible_host: 172.21.1.116
+        clab-traditional-battalion-500node-b1-soldier-300:
+          ansible_host: 172.21.1.101
+        clab-traditional-battalion-500node-b1-soldier-301:
+          ansible_host: 172.21.0.28
+        clab-traditional-battalion-500node-b1-soldier-302:
+          ansible_host: 172.21.0.25
+        clab-traditional-battalion-500node-b1-soldier-303:
+          ansible_host: 172.21.0.121
+        clab-traditional-battalion-500node-b1-soldier-304:
+          ansible_host: 172.21.0.173
+        clab-traditional-battalion-500node-b1-soldier-305:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-306:
+          ansible_host: 172.21.0.203
+        clab-traditional-battalion-500node-b1-soldier-307:
+          ansible_host: 172.21.0.182
+        clab-traditional-battalion-500node-b1-soldier-308:
+          ansible_host: 172.21.0.7
+        clab-traditional-battalion-500node-b1-soldier-309:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-31:
+          ansible_host: 172.21.1.57
+        clab-traditional-battalion-500node-b1-soldier-310:
+          ansible_host: 172.21.0.78
+        clab-traditional-battalion-500node-b1-soldier-311:
+          ansible_host: 172.21.1.91
+        clab-traditional-battalion-500node-b1-soldier-312:
+          ansible_host: 172.21.0.141
+        clab-traditional-battalion-500node-b1-soldier-313:
+          ansible_host: 172.21.1.44
+        clab-traditional-battalion-500node-b1-soldier-314:
+          ansible_host: 172.21.0.61
+        clab-traditional-battalion-500node-b1-soldier-315:
+          ansible_host: 172.21.0.143
+        clab-traditional-battalion-500node-b1-soldier-316:
+          ansible_host: 172.21.0.156
+        clab-traditional-battalion-500node-b1-soldier-317:
+          ansible_host: 172.21.0.209
+        clab-traditional-battalion-500node-b1-soldier-318:
+          ansible_host: 172.21.1.120
+        clab-traditional-battalion-500node-b1-soldier-319:
+          ansible_host: 172.21.1.59
+        clab-traditional-battalion-500node-b1-soldier-32:
+          ansible_host: 172.21.1.130
+        clab-traditional-battalion-500node-b1-soldier-320:
+          ansible_host: 172.21.0.89
+        clab-traditional-battalion-500node-b1-soldier-321:
+          ansible_host: 172.21.0.196
+        clab-traditional-battalion-500node-b1-soldier-322:
+          ansible_host: 172.21.1.140
+        clab-traditional-battalion-500node-b1-soldier-323:
+          ansible_host: 172.21.0.236
+        clab-traditional-battalion-500node-b1-soldier-324:
+          ansible_host: 172.21.0.42
+        clab-traditional-battalion-500node-b1-soldier-325:
+          ansible_host: 172.21.0.75
+        clab-traditional-battalion-500node-b1-soldier-326:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-327:
+          ansible_host: 172.21.0.111
+        clab-traditional-battalion-500node-b1-soldier-328:
+          ansible_host: 172.21.0.130
+        clab-traditional-battalion-500node-b1-soldier-329:
+          ansible_host: 172.21.1.49
+        clab-traditional-battalion-500node-b1-soldier-33:
+          ansible_host: 172.21.1.74
+        clab-traditional-battalion-500node-b1-soldier-330:
+          ansible_host: 172.21.0.114
+        clab-traditional-battalion-500node-b1-soldier-331:
+          ansible_host: 172.21.0.144
+        clab-traditional-battalion-500node-b1-soldier-332:
+          ansible_host: 172.21.0.207
+        clab-traditional-battalion-500node-b1-soldier-333:
+          ansible_host: 172.21.1.13
+        clab-traditional-battalion-500node-b1-soldier-334:
+          ansible_host: 172.21.0.169
+        clab-traditional-battalion-500node-b1-soldier-335:
+          ansible_host: 172.21.0.97
+        clab-traditional-battalion-500node-b1-soldier-336:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-337:
+          ansible_host: 172.21.1.159
+        clab-traditional-battalion-500node-b1-soldier-338:
+          ansible_host: 172.21.0.29
+        clab-traditional-battalion-500node-b1-soldier-339:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-34:
+          ansible_host: 172.21.0.188
+        clab-traditional-battalion-500node-b1-soldier-340:
+          ansible_host: 172.21.1.127
+        clab-traditional-battalion-500node-b1-soldier-341:
+          ansible_host: 172.21.0.12
+        clab-traditional-battalion-500node-b1-soldier-342:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-343:
+          ansible_host: 172.21.0.83
+        clab-traditional-battalion-500node-b1-soldier-344:
+          ansible_host: 172.21.1.132
+        clab-traditional-battalion-500node-b1-soldier-345:
+          ansible_host: 172.21.0.233
+        clab-traditional-battalion-500node-b1-soldier-346:
+          ansible_host: 172.21.0.38
+        clab-traditional-battalion-500node-b1-soldier-347:
+          ansible_host: 172.21.0.191
+        clab-traditional-battalion-500node-b1-soldier-348:
+          ansible_host: 172.21.0.199
+        clab-traditional-battalion-500node-b1-soldier-349:
+          ansible_host: 172.21.0.50
+        clab-traditional-battalion-500node-b1-soldier-35:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-350:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-351:
+          ansible_host: 172.21.0.13
+        clab-traditional-battalion-500node-b1-soldier-352:
+          ansible_host: 172.21.0.175
+        clab-traditional-battalion-500node-b1-soldier-353:
+          ansible_host: 172.21.1.48
+        clab-traditional-battalion-500node-b1-soldier-354:
+          ansible_host: 172.21.0.158
+        clab-traditional-battalion-500node-b1-soldier-355:
+          ansible_host: 172.21.0.95
+        clab-traditional-battalion-500node-b1-soldier-356:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-357:
+          ansible_host: 172.21.1.167
+        clab-traditional-battalion-500node-b1-soldier-358:
+          ansible_host: 172.21.1.76
+        clab-traditional-battalion-500node-b1-soldier-359:
+          ansible_host: 172.21.1.111
+        clab-traditional-battalion-500node-b1-soldier-36:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-360:
+          ansible_host: 172.21.0.91
+        clab-traditional-battalion-500node-b1-soldier-361:
+          ansible_host: 172.21.1.29
+        clab-traditional-battalion-500node-b1-soldier-362:
+          ansible_host: 172.21.0.245
+        clab-traditional-battalion-500node-b1-soldier-363:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-364:
+          ansible_host: 172.21.1.173
+        clab-traditional-battalion-500node-b1-soldier-365:
+          ansible_host: 172.21.1.151
+        clab-traditional-battalion-500node-b1-soldier-366:
+          ansible_host: 172.21.0.212
+        clab-traditional-battalion-500node-b1-soldier-367:
+          ansible_host: 172.21.0.142
+        clab-traditional-battalion-500node-b1-soldier-368:
+          ansible_host: 172.21.1.21
+        clab-traditional-battalion-500node-b1-soldier-369:
+          ansible_host: 172.21.0.218
+        clab-traditional-battalion-500node-b1-soldier-37:
+          ansible_host: 172.21.1.63
+        clab-traditional-battalion-500node-b1-soldier-370:
+          ansible_host: 172.21.0.100
+        clab-traditional-battalion-500node-b1-soldier-371:
+          ansible_host: 172.21.1.126
+        clab-traditional-battalion-500node-b1-soldier-372:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-373:
+          ansible_host: 172.21.0.163
+        clab-traditional-battalion-500node-b1-soldier-374:
+          ansible_host: 172.21.1.118
+        clab-traditional-battalion-500node-b1-soldier-375:
+          ansible_host: 172.21.1.19
+        clab-traditional-battalion-500node-b1-soldier-376:
+          ansible_host: 172.21.0.55
+        clab-traditional-battalion-500node-b1-soldier-377:
+          ansible_host: 172.21.0.81
+        clab-traditional-battalion-500node-b1-soldier-378:
+          ansible_host: 172.21.1.145
+        clab-traditional-battalion-500node-b1-soldier-379:
+          ansible_host: 172.21.1.5
+        clab-traditional-battalion-500node-b1-soldier-38:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-380:
+          ansible_host: 172.21.0.110
+        clab-traditional-battalion-500node-b1-soldier-381:
+          ansible_host: 172.21.1.85
+        clab-traditional-battalion-500node-b1-soldier-382:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-383:
+          ansible_host: 172.21.0.103
+        clab-traditional-battalion-500node-b1-soldier-384:
+          ansible_host: 172.21.1.35
+        clab-traditional-battalion-500node-b1-soldier-385:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-386:
+          ansible_host: 172.21.0.244
+        clab-traditional-battalion-500node-b1-soldier-387:
+          ansible_host: 172.21.1.38
+        clab-traditional-battalion-500node-b1-soldier-388:
+          ansible_host: 172.21.1.72
+        clab-traditional-battalion-500node-b1-soldier-389:
+          ansible_host: 172.21.0.241
+        clab-traditional-battalion-500node-b1-soldier-39:
+          ansible_host: 172.21.0.131
+        clab-traditional-battalion-500node-b1-soldier-390:
+          ansible_host: 172.21.1.109
+        clab-traditional-battalion-500node-b1-soldier-391:
+          ansible_host: 172.21.1.152
+        clab-traditional-battalion-500node-b1-soldier-392:
+          ansible_host: 172.21.0.152
+        clab-traditional-battalion-500node-b1-soldier-393:
+          ansible_host: 172.21.0.151
+        clab-traditional-battalion-500node-b1-soldier-394:
+          ansible_host: 172.21.1.14
+        clab-traditional-battalion-500node-b1-soldier-395:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-396:
+          ansible_host: 172.21.0.230
+        clab-traditional-battalion-500node-b1-soldier-397:
+          ansible_host: 172.21.0.160
+        clab-traditional-battalion-500node-b1-soldier-398:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-399:
+          ansible_host: 172.21.1.39
+        clab-traditional-battalion-500node-b1-soldier-4:
+          ansible_host: 172.21.1.6
+        clab-traditional-battalion-500node-b1-soldier-40:
+          ansible_host: 172.21.0.239
+        clab-traditional-battalion-500node-b1-soldier-400:
+          ansible_host: 172.21.1.0
+        clab-traditional-battalion-500node-b1-soldier-401:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-402:
+          ansible_host: 172.21.0.37
+        clab-traditional-battalion-500node-b1-soldier-403:
+          ansible_host: 172.21.0.185
+        clab-traditional-battalion-500node-b1-soldier-404:
+          ansible_host: 172.21.1.31
+        clab-traditional-battalion-500node-b1-soldier-405:
+          ansible_host: 172.21.0.167
+        clab-traditional-battalion-500node-b1-soldier-406:
+          ansible_host: 172.21.0.159
+        clab-traditional-battalion-500node-b1-soldier-407:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-408:
+          ansible_host: 172.21.1.156
+        clab-traditional-battalion-500node-b1-soldier-409:
+          ansible_host: 172.21.1.7
+        clab-traditional-battalion-500node-b1-soldier-41:
+          ansible_host: 172.21.0.59
+        clab-traditional-battalion-500node-b1-soldier-410:
+          ansible_host: 172.21.1.102
+        clab-traditional-battalion-500node-b1-soldier-411:
+          ansible_host: 172.21.0.76
+        clab-traditional-battalion-500node-b1-soldier-412:
+          ansible_host: 172.21.0.195
+        clab-traditional-battalion-500node-b1-soldier-413:
+          ansible_host: 172.21.1.55
+        clab-traditional-battalion-500node-b1-soldier-414:
+          ansible_host: 172.21.1.131
+        clab-traditional-battalion-500node-b1-soldier-415:
+          ansible_host: 172.21.0.139
+        clab-traditional-battalion-500node-b1-soldier-416:
+          ansible_host: 172.21.0.136
+        clab-traditional-battalion-500node-b1-soldier-417:
+          ansible_host: 172.21.1.4
+        clab-traditional-battalion-500node-b1-soldier-418:
+          ansible_host: 172.21.1.98
+        clab-traditional-battalion-500node-b1-soldier-419:
+          ansible_host: 172.21.0.15
+        clab-traditional-battalion-500node-b1-soldier-42:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-420:
+          ansible_host: 172.21.1.146
+        clab-traditional-battalion-500node-b1-soldier-421:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-422:
+          ansible_host: 172.21.1.62
+        clab-traditional-battalion-500node-b1-soldier-423:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-424:
+          ansible_host: 172.21.0.157
+        clab-traditional-battalion-500node-b1-soldier-425:
+          ansible_host: 172.21.1.42
+        clab-traditional-battalion-500node-b1-soldier-426:
+          ansible_host: 172.21.0.23
+        clab-traditional-battalion-500node-b1-soldier-427:
+          ansible_host: 172.21.1.149
+        clab-traditional-battalion-500node-b1-soldier-428:
+          ansible_host: 172.21.0.237
+        clab-traditional-battalion-500node-b1-soldier-429:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-43:
+          ansible_host: 172.21.1.137
+        clab-traditional-battalion-500node-b1-soldier-430:
+          ansible_host: 172.21.0.186
+        clab-traditional-battalion-500node-b1-soldier-431:
+          ansible_host: 172.21.0.248
+        clab-traditional-battalion-500node-b1-soldier-432:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-433:
+          ansible_host: 172.21.0.106
+        clab-traditional-battalion-500node-b1-soldier-434:
+          ansible_host: 172.21.0.133
+        clab-traditional-battalion-500node-b1-soldier-435:
+          ansible_host: 172.21.0.249
+        clab-traditional-battalion-500node-b1-soldier-436:
+          ansible_host: 172.21.0.126
+        clab-traditional-battalion-500node-b1-soldier-437:
+          ansible_host: 172.21.1.95
+        clab-traditional-battalion-500node-b1-soldier-438:
+          ansible_host: 172.21.0.214
+        clab-traditional-battalion-500node-b1-soldier-439:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-44:
+          ansible_host: 172.21.0.253
+        clab-traditional-battalion-500node-b1-soldier-440:
+          ansible_host: 172.21.0.192
+        clab-traditional-battalion-500node-b1-soldier-441:
+          ansible_host: 172.21.0.247
+        clab-traditional-battalion-500node-b1-soldier-442:
+          ansible_host: 172.21.0.4
+        clab-traditional-battalion-500node-b1-soldier-443:
+          ansible_host: 172.21.0.35
+        clab-traditional-battalion-500node-b1-soldier-444:
+          ansible_host: 172.21.0.22
+        clab-traditional-battalion-500node-b1-soldier-445:
+          ansible_host: 172.21.0.219
+        clab-traditional-battalion-500node-b1-soldier-446:
+          ansible_host: 172.21.1.9
+        clab-traditional-battalion-500node-b1-soldier-447:
+          ansible_host: 172.21.0.39
+        clab-traditional-battalion-500node-b1-soldier-448:
+          ansible_host: 172.21.0.189
+        clab-traditional-battalion-500node-b1-soldier-449:
+          ansible_host: 172.21.1.32
+        clab-traditional-battalion-500node-b1-soldier-45:
+          ansible_host: 172.21.1.165
+        clab-traditional-battalion-500node-b1-soldier-450:
+          ansible_host: 172.21.0.223
+        clab-traditional-battalion-500node-b1-soldier-451:
+          ansible_host: 172.21.0.178
+        clab-traditional-battalion-500node-b1-soldier-452:
+          ansible_host: 172.21.0.171
+        clab-traditional-battalion-500node-b1-soldier-453:
+          ansible_host: 172.21.1.36
+        clab-traditional-battalion-500node-b1-soldier-454:
+          ansible_host: 172.21.1.124
+        clab-traditional-battalion-500node-b1-soldier-455:
+          ansible_host: 172.21.1.121
+        clab-traditional-battalion-500node-b1-soldier-456:
+          ansible_host: 172.21.0.231
+        clab-traditional-battalion-500node-b1-soldier-457:
+          ansible_host: 172.21.1.1
+        clab-traditional-battalion-500node-b1-soldier-458:
+          ansible_host: 172.21.1.17
+        clab-traditional-battalion-500node-b1-soldier-459:
+          ansible_host: 172.21.1.125
+        clab-traditional-battalion-500node-b1-soldier-46:
+          ansible_host: 172.21.0.190
+        clab-traditional-battalion-500node-b1-soldier-460:
+          ansible_host: 172.21.0.211
+        clab-traditional-battalion-500node-b1-soldier-461:
+          ansible_host: 172.21.1.163
+        clab-traditional-battalion-500node-b1-soldier-462:
+          ansible_host: 172.21.0.53
+        clab-traditional-battalion-500node-b1-soldier-463:
+          ansible_host: 172.21.1.179
+        clab-traditional-battalion-500node-b1-soldier-464:
+          ansible_host: 172.21.0.166
+        clab-traditional-battalion-500node-b1-soldier-465:
+          ansible_host: 172.21.0.201
+        clab-traditional-battalion-500node-b1-soldier-466:
+          ansible_host: 172.21.1.119
+        clab-traditional-battalion-500node-b1-soldier-467:
+          ansible_host: 172.21.1.51
+        clab-traditional-battalion-500node-b1-soldier-468:
+          ansible_host: 172.21.1.99
+        clab-traditional-battalion-500node-b1-soldier-469:
+          ansible_host: 172.21.0.194
+        clab-traditional-battalion-500node-b1-soldier-47:
+          ansible_host: 172.21.0.67
+        clab-traditional-battalion-500node-b1-soldier-470:
+          ansible_host: 172.21.0.147
+        clab-traditional-battalion-500node-b1-soldier-471:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-472:
+          ansible_host: 172.21.0.101
+        clab-traditional-battalion-500node-b1-soldier-473:
+          ansible_host: 172.21.1.176
+        clab-traditional-battalion-500node-b1-soldier-474:
+          ansible_host: 172.21.1.82
+        clab-traditional-battalion-500node-b1-soldier-475:
+          ansible_host: 172.21.1.113
+        clab-traditional-battalion-500node-b1-soldier-476:
+          ansible_host: 172.21.0.198
+        clab-traditional-battalion-500node-b1-soldier-477:
+          ansible_host: 172.21.1.45
+        clab-traditional-battalion-500node-b1-soldier-478:
+          ansible_host: 172.21.0.148
+        clab-traditional-battalion-500node-b1-soldier-479:
+          ansible_host: 172.21.0.164
+        clab-traditional-battalion-500node-b1-soldier-48:
+          ansible_host: 172.21.0.52
+        clab-traditional-battalion-500node-b1-soldier-480:
+          ansible_host: 172.21.0.43
+        clab-traditional-battalion-500node-b1-soldier-481:
+          ansible_host: 172.21.0.65
+        clab-traditional-battalion-500node-b1-soldier-482:
+          ansible_host: 172.21.0.113
+        clab-traditional-battalion-500node-b1-soldier-483:
+          ansible_host: 172.21.1.150
+        clab-traditional-battalion-500node-b1-soldier-484:
+          ansible_host: 172.21.0.69
+        clab-traditional-battalion-500node-b1-soldier-485:
+          ansible_host: 172.21.1.162
+        clab-traditional-battalion-500node-b1-soldier-486:
+          ansible_host: 172.21.0.220
+        clab-traditional-battalion-500node-b1-soldier-487:
+          ansible_host: 172.21.0.120
+        clab-traditional-battalion-500node-b1-soldier-488:
+          ansible_host: 172.21.1.64
+        clab-traditional-battalion-500node-b1-soldier-489:
+          ansible_host: 172.21.0.125
+        clab-traditional-battalion-500node-b1-soldier-49:
+          ansible_host: 172.21.1.89
+        clab-traditional-battalion-500node-b1-soldier-490:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-491:
+          ansible_host: 172.21.1.133
+        clab-traditional-battalion-500node-b1-soldier-492:
+          ansible_host: 172.21.0.93
+        clab-traditional-battalion-500node-b1-soldier-493:
+          ansible_host: 172.21.0.80
+        clab-traditional-battalion-500node-b1-soldier-494:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-495:
+          ansible_host: 172.21.0.70
+        clab-traditional-battalion-500node-b1-soldier-496:
+          ansible_host: 172.21.0.27
+        clab-traditional-battalion-500node-b1-soldier-497:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-498:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-499:
+          ansible_host: 172.21.0.85
+        clab-traditional-battalion-500node-b1-soldier-5:
+          ansible_host: 172.21.1.46
+        clab-traditional-battalion-500node-b1-soldier-50:
+          ansible_host: 172.21.1.18
+        clab-traditional-battalion-500node-b1-soldier-51:
+          ansible_host: 172.21.0.135
+        clab-traditional-battalion-500node-b1-soldier-52:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-53:
+          ansible_host: 172.21.0.145
+        clab-traditional-battalion-500node-b1-soldier-54:
+          ansible_host: 172.21.0.56
+        clab-traditional-battalion-500node-b1-soldier-55:
+          ansible_host: 172.21.0.240
+        clab-traditional-battalion-500node-b1-soldier-56:
+          ansible_host: 172.21.1.144
+        clab-traditional-battalion-500node-b1-soldier-57:
+          ansible_host: 172.21.1.83
+        clab-traditional-battalion-500node-b1-soldier-58:
+          ansible_host: 172.21.0.137
+        clab-traditional-battalion-500node-b1-soldier-59:
+          ansible_host: 172.21.0.8
+        clab-traditional-battalion-500node-b1-soldier-6:
+          ansible_host: 172.21.0.187
+        clab-traditional-battalion-500node-b1-soldier-60:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-61:
+          ansible_host: 172.21.0.146
+        clab-traditional-battalion-500node-b1-soldier-62:
+          ansible_host: 172.21.1.143
+        clab-traditional-battalion-500node-b1-soldier-63:
+          ansible_host: 172.21.0.45
+        clab-traditional-battalion-500node-b1-soldier-64:
+          ansible_host: 172.21.0.14
+        clab-traditional-battalion-500node-b1-soldier-65:
+          ansible_host: 172.21.1.84
+        clab-traditional-battalion-500node-b1-soldier-66:
+          ansible_host: 172.21.0.99
+        clab-traditional-battalion-500node-b1-soldier-67:
+          ansible_host: 172.21.1.54
+        clab-traditional-battalion-500node-b1-soldier-68:
+          ansible_host: 172.21.0.181
+        clab-traditional-battalion-500node-b1-soldier-69:
+          ansible_host: 172.21.1.160
+        clab-traditional-battalion-500node-b1-soldier-7:
+          ansible_host: 172.21.0.115
+        clab-traditional-battalion-500node-b1-soldier-70:
+          ansible_host: 172.21.0.246
+        clab-traditional-battalion-500node-b1-soldier-71:
+          ansible_host: 172.21.1.112
+        clab-traditional-battalion-500node-b1-soldier-72:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-73:
+          ansible_host: 172.21.0.18
+        clab-traditional-battalion-500node-b1-soldier-74:
+          ansible_host: 172.21.1.27
+        clab-traditional-battalion-500node-b1-soldier-75:
+          ansible_host: 172.21.0.62
+        clab-traditional-battalion-500node-b1-soldier-76:
+          ansible_host: 172.21.0.21
+        clab-traditional-battalion-500node-b1-soldier-77:
+          ansible_host: 172.21.0.227
+        clab-traditional-battalion-500node-b1-soldier-78:
+          ansible_host: 172.21.0.132
+        clab-traditional-battalion-500node-b1-soldier-79:
+          ansible_host: 172.21.0.74
+        clab-traditional-battalion-500node-b1-soldier-8:
+          ansible_host: 172.21.1.87
+        clab-traditional-battalion-500node-b1-soldier-80:
+          ansible_host: 172.21.1.28
+        clab-traditional-battalion-500node-b1-soldier-81:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-82:
+          ansible_host: 172.21.1.171
+        clab-traditional-battalion-500node-b1-soldier-83:
+          ansible_host: 172.21.1.37
+        clab-traditional-battalion-500node-b1-soldier-84:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-85:
+          ansible_host: 172.21.0.94
+        clab-traditional-battalion-500node-b1-soldier-86:
+          ansible_host: 172.21.0.149
+        clab-traditional-battalion-500node-b1-soldier-87:
+          ansible_host: 172.21.0.216
+        clab-traditional-battalion-500node-b1-soldier-88:
+          ansible_host: 172.21.0.124
+        clab-traditional-battalion-500node-b1-soldier-89:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-9:
+          ansible_host: 172.21.0.17
+        clab-traditional-battalion-500node-b1-soldier-90:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-91:
+          ansible_host: 172.21.0.57
+        clab-traditional-battalion-500node-b1-soldier-92:
+          ansible_host: 172.21.1.50
+        clab-traditional-battalion-500node-b1-soldier-93:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-94:
+          ansible_host: 172.21.0.200
+        clab-traditional-battalion-500node-b1-soldier-95:
+          ansible_host: 172.21.0.102
+        clab-traditional-battalion-500node-b1-soldier-96:
+          ansible_host: 
+        clab-traditional-battalion-500node-b1-soldier-97:
+          ansible_host: 172.21.0.92
+        clab-traditional-battalion-500node-b1-soldier-98:
+          ansible_host: 172.21.0.229
+        clab-traditional-battalion-500node-b1-soldier-99:
+          ansible_host: 172.21.0.238
+        clab-traditional-battalion-500node-battalion-1-hq:
+          ansible_host: 172.21.0.60

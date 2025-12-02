@@ -1,0 +1,1797 @@
+all:
+  vars:
+    # The generated inventory is assumed to be used from the clab host.
+    # Hence no http proxy should be used. Therefore we make sure the http
+    # module does not attempt using any global http proxy.
+    ansible_httpapi_use_proxy: false
+  children:
+    linux:
+      hosts:
+        clab-lab4-hierarchical-1000n-1gbps-company-1-commander:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-leader:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-1-leader:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-1-soldier-1:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-1-soldier-2:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-1-soldier-3:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-1-soldier-4:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-1-soldier-5:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-1-soldier-6:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-1-soldier-7:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-1-soldier-8:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-2-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-2-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-2-soldier-2:
+          ansible_host: 172.30.0.11
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-2-soldier-3:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-2-soldier-4:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-2-soldier-5:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-2-soldier-6:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-2-soldier-7:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-2-soldier-8:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-3-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-3-soldier-1:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-3-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-3-soldier-3:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-3-soldier-4:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-3-soldier-5:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-3-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-3-soldier-7:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-3-soldier-8:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-4-leader:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-4-soldier-1:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-4-soldier-2:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-4-soldier-3:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-4-soldier-4:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-4-soldier-5:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-4-soldier-6:
+          ansible_host: 172.30.0.13
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-4-soldier-7:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-1-squad-4-soldier-8:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-leader:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-1-leader:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-1-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-1-soldier-2:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-1-soldier-3:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-1-soldier-4:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-1-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-1-soldier-6:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-1-soldier-7:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-1-soldier-8:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-2-leader:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-2-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-2-soldier-2:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-2-soldier-3:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-2-soldier-4:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-2-soldier-5:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-2-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-2-soldier-7:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-2-soldier-8:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-3-leader:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-3-soldier-1:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-3-soldier-2:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-3-soldier-3:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-3-soldier-4:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-3-soldier-5:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-3-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-3-soldier-7:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-3-soldier-8:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-4-leader:
+          ansible_host: 172.30.0.11
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-4-soldier-1:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-4-soldier-2:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-4-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-4-soldier-4:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-4-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-4-soldier-6:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-4-soldier-7:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-2-squad-4-soldier-8:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-1-leader:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-1-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-1-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-1-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-1-soldier-4:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-1-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-1-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-1-soldier-7:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-1-soldier-8:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-2-leader:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-2-soldier-1:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-2-soldier-2:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-2-soldier-3:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-2-soldier-4:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-2-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-2-soldier-6:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-2-soldier-7:
+          ansible_host: 172.30.0.12
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-2-soldier-8:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-3-leader:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-3-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-3-soldier-2:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-3-soldier-3:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-3-soldier-4:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-3-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-3-soldier-6:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-3-soldier-7:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-3-soldier-8:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-4-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-4-soldier-1:
+          ansible_host: 172.30.0.12
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-4-soldier-2:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-4-soldier-3:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-4-soldier-4:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-4-soldier-5:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-4-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-4-soldier-7:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-3-squad-4-soldier-8:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-1-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-1-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-1-soldier-2:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-1-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-1-soldier-4:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-1-soldier-5:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-1-soldier-6:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-1-soldier-7:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-1-soldier-8:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-2-leader:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-2-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-2-soldier-2:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-2-soldier-3:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-2-soldier-4:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-2-soldier-5:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-2-soldier-6:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-2-soldier-7:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-2-soldier-8:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-3-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-3-soldier-1:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-3-soldier-2:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-3-soldier-3:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-3-soldier-4:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-3-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-3-soldier-6:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-3-soldier-7:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-3-soldier-8:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-4-leader:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-4-soldier-1:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-4-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-4-soldier-3:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-4-soldier-4:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-4-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-4-soldier-6:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-4-soldier-7:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-1-platoon-4-squad-4-soldier-8:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-commander:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-leader:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-1-leader:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-1-soldier-1:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-1-soldier-2:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-1-soldier-3:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-1-soldier-4:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-1-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-1-soldier-6:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-1-soldier-7:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-1-soldier-8:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-2-leader:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-2-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-2-soldier-2:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-2-soldier-3:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-2-soldier-4:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-2-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-2-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-2-soldier-7:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-2-soldier-8:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-3-leader:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-3-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-3-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-3-soldier-3:
+          ansible_host: 172.30.0.12
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-3-soldier-4:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-3-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-3-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-3-soldier-7:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-3-soldier-8:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-4-leader:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-4-soldier-1:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-4-soldier-2:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-4-soldier-3:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-4-soldier-4:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-4-soldier-5:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-4-soldier-6:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-4-soldier-7:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-1-squad-4-soldier-8:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-leader:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-1-leader:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-1-soldier-1:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-1-soldier-2:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-1-soldier-3:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-1-soldier-4:
+          ansible_host: 172.30.0.11
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-1-soldier-5:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-1-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-1-soldier-7:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-1-soldier-8:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-2-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-2-soldier-1:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-2-soldier-2:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-2-soldier-3:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-2-soldier-4:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-2-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-2-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-2-soldier-7:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-2-soldier-8:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-3-leader:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-3-soldier-1:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-3-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-3-soldier-3:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-3-soldier-4:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-3-soldier-5:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-3-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-3-soldier-7:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-3-soldier-8:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-4-leader:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-4-soldier-1:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-4-soldier-2:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-4-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-4-soldier-4:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-4-soldier-5:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-4-soldier-6:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-4-soldier-7:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-2-squad-4-soldier-8:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-leader:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-1-leader:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-1-soldier-1:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-1-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-1-soldier-3:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-1-soldier-4:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-1-soldier-5:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-1-soldier-6:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-1-soldier-7:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-1-soldier-8:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-2-leader:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-2-soldier-1:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-2-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-2-soldier-3:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-2-soldier-4:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-2-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-2-soldier-6:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-2-soldier-7:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-2-soldier-8:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-3-leader:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-3-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-3-soldier-2:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-3-soldier-3:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-3-soldier-4:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-3-soldier-5:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-3-soldier-6:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-3-soldier-7:
+          ansible_host: 172.30.0.13
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-3-soldier-8:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-4-leader:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-4-soldier-1:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-4-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-4-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-4-soldier-4:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-4-soldier-5:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-4-soldier-6:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-4-soldier-7:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-3-squad-4-soldier-8:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-leader:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-1-leader:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-1-soldier-1:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-1-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-1-soldier-3:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-1-soldier-4:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-1-soldier-5:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-1-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-1-soldier-7:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-1-soldier-8:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-2-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-2-soldier-1:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-2-soldier-2:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-2-soldier-3:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-2-soldier-4:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-2-soldier-5:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-2-soldier-6:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-2-soldier-7:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-2-soldier-8:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-3-leader:
+          ansible_host: 172.30.0.12
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-3-soldier-1:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-3-soldier-2:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-3-soldier-3:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-3-soldier-4:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-3-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-3-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-3-soldier-7:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-3-soldier-8:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-4-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-4-soldier-1:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-4-soldier-2:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-4-soldier-3:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-4-soldier-4:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-4-soldier-5:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-4-soldier-6:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-4-soldier-7:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-2-platoon-4-squad-4-soldier-8:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-3-commander:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-leader:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-1-leader:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-1-soldier-1:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-1-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-1-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-1-soldier-4:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-1-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-1-soldier-6:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-1-soldier-7:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-1-soldier-8:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-2-leader:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-2-soldier-1:
+          ansible_host: 172.30.0.12
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-2-soldier-2:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-2-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-2-soldier-4:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-2-soldier-5:
+          ansible_host: 172.30.0.11
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-2-soldier-6:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-2-soldier-7:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-2-soldier-8:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-3-leader:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-3-soldier-1:
+          ansible_host: 172.30.0.13
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-3-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-3-soldier-3:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-3-soldier-4:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-3-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-3-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-3-soldier-7:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-3-soldier-8:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-4-leader:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-4-soldier-1:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-4-soldier-2:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-4-soldier-3:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-4-soldier-4:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-4-soldier-5:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-4-soldier-6:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-4-soldier-7:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-1-squad-4-soldier-8:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-leader:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-1-leader:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-1-soldier-1:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-1-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-1-soldier-3:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-1-soldier-4:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-1-soldier-5:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-1-soldier-6:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-1-soldier-7:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-1-soldier-8:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-2-leader:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-2-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-2-soldier-2:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-2-soldier-3:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-2-soldier-4:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-2-soldier-5:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-2-soldier-6:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-2-soldier-7:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-2-soldier-8:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-3-leader:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-3-soldier-1:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-3-soldier-2:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-3-soldier-3:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-3-soldier-4:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-3-soldier-5:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-3-soldier-6:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-3-soldier-7:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-3-soldier-8:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-4-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-4-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-4-soldier-2:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-4-soldier-3:
+          ansible_host: 172.30.0.11
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-4-soldier-4:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-4-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-4-soldier-6:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-4-soldier-7:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-2-squad-4-soldier-8:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-leader:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-1-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-1-soldier-1:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-1-soldier-2:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-1-soldier-3:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-1-soldier-4:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-1-soldier-5:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-1-soldier-6:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-1-soldier-7:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-1-soldier-8:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-2-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-2-soldier-1:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-2-soldier-2:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-2-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-2-soldier-4:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-2-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-2-soldier-6:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-2-soldier-7:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-2-soldier-8:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-3-leader:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-3-soldier-1:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-3-soldier-2:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-3-soldier-3:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-3-soldier-4:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-3-soldier-5:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-3-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-3-soldier-7:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-3-soldier-8:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-4-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-4-soldier-1:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-4-soldier-2:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-4-soldier-3:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-4-soldier-4:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-4-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-4-soldier-6:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-4-soldier-7:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-3-squad-4-soldier-8:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-leader:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-1-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-1-soldier-1:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-1-soldier-2:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-1-soldier-3:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-1-soldier-4:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-1-soldier-5:
+          ansible_host: 172.30.0.12
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-1-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-1-soldier-7:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-1-soldier-8:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-2-leader:
+          ansible_host: 172.30.0.12
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-2-soldier-1:
+          ansible_host: 172.30.0.11
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-2-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-2-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-2-soldier-4:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-2-soldier-5:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-2-soldier-6:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-2-soldier-7:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-2-soldier-8:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-3-leader:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-3-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-3-soldier-2:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-3-soldier-3:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-3-soldier-4:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-3-soldier-5:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-3-soldier-6:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-3-soldier-7:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-3-soldier-8:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-4-leader:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-4-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-4-soldier-2:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-4-soldier-3:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-4-soldier-4:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-4-soldier-5:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-4-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-4-soldier-7:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-3-platoon-4-squad-4-soldier-8:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-commander:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-1-leader:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-1-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-1-soldier-2:
+          ansible_host: 172.30.0.11
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-1-soldier-3:
+          ansible_host: 172.30.0.12
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-1-soldier-4:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-1-soldier-5:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-1-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-1-soldier-7:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-1-soldier-8:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-2-leader:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-2-soldier-1:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-2-soldier-2:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-2-soldier-3:
+          ansible_host: 172.30.0.13
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-2-soldier-4:
+          ansible_host: 172.30.0.12
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-2-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-2-soldier-6:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-2-soldier-7:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-2-soldier-8:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-3-leader:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-3-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-3-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-3-soldier-3:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-3-soldier-4:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-3-soldier-5:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-3-soldier-6:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-3-soldier-7:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-3-soldier-8:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-4-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-4-soldier-1:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-4-soldier-2:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-4-soldier-3:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-4-soldier-4:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-4-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-4-soldier-6:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-4-soldier-7:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-1-squad-4-soldier-8:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-leader:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-1-leader:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-1-soldier-1:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-1-soldier-2:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-1-soldier-3:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-1-soldier-4:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-1-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-1-soldier-6:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-1-soldier-7:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-1-soldier-8:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-2-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-2-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-2-soldier-2:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-2-soldier-3:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-2-soldier-4:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-2-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-2-soldier-6:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-2-soldier-7:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-2-soldier-8:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-3-leader:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-3-soldier-1:
+          ansible_host: 172.30.0.13
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-3-soldier-2:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-3-soldier-3:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-3-soldier-4:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-3-soldier-5:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-3-soldier-6:
+          ansible_host: 172.30.0.11
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-3-soldier-7:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-3-soldier-8:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-4-leader:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-4-soldier-1:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-4-soldier-2:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-4-soldier-3:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-4-soldier-4:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-4-soldier-5:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-4-soldier-6:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-4-soldier-7:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-2-squad-4-soldier-8:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-leader:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-1-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-1-soldier-1:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-1-soldier-2:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-1-soldier-3:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-1-soldier-4:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-1-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-1-soldier-6:
+          ansible_host: 172.30.0.13
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-1-soldier-7:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-1-soldier-8:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-2-leader:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-2-soldier-1:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-2-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-2-soldier-3:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-2-soldier-4:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-2-soldier-5:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-2-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-2-soldier-7:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-2-soldier-8:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-3-leader:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-3-soldier-1:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-3-soldier-2:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-3-soldier-3:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-3-soldier-4:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-3-soldier-5:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-3-soldier-6:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-3-soldier-7:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-3-soldier-8:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-4-leader:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-4-soldier-1:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-4-soldier-2:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-4-soldier-3:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-4-soldier-4:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-4-soldier-5:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-4-soldier-6:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-4-soldier-7:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-3-squad-4-soldier-8:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-1-leader:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-1-soldier-1:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-1-soldier-2:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-1-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-1-soldier-4:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-1-soldier-5:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-1-soldier-6:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-1-soldier-7:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-1-soldier-8:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-2-leader:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-2-soldier-1:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-2-soldier-2:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-2-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-2-soldier-4:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-2-soldier-5:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-2-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-2-soldier-7:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-2-soldier-8:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-3-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-3-soldier-1:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-3-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-3-soldier-3:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-3-soldier-4:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-3-soldier-5:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-3-soldier-6:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-3-soldier-7:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-3-soldier-8:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-4-leader:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-4-soldier-1:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-4-soldier-2:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-4-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-4-soldier-4:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-4-soldier-5:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-4-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-4-soldier-7:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-4-platoon-4-squad-4-soldier-8:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-5-commander:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-leader:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-1-leader:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-1-soldier-1:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-1-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-1-soldier-3:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-1-soldier-4:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-1-soldier-5:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-1-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-1-soldier-7:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-1-soldier-8:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-2-leader:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-2-soldier-1:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-2-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-2-soldier-3:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-2-soldier-4:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-2-soldier-5:
+          ansible_host: 172.30.0.11
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-2-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-2-soldier-7:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-2-soldier-8:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-3-leader:
+          ansible_host: 172.30.0.11
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-3-soldier-1:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-3-soldier-2:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-3-soldier-3:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-3-soldier-4:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-3-soldier-5:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-3-soldier-6:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-3-soldier-7:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-3-soldier-8:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-4-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-4-soldier-1:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-4-soldier-2:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-4-soldier-3:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-4-soldier-4:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-4-soldier-5:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-4-soldier-6:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-4-soldier-7:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-1-squad-4-soldier-8:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-leader:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-1-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-1-soldier-1:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-1-soldier-2:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-1-soldier-3:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-1-soldier-4:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-1-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-1-soldier-6:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-1-soldier-7:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-1-soldier-8:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-2-leader:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-2-soldier-1:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-2-soldier-2:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-2-soldier-3:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-2-soldier-4:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-2-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-2-soldier-6:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-2-soldier-7:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-2-soldier-8:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-3-leader:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-3-soldier-1:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-3-soldier-2:
+          ansible_host: 172.30.0.12
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-3-soldier-3:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-3-soldier-4:
+          ansible_host: 172.30.0.14
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-3-soldier-5:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-3-soldier-6:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-3-soldier-7:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-3-soldier-8:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-4-leader:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-4-soldier-1:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-4-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-4-soldier-3:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-4-soldier-4:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-4-soldier-5:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-4-soldier-6:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-4-soldier-7:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-2-squad-4-soldier-8:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-leader:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-1-leader:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-1-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-1-soldier-2:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-1-soldier-3:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-1-soldier-4:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-1-soldier-5:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-1-soldier-6:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-1-soldier-7:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-1-soldier-8:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-2-leader:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-2-soldier-1:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-2-soldier-2:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-2-soldier-3:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-2-soldier-4:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-2-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-2-soldier-6:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-2-soldier-7:
+          ansible_host: 172.30.0.11
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-2-soldier-8:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-3-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-3-soldier-1:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-3-soldier-2:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-3-soldier-3:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-3-soldier-4:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-3-soldier-5:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-3-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-3-soldier-7:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-3-soldier-8:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-4-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-4-soldier-1:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-4-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-4-soldier-3:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-4-soldier-4:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-4-soldier-5:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-4-soldier-6:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-4-soldier-7:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-3-squad-4-soldier-8:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-1-leader:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-1-soldier-1:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-1-soldier-2:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-1-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-1-soldier-4:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-1-soldier-5:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-1-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-1-soldier-7:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-1-soldier-8:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-2-leader:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-2-soldier-1:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-2-soldier-2:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-2-soldier-3:
+          ansible_host: 172.30.0.12
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-2-soldier-4:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-2-soldier-5:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-2-soldier-6:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-2-soldier-7:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-2-soldier-8:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-3-leader:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-3-soldier-1:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-3-soldier-2:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-3-soldier-3:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-3-soldier-4:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-3-soldier-5:
+          ansible_host: 172.30.0.13
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-3-soldier-6:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-3-soldier-7:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-3-soldier-8:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-4-leader:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-4-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-4-soldier-2:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-4-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-4-soldier-4:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-4-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-4-soldier-6:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-4-soldier-7:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-5-platoon-4-squad-4-soldier-8:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-6-commander:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-1-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-1-soldier-1:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-1-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-1-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-1-soldier-4:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-1-soldier-5:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-1-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-1-soldier-7:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-1-soldier-8:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-2-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-2-soldier-1:
+          ansible_host: 172.30.0.12
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-2-soldier-2:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-2-soldier-3:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-2-soldier-4:
+          ansible_host: 172.30.0.15
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-2-soldier-5:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-2-soldier-6:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-2-soldier-7:
+          ansible_host: 172.30.0.12
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-2-soldier-8:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-3-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-3-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-3-soldier-2:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-3-soldier-3:
+          ansible_host: 172.30.0.12
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-3-soldier-4:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-3-soldier-5:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-3-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-3-soldier-7:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-3-soldier-8:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-4-leader:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-4-soldier-1:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-4-soldier-2:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-4-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-4-soldier-4:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-4-soldier-5:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-4-soldier-6:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-4-soldier-7:
+          ansible_host: 172.30.0.11
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-1-squad-4-soldier-8:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-1-leader:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-1-soldier-1:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-1-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-1-soldier-3:
+          ansible_host: 172.30.0.10
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-1-soldier-4:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-1-soldier-5:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-1-soldier-6:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-1-soldier-7:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-1-soldier-8:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-2-leader:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-2-soldier-1:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-2-soldier-2:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-2-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-2-soldier-4:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-2-soldier-5:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-2-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-2-soldier-7:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-2-soldier-8:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-3-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-3-soldier-1:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-3-soldier-2:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-3-soldier-3:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-3-soldier-4:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-3-soldier-5:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-3-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-3-soldier-7:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-3-soldier-8:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-4-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-4-soldier-1:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-4-soldier-2:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-4-soldier-3:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-4-soldier-4:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-4-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-4-soldier-6:
+          ansible_host: 172.30.0.12
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-4-soldier-7:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-2-squad-4-soldier-8:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-1-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-1-soldier-1:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-1-soldier-2:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-1-soldier-3:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-1-soldier-4:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-1-soldier-5:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-1-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-1-soldier-7:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-1-soldier-8:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-2-leader:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-2-soldier-1:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-2-soldier-2:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-2-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-2-soldier-4:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-2-soldier-5:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-2-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-2-soldier-7:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-2-soldier-8:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-3-leader:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-3-soldier-1:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-3-soldier-2:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-3-soldier-3:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-3-soldier-4:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-3-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-3-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-3-soldier-7:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-3-soldier-8:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-4-leader:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-4-soldier-1:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-4-soldier-2:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-4-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-4-soldier-4:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-4-soldier-5:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-4-soldier-6:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-4-soldier-7:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-3-squad-4-soldier-8:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-leader:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-1-leader:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-1-soldier-1:
+          ansible_host: 172.30.0.9
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-1-soldier-2:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-1-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-1-soldier-4:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-1-soldier-5:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-1-soldier-6:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-1-soldier-7:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-1-soldier-8:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-2-leader:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-2-soldier-1:
+          ansible_host: 172.30.0.14
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-2-soldier-2:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-2-soldier-3:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-2-soldier-4:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-2-soldier-5:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-2-soldier-6:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-2-soldier-7:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-2-soldier-8:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-3-leader:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-3-soldier-1:
+          ansible_host: 172.30.0.13
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-3-soldier-2:
+          ansible_host: 172.30.0.3
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-3-soldier-3:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-3-soldier-4:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-3-soldier-5:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-3-soldier-6:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-3-soldier-7:
+          ansible_host: 172.30.0.7
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-3-soldier-8:
+          ansible_host: 172.30.0.5
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-4-leader:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-4-soldier-1:
+          ansible_host: 172.30.0.6
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-4-soldier-2:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-4-soldier-3:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-4-soldier-4:
+          ansible_host: 
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-4-soldier-5:
+          ansible_host: 172.30.0.8
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-4-soldier-6:
+          ansible_host: 172.30.0.2
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-4-soldier-7:
+          ansible_host: 172.30.0.4
+        clab-lab4-hierarchical-1000n-1gbps-company-6-platoon-4-squad-4-soldier-8:
+          ansible_host: 
