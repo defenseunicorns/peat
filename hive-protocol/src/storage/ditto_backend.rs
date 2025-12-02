@@ -70,9 +70,15 @@
 //! - Testing with mock implementations
 //! - CRDT benefits are not critical for the data type
 
-use super::capabilities::{CrdtCapable, SyncCapable, SyncStats, TypedCollection};
+use super::capabilities::{
+    CrdtCapable, HierarchicalStorageCapable, SyncCapable, SyncStats, TypedCollection,
+};
+use super::ditto_command_storage::DittoCommandStorage;
 use super::ditto_store::DittoStore;
+use super::ditto_summary_storage::DittoSummaryStorage;
 use super::traits::{Collection as CollectionTrait, DocumentPredicate, StorageBackend};
+use crate::command::CommandStorage;
+use crate::hierarchy::SummaryStorage;
 use anyhow::{Context, Result};
 use base64::Engine;
 use prost::Message;
@@ -465,6 +471,16 @@ impl SyncCapable for DittoBackend {
             bytes_received: 0, // Not available from Ditto SDK public API
             last_sync: None,   // Could query system:data_sync_info but requires async
         })
+    }
+}
+
+impl HierarchicalStorageCapable for DittoBackend {
+    fn summary_storage(&self) -> Arc<dyn SummaryStorage> {
+        Arc::new(DittoSummaryStorage::new(Arc::clone(&self.store)))
+    }
+
+    fn command_storage(&self) -> Arc<dyn CommandStorage> {
+        Arc::new(DittoCommandStorage::new(Arc::clone(&self.store)))
     }
 }
 

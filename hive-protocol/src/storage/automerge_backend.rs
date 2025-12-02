@@ -60,15 +60,25 @@
 //! | Backend-agnostic API | ✅                   | ✅                         | ✅                         |
 
 #[cfg(feature = "automerge-backend")]
+use super::automerge_command_storage::AutomergeCommandStorage;
+#[cfg(feature = "automerge-backend")]
 use super::automerge_conversion::{automerge_to_message, message_to_automerge};
 #[cfg(feature = "automerge-backend")]
 use super::automerge_store::AutomergeStore;
 #[cfg(feature = "automerge-backend")]
+use super::automerge_summary_storage::AutomergeSummaryStorage;
+#[cfg(feature = "automerge-backend")]
 use super::automerge_sync::AutomergeSyncCoordinator;
 #[cfg(feature = "automerge-backend")]
-use super::capabilities::{CrdtCapable, SyncCapable, SyncStats, TypedCollection};
+use super::capabilities::{
+    CrdtCapable, HierarchicalStorageCapable, SyncCapable, SyncStats, TypedCollection,
+};
 #[cfg(feature = "automerge-backend")]
 use super::traits::{Collection, StorageBackend};
+#[cfg(feature = "automerge-backend")]
+use crate::command::CommandStorage;
+#[cfg(feature = "automerge-backend")]
+use crate::hierarchy::SummaryStorage;
 #[cfg(feature = "automerge-backend")]
 use crate::network::iroh_transport::IrohTransport;
 #[cfg(feature = "automerge-backend")]
@@ -606,6 +616,21 @@ impl SyncCapable for AutomergeBackend {
             bytes_received,
             last_sync,
         })
+    }
+}
+
+/// Implement HierarchicalStorageCapable trait for hierarchical aggregation mode
+///
+/// This enables backend-agnostic access to SummaryStorage and CommandStorage,
+/// eliminating the need for downcast patterns in hive-sim.
+#[cfg(feature = "automerge-backend")]
+impl HierarchicalStorageCapable for AutomergeBackend {
+    fn summary_storage(&self) -> Arc<dyn SummaryStorage> {
+        Arc::new(AutomergeSummaryStorage::new(Arc::clone(&self.store)))
+    }
+
+    fn command_storage(&self) -> Arc<dyn CommandStorage> {
+        Arc::new(AutomergeCommandStorage::new(Arc::clone(&self.store)))
     }
 }
 
