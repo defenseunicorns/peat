@@ -709,6 +709,7 @@ type PeerCallbacks = Arc<Mutex<Vec<Box<dyn Fn(PeerEvent) + Send + Sync>>>>;
 ///
 /// This adapter wraps the storage::AutomergeBackend (RocksDB + Iroh + Automerge)
 /// to provide DataSyncBackend trait compatibility for cap_sim_node.rs
+#[derive(Clone)]
 pub struct AutomergeIrohBackend {
     /// The underlying Automerge+Iroh backend
     backend: Arc<crate::storage::AutomergeBackend>,
@@ -1363,6 +1364,21 @@ impl DataSyncBackend for AutomergeIrohBackend {
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+}
+
+// Implement HierarchicalStorageCapable for AutomergeIrohBackend
+// This enables hive-sim hierarchical mode with Automerge backend
+#[cfg(feature = "automerge-backend")]
+impl crate::storage::HierarchicalStorageCapable for AutomergeIrohBackend {
+    fn summary_storage(&self) -> Arc<dyn crate::hierarchy::SummaryStorage> {
+        // Delegate to the underlying storage::AutomergeBackend
+        crate::storage::HierarchicalStorageCapable::summary_storage(self.backend.as_ref())
+    }
+
+    fn command_storage(&self) -> Arc<dyn crate::command::CommandStorage> {
+        // Delegate to the underlying storage::AutomergeBackend
+        crate::storage::HierarchicalStorageCapable::command_storage(self.backend.as_ref())
     }
 }
 
