@@ -63,7 +63,7 @@
 //! 1: Failure (timeout, error, or document not received)
 
 #[cfg(feature = "automerge-backend")]
-use hive_protocol::sync::automerge::AutomergeBackend;
+use hive_protocol::sync::automerge::AutomergeIrohBackend;
 use hive_protocol::sync::ditto::DittoBackend;
 use hive_protocol::sync::{
     BackendConfig, ChangeEvent, ChangeStream, DataSyncBackend, Document, Query, TransportConfig,
@@ -82,6 +82,12 @@ use hive_protocol::models::{NodeConfig, NodeState};
 // Phase 3: Command dissemination imports
 use hive_protocol::command::{CommandCoordinator, CommandStorage};
 use hive_protocol::storage::DittoCommandStorage;
+
+// AutomergeIroh backend components
+#[cfg(feature = "automerge-backend")]
+use hive_protocol::network::IrohTransport;
+#[cfg(feature = "automerge-backend")]
+use hive_protocol::storage::AutomergeStore;
 use hive_schema::command::v1::{
     command_target::Scope, AckStatus, CommandAcknowledgment, CommandTarget, HierarchicalCommand,
 };
@@ -1174,7 +1180,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create backend
     println!("[{}] Creating {} backend...", node_id, backend_type);
-    let backend = create_backend(&backend_type)?;
+    let backend = create_backend(&backend_type, &node_id).await?;
 
     // Initialize backend
     println!("[{}] Initializing backend...", node_id);
@@ -1363,10 +1369,94 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                 } else {
-                    eprintln!(
-                        "[{}] ✗ Cannot spawn squad leader task: backend is not DittoBackend",
-                        node_id
-                    );
+                    // Try AutomergeIroh backend for hierarchical mode
+                    #[cfg(feature = "automerge-backend")]
+                    {
+                        if let Some(automerge_backend) =
+                            backend.as_any().downcast_ref::<AutomergeIrohBackend>()
+                        {
+                            use hive_protocol::storage::HierarchicalStorageCapable;
+
+                            let storage = automerge_backend.summary_storage();
+                            let coordinator = Arc::new(HierarchicalAggregator::new(storage));
+
+                            let cmd_storage = automerge_backend.command_storage();
+                            let cmd_coordinator = Arc::new(CommandCoordinator::new(
+                                Some(squad_id.clone()),
+                                node_id.clone(),
+                                member_ids.clone(),
+                                cmd_storage,
+                            ));
+
+                            let node_id_clone = node_id.clone();
+                            let member_ids_clone = member_ids.clone();
+
+                            println!(
+                                "[{}] → Squad: {}, Members: {:?} (AutomergeIroh)",
+                                node_id, squad_id, member_ids
+                            );
+
+                            // Clone backend for aggregation loop
+                            let backend_for_aggregation: Arc<Box<dyn DataSyncBackend>> =
+                                Arc::new(Box::new((*automerge_backend).clone()));
+                            tokio::spawn(async move {
+                                if let Err(e) = squad_leader_aggregation_loop(
+                                    coordinator,
+                                    backend_for_aggregation,
+                                    squad_id.clone(),
+                                    node_id_clone.clone(),
+                                    member_ids,
+                                )
+                                .await
+                                {
+                                    eprintln!(
+                                        "[{}] Squad leader aggregation error: {}",
+                                        node_id_clone, e
+                                    );
+                                }
+                            });
+
+                            // Phase 3: Spawn command demo task
+                            let cmd_node_id = node_id.clone();
+                            tokio::spawn(async move {
+                                sleep(Duration::from_secs(15)).await;
+                                loop {
+                                    if let Err(e) = demo_command_issuance(
+                                        Arc::clone(&cmd_coordinator),
+                                        cmd_node_id.clone(),
+                                        Scope::Individual,
+                                        member_ids_clone.clone(),
+                                    )
+                                    .await
+                                    {
+                                        eprintln!(
+                                            "[{}] Command issuance error: {}",
+                                            cmd_node_id, e
+                                        );
+                                    }
+                                    sleep(Duration::from_secs(30)).await;
+                                }
+                            });
+
+                            println!(
+                                "[{}] ✓ Squad leader aggregation task spawned (AutomergeIroh)",
+                                node_id
+                            );
+                        } else {
+                            eprintln!(
+                                "[{}] ✗ Cannot spawn squad leader task: unsupported backend type",
+                                node_id
+                            );
+                        }
+                    }
+
+                    #[cfg(not(feature = "automerge-backend"))]
+                    {
+                        eprintln!(
+                            "[{}] ✗ Cannot spawn squad leader task: backend is not DittoBackend",
+                            node_id
+                        );
+                    }
                 }
             }
             "platoon_leader" => {
@@ -1433,10 +1523,78 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                 } else {
-                    eprintln!(
-                        "[{}] ✗ Cannot spawn platoon leader task: backend is not DittoBackend",
-                        node_id
-                    );
+                    // Try AutomergeIroh backend for platoon leader
+                    #[cfg(feature = "automerge-backend")]
+                    {
+                        if let Some(automerge_backend) =
+                            backend.as_any().downcast_ref::<AutomergeIrohBackend>()
+                        {
+                            use hive_protocol::storage::HierarchicalStorageCapable;
+
+                            match change_stream_result {
+                                Ok(change_stream) => {
+                                    let storage = automerge_backend.summary_storage();
+                                    let coordinator =
+                                        Arc::new(HierarchicalAggregator::new(storage));
+
+                                    let cmd_storage = automerge_backend.command_storage();
+                                    let _cmd_coordinator = Arc::new(CommandCoordinator::new(
+                                        None,
+                                        node_id.clone(),
+                                        vec![],
+                                        cmd_storage,
+                                    ));
+
+                                    let node_id_clone = node_id.clone();
+
+                                    println!(
+                                        "[{}] → Platoon: {} (AutomergeIroh)",
+                                        node_id, platoon_id
+                                    );
+
+                                    tokio::spawn(async move {
+                                        if let Err(e) = platoon_leader_aggregation_loop(
+                                            change_stream,
+                                            coordinator,
+                                            platoon_id,
+                                            node_id_clone.clone(),
+                                        )
+                                        .await
+                                        {
+                                            eprintln!(
+                                                "[{}] Platoon leader aggregation error: {}",
+                                                node_id_clone, e
+                                            );
+                                        }
+                                    });
+
+                                    println!(
+                                        "[{}] ✓ Platoon leader aggregation task spawned (AutomergeIroh)",
+                                        node_id
+                                    );
+                                }
+                                Err(e) => {
+                                    eprintln!(
+                                        "[{}] ✗ Failed to create change stream: {}",
+                                        node_id, e
+                                    );
+                                }
+                            }
+                        } else {
+                            eprintln!(
+                                "[{}] ✗ Cannot spawn platoon leader task: unsupported backend type",
+                                node_id
+                            );
+                        }
+                    }
+
+                    #[cfg(not(feature = "automerge-backend"))]
+                    {
+                        eprintln!(
+                            "[{}] ✗ Cannot spawn platoon leader task: backend is not DittoBackend",
+                            node_id
+                        );
+                    }
                 }
             }
             _ => {
@@ -1517,13 +1675,31 @@ fn log_metrics(event: &MetricsEvent) {
 }
 
 /// Create a backend instance based on type
-fn create_backend(
+async fn create_backend(
     backend_type: &str,
+    node_id: &str,
 ) -> Result<Box<dyn DataSyncBackend>, Box<dyn std::error::Error>> {
     match backend_type {
         "ditto" => Ok(Box::new(DittoBackend::new())),
         #[cfg(feature = "automerge-backend")]
-        "automerge" => Ok(Box::new(AutomergeBackend::new())),
+        "automerge" => {
+            // Create AutomergeIrohBackend with persistence and transport
+            // This enables hierarchical mode support (HierarchicalStorageCapable trait)
+            let persistence_dir = PathBuf::from(format!("/tmp/hive_sim_{}", node_id));
+            std::fs::create_dir_all(&persistence_dir)?;
+
+            let store = Arc::new(
+                AutomergeStore::open(&persistence_dir)
+                    .map_err(|e| format!("Failed to open AutomergeStore: {}", e))?,
+            );
+            let transport = Arc::new(
+                IrohTransport::new()
+                    .await
+                    .map_err(|e| format!("Failed to create IrohTransport: {}", e))?,
+            );
+
+            Ok(Box::new(AutomergeIrohBackend::from_parts(store, transport)))
+        }
         _ => Err(format!(
             "Unknown backend type: {}. Available: ditto{}",
             backend_type,
