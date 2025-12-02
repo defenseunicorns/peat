@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- HIVE Plugin registration for ATAK -->
+<plugin>
+
+    <extension
+        type="gov.tak.api.plugin.IPlugin"
+        impl="com.atakmap.android.hive.plugin.HivePluginLifecycle"
+        singleton="true" />
+
+</plugin>

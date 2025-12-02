@@ -1,64 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
-
-    <!-- Permissions required for HIVE plugin functionality -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="GoogleAppIndexingWarning">
 
     <application
         android:allowBackup="false"
-        android:icon="@drawable/ic_hive_plugin"
+        android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
-        android:supportsRtl="true"
-        tools:ignore="AllowBackup">
+        android:description="@string/app_desc"
+        android:extractNativeLibs="true"
+        android:theme="@style/AppTheme">
 
-        <!-- ATAK Plugin Metadata -->
-        <meta-data
-            android:name="plugin-api"
-            android:value="gov.tak.api.plugin.IPlugin" />
+        <meta-data android:name="plugin-api" android:value="${atakApiVersion}"/>
+        <meta-data android:name="app_desc" android:value="@string/app_desc"/>
 
-        <!-- Plugin entry point -->
-        <activity
-            android:name="com.atakmap.android.hive.plugin.HivePluginActivity"
-            android:exported="false"
-            android:label="@string/app_name"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar">
-
-            <intent-filter>
-                <action android:name="com.atakmap.android.hive.SHOW_PLUGIN" />
-                <category android:name="android.intent.category.DEFAULT" />
+        <!-- This fictitious activity entry allows for ATAK 4.6.0.2 and newer to perform
+             plugin discovery on Android devices. If this is removed, the plugin will
+             not be able to be discovered or loaded. -->
+        <activity android:name="com.atakmap.app.component"
+            android:exported="true"
+            tools:ignore="MissingClass">
+            <intent-filter android:label="@string/app_name">
+                <action android:name="com.atakmap.app.component" />
             </intent-filter>
         </activity>
-
-        <!-- ATAK Plugin Tool (toolbar button) -->
-        <receiver
-            android:name="com.atakmap.android.hive.plugin.HivePluginTool"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.atakmap.android.maps.TOOLBARS_CREATED" />
-            </intent-filter>
-        </receiver>
-
-        <!-- Main Plugin MapComponent (entry point) -->
-        <receiver
-            android:name="com.atakmap.android.hive.plugin.HiveMapComponent"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.atakmap.android.maps.COMPONENTS_CREATED" />
-            </intent-filter>
-        </receiver>
-
-        <!-- Plugin DropDownReceiver for side panel UI -->
-        <receiver
-            android:name="com.atakmap.android.hive.plugin.HiveDropDownReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.atakmap.android.hive.SHOW_DROPDOWN" />
-            </intent-filter>
-        </receiver>
 
     </application>
 

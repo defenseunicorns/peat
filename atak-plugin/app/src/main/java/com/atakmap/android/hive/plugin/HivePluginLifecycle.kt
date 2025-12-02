@@ -10,10 +10,6 @@ import gov.tak.api.plugin.IServiceController
  *
  * Main entry point for the HIVE ATAK plugin. Extends AbstractPlugin
  * as per ATAK SDK 5.6 pattern.
- *
- * NOTE: This is a simplified version without FFI loading to avoid
- * JNA/coroutines dependency conflicts with ATAK SDK 5.6 Preview.
- * Full FFI integration will be added when testing on real hardware.
  */
 class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugin(
     serviceController,
@@ -35,21 +31,27 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
         instance = this
         val pluginContext = serviceController.getService(PluginContextProvider::class.java).pluginContext
 
-        // Initialize native library loader (for future FFI loading)
+        // Initialize native library loader
         HiveNativeLoader.init(pluginContext)
 
-        // NOTE: FFI loading is temporarily disabled to avoid JNA dependency conflicts
-        // with ATAK SDK 5.6 Preview. Will be re-enabled when testing on device.
-        //
-        // try {
-        //     HiveNativeLoader.loadLibrary("hive_ffi")
-        //     hiveFfiInitialized = true
-        //     Log.i(TAG, "hive-ffi native library loaded successfully")
-        // } catch (e: UnsatisfiedLinkError) {
-        //     Log.e(TAG, "Failed to load hive-ffi native library: ${e.message}")
-        // }
+        // Load hive-ffi native library
+        try {
+            HiveNativeLoader.loadLibrary("hive_ffi")
+            hiveFfiInitialized = true
+            Log.i(TAG, "hive-ffi native library loaded successfully")
 
-        Log.i(TAG, "HIVE Plugin initialized (FFI disabled)")
+            // Test FFI by getting version
+            val hiveVersion = uniffi.hive_ffi.hiveVersion()
+            Log.i(TAG, "HIVE FFI version: $hiveVersion")
+        } catch (e: UnsatisfiedLinkError) {
+            Log.e(TAG, "Failed to load hive-ffi native library: ${e.message}")
+            hiveFfiInitialized = false
+        } catch (e: Exception) {
+            Log.e(TAG, "Error initializing hive-ffi: ${e.message}")
+            hiveFfiInitialized = false
+        }
+
+        Log.i(TAG, "HIVE Plugin initialized (FFI: $hiveFfiInitialized)")
     }
 
     fun isHiveFfiAvailable(): Boolean = hiveFfiInitialized
