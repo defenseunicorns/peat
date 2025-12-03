@@ -1,4 +1,4 @@
-package com.atakmap.android.hive.plugin.model
+package com.revolveteam.atak.hive.model
 
 /**
  * Represents a HIVE cell (squad/team) for display in ATAK.
