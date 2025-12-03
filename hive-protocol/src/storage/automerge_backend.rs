@@ -489,44 +489,44 @@ impl SyncCapable for AutomergeBackend {
         //
         // Subscribe to document change notifications and automatically sync
         // changed documents with all connected peers.
-        if let Some(mut change_rx) = self.store.subscribe_to_changes() {
-            let coordinator = self.sync_coordinator.clone().unwrap();
-            let sync_active = Arc::clone(&self.sync_active);
+        let mut change_rx = self.store.subscribe_to_changes();
+        let coordinator = self.sync_coordinator.clone().unwrap();
+        let sync_active = Arc::clone(&self.sync_active);
 
-            let auto_task = tokio::spawn(async move {
-                tracing::debug!("Automatic sync task started");
+        let auto_task = tokio::spawn(async move {
+            tracing::debug!("Automatic sync task started");
 
-                while sync_active.load(Ordering::Relaxed) {
-                    // Wait for change notification
-                    match change_rx.recv().await {
-                        Some(doc_key) => {
-                            tracing::debug!("Document changed: {}, triggering sync", doc_key);
+            while sync_active.load(Ordering::Relaxed) {
+                // Wait for change notification
+                match change_rx.recv().await {
+                    Ok(doc_key) => {
+                        tracing::debug!("Document changed: {}, triggering sync", doc_key);
 
-                            // Sync with all connected peers
-                            if let Err(e) = coordinator.sync_document_with_all_peers(&doc_key).await
-                            {
-                                tracing::warn!(
-                                    "Failed to sync document {} after change: {}",
-                                    doc_key,
-                                    e
-                                );
-                            }
-                        }
-                        None => {
-                            // Channel closed
-                            tracing::debug!("Change notification channel closed");
-                            break;
+                        // Sync with all connected peers
+                        if let Err(e) = coordinator.sync_document_with_all_peers(&doc_key).await {
+                            tracing::warn!(
+                                "Failed to sync document {} after change: {}",
+                                doc_key,
+                                e
+                            );
                         }
                     }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        // Some messages were skipped due to slow receiver
+                        tracing::warn!("Change notification lagged, skipped {} messages", n);
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        // Channel closed
+                        tracing::debug!("Change notification channel closed");
+                        break;
+                    }
                 }
+            }
 
-                tracing::debug!("Automatic sync task stopped");
-            });
+            tracing::debug!("Automatic sync task stopped");
+        });
 
-            *self.auto_sync_task.write().unwrap() = Some(auto_task);
-        } else {
-            tracing::warn!("Could not subscribe to store changes - automatic sync disabled");
-        }
+        *self.auto_sync_task.write().unwrap() = Some(auto_task);
 
         // Phase 6.4: Spawn heartbeat task for partition detection
         //

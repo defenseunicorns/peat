@@ -953,9 +953,69 @@ impl DocumentStore for IrohDocumentStore {
             documents: initial_docs,
         });
 
-        // Note: AutomergeIroh doesn't have built-in change notification yet
-        // This implementation provides initial snapshot but won't emit updates
-        // TODO: Implement proper change notification when Automerge sync supports it
+        // Subscribe to change notifications from the store (Issue #221)
+        // This enables emitting ChangeEvent::Updated when documents sync from peers
+        let mut change_rx = self.backend.automerge_store().subscribe_to_changes();
+        let collection_name = collection.to_string();
+        let collection_prefix = format!("{}:", collection);
+        let query_clone = query.clone();
+        let backend = Arc::clone(&self.backend);
+        let tx_clone = tx.clone();
+
+        // Spawn background task to listen for changes and emit Updated events
+        tokio::spawn(async move {
+            loop {
+                match change_rx.recv().await {
+                    Ok(doc_key) => {
+                        // Check if this change is for our collection
+                        if !doc_key.starts_with(&collection_prefix) {
+                            continue;
+                        }
+
+                        // Extract doc_id from key (format: "collection:doc_id")
+                        let doc_id = match doc_key.strip_prefix(&collection_prefix) {
+                            Some(id) => id.to_string(),
+                            None => continue,
+                        };
+
+                        // Fetch the updated document
+                        let coll = backend.collection(collection_prefix.trim_end_matches(':'));
+                        if let Ok(Some(bytes)) = coll.get(&doc_id) {
+                            if let Ok(mut doc) = serde_json::from_slice::<Document>(&bytes) {
+                                if doc.id.is_none() {
+                                    doc.id = Some(doc_id);
+                                }
+
+                                // Check if document matches query
+                                if matches_query(&doc, &query_clone) {
+                                    // Emit Updated event
+                                    if tx_clone
+                                        .send(ChangeEvent::Updated {
+                                            collection: collection_name.clone(),
+                                            document: doc,
+                                        })
+                                        .is_err()
+                                    {
+                                        // Receiver dropped, stop listening
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!(
+                            "Observer change notification lagged, skipped {} messages",
+                            n
+                        );
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        // Channel closed, stop listening
+                        break;
+                    }
+                }
+            }
+        });
 
         Ok(ChangeStream { receiver: rx })
     }
