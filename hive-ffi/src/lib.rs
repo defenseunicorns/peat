@@ -488,13 +488,8 @@ impl HiveNode {
         &self,
         callback: Box<dyn DocumentCallback>,
     ) -> Result<Arc<SubscriptionHandle>, HiveError> {
-        // Get the change receiver from the store
-        let change_rx = self
-            .store
-            .subscribe_to_changes()
-            .ok_or_else(|| HiveError::SyncError {
-                msg: "Subscription already active or store not available".to_string(),
-            })?;
+        // Get the change receiver from the store (broadcast channel)
+        let change_rx = self.store.subscribe_to_changes();
 
         // Create active flag for the subscription
         let active = Arc::new(AtomicBool::new(true));
@@ -509,7 +504,7 @@ impl HiveNode {
                 tokio::select! {
                     result = rx.recv() => {
                         match result {
-                            Some(doc_key) => {
+                            Ok(doc_key) => {
                                 // Parse the document key (format: "collection:doc_id")
                                 let change = if let Some((collection, doc_id)) = doc_key.split_once(':') {
                                     DocumentChange {
@@ -528,7 +523,11 @@ impl HiveNode {
 
                                 callback.on_change(change);
                             }
-                            None => {
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                // Some messages were skipped due to slow receiver
+                                callback.on_error(format!("Lagged {} messages", n));
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => {
                                 // Channel closed
                                 callback.on_error("Document change channel closed".to_string());
                                 break;
