@@ -4,7 +4,7 @@
 
     <extension
         type="gov.tak.api.plugin.IPlugin"
-        impl="com.atakmap.android.hive.plugin.HivePluginLifecycle"
+        impl="com.revolveteam.atak.hive.HivePluginLifecycle"
         singleton="true" />
 
 </plugin>

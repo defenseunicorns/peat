@@ -92,7 +92,7 @@ def supportedFlavors =
 
 android {
     compileSdk 36
-    namespace 'com.atakmap.android.hive.plugin'
+    namespace 'com.revolveteam.atak.hive'
 
     dexOptions {
         jumboMode = true
@@ -164,6 +164,8 @@ android {
         exclude 'META-INF/INDEX.LIST'
         // Extract native libraries from the APK - required for plugin loading
         jniLibs.useLegacyPackaging true
+        // Do NOT strip native libraries - preserves JNI symbols like JNI_OnLoad
+        doNotStrip '**/*.so'
     }
 
     sourceSets {

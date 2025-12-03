@@ -2171,6 +2171,7 @@ dependencies = [
  "chrono",
  "hex",
  "hive-protocol",
+ "jni",
  "serde_json",
  "tempfile",
  "thiserror 1.0.69",

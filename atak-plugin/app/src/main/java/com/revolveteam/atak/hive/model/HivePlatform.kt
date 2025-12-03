@@ -1,4 +1,4 @@
-package com.atakmap.android.hive.plugin.model
+package com.revolveteam.atak.hive.model
 
 /**
  * Represents an individual HIVE platform (UAV, UGV, etc.) for display in ATAK.
