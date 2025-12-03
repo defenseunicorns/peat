@@ -1,14 +1,14 @@
-package com.atakmap.android.hive.plugin
+package com.revolveteam.atak.hive
 
 import android.content.Context
 import android.content.Intent
 import com.atakmap.android.dropdown.DropDownMapComponent
-import com.atakmap.android.hive.plugin.model.HiveCell
-import com.atakmap.android.hive.plugin.model.HivePlatform
-import com.atakmap.android.hive.plugin.model.HiveTrack
 import com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter
 import com.atakmap.android.maps.MapView
 import com.atakmap.coremap.log.Log
+import com.revolveteam.atak.hive.model.HiveCell
+import com.revolveteam.atak.hive.model.HivePlatform
+import com.revolveteam.atak.hive.model.HiveTrack
 
 /**
  * HIVE Map Component
@@ -18,7 +18,6 @@ import com.atakmap.coremap.log.Log
  *
  * NOTE: This is a simplified version without coroutines/Flow to avoid
  * dependency conflicts with ATAK SDK 5.6 Preview's bundled libraries.
- * Full coroutines support will be added when testing on real hardware.
  */
 class HiveMapComponent : DropDownMapComponent() {
 
@@ -42,8 +41,7 @@ class HiveMapComponent : DropDownMapComponent() {
     private var _connectionStatus = ConnectionStatus.DISCONNECTED
     val connectionStatus: ConnectionStatus get() = _connectionStatus
 
-    private var _peerCount = 0
-    val peerCount: Int get() = _peerCount
+    val peerCount: Int get() = HivePluginLifecycle.getInstance()?.getPeerCount() ?: 0
 
     override fun onCreate(context: Context, intent: Intent, view: MapView) {
         context.setTheme(R.style.ATAKPluginTheme)
@@ -60,8 +58,8 @@ class HiveMapComponent : DropDownMapComponent() {
         ddFilter.addAction(HiveDropDownReceiver.SHOW_PLUGIN)
         registerDropDownReceiver(dropDownReceiver, ddFilter)
 
-        // Load mock data for now
-        loadMockData()
+        // Update connection status based on HIVE node availability
+        updateConnectionStatus()
 
         Log.d(TAG, "HiveMapComponent initialized")
     }
@@ -72,42 +70,27 @@ class HiveMapComponent : DropDownMapComponent() {
     }
 
     /**
-     * Load mock data for development/testing
+     * Update connection status based on HIVE node availability
      */
-    private fun loadMockData() {
-        Log.d(TAG, "Loading mock data")
-        _connectionStatus = ConnectionStatus.CONNECTED
-        _peerCount = 2
-
-        _cells.clear()
-        _cells.addAll(listOf(
-            HiveCell(
-                id = "alpha-team",
-                name = "Alpha Team",
-                status = HiveCell.Status.ACTIVE,
-                platformCount = 4,
-                centerLat = 38.8977,
-                centerLon = -77.0365,
-                capabilities = listOf("detection", "tracking")
-            ),
-            HiveCell(
-                id = "bravo-team",
-                name = "Bravo Team",
-                status = HiveCell.Status.ACTIVE,
-                platformCount = 3,
-                centerLat = 38.9000,
-                centerLon = -77.0400,
-                capabilities = listOf("classification", "tracking")
-            )
-        ))
+    private fun updateConnectionStatus() {
+        _connectionStatus = if (HivePluginLifecycle.getInstance()?.getHiveNodeJni() != null) {
+            ConnectionStatus.CONNECTED
+        } else {
+            ConnectionStatus.DISCONNECTED
+        }
+        Log.d(TAG, "Connection status: $_connectionStatus")
     }
 
     /**
-     * Refresh data
+     * Refresh data from HIVE network
      */
     fun refreshData() {
         Log.d(TAG, "Refreshing HIVE data")
-        loadMockData()
+        updateConnectionStatus()
+        // TODO: Fetch real cells/platforms/tracks from HIVE sync when automerge is fixed
+        _cells.clear()
+        _platforms.clear()
+        _tracks.clear()
     }
 
     /**
