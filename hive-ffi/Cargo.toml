@@ -21,6 +21,9 @@ sync = ["hive-protocol/automerge-backend"]
 # UniFFI for cross-language bindings (proc-macro only mode)
 uniffi = { version = "0.28", features = ["cli", "tokio"] }
 
+# JNI for direct Android native method binding (bypasses JNA symbol lookup issues)
+jni = "0.21"
+
 # HIVE crates - no ditto-backend for Android cross-compilation
 hive-protocol = { path = "../hive-protocol", default-features = false }
 

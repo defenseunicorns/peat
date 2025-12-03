@@ -1,4 +1,4 @@
-package com.atakmap.android.hive.plugin
+package com.revolveteam.atak.hive
 
 import android.content.Context
 import com.atak.plugins.impl.AbstractPluginTool

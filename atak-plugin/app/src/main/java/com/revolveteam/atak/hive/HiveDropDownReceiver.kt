@@ -1,4 +1,4 @@
-package com.atakmap.android.hive.plugin
+package com.revolveteam.atak.hive
 
 import android.content.Context
 import android.content.Intent
@@ -13,6 +13,7 @@ import com.atakmap.android.dropdown.DropDown.OnStateListener
 import com.atakmap.android.dropdown.DropDownReceiver
 import com.atakmap.android.maps.MapView
 import com.atakmap.coremap.log.Log
+import com.revolveteam.atak.hive.model.HiveCell
 
 /**
  * HIVE DropDown Receiver
@@ -28,7 +29,7 @@ class HiveDropDownReceiver(
 
     companion object {
         val TAG: String = HiveDropDownReceiver::class.java.simpleName
-        const val SHOW_PLUGIN = "com.atakmap.android.hive.SHOW_PLUGIN"
+        const val SHOW_PLUGIN = "com.revolveteam.atak.hive.SHOW_PLUGIN"
     }
 
     override fun disposeImpl() {
@@ -160,7 +161,7 @@ class HiveDropDownReceiver(
         }
     }
 
-    private fun createCellCard(cell: com.atakmap.android.hive.plugin.model.HiveCell): View {
+    private fun createCellCard(cell: HiveCell): View {
         val card = LinearLayout(pluginContext).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#2d2d2d"))
@@ -181,8 +182,8 @@ class HiveDropDownReceiver(
         headerRow.addView(name)
 
         val statusColor = when (cell.status) {
-            com.atakmap.android.hive.plugin.model.HiveCell.Status.ACTIVE -> Color.parseColor("#4CAF50")
-            com.atakmap.android.hive.plugin.model.HiveCell.Status.FORMING -> Color.parseColor("#FFC107")
+            HiveCell.Status.ACTIVE -> Color.parseColor("#4CAF50")
+            HiveCell.Status.FORMING -> Color.parseColor("#FFC107")
             else -> Color.parseColor("#F44336")
         }
         val statusText = TextView(pluginContext).apply {
@@ -234,6 +235,34 @@ class HiveDropDownReceiver(
             setTextColor(Color.GRAY)
         }
         card.addView(ffi)
+
+        // Node ID (full)
+        val nodeId = HivePluginLifecycle.getInstance()?.getNodeId() ?: "N/A"
+        val nodeIdLabel = TextView(pluginContext).apply {
+            text = "Node ID:"
+            textSize = 12f
+            setTextColor(Color.GRAY)
+        }
+        card.addView(nodeIdLabel)
+
+        val nodeIdText = TextView(pluginContext).apply {
+            text = nodeId
+            textSize = 10f
+            setTextColor(Color.parseColor("#888888"))
+            setTypeface(android.graphics.Typeface.MONOSPACE)
+            // Allow text selection for copying
+            setTextIsSelectable(true)
+        }
+        card.addView(nodeIdText)
+
+        // Peer count
+        val peerCount = HivePluginLifecycle.getInstance()?.getPeerCount() ?: 0
+        val peersText = TextView(pluginContext).apply {
+            text = "Connected Peers: $peerCount"
+            textSize = 12f
+            setTextColor(Color.GRAY)
+        }
+        card.addView(peersText)
 
         return card
     }

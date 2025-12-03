@@ -9,9 +9,21 @@
 //! - **Sync** (optional): P2P document sync via AutomergeIroh backend
 //!
 //! Uses proc-macro only UniFFI approach (no UDL file).
+//!
+//! ## Android JNI Support
+//!
+//! This crate also provides direct JNI bindings that bypass JNA's symbol lookup
+//! issues on Android. The JNI functions are exported with standard naming
+//! (Java_package_Class_method) and can be called directly via Android's NDK.
 
 use std::collections::HashMap;
 use std::sync::Arc;
+
+// JNI support for Android
+use jni::objects::{JClass, JString};
+use jni::sys::{jint, jstring, JavaVM, JNI_VERSION_1_6};
+use jni::JNIEnv;
+use std::os::raw::c_void;
 
 use hive_protocol::cot::{
     CotEncoder, Position as CotPosition, TrackUpdate, Velocity as CotVelocity,
@@ -21,6 +33,10 @@ use hive_protocol::cot::{
 use hive_protocol::network::{IrohTransport, PeerInfo as HivePeerInfo};
 #[cfg(feature = "sync")]
 use hive_protocol::storage::{AutomergeBackend, AutomergeStore, StorageBackend, SyncCapable};
+#[cfg(feature = "sync")]
+use hive_protocol::sync::automerge::AutomergeIrohBackend;
+#[cfg(feature = "sync")]
+use hive_protocol::sync::{BackendConfig, DataSyncBackend, TransportConfig};
 #[cfg(feature = "sync")]
 use std::net::SocketAddr;
 #[cfg(feature = "sync")]
@@ -164,7 +180,14 @@ pub fn create_velocity(bearing: f64, speed_mps: f64) -> Velocity {
 #[cfg(feature = "sync")]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct NodeConfig {
-    /// Bind address for P2P connections (e.g., "127.0.0.1:0" for auto-assign)
+    /// Application/Formation ID (used for peer discovery and authentication)
+    /// This identifies which "formation" or "swarm" this node belongs to.
+    pub app_id: String,
+    /// Shared secret key (base64-encoded 32 bytes) for peer authentication
+    /// Only peers with matching app_id AND shared_key can connect.
+    /// Generate with: `openssl rand -base64 32`
+    pub shared_key: String,
+    /// Bind address for P2P connections (e.g., "0.0.0.0:0" for auto-assign)
     pub bind_address: Option<String>,
     /// Storage path for Automerge documents
     pub storage_path: String,
@@ -273,11 +296,15 @@ impl Drop for SubscriptionHandle {
 
 /// A HIVE network node with P2P sync capabilities
 ///
-/// Wraps AutomergeBackend + IrohTransport for document sync.
+/// Wraps AutomergeIrohBackend for authenticated document sync.
+/// Requires matching app_id and shared_key for peer connections.
 #[cfg(feature = "sync")]
 #[derive(uniffi::Object)]
 pub struct HiveNode {
-    backend: Arc<RwLock<AutomergeBackend>>,
+    /// The sync backend with FormationKey authentication
+    sync_backend: Arc<AutomergeIrohBackend>,
+    /// Storage backend for document operations
+    storage_backend: Arc<RwLock<AutomergeBackend>>,
     transport: Arc<IrohTransport>,
     /// Store reference for subscriptions
     store: Arc<AutomergeStore>,
@@ -317,7 +344,7 @@ impl HiveNode {
     /// Start sync operations
     pub fn start_sync(&self) -> Result<(), HiveError> {
         self.runtime.block_on(async {
-            let backend = self.backend.read().await;
+            let backend = self.storage_backend.read().await;
             backend
                 .start_sync()
                 .map_err(|e| HiveError::SyncError { msg: e.to_string() })
@@ -327,7 +354,7 @@ impl HiveNode {
     /// Stop sync operations
     pub fn stop_sync(&self) -> Result<(), HiveError> {
         self.runtime.block_on(async {
-            let backend = self.backend.read().await;
+            let backend = self.storage_backend.read().await;
             backend
                 .stop_sync()
                 .map_err(|e| HiveError::SyncError { msg: e.to_string() })
@@ -337,7 +364,7 @@ impl HiveNode {
     /// Get sync statistics
     pub fn sync_stats(&self) -> Result<SyncStats, HiveError> {
         self.runtime.block_on(async {
-            let backend = self.backend.read().await;
+            let backend = self.storage_backend.read().await;
             let stats = backend
                 .sync_stats()
                 .map_err(|e| HiveError::SyncError { msg: e.to_string() })?;
@@ -404,7 +431,7 @@ impl HiveNode {
             })?;
 
         self.runtime.block_on(async {
-            let backend = self.backend.read().await;
+            let backend = self.storage_backend.read().await;
             let coll = backend.collection(collection);
 
             coll.upsert(doc_id, json_data.as_bytes().to_vec())
@@ -419,7 +446,7 @@ impl HiveNode {
         doc_id: &str,
     ) -> Result<Option<String>, HiveError> {
         self.runtime.block_on(async {
-            let backend = self.backend.read().await;
+            let backend = self.storage_backend.read().await;
             let coll = backend.collection(collection);
 
             match coll.get(doc_id) {
@@ -438,7 +465,7 @@ impl HiveNode {
     /// Delete a document from a collection
     pub fn delete_document(&self, collection: &str, doc_id: &str) -> Result<(), HiveError> {
         self.runtime.block_on(async {
-            let backend = self.backend.read().await;
+            let backend = self.storage_backend.read().await;
             let coll = backend.collection(collection);
 
             coll.delete(doc_id)
@@ -449,7 +476,7 @@ impl HiveNode {
     /// List all document IDs in a collection
     pub fn list_documents(&self, collection: &str) -> Result<Vec<String>, HiveError> {
         self.runtime.block_on(async {
-            let backend = self.backend.read().await;
+            let backend = self.storage_backend.read().await;
             let coll = backend.collection(collection);
 
             let docs = coll
@@ -465,7 +492,7 @@ impl HiveNode {
         let doc_key = format!("{}:{}", collection, doc_id);
 
         self.runtime.block_on(async {
-            let backend = self.backend.read().await;
+            let backend = self.storage_backend.read().await;
 
             backend
                 .sync_document(&doc_key)
@@ -548,13 +575,36 @@ impl HiveNode {
     }
 }
 
-/// Create a new HiveNode
+/// Create a new HiveNode with FormationKey authentication
+///
+/// Requires `app_id` and `shared_key` for peer authentication.
+/// Only peers with matching credentials can connect and sync.
+///
+/// # Arguments
+///
+/// * `config` - Node configuration including:
+///   - `app_id`: Formation/application identifier (use same value for all nodes in your swarm)
+///   - `shared_key`: Base64-encoded 32-byte secret key (generate with `openssl rand -base64 32`)
+///   - `bind_address`: Optional address to bind (default: "0.0.0.0:0")
+///   - `storage_path`: Directory for persistent storage
 ///
 /// Note: This function is NOT async because we manage our own Tokio runtime
 /// to ensure proper context for Iroh transport operations.
 #[cfg(feature = "sync")]
 #[uniffi::export]
 pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
+    // Validate credentials
+    if config.app_id.is_empty() {
+        return Err(HiveError::InvalidInput {
+            msg: "app_id cannot be empty".to_string(),
+        });
+    }
+    if config.shared_key.is_empty() {
+        return Err(HiveError::InvalidInput {
+            msg: "shared_key cannot be empty".to_string(),
+        });
+    }
+
     // Create a dedicated Tokio runtime for this node
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
@@ -568,7 +618,7 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
     let bind_addr: SocketAddr = config
         .bind_address
         .as_deref()
-        .unwrap_or("127.0.0.1:0")
+        .unwrap_or("0.0.0.0:0")
         .parse()
         .map_err(|e| HiveError::InvalidInput {
             msg: format!("Invalid bind address: {}", e),
@@ -598,11 +648,43 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
     })?;
     let transport = Arc::new(transport);
 
-    // Create backend with transport (clone store Arc so we can keep a reference)
-    let backend = AutomergeBackend::with_transport(Arc::clone(&store), Arc::clone(&transport));
+    // Create storage backend with transport
+    let storage_backend = Arc::new(AutomergeBackend::with_transport(
+        Arc::clone(&store),
+        Arc::clone(&transport),
+    ));
+
+    // Create sync backend (AutomergeIrohBackend) for authenticated P2P sync
+    // Note: AutomergeIrohBackend wraps storage::AutomergeBackend for the DataSyncBackend trait
+    let sync_backend = Arc::new(AutomergeIrohBackend::new(
+        Arc::clone(&storage_backend),
+        Arc::clone(&transport),
+    ));
+
+    // Initialize sync backend with credentials for FormationKey authentication
+    let backend_config = BackendConfig {
+        app_id: config.app_id.clone(),
+        persistence_dir: storage_path.clone(),
+        shared_key: Some(config.shared_key.clone()),
+        transport: TransportConfig::default(),
+        extra: std::collections::HashMap::new(),
+    };
+
+    runtime.block_on(async {
+        sync_backend
+            .initialize(backend_config)
+            .await
+            .map_err(|e| HiveError::SyncError {
+                msg: format!("Failed to initialize sync backend: {}", e),
+            })
+    })?;
 
     Ok(Arc::new(HiveNode {
-        backend: Arc::new(RwLock::new(backend)),
+        sync_backend,
+        storage_backend: Arc::new(RwLock::new(AutomergeBackend::with_transport(
+            Arc::clone(&store),
+            Arc::clone(&transport),
+        ))),
         transport,
         store,
         storage_path,
@@ -709,5 +791,417 @@ mod tests {
         let vel = create_velocity(45.0, 15.0);
         assert_eq!(vel.bearing, 45.0);
         assert_eq!(vel.speed_mps, 15.0);
+    }
+}
+
+// =============================================================================
+// JNI Bindings - Direct Android native method support
+// =============================================================================
+//
+// These functions provide a direct JNI interface that bypasses JNA's symbol
+// lookup issues on Android. When System.loadLibrary() is called, these
+// functions are registered via JNI's standard naming convention.
+//
+// Usage in Kotlin:
+// ```kotlin
+// class HiveJni {
+//     companion object {
+//         init {
+//             System.loadLibrary("hive_ffi")
+//         }
+//     }
+//     external fun hiveVersion(): String
+//     external fun testJni(): String
+// }
+// ```
+
+/// JNI: Get HIVE library version
+///
+/// Kotlin signature: external fun hiveVersion(): String
+#[no_mangle]
+pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_hiveVersion(
+    mut env: JNIEnv,
+    _class: JClass,
+) -> jstring {
+    let version = hive_version();
+    env.new_string(&version)
+        .expect("Failed to create Java string")
+        .into_raw()
+}
+
+/// JNI: Test that JNI bindings work
+///
+/// Kotlin signature: external fun testJni(): String
+#[no_mangle]
+pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_testJni(
+    mut env: JNIEnv,
+    _class: JClass,
+) -> jstring {
+    let msg = "JNI bindings working! HIVE FFI loaded successfully.";
+    env.new_string(msg)
+        .expect("Failed to create Java string")
+        .into_raw()
+}
+
+/// JNI: Create a HIVE node (simplified for testing)
+///
+/// Kotlin signature: external fun createNodeJni(appId: String, sharedKey: String, storagePath: String): Long
+#[cfg(feature = "sync")]
+#[no_mangle]
+pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_createNodeJni(
+    mut env: JNIEnv,
+    _class: JClass,
+    app_id: JString,
+    shared_key: JString,
+    storage_path: JString,
+) -> i64 {
+    let app_id: String = match env.get_string(&app_id) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+    let shared_key: String = match env.get_string(&shared_key) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+    let storage_path: String = match env.get_string(&storage_path) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+
+    #[cfg(target_os = "android")]
+    android_log(&format!(
+        "createNodeJni: app_id={}, storage_path={}",
+        app_id, storage_path
+    ));
+
+    let config = NodeConfig {
+        app_id,
+        shared_key,
+        bind_address: None,
+        storage_path,
+    };
+
+    match create_node(config) {
+        Ok(node) => {
+            #[cfg(target_os = "android")]
+            android_log("createNodeJni: Node created successfully");
+            // Return the Arc pointer as a handle
+            Arc::into_raw(node) as i64
+        }
+        Err(e) => {
+            #[cfg(target_os = "android")]
+            android_log(&format!("createNodeJni: Error creating node: {:?}", e));
+            0
+        }
+    }
+}
+
+/// JNI: Get node ID from a HiveNode handle
+///
+/// Kotlin signature: external fun nodeIdJni(handle: Long): String
+#[cfg(feature = "sync")]
+#[no_mangle]
+pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_nodeIdJni(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: i64,
+) -> jstring {
+    if handle == 0 {
+        return env
+            .new_string("")
+            .expect("Failed to create Java string")
+            .into_raw();
+    }
+
+    let node = unsafe { Arc::from_raw(handle as *const HiveNode) };
+    let node_id = node.node_id();
+
+    // Don't drop the Arc - we're just borrowing
+    std::mem::forget(node);
+
+    env.new_string(&node_id)
+        .expect("Failed to create Java string")
+        .into_raw()
+}
+
+/// JNI: Get peer count from a HiveNode handle
+///
+/// Kotlin signature: external fun peerCountJni(handle: Long): Int
+#[cfg(feature = "sync")]
+#[no_mangle]
+pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_peerCountJni(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: i64,
+) -> i32 {
+    if handle == 0 {
+        return 0;
+    }
+
+    let node = unsafe { Arc::from_raw(handle as *const HiveNode) };
+    let count = node.peer_count() as i32;
+
+    // Don't drop the Arc - we're just borrowing
+    std::mem::forget(node);
+
+    count
+}
+
+/// JNI: Start sync on a HiveNode
+///
+/// Kotlin signature: external fun startSyncJni(handle: Long): Boolean
+#[cfg(feature = "sync")]
+#[no_mangle]
+pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_startSyncJni(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: i64,
+) -> bool {
+    if handle == 0 {
+        return false;
+    }
+
+    let node = unsafe { Arc::from_raw(handle as *const HiveNode) };
+    let result = node.start_sync().is_ok();
+
+    // Don't drop the Arc - we're just borrowing
+    std::mem::forget(node);
+
+    result
+}
+
+/// JNI: Free a HiveNode handle
+///
+/// Kotlin signature: external fun freeNodeJni(handle: Long)
+#[cfg(feature = "sync")]
+#[no_mangle]
+pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_freeNodeJni(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: i64,
+) {
+    if handle != 0 {
+        // This will drop the Arc and potentially free the node
+        let _ = unsafe { Arc::from_raw(handle as *const HiveNode) };
+    }
+}
+
+// =============================================================================
+// JNI Native Method Registration
+// =============================================================================
+//
+// Android's linker namespace isolation prevents normal JNI symbol lookup.
+// We provide a nativeInit function that Kotlin must call after System.load()
+// to explicitly register the native methods.
+
+/// Register native methods for HiveJni class
+///
+/// This must be called from Kotlin after System.load() to register native methods.
+/// Android's classloader isolation prevents JNI_OnLoad from finding the class.
+///
+/// Kotlin usage:
+/// ```kotlin
+/// companion object {
+///     init {
+///         System.load(libPath)
+///         nativeInit()
+///     }
+///     @JvmStatic external fun nativeInit()
+/// }
+/// ```
+#[no_mangle]
+pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_nativeInit(
+    mut env: JNIEnv,
+    class: JClass,
+) {
+    use jni::NativeMethod;
+
+    let methods: Vec<NativeMethod> = vec![
+        NativeMethod {
+            name: "hiveVersion".into(),
+            sig: "()Ljava/lang/String;".into(),
+            fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_hiveVersion as *mut c_void,
+        },
+        NativeMethod {
+            name: "testJni".into(),
+            sig: "()Ljava/lang/String;".into(),
+            fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_testJni as *mut c_void,
+        },
+        #[cfg(feature = "sync")]
+        NativeMethod {
+            name: "createNodeJni".into(),
+            sig: "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)J".into(),
+            fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_createNodeJni as *mut c_void,
+        },
+        #[cfg(feature = "sync")]
+        NativeMethod {
+            name: "nodeIdJni".into(),
+            sig: "(J)Ljava/lang/String;".into(),
+            fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_nodeIdJni as *mut c_void,
+        },
+        #[cfg(feature = "sync")]
+        NativeMethod {
+            name: "peerCountJni".into(),
+            sig: "(J)I".into(),
+            fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_peerCountJni as *mut c_void,
+        },
+        #[cfg(feature = "sync")]
+        NativeMethod {
+            name: "startSyncJni".into(),
+            sig: "(J)Z".into(),
+            fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_startSyncJni as *mut c_void,
+        },
+        #[cfg(feature = "sync")]
+        NativeMethod {
+            name: "freeNodeJni".into(),
+            sig: "(J)V".into(),
+            fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_freeNodeJni as *mut c_void,
+        },
+    ];
+
+    // Register native methods - the class is passed in from Kotlin so it's valid
+    if let Err(e) = env.register_native_methods(&class, &methods) {
+        // Log error but don't crash - caller will see methods not registered
+        let _ = env.exception_describe();
+        let _ = env.exception_clear();
+    }
+}
+
+/// JNI_OnLoad - Called when library is loaded via System.loadLibrary()
+///
+/// This is our chance to register native methods while we have access to
+/// the JNI environment from inside the library's linker namespace.
+#[no_mangle]
+#[allow(non_snake_case)]
+pub extern "C" fn JNI_OnLoad(vm: *mut JavaVM, _reserved: *mut c_void) -> jint {
+    // Log that we're being called
+    #[cfg(target_os = "android")]
+    {
+        android_log("JNI_OnLoad called for hive_ffi");
+    }
+
+    // Get JNIEnv from JavaVM
+    let mut env = unsafe {
+        let mut env_ptr: *mut jni::sys::JNIEnv = std::ptr::null_mut();
+        let get_env_result = (**vm).GetEnv.unwrap()(
+            vm,
+            &mut env_ptr as *mut _ as *mut *mut c_void,
+            JNI_VERSION_1_6 as i32,
+        );
+        if get_env_result != jni::sys::JNI_OK as i32 {
+            #[cfg(target_os = "android")]
+            android_log("JNI_OnLoad: GetEnv failed");
+            return jni::sys::JNI_ERR;
+        }
+        match JNIEnv::from_raw(env_ptr) {
+            Ok(env) => env,
+            Err(_) => {
+                #[cfg(target_os = "android")]
+                android_log("JNI_OnLoad: JNIEnv::from_raw failed");
+                return jni::sys::JNI_ERR;
+            }
+        }
+    };
+
+    #[cfg(target_os = "android")]
+    android_log("JNI_OnLoad: Got JNIEnv, looking for HiveJni class...");
+
+    // Try to find the HiveJni class and register natives
+    let class_name = "com/revolveteam/atak/hive/HiveJni";
+    match env.find_class(class_name) {
+        Ok(class) => {
+            #[cfg(target_os = "android")]
+            android_log("JNI_OnLoad: Found HiveJni class, registering natives...");
+
+            // Register native methods
+            use jni::NativeMethod;
+            let methods: Vec<NativeMethod> = vec![
+                NativeMethod {
+                    name: "nativeInit".into(),
+                    sig: "()V".into(),
+                    fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_nativeInit as *mut c_void,
+                },
+                NativeMethod {
+                    name: "hiveVersion".into(),
+                    sig: "()Ljava/lang/String;".into(),
+                    fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_hiveVersion as *mut c_void,
+                },
+                NativeMethod {
+                    name: "testJni".into(),
+                    sig: "()Ljava/lang/String;".into(),
+                    fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_testJni as *mut c_void,
+                },
+                #[cfg(feature = "sync")]
+                NativeMethod {
+                    name: "createNodeJni".into(),
+                    sig: "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)J".into(),
+                    fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_createNodeJni as *mut c_void,
+                },
+                #[cfg(feature = "sync")]
+                NativeMethod {
+                    name: "nodeIdJni".into(),
+                    sig: "(J)Ljava/lang/String;".into(),
+                    fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_nodeIdJni as *mut c_void,
+                },
+                #[cfg(feature = "sync")]
+                NativeMethod {
+                    name: "peerCountJni".into(),
+                    sig: "(J)I".into(),
+                    fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_peerCountJni as *mut c_void,
+                },
+                #[cfg(feature = "sync")]
+                NativeMethod {
+                    name: "startSyncJni".into(),
+                    sig: "(J)Z".into(),
+                    fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_startSyncJni as *mut c_void,
+                },
+                #[cfg(feature = "sync")]
+                NativeMethod {
+                    name: "freeNodeJni".into(),
+                    sig: "(J)V".into(),
+                    fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_freeNodeJni as *mut c_void,
+                },
+            ];
+
+            match env.register_native_methods(&class, &methods) {
+                Ok(_) => {
+                    #[cfg(target_os = "android")]
+                    android_log("JNI_OnLoad: Native methods registered successfully!");
+                }
+                Err(_) => {
+                    #[cfg(target_os = "android")]
+                    android_log("JNI_OnLoad: Failed to register native methods");
+                    let _ = env.exception_describe();
+                    let _ = env.exception_clear();
+                }
+            }
+        }
+        Err(_) => {
+            #[cfg(target_os = "android")]
+            android_log(
+                "JNI_OnLoad: HiveJni class not found (this is OK if loading before class init)",
+            );
+            // Class not loaded yet - this is OK, nativeInit will be called later
+        }
+    }
+
+    JNI_VERSION_1_6
+}
+
+/// Log to Android logcat
+#[cfg(target_os = "android")]
+fn android_log(msg: &str) {
+    use std::ffi::CString;
+    use std::os::raw::c_char;
+
+    let tag = CString::new("HiveFFI").unwrap();
+    let msg = CString::new(msg).unwrap();
+
+    unsafe {
+        // Android log priority INFO = 4
+        extern "C" {
+            fn __android_log_write(prio: i32, tag: *const c_char, text: *const c_char) -> i32;
+        }
+        __android_log_write(4, tag.as_ptr(), msg.as_ptr());
     }
 }
