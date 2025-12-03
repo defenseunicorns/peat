@@ -25,6 +25,7 @@ pub mod composition;
 pub mod cot; // Cursor-on-Target translation layer (ADR-020, ADR-028)
 pub mod credentials; // Backend-agnostic credential management
 pub mod discovery;
+pub mod distribution; // AI model distribution (manifests, updates, requirements)
 pub mod error;
 pub mod hierarchy;
 pub mod models;
