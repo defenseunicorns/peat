@@ -17,7 +17,7 @@ use std::path::Path;
 #[cfg(feature = "automerge-backend")]
 use std::sync::{Arc, RwLock};
 #[cfg(feature = "automerge-backend")]
-use tokio::sync::mpsc;
+use tokio::sync::broadcast;
 
 #[cfg(feature = "automerge-backend")]
 use anyhow::{Context, Result};
@@ -32,9 +32,9 @@ use anyhow::{Context, Result};
 pub struct AutomergeStore {
     db: Arc<DB>,
     cache: Arc<RwLock<LruCache<String, Automerge>>>,
-    /// Channel for notifying of document changes (Phase 6.3)
-    change_tx: mpsc::UnboundedSender<String>,
-    change_rx: Arc<RwLock<Option<mpsc::UnboundedReceiver<String>>>>,
+    /// Broadcast channel for notifying of document changes (Phase 6.3)
+    /// Multiple subscribers can receive notifications (sync coordinator + observers)
+    change_tx: broadcast::Sender<String>,
 }
 
 #[cfg(feature = "automerge-backend")]
@@ -49,14 +49,14 @@ impl AutomergeStore {
         let db = DB::open(&opts, path).context("Failed to open RocksDB")?;
         let cache = LruCache::new(NonZeroUsize::new(1000).unwrap());
 
-        // Create change notification channel
-        let (change_tx, change_rx) = mpsc::unbounded_channel();
+        // Create broadcast channel for change notifications
+        // Capacity of 1024 should be sufficient for most workloads
+        let (change_tx, _) = broadcast::channel(1024);
 
         Ok(Self {
             db: Arc::new(db),
             cache: Arc::new(RwLock::new(cache)),
             change_tx,
-            change_rx: Arc::new(RwLock::new(Some(change_rx))),
         })
     }
 
@@ -145,20 +145,19 @@ impl AutomergeStore {
     /// Subscribe to document change notifications (Phase 6.3)
     ///
     /// Returns a receiver that will receive document keys whenever documents are modified.
-    /// This can only be called once - subsequent calls will return None.
+    /// Multiple subscribers are supported - each gets their own receiver.
     ///
     /// # Example
     ///
     /// ```ignore
     /// let store = AutomergeStore::open("./data")?;
-    /// if let Some(mut rx) = store.subscribe_to_changes() {
-    ///     while let Some(doc_key) = rx.recv().await {
-    ///         println!("Document changed: {}", doc_key);
-    ///     }
+    /// let mut rx = store.subscribe_to_changes();
+    /// while let Ok(doc_key) = rx.recv().await {
+    ///     println!("Document changed: {}", doc_key);
     /// }
     /// ```
-    pub fn subscribe_to_changes(&self) -> Option<mpsc::UnboundedReceiver<String>> {
-        self.change_rx.write().unwrap().take()
+    pub fn subscribe_to_changes(&self) -> broadcast::Receiver<String> {
+        self.change_tx.subscribe()
     }
 
     /// Get a collection handle for a specific namespace
