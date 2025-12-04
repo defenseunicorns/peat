@@ -1,0 +1,116 @@
+// HIVE Protocol - Capability Model
+// Specification Version: 0.1.0
+// License: CC0 1.0 Universal (Public Domain)
+//
+// This file defines the capability model for HIVE Protocol.
+// Capabilities represent what a node or cell can do (sense, compute, move, etc.)
+// and are fundamental to the composition and matching algorithms.
+
+syntax = "proto3";
+
+package cap.capability.v1;
+
+import "cap/v1/common.proto";
+
+// CapabilityType enumerates the fundamental categories of platform capabilities.
+//
+// These categories enable capability-based discovery and composition.
+// Implementations MUST support all defined types.
+// Implementations MAY define additional types using CAPABILITY_TYPE_CUSTOM.
+enum CapabilityType {
+  // Default value. Implementations MUST NOT use this for valid capabilities.
+  CAPABILITY_TYPE_UNSPECIFIED = 0;
+
+  // Sensing capabilities: cameras, radar, sonar, SIGINT, etc.
+  CAPABILITY_TYPE_SENSOR = 1;
+
+  // Computing capabilities: processing, inference, analysis
+  CAPABILITY_TYPE_COMPUTE = 2;
+
+  // Communication capabilities: relay, mesh networking, BLOS
+  CAPABILITY_TYPE_COMMUNICATION = 3;
+
+  // Mobility capabilities: flight, ground movement, maritime
+  CAPABILITY_TYPE_MOBILITY = 4;
+
+  // Payload capabilities: cargo, weapons, countermeasures
+  CAPABILITY_TYPE_PAYLOAD = 5;
+
+  // Emergent capabilities: created through composition of other capabilities
+  CAPABILITY_TYPE_EMERGENT = 6;
+
+  // Reserved for future specification use
+  // Values 7-99 are reserved
+
+  // Custom/application-defined capabilities (100+)
+  // Implementations MAY define custom types starting at 100
+}
+
+// Capability represents a single capability of a node or cell.
+//
+// Requirements:
+// - Each capability MUST have a unique id within its containing node/cell
+// - The confidence score MUST be in range [0.0, 1.0]
+// - Implementations MUST preserve capabilities during CRDT sync (G-Set semantics)
+//
+// CRDT Semantics: Capabilities use G-Set (grow-only set) semantics.
+// Once advertised, a capability cannot be removed, only marked with confidence=0.
+message Capability {
+  // REQUIRED. Unique identifier for this capability.
+  // MUST be unique within the containing node or cell.
+  // Format: lowercase alphanumeric with hyphens, e.g., "eo-camera-1"
+  string id = 1;
+
+  // REQUIRED. Human-readable capability name.
+  // SHOULD be descriptive, e.g., "Electro-Optical Camera"
+  string name = 2;
+
+  // REQUIRED. Capability category.
+  // MUST NOT be CAPABILITY_TYPE_UNSPECIFIED.
+  CapabilityType capability_type = 3;
+
+  // REQUIRED. Confidence score indicating capability reliability/availability.
+  // Range: [0.0, 1.0] where 1.0 = fully operational, 0.0 = non-functional
+  // Implementations MUST update confidence based on health/status changes.
+  float confidence = 4;
+
+  // OPTIONAL. Application-specific metadata as JSON.
+  // MAY include: range_m, resolution, bandwidth_mbps, etc.
+  // Implementations MUST preserve unknown metadata fields.
+  string metadata_json = 5;
+
+  // OPTIONAL. Timestamp when capability was first registered.
+  // Used for ordering and provenance.
+  common.v1.Timestamp registered_at = 6;
+}
+
+// CapabilityQuery defines filters for discovering nodes/cells by capability.
+//
+// Requirements:
+// - An empty query (no filters) matches all capabilities
+// - Multiple required_types use AND logic (all must be present)
+// - min_confidence filters out capabilities below the threshold
+message CapabilityQuery {
+  // OPTIONAL. Required capability types.
+  // Matching nodes MUST have at least one capability of each listed type.
+  // Empty list matches any type.
+  repeated CapabilityType required_types = 1;
+
+  // OPTIONAL. Minimum confidence threshold.
+  // Only capabilities with confidence >= this value match.
+  // Default: 0.0 (match all confidence levels)
+  float min_confidence = 2;
+
+  // OPTIONAL. Metadata filters as key-value pairs.
+  // All specified filters must match (AND logic).
+  map<string, string> metadata_filters = 3;
+}
+
+// CapabilityResponse contains the result of a capability query.
+message CapabilityResponse {
+  // Capabilities matching the query criteria.
+  repeated Capability capabilities = 1;
+
+  // Total count of matching capabilities.
+  uint32 total_count = 2;
+}

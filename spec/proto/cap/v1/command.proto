@@ -1,0 +1,410 @@
+// HIVE Protocol - Command Dissemination
+// Specification Version: 0.1.0
+// License: CC0 1.0 Universal (Public Domain)
+//
+// This file defines the command dissemination model for HIVE Protocol.
+// Commands flow downward through the hierarchy (company -> platoon -> squad -> node)
+// while acknowledgments flow upward.
+
+syntax = "proto3";
+
+package cap.command.v1;
+
+import "cap/v1/common.proto";
+
+// HierarchicalCommand is the primary command message.
+//
+// Commands are issued by higher echelons and disseminated to subordinate units.
+// The protocol supports configurable policies for handling partitions,
+// conflicts, acknowledgments, and leader changes.
+//
+// Requirements:
+// - Commands MUST have unique command_id (UUID v4)
+// - Implementations MUST honor priority ordering
+// - Implementations MUST apply configured policies
+message HierarchicalCommand {
+  // REQUIRED. Unique command identifier (UUID v4).
+  string command_id = 1;
+
+  // REQUIRED. Node ID of the command originator.
+  string originator_id = 2;
+
+  // REQUIRED. Target specification for the command.
+  CommandTarget target = 3;
+
+  // REQUIRED. Command payload (one of the command types).
+  oneof command_type {
+    MissionOrder mission_order = 10;
+    EngagementOrder engagement_order = 11;
+    FormationChange formation_change = 12;
+    ConfigurationUpdate configuration_update = 13;
+  }
+
+  // REQUIRED. Command priority level.
+  CommandPriority priority = 20;
+
+  // REQUIRED. Policy configurations.
+  BufferPolicy buffer_policy = 30;
+  ConflictPolicy conflict_policy = 31;
+  AcknowledgmentPolicy acknowledgment_policy = 32;
+  LeaderChangePolicy leader_change_policy = 33;
+
+  // REQUIRED. When command was issued.
+  common.v1.Timestamp issued_at = 40;
+
+  // OPTIONAL. Expiration time (command invalid after this).
+  optional common.v1.Timestamp expires_at = 41;
+
+  // REQUIRED. Version for conflict resolution.
+  uint32 version = 42;
+}
+
+// CommandTarget specifies which nodes/units receive a command.
+message CommandTarget {
+  // Target scope enumeration.
+  enum Scope {
+    SCOPE_UNSPECIFIED = 0;
+
+    // Single node by ID
+    INDIVIDUAL = 1;
+
+    // All members of specified squad(s)
+    SQUAD = 2;
+
+    // All members of specified platoon(s)
+    PLATOON = 3;
+
+    // All nodes in the network
+    BROADCAST = 4;
+  }
+
+  // REQUIRED. Scope of targeting.
+  Scope scope = 1;
+
+  // REQUIRED. Target identifiers (interpretation depends on scope).
+  // INDIVIDUAL: node_ids, SQUAD: squad_ids, PLATOON: platoon_ids
+  repeated string target_ids = 2;
+}
+
+// CommandPriority defines urgency levels for commands.
+//
+// Requirements:
+// - Higher priority commands preempt lower priority in queues
+// - FLASH commands SHOULD be delivered immediately
+enum CommandPriority {
+  COMMAND_PRIORITY_UNSPECIFIED = 0;
+
+  // Standard operations, normal processing
+  ROUTINE = 1;
+
+  // Time-sensitive but not critical
+  PRIORITY = 2;
+
+  // Requires immediate action
+  IMMEDIATE = 3;
+
+  // Mission-critical, override conflicts
+  FLASH = 4;
+}
+
+// BufferPolicy defines behavior during network partitions.
+enum BufferPolicy {
+  BUFFER_POLICY_UNSPECIFIED = 0;
+
+  // Queue commands during partition, deliver on reconnection
+  BUFFER_AND_RETRY = 1;
+
+  // Drop commands if target is unreachable
+  DROP_ON_PARTITION = 2;
+
+  // Fail immediately if cannot deliver
+  REQUIRE_IMMEDIATE_DELIVERY = 3;
+}
+
+// ConflictPolicy defines how to resolve conflicting commands.
+enum ConflictPolicy {
+  CONFLICT_POLICY_UNSPECIFIED = 0;
+
+  // Most recent command wins (by timestamp)
+  LAST_WRITE_WINS = 1;
+
+  // Higher priority command wins
+  HIGHEST_PRIORITY_WINS = 2;
+
+  // Command from higher authority wins
+  HIGHEST_AUTHORITY_WINS = 3;
+
+  // Merge if commands are compatible
+  MERGE_COMPATIBLE = 4;
+
+  // Reject any conflicting commands
+  REJECT_CONFLICT = 5;
+}
+
+// AcknowledgmentPolicy defines acknowledgment requirements.
+enum AcknowledgmentPolicy {
+  ACKNOWLEDGMENT_POLICY_UNSPECIFIED = 0;
+
+  // Fire-and-forget, no acknowledgment required
+  NO_ACK_REQUIRED = 1;
+
+  // Require acknowledgment from all targets
+  ACK_REQUIRED = 2;
+
+  // Require acks from >50% of targets
+  ACK_MAJORITY_REQUIRED = 3;
+
+  // Only squad/platoon leader must acknowledge
+  ACK_LEADER_ONLY = 4;
+}
+
+// LeaderChangePolicy defines behavior when leadership changes.
+enum LeaderChangePolicy {
+  LEADER_CHANGE_POLICY_UNSPECIFIED = 0;
+
+  // New leader reissues the command
+  REISSUE_FROM_NEW_LEADER = 1;
+
+  // Command continues without reissuance
+  CONTINUE_AS_IS = 2;
+
+  // Cancel command when leader changes
+  CANCEL_ON_LEADER_CHANGE = 3;
+}
+
+// MissionOrder assigns a mission to target units.
+message MissionOrder {
+  // Mission type enumeration.
+  enum MissionType {
+    MISSION_TYPE_UNSPECIFIED = 0;
+    ISR = 1;           // Intelligence, Surveillance, Reconnaissance
+    KINETIC = 2;       // Strike/engagement
+    HUMANITARIAN = 3;  // Aid/relief
+    TRANSPORT = 4;     // Movement/logistics
+    DEFENSIVE = 5;     // Defensive posture
+  }
+
+  // REQUIRED. Type of mission.
+  MissionType mission_type = 1;
+
+  // REQUIRED. Mission identifier.
+  string mission_id = 2;
+
+  // OPTIONAL. Human-readable description.
+  string description = 3;
+
+  // OPTIONAL. Primary objective location.
+  common.v1.Position objective_location = 4;
+
+  // OPTIONAL. Mission start time.
+  optional common.v1.Timestamp start_time = 5;
+
+  // OPTIONAL. Mission end time.
+  optional common.v1.Timestamp end_time = 6;
+
+  // OPTIONAL. Rules of engagement.
+  optional RulesOfEngagement roe = 7;
+}
+
+// RulesOfEngagement constrain autonomous engagement decisions.
+message RulesOfEngagement {
+  // Authority level required for engagement.
+  enum EngagementAuthority {
+    ENGAGEMENT_AUTHORITY_UNSPECIFIED = 0;
+
+    // System can engage autonomously
+    AUTONOMOUS = 1;
+
+    // Requires human operator approval
+    OPERATOR_APPROVAL = 2;
+
+    // Requires commander approval
+    COMMANDER_APPROVAL = 3;
+  }
+
+  // REQUIRED. Authority level for engagement decisions.
+  EngagementAuthority engagement_authority = 1;
+
+  // OPTIONAL. Allowed weapon systems.
+  repeated string allowed_weapons = 2;
+
+  // OPTIONAL. Prohibited weapon systems.
+  repeated string prohibited_weapons = 3;
+
+  // OPTIONAL. Maximum acceptable collateral damage [0.0, 1.0].
+  optional float max_collateral_damage_estimate = 4;
+
+  // OPTIONAL. Require standoff if civilians present.
+  bool civilians_present_standoff = 5;
+}
+
+// EngagementOrder directs specific engagement actions.
+message EngagementOrder {
+  // Engagement type enumeration.
+  enum EngagementType {
+    ENGAGEMENT_TYPE_UNSPECIFIED = 0;
+    DEFENSIVE_FIRE = 1;
+    SUPPRESSIVE_FIRE = 2;
+    PRECISION_STRIKE = 3;
+    WARNING_SHOT = 4;
+  }
+
+  // REQUIRED. Type of engagement.
+  EngagementType engagement_type = 1;
+
+  // REQUIRED. Target identifier.
+  string target_id = 2;
+
+  // REQUIRED. Target location.
+  common.v1.Position target_location = 3;
+
+  // OPTIONAL. Target description.
+  optional string target_description = 4;
+
+  // REQUIRED. Weapon system to employ.
+  string weapon_system_id = 5;
+
+  // OPTIONAL. Maximum collateral radius (meters).
+  optional float max_collateral_radius_meters = 6;
+
+  // OPTIONAL. Require visual confirmation before engagement.
+  bool require_visual_confirmation = 7;
+}
+
+// FormationChange directs units to change formation.
+message FormationChange {
+  // Formation type enumeration.
+  enum FormationType {
+    FORMATION_TYPE_UNSPECIFIED = 0;
+    LINE = 1;
+    COLUMN = 2;
+    WEDGE = 3;
+    DIAMOND = 4;
+    DISPERSED = 5;
+    RALLY = 6;
+  }
+
+  // REQUIRED. Target formation type.
+  FormationType formation_type = 1;
+
+  // OPTIONAL. Rally point for RALLY formation.
+  optional common.v1.Position rally_point = 2;
+
+  // OPTIONAL. Spacing between elements (meters).
+  optional float spacing_meters = 3;
+
+  // OPTIONAL. Formation heading (degrees).
+  optional float heading_degrees = 4;
+
+  // OPTIONAL. Individual position assignments.
+  repeated NodePositionAssignment assignments = 5;
+}
+
+// NodePositionAssignment assigns a specific position to a node.
+message NodePositionAssignment {
+  // REQUIRED. Node to position.
+  string node_id = 1;
+
+  // REQUIRED. Assigned position.
+  common.v1.Position position = 2;
+
+  // OPTIONAL. Assigned heading (degrees).
+  optional float heading_degrees = 3;
+}
+
+// ConfigurationUpdate modifies system configuration.
+message ConfigurationUpdate {
+  // Update type enumeration.
+  enum UpdateType {
+    UPDATE_TYPE_UNSPECIFIED = 0;
+    AGGREGATION_POLICY = 1;
+    SYNC_INTERVAL = 2;
+    CAPABILITY_FILTER = 3;
+    AUTHORITY_LEVEL = 4;
+  }
+
+  // REQUIRED. Type of configuration update.
+  UpdateType update_type = 1;
+
+  // REQUIRED. Configuration data (JSON).
+  string configuration_json = 2;
+}
+
+// CommandAcknowledgment flows upward to confirm command receipt/execution.
+message CommandAcknowledgment {
+  // REQUIRED. Command being acknowledged.
+  string command_id = 1;
+
+  // REQUIRED. Node sending acknowledgment.
+  string node_id = 2;
+
+  // REQUIRED. Acknowledgment status.
+  AckStatus status = 3;
+
+  // OPTIONAL. Reason for rejection or failure.
+  optional string reason = 4;
+
+  // REQUIRED. Acknowledgment timestamp.
+  common.v1.Timestamp timestamp = 5;
+}
+
+// AckStatus indicates the command handling status.
+enum AckStatus {
+  ACK_STATUS_UNSPECIFIED = 0;
+
+  // Command received
+  ACK_RECEIVED = 1;
+
+  // Command accepted and executing
+  ACK_ACCEPTED = 2;
+
+  // Command completed successfully
+  ACK_COMPLETED = 3;
+
+  // Command rejected (see reason)
+  ACK_REJECTED = 4;
+
+  // Command execution failed (see reason)
+  ACK_FAILED = 5;
+}
+
+// CommandStatus tracks the state of a command for originators.
+message CommandStatus {
+  // Command being tracked.
+  string command_id = 1;
+
+  // Current state.
+  CommandState state = 2;
+
+  // Collected acknowledgments.
+  repeated CommandAcknowledgment acknowledgments = 3;
+
+  // Last status update.
+  common.v1.Timestamp last_updated = 4;
+}
+
+// CommandState tracks overall command execution state.
+enum CommandState {
+  COMMAND_STATE_UNSPECIFIED = 0;
+
+  // Command issued, awaiting delivery
+  STATE_PENDING = 1;
+
+  // Delivered to at least one target
+  STATE_DELIVERED = 2;
+
+  // Currently being executed
+  STATE_EXECUTING = 3;
+
+  // Completed successfully
+  STATE_COMPLETED = 4;
+
+  // Failed to execute
+  STATE_FAILED = 5;
+
+  // Cancelled by originator
+  STATE_CANCELLED = 6;
+
+  // Expired (past expires_at)
+  STATE_EXPIRED = 7;
+}

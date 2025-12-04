@@ -1,0 +1,119 @@
+// HIVE Protocol - Discovery Beacon
+// Specification Version: 0.1.0
+// License: CC0 1.0 Universal (Public Domain)
+//
+// This file defines the beacon model for the HIVE Protocol discovery phase.
+// Beacons are broadcast by nodes to announce their presence and capabilities.
+
+syntax = "proto3";
+
+package cap.beacon.v1;
+
+import "cap/v1/common.proto";
+import "cap/v1/node.proto";
+import "cap/v1/capability.proto";
+
+// Beacon is the discovery broadcast message.
+//
+// During Phase 1 (Discovery), nodes broadcast beacons to announce their
+// presence, capabilities, and current state to nearby peers.
+//
+// Requirements:
+// - Nodes in PHASE_DISCOVERY MUST broadcast beacons periodically
+// - Beacon interval SHOULD be configurable (default: 1 second)
+// - Beacons MUST include accurate position and capabilities
+// - sequence_number MUST monotonically increase per node
+//
+// Message Complexity:
+// - Beacons are geographically scoped using geohash bucketing
+// - This achieves O(sqrt(n)) discovery complexity vs O(n^2) broadcast
+message Beacon {
+  // REQUIRED. Node ID broadcasting this beacon.
+  string node_id = 1;
+
+  // REQUIRED. Summary of node configuration.
+  node.v1.NodeConfig node_config = 2;
+
+  // REQUIRED. Current node state.
+  node.v1.NodeState node_state = 3;
+
+  // REQUIRED. Capabilities being advertised.
+  repeated capability.v1.Capability capabilities = 4;
+
+  // REQUIRED. Monotonically increasing sequence number.
+  // Used to detect beacon gaps and ordering.
+  uint64 sequence_number = 5;
+
+  // OPTIONAL. Time-to-live for multi-hop relay.
+  // Decremented by each relay; dropped when TTL=0.
+  // Default: 3 (typical for tactical networks)
+  uint32 ttl = 6;
+
+  // REQUIRED. Timestamp when beacon was generated.
+  common.v1.Timestamp timestamp = 7;
+
+  // OPTIONAL. Cell ID if node is already part of a cell.
+  // Used to inform discoverers of existing cell membership.
+  optional string current_cell_id = 8;
+}
+
+// BeaconQuery filters for discovering nodes.
+//
+// All filter criteria use AND logic (all must match).
+// An empty query matches all beacons.
+message BeaconQuery {
+  // OPTIONAL. Filter by platform type.
+  optional string platform_type = 1;
+
+  // OPTIONAL. Filter by required capabilities.
+  repeated capability.v1.CapabilityType required_capabilities = 2;
+
+  // OPTIONAL. Filter by protocol phase.
+  optional node.v1.Phase phase = 3;
+
+  // OPTIONAL. Maximum distance from reference position (meters).
+  // Requires reference_position to be set.
+  optional float max_distance_m = 4;
+
+  // OPTIONAL. Reference position for distance filtering.
+  optional common.v1.Position reference_position = 5;
+
+  // OPTIONAL. Minimum health status required.
+  optional node.v1.HealthStatus min_health = 6;
+
+  // OPTIONAL. Minimum fuel remaining (minutes).
+  optional uint32 min_fuel_minutes = 7;
+}
+
+// BeaconQueryResponse contains beacons matching a query.
+message BeaconQueryResponse {
+  // Beacons matching the query criteria.
+  repeated Beacon beacons = 1;
+
+  // Total count of matching beacons.
+  uint32 total_count = 2;
+
+  // Timestamp when query was executed.
+  common.v1.Timestamp queried_at = 3;
+}
+
+// BeaconRecord is the storage representation of a beacon.
+//
+// Used for CRDT persistence and tracking beacon freshness.
+message BeaconRecord {
+  // The beacon itself.
+  Beacon beacon = 1;
+
+  // When this beacon was first observed.
+  common.v1.Timestamp first_seen = 2;
+
+  // When this beacon was last observed.
+  common.v1.Timestamp last_seen = 3;
+
+  // Number of times this beacon has been received.
+  uint64 seen_count = 4;
+
+  // Whether this beacon is still considered active.
+  // Implementations SHOULD mark inactive after TTL expiration.
+  bool active = 5;
+}

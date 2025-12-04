@@ -1,0 +1,169 @@
+// HIVE Protocol - Capability Composition
+// Specification Version: 0.1.0
+// License: CC0 1.0 Universal (Public Domain)
+//
+// This file defines the capability composition model for HIVE Protocol.
+// Composition rules transform individual platform capabilities into
+// aggregated team capabilities, including emergent capabilities.
+
+syntax = "proto3";
+
+package cap.composition.v1;
+
+import "cap/v1/common.proto";
+import "cap/v1/capability.proto";
+
+// CompositionRuleType defines how capabilities are combined.
+//
+// The four composition patterns enable different aggregation behaviors:
+// - ADDITIVE: Sum of capabilities (e.g., coverage area)
+// - EMERGENT: New capabilities from combinations (e.g., ISR chain)
+// - REDUNDANT: Improved reliability through overlap (e.g., detection probability)
+// - CONSTRAINT: Limiting factors (e.g., team speed = slowest member)
+enum CompositionRuleType {
+  COMPOSITION_RULE_TYPE_UNSPECIFIED = 0;
+
+  // Additive: team_capability = sum(individual_capabilities)
+  // Example: Total sensor coverage = sum of individual coverage areas
+  COMPOSITION_RULE_TYPE_ADDITIVE = 1;
+
+  // Emergent: new capability created when prerequisites are met
+  // Example: ISR_Chain = sensor AND compute AND communications
+  COMPOSITION_RULE_TYPE_EMERGENT = 2;
+
+  // Redundant: improved reliability through multiple providers
+  // Example: detection_prob = 1 - product(1 - individual_prob)
+  COMPOSITION_RULE_TYPE_REDUNDANT = 3;
+
+  // Constraint: team limited by weakest link or best performer
+  // Example: team_speed = min(individual_speeds)
+  COMPOSITION_RULE_TYPE_CONSTRAINT = 4;
+}
+
+// CompositionRule defines how to compose capabilities.
+//
+// Rules are evaluated by cell leaders to aggregate member capabilities
+// into team-level capabilities, including discovering emergent capabilities.
+//
+// Requirements:
+// - Each rule MUST have a unique id within the rule set
+// - Emergent rules MUST specify output_capability
+// - min_inputs MUST be >= 1
+message CompositionRule {
+  // REQUIRED. Unique rule identifier.
+  string id = 1;
+
+  // REQUIRED. Human-readable rule name.
+  string name = 2;
+
+  // REQUIRED. Composition pattern to apply.
+  CompositionRuleType rule_type = 3;
+
+  // REQUIRED. Input capability types required for this rule.
+  // For EMERGENT rules, all types must be present.
+  // For other rules, capabilities of these types are aggregated.
+  repeated capability.v1.CapabilityType input_capabilities = 4;
+
+  // CONDITIONAL. Output capability produced (REQUIRED for EMERGENT rules).
+  // This is the new capability created when the rule conditions are met.
+  optional capability.v1.Capability output_capability = 5;
+
+  // REQUIRED. Minimum number of input capabilities required.
+  // Must be >= 1.
+  uint32 min_inputs = 6;
+
+  // OPTIONAL. Maximum number of inputs to consider.
+  // If not set, all available inputs are used.
+  optional uint32 max_inputs = 7;
+
+  // Method for calculating output confidence from inputs.
+  enum ConfidenceMethod {
+    CONFIDENCE_METHOD_UNSPECIFIED = 0;
+
+    // Output confidence = minimum of all input confidences
+    CONFIDENCE_METHOD_MIN = 1;
+
+    // Output confidence = maximum of all input confidences
+    CONFIDENCE_METHOD_MAX = 2;
+
+    // Output confidence = average of all input confidences
+    CONFIDENCE_METHOD_AVERAGE = 3;
+
+    // Output confidence = product of all input confidences
+    CONFIDENCE_METHOD_PRODUCT = 4;
+
+    // Custom calculation defined in metadata
+    CONFIDENCE_METHOD_CUSTOM = 5;
+  }
+
+  // REQUIRED. How to calculate output confidence.
+  ConfidenceMethod confidence_method = 8;
+
+  // OPTIONAL. Additional rule configuration (JSON).
+  // For CUSTOM confidence method, must include calculation formula.
+  string metadata_json = 9;
+
+  // OPTIONAL. Rule priority for ordering (higher = evaluated first).
+  uint32 priority = 10;
+
+  // OPTIONAL. Whether this rule is currently enabled.
+  // Default: true
+  bool enabled = 11;
+
+  // OPTIONAL. When this rule was defined.
+  common.v1.Timestamp created_at = 12;
+}
+
+// CompositionResult contains the output of composition rule evaluation.
+//
+// Cell leaders publish composition results to advertise team capabilities.
+message CompositionResult {
+  // REQUIRED. Cell ID this composition applies to.
+  string cell_id = 1;
+
+  // Rules that were applied.
+  repeated CompositionRule applied_rules = 2;
+
+  // Input capabilities from cell members.
+  repeated capability.v1.Capability input_capabilities = 3;
+
+  // Output capabilities after composition (including emergent).
+  repeated capability.v1.Capability output_capabilities = 4;
+
+  // Overall composition confidence score.
+  float composition_confidence = 5;
+
+  // When composition was performed.
+  common.v1.Timestamp composed_at = 6;
+
+  // Whether all constraint rules were satisfied.
+  bool valid = 7;
+
+  // Validation errors (if any constraints failed).
+  repeated string validation_errors = 8;
+}
+
+// ApplyCompositionRequest triggers composition rule evaluation.
+message ApplyCompositionRequest {
+  // REQUIRED. Cell ID to apply composition rules.
+  string cell_id = 1;
+
+  // OPTIONAL. Specific rule IDs to apply.
+  // If empty, all enabled rules are applied.
+  repeated string rule_ids = 2;
+
+  // REQUIRED. Input capabilities from cell members.
+  repeated capability.v1.Capability input_capabilities = 3;
+}
+
+// ApplyCompositionResponse contains the composition result.
+message ApplyCompositionResponse {
+  // The composition result.
+  CompositionResult result = 1;
+
+  // Whether composition succeeded.
+  bool success = 2;
+
+  // Error message if composition failed.
+  optional string error_message = 3;
+}
