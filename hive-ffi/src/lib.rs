@@ -302,6 +302,7 @@ impl Drop for SubscriptionHandle {
 #[derive(uniffi::Object)]
 pub struct HiveNode {
     /// The sync backend with FormationKey authentication
+    #[allow(dead_code)] // Kept for potential future use in mesh operations
     sync_backend: Arc<AutomergeIrohBackend>,
     /// Storage backend for document operations
     storage_backend: Arc<RwLock<AutomergeBackend>>,
@@ -700,100 +701,6 @@ impl From<anyhow::Error> for HiveError {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_hive_version() {
-        let version = hive_version();
-        assert!(!version.is_empty());
-        assert!(version.contains('.'));
-    }
-
-    #[test]
-    fn test_encode_track() {
-        let track = TrackData {
-            track_id: "track-001".to_string(),
-            source_platform: "platform-1".to_string(),
-            position: Position {
-                lat: 34.0522,
-                lon: -118.2437,
-                hae: Some(100.0),
-            },
-            velocity: Some(Velocity {
-                bearing: 90.0,
-                speed_mps: 10.0,
-            }),
-            classification: "a-f-G-U-C".to_string(),
-            confidence: 0.95,
-            cell_id: Some("cell-1".to_string()),
-            formation_id: None,
-        };
-
-        let result = encode_track_to_cot(track);
-        assert!(result.is_ok());
-
-        let xml = result.unwrap();
-        assert!(xml.contains("<event"));
-        assert!(xml.contains("track-001"));
-    }
-
-    #[test]
-    fn test_encode_minimal_track() {
-        let track = TrackData {
-            track_id: "t1".to_string(),
-            source_platform: "p1".to_string(),
-            position: Position {
-                lat: 0.0,
-                lon: 0.0,
-                hae: None,
-            },
-            velocity: None,
-            classification: "a-u-G".to_string(),
-            confidence: 0.5,
-            cell_id: None,
-            formation_id: None,
-        };
-
-        let result = encode_track_to_cot(track);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_invalid_track_id() {
-        let track = TrackData {
-            track_id: "".to_string(), // Empty - should fail
-            source_platform: "p1".to_string(),
-            position: Position {
-                lat: 0.0,
-                lon: 0.0,
-                hae: None,
-            },
-            velocity: None,
-            classification: "a-u-G".to_string(),
-            confidence: 0.5,
-            cell_id: None,
-            formation_id: None,
-        };
-
-        let result = encode_track_to_cot(track);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_helper_functions() {
-        let pos = create_position(34.0, -118.0, Some(50.0));
-        assert_eq!(pos.lat, 34.0);
-        assert_eq!(pos.lon, -118.0);
-        assert_eq!(pos.hae, Some(50.0));
-
-        let vel = create_velocity(45.0, 15.0);
-        assert_eq!(vel.bearing, 45.0);
-        assert_eq!(vel.speed_mps, 15.0);
-    }
-}
-
 // =============================================================================
 // JNI Bindings - Direct Android native method support
 // =============================================================================
@@ -820,7 +727,7 @@ mod tests {
 /// Kotlin signature: external fun hiveVersion(): String
 #[no_mangle]
 pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_hiveVersion(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
 ) -> jstring {
     let version = hive_version();
@@ -834,7 +741,7 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_hiveVersion(
 /// Kotlin signature: external fun testJni(): String
 #[no_mangle]
 pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_testJni(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
 ) -> jstring {
     let msg = "JNI bindings working! HIVE FFI loaded successfully.";
@@ -849,12 +756,13 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_testJni(
 #[cfg(feature = "sync")]
 #[no_mangle]
 pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_createNodeJni(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
     app_id: JString,
     shared_key: JString,
     storage_path: JString,
 ) -> i64 {
+    let mut env = env;
     let app_id: String = match env.get_string(&app_id) {
         Ok(s) => s.into(),
         Err(_) => return 0,
@@ -888,9 +796,9 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_createNodeJni(
             // Return the Arc pointer as a handle
             Arc::into_raw(node) as i64
         }
-        Err(e) => {
+        Err(_e) => {
             #[cfg(target_os = "android")]
-            android_log(&format!("createNodeJni: Error creating node: {:?}", e));
+            android_log(&format!("createNodeJni: Error creating node: {:?}", _e));
             0
         }
     }
@@ -902,7 +810,7 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_createNodeJni(
 #[cfg(feature = "sync")]
 #[no_mangle]
 pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_nodeIdJni(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
     handle: i64,
 ) -> jstring {
@@ -1011,9 +919,10 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_freeNodeJni(
 /// ```
 #[no_mangle]
 pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_nativeInit(
-    mut env: JNIEnv,
+    env: JNIEnv,
     class: JClass,
 ) {
+    let mut env = env;
     use jni::NativeMethod;
 
     let methods: Vec<NativeMethod> = vec![
@@ -1060,7 +969,7 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_nativeInit(
     ];
 
     // Register native methods - the class is passed in from Kotlin so it's valid
-    if let Err(e) = env.register_native_methods(&class, &methods) {
+    if let Err(_e) = env.register_native_methods(&class, &methods) {
         // Log error but don't crash - caller will see methods not registered
         let _ = env.exception_describe();
         let _ = env.exception_clear();
@@ -1071,9 +980,14 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_nativeInit(
 ///
 /// This is our chance to register native methods while we have access to
 /// the JNI environment from inside the library's linker namespace.
+///
+/// # Safety
+///
+/// This function dereferences raw pointers passed from the JVM.
+/// It is only safe to call from the JVM's library loading mechanism.
 #[no_mangle]
 #[allow(non_snake_case)]
-pub extern "C" fn JNI_OnLoad(vm: *mut JavaVM, _reserved: *mut c_void) -> jint {
+pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, _reserved: *mut c_void) -> jint {
     // Log that we're being called
     #[cfg(target_os = "android")]
     {
@@ -1081,14 +995,14 @@ pub extern "C" fn JNI_OnLoad(vm: *mut JavaVM, _reserved: *mut c_void) -> jint {
     }
 
     // Get JNIEnv from JavaVM
-    let mut env = unsafe {
+    let mut env = {
         let mut env_ptr: *mut jni::sys::JNIEnv = std::ptr::null_mut();
-        let get_env_result = (**vm).GetEnv.unwrap()(
+        let get_env_result = (*(*vm)).GetEnv.unwrap()(
             vm,
             &mut env_ptr as *mut _ as *mut *mut c_void,
-            JNI_VERSION_1_6 as i32,
+            JNI_VERSION_1_6,
         );
-        if get_env_result != jni::sys::JNI_OK as i32 {
+        if get_env_result != jni::sys::JNI_OK {
             #[cfg(target_os = "android")]
             android_log("JNI_OnLoad: GetEnv failed");
             return jni::sys::JNI_ERR;
@@ -1203,5 +1117,103 @@ fn android_log(msg: &str) {
             fn __android_log_write(prio: i32, tag: *const c_char, text: *const c_char) -> i32;
         }
         __android_log_write(4, tag.as_ptr(), msg.as_ptr());
+    }
+}
+
+// =============================================================================
+// Tests
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hive_version() {
+        let version = hive_version();
+        assert!(!version.is_empty());
+        assert!(version.contains('.'));
+    }
+
+    #[test]
+    fn test_encode_track() {
+        let track = TrackData {
+            track_id: "track-001".to_string(),
+            source_platform: "platform-1".to_string(),
+            position: Position {
+                lat: 34.0522,
+                lon: -118.2437,
+                hae: Some(100.0),
+            },
+            velocity: Some(Velocity {
+                bearing: 90.0,
+                speed_mps: 10.0,
+            }),
+            classification: "a-f-G-U-C".to_string(),
+            confidence: 0.95,
+            cell_id: Some("cell-1".to_string()),
+            formation_id: None,
+        };
+
+        let result = encode_track_to_cot(track);
+        assert!(result.is_ok());
+
+        let xml = result.unwrap();
+        assert!(xml.contains("<event"));
+        assert!(xml.contains("track-001"));
+    }
+
+    #[test]
+    fn test_encode_minimal_track() {
+        let track = TrackData {
+            track_id: "t1".to_string(),
+            source_platform: "p1".to_string(),
+            position: Position {
+                lat: 0.0,
+                lon: 0.0,
+                hae: None,
+            },
+            velocity: None,
+            classification: "a-u-G".to_string(),
+            confidence: 0.5,
+            cell_id: None,
+            formation_id: None,
+        };
+
+        let result = encode_track_to_cot(track);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_invalid_track_id() {
+        let track = TrackData {
+            track_id: "".to_string(), // Empty - should fail
+            source_platform: "p1".to_string(),
+            position: Position {
+                lat: 0.0,
+                lon: 0.0,
+                hae: None,
+            },
+            velocity: None,
+            classification: "a-u-G".to_string(),
+            confidence: 0.5,
+            cell_id: None,
+            formation_id: None,
+        };
+
+        let result = encode_track_to_cot(track);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_helper_functions() {
+        let pos = create_position(34.0, -118.0, Some(50.0));
+        assert_eq!(pos.lat, 34.0);
+        assert_eq!(pos.lon, -118.0);
+        assert_eq!(pos.hae, Some(50.0));
+
+        let vel = create_velocity(45.0, 15.0);
+        assert_eq!(vel.bearing, 45.0);
+        assert_eq!(vel.speed_mps, 15.0);
     }
 }

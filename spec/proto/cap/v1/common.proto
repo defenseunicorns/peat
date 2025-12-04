@@ -1,0 +1,83 @@
+// HIVE Protocol - Common Types
+// Specification Version: 0.1.0
+// License: CC0 1.0 Universal (Public Domain)
+//
+// This file defines common message types used throughout the HIVE Protocol.
+// All implementations MUST support these types as the foundation for protocol messages.
+
+syntax = "proto3";
+
+package cap.common.v1;
+
+// Uuid represents a universally unique identifier.
+//
+// Requirements:
+// - Implementations MUST generate UUIDs conforming to RFC 4122 version 4
+// - The value field MUST contain a valid UUID string representation
+// - Format: "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx" where x is hex and y is [89ab]
+// - Implementations MUST reject malformed UUID strings
+message Uuid {
+  // REQUIRED. The UUID string value.
+  string value = 1;
+}
+
+// Timestamp represents a point in time with nanosecond precision.
+//
+// Requirements:
+// - Implementations MUST use Unix epoch (1970-01-01T00:00:00Z) as the reference
+// - The nanos field MUST be in the range [0, 999999999]
+// - For CRDT LWW semantics, implementations MUST ensure timestamp monotonicity
+// - Implementations SHOULD use synchronized time sources (NTP, GPS) when available
+message Timestamp {
+  // REQUIRED. Seconds since Unix epoch.
+  uint64 seconds = 1;
+
+  // OPTIONAL. Nanoseconds within the second. MUST be [0, 999999999].
+  // If omitted, implementations SHOULD treat as 0.
+  uint32 nanos = 2;
+}
+
+// Position represents a geographic location using WGS84 coordinates.
+//
+// Requirements:
+// - Implementations MUST use WGS84 datum (EPSG:4326)
+// - Latitude MUST be in the range [-90.0, 90.0] degrees
+// - Longitude MUST be in the range [-180.0, 180.0] degrees
+// - Altitude is meters above the WGS84 ellipsoid (not mean sea level)
+// - Implementations MUST reject positions outside valid ranges
+message Position {
+  // REQUIRED. Latitude in decimal degrees. Range: [-90.0, 90.0].
+  double latitude = 1;
+
+  // REQUIRED. Longitude in decimal degrees. Range: [-180.0, 180.0].
+  double longitude = 2;
+
+  // OPTIONAL. Altitude in meters above WGS84 ellipsoid.
+  // If omitted, altitude is unknown or not applicable.
+  double altitude = 3;
+}
+
+// Confidence represents a normalized confidence or probability score.
+//
+// Requirements:
+// - The value MUST be in the range [0.0, 1.0]
+// - 0.0 represents no confidence / impossible
+// - 1.0 represents full confidence / certain
+// - Implementations MUST reject values outside this range
+message Confidence {
+  // REQUIRED. Confidence value. Range: [0.0, 1.0].
+  float value = 1;
+}
+
+// Metadata provides extensible key-value storage for application-specific data.
+//
+// Requirements:
+// - Keys MUST be non-empty strings
+// - Keys SHOULD use lowercase with underscores (snake_case)
+// - Values MAY be any string (including JSON for complex data)
+// - Implementations MUST preserve unknown metadata during sync
+// - Reserved key prefixes: "hive_" (protocol use), "x_" (experimental)
+message Metadata {
+  // Key-value pairs for extensible metadata.
+  map<string, string> fields = 1;
+}
