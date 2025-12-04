@@ -1220,6 +1220,7 @@ impl PeerDiscovery for IrohPeerDiscovery {
     }
 
     async fn add_peer(&self, address: &str, _transport: TransportType) -> Result<()> {
+        use crate::network::iroh_transport::IrohTransport;
         use crate::network::PeerInfo as NetworkPeerInfo;
 
         // Get formation key for authentication
@@ -1230,10 +1231,45 @@ impl PeerDiscovery for IrohPeerDiscovery {
             .clone()
             .ok_or_else(|| Error::Internal("Formation key not initialized".to_string()))?;
 
+        // Parse address format (Issue #226):
+        // Format 1: "seed|hostname:port" - Derives EndpointId from seed (for containerlab)
+        // Format 2: "hex_node_id" - Raw hex EndpointId (legacy static config)
+        //
+        // Example: "alpha-formation/node-1|192.168.1.100:9000"
+        let (node_id, socket_addr) = if address.contains('|') {
+            // Seed-based format: "seed|address"
+            let parts: Vec<&str> = address.splitn(2, '|').collect();
+            if parts.len() != 2 {
+                return Err(Error::Internal(format!(
+                    "Invalid address format: {}. Expected 'seed|host:port'",
+                    address
+                )));
+            }
+            let seed = parts[0];
+            let addr = parts[1];
+
+            // Derive EndpointId from seed using deterministic key generation
+            let endpoint_id = IrohTransport::endpoint_id_from_seed(seed);
+            let node_id_hex = hex::encode(endpoint_id.as_bytes());
+
+            tracing::debug!(
+                seed = seed,
+                node_id = %node_id_hex,
+                address = addr,
+                "Derived EndpointId from seed for add_peer"
+            );
+
+            (node_id_hex, addr.to_string())
+        } else {
+            // Legacy format: assume address is a hex-encoded EndpointId
+            // (for backwards compatibility with existing static configs)
+            (address.to_string(), address.to_string())
+        };
+
         let peer_info = NetworkPeerInfo {
             name: "manual-peer".to_string(),
-            node_id: address.to_string(),
-            addresses: vec![address.to_string()],
+            node_id,
+            addresses: vec![socket_addr],
             relay_url: None,
         };
 

@@ -44,7 +44,7 @@ subtle = "2.6"             # Constant-time comparison (formation key auth)
 automerge = { version = "0.7.1", optional = true }  # Automerge CRDT library for evaluation
 
 # AutomergeIrohBackend dependencies (ADR-011)
-iroh = { version = "0.95", optional = true }  # QUIC-based P2P networking
+iroh = { version = "0.95", optional = true, features = ["discovery-local-network"] }  # QUIC-based P2P networking with local mDNS discovery
 iroh-blobs = { version = "0.97", optional = true }  # Content-addressed blob storage (ADR-025)
 rocksdb = { version = "0.22", optional = true }  # Persistent storage
 lru = { version = "0.12", optional = true }  # LRU cache for hot documents

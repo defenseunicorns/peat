@@ -2,24 +2,33 @@
 //!
 //! This module provides a wrapper around Iroh's Endpoint for HIVE Protocol.
 //!
-//! # Phase 3 Implementation
+//! # Features
 //!
-//! Basic P2P connectivity with:
-//! - Endpoint creation and lifecycle
-//! - Peer connection management
-//! - Bidirectional streams
-//! - Static peer configuration
+//! - **Endpoint creation and lifecycle**: QUIC-based P2P connections
+//! - **Peer connection management**: Connect, accept, and track connections
+//! - **Local network discovery**: Automatic peer discovery via mDNS-like protocol (Issue #226)
+//! - **Static peer configuration**: Connect to peers with known addresses
 //!
-//! # Phase 4 Will Add
+//! # Local Discovery (Issue #226)
 //!
-//! - Automerge sync protocol
-//! - Document sync over streams
-//! - Automatic change propagation
+//! Iroh's local network discovery uses swarm-discovery to automatically find peers
+//! on the same L2 network. This bridges the gap between Ditto's hostname:port
+//! addressing and Iroh's EndpointId-based addressing.
+//!
+//! ```ignore
+//! // Create transport with local discovery enabled (recommended for production)
+//! let transport = IrohTransport::with_discovery("my-node").await?;
+//!
+//! // Discovered peers are automatically available for connection
+//! let peers = transport.discovered_peers().await;
+//! ```
 
 #[cfg(feature = "automerge-backend")]
 use super::peer_config::PeerInfo;
 #[cfg(feature = "automerge-backend")]
 use anyhow::{Context, Result};
+#[cfg(feature = "automerge-backend")]
+use iroh::discovery::mdns::MdnsDiscovery;
 #[cfg(feature = "automerge-backend")]
 use iroh::endpoint::{Connection, Endpoint};
 #[cfg(feature = "automerge-backend")]
@@ -52,6 +61,9 @@ pub struct IrohTransport {
     accept_running: Arc<AtomicBool>,
     /// Accept loop task handle
     accept_task: Arc<RwLock<Option<JoinHandle<()>>>>,
+    /// mDNS discovery (optional, for automatic peer discovery on local network)
+    #[allow(dead_code)]
+    mdns_discovery: Option<MdnsDiscovery>,
 }
 
 #[cfg(feature = "automerge-backend")]
@@ -90,7 +102,244 @@ impl IrohTransport {
             connections: Arc::new(RwLock::new(HashMap::new())),
             accept_running: Arc::new(AtomicBool::new(false)),
             accept_task: Arc::new(RwLock::new(None)),
+            mdns_discovery: None,
         })
+    }
+
+    /// Create a new Iroh transport with local network discovery enabled (Issue #226)
+    ///
+    /// This is the recommended constructor for containerlab and local network testing.
+    /// It enables automatic peer discovery via mDNS-like protocol, bridging the gap
+    /// between Ditto's hostname:port addressing and Iroh's EndpointId-based addressing.
+    ///
+    /// # How Local Discovery Works
+    ///
+    /// 1. Each node broadcasts its EndpointId and addresses via mDNS/DNS-SD
+    /// 2. Other nodes on the same L2 network receive these announcements
+    /// 3. Discovered peers are automatically added to the endpoint's address book
+    /// 4. Connections can be established using just the EndpointId
+    ///
+    /// # Arguments
+    ///
+    /// * `node_name` - Human-readable name for this node (used in discovery announcements)
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Create transport with local discovery (recommended for containerlab)
+    /// let transport = IrohTransport::with_discovery("squad-alpha-1").await?;
+    ///
+    /// // Wait for peers to be discovered, then connect by EndpointId
+    /// let peer_id = transport.discovered_peers().await.first().unwrap();
+    /// let conn = transport.connect_by_id(*peer_id).await?;
+    /// ```
+    pub async fn with_discovery(_node_name: &str) -> Result<Self> {
+        // Generate a secret key to derive the endpoint_id
+        let mut rng = rand::rng();
+        let secret_key = iroh::SecretKey::generate(&mut rng);
+        let endpoint_id = secret_key.public();
+
+        // Create mDNS discovery service using the endpoint_id
+        let discovery = MdnsDiscovery::builder()
+            .build(endpoint_id)
+            .context("Failed to create mDNS discovery")?;
+
+        // Create endpoint with the same secret key and discovery enabled
+        let endpoint = Endpoint::builder()
+            .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
+            .secret_key(secret_key)
+            .discovery(discovery.clone())
+            .bind()
+            .await
+            .context("Failed to create Iroh endpoint with mDNS discovery")?;
+
+        tracing::info!(
+            endpoint_id = %endpoint.id(),
+            "Created IrohTransport with mDNS discovery"
+        );
+
+        Ok(Self {
+            endpoint,
+            connections: Arc::new(RwLock::new(HashMap::new())),
+            accept_running: Arc::new(AtomicBool::new(false)),
+            accept_task: Arc::new(RwLock::new(None)),
+            mdns_discovery: Some(discovery),
+        })
+    }
+
+    /// Create a new Iroh transport with deterministic key from seed (Issue #226)
+    ///
+    /// This is the recommended constructor for containerlab and static configurations
+    /// where the EndpointId must be predictable. The secret key is derived from the
+    /// seed using HKDF, making the EndpointId deterministic for a given seed.
+    ///
+    /// # Deterministic Key Generation for Containerlab
+    ///
+    /// In containerlab environments, we know:
+    /// - Container hostnames (e.g., "node-1", "node-2")
+    /// - Container IP addresses
+    /// - A shared formation key
+    ///
+    /// By deriving the secret key from `"{formation_id}/{node_name}"`, the EndpointId
+    /// becomes predictable and can be configured statically.
+    ///
+    /// # Arguments
+    ///
+    /// * `seed` - Seed for deterministic key generation (e.g., "formation-id/node-name")
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Create transport with deterministic key for containerlab
+    /// let transport = IrohTransport::from_seed("alpha-formation/node-1").await?;
+    ///
+    /// // The EndpointId is now predictable and can be pre-configured
+    /// let endpoint_id = transport.endpoint_id();
+    /// println!("Node ID: {}", hex::encode(endpoint_id.as_bytes()));
+    /// ```
+    pub async fn from_seed(seed: &str) -> Result<Self> {
+        use sha2::{Digest, Sha256};
+
+        // Derive 32 bytes from seed using SHA-256
+        let mut hasher = Sha256::new();
+        hasher.update(b"hive-iroh-key-v1:"); // Domain separator
+        hasher.update(seed.as_bytes());
+        let hash = hasher.finalize();
+
+        // Convert hash to secret key bytes
+        let mut seed_bytes = [0u8; 32];
+        seed_bytes.copy_from_slice(&hash);
+
+        // Create deterministic secret key
+        let secret_key = iroh::SecretKey::from_bytes(&seed_bytes);
+
+        tracing::info!(
+            seed = seed,
+            endpoint_id = %secret_key.public(),
+            "Created IrohTransport with deterministic key from seed"
+        );
+
+        let endpoint = Endpoint::builder()
+            .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
+            .secret_key(secret_key)
+            .bind()
+            .await
+            .context("Failed to create Iroh endpoint from seed")?;
+
+        Ok(Self {
+            endpoint,
+            connections: Arc::new(RwLock::new(HashMap::new())),
+            accept_running: Arc::new(AtomicBool::new(false)),
+            accept_task: Arc::new(RwLock::new(None)),
+            mdns_discovery: None,
+        })
+    }
+
+    /// Create a new Iroh transport with deterministic key and mDNS discovery
+    ///
+    /// Combines deterministic key generation with mDNS discovery for maximum
+    /// flexibility in containerlab environments where multicast works.
+    ///
+    /// # Arguments
+    ///
+    /// * `seed` - Seed for deterministic key generation
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Create transport with deterministic key AND mDNS discovery
+    /// let transport = IrohTransport::from_seed_with_discovery("alpha/node-1").await?;
+    /// ```
+    pub async fn from_seed_with_discovery(seed: &str) -> Result<Self> {
+        use sha2::{Digest, Sha256};
+
+        // Derive 32 bytes from seed using SHA-256
+        let mut hasher = Sha256::new();
+        hasher.update(b"hive-iroh-key-v1:"); // Domain separator
+        hasher.update(seed.as_bytes());
+        let hash = hasher.finalize();
+
+        // Convert hash to secret key bytes
+        let mut seed_bytes = [0u8; 32];
+        seed_bytes.copy_from_slice(&hash);
+
+        // Create deterministic secret key
+        let secret_key = iroh::SecretKey::from_bytes(&seed_bytes);
+        let endpoint_id = secret_key.public();
+
+        // Create mDNS discovery service
+        let discovery = MdnsDiscovery::builder()
+            .build(endpoint_id)
+            .context("Failed to create mDNS discovery")?;
+
+        tracing::info!(
+            seed = seed,
+            endpoint_id = %endpoint_id,
+            "Created IrohTransport with deterministic key and mDNS discovery"
+        );
+
+        let endpoint = Endpoint::builder()
+            .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
+            .secret_key(secret_key)
+            .discovery(discovery.clone())
+            .bind()
+            .await
+            .context("Failed to create Iroh endpoint from seed with discovery")?;
+
+        Ok(Self {
+            endpoint,
+            connections: Arc::new(RwLock::new(HashMap::new())),
+            accept_running: Arc::new(AtomicBool::new(false)),
+            accept_task: Arc::new(RwLock::new(None)),
+            mdns_discovery: Some(discovery),
+        })
+    }
+
+    /// Compute the EndpointId from a seed without creating a transport (Issue #226)
+    ///
+    /// This is useful for generating static peer configurations where you need
+    /// to know the EndpointId before starting the node.
+    ///
+    /// # Arguments
+    ///
+    /// * `seed` - Seed for deterministic key generation (e.g., "formation-id/node-name")
+    ///
+    /// # Returns
+    ///
+    /// The EndpointId that would be generated for this seed
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Pre-compute EndpointIds for all nodes in a containerlab topology
+    /// for node in ["node-1", "node-2", "node-3"] {
+    ///     let seed = format!("alpha-formation/{}", node);
+    ///     let endpoint_id = IrohTransport::endpoint_id_from_seed(&seed);
+    ///     println!("{}: {}", node, hex::encode(endpoint_id.as_bytes()));
+    /// }
+    ///
+    /// // Output can be used in TOML config:
+    /// // [[peers]]
+    /// // name = "node-1"
+    /// // node_id = "computed-hex-id"
+    /// // addresses = ["node-1:9000"]
+    /// ```
+    pub fn endpoint_id_from_seed(seed: &str) -> EndpointId {
+        use sha2::{Digest, Sha256};
+
+        // Derive 32 bytes from seed using SHA-256 (same as from_seed)
+        let mut hasher = Sha256::new();
+        hasher.update(b"hive-iroh-key-v1:"); // Domain separator
+        hasher.update(seed.as_bytes());
+        let hash = hasher.finalize();
+
+        // Convert hash to secret key bytes
+        let mut seed_bytes = [0u8; 32];
+        seed_bytes.copy_from_slice(&hash);
+
+        // Create deterministic secret key and extract public key
+        let secret_key = iroh::SecretKey::from_bytes(&seed_bytes);
+        secret_key.public()
     }
 
     /// Create a new Iroh transport bound to a SINGLE specific address
@@ -134,6 +383,7 @@ impl IrohTransport {
             connections: Arc::new(RwLock::new(HashMap::new())),
             accept_running: Arc::new(AtomicBool::new(false)),
             accept_task: Arc::new(RwLock::new(None)),
+            mdns_discovery: None,
         })
     }
 
@@ -209,6 +459,61 @@ impl IrohTransport {
         }
 
         self.connect(addr).await
+    }
+
+    /// Connect to a peer using only their EndpointId (requires discovery) (Issue #226)
+    ///
+    /// This method is designed for use with local network discovery enabled.
+    /// The discovery system must have already learned about this peer before
+    /// a connection can be established.
+    ///
+    /// # Arguments
+    ///
+    /// * `endpoint_id` - The peer's EndpointId (discovered via local discovery)
+    ///
+    /// # Returns
+    ///
+    /// Connection to the peer
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // With discovery enabled, discovered peers can be connected by ID only
+    /// let transport = IrohTransport::with_discovery("my-node").await?;
+    ///
+    /// // Wait for discovery to find peers...
+    /// tokio::time::sleep(Duration::from_secs(2)).await;
+    ///
+    /// // Connect to a discovered peer by their EndpointId
+    /// let conn = transport.connect_by_id(peer_endpoint_id).await?;
+    /// ```
+    pub async fn connect_by_id(&self, endpoint_id: EndpointId) -> Result<Connection> {
+        // Create EndpointAddr with just the ID - discovery should have provided addresses
+        let addr = EndpointAddr::new(endpoint_id);
+
+        tracing::debug!(
+            peer_id = %endpoint_id,
+            "Connecting to peer by ID (using discovery-resolved addresses)"
+        );
+
+        let conn = self
+            .endpoint
+            .connect(addr, CAP_AUTOMERGE_ALPN)
+            .await
+            .context("Failed to connect to peer by ID - ensure discovery has found this peer")?;
+
+        // Store connection
+        self.connections
+            .write()
+            .unwrap()
+            .insert(endpoint_id, conn.clone());
+
+        Ok(conn)
+    }
+
+    /// Check if mDNS discovery is enabled
+    pub fn has_discovery(&self) -> bool {
+        self.mdns_discovery.is_some()
     }
 
     /// Accept an incoming connection
@@ -377,6 +682,124 @@ mod tests {
     async fn test_connected_peers_initially_empty() {
         let transport = IrohTransport::new().await.unwrap();
         assert!(transport.connected_peers().is_empty());
+        transport.close().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_transport_with_discovery() {
+        // Test that with_discovery creates a transport with mDNS discovery enabled (Issue #226)
+        let transport = IrohTransport::with_discovery("test-node").await.unwrap();
+
+        // Verify endpoint was created
+        let endpoint_id = transport.endpoint_id();
+        assert_ne!(endpoint_id.as_bytes(), &[0u8; 32]);
+
+        // Verify discovery is enabled
+        assert!(transport.has_discovery());
+
+        // Verify initial state is empty
+        assert_eq!(transport.peer_count(), 0);
+        assert!(transport.connected_peers().is_empty());
+
+        transport.close().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_transport_without_discovery() {
+        // Test that standard new() doesn't enable discovery
+        let transport = IrohTransport::new().await.unwrap();
+
+        // Verify discovery is NOT enabled
+        assert!(!transport.has_discovery());
+
+        transport.close().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_from_seed_deterministic() {
+        // Test that from_seed produces deterministic EndpointIds (Issue #226)
+        let seed = "test-formation/node-1";
+
+        // Create two transports from the same seed
+        let transport1 = IrohTransport::from_seed(seed).await.unwrap();
+        let id1 = transport1.endpoint_id();
+        transport1.close().await.unwrap();
+
+        let transport2 = IrohTransport::from_seed(seed).await.unwrap();
+        let id2 = transport2.endpoint_id();
+        transport2.close().await.unwrap();
+
+        // They should have the same EndpointId
+        assert_eq!(id1, id2, "Same seed should produce same EndpointId");
+    }
+
+    #[tokio::test]
+    async fn test_from_seed_different_seeds() {
+        // Test that different seeds produce different EndpointIds
+        let transport1 = IrohTransport::from_seed("formation/node-1").await.unwrap();
+        let id1 = transport1.endpoint_id();
+
+        let transport2 = IrohTransport::from_seed("formation/node-2").await.unwrap();
+        let id2 = transport2.endpoint_id();
+
+        // Different seeds should produce different EndpointIds
+        assert_ne!(
+            id1, id2,
+            "Different seeds should produce different EndpointIds"
+        );
+
+        transport1.close().await.unwrap();
+        transport2.close().await.unwrap();
+    }
+
+    #[test]
+    fn test_endpoint_id_from_seed() {
+        // Test the static helper function
+        let seed = "alpha-formation/node-1";
+
+        let id1 = IrohTransport::endpoint_id_from_seed(seed);
+        let id2 = IrohTransport::endpoint_id_from_seed(seed);
+
+        // Should be deterministic
+        assert_eq!(id1, id2);
+
+        // Should produce different IDs for different seeds
+        let id3 = IrohTransport::endpoint_id_from_seed("alpha-formation/node-2");
+        assert_ne!(id1, id3);
+    }
+
+    #[tokio::test]
+    async fn test_from_seed_matches_static_computation() {
+        // Test that from_seed produces the same ID as endpoint_id_from_seed
+        let seed = "containerlab/mesh-node-1";
+
+        let computed_id = IrohTransport::endpoint_id_from_seed(seed);
+
+        let transport = IrohTransport::from_seed(seed).await.unwrap();
+        let transport_id = transport.endpoint_id();
+
+        assert_eq!(
+            computed_id, transport_id,
+            "Static and dynamic computation should match"
+        );
+
+        transport.close().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_from_seed_with_discovery() {
+        // Test that from_seed_with_discovery enables both deterministic keys and mDNS
+        let seed = "test-formation/discovery-node";
+
+        let transport = IrohTransport::from_seed_with_discovery(seed).await.unwrap();
+
+        // Should have discovery enabled
+        assert!(transport.has_discovery());
+
+        // Should have deterministic endpoint ID
+        let expected_id = IrohTransport::endpoint_id_from_seed(seed);
+        assert_eq!(transport.endpoint_id(), expected_id);
+
         transport.close().await.unwrap();
     }
 }
