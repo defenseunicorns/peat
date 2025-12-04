@@ -1,0 +1,270 @@
+// HIVE Protocol - Node Model
+// Specification Version: 0.1.0
+// License: CC0 1.0 Universal (Public Domain)
+//
+// This file defines the node model for HIVE Protocol.
+// A Node represents a single platform (UAV, UGV, soldier system, sensor, etc.)
+// participating in the HIVE mesh.
+
+syntax = "proto3";
+
+package cap.node.v1;
+
+import "cap/v1/common.proto";
+import "cap/v1/capability.proto";
+
+// Phase represents the current operational phase of a node in the HIVE Protocol.
+//
+// The protocol operates in three sequential phases:
+// 1. DISCOVERY - Nodes broadcast beacons and discover peers
+// 2. CELL - Nodes form cells (squads) and elect leaders
+// 3. HIERARCHY - Cells organize hierarchically and begin operations
+//
+// Requirements:
+// - Nodes MUST start in PHASE_DISCOVERY
+// - Phase transitions MUST follow the sequence: DISCOVERY -> CELL -> HIERARCHY
+// - Nodes MAY regress to earlier phases on network partition recovery
+enum Phase {
+  // Default value. Implementations MUST NOT use for active nodes.
+  PHASE_UNSPECIFIED = 0;
+
+  // Discovery phase: broadcasting beacons, discovering peers
+  PHASE_DISCOVERY = 1;
+
+  // Cell formation phase: joining/forming cells, leader election
+  PHASE_CELL = 2;
+
+  // Hierarchical operations phase: normal operations within hierarchy
+  PHASE_HIERARCHY = 3;
+}
+
+// HealthStatus represents the operational health of a node.
+//
+// Requirements:
+// - Implementations MUST update health status based on platform diagnostics
+// - Health status affects leader election scoring (lower health = lower score)
+// - Nodes with HEALTH_STATUS_FAILED SHOULD be excluded from operations
+enum HealthStatus {
+  HEALTH_STATUS_UNSPECIFIED = 0;
+
+  // Fully operational, all systems nominal
+  HEALTH_STATUS_NOMINAL = 1;
+
+  // Degraded but operational (reduced capability)
+  HEALTH_STATUS_DEGRADED = 2;
+
+  // Critical failure imminent, limited operations
+  HEALTH_STATUS_CRITICAL = 3;
+
+  // Failed/offline, non-operational
+  HEALTH_STATUS_FAILED = 4;
+}
+
+// OperatorRank maps to standard military rank structures.
+//
+// This enumeration supports human-machine teaming by encoding
+// military rank for authority calculations.
+//
+// Requirements:
+// - Implementations MUST map these values to appropriate rank scores
+// - Rank contributes to leader election when humans are present
+enum OperatorRank {
+  OPERATOR_RANK_UNSPECIFIED = 0;
+
+  // Enlisted ranks (E1-E9)
+  OPERATOR_RANK_E1 = 1;   // Private / Seaman Recruit
+  OPERATOR_RANK_E2 = 2;   // Private First Class
+  OPERATOR_RANK_E3 = 3;   // Lance Corporal / Specialist
+  OPERATOR_RANK_E4 = 4;   // Corporal / Specialist
+  OPERATOR_RANK_E5 = 5;   // Sergeant (Squad Leader level)
+  OPERATOR_RANK_E6 = 6;   // Staff Sergeant
+  OPERATOR_RANK_E7 = 7;   // Sergeant First Class (Platoon Sergeant)
+  OPERATOR_RANK_E8 = 8;   // Master Sergeant
+  OPERATOR_RANK_E9 = 9;   // Sergeant Major
+
+  // Commissioned Officer ranks (O1-O10)
+  OPERATOR_RANK_O1 = 11;  // Second Lieutenant (Platoon Leader)
+  OPERATOR_RANK_O2 = 12;  // First Lieutenant
+  OPERATOR_RANK_O3 = 13;  // Captain (Company Commander)
+  OPERATOR_RANK_O4 = 14;  // Major
+  OPERATOR_RANK_O5 = 15;  // Lieutenant Colonel (Battalion Commander)
+  OPERATOR_RANK_O6 = 16;  // Colonel (Brigade Commander)
+  OPERATOR_RANK_O7 = 17;  // Brigadier General
+  OPERATOR_RANK_O8 = 18;  // Major General
+  OPERATOR_RANK_O9 = 19;  // Lieutenant General
+  OPERATOR_RANK_O10 = 20; // General
+
+  // Warrant Officer ranks (W1-W5)
+  OPERATOR_RANK_W1 = 21;
+  OPERATOR_RANK_W2 = 22;
+  OPERATOR_RANK_W3 = 23;
+  OPERATOR_RANK_W4 = 24;
+  OPERATOR_RANK_W5 = 25;
+}
+
+// AuthorityLevel defines the human authority level for autonomous operations.
+//
+// Based on Sheridan & Verplank autonomy levels, this defines how much
+// authority a human operator has over autonomous platform decisions.
+//
+// Requirements:
+// - Higher authority levels increase influence in leader election
+// - Rules of Engagement MAY mandate minimum authority levels for certain actions
+enum AuthorityLevel {
+  AUTHORITY_LEVEL_UNSPECIFIED = 0;
+
+  // Observer: can view system state, cannot influence decisions
+  AUTHORITY_LEVEL_OBSERVER = 1;
+
+  // Advisor: can provide recommendations, systems may consider but not require
+  AUTHORITY_LEVEL_ADVISOR = 2;
+
+  // Supervisor: provides intent, approves/rejects autonomous plans
+  AUTHORITY_LEVEL_SUPERVISOR = 3;
+
+  // Commander: approves all significant autonomous decisions
+  AUTHORITY_LEVEL_COMMANDER = 4;
+}
+
+// BindingType defines the relationship cardinality between operators and platforms.
+enum BindingType {
+  BINDING_TYPE_UNSPECIFIED = 0;
+
+  // One operator controlling one platform
+  BINDING_TYPE_ONE_TO_ONE = 1;
+
+  // One operator supervising multiple platforms (swarm control)
+  BINDING_TYPE_ONE_TO_MANY = 2;
+
+  // Multiple operators collaborating on one platform
+  BINDING_TYPE_MANY_TO_ONE = 3;
+
+  // Multiple operators supervising multiple platforms
+  BINDING_TYPE_MANY_TO_MANY = 4;
+}
+
+// Operator represents a human operator for human-machine teaming.
+//
+// Requirements:
+// - Operator id MUST be unique across the network
+// - Rank and authority_level affect leader election calculations
+message Operator {
+  // REQUIRED. Unique operator identifier.
+  string id = 1;
+
+  // OPTIONAL. Operator display name.
+  string name = 2;
+
+  // REQUIRED. Military rank of the operator.
+  OperatorRank rank = 3;
+
+  // REQUIRED. Authority level for autonomous operations.
+  AuthorityLevel authority_level = 4;
+
+  // OPTIONAL. Military Occupational Specialty code.
+  string mos = 5;
+
+  // OPTIONAL. Additional operator metadata (JSON).
+  // MAY include: cognitive_load, fatigue, certifications
+  string metadata_json = 6;
+}
+
+// HumanMachinePair represents a binding between operators and platforms.
+//
+// This enables human-machine teaming where humans supervise autonomous platforms.
+message HumanMachinePair {
+  // Operators in this binding.
+  repeated Operator operators = 1;
+
+  // Platform/node IDs bound to these operators.
+  repeated string platform_ids = 2;
+
+  // Cardinality of the binding.
+  BindingType binding_type = 3;
+
+  // When this binding was established.
+  common.v1.Timestamp bound_at = 4;
+}
+
+// NodeConfig contains static configuration for a node.
+//
+// Requirements:
+// - NodeConfig is immutable after node initialization
+// - The id MUST be a valid UUID v4
+// - Implementations MUST NOT modify NodeConfig during operation
+//
+// CRDT Semantics: NodeConfig is treated as immutable and replicated as-is.
+message NodeConfig {
+  // REQUIRED. Unique platform identifier (UUID v4).
+  string id = 1;
+
+  // REQUIRED. Platform type identifier.
+  // Examples: "UAV", "UGV", "SOLDIER_SYSTEM", "SENSOR_NODE"
+  string platform_type = 2;
+
+  // REQUIRED. Static capabilities of this platform.
+  // CRDT: G-Set semantics (grow-only)
+  repeated capability.v1.Capability capabilities = 3;
+
+  // OPTIONAL. Maximum communication range in meters.
+  float comm_range_m = 4;
+
+  // OPTIONAL. Maximum platform speed in meters per second.
+  float max_speed_mps = 5;
+
+  // OPTIONAL. Human-machine binding for this platform.
+  optional HumanMachinePair operator_binding = 6;
+
+  // OPTIONAL. Timestamp when node was configured/initialized.
+  common.v1.Timestamp created_at = 7;
+}
+
+// NodeState contains dynamic state for a node.
+//
+// Requirements:
+// - NodeState MUST be updated by the owning node
+// - Timestamp MUST be updated on every state change
+// - Implementations MUST use LWW semantics for conflict resolution
+//
+// CRDT Semantics: Uses LWW-Register for most fields, PN-Counter for fuel.
+message NodeState {
+  // REQUIRED. Current geographic position.
+  // CRDT: LWW-Register
+  common.v1.Position position = 1;
+
+  // OPTIONAL. Fuel/battery remaining in minutes.
+  // CRDT: PN-Counter (can increment and decrement)
+  uint32 fuel_minutes = 2;
+
+  // REQUIRED. Current health status.
+  // CRDT: LWW-Register
+  HealthStatus health = 3;
+
+  // REQUIRED. Current protocol phase.
+  // CRDT: LWW-Register
+  Phase phase = 4;
+
+  // OPTIONAL. ID of the cell this node belongs to.
+  // CRDT: LWW-Register
+  optional string cell_id = 5;
+
+  // OPTIONAL. ID of the zone for hierarchical routing.
+  // CRDT: LWW-Register
+  optional string zone_id = 6;
+
+  // REQUIRED. Last update timestamp for LWW conflict resolution.
+  // Implementations MUST update this on every state change.
+  common.v1.Timestamp timestamp = 7;
+}
+
+// Node represents the complete state of a platform in the HIVE mesh.
+//
+// This is the primary entity synchronized across the CRDT mesh.
+// Each physical platform MUST have exactly one Node representation.
+message Node {
+  // REQUIRED. Static configuration (immutable).
+  NodeConfig config = 1;
+
+  // REQUIRED. Dynamic state (CRDT-backed).
+  NodeState state = 2;
+}
