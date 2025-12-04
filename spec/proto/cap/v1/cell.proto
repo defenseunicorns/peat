@@ -1,0 +1,144 @@
+// HIVE Protocol - Cell Model
+// Specification Version: 0.1.0
+// License: CC0 1.0 Universal (Public Domain)
+//
+// This file defines the cell (squad) model for HIVE Protocol.
+// A Cell is a group of nodes that operate together, with a single leader.
+// Cells are the fundamental unit of hierarchical organization.
+
+syntax = "proto3";
+
+package cap.cell.v1;
+
+import "cap/v1/common.proto";
+import "cap/v1/capability.proto";
+
+// CellConfig contains static configuration for a cell.
+//
+// Requirements:
+// - Cell id MUST be a valid UUID v4
+// - max_size SHOULD be in range [3, 12] for tactical effectiveness
+// - min_size MUST be >= 2 (a cell requires at least a leader and one member)
+message CellConfig {
+  // REQUIRED. Unique cell identifier (UUID v4).
+  string id = 1;
+
+  // REQUIRED. Maximum number of members in this cell.
+  // Implementations SHOULD reject join requests when at capacity.
+  uint32 max_size = 2;
+
+  // OPTIONAL. Minimum number of members for the cell to be operational.
+  // Default: 2
+  uint32 min_size = 3;
+
+  // OPTIONAL. Timestamp when cell was created.
+  common.v1.Timestamp created_at = 4;
+}
+
+// CellState contains dynamic state for a cell.
+//
+// Requirements:
+// - Exactly one member MUST be designated as leader
+// - All members MUST have the cell_id in their NodeState
+// - Leader is responsible for publishing aggregated capabilities
+//
+// CRDT Semantics:
+// - leader_id: LWW-Register with deterministic tie-breaking
+// - members: OR-Set (allows add and remove with tombstones)
+// - capabilities: G-Set (aggregated from member capabilities)
+message CellState {
+  // Cell configuration.
+  CellConfig config = 1;
+
+  // OPTIONAL. Current leader node ID.
+  // CRDT: LWW-Register
+  // If absent, cell is in leader election state.
+  optional string leader_id = 2;
+
+  // REQUIRED. Set of member node IDs.
+  // CRDT: OR-Set
+  // MUST include the leader_id if leader is set.
+  repeated string members = 3;
+
+  // REQUIRED. Aggregated cell capabilities.
+  // CRDT: G-Set
+  // Computed by leader from member capabilities using composition rules.
+  repeated capability.v1.Capability capabilities = 4;
+
+  // OPTIONAL. Parent zone/platoon ID for hierarchical organization.
+  // CRDT: LWW-Register
+  optional string platoon_id = 5;
+
+  // REQUIRED. Last update timestamp for LWW conflict resolution.
+  common.v1.Timestamp timestamp = 6;
+}
+
+// Cell represents the complete state of a cell (squad).
+message Cell {
+  // Static configuration.
+  CellConfig config = 1;
+
+  // Dynamic state.
+  CellState state = 2;
+}
+
+// CellFormationRequest is sent by a node to initiate or join cell formation.
+//
+// Requirements:
+// - Nodes in PHASE_DISCOVERY MAY send formation requests
+// - Formation requests SHOULD include required capabilities for matching
+message CellFormationRequest {
+  // REQUIRED. ID of the node requesting formation/joining.
+  string node_id = 1;
+
+  // OPTIONAL. Required capability types for the cell.
+  // Used for capability-based cell matching.
+  repeated capability.v1.CapabilityType required_capabilities = 2;
+
+  // REQUIRED. Timestamp of the request.
+  common.v1.Timestamp requested_at = 3;
+}
+
+// CellFormationResponse is returned in response to a formation request.
+message CellFormationResponse {
+  // The formed/joined cell (if successful).
+  optional Cell cell = 1;
+
+  // Whether formation/join was successful.
+  bool success = 2;
+
+  // Reason for failure (if not successful).
+  optional string failure_reason = 3;
+}
+
+// CellMembershipChange represents a change in cell membership.
+//
+// These events are used to track cell composition changes for
+// auditing and hierarchical notification.
+message CellMembershipChange {
+  // REQUIRED. ID of the cell affected.
+  string cell_id = 1;
+
+  // Type of membership change.
+  enum ChangeType {
+    CHANGE_TYPE_UNSPECIFIED = 0;
+
+    // A node joined the cell
+    CHANGE_TYPE_JOIN = 1;
+
+    // A node left the cell
+    CHANGE_TYPE_LEAVE = 2;
+
+    // Leadership changed
+    CHANGE_TYPE_LEADER = 3;
+  }
+
+  // REQUIRED. Type of change.
+  ChangeType change_type = 2;
+
+  // REQUIRED. Node ID involved in the change.
+  string node_id = 3;
+
+  // REQUIRED. Timestamp of the change.
+  common.v1.Timestamp timestamp = 4;
+}
