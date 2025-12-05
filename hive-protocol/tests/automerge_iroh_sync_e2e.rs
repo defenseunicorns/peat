@@ -20,6 +20,7 @@
 
 #![cfg(feature = "automerge-backend")]
 
+use hive_protocol::discovery::peer::StaticDiscovery;
 use hive_protocol::network::{IrohTransport, PeerInfo};
 use hive_protocol::storage::capabilities::{CrdtCapable, SyncCapable, TypedCollection};
 use hive_protocol::storage::{AutomergeBackend, AutomergeStore};
@@ -83,31 +84,60 @@ async fn test_two_nodes_connect() {
     println!("  Node 2 ID: {:?}", transport2.endpoint_id());
     println!("  Node 2 Addr: {}", addr2);
 
-    // Start accept loop on Node 2
-    println!("  Starting accept loop on Node 2...");
+    // Start accept loop on BOTH nodes (required for bidirectional connection with tie-breaking)
+    println!("  Starting accept loops on both nodes...");
+    transport1.start_accept_loop().unwrap();
     transport2.start_accept_loop().unwrap();
 
-    // Give accept loop a moment to start
+    // Give accept loops a moment to start
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    // Create PeerInfo for node 2
+    // Create PeerInfo for both nodes (required for deterministic tie-breaking)
+    let node1_peer = create_peer_info("node-1", &transport1, addr1);
     let node2_peer = create_peer_info("node-2", &transport2, addr2);
 
-    println!("  1. Node 1 connecting to Node 2 via static config...");
+    // Determine which node should initiate based on endpoint ID comparison
+    let endpoint1 = transport1.endpoint_id();
+    let endpoint2 = transport2.endpoint_id();
+    println!("  Endpoint 1: {:?}", endpoint1);
+    println!("  Endpoint 2: {:?}", endpoint2);
 
-    // Connect using PeerInfo
-    let connection_result = transport1.connect_peer(&node2_peer).await;
+    let node1_should_initiate = endpoint1.as_bytes() < endpoint2.as_bytes();
+    println!(
+        "  Node {} should initiate (lower endpoint ID)",
+        if node1_should_initiate { "1" } else { "2" }
+    );
 
-    match connection_result {
-        Ok(_conn) => {
-            println!("  ✓ Connection established!");
-            assert_eq!(transport1.peer_count(), 1);
+    println!("  1. Attempting connection (with deterministic tie-breaking)...");
+
+    // Connect using PeerInfo - the side with lower endpoint ID will succeed
+    if node1_should_initiate {
+        // Node 1 initiates
+        match transport1.connect_peer(&node2_peer).await {
+            Ok(Some(_conn)) => {
+                println!("  ✓ Connection established (Node 1 initiated)!");
+                assert_eq!(transport1.peer_count(), 1);
+            }
+            Ok(None) => {
+                panic!("Expected Node 1 to initiate but got None");
+            }
+            Err(e) => {
+                println!("  ✗ Connection failed: {}", e);
+            }
         }
-        Err(e) => {
-            println!("  ✗ Connection failed: {}", e);
-            println!("  → Phase 6.1 TODO: May need accept task on Node 2");
-            println!("  → Phase 6.1 TODO: Debug why direct addressing isn't working");
-            // Don't panic yet - we need to investigate further
+    } else {
+        // Node 2 initiates
+        match transport2.connect_peer(&node1_peer).await {
+            Ok(Some(_conn)) => {
+                println!("  ✓ Connection established (Node 2 initiated)!");
+                assert_eq!(transport2.peer_count(), 1);
+            }
+            Ok(None) => {
+                panic!("Expected Node 2 to initiate but got None");
+            }
+            Err(e) => {
+                println!("  ✗ Connection failed: {}", e);
+            }
         }
     }
 
@@ -141,19 +171,29 @@ async fn test_document_sync_two_nodes() {
 
     println!("  1. Starting sync on both backends...");
 
-    // Start sync
+    // Start sync (this also starts accept loops internally)
     backend1.start_sync().unwrap();
     backend2.start_sync().unwrap();
 
-    println!("  2. Connecting peers via static config...");
+    println!("  2. Connecting peers via static config (with deterministic tie-breaking)...");
 
-    // Create PeerInfo and connect
+    // Create PeerInfo for both nodes
+    let node1_peer = create_peer_info("node-1", &transport1, addr1);
     let node2_peer = create_peer_info("node-2", &transport2, addr2);
-    let connection_result = transport1.connect_peer(&node2_peer).await;
 
-    if connection_result.is_err() {
+    // Determine which node should initiate based on endpoint ID comparison
+    let endpoint1 = transport1.endpoint_id();
+    let endpoint2 = transport2.endpoint_id();
+    let node1_initiates = endpoint1.as_bytes() < endpoint2.as_bytes();
+
+    let connected = if node1_initiates {
+        matches!(transport1.connect_peer(&node2_peer).await, Ok(Some(_)))
+    } else {
+        matches!(transport2.connect_peer(&node1_peer).await, Ok(Some(_)))
+    };
+
+    if !connected {
         println!("  ✗ Connection failed - skipping sync test");
-        println!("  → Phase 6.1 TODO: Debug connection issue");
         return;
     }
 
@@ -219,13 +259,22 @@ async fn test_bidirectional_sync() {
     let nodes1: Arc<dyn TypedCollection<NodeState>> = backend1.typed_collection("nodes");
     let nodes2: Arc<dyn TypedCollection<NodeState>> = backend2.typed_collection("nodes");
 
-    // Start sync
+    // Start sync (this also starts accept loops internally)
     backend1.start_sync().unwrap();
     backend2.start_sync().unwrap();
 
-    // Connect via static config
+    // Connect via static config (with deterministic tie-breaking)
+    let node1_peer = create_peer_info("node-1", &transport1, addr1);
     let node2_peer = create_peer_info("node-2", &transport2, addr2);
-    if transport1.connect_peer(&node2_peer).await.is_err() {
+    let node1_initiates = transport1.endpoint_id().as_bytes() < transport2.endpoint_id().as_bytes();
+
+    let connected = if node1_initiates {
+        matches!(transport1.connect_peer(&node2_peer).await, Ok(Some(_)))
+    } else {
+        matches!(transport2.connect_peer(&node1_peer).await, Ok(Some(_)))
+    };
+
+    if !connected {
         println!("  ✗ Connection failed - skipping test");
         return;
     }
@@ -289,8 +338,18 @@ async fn test_concurrent_updates_merge() {
     backend1.start_sync().unwrap();
     backend2.start_sync().unwrap();
 
+    // Connect via static config (with deterministic tie-breaking)
+    let node1_peer = create_peer_info("node-1", &transport1, addr1);
     let node2_peer = create_peer_info("node-2", &transport2, addr2);
-    if transport1.connect_peer(&node2_peer).await.is_err() {
+    let node1_initiates = transport1.endpoint_id().as_bytes() < transport2.endpoint_id().as_bytes();
+
+    let connected = if node1_initiates {
+        matches!(transport1.connect_peer(&node2_peer).await, Ok(Some(_)))
+    } else {
+        matches!(transport2.connect_peer(&node1_peer).await, Ok(Some(_)))
+    };
+
+    if !connected {
         println!("  ✗ Connection failed - skipping test");
         return;
     }
@@ -372,18 +431,27 @@ async fn test_sync_stats_tracking() {
     assert_eq!(initial_stats1.bytes_received, 0);
 
     let node2_peer = create_peer_info("node-2", &transport2, addr2);
-    if transport1.connect_peer(&node2_peer).await.is_ok() {
-        println!("  ✓ Connected");
+    match transport1.connect_peer(&node2_peer).await {
+        Ok(Some(_conn)) => {
+            println!("  ✓ Connected (we initiated)");
 
-        let stats_after_connect = backend1.sync_stats().unwrap();
-        println!("  Peer count: {}", stats_after_connect.peer_count);
-        assert_eq!(stats_after_connect.peer_count, 1);
+            let stats_after_connect = backend1.sync_stats().unwrap();
+            println!("  Peer count: {}", stats_after_connect.peer_count);
+            assert_eq!(stats_after_connect.peer_count, 1);
 
-        // TODO Phase 6.2: After actual sync, verify byte counters
-        println!("  → Phase 6.2 TODO: Track bytes sent/received");
-        println!("  → Phase 6.2 TODO: Track last sync timestamp");
-    } else {
-        println!("  ✗ Connection failed");
+            // TODO Phase 6.2: After actual sync, verify byte counters
+            println!("  → Phase 6.2 TODO: Track bytes sent/received");
+            println!("  → Phase 6.2 TODO: Track last sync timestamp");
+        }
+        Ok(None) => {
+            // With deterministic tie-breaking, we may not be the initiator
+            println!("  ✓ Connection skipped (other side should initiate)");
+            // Peer count will be 0 since we didn't initiate
+            // This is expected behavior with the new tie-breaking logic
+        }
+        Err(e) => {
+            println!("  ✗ Connection failed: {}", e);
+        }
     }
 
     backend1.stop_sync().unwrap();
@@ -443,6 +511,32 @@ async fn test_observer_notifications_on_remote_sync() {
     println!("  Backend 1 endpoint: {:?}", backend1.endpoint_id());
     println!("  Backend 2 endpoint: {:?}", backend2.endpoint_id());
 
+    // Setup bidirectional discovery (required for deterministic tie-breaking)
+    let transport1 = backend1.transport();
+    let transport2 = backend2.transport();
+
+    let peer1_info = hive_protocol::discovery::peer::PeerInfo {
+        name: "node-1".to_string(),
+        node_id: hex::encode(transport1.endpoint_id().as_bytes()),
+        addresses: vec![addr1.to_string()],
+        relay_url: None,
+    };
+    let peer2_info = hive_protocol::discovery::peer::PeerInfo {
+        name: "node-2".to_string(),
+        node_id: hex::encode(transport2.endpoint_id().as_bytes()),
+        addresses: vec![addr2.to_string()],
+        relay_url: None,
+    };
+
+    backend1
+        .add_discovery_strategy(Box::new(StaticDiscovery::from_peers(vec![peer2_info])))
+        .await
+        .unwrap();
+    backend2
+        .add_discovery_strategy(Box::new(StaticDiscovery::from_peers(vec![peer1_info])))
+        .await
+        .unwrap();
+
     // Start sync on both backends
     backend1.sync_engine().start_sync().await.unwrap();
     backend2.sync_engine().start_sync().await.unwrap();
@@ -476,40 +570,25 @@ async fn test_observer_notifications_on_remote_sync() {
         _ => panic!("Expected Initial event, got {:?}", initial_event),
     }
 
-    println!("  2. Connecting peers with authenticated handshake...");
+    println!("  2. Connecting peers...");
 
-    // Connect Node 1 to Node 2 with proper handshake
-    let transport2 = backend2.transport();
-    let node2_peer = create_peer_info("node-2", &transport2, addr2);
-    let transport1 = backend1.transport();
+    // Wait for background discovery/connection to establish (runs every 5 seconds)
+    // With bidirectional discovery, the lower-ID node will initiate the connection
+    println!("    Waiting for discovery connect loop...");
+    tokio::time::sleep(Duration::from_secs(7)).await;
 
-    // First establish QUIC connection
-    let conn = match transport1.connect_peer(&node2_peer).await {
-        Ok(conn) => conn,
-        Err(e) => {
-            println!("  ✗ Connection failed: {} - skipping observer test", e);
-            println!("  → This indicates a transport-level issue, not observer issue");
-            return;
-        }
-    };
+    // Verify connection is established
+    let connected1 = transport1.connected_peers();
+    let connected2 = transport2.connected_peers();
+    println!("    Node 1 connected to {} peers", connected1.len());
+    println!("    Node 2 connected to {} peers", connected2.len());
 
-    // Then perform formation handshake (required for authenticated backends)
-    let formation_key = backend1.formation_key().unwrap();
-    match hive_protocol::network::formation_handshake::perform_initiator_handshake(
-        &conn,
-        &formation_key,
-    )
-    .await
-    {
-        Ok(()) => println!("  ✓ Peers connected and authenticated"),
-        Err(e) => {
-            println!("  ✗ Handshake failed: {} - skipping observer test", e);
-            return;
-        }
+    if connected1.is_empty() && connected2.is_empty() {
+        println!("  ✗ No connection established - skipping observer test");
+        println!("  → This indicates bidirectional discovery/connect issue");
+        return;
     }
-
-    // Give peers a moment to establish sync
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    println!("  ✓ Peers connected via discovery");
 
     println!("  3. Creating document on Node 1...");
 

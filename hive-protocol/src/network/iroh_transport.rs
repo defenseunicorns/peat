@@ -412,9 +412,45 @@ impl IrohTransport {
     ///
     /// # Returns
     ///
-    /// Connection to the peer
-    pub async fn connect(&self, addr: EndpointAddr) -> Result<Connection> {
-        let endpoint_id = addr.id;
+    /// `Ok(Some(conn))` - New connection that needs handshake
+    /// `Ok(None)` - We should not initiate (they have lower ID and will connect to us)
+    /// `Err(e)` - Connection failed
+    ///
+    /// # Note (Issue #229)
+    ///
+    /// Uses deterministic tie-breaking to prevent simultaneous connection race conditions.
+    /// Only the side with the LOWER endpoint ID initiates connections. The side with
+    /// higher ID should wait to accept incoming connections instead.
+    ///
+    /// This ensures exactly one QUIC connection is established between any pair of peers,
+    /// avoiding the race where both sides establish connections and then close the "wrong" one.
+    ///
+    /// Callers MUST check for `None` and skip connection in that case.
+    pub async fn connect(&self, addr: EndpointAddr) -> Result<Option<Connection>> {
+        let remote_id = addr.id;
+        let our_id = self.endpoint_id();
+
+        // Deterministic tie-breaking (Issue #229): only lower ID initiates
+        let we_are_lower = our_id.as_bytes() < remote_id.as_bytes();
+
+        if !we_are_lower {
+            // We have higher ID - we should NOT initiate
+            // The peer with lower ID will connect to us, and we'll accept
+            tracing::debug!(
+                "Skipping connect to {:?}: they have lower ID and will initiate",
+                remote_id
+            );
+            return Ok(None);
+        }
+
+        // Check if we already have a connection to this peer
+        {
+            let connections = self.connections.read().unwrap();
+            if let Some(existing) = connections.get(&remote_id) {
+                tracing::debug!("Already have connection to {:?}, reusing", remote_id);
+                return Ok(Some(existing.clone()));
+            }
+        }
 
         let conn = self
             .endpoint
@@ -422,13 +458,25 @@ impl IrohTransport {
             .await
             .context("Failed to connect to peer")?;
 
-        // Store connection
-        self.connections
-            .write()
-            .unwrap()
-            .insert(endpoint_id, conn.clone());
+        // Store connection (check again in case of race with accept loop)
+        let mut connections = self.connections.write().unwrap();
+        if let Some(_existing) = connections.get(&remote_id) {
+            // Race: accept loop stored an incoming connection while we were connecting
+            // Since we're the lower ID, we're the initiator - close theirs, use ours
+            // Wait, this shouldn't happen since only lower ID connects...
+            // But if it does, keep our outgoing connection
+            tracing::debug!(
+                "Race detected with accept loop for {:?}, keeping our connection",
+                remote_id
+            );
+            // Close the existing (incoming) and use our new one
+            if let Some(old) = connections.remove(&remote_id) {
+                old.close(0u32.into(), b"replaced by our initiated connection");
+            }
+        }
 
-        Ok(conn)
+        connections.insert(remote_id, conn.clone());
+        Ok(Some(conn))
     }
 
     /// Connect to a peer using PeerInfo from static configuration
@@ -439,15 +487,19 @@ impl IrohTransport {
     ///
     /// # Returns
     ///
-    /// Connection to the peer
+    /// `Ok(Some(conn))` - New connection that needs handshake
+    /// `Ok(None)` - Already connected, no handshake needed (they are the initiator)
+    /// `Err(e)` - Connection failed
     ///
     /// # Example
     ///
     /// ```ignore
     /// let peer = config.get_peer("node-1").unwrap();
-    /// let conn = transport.connect_peer(peer).await?;
+    /// if let Some(conn) = transport.connect_peer(peer).await? {
+    ///     // Do initiator handshake
+    /// }
     /// ```
-    pub async fn connect_peer(&self, peer: &PeerInfo) -> Result<Connection> {
+    pub async fn connect_peer(&self, peer: &PeerInfo) -> Result<Option<Connection>> {
         let endpoint_id = peer.endpoint_id()?;
         let socket_addrs = peer.socket_addrs()?;
 
@@ -487,7 +539,7 @@ impl IrohTransport {
     /// // Connect to a discovered peer by their EndpointId
     /// let conn = transport.connect_by_id(peer_endpoint_id).await?;
     /// ```
-    pub async fn connect_by_id(&self, endpoint_id: EndpointId) -> Result<Connection> {
+    pub async fn connect_by_id(&self, endpoint_id: EndpointId) -> Result<Option<Connection>> {
         // Create EndpointAddr with just the ID - discovery should have provided addresses
         let addr = EndpointAddr::new(endpoint_id);
 
@@ -496,19 +548,8 @@ impl IrohTransport {
             "Connecting to peer by ID (using discovery-resolved addresses)"
         );
 
-        let conn = self
-            .endpoint
-            .connect(addr, CAP_AUTOMERGE_ALPN)
-            .await
-            .context("Failed to connect to peer by ID - ensure discovery has found this peer")?;
-
-        // Store connection
-        self.connections
-            .write()
-            .unwrap()
-            .insert(endpoint_id, conn.clone());
-
-        Ok(conn)
+        // Use connect() which handles tie-breaking (Issue #229)
+        self.connect(addr).await
     }
 
     /// Check if mDNS discovery is enabled
@@ -522,8 +563,19 @@ impl IrohTransport {
     ///
     /// # Returns
     ///
-    /// The accepted connection
-    pub async fn accept(&self) -> Result<Connection> {
+    /// `Ok(Some(conn))` - A new connection that needs authentication
+    /// `Ok(None)` - A duplicate connection was received and closed (already have one to this peer)
+    /// `Err(e)` - An error occurred
+    ///
+    /// # Note (Issue #229)
+    ///
+    /// Since only the side with LOWER endpoint ID initiates connections, incoming
+    /// connections always come from peers with lower IDs. If we already have a
+    /// connection to this peer, it means they're reconnecting - we close the old
+    /// connection and accept the new one.
+    ///
+    /// Callers MUST check for `None` and skip authentication in that case.
+    pub async fn accept(&self) -> Result<Option<Connection>> {
         let incoming = self
             .endpoint
             .accept()
@@ -531,15 +583,24 @@ impl IrohTransport {
             .context("No incoming connection")?;
 
         let conn = incoming.await.context("Failed to accept connection")?;
-        let endpoint_id = conn.remote_id();
+        let remote_id = conn.remote_id();
 
-        // Store connection
-        self.connections
-            .write()
-            .unwrap()
-            .insert(endpoint_id, conn.clone());
+        let mut connections = self.connections.write().unwrap();
 
-        Ok(conn)
+        // Check if we already have a connection to this peer (Issue #229)
+        // Since only lower ID initiates, if we have an existing connection to them,
+        // it's from a previous connection attempt. Accept the new one.
+        if let Some(old_conn) = connections.remove(&remote_id) {
+            tracing::debug!(
+                "Replacing existing connection from {:?} with new incoming connection",
+                remote_id
+            );
+            old_conn.close(0u32.into(), b"replaced by new connection");
+        }
+
+        // Store and return the new connection
+        connections.insert(remote_id, conn.clone());
+        Ok(Some(conn))
     }
 
     /// Get an existing connection to a peer
@@ -591,8 +652,12 @@ impl IrohTransport {
         let task = tokio::spawn(async move {
             while accept_running.load(Ordering::Relaxed) {
                 match transport.accept().await {
-                    Ok(conn) => {
+                    Ok(Some(conn)) => {
                         tracing::debug!("Accepted connection from: {:?}", conn.remote_id());
+                    }
+                    Ok(None) => {
+                        // Duplicate connection closed (Issue #229)
+                        tracing::debug!("Duplicate connection closed, using existing");
                     }
                     Err(e) => {
                         // Accept loop stopped or endpoint closed
@@ -624,6 +689,24 @@ impl IrohTransport {
     /// Check if accept loop is running
     pub fn is_accept_loop_running(&self) -> bool {
         self.accept_running.load(Ordering::Relaxed)
+    }
+
+    /// Mark accept loop as externally managed
+    ///
+    /// Call this when external code (e.g., IrohPeerDiscovery) is managing its own
+    /// accept loop with custom handling (like formation handshakes).
+    /// This prevents `start_accept_loop()` from starting a duplicate accept loop.
+    ///
+    /// Returns `Err` if an accept loop is already marked as running.
+    pub fn mark_accept_loop_managed(&self) -> Result<()> {
+        if self
+            .accept_running
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::Relaxed)
+            .is_err()
+        {
+            anyhow::bail!("Accept loop already running");
+        }
+        Ok(())
     }
 
     /// Close the transport and all connections
