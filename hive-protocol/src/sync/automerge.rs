@@ -1045,8 +1045,18 @@ impl PeerDiscovery for IrohPeerDiscovery {
 
         // Start authenticated accept loop (replaces simple start_accept_loop)
         // This spawns a background task that accepts connections and performs handshake
+        //
+        // IMPORTANT (Issue #229): We MUST mark the accept loop as managed BEFORE spawning
+        // our custom loop. This prevents AutomergeBackend::start_sync() from starting a
+        // duplicate accept loop via transport.start_accept_loop(), which would cause
+        // competing loops where one might accept connections without doing the handshake.
         #[cfg(feature = "automerge-backend")]
         {
+            // Mark accept loop as externally managed to prevent duplicate loops
+            self.transport.mark_accept_loop_managed().map_err(|e| {
+                Error::Internal(format!("Failed to mark accept loop as managed: {}", e))
+            })?;
+
             let transport = Arc::clone(&self.transport);
             let formation_key_accept = formation_key.clone();
 
@@ -1055,8 +1065,11 @@ impl PeerDiscovery for IrohPeerDiscovery {
 
                 loop {
                     // Accept incoming connection
+                    // Note (Issue #229): accept() returns Option<Connection>
+                    // - Some(conn) = new connection that needs authentication
+                    // - None = duplicate connection (already have one to this peer), skip handshake
                     match transport.accept().await {
-                        Ok(conn) => {
+                        Ok(Some(conn)) => {
                             let peer_id = conn.remote_id();
                             tracing::debug!("Accepted connection from: {:?}", peer_id);
 
@@ -1077,6 +1090,11 @@ impl PeerDiscovery for IrohPeerDiscovery {
                                     transport.disconnect(&peer_id).ok();
                                 }
                             }
+                        }
+                        Ok(None) => {
+                            // Duplicate connection - already have one to this peer (Issue #229)
+                            // Skip handshake since the existing connection is already authenticated
+                            tracing::debug!("Duplicate connection closed, using existing");
                         }
                         Err(e) => {
                             // Accept loop stopped or endpoint closed
@@ -1127,43 +1145,49 @@ impl PeerDiscovery for IrohPeerDiscovery {
                             relay_url: peer.relay_url.clone(),
                         };
 
-                        // Only attempt connection if not already connected
+                        // Try to connect to the peer
+                        // connect_peer() returns Option<Connection> (Issue #229):
+                        // - Some(conn): New connection, we need to do initiator handshake
+                        // - None: Already connected via their initiative, no handshake needed
                         if let Ok(endpoint_id) = peer.endpoint_id() {
-                            if transport.get_connection(&endpoint_id).is_none() {
-                                match transport.connect_peer(&network_peer_info).await {
-                                    Ok(conn) => {
-                                        // Perform formation handshake to authenticate
-                                        match perform_initiator_handshake(
-                                            &conn,
-                                            &formation_key_connect,
-                                        )
+                            match transport.connect_peer(&network_peer_info).await {
+                                Ok(Some(conn)) => {
+                                    // New connection - perform formation handshake to authenticate
+                                    match perform_initiator_handshake(&conn, &formation_key_connect)
                                         .await
-                                        {
-                                            Ok(()) => {
-                                                tracing::info!(
-                                                    "Connected and authenticated with peer: {}",
-                                                    peer.name
-                                                );
-                                            }
-                                            Err(e) => {
-                                                tracing::warn!(
-                                                    "Peer {} failed authentication: {}. Disconnecting.",
-                                                    peer.name,
-                                                    e
-                                                );
-                                                // Disconnect unauthenticated peer
-                                                conn.close(1u32.into(), b"authentication failed");
-                                                transport.disconnect(&endpoint_id).ok();
-                                            }
+                                    {
+                                        Ok(()) => {
+                                            tracing::info!(
+                                                "Connected and authenticated with peer: {}",
+                                                peer.name
+                                            );
+                                        }
+                                        Err(e) => {
+                                            tracing::warn!(
+                                                "Peer {} failed authentication: {}. Disconnecting.",
+                                                peer.name,
+                                                e
+                                            );
+                                            // Disconnect unauthenticated peer
+                                            conn.close(1u32.into(), b"authentication failed");
+                                            transport.disconnect(&endpoint_id).ok();
                                         }
                                     }
-                                    Err(e) => {
-                                        tracing::debug!(
-                                            "Failed to connect to discovered peer {}: {}",
-                                            peer.name,
-                                            e
-                                        );
-                                    }
+                                }
+                                Ok(None) => {
+                                    // Already connected - they are the initiator (Issue #229)
+                                    // Their accept loop will handle the handshake
+                                    tracing::debug!(
+                                        "Already connected to peer {} (they initiated)",
+                                        peer.name
+                                    );
+                                }
+                                Err(e) => {
+                                    tracing::debug!(
+                                        "Failed to connect to discovered peer {}: {}",
+                                        peer.name,
+                                        e
+                                    );
                                 }
                             }
                         }
@@ -1273,20 +1297,22 @@ impl PeerDiscovery for IrohPeerDiscovery {
             relay_url: None,
         };
 
-        // Connect to peer
-        let conn = self
-            .transport
-            .connect_peer(&peer_info)
-            .await
-            .map_err(|e| Error::Network {
-                message: format!("Failed to connect to peer: {}", e),
-                peer_id: None,
-                source: None,
-            })?;
+        // Connect to peer (Issue #229: returns Option<Connection>)
+        // - Some(conn): New connection, we need to do initiator handshake
+        // - None: Already connected via their initiative, no handshake needed
+        let conn_opt =
+            self.transport
+                .connect_peer(&peer_info)
+                .await
+                .map_err(|e| Error::Network {
+                    message: format!("Failed to connect to peer: {}", e),
+                    peer_id: None,
+                    source: None,
+                })?;
 
-        // Perform formation handshake to authenticate
+        // Perform formation handshake to authenticate (only if we got a new connection)
         #[cfg(feature = "automerge-backend")]
-        {
+        if let Some(conn) = conn_opt {
             use crate::network::formation_handshake::perform_initiator_handshake;
 
             if let Err(e) = perform_initiator_handshake(&conn, &formation_key).await {
