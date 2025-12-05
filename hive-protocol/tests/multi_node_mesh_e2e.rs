@@ -92,26 +92,9 @@ async fn test_automerge_three_node_mesh() {
 
     println!("  ✓ 3 backends created");
 
-    // Start peer discovery first (starts authenticated accept loops)
-    println!("  Starting peer discovery on all nodes...");
-    backend1
-        .peer_discovery()
-        .start()
-        .await
-        .expect("Should start discovery on backend1");
-    backend2
-        .peer_discovery()
-        .start()
-        .await
-        .expect("Should start discovery on backend2");
-    backend3
-        .peer_discovery()
-        .start()
-        .await
-        .expect("Should start discovery on backend3");
-    println!("  ✓ Peer discovery started");
-
-    // Give accept loops time to start
+    // Note: peer_discovery().start() is called by initialize() in create_automerge_backend_with_bind()
+    // So accept loops are already running. Just wait for them to be fully ready.
+    println!("  ✓ Peer discovery started (via initialize)");
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
     // Explicitly connect peers for Automerge (full mesh topology)
@@ -145,31 +128,37 @@ async fn test_automerge_three_node_mesh() {
     use hive_protocol::network::formation_handshake::perform_initiator_handshake;
 
     // Node 1 → Node 2
-    let conn1_2 = transport1
+    if let Some(conn1_2) = transport1
         .connect_peer(&peer2_info)
         .await
-        .expect("Should connect node1 to node2");
-    perform_initiator_handshake(&conn1_2, &formation_key1)
-        .await
-        .expect("Should authenticate node1 to node2");
+        .expect("Should connect node1 to node2")
+    {
+        perform_initiator_handshake(&conn1_2, &formation_key1)
+            .await
+            .expect("Should authenticate node1 to node2");
+    }
 
     // Node 1 → Node 3
-    let conn1_3 = transport1
+    if let Some(conn1_3) = transport1
         .connect_peer(&peer3_info)
         .await
-        .expect("Should connect node1 to node3");
-    perform_initiator_handshake(&conn1_3, &formation_key1)
-        .await
-        .expect("Should authenticate node1 to node3");
+        .expect("Should connect node1 to node3")
+    {
+        perform_initiator_handshake(&conn1_3, &formation_key1)
+            .await
+            .expect("Should authenticate node1 to node3");
+    }
 
     // Node 2 → Node 3 (already connected to Node 1 from above)
-    let conn2_3 = transport2
+    if let Some(conn2_3) = transport2
         .connect_peer(&peer3_info)
         .await
-        .expect("Should connect node2 to node3");
-    perform_initiator_handshake(&conn2_3, &formation_key2)
-        .await
-        .expect("Should authenticate node2 to node3");
+        .expect("Should connect node2 to node3")
+    {
+        perform_initiator_handshake(&conn2_3, &formation_key2)
+            .await
+            .expect("Should authenticate node2 to node3");
+    }
 
     println!("  ✓ Full mesh connected with authentication (3 connections)");
 
@@ -416,19 +405,17 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
 
     // In a full mesh, nodes should have discovered each other
     // Note: For Ditto this might vary due to automatic discovery
-    // For Automerge+Iroh we explicitly created connections
+    // For Automerge+Iroh we explicitly created connections, but with deterministic
+    // tie-breaking only one side initiates. Document sync verified above proves
+    // the mesh is functional.
     if backend_name == "Automerge+Iroh" {
+        // With tie-breaking, only initiator-side connections show in discovered_peers
+        // Total discovered peers across all nodes should be >= 3 for a functional mesh
+        let total_discovered = peers1.len() + peers2.len() + peers3.len();
         assert!(
-            peers1.len() >= 2,
-            "Node 1 should have discovered at least 2 peers"
-        );
-        assert!(
-            peers2.len() >= 2,
-            "Node 2 should have discovered at least 2 peers"
-        );
-        assert!(
-            !peers3.is_empty(),
-            "Node 3 should have discovered at least 1 peer"
+            total_discovered >= 3,
+            "Mesh should have at least 3 peer connections total, got {}",
+            total_discovered
         );
     }
 

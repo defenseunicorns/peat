@@ -258,18 +258,33 @@ mod tests {
         let transport1 = Arc::new(IrohTransport::new().await.unwrap());
         let transport2 = Arc::new(IrohTransport::new().await.unwrap());
 
-        let addr2 = transport2.endpoint_addr();
+        // With deterministic tie-breaking, only the lower ID initiates connections.
+        // Determine which transport should be initiator vs responder.
+        let t1_is_lower = transport1.endpoint_id().as_bytes() < transport2.endpoint_id().as_bytes();
+
+        let (initiator, responder, initiator_key, responder_key) = if t1_is_lower {
+            (transport1, transport2, key1, key2)
+        } else {
+            (transport2, transport1, key2, key1)
+        };
+
+        let responder_addr = responder.endpoint_addr();
 
         // Use oneshot channel to synchronize
         let (ready_tx, ready_rx) = oneshot::channel::<()>();
 
         // Spawn responder task
-        let transport2_clone = Arc::clone(&transport2);
+        let responder_clone = Arc::clone(&responder);
         let responder_task = tokio::spawn(async move {
             // Signal we're ready to accept
             let _ = ready_tx.send(());
-            let conn = transport2_clone.accept().await.unwrap();
-            perform_responder_handshake(&conn, &key2).await
+            // accept() returns Option<Connection> - unwrap expects Some since this is first connection
+            let conn = responder_clone
+                .accept()
+                .await
+                .unwrap()
+                .expect("Expected new connection, not duplicate");
+            perform_responder_handshake(&conn, &responder_key).await
         });
 
         // Wait for responder to be ready
@@ -277,13 +292,19 @@ mod tests {
         // Small additional delay to ensure accept() is called
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
-        // Initiator connects and handshakes
-        let conn = transport1.connect(addr2).await.unwrap();
-        let initiator_result = perform_initiator_handshake(&conn, &key1).await;
+        // Initiator connects and handshakes (initiator has lower ID, so connect should succeed)
+        let conn = initiator
+            .connect(responder_addr)
+            .await
+            .unwrap()
+            .expect("Lower ID should successfully initiate connection");
+        let initiator_result = perform_initiator_handshake(&conn, &initiator_key).await;
 
         // Wait for responder
         let responder_result = responder_task.await.unwrap();
 
+        // Always return (initiator_result, responder_result) regardless of which transport
+        // was the initiator. Tests expect the first element to be from the initiator.
         (initiator_result, responder_result)
     }
 
