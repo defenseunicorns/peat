@@ -167,23 +167,38 @@ impl MeshTransport for IrohMeshTransport {
                 .ok_or_else(|| TransportError::PeerNotFound(peer_id.as_str().to_string()))?
         };
 
-        // Connect using IrohTransport
-        let conn = self
+        // Connect using IrohTransport (Issue #229: returns Option<Connection>)
+        let conn_opt = self
             .transport
             .connect_peer(&peer_info)
             .await
             .map_err(|e| TransportError::ConnectionFailed(e.to_string()))?;
 
-        // Wrap in MeshConnection
-        let mesh_conn = IrohMeshConnection::new(peer_id.clone(), conn);
-
-        // Store connection
-        self.connections
-            .write()
-            .unwrap()
-            .insert(peer_id.clone(), mesh_conn.clone());
-
-        Ok(Box::new(mesh_conn))
+        match conn_opt {
+            Some(conn) => {
+                // New connection - wrap in MeshConnection and store
+                let mesh_conn = IrohMeshConnection::new(peer_id.clone(), conn);
+                self.connections
+                    .write()
+                    .unwrap()
+                    .insert(peer_id.clone(), mesh_conn.clone());
+                Ok(Box::new(mesh_conn))
+            }
+            None => {
+                // Already connected (they were initiator) - return existing connection
+                self.connections
+                    .read()
+                    .unwrap()
+                    .get(peer_id)
+                    .cloned()
+                    .map(|c| Box::new(c) as Box<dyn MeshConnection>)
+                    .ok_or_else(|| {
+                        TransportError::ConnectionFailed(
+                            "Connection exists in transport but not in mesh".to_string(),
+                        )
+                    })
+            }
+        }
     }
 
     async fn disconnect(&self, peer_id: &NodeId) -> Result<()> {

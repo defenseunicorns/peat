@@ -86,10 +86,14 @@ async fn test_two_node_mdns_discovery() {
     // Try to connect from node 1 to node 2 using just EndpointId
     // The discovery should have populated the address book
     match transport1.connect_by_id(node2_id).await {
-        Ok(conn) => {
+        Ok(Some(conn)) => {
             tracing::info!("Successfully connected via mDNS discovery!");
             assert_eq!(conn.remote_id(), node2_id);
             assert_eq!(transport1.peer_count(), 1);
+        }
+        Ok(None) => {
+            tracing::info!("Connection already exists or skipped due to tie-breaking");
+            // This is valid - may already be connected or tie-breaking applies
         }
         Err(e) => {
             // mDNS discovery may not work in all test environments
@@ -124,21 +128,34 @@ async fn test_direct_connection_with_discovery_enabled() {
             .unwrap(),
     );
 
-    // Start accept loop on node 2
-    transport2.start_accept_loop().unwrap();
+    // With deterministic tie-breaking, the lower ID initiates.
+    // Determine which transport should initiate.
+    let t1_is_lower = transport1.endpoint_id().as_bytes() < transport2.endpoint_id().as_bytes();
+    let (initiator, responder) = if t1_is_lower {
+        (Arc::clone(&transport1), Arc::clone(&transport2))
+    } else {
+        (Arc::clone(&transport2), Arc::clone(&transport1))
+    };
 
-    // Get node 2's full EndpointAddr (includes all addresses)
-    let node2_addr = transport2.endpoint_addr();
+    // Start accept loop on responder
+    responder.start_accept_loop().unwrap();
+
+    // Get responder's full EndpointAddr (includes all addresses)
+    let responder_addr = responder.endpoint_addr();
 
     // Connect using full EndpointAddr (not relying on mDNS)
-    let conn = transport1.connect(node2_addr).await.unwrap();
+    let conn = initiator
+        .connect(responder_addr)
+        .await
+        .unwrap()
+        .expect("Lower ID should successfully initiate connection");
 
     // Verify connection
-    assert_eq!(conn.remote_id(), transport2.endpoint_id());
-    assert_eq!(transport1.peer_count(), 1);
+    assert_eq!(conn.remote_id(), responder.endpoint_id());
+    assert_eq!(initiator.peer_count(), 1);
 
     // Cleanup
-    let _ = transport2.stop_accept_loop();
+    let _ = responder.stop_accept_loop();
 }
 
 /// Test 4: Multiple Transports with Discovery
@@ -222,7 +239,11 @@ async fn test_containerlab_static_configuration() {
     // In real containerlab, we'd also have the address from hostname resolution
     // For this test, we use the full EndpointAddr since we can't resolve hostnames
     let node2_addr = transport2.endpoint_addr();
-    let conn = transport1.connect(node2_addr).await.unwrap();
+    let conn = transport1
+        .connect(node2_addr)
+        .await
+        .unwrap()
+        .expect("Expected new connection");
 
     // Verify connection established with expected peer
     assert_eq!(conn.remote_id(), endpoint_ids[1].1);

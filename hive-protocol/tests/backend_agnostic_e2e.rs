@@ -784,7 +784,7 @@ async fn test_automerge_different_credentials_rejected() {
 
     // The connection itself may succeed (QUIC level), but the handshake should fail
     match transport1.connect(addr2).await {
-        Ok(conn) => {
+        Ok(Some(conn)) => {
             // Connection established, now try handshake
             use hive_protocol::network::formation_handshake::perform_initiator_handshake;
 
@@ -801,6 +801,10 @@ async fn test_automerge_different_credentials_rejected() {
                     transport1.disconnect(&conn.remote_id()).ok();
                 }
             }
+        }
+        Ok(None) => {
+            // Connection skipped due to tie-breaking - this is also acceptable
+            println!("  ✓ Connection skipped due to tie-breaking");
         }
         Err(e) => {
             // Connection failed - this is also acceptable
@@ -872,32 +876,47 @@ async fn test_automerge_same_credentials_accepted() {
     };
     backend2.initialize(config2).await.unwrap();
 
-    // Connect backend1 -> backend2
+    // With deterministic tie-breaking, only the lower ID initiates.
+    // Determine which backend should be the initiator.
+    let transport1_ref = backend1.transport();
+    let transport2_ref = backend2.transport();
+    let t1_is_lower =
+        transport1_ref.endpoint_id().as_bytes() < transport2_ref.endpoint_id().as_bytes();
+
+    let (initiator, responder) = if t1_is_lower {
+        (backend1.clone(), backend2.clone())
+    } else {
+        (backend2.clone(), backend1.clone())
+    };
+
     println!("\n  Attempting connection with matching credentials...");
 
-    let addr2 = backend2.transport().endpoint_addr();
-    let transport1_ref = backend1.transport();
+    let responder_addr = responder.transport().endpoint_addr();
+    let initiator_transport = initiator.transport();
 
-    let conn = transport1_ref
-        .connect(addr2)
+    let conn = initiator_transport
+        .connect(responder_addr)
         .await
-        .expect("Should connect at QUIC level");
+        .expect("Should connect at QUIC level")
+        .expect("Lower ID should successfully initiate connection");
 
     // Perform handshake
     use hive_protocol::network::formation_handshake::perform_initiator_handshake;
-    let formation_key1 = backend1.formation_key().expect("Should have formation key");
+    let formation_key = initiator
+        .formation_key()
+        .expect("Should have formation key");
 
-    perform_initiator_handshake(&conn, &formation_key1)
+    perform_initiator_handshake(&conn, &formation_key)
         .await
         .expect("Handshake should succeed with matching credentials");
 
     println!("  ✓ Handshake succeeded with matching credentials");
 
     // Verify peer is connected
-    let connected_peers = backend1.transport().connected_peers();
+    let connected_peers = initiator.transport().connected_peers();
     assert!(
         !connected_peers.is_empty(),
-        "Backend1 should have connected peer after successful handshake"
+        "Initiator should have connected peer after successful handshake"
     );
 
     println!("\n  ✅ Security test passed: Same credentials correctly accepted!\n");
