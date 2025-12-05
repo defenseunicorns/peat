@@ -295,6 +295,82 @@ impl IrohTransport {
         })
     }
 
+    /// Create transport with deterministic key, mDNS discovery, AND specific bind address (Issue #233)
+    ///
+    /// This is the recommended constructor for mobile/embedded deployments where you need:
+    /// - Deterministic EndpointId (for peer pre-configuration)
+    /// - mDNS discovery (for local network peer finding)
+    /// - Specific bind address (for firewall/NAT configuration)
+    ///
+    /// # Arguments
+    ///
+    /// * `seed` - Seed for deterministic key generation (e.g., "app-id/device-uuid")
+    /// * `bind_addr` - Socket address to bind to (IPv4 only)
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // For Android FFI with discovery enabled
+    /// let seed = format!("{}/{}", app_id, device_uuid);
+    /// let addr = "0.0.0.0:9000".parse()?;
+    /// let transport = IrohTransport::from_seed_with_discovery_at_addr(&seed, addr).await?;
+    /// ```
+    pub async fn from_seed_with_discovery_at_addr(
+        seed: &str,
+        bind_addr: SocketAddr,
+    ) -> Result<Self> {
+        use sha2::{Digest, Sha256};
+
+        // Convert SocketAddr to SocketAddrV4 if it's IPv4
+        let bind_addr_v4 = match bind_addr {
+            SocketAddr::V4(addr) => addr,
+            SocketAddr::V6(_) => anyhow::bail!("Only IPv4 addresses supported for now"),
+        };
+
+        // Derive 32 bytes from seed using SHA-256
+        let mut hasher = Sha256::new();
+        hasher.update(b"hive-iroh-key-v1:"); // Domain separator
+        hasher.update(seed.as_bytes());
+        let hash = hasher.finalize();
+
+        // Convert hash to secret key bytes
+        let mut seed_bytes = [0u8; 32];
+        seed_bytes.copy_from_slice(&hash);
+
+        // Create deterministic secret key
+        let secret_key = iroh::SecretKey::from_bytes(&seed_bytes);
+        let endpoint_id = secret_key.public();
+
+        // Create mDNS discovery service
+        let discovery = MdnsDiscovery::builder()
+            .build(endpoint_id)
+            .context("Failed to create mDNS discovery")?;
+
+        tracing::info!(
+            seed = seed,
+            endpoint_id = %endpoint_id,
+            bind_addr = %bind_addr,
+            "Created IrohTransport with deterministic key, mDNS discovery, and bind address"
+        );
+
+        let endpoint = Endpoint::builder()
+            .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
+            .secret_key(secret_key)
+            .discovery(discovery.clone())
+            .bind_addr_v4(bind_addr_v4)
+            .bind()
+            .await
+            .context("Failed to create Iroh endpoint from seed with discovery at addr")?;
+
+        Ok(Self {
+            endpoint,
+            connections: Arc::new(RwLock::new(HashMap::new())),
+            accept_running: Arc::new(AtomicBool::new(false)),
+            accept_task: Arc::new(RwLock::new(None)),
+            mdns_discovery: Some(discovery),
+        })
+    }
+
     /// Compute the EndpointId from a seed without creating a transport (Issue #226)
     ///
     /// This is useful for generating static peer configurations where you need

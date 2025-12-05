@@ -84,11 +84,13 @@ use crate::network::iroh_transport::IrohTransport;
 #[cfg(feature = "automerge-backend")]
 use anyhow::Result;
 #[cfg(feature = "automerge-backend")]
+use iroh::EndpointId;
+#[cfg(feature = "automerge-backend")]
 use prost::Message as ProstMessage;
 #[cfg(feature = "automerge-backend")]
 use serde::{de::DeserializeOwned, Serialize};
 #[cfg(feature = "automerge-backend")]
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 #[cfg(feature = "automerge-backend")]
 use std::marker::PhantomData;
 #[cfg(feature = "automerge-backend")]
@@ -134,6 +136,10 @@ pub struct AutomergeBackend {
     heartbeat_task: Arc<RwLock<Option<JoinHandle<()>>>>,
     /// Heartbeat receiver task handle (Phase 6.4)
     heartbeat_receiver_task: Arc<RwLock<Option<JoinHandle<()>>>>,
+    /// Active sync handlers per connection (to avoid spawning duplicates)
+    active_sync_handlers: Arc<RwLock<HashSet<EndpointId>>>,
+    /// Active heartbeat handlers per connection
+    active_heartbeat_handlers: Arc<RwLock<HashSet<EndpointId>>>,
 }
 
 #[cfg(feature = "automerge-backend")]
@@ -169,6 +175,8 @@ impl AutomergeBackend {
             auto_sync_task: Arc::new(RwLock::new(None)),
             heartbeat_task: Arc::new(RwLock::new(None)),
             heartbeat_receiver_task: Arc::new(RwLock::new(None)),
+            active_sync_handlers: Arc::new(RwLock::new(HashSet::new())),
+            active_heartbeat_handlers: Arc::new(RwLock::new(HashSet::new())),
         }
     }
 
@@ -208,6 +216,8 @@ impl AutomergeBackend {
             auto_sync_task: Arc::new(RwLock::new(None)),
             heartbeat_task: Arc::new(RwLock::new(None)),
             heartbeat_receiver_task: Arc::new(RwLock::new(None)),
+            active_sync_handlers: Arc::new(RwLock::new(HashSet::new())),
+            active_heartbeat_handlers: Arc::new(RwLock::new(HashSet::new())),
         }
     }
 
@@ -408,39 +418,97 @@ impl SyncCapable for AutomergeBackend {
         // The accept loop in IrohTransport accepts connections, and we need a stream
         // accept loop for each connection to handle incoming sync messages.
         //
-        // For now, we'll implement a simple polling-based handler that checks for
-        // incoming streams on all connected peers.
+        // Spawn continuous per-connection handlers instead of polling every 100ms.
+        // This dramatically reduces latency from 100ms+ per sync to near-instant.
         let transport = self.transport.clone().unwrap();
         let coordinator = self.sync_coordinator.clone().unwrap();
         let sync_active = Arc::clone(&self.sync_active);
+        let active_handlers = Arc::clone(&self.active_sync_handlers);
 
         let task = tokio::spawn(async move {
+            // Check for new connections every 100ms, but spawn CONTINUOUS handlers
             while sync_active.load(Ordering::Relaxed) {
-                // Get all connected peers
                 let peer_ids = transport.connected_peers();
 
                 for peer_id in peer_ids {
-                    // Get connection for this peer
-                    if let Some(conn) = transport.get_connection(&peer_id) {
-                        // Clone for the async block
-                        let coordinator_clone = Arc::clone(&coordinator);
-                        let conn_clone = conn.clone();
+                    // Skip if we already have a handler for this connection
+                    {
+                        let handlers = active_handlers.read().unwrap();
+                        if handlers.contains(&peer_id) {
+                            continue;
+                        }
+                    }
 
-                        // Spawn a task to accept incoming streams on this connection
+                    // Get connection and spawn continuous handler
+                    if let Some(conn) = transport.get_connection(&peer_id) {
+                        // Mark as having active handler
+                        active_handlers.write().unwrap().insert(peer_id);
+
+                        let coordinator_clone = Arc::clone(&coordinator);
+                        let sync_active_clone = Arc::clone(&sync_active);
+                        let active_handlers_clone = Arc::clone(&active_handlers);
+                        let handler_peer_id = peer_id;
+
+                        // Spawn continuous handler that loops accepting streams
                         tokio::spawn(async move {
-                            if let Err(e) = coordinator_clone.handle_incoming_sync(conn_clone).await
-                            {
-                                tracing::debug!("Error handling incoming sync: {}", e);
+                            tracing::debug!(
+                                "Started continuous sync handler for peer {:?}",
+                                handler_peer_id
+                            );
+
+                            // Loop accepting streams until connection closes or sync stops
+                            while sync_active_clone.load(Ordering::Relaxed) {
+                                match conn.accept_bi().await {
+                                    Ok((send, recv)) => {
+                                        // Handle this stream in a separate task for parallelism
+                                        let coord = Arc::clone(&coordinator_clone);
+                                        let stream_peer_id = handler_peer_id;
+                                        tokio::spawn(async move {
+                                            if let Err(e) = coord
+                                                .handle_incoming_sync_stream(
+                                                    stream_peer_id,
+                                                    send,
+                                                    recv,
+                                                )
+                                                .await
+                                            {
+                                                tracing::debug!(
+                                                    "Error handling sync stream: {}",
+                                                    e
+                                                );
+                                            }
+                                        });
+                                    }
+                                    Err(e) => {
+                                        // Connection closed or error - exit handler
+                                        tracing::debug!(
+                                            "Sync handler for {:?} exiting: {}",
+                                            handler_peer_id,
+                                            e
+                                        );
+                                        break;
+                                    }
+                                }
                             }
+
+                            // Remove from active handlers on exit
+                            active_handlers_clone
+                                .write()
+                                .unwrap()
+                                .remove(&handler_peer_id);
+                            tracing::debug!(
+                                "Stopped continuous sync handler for peer {:?}",
+                                handler_peer_id
+                            );
                         });
                     }
                 }
 
-                // Small delay to avoid busy loop
+                // Check for new connections periodically (much less critical now)
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
             }
 
-            tracing::debug!("Incoming sync handler stopped");
+            tracing::debug!("Incoming sync handler manager stopped");
         });
 
         *self.incoming_handler_task.write().unwrap() = Some(task);
@@ -448,39 +516,90 @@ impl SyncCapable for AutomergeBackend {
         // Phase 6.4: Spawn incoming heartbeat handler task
         //
         // Accept incoming heartbeat messages on unidirectional streams
+        // Uses continuous per-connection handlers for low latency
         let transport_heartbeat_rx = self.transport.clone().unwrap();
         let coordinator_heartbeat_rx = self.sync_coordinator.clone().unwrap();
         let sync_active_heartbeat_rx = Arc::clone(&self.sync_active);
+        let active_heartbeat_handlers = Arc::clone(&self.active_heartbeat_handlers);
 
         let heartbeat_rx_task = tokio::spawn(async move {
             while sync_active_heartbeat_rx.load(Ordering::Relaxed) {
-                // Get all connected peers
                 let peer_ids = transport_heartbeat_rx.connected_peers();
 
                 for peer_id in peer_ids {
-                    // Get connection for this peer
-                    if let Some(conn) = transport_heartbeat_rx.get_connection(&peer_id) {
-                        // Clone for the async block
-                        let coordinator_clone = Arc::clone(&coordinator_heartbeat_rx);
-                        let conn_clone = conn.clone();
+                    // Skip if we already have a handler for this connection
+                    {
+                        let handlers = active_heartbeat_handlers.read().unwrap();
+                        if handlers.contains(&peer_id) {
+                            continue;
+                        }
+                    }
 
-                        // Spawn a task to accept incoming heartbeat streams on this connection
+                    // Get connection and spawn continuous handler
+                    if let Some(conn) = transport_heartbeat_rx.get_connection(&peer_id) {
+                        // Mark as having active handler
+                        active_heartbeat_handlers.write().unwrap().insert(peer_id);
+
+                        let coordinator_clone = Arc::clone(&coordinator_heartbeat_rx);
+                        let sync_active_clone = Arc::clone(&sync_active_heartbeat_rx);
+                        let active_handlers_clone = Arc::clone(&active_heartbeat_handlers);
+                        let handler_peer_id = peer_id;
+
+                        // Spawn continuous handler that loops accepting heartbeat streams
                         tokio::spawn(async move {
-                            if let Err(e) = coordinator_clone
-                                .handle_incoming_heartbeat(conn_clone)
-                                .await
-                            {
-                                tracing::trace!("Error handling incoming heartbeat: {}", e);
+                            tracing::debug!(
+                                "Started continuous heartbeat handler for peer {:?}",
+                                handler_peer_id
+                            );
+
+                            while sync_active_clone.load(Ordering::Relaxed) {
+                                match conn.accept_uni().await {
+                                    Ok(recv) => {
+                                        let coord = Arc::clone(&coordinator_clone);
+                                        let stream_peer_id = handler_peer_id;
+                                        tokio::spawn(async move {
+                                            if let Err(e) = coord
+                                                .handle_incoming_heartbeat_stream(
+                                                    stream_peer_id,
+                                                    recv,
+                                                )
+                                                .await
+                                            {
+                                                tracing::trace!(
+                                                    "Error handling heartbeat stream: {}",
+                                                    e
+                                                );
+                                            }
+                                        });
+                                    }
+                                    Err(e) => {
+                                        tracing::debug!(
+                                            "Heartbeat handler for {:?} exiting: {}",
+                                            handler_peer_id,
+                                            e
+                                        );
+                                        break;
+                                    }
+                                }
                             }
+
+                            active_handlers_clone
+                                .write()
+                                .unwrap()
+                                .remove(&handler_peer_id);
+                            tracing::debug!(
+                                "Stopped continuous heartbeat handler for peer {:?}",
+                                handler_peer_id
+                            );
                         });
                     }
                 }
 
-                // Small delay to avoid busy loop
+                // Check for new connections periodically
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
             }
 
-            tracing::debug!("Incoming heartbeat handler stopped");
+            tracing::debug!("Incoming heartbeat handler manager stopped");
         });
 
         *self.heartbeat_receiver_task.write().unwrap() = Some(heartbeat_rx_task);
