@@ -514,6 +514,32 @@ impl AutomergeSyncCoordinator {
         Ok(())
     }
 
+    /// Handle an incoming sync stream (when streams are accepted externally)
+    ///
+    /// This is a more efficient variant for continuous accept loops where
+    /// streams are pre-accepted and passed in directly.
+    ///
+    /// # Arguments
+    ///
+    /// * `peer_id` - The EndpointId of the peer (for stats tracking)
+    /// * `_send` - The send half of the bidirectional stream (unused for now)
+    /// * `recv` - The receive half of the bidirectional stream
+    pub async fn handle_incoming_sync_stream(
+        &self,
+        peer_id: EndpointId,
+        _send: iroh::endpoint::SendStream,
+        recv: iroh::endpoint::RecvStream,
+    ) -> Result<()> {
+        // Receive the sync message (includes doc_key in wire format)
+        let (doc_key, message, message_size) = self.receive_sync_message_from_stream(recv).await?;
+
+        // Process the message with statistics tracking
+        self.receive_sync_message(&doc_key, peer_id, message, message_size)
+            .await?;
+
+        Ok(())
+    }
+
     /// Get total bytes sent across all peers
     pub fn total_bytes_sent(&self) -> u64 {
         self.total_bytes_sent.load(Ordering::Relaxed)
@@ -614,6 +640,47 @@ impl AutomergeSyncCoordinator {
             .await
             .context("Failed to accept unidirectional stream")?;
 
+        // Read heartbeat marker (1 byte: 0x01)
+        let mut marker = [0u8; 1];
+        recv.read_exact(&mut marker)
+            .await
+            .context("Failed to read heartbeat marker")?;
+
+        if marker[0] != 0x01 {
+            anyhow::bail!(
+                "Invalid heartbeat marker: expected 0x01, got {:#x}",
+                marker[0]
+            );
+        }
+
+        // Read timestamp (8 bytes, big-endian)
+        let mut timestamp_bytes = [0u8; 8];
+        recv.read_exact(&mut timestamp_bytes)
+            .await
+            .context("Failed to read timestamp")?;
+        let _timestamp = u64::from_be_bytes(timestamp_bytes);
+
+        // Record heartbeat success in partition detector
+        self.partition_detector.record_heartbeat_success(&peer_id);
+
+        tracing::trace!("Received heartbeat from peer {:?}", peer_id);
+
+        Ok(())
+    }
+
+    /// Handle an incoming heartbeat stream (when streams are accepted externally)
+    ///
+    /// This is a more efficient variant for continuous accept loops.
+    ///
+    /// # Arguments
+    ///
+    /// * `peer_id` - The EndpointId of the peer (for partition detection)
+    /// * `recv` - The unidirectional receive stream
+    pub async fn handle_incoming_heartbeat_stream(
+        &self,
+        peer_id: EndpointId,
+        mut recv: iroh::endpoint::RecvStream,
+    ) -> Result<()> {
         // Read heartbeat marker (1 byte: 0x01)
         let mut marker = [0u8; 1];
         recv.read_exact(&mut marker)
