@@ -639,12 +639,14 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
             })?,
         );
 
-    // Create IrohTransport within our runtime context
+    // Create IrohTransport with mDNS discovery enabled (Issue #233)
+    // Use app_id + storage_path as seed for deterministic but unique EndpointId
+    let seed = format!("{}/{}", config.app_id, config.storage_path);
     let transport = runtime.block_on(async {
-        IrohTransport::bind(bind_addr)
+        IrohTransport::from_seed_with_discovery_at_addr(&seed, bind_addr)
             .await
             .map_err(|e| HiveError::ConnectionError {
-                msg: format!("Failed to bind transport: {}", e),
+                msg: format!("Failed to create transport with discovery: {}", e),
             })
     })?;
     let transport = Arc::new(transport);
