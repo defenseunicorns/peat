@@ -511,7 +511,7 @@ Phase 8.3: Discovery Enhancement (Week 6+)
 ```toml
 automerge = "0.7.1"
 iroh = "0.95"
-rocksdb = "0.22"
+redb = "2.4"  # Pure Rust embedded database (replaces RocksDB)
 lru = "0.12"
 toml = "0.8"
 hex = "0.4"

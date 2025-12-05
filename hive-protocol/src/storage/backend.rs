@@ -5,7 +5,7 @@
 //!
 //! # Environment Variables
 //!
-//! - `CAP_STORAGE_BACKEND`: Backend type ("ditto", "automerge-memory", "rocksdb")
+//! - `CAP_STORAGE_BACKEND`: Backend type ("ditto", "automerge-memory", "redb")
 //! - `CAP_DATA_PATH`: Data directory path for persistent backends
 //! - Ditto-specific variables (loaded by DittoStore)
 //!
@@ -43,12 +43,12 @@ pub struct StorageConfig {
     /// Supported values:
     /// - `"ditto"`: Ditto SDK backend (proprietary, production-ready)
     /// - `"automerge-memory"`: Automerge in-memory (POC, testing)
-    /// - `"rocksdb"`: RocksDB persistence (production target)
+    /// - `"redb"`: redb persistence (production target)
     pub backend: String,
 
     /// Data directory path for persistent backends
     ///
-    /// Required for RocksDB, optional for others.
+    /// Required for redb, optional for others.
     /// Example: `/var/cap/data`, `./data`, `/tmp/cap-test`
     pub data_path: Option<PathBuf>,
 }
@@ -110,7 +110,7 @@ impl StorageConfig {
     ///
     /// # Errors
     ///
-    /// - RocksDB requires data_path
+    /// - redb requires data_path
     /// - Unknown backend type
     pub fn validate(&self) -> Result<()> {
         match self.backend.as_str() {
@@ -122,9 +122,9 @@ impl StorageConfig {
                 // In-memory, no data path needed
                 Ok(())
             }
-            "rocksdb" => {
+            "redb" => {
                 if self.data_path.is_none() {
-                    return Err(anyhow!("RocksDB backend requires CAP_DATA_PATH to be set"));
+                    return Err(anyhow!("redb backend requires CAP_DATA_PATH to be set"));
                 }
                 Ok(())
             }
@@ -216,18 +216,18 @@ pub fn create_storage_backend(config: &StorageConfig) -> Result<Arc<dyn StorageB
                 ))
             }
         }
-        "rocksdb" => {
-            // RocksDB is used internally by automerge-backend
-            // There's no standalone RocksDB backend - use automerge-memory instead
+        "redb" => {
+            // redb is used internally by automerge-backend
+            // There's no standalone redb backend - use automerge-memory instead
             Err(anyhow!(
-                "Direct RocksDB backend not available.\n\
-                 Use CAP_STORAGE_BACKEND=automerge-memory for RocksDB-backed storage,\n\
+                "Direct redb backend not available.\n\
+                 Use CAP_STORAGE_BACKEND=automerge-memory for redb-backed storage,\n\
                  or CAP_STORAGE_BACKEND=ditto for production use."
             ))
         }
         other => Err(anyhow!(
             "Unknown storage backend: {}\n\
-             Supported backends: ditto, automerge-memory, rocksdb",
+             Supported backends: ditto, automerge-memory, redb",
             other
         )),
     }
@@ -263,15 +263,15 @@ mod tests {
     }
 
     #[test]
-    fn test_storage_config_validation_rocksdb_requires_path() {
+    fn test_storage_config_validation_redb_requires_path() {
         let config = StorageConfig {
-            backend: "rocksdb".to_string(),
+            backend: "redb".to_string(),
             data_path: None,
         };
         assert!(config.validate().is_err());
 
         let config_with_path = StorageConfig {
-            backend: "rocksdb".to_string(),
+            backend: "redb".to_string(),
             data_path: Some(PathBuf::from("/var/cap/data")),
         };
         assert!(config_with_path.validate().is_ok());
@@ -313,9 +313,9 @@ mod tests {
     }
 
     #[test]
-    fn test_create_backend_rocksdb_not_available() {
+    fn test_create_backend_redb_not_available() {
         let config = StorageConfig {
-            backend: "rocksdb".to_string(),
+            backend: "redb".to_string(),
             data_path: Some(PathBuf::from("/tmp/test")),
         };
         let result = create_storage_backend(&config);
