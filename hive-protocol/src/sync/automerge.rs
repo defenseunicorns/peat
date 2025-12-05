@@ -1127,8 +1127,12 @@ impl PeerDiscovery for IrohPeerDiscovery {
                 use crate::network::formation_handshake::perform_initiator_handshake;
                 use crate::network::PeerInfo as NetworkPeerInfo;
 
+                // Adaptive interval: start fast (1s), slow down once mesh is stable (up to 5s)
+                let mut interval_secs = 1u64;
+                let mut consecutive_no_new_connections = 0u32;
+
                 loop {
-                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                    tokio::time::sleep(std::time::Duration::from_secs(interval_secs)).await;
 
                     // Get discovered peers
                     let manager = discovery_manager.read().await;
@@ -1136,6 +1140,7 @@ impl PeerDiscovery for IrohPeerDiscovery {
                     drop(manager);
 
                     // Try to connect to each discovered peer
+                    let mut made_new_connection = false;
                     for peer in discovered_peers {
                         // Convert discovery::peer::PeerInfo to network::PeerInfo
                         let network_peer_info = NetworkPeerInfo {
@@ -1161,6 +1166,7 @@ impl PeerDiscovery for IrohPeerDiscovery {
                                                 "Connected and authenticated with peer: {}",
                                                 peer.name
                                             );
+                                            made_new_connection = true;
                                         }
                                         Err(e) => {
                                             tracing::warn!(
@@ -1190,6 +1196,23 @@ impl PeerDiscovery for IrohPeerDiscovery {
                                     );
                                 }
                             }
+                        }
+                    }
+
+                    // Adaptive backoff: stay fast while forming mesh, slow down once stable
+                    if made_new_connection {
+                        // Reset to fast polling when we're actively connecting
+                        interval_secs = 1;
+                        consecutive_no_new_connections = 0;
+                    } else {
+                        consecutive_no_new_connections += 1;
+                        // After 3 cycles with no new connections, increase interval (max 5s)
+                        if consecutive_no_new_connections >= 3 && interval_secs < 5 {
+                            interval_secs = (interval_secs * 2).min(5);
+                            tracing::debug!(
+                                "Mesh stable, increasing connect interval to {}s",
+                                interval_secs
+                            );
                         }
                     }
                 }
