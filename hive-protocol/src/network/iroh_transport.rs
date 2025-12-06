@@ -724,14 +724,38 @@ impl IrohTransport {
         Ok(())
     }
 
-    /// Get the number of connected peers
+    /// Get the number of currently connected peers
+    ///
+    /// Only counts connections that are still alive (not closed).
+    /// Automatically cleans up closed connections from the map.
     pub fn peer_count(&self) -> usize {
+        self.cleanup_closed_connections();
         self.connections.read().unwrap().len()
     }
 
-    /// Get all connected peer IDs
+    /// Get all currently connected peer IDs
+    ///
+    /// Only returns connections that are still alive (not closed).
+    /// Automatically cleans up closed connections from the map.
     pub fn connected_peers(&self) -> Vec<EndpointId> {
+        self.cleanup_closed_connections();
         self.connections.read().unwrap().keys().copied().collect()
+    }
+
+    /// Remove closed connections from the connections map
+    ///
+    /// Called automatically by `peer_count()` and `connected_peers()`.
+    /// Can also be called explicitly to clean up stale connections.
+    pub fn cleanup_closed_connections(&self) {
+        let mut connections = self.connections.write().unwrap();
+        connections.retain(|endpoint_id, conn| {
+            if conn.close_reason().is_some() {
+                tracing::debug!(?endpoint_id, "Removing closed connection from map");
+                false
+            } else {
+                true
+            }
+        });
     }
 
     /// Start the accept loop to receive incoming connections
@@ -992,5 +1016,78 @@ mod tests {
         assert_eq!(transport.endpoint_id(), expected_id);
 
         transport.close().await.unwrap();
+    }
+
+    /// Test that disconnected peers are removed from the connections map (Issue #244)
+    #[tokio::test]
+    async fn test_stale_peer_cleanup_issue_244() {
+        use std::sync::Arc;
+
+        // Use deterministic keys so we know which direction to connect
+        // Lower ID initiates connection (Issue #229 tie-breaking)
+        let transport_a = Arc::new(IrohTransport::from_seed("test/node-a").await.unwrap());
+        let transport_b = Arc::new(IrohTransport::from_seed("test/node-b").await.unwrap());
+
+        let id_a = transport_a.endpoint_id();
+        let id_b = transport_b.endpoint_id();
+
+        // Determine which should initiate (lower ID initiates)
+        let (initiator, acceptor, acceptor_addr) = if id_a.as_bytes() < id_b.as_bytes() {
+            (
+                Arc::clone(&transport_a),
+                Arc::clone(&transport_b),
+                transport_b.endpoint_addr(),
+            )
+        } else {
+            (
+                Arc::clone(&transport_b),
+                Arc::clone(&transport_a),
+                transport_a.endpoint_addr(),
+            )
+        };
+
+        // Initially no connections
+        assert_eq!(initiator.peer_count(), 0);
+        assert_eq!(acceptor.peer_count(), 0);
+
+        // Start accept loop on acceptor
+        acceptor.start_accept_loop().unwrap();
+
+        // Connect from initiator to acceptor
+        let conn = initiator.connect(acceptor_addr).await.unwrap();
+        assert!(conn.is_some(), "Connection should be established");
+
+        // Give the connection time to establish fully
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+        // Initiator should have 1 connected peer
+        assert_eq!(initiator.peer_count(), 1);
+
+        // Now close acceptor, simulating a peer disconnect
+        let _ = acceptor.stop_accept_loop();
+
+        // Close the acceptor connections - this will close the QUIC connection
+        for (_id, conn) in acceptor.connections.write().unwrap().drain() {
+            conn.close(0u32.into(), b"test_close");
+        }
+
+        // Give time for the connection close to propagate
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+
+        // Now initiator should report 0 peers (Issue #244 fix)
+        // Before the fix, this would still return 1 because closed connections weren't removed
+        assert_eq!(
+            initiator.peer_count(),
+            0,
+            "Closed connections should be removed from the map"
+        );
+        assert!(
+            initiator.connected_peers().is_empty(),
+            "connected_peers() should not include closed connections"
+        );
+
+        // Cleanup - drop the Arcs (connections will close automatically)
+        drop(transport_a);
+        drop(transport_b);
     }
 }
