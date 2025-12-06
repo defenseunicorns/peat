@@ -1116,6 +1116,96 @@ impl PeerDiscovery for IrohPeerDiscovery {
             })?;
         }
 
+        // Spawn mDNS discovery event handler (Issue #233)
+        // This subscribes to Iroh's MdnsDiscovery stream and connects to newly discovered peers.
+        // Without this, mDNS only populates the address book but doesn't trigger connections.
+        #[cfg(feature = "automerge-backend")]
+        if let Some(mdns) = self.transport.mdns_discovery() {
+            use futures_lite::StreamExt;
+            use iroh::discovery::mdns::DiscoveryEvent;
+
+            let mdns = mdns.clone();
+            let transport = Arc::clone(&self.transport);
+            let formation_key_mdns = formation_key.clone();
+
+            tokio::spawn(async move {
+                use crate::network::formation_handshake::perform_initiator_handshake;
+
+                tracing::info!("Starting mDNS discovery event handler");
+                let mut stream = mdns.subscribe().await;
+
+                while let Some(event) = stream.next().await {
+                    match event {
+                        DiscoveryEvent::Discovered { endpoint_info, .. } => {
+                            let peer_id = endpoint_info.endpoint_id;
+                            tracing::info!(
+                                peer_id = %peer_id,
+                                "mDNS discovered peer, attempting connection"
+                            );
+
+                            // Check if already connected
+                            if transport.get_connection(&peer_id).is_some() {
+                                tracing::debug!(
+                                    peer_id = %peer_id,
+                                    "Already connected to mDNS-discovered peer"
+                                );
+                                continue;
+                            }
+
+                            // Connect using just the EndpointId (addresses from mDNS discovery)
+                            match transport.connect_by_id(peer_id).await {
+                                Ok(Some(conn)) => {
+                                    // New connection - perform formation handshake
+                                    match perform_initiator_handshake(&conn, &formation_key_mdns)
+                                        .await
+                                    {
+                                        Ok(()) => {
+                                            tracing::info!(
+                                                peer_id = %peer_id,
+                                                "mDNS peer connected and authenticated"
+                                            );
+                                        }
+                                        Err(e) => {
+                                            tracing::warn!(
+                                                peer_id = %peer_id,
+                                                error = %e,
+                                                "mDNS peer failed authentication"
+                                            );
+                                            conn.close(1u32.into(), b"authentication failed");
+                                            transport.disconnect(&peer_id).ok();
+                                        }
+                                    }
+                                }
+                                Ok(None) => {
+                                    // Already connected (they initiated) - per tie-breaking
+                                    tracing::debug!(
+                                        peer_id = %peer_id,
+                                        "mDNS peer already connected (they initiated)"
+                                    );
+                                }
+                                Err(e) => {
+                                    tracing::debug!(
+                                        peer_id = %peer_id,
+                                        error = %e,
+                                        "Failed to connect to mDNS-discovered peer"
+                                    );
+                                }
+                            }
+                        }
+                        DiscoveryEvent::Expired { endpoint_id } => {
+                            tracing::debug!(
+                                peer_id = %endpoint_id,
+                                "mDNS peer expired (no longer advertising)"
+                            );
+                            // Note: We don't disconnect immediately since the peer might still
+                            // be reachable. The connection will fail naturally if unreachable.
+                        }
+                    }
+                }
+                tracing::debug!("mDNS discovery event handler stopped");
+            });
+        }
+
         // Spawn background task to connect to discovered peers (with authentication)
         #[cfg(feature = "automerge-backend")]
         {
