@@ -9,6 +9,7 @@ members = [
     "hive-discovery",
     "hive-mesh",
     "hive-ffi",
+    "hive-commander",
 ]
 
 [workspace.package]
