@@ -633,6 +633,38 @@ impl IrohTransport {
         self.mdns_discovery.is_some()
     }
 
+    /// Get a reference to the mDNS discovery service (Issue #233)
+    ///
+    /// This allows subscribing to mDNS discovery events to learn about newly
+    /// discovered peers on the local network. The returned discovery service
+    /// has a `subscribe()` method that returns a stream of `DiscoveryEvent`.
+    ///
+    /// # Returns
+    ///
+    /// `Some(&MdnsDiscovery)` if mDNS discovery is enabled, `None` otherwise.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// if let Some(mdns) = transport.mdns_discovery() {
+    ///     let mut stream = mdns.subscribe().await;
+    ///     while let Some(event) = stream.next().await {
+    ///         match event {
+    ///             DiscoveryEvent::Discovered(item) => {
+    ///                 // Connect to the newly discovered peer
+    ///                 transport.connect_by_id(item.node_id).await?;
+    ///             }
+    ///             DiscoveryEvent::Expired(node_id) => {
+    ///                 // Peer is no longer available
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    pub fn mdns_discovery(&self) -> Option<&MdnsDiscovery> {
+        self.mdns_discovery.as_ref()
+    }
+
     /// Accept an incoming connection
     ///
     /// This is a blocking call that waits for the next incoming connection.
