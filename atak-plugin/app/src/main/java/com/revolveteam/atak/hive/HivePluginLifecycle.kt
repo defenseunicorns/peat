@@ -161,4 +161,6 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
     fun getPeerCount(): Int = hiveNodeJni?.peerCount() ?: 0
 
     fun getNodeId(): String? = hiveNodeJni?.nodeId()
+
+    fun getConnectedPeers(): String = hiveNodeJni?.connectedPeers() ?: "[]"
 }

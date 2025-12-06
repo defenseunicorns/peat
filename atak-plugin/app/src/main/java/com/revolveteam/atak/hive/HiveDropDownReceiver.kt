@@ -264,6 +264,27 @@ class HiveDropDownReceiver(
         }
         card.addView(peersText)
 
+        // Show peer IDs if we have any
+        if (peerCount > 0) {
+            val peersJson = HivePluginLifecycle.getInstance()?.getConnectedPeers() ?: "[]"
+            try {
+                val peerIds = org.json.JSONArray(peersJson)
+                for (i in 0 until peerIds.length()) {
+                    val peerId = peerIds.getString(i)
+                    val peerIdText = TextView(pluginContext).apply {
+                        // Show first 16 chars of peer ID for readability
+                        text = "  - ${peerId.take(16)}..."
+                        textSize = 10f
+                        setTextColor(Color.parseColor("#888888"))
+                        setTypeface(android.graphics.Typeface.MONOSPACE)
+                    }
+                    card.addView(peerIdText)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to parse peer IDs JSON: ${e.message}")
+            }
+        }
+
         return card
     }
 

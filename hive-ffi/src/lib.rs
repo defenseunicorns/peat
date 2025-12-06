@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 // JNI support for Android
-use jni::objects::{JClass, JString};
+use jni::objects::{JClass, JObject, JString};
 use jni::sys::{jint, jstring, JavaVM, JNI_VERSION_1_6};
 use jni::JNIEnv;
 use std::os::raw::c_void;
@@ -857,6 +857,38 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_peerCountJni(
     count
 }
 
+/// JNI: Get connected peer IDs as JSON array
+///
+/// Returns a JSON array of peer ID strings (hex-encoded).
+/// Kotlin signature: external fun connectedPeersJni(handle: Long): String
+#[cfg(feature = "sync")]
+#[no_mangle]
+pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_connectedPeersJni<'a>(
+    env: JNIEnv<'a>,
+    _class: JClass,
+    handle: i64,
+) -> JString<'a> {
+    let mut env = env;
+
+    if handle == 0 {
+        return env
+            .new_string("[]")
+            .unwrap_or_else(|_| JObject::null().into());
+    }
+
+    let node = unsafe { Arc::from_raw(handle as *const HiveNode) };
+    let peers = node.connected_peers();
+
+    // Don't drop the Arc - we're just borrowing
+    std::mem::forget(node);
+
+    // Convert to JSON array
+    let json = serde_json::to_string(&peers).unwrap_or_else(|_| "[]".to_string());
+
+    env.new_string(&json)
+        .unwrap_or_else(|_| JObject::null().into())
+}
+
 /// JNI: Start sync on a HiveNode
 ///
 /// Kotlin signature: external fun startSyncJni(handle: Long): Boolean
@@ -955,6 +987,12 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_nativeInit(
             name: "peerCountJni".into(),
             sig: "(J)I".into(),
             fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_peerCountJni as *mut c_void,
+        },
+        #[cfg(feature = "sync")]
+        NativeMethod {
+            name: "connectedPeersJni".into(),
+            sig: "(J)Ljava/lang/String;".into(),
+            fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_connectedPeersJni as *mut c_void,
         },
         #[cfg(feature = "sync")]
         NativeMethod {
@@ -1064,6 +1102,12 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, _reserved: *mut c_void) -> 
                     name: "peerCountJni".into(),
                     sig: "(J)I".into(),
                     fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_peerCountJni as *mut c_void,
+                },
+                #[cfg(feature = "sync")]
+                NativeMethod {
+                    name: "connectedPeersJni".into(),
+                    sig: "(J)Ljava/lang/String;".into(),
+                    fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_connectedPeersJni as *mut c_void,
                 },
                 #[cfg(feature = "sync")]
                 NativeMethod {
