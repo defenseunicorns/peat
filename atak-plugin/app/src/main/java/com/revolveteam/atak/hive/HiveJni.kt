@@ -91,6 +91,14 @@ object HiveJni {
     external fun peerCountJni(handle: Long): Int
 
     /**
+     * Get connected peer IDs as a JSON array.
+     * @param handle Node handle from createNodeJni
+     * @return JSON array of hex-encoded peer IDs, e.g. ["abc123...", "def456..."]
+     */
+    @JvmStatic
+    external fun connectedPeersJni(handle: Long): String
+
+    /**
      * Start sync for a node.
      * @param handle Node handle from createNodeJni
      * @return true if sync started successfully
@@ -172,6 +180,12 @@ class HiveNodeJni private constructor(private val handle: Long) : AutoCloseable 
      * Get the current number of connected peers.
      */
     fun peerCount(): Int = HiveJni.peerCountJni(handle)
+
+    /**
+     * Get connected peer IDs as a JSON array string.
+     * @return JSON array of hex-encoded peer IDs
+     */
+    fun connectedPeers(): String = HiveJni.connectedPeersJni(handle)
 
     /**
      * Start P2P sync.
