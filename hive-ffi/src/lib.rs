@@ -871,7 +871,9 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_connectedPeersJni<
     let mut env = env;
 
     if handle == 0 {
-        return env.new_string("[]").unwrap_or_else(|_| JObject::null().into());
+        return env
+            .new_string("[]")
+            .unwrap_or_else(|_| JObject::null().into());
     }
 
     let node = unsafe { Arc::from_raw(handle as *const HiveNode) };
@@ -883,7 +885,8 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_connectedPeersJni<
     // Convert to JSON array
     let json = serde_json::to_string(&peers).unwrap_or_else(|_| "[]".to_string());
 
-    env.new_string(&json).unwrap_or_else(|_| JObject::null().into())
+    env.new_string(&json)
+        .unwrap_or_else(|_| JObject::null().into())
 }
 
 /// JNI: Start sync on a HiveNode
