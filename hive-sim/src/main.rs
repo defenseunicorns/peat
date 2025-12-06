@@ -1180,11 +1180,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create backend
     println!("[{}] Creating {} backend...", node_id, backend_type);
-    let backend = create_backend(&backend_type, &node_id).await?;
+    let backend = create_backend(&backend_type, &node_id, tcp_listen_port).await?;
 
     // Initialize backend
     println!("[{}] Initializing backend...", node_id);
-    let config = create_backend_config(&node_id, &backend_type, tcp_listen_port, tcp_connect_addr)?;
+    let config = create_backend_config(
+        &node_id,
+        &backend_type,
+        tcp_listen_port,
+        tcp_connect_addr.clone(),
+    )?;
     backend.initialize(config).await?;
     println!("[{}] ✓ Backend initialized", node_id);
 
@@ -1227,6 +1232,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("[{}] Starting sync...", node_id);
     sync_engine.start_sync().await?;
     println!("[{}] ✓ Sync started", node_id);
+
+    // Connect to Automerge peers using static configuration (Issue #235)
+    // This is needed because mDNS doesn't work across containerlab network namespaces
+    #[cfg(feature = "automerge-backend")]
+    if backend_type == "automerge" {
+        connect_to_automerge_peers(&sync_engine, &node_id, &tcp_connect_addr).await?;
+    }
 
     // Step 4: Spawn aggregation tasks based on ROLE if in hierarchical mode
     if is_hierarchical_mode {
@@ -1678,6 +1690,7 @@ fn log_metrics(event: &MetricsEvent) {
 async fn create_backend(
     backend_type: &str,
     node_id: &str,
+    tcp_listen_port: Option<u16>,
 ) -> Result<Box<dyn DataSyncBackend>, Box<dyn std::error::Error>> {
     match backend_type {
         "ditto" => Ok(Box::new(DittoBackend::new())),
@@ -1692,10 +1705,33 @@ async fn create_backend(
                 AutomergeStore::open(&persistence_dir)
                     .map_err(|e| format!("Failed to open AutomergeStore: {}", e))?,
             );
+
+            // Get formation ID from environment (used as seed prefix for deterministic keys)
+            let formation_id =
+                std::env::var("DITTO_APP_ID").unwrap_or_else(|_| "default-formation".to_string());
+
+            // Create deterministic seed from formation ID and node ID (Issue #235)
+            // This ensures EndpointIds are predictable for static peer configuration
+            let seed = format!("{}/{}", formation_id, node_id);
+
+            // Determine bind address for QUIC transport
+            let bind_addr: std::net::SocketAddr = if let Some(port) = tcp_listen_port {
+                format!("0.0.0.0:{}", port).parse()?
+            } else {
+                "0.0.0.0:0".parse()?
+            };
+
             let transport = Arc::new(
-                IrohTransport::new()
+                IrohTransport::from_seed_with_discovery_at_addr(&seed, bind_addr)
                     .await
                     .map_err(|e| format!("Failed to create IrohTransport: {}", e))?,
+            );
+
+            eprintln!(
+                "[{}] Created Automerge transport with seed '{}', EndpointId: {}",
+                node_id,
+                seed,
+                hex::encode(transport.endpoint_id().as_bytes())
             );
 
             Ok(Box::new(AutomergeIrohBackend::from_parts(store, transport)))
@@ -1767,6 +1803,110 @@ fn create_backend_config(
     };
 
     Ok(config)
+}
+
+/// Connect to Automerge peers using static configuration (Issue #235)
+///
+/// Parses TCP_CONNECT environment variable and establishes QUIC connections
+/// to peers using their deterministically-derived EndpointIds.
+///
+/// # TCP_CONNECT Format
+///
+/// `peer_name|hostname:port,peer_name2|hostname2:port2,...`
+///
+/// Example: `node-1|clab-mesh-node-1:9000,node-2|clab-mesh-node-2:9000`
+///
+/// # EndpointId Derivation
+///
+/// EndpointIds are derived from seeds using the same algorithm as `IrohTransport::from_seed()`:
+/// - Seed format: `{formation_id}/{peer_name}`
+/// - Hash: SHA-256 with domain separator "hive-iroh-key-v1:"
+/// - Result: ed25519 public key (EndpointId)
+#[cfg(feature = "automerge-backend")]
+async fn connect_to_automerge_peers(
+    sync_engine: &Arc<dyn hive_protocol::sync::SyncEngine>,
+    node_id: &str,
+    tcp_connect_addr: &Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let tcp_connect = match tcp_connect_addr {
+        Some(addr) => addr,
+        None => return Ok(()), // No peers to connect
+    };
+
+    if tcp_connect.is_empty() {
+        return Ok(());
+    }
+
+    // Get formation ID for deriving peer EndpointIds
+    let formation_id =
+        std::env::var("DITTO_APP_ID").unwrap_or_else(|_| "default-formation".to_string());
+
+    eprintln!(
+        "[{}] Connecting to Automerge peers from TCP_CONNECT: {}",
+        node_id, tcp_connect
+    );
+
+    // Parse: "peer_name|hostname:port,peer_name2|hostname2:port2,..."
+    for peer_spec in tcp_connect.split(',') {
+        let peer_spec = peer_spec.trim();
+        if peer_spec.is_empty() {
+            continue;
+        }
+
+        let parts: Vec<&str> = peer_spec.splitn(2, '|').collect();
+        if parts.len() != 2 {
+            eprintln!(
+                "[{}] Invalid peer spec (expected 'name|address'): {}",
+                node_id, peer_spec
+            );
+            continue;
+        }
+
+        let peer_name = parts[0];
+        let peer_addr = parts[1];
+
+        // Skip connecting to self
+        if peer_name == node_id {
+            continue;
+        }
+
+        // Derive EndpointId from peer seed
+        let peer_seed = format!("{}/{}", formation_id, peer_name);
+        let peer_endpoint_id = IrohTransport::endpoint_id_from_seed(&peer_seed);
+        let peer_endpoint_hex = hex::encode(peer_endpoint_id.as_bytes());
+
+        eprintln!(
+            "[{}] Connecting to peer '{}' at {} (EndpointId: {}...)",
+            node_id,
+            peer_name,
+            peer_addr,
+            &peer_endpoint_hex[..16]
+        );
+
+        // Connect using the SyncEngine trait method
+        match sync_engine
+            .connect_to_peer(&peer_endpoint_hex, &[peer_addr.to_string()])
+            .await
+        {
+            Ok(true) => {
+                eprintln!("[{}] ✓ Connected to peer '{}'", node_id, peer_name);
+            }
+            Ok(false) => {
+                eprintln!(
+                    "[{}] → Waiting for peer '{}' to connect (tie-breaking)",
+                    node_id, peer_name
+                );
+            }
+            Err(e) => {
+                eprintln!(
+                    "[{}] ✗ Failed to connect to peer '{}': {}",
+                    node_id, peer_name, e
+                );
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Event-driven hierarchical mode with capability reporting
