@@ -2188,6 +2188,7 @@ dependencies = [
  "dittolive-ditto",
  "dotenvy",
  "ed25519-dalek 2.2.0",
+ "futures-lite",
  "geohash",
  "hex",
  "hive-schema",
