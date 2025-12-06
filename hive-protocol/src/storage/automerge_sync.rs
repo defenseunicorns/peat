@@ -492,6 +492,38 @@ impl AutomergeSyncCoordinator {
         Ok(())
     }
 
+    /// Sync all existing documents with a newly connected peer (Issue #235)
+    ///
+    /// This is called when a new peer connection is established to ensure
+    /// documents created before the peer connected are synchronized.
+    ///
+    /// # Arguments
+    ///
+    /// * `peer_id` - The EndpointId of the newly connected peer
+    pub async fn sync_all_documents_with_peer(&self, peer_id: EndpointId) -> Result<()> {
+        // Get all document keys from the store
+        let all_docs = self.store.scan_prefix("")?;
+
+        tracing::info!(
+            "Syncing {} existing documents with new peer {:?}",
+            all_docs.len(),
+            peer_id
+        );
+
+        for (doc_key, _doc) in all_docs {
+            if let Err(e) = self.sync_document_with_peer(&doc_key, peer_id).await {
+                tracing::warn!(
+                    "Failed to sync document {} with new peer {:?}: {}",
+                    doc_key,
+                    peer_id,
+                    e
+                );
+            }
+        }
+
+        Ok(())
+    }
+
     /// Handle an incoming sync connection from a peer
     ///
     /// This is called when a peer initiates sync with us.

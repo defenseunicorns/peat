@@ -178,6 +178,28 @@ pub trait SyncEngine: Send + Sync {
         // Default: no-op (most backends sync automatically)
         Ok(())
     }
+
+    /// Connect to a peer using their EndpointId and addresses (Issue #235)
+    ///
+    /// Establishes a connection to a peer with a known EndpointId and network addresses.
+    /// Used for static peer configuration in containerlab and similar environments.
+    ///
+    /// # Arguments
+    ///
+    /// * `endpoint_id_hex` - The peer's EndpointId as a hex string (64 chars)
+    /// * `addresses` - List of socket addresses (e.g., "192.168.1.1:12345")
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(true)` - Connection established successfully
+    /// * `Ok(false)` - Tie-breaking: peer will connect to us instead
+    /// * `Err(e)` - Connection failed
+    ///
+    /// Default implementation returns Ok(false) for backends that don't support this.
+    async fn connect_to_peer(&self, endpoint_id_hex: &str, addresses: &[String]) -> Result<bool> {
+        let _ = (endpoint_id_hex, addresses);
+        Ok(false)
+    }
 }
 
 /// Trait 4: Lifecycle Management and Composition
