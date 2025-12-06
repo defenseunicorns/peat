@@ -1,4 +1,4 @@
-# ADR-031: HIVE Commander - Interactive Capability Demonstration Game
+# ADR-031: HIVE Commander - Tactical Capability RPG
 
 ## Status
 Proposed
@@ -13,1133 +13,581 @@ Industry feedback identified two critical gaps in HIVE's current demonstration c
 
 Additionally, the concept of **coagency performance** - measuring how well human-machine-AI teams perform together - was identified as a research differentiator that HIVE could demonstrate through interactive gameplay.
 
-Current demonstration approaches (slides, architecture diagrams, static scenarios) fail to convey the dynamic nature of capability aggregation and the intuitive power of HIVE's coordination model. A playable demonstration would:
+### Why Not RTS?
 
-- Make the value proposition immediately tangible to investors and program managers
-- Force crystallization of the capability query and composition API
-- Provide a platform for game-theoretic validation of coordination dynamics
-- Generate data on human-HIVE teaming effectiveness (coagency metrics)
+Real-time strategy games are chaotic, hard to follow in demos, and don't naturally emphasize **composition** - the core value of HIVE. Players focus on micro-management and APM rather than thoughtful capability aggregation.
+
+### Why D&D-Style Tactical RPG?
+
+Dungeons & Dragons is fundamentally about **party composition**:
+- "Do we have the right mix of capabilities to handle this encounter?"
+- "Who has the skill we need? Can we combine abilities?"
+- "The rogue can't pick the lock alone, but with the wizard's guidance spell..."
+
+This is *exactly* what HIVE does - matching task requirements to composed capabilities. The D&D framing makes this intuitive and memorable.
 
 ## Decision
 
-Build **HIVE Commander**, an RTS-style interactive demonstration game that uses the actual Rust HIVE reference implementation to coordinate heterogeneous assets within an operational area.
+Build **HIVE Commander**, a turn-based tactical RPG that uses the actual Rust HIVE reference implementation to coordinate heterogeneous assets on a 3D terrain map. The game emphasizes **capability composition** through D&D-style skill checks and party mechanics.
 
-### Technology Stack
+### Core Design Principles
 
-**Server-Side Multiplayer Only**
+1. **Composition is the game** - Victory comes from clever capability combinations, not twitch reflexes
+2. **Turn-based for clarity** - Audience can follow the action in demos
+3. **DM = Presenter** - The presenter controls scenarios, introduces challenges
+4. **Skill checks = Capability matching** - D&D's core mechanic maps perfectly to HIVE
+5. **3D terrain map** - Spatial context with elevation, cover, and line-of-sight
+6. **Hierarchy through zoom** - Zoomed out shows composed capabilities, drill down for details
+
+---
+
+## Game Design
+
+### The HIVE Party System
+
+Instead of D&D's Fighter/Wizard/Rogue classes, HIVE Commander has **Capability Classes**:
+
+| Class | Role | Base Capabilities | D&D Analog |
+|-------|------|-------------------|------------|
+| **Sensor** | Detection, tracking | `DETECT`, `TRACK`, `IDENTIFY` | Ranger/Scout |
+| **Scout** | Recon, mobility | `RECON`, `FAST_MOVE`, `STEALTH` | Rogue |
+| **Striker** | Kinetic effects | `STRIKE`, `SUPPRESS`, `BREACH` | Fighter |
+| **Support** | Logistics, comms | `RELAY`, `RESUPPLY`, `REPAIR` | Cleric |
+| **Authority** | Human-in-loop | `AUTHORIZE`, `OVERRIDE`, `COMMAND` | Paladin |
+| **Analyst** | AI/ML processing | `CLASSIFY`, `PREDICT`, `FUSE` | Wizard |
+
+Each **piece** (asset) on the board is one of these classes with specific capability stats.
+
+### Capability Stats (The "Character Sheet")
+
+Every piece has a capability profile:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  SCOUT DRONE "ALPHA-1"                          Class: Sensor  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  CAPABILITIES                        STATS                      │
+│  ├── DETECT (EO)        +3          Movement: 4 hexes          │
+│  ├── DETECT (IR)        +2          Range: 3 hexes             │
+│  ├── TRACK              +2          Fuel: ████████░░ 80%       │
+│  └── IDENTIFY           +1          Health: ██████████ 100%    │
+│                                                                 │
+│  SYNERGIES                                                      │
+│  └── +1 to TRACK when paired with Analyst                      │
+│                                                                 │
+│  LIMITATIONS                                                    │
+│  └── Cannot AUTHORIZE (requires Authority class)               │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### The Skill Check System
+
+When a task requires capabilities, HIVE Commander uses D&D-style skill checks:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  ENCOUNTER: "Track High-Value Target at Grid C7"               │
+│                                                                 │
+│  REQUIRED CAPABILITIES:                                         │
+│  ├── DETECT (any)       DC 10                                  │
+│  ├── TRACK              DC 12                                  │
+│  └── AUTHORIZE          DC 8  (human-in-loop required)         │
+│                                                                 │
+│  YOUR PARTY (assets in range):                                 │
+│  ├── Scout Drone Alpha-1:  DETECT +3, TRACK +2                 │
+│  ├── Ground Robot Beta-2:  DETECT +1                           │
+│  └── Operator Human-1:     AUTHORIZE +4                        │
+│                                                                 │
+│  COMPOSITION BONUSES:                                           │
+│  ├── Multi-sensor fusion: +2 to DETECT (two sensors)           │
+│  ├── Elevation advantage: +1 to TRACK (drone on hill)          │
+│  └── Authority present:   +1 to all checks                     │
+│                                                                 │
+│  ROLL RESULTS:                                                  │
+│  ├── DETECT:    Roll 8 + 3 (drone) + 1 (robot) + 2 (fusion)    │
+│  │              = 14 vs DC 10 ✓ SUCCESS                        │
+│  ├── TRACK:     Roll 11 + 2 (drone) + 1 (elevation)            │
+│  │              = 14 vs DC 12 ✓ SUCCESS                        │
+│  └── AUTHORIZE: Roll 6 + 4 (human)                              │
+│                 = 10 vs DC 8 ✓ SUCCESS                         │
+│                                                                 │
+│  OUTCOME: Target tracked! +50 points, target revealed on map   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Turn Structure
+
+Each round has phases that mirror HIVE's coordination flow:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         ROUND STRUCTURE                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  PHASE 1: ENCOUNTER (DM/System)                                 │
+│  ├── New objectives appear on map                               │
+│  ├── Enemy actions resolve                                      │
+│  └── Environmental changes (weather, comms, etc.)              │
+│                                                                 │
+│  PHASE 2: PLANNING (Commander)                                  │
+│  ├── View capability requirements for each objective           │
+│  ├── See HIVE's recommended compositions                       │
+│  └── Decide which objectives to pursue                         │
+│                                                                 │
+│  PHASE 3: MOVEMENT (All Players)                                │
+│  ├── Each piece moves up to its movement value                 │
+│  ├── Terrain affects movement (hills slow, roads speed)        │
+│  └── Moving into proximity enables composition                  │
+│                                                                 │
+│  PHASE 4: COMPOSITION (Commander)                               │
+│  ├── Group pieces into parties (drag-select or tap)            │
+│  ├── See emergent capabilities from composition                │
+│  └── Assign parties to objectives                               │
+│                                                                 │
+│  PHASE 5: RESOLUTION (System)                                   │
+│  ├── Skill checks for each objective                           │
+│  ├── Dice rolls with composition bonuses                       │
+│  ├── Success/failure narration                                  │
+│  └── Points awarded, map state updates                         │
+│                                                                 │
+│  PHASE 6: UPKEEP                                                │
+│  ├── Fuel consumption                                           │
+│  ├── Asset recovery (damaged pieces heal)                      │
+│  └── Reinforcement spawns (if earned)                          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### The 3D Terrain Map
+
+The game board is a 3D terrain map with tactical significance:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        3D TERRAIN MAP                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  TERRAIN TYPES                      EFFECTS                     │
+│  ─────────────────────────────────────────────────────────────  │
+│  🏔️ Hills/Elevation                +1 to DETECT/TRACK range    │
+│                                    -1 to ground movement        │
+│                                                                 │
+│  🌲 Forest/Cover                   +2 to STEALTH checks         │
+│                                    Blocks line-of-sight         │
+│                                                                 │
+│  🏢 Urban/Buildings                BREACH required to enter     │
+│                                    Cover from STRIKE            │
+│                                                                 │
+│  🛣️ Roads                          +2 to ground movement        │
+│                                    No cover                     │
+│                                                                 │
+│  📡 Comm Towers                    Extends RELAY range          │
+│                                    High-value objective         │
+│                                                                 │
+│  ⚡ Jamming Zones                  -2 to all RELAY checks       │
+│                                    FUSE capability negates      │
+│                                                                 │
+│  ZOOM LEVELS                                                    │
+│  ─────────────────────────────────────────────────────────────  │
+│  Strategic (zoomed out):  See composed capabilities as icons   │
+│  Tactical (mid):          See individual pieces + composition   │
+│  Detail (zoomed in):      See piece stats, terrain bonuses     │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Hierarchy Through Zoom
+
+The 3D map implements hierarchy visualization through zoom levels:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  ZOOMED OUT (Commander's View)                                  │
+│                                                                 │
+│     [🎯 PERSISTENT_ISR]          [⚔️ STRIKE_PACKAGE]            │
+│           Grid B4                      Grid D7                  │
+│                                                                 │
+│  You see: Composed capabilities as single icons                │
+│  Hierarchy level: Formation / Task Force                        │
+├─────────────────────────────────────────────────────────────────┤
+│  TAP TO DRILL DOWN...                                           │
+├─────────────────────────────────────────────────────────────────┤
+│  ZOOMED IN (Operator's View)                                    │
+│                                                                 │
+│     [🎯 PERSISTENT_ISR]                                         │
+│     ├── 🛩️ Scout Drone Alpha-1 (DETECT+3, TRACK+2)             │
+│     ├── 🛩️ Scout Drone Alpha-2 (DETECT+2, TRACK+3)             │
+│     └── 🤖 Analyst Bot Gamma-1 (CLASSIFY+3, FUSE+2)            │
+│                                                                 │
+│  You see: Individual pieces that compose the capability        │
+│  Hierarchy level: Squad / Individual assets                     │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Random Draft (Force Composition)
+
+At game start, players don't choose their pieces - they're dealt a random hand:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  DRAFT PHASE                                                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  BLUE TEAM receives:                 RED TEAM receives:         │
+│  ├── 2x Sensor (Scout Drones)        ├── 3x Sensor             │
+│  ├── 1x Scout (Recon Bot)            ├── 1x Scout              │
+│  ├── 2x Striker (Strike Drones)      ├── 1x Striker            │
+│  ├── 1x Support (Relay Node)         ├── 2x Support            │
+│  └── 1x Authority (Human Op)         └── 1x Authority          │
+│                                                                 │
+│  "You have strong strike capability but limited ISR.            │
+│   They have excellent sensors but weak kinetics.                │
+│   How will you compose your way to victory?"                    │
+│                                                                 │
+│  OPTIONAL: Trade/Coalition                                      │
+│  └── In multiplayer, teams can negotiate asset trades          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Encounter Types
+
+The DM (presenter/system) introduces encounters that require specific compositions:
+
+| Encounter | Required Capabilities | Composition Challenge |
+|-----------|----------------------|----------------------|
+| **Track HVT** | DETECT + TRACK + AUTHORIZE | Need sensor + authority |
+| **Secure Area** | DETECT + SUPPRESS + RELAY | Continuous presence |
+| **Strike Target** | DETECT + IDENTIFY + STRIKE + AUTHORIZE | Full kill chain |
+| **Establish Comms** | RELAY + RELAY (redundancy) | Two support assets |
+| **Breach Compound** | BREACH + SUPPRESS + DETECT | Combined arms |
+| **Rescue Asset** | DETECT + FAST_MOVE + EXTRACT | Speed + awareness |
+| **Jam Enemy** | FUSE + RELAY + COMMAND | Electronic warfare |
+
+### Composition Bonuses (Synergies)
+
+When pieces work together, they gain bonuses beyond their individual stats:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  COMPOSITION SYNERGIES                                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  MULTI-SENSOR FUSION                                            │
+│  └── 2+ Sensors in party: +2 to all DETECT checks              │
+│                                                                 │
+│  HUMAN-MACHINE TEAMING                                          │
+│  └── Authority + any other class: +1 to all checks             │
+│                                                                 │
+│  AI-AUGMENTED OPS                                               │
+│  └── Analyst + Sensor: +2 to IDENTIFY, enables PREDICT         │
+│                                                                 │
+│  COMBINED ARMS                                                  │
+│  └── Striker + Sensor + Authority: +3 to STRIKE               │
+│                                                                 │
+│  PERSISTENT PRESENCE                                            │
+│  └── 2+ of same class: Redundancy - can lose one, keep bonus  │
+│                                                                 │
+│  MESH NETWORK                                                   │
+│  └── 2+ Support in range: +1 to RELAY per additional node     │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### The DM Role (Presenter)
+
+In demo mode, the presenter acts as Dungeon Master:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  DM CONTROLS (Presenter Dashboard)                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ENCOUNTER DECK                                                 │
+│  ├── [Draw Next Encounter]                                      │
+│  ├── [Custom Encounter] - design on the fly                    │
+│  └── [Boss Encounter] - high-stakes finale                     │
+│                                                                 │
+│  DIFFICULTY ADJUSTMENT                                          │
+│  ├── DC Modifier: [-2] [-1] [0] [+1] [+2]                      │
+│  └── "Make it easier/harder based on audience"                 │
+│                                                                 │
+│  DRAMA CONTROLS                                                 │
+│  ├── [Introduce Complication] - jamming, weather, asset loss   │
+│  ├── [Reinforcements] - give team new pieces                   │
+│  └── [Narrate] - add flavor text to outcomes                   │
+│                                                                 │
+│  TEACHING MOMENTS                                               │
+│  ├── [Highlight Composition] - show why this combo worked      │
+│  ├── [Show HIVE Recommendation] - "HIVE suggests..."           │
+│  └── [Pause for Q&A] - freeze game state                       │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Multiplayer Modes
+
+### Mode 1: Solo Practice
+- Player controls all pieces
+- System acts as DM, drawing encounters
+- Good for learning mechanics
+
+### Mode 2: Commander + Operators
+- One player as Commander (strategic view)
+- Other players control individual pieces (operator view)
+- Commander assigns objectives, operators execute movement
+- **Best for conference demos**
+
+### Mode 3: Head-to-Head
+- Two commanders compete for objectives
+- Each has their own randomly drafted pieces
+- Contested objectives in shared map area
+- **Best for game theory research**
+
+### Mode 4: Coalition
+- Multiple commanders with separate pieces
+- Must negotiate to form cross-boundary parties
+- Authority delegation mechanics
+- **Best for demonstrating AUKUS/NATO scenarios**
+
+### Audience Participation Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  CONFERENCE DEMO SETUP                                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. Presenter creates game session                              │
+│     └── Selects scenario, theme, difficulty                    │
+│                                                                 │
+│  2. Displays QR code / short link                               │
+│     └── "Join at hive.game/ABC123"                             │
+│                                                                 │
+│  3. Attendees join on phones                                    │
+│     ├── Select available piece to control                       │
+│     └── See their piece's capability card                      │
+│                                                                 │
+│  4. Presenter acts as Commander + DM                            │
+│     ├── Introduces encounters                                   │
+│     ├── Asks "who has DETECT capability?"                      │
+│     └── Forms parties from audience pieces                     │
+│                                                                 │
+│  5. Skill checks with audience                                  │
+│     ├── "Alpha-1, roll for DETECT!"                            │
+│     ├── Attendee taps to roll on their phone                   │
+│     └── Result appears on main screen                          │
+│                                                                 │
+│  6. Narrate outcomes                                            │
+│     └── "The scout drone spots the target - but wait,          │
+│          we need AUTHORIZE! Who has Authority class?"          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Technology Stack
+
+### Server-Side Multiplayer (Same as before)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        HIVE Commander                           │
 ├─────────────────────────────────────────────────────────────────┤
 │  Frontend (TypeScript/React)                                    │
-│  ├── Hosted at revolveteam.com/commander                       │
-│  ├── Map Renderer (Canvas/WebGL or Leaflet)                    │
-│  ├── Asset Visualization                                        │
-│  ├── Capability Tree View                                       │
-│  ├── Task Assignment UI                                         │
-│  ├── Mobile-optimized participant view                         │
-│  └── Metrics Dashboard                                          │
+│  ├── 3D Map Renderer (Three.js or React Three Fiber)           │
+│  ├── Piece Visualization with capability cards                 │
+│  ├── Zoom-based hierarchy view                                  │
+│  ├── Skill check UI with dice animation                        │
+│  ├── Mobile operator view (phone-optimized)                    │
+│  └── DM dashboard                                               │
 ├─────────────────────────────────────────────────────────────────┤
 │  WebSocket Connection                                           │
 ├─────────────────────────────────────────────────────────────────┤
-│  Backend (Rust/Axum) - api.revolveteam.com                     │
+│  Backend (Rust/Axum)                                            │
 │  ├── HIVE Reference Implementation                              │
 │  │   ├── Capability Documents (Automerge CRDTs)                │
-│  │   ├── Hierarchical Aggregation Engine                       │
-│  │   ├── Task-to-Capability Matching                           │
-│  │   └── Cross-Boundary Composition                            │
+│  │   ├── Composition Engine (calculate synergies)              │
+│  │   ├── Task-Capability Matching (DC calculation)             │
+│  │   └── Skill Check Resolution                                │
 │  ├── Game Session Management                                    │
-│  │   ├── Create/join sessions                                  │
-│  │   ├── Role assignment                                        │
-│  │   └── Real-time state broadcast                             │
-│  ├── Simulation Engine                                          │
-│  │   ├── Asset State Management                                │
-│  │   ├── Movement/Behavior Models                              │
-│  │   └── Event Generation                                       │
+│  ├── Turn/Phase State Machine                                   │
+│  ├── Encounter Deck & DM Controls                               │
 │  └── Metrics Collection                                         │
-│      ├── Coordination Latency                                   │
-│      ├── Task Completion Rates                                  │
-│      └── Coagency Performance Scores                           │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Why Server-Only:**
-- Simpler architecture, one deployment target
-- All game logic in Rust, validated against real HIVE implementation
-- Multiplayer is the primary use case (demos, presentations, research)
-- No WASM compilation complexity
-- Easier to iterate on game balance (server-side updates only)
-
-### Cross-Platform Client Strategy
-
-For optimal mobile experience, especially for Asset Operators joining via phone, a native app provides better performance and UX than mobile web.
-
-**Framework Comparison:**
-
-| Framework | Web | iOS | Android | DX | Notes |
-|-----------|-----|-----|---------|-----|-------|
-| **Expo** | ✓ | ✓ | ✓ | ⭐⭐⭐ | Best choice - same React, batteries included |
-| React Native + RN Web | ✓ | ✓ | ✓ | ⭐⭐ | More control, more config |
-| Capacitor | ✓ | ✓ | ✓ | ⭐⭐ | Web-first wrapper, less native feel |
-| Tauri Mobile | ✓ | ✓ | ✓ | ⭐ | Rust-native but adds complexity |
-
-**Recommended: Expo (React Native)**
-
-Expo provides the best developer experience for cross-platform React:
-
-- **Expo Go**: Scan QR code → instantly test on your phone during development
-- **Expo Web**: Same codebase renders to web browser
-- **EAS Build**: Cloud builds for iOS/Android without local Xcode/Android Studio
-- **OTA Updates**: Push updates without app store review cycle
-
-**Architecture with Expo:**
+### Repository Structure (Monorepo)
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Shared Code                              │
-│  ├── WebSocket client (connects to api.revolveteam.com)        │
-│  ├── Game state management (Zustand or similar)                │
-│  ├── HIVE message types (TypeScript interfaces)                │
-│  └── Core UI components (maps, asset icons, task cards)        │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌──────────────────────┐       ┌──────────────────────┐       │
-│  │   Commander View     │       │   Operator View      │       │
-│  │   (Large screens)    │       │   (Phone-native)     │       │
-│  │                      │       │                      │       │
-│  │  • Full tactical map │       │  • Asset-centric UI  │       │
-│  │  • Capability tree   │       │  • Touch-optimized   │       │
-│  │  • Task assignment   │       │  • Task notifications│       │
-│  │  • Metrics dashboard │       │  • Quick actions     │       │
-│  │                      │       │                      │       │
-│  │  Optimized for:      │       │  Runs on:            │       │
-│  │  Desktop/tablet web  │       │  iOS, Android, Web   │       │
-│  └──────────────────────┘       └──────────────────────┘       │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+cap/
+├── hive-protocol/
+├── hive-mesh/
+├── hive-sim/
+├── hive-commander/           # Rust backend (Axum server)
+│   ├── Cargo.toml
+│   └── src/
+│       ├── main.rs
+│       ├── game/
+│       │   ├── session.rs        # Game session management
+│       │   ├── turn.rs           # Turn/phase state machine
+│       │   ├── skill_check.rs    # D20 + modifiers resolution
+│       │   ├── composition.rs    # Synergy calculation
+│       │   └── encounter.rs      # Encounter deck
+│       ├── ws/                   # WebSocket handlers
+│       └── types/                # Shared types (ts-rs)
+│
+└── hive-commander-ui/        # Frontend (React/TypeScript)
+    ├── package.json
+    └── src/
+        ├── components/
+        │   ├── Map3D/            # Three.js terrain map
+        │   ├── PieceCard/        # Capability stat cards
+        │   ├── SkillCheck/       # Dice roll UI
+        │   ├── PartyComposer/    # Drag-select grouping
+        │   └── DMDashboard/      # Presenter controls
+        └── views/
+            ├── CommanderView/    # Strategic zoom level
+            ├── OperatorView/     # Mobile piece control
+            └── SpectatorView/    # Watch-only
 ```
 
-**Single Codebase Option:**
-
-One Expo app that adapts based on screen size and role:
-
-```typescript
-// Responsive role-based rendering
-function App() {
-  const { role } = useGameSession();
-  const isLargeScreen = useMediaQuery('(min-width: 1024px)');
-  
-  if (role === 'commander' || isLargeScreen) {
-    return <CommanderView />;
-  }
-  return <OperatorView />;
-}
-```
-
-**Native App Benefits for Demos:**
-
-| Benefit | Impact |
-|---------|--------|
-| App Store presence | "Download HIVE Commander" - legitimacy |
-| Push notifications | Task assignments ping operators |
-| Better performance | Smoother map interactions on phones |
-| Native gestures | Pinch-zoom, swipe feels right |
-| Offline resilience | Reconnects gracefully after signal loss |
-| No browser chrome | Full-screen immersive experience |
-
-**Expo Development Workflow:**
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Development                                 │
-│                                                                 │
-│   $ npx expo start                                             │
-│                                                                 │
-│   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐           │
-│   │ Expo Go     │  │ iOS Sim    │  │ Web Browser │           │
-│   │ (your      │  │             │  │ localhost   │           │
-│   │  phone)    │  │             │  │             │           │
-│   │ Scan QR    │  │             │  │             │           │
-│   └─────────────┘  └─────────────┘  └─────────────┘           │
-│         │                │                │                    │
-│         └────────────────┴────────────────┘                    │
-│                          │                                     │
-│                    Hot Reload                                  │
-│                 (instant updates)                              │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│                     Production                                  │
-│                                                                 │
-│   $ eas build --platform all                                   │
-│                                                                 │
-│   EAS Cloud builds:                                            │
-│   ├── iOS .ipa → App Store / TestFlight                       │
-│   ├── Android .apk/.aab → Play Store                          │
-│   └── Web bundle → Cloudflare Pages                           │
-│                                                                 │
-│   OTA Updates (post-launch):                                   │
-│   $ eas update --branch production                             │
-│   → Users get updates without app store review                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**Phased Approach to Native:**
-
-| Phase | Client Strategy |
-|-------|-----------------|
-| Phase 1 | Web-only (React/Vite), validate core gameplay |
-| Phase 2 | Evaluate Expo migration based on mobile feedback |
-| Phase 3+ | Native app in App Store, web fallback for quick joins |
-
-**Conference Demo Flow with Native App:**
-
-```
-Before talk:
-  "Download HIVE Commander from the App Store"
-  (or scan QR for web fallback)
-
-During talk:
-  1. Presenter shares game code: "HIVE-7X3K"
-  2. Attendees open app → Enter code → Pick asset
-  3. Push notification: "You are Scout Drone Alpha-1"
-  4. Live coordination begins
-  
-After talk:
-  App stays installed → future engagement
-```
-
-## Game Design
-
-### Design Philosophy
-
-HIVE Commander is designed as three things simultaneously:
-
-1. **Presentation Tool**: Live demos where conference audiences participate
-2. **Sales Tool**: Themed versions that speak directly to target verticals
-3. **Research Platform**: Head-to-head play generates real game theory data
-
-The core insight: **HIVE's coordination mechanics are domain-agnostic**. The same capability aggregation that coordinates drones and operators also coordinates cells and researchers, or trucks and dispatchers. Different themes make this tangible to different audiences.
-
-### Multiplayer Modes
-
-| Mode | Players | Use Case |
-|------|---------|----------|
-| **Solo** | 1 | Learning, practice, async demos |
-| **Cooperative** | 2-8 | Coalition coordination demo, team training |
-| **Head-to-Head** | 2 (+ observers) | Competitive demo, game theory research |
-| **Audience Play** | 10-50 | Conference presentations, workshops |
-
-#### Head-to-Head Mode
-
-Two commanders compete for objectives in a shared operational space:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Shared Operational Area                      │
-│                                                                 │
-│   ┌───────────────────┐       ┌───────────────────┐            │
-│   │    BLUE TEAM      │       │     RED TEAM      │            │
-│   │    (Player 1)     │       │    (Player 2)     │            │
-│   │                   │       │                   │            │
-│   │  🛩️🛩️🛩️ Drones    │       │   Drones 🛩️🛩️🛩️   │            │
-│   │  🤖🤖 Robots      │       │    Robots 🤖🤖    │            │
-│   │  👤 Operator      │       │   Operator 👤     │            │
-│   └───────────────────┘       └───────────────────┘            │
-│                                                                 │
-│                    🎯 Contested Objectives 🎯                   │
-│                                                                 │
-│   Win condition: Control objectives through superior           │
-│   capability composition and task coordination                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**What head-to-head reveals:**
-- Which coordination strategies win under pressure
-- How quickly players can recompose after losses
-- Whether HIVE's recommendations improve competitive performance
-- Emergent tactics that inform real operational doctrine
-
-#### Audience Participation Mode
-
-For conference demos and workshops, attendees join via phone/laptop:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Presenter View                             │
-│                   (Main Screen / Projector)                     │
-│                                                                 │
-│   Full operational map, all assets, capability tree            │
-│   Presenter acts as C2, assigns high-level tasks               │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-        ┌─────────────────────┼─────────────────────┐
-        ▼                     ▼                     ▼
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│  Attendee 1  │     │  Attendee 2  │     │  Attendee 3  │
-│  "Alpha-1"   │     │  "Alpha-2"   │     │  "Bravo-1"   │
-│              │     │              │     │              │
-│  Controls:   │     │  Controls:   │     │  Controls:   │
-│  Scout Drone │     │  Ground Bot  │     │  Strike UAV  │
-│              │     │              │     │              │
-│  Phone UI:   │     │  Phone UI:   │     │  Phone UI:   │
-│  - Status    │     │  - Status    │     │  - Status    │
-│  - Position  │     │  - Position  │     │  - Position  │
-│  - Execute   │     │  - Execute   │     │  - Execute   │
-└──────────────┘     └──────────────┘     └──────────────┘
-```
-
-### Role System
-
-The game supports a hierarchy of roles that mirror real command structures:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         ROLE HIERARCHY                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  COMMANDER (1 per team)                                        │
-│  ├── Full map view, all assets visible                         │
-│  ├── Capability tree showing aggregated capabilities           │
-│  ├── Assign tasks to squads or individual assets               │
-│  ├── Create/dissolve task forces                               │
-│  ├── See HIVE recommendations, accept/reject                   │
-│  └── Coalition: can request assets from allied commanders      │
-│                                                                 │
-│  SQUAD LEADER (optional, 1 per squad)                          │
-│  ├── Squad-level map view                                       │
-│  ├── Controls task distribution within squad                   │
-│  ├── Can suggest task force composition to Commander           │
-│  └── Receives tasks from Commander, delegates to operators     │
-│                                                                 │
-│  ASSET OPERATOR (1 per asset, or 1 controlling multiple)       │
-│  ├── Asset-centric view (own position, local area)            │
-│  ├── Receives task assignments                                  │
-│  ├── Executes movement and actions                             │
-│  ├── Reports status (auto or manual)                           │
-│  └── Mobile-optimized UI                                        │
-│                                                                 │
-│  OBSERVER (unlimited)                                           │
-│  ├── Read-only full map view                                   │
-│  ├── Metrics dashboard                                          │
-│  └── Good for: investors watching, researchers, spectators    │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Demo Configurations
-
-| Scenario | Commander | Squad Leaders | Asset Operators | Observers |
-|----------|-----------|---------------|-----------------|-----------|
-| **Solo practice** | 1 (you) | 0 | 0 (AI-controlled) | 0 |
-| **Investor demo** | 1 (investor) | 0 | 1-2 (you/team) | 0-2 |
-| **Workshop** | 1 (presenter) | 2-4 | 10-40 (attendees) | 0-10 |
-| **Head-to-head** | 2 (competing) | 0-2 each | 0-10 each | unlimited |
-| **Coalition** | 2-3 (allied) | 1-2 each | 5-15 each | unlimited |
-
-### Join Flow
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                                                                  │
-│   1. Scan QR / visit revolveteam.com/commander/join/HIVE-7X3K  │
-│                                                                  │
-│   2. Select Role:                                                │
-│      ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
-│      │  COMMANDER  │  │  OPERATOR   │  │  OBSERVER   │          │
-│      │  (if open)  │  │             │  │             │          │
-│      └─────────────┘  └─────────────┘  └─────────────┘          │
-│                                                                  │
-│   3. If Operator, pick available asset:                         │
-│      ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
-│      │ Scout Drone │  │ Ground Bot  │  │ Strike UAV  │          │
-│      │   Alpha-1   │  │   Alpha-2   │  │   Bravo-1   │          │
-│      │  ✓ Available│  │  ✓ Available│  │  ✗ Taken    │          │
-│      └─────────────┘  └─────────────┘  └─────────────┘          │
-│                                                                  │
-│   4. Join game, receive role-appropriate UI                     │
-│                                                                  │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-### Why This Works
-
-**For the Commander (presenter/investor):**
-- They experience the cognitive load of coordination
-- HIVE's recommendations feel like genuine help
-- "I couldn't have tracked all that manually"
-
-**For Asset Operators (audience):**
-- They're engaged, not passive observers
-- They feel the task come down from C2
-- "So THAT'S why it picked me for this task"
-- Creates memorable "I was the drone" stories
-
-**For Researchers:**
-- Real human coordination behavior, not simulated
-- Multiple skill levels interacting
-- Natural variance for statistical analysis
-
-**Why this works for presentations:**
-- Audience is *engaged*, not passive
-- They *feel* the coordination problem firsthand
-- "I was the drone operator" creates memorable demos
-- Natural Q&A: "Why did HIVE pick my asset for that task?"
-
-### Theming Architecture
-
-The game separates **core mechanics** from **presentation layer**:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      HIVE Core Engine                           │
-│  (Domain-agnostic coordination)                                 │
-│                                                                 │
-│  • Capability documents                                         │
-│  • Hierarchical aggregation                                     │
-│  • Task-capability matching                                     │
-│  • Cross-boundary composition                                   │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                    Theme Adapter Layer
-                              │
-        ┌─────────────────────┼─────────────────────┐
-        ▼                     ▼                     ▼
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│   MILITARY   │     │   BIOLOGY    │     │   LOGISTICS  │
-│    Theme     │     │    Theme     │     │    Theme     │
-└──────────────┘     └──────────────┘     └──────────────┘
-```
-
-#### Theme: Military Operations (Default)
-
-| Core Concept | Military Skin |
-|--------------|---------------|
-| Asset | Platform (drone, robot, vehicle) |
-| Operator | Warfighter, Commander |
-| Capability | ISR, Strike, Transport, Comms |
-| Task | Mission (track, secure, neutralize) |
-| Group | Squad, Platoon, Company |
-| Boundary | National ownership, OPCON/ADCON |
-
-**Visual style**: Tactical map, military iconography, MIL-STD colors
-
-#### Theme: Cellular Biology
-
-| Core Concept | Biology Skin |
-|--------------|--------------|
-| Asset | Cell, Organelle, Molecule |
-| Operator | Researcher, Lab AI |
-| Capability | Sense, Signal, Transport, Metabolize |
-| Task | Response (detect pathogen, synthesize, migrate) |
-| Group | Tissue, Organ, System |
-| Boundary | Membrane, Blood-brain barrier |
-
-**Visual style**: Microscopy aesthetic, organic shapes, bioluminescent colors
-
-**Target audience**: Biotech, pharma, synthetic biology, DARPA BTO
-
-#### Theme: Supply Chain / Logistics
-
-| Core Concept | Logistics Skin |
-|--------------|----------------|
-| Asset | Truck, Warehouse, Drone, Forklift |
-| Operator | Dispatcher, Manager |
-| Capability | Transport, Store, Sort, Deliver |
-| Task | Order fulfillment, Restock, Route |
-| Group | Fleet, Region, Network |
-| Boundary | Company ownership, Contractor |
-
-**Visual style**: Clean industrial, familiar logistics iconography
-
-**Target audience**: Ports, warehousing, last-mile delivery, manufacturing
-
-#### Theme: Manufacturing
-
-| Core Concept | Manufacturing Skin |
-|--------------|-------------------|
-| Asset | Robot arm, AGV, Sensor, Station |
-| Operator | Supervisor, Quality AI |
-| Capability | Weld, Assemble, Inspect, Transport |
-| Task | Build order, Quality check, Changeover |
-| Group | Cell, Line, Plant |
-| Boundary | OEM vs Supplier, Union jurisdiction |
-
-**Visual style**: Factory floor, industrial automation aesthetic
-
-**Target audience**: Industry 4.0, automotive, aerospace manufacturing
-
-#### Theme: Agriculture
-
-| Core Concept | Agriculture Skin |
-|--------------|-----------------|
-| Asset | Tractor, Drone, Sensor, Irrigation |
-| Operator | Farmer, Agronomist AI |
-| Capability | Till, Plant, Spray, Harvest, Monitor |
-| Task | Field operation, Pest response, Harvest |
-| Group | Field, Farm, Cooperative |
-| Boundary | Property lines, Water rights |
-
-**Visual style**: Aerial field views, agricultural equipment
-
-**Target audience**: AgTech, precision agriculture, farming cooperatives
-
-### Theme Configuration
-
-Themes are defined as configuration, not code:
-
-```yaml
-# themes/military.yaml
-theme:
-  name: "Military Operations"
-  id: military
-  
-  terminology:
-    asset: "Platform"
-    operator: "Warfighter"
-    capability: "Capability"
-    task: "Mission"
-    group: "Unit"
-    
-  asset_types:
-    - id: scout_uav
-      name: "Scout UAV"
-      icon: "assets/military/scout_uav.svg"
-      capabilities: [SENSOR_EO, SENSOR_IR, RECON]
-      
-    - id: strike_uav
-      name: "Strike UAV"  
-      icon: "assets/military/strike_uav.svg"
-      capabilities: [SENSOR_EO, STRIKE_PRECISION, LOITER]
-      
-  task_types:
-    - id: track_target
-      name: "Track Target"
-      icon: "assets/military/track.svg"
-      required_capabilities: [SENSOR_*, TRACK_OBJECT]
-      
-  colors:
-    friendly: "#4A90D9"
-    hostile: "#D94A4A"
-    neutral: "#808080"
-    
-  map_style: "tactical"
-```
-
-```yaml
-# themes/biology.yaml
-theme:
-  name: "Cellular Systems"
-  id: biology
-  
-  terminology:
-    asset: "Cell"
-    operator: "Researcher"
-    capability: "Function"
-    task: "Response"
-    group: "Tissue"
-    
-  asset_types:
-    - id: tcell
-      name: "T-Cell"
-      icon: "assets/biology/tcell.svg"
-      capabilities: [DETECT_ANTIGEN, SIGNAL, ATTACK]
-      
-    - id: macrophage
-      name: "Macrophage"
-      icon: "assets/biology/macrophage.svg"
-      capabilities: [ENGULF, PRESENT_ANTIGEN, SIGNAL]
-      
-  colors:
-    friendly: "#4AD98A"
-    hostile: "#D94A4A"
-    neutral: "#E8E8E8"
-    
-  map_style: "microscopy"
-```
-
-### Core Gameplay Loop
-
-```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│   OBSERVE    │────▶│    DECIDE    │────▶│     ACT      │
-│              │     │              │     │              │
-│ View map     │     │ Select task  │     │ Assign task  │
-│ See caps     │     │ Choose assets│     │ HIVE matches │
-│ Track status │     │ Form groups  │     │ Assets move  │
-└──────────────┘     └──────────────┘     └──────────────┘
-       ▲                                         │
-       │                                         │
-       └─────────────────────────────────────────┘
-                    Game State Updates
-```
-
-### Asset Types and Capabilities
-
-| Asset Type | Platform | Advertised Capabilities |
-|------------|----------|------------------------|
-| Scout Drone | UAV | `SENSOR_EO`, `SENSOR_IR`, `RECON` |
-| Strike Drone | UAV | `SENSOR_EO`, `STRIKE_PRECISION`, `LOITER` |
-| Ground Robot | UGV | `SENSOR_ACOUSTIC`, `TRANSPORT_LIGHT`, `PATROL` |
-| Relay Node | Fixed | `COMMS_RELAY`, `MESH_EXTEND` |
-| Operator | Human | `AUTHORIZE`, `OVERRIDE`, `INTEL_ANALYSIS` |
-| AI Agent | Software | `TRACK_OBJECT`, `CLASSIFY`, `PREDICT_PATH` |
-
-### Emergent Capabilities (Hierarchical Aggregation)
-
-When assets are grouped, HIVE computes emergent capabilities:
-
-```
-Individual Assets              Squad Aggregation           Emergent Capability
-─────────────────              ─────────────────           ───────────────────
-
-Scout Drone (SENSOR_EO)    ┐
-Scout Drone (SENSOR_IR)    ├──▶  Alpha Squad         ──▶  PERSISTENT_ISR
-AI Agent (TRACK_OBJECT)    ┘     3 assets                  (continuous tracking)
-
-Strike Drone (STRIKE)      ┐
-Operator (AUTHORIZE)       ├──▶  Bravo Squad         ──▶  AUTHORIZED_STRIKE
-AI Agent (CLASSIFY)        ┘     3 assets                  (human-in-loop strike)
-
-Ground Robot (PATROL)      ┐
-Scout Drone (SENSOR_EO)    ├──▶  Charlie Squad       ──▶  AREA_SECURITY
-Relay Node (COMMS_RELAY)   ┘     3 assets                  (persistent presence)
-```
-
-### Task Types
-
-| Task | Required Capabilities | Success Criteria |
-|------|----------------------|------------------|
-| Track Target | `SENSOR_*` + `TRACK_OBJECT` | Continuous track maintained |
-| Secure Area | `PATROL` + `SENSOR_*` | No incursions undetected |
-| Strike Target | `STRIKE_*` + `AUTHORIZE` | Target neutralized |
-| Extend Comms | `COMMS_RELAY` | Coverage area increased |
-| Escort Asset | `TRANSPORT_*` + `SENSOR_*` | Asset reaches destination |
-
-### Cross-Boundary Task Forces (Point 2 Validation)
-
-The game explicitly supports creating ad-hoc task forces across ownership boundaries:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Operational Area                            │
-│                                                                 │
-│   ┌─────────────┐              ┌─────────────┐                 │
-│   │  US Squad   │              │  UK Squad   │                 │
-│   │  (Blue)     │              │  (Blue)     │                 │
-│   │             │              │             │                 │
-│   │  🛩️ Scout   │              │  🛩️ Strike  │                 │
-│   │  🤖 Robot   │              │  👤 Operator│                 │
-│   └─────────────┘              └─────────────┘                 │
-│          │                            │                         │
-│          │     Player drag-selects    │                         │
-│          │     across boundaries      │                         │
-│          ▼                            ▼                         │
-│   ┌─────────────────────────────────────────┐                  │
-│   │         Ad-Hoc Task Force               │                  │
-│   │         (Coalition - Purple)            │                  │
-│   │                                         │                  │
-│   │  🛩️ US Scout + 🛩️ UK Strike + 👤 UK Op  │                  │
-│   │                                         │                  │
-│   │  Emergent: AUTHORIZED_STRIKE_WITH_ISR   │                  │
-│   └─────────────────────────────────────────┘                  │
-│                                                                 │
-│   HIVE handles:                                                │
-│   • Capability composition across owners                       │
-│   • Authority delegation (UK Op authorizes US asset strike)   │
-│   • State sync between national systems                        │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### UI Components
-
-**1. Operational Map**
-- 2D top-down view of operational area
-- Assets shown as icons with ownership coloring
-- Coverage areas visualized (sensor ranges, patrol zones)
-- Targets and objectives marked
-- Drag-select for ad-hoc grouping
-
-**2. Capability Tree**
-- Hierarchical view: Assets → Squads → Formation → Operational
-- Real-time capability aggregation visualization
-- Emergent capabilities highlighted
-- Click-to-expand details
-
-**3. Task Panel**
-- Available task types
-- Drag-drop task assignment
-- HIVE's capability matching shown (which assets can fulfill)
-- Confidence/suitability scores
-
-**4. Metrics Dashboard**
-- Coordination latency (time from task to execution)
-- Task completion rate
-- Coverage percentage
-- Coagency score (human-machine team effectiveness)
+---
 
 ## Validation Objectives
 
-### 1. Capability Algebra Validation
+### 1. Capability Composition (Core Mechanic)
 
-The game provides empirical testing of capability composition rules:
-
-```rust
-// Example composition rule - does this feel right in gameplay?
-fn compose_isr(assets: &[Asset]) -> Option<EmergentCapability> {
-    let has_sensor = assets.iter().any(|a| a.has_capability("SENSOR_*"));
-    let has_tracking = assets.iter().any(|a| a.has_capability("TRACK_OBJECT"));
-    let has_persistence = assets.len() >= 2; // Redundancy for persistence
-    
-    if has_sensor && has_tracking && has_persistence {
-        Some(EmergentCapability::PersistentISR {
-            coverage: calculate_coverage(assets),
-            track_capacity: count_track_slots(assets),
-        })
-    } else {
-        None
-    }
-}
-```
-
-**Validation question**: When players form groups, do the emergent capabilities match their intuition? If not, the composition rules need adjustment.
-
-### 2. Task-Capability Matching
-
-When a player assigns a task, HIVE must select appropriate assets:
+The skill check system directly validates HIVE's composition engine:
 
 ```rust
-fn match_task_to_assets(
-    task: &Task,
-    available: &[Asset],
-    constraints: &Constraints,
-) -> TaskAssignment {
-    // HIVE's matching algorithm runs here
-    // Game reveals whether selections feel "smart"
+// Does HIVE's composition bonus calculation match player intuition?
+fn calculate_party_modifier(party: &[Piece], check_type: Capability) -> i32 {
+    let base = party.iter()
+        .map(|p| p.get_modifier(check_type))
+        .max()
+        .unwrap_or(0);
+
+    let synergy = calculate_synergies(party);
+    let terrain = calculate_terrain_bonus(party, check_type);
+
+    base + synergy + terrain
 }
 ```
 
-**Validation question**: Does HIVE pick the assets the player would have picked? Does it explain why?
+**Validation question**: When players form parties, do the computed bonuses feel right? Do synergies reward smart composition?
 
-### 3. Cross-Boundary Coordination
+### 2. Hierarchy Visualization
 
-The game explicitly tests coalition scenarios:
+The zoom mechanic validates that hierarchy is intuitive:
 
-- US assets working with UK assets
-- Authority delegation across ownership boundaries
-- Information sharing constraints (some data stays national)
+- **Zoomed out**: Do composed capabilities read as coherent units?
+- **Drill down**: Is it clear how individual pieces contribute?
+- **Cross-boundary**: Do coalition parties show ownership correctly?
 
-**Validation question**: Can HIVE correctly model OPCON/ADCON distinctions?
+### 3. Task-Capability Matching
 
-### 4. Degradation Behavior
+Encounters validate that DC calculation makes sense:
 
-The game can simulate asset loss, comms degradation, and network partitions:
+- Are "impossible" encounters actually impossible without the right composition?
+- Do "easy" encounters feel appropriately simple?
+- Does HIVE's recommendation system suggest good parties?
 
-- Remove an asset mid-mission
-- Introduce communications delay
-- Partition the network
+### 4. Cross-Boundary Coordination
 
-**Validation question**: Does HIVE gracefully degrade? Do emergent capabilities recompute correctly?
+Coalition mode validates AUKUS/NATO scenarios:
 
-### 5. Coagency Performance Metrics
+- Can players form parties across ownership boundaries?
+- Does authority delegation work correctly?
+- Is it clear which pieces belong to which owner?
 
-The game can measure human-HIVE teaming effectiveness:
+---
 
-| Metric | Description | Target |
-|--------|-------------|--------|
-| Decision Latency | Time from situation change to task assignment | < 10s |
-| Trust Calibration | Player acceptance rate of HIVE recommendations | > 80% |
-| Override Rate | How often player overrides HIVE's matching | < 20% |
-| Task Success | Successful task completions | > 90% |
-| Coordination Overhead | Player actions per task | < 5 |
+## Theming
 
-These metrics directly support research into human-machine teaming and provide data for DARPA/academic proposals.
+The D&D-style mechanics support multiple themes:
 
-## Integration Points with HIVE Reference Implementation
+### Theme: Military Operations (Default)
 
-### Required APIs
+| Core Concept | Military Skin |
+|--------------|---------------|
+| Piece classes | Platform types (UAV, UGV, Operator) |
+| Capability checks | Mission capabilities |
+| Encounters | Tactical objectives |
+| Terrain | Operational environment |
 
-The game server needs these interfaces from hive-core:
+### Theme: Cellular Biology
 
-```rust
-// Capability Document Operations
-trait CapabilityStore {
-    fn advertise(&mut self, asset_id: AssetId, capabilities: Vec<Capability>);
-    fn get_capabilities(&self, asset_id: AssetId) -> Vec<Capability>;
-    fn get_aggregated(&self, group_id: GroupId) -> AggregatedCapabilities;
-}
+| Core Concept | Biology Skin |
+|--------------|--------------|
+| Piece classes | Cell types (T-Cell, Macrophage, etc.) |
+| Capability checks | Immune responses |
+| Encounters | Pathogen threats |
+| Terrain | Body systems |
 
-// Hierarchical Aggregation
-trait HierarchyManager {
-    fn create_group(&mut self, name: &str, members: Vec<AssetId>) -> GroupId;
-    fn dissolve_group(&mut self, group_id: GroupId);
-    fn compute_emergent(&self, group_id: GroupId) -> Vec<EmergentCapability>;
-}
+### Theme: Logistics
 
-// Task Matching
-trait TaskMatcher {
-    fn find_capable(&self, task: &Task) -> Vec<(AssetId, Suitability)>;
-    fn assign_task(&mut self, task: Task, assets: Vec<AssetId>) -> Assignment;
-}
+| Core Concept | Logistics Skin |
+|--------------|----------------|
+| Piece classes | Fleet assets (Truck, Drone, Warehouse) |
+| Capability checks | Delivery capabilities |
+| Encounters | Fulfillment challenges |
+| Terrain | Supply chain network |
 
-// Cross-Boundary Composition
-trait CoalitionManager {
-    fn create_task_force(&mut self, name: &str, assets: Vec<AssetId>) -> TaskForceId;
-    fn delegate_authority(&mut self, from: Owner, to: Owner, scope: AuthScope);
-}
-```
-
-### WebSocket Message Protocol
-
-Client-server communication uses JSON messages over WebSocket:
-
-```typescript
-// Client → Server
-type ClientMessage = 
-  | { type: "join", sessionId: string, role: Role }
-  | { type: "create_game", theme: string, mode: GameMode }
-  | { type: "assign_task", taskType: string, target: Target }
-  | { type: "create_task_force", name: string, assetIds: string[] }
-  | { type: "move_asset", assetId: string, position: Position }
-  | { type: "accept_recommendation", recommendationId: string }
-  | { type: "reject_recommendation", recommendationId: string };
-
-// Server → Client
-type ServerMessage =
-  | { type: "game_state", state: GameState }
-  | { type: "asset_update", asset: Asset }
-  | { type: "capability_update", groupId: string, capabilities: Capability[] }
-  | { type: "task_assigned", task: Task, assets: string[] }
-  | { type: "recommendation", id: string, suggestion: Suggestion }
-  | { type: "metrics_update", metrics: Metrics }
-  | { type: "player_joined", player: Player }
-  | { type: "game_over", winner: Team, stats: GameStats };
-```
-
-### Axum Server Structure
-
-```rust
-// Main server setup
-#[tokio::main]
-async fn main() {
-    let app = Router::new()
-        .route("/api/games", post(create_game))
-        .route("/api/games/:id", get(get_game))
-        .route("/ws", get(websocket_handler))
-        .with_state(AppState::new());
-    
-    axum::Server::bind(&"0.0.0.0:3030".parse().unwrap())
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
-}
-
-// WebSocket handler
-async fn websocket_handler(
-    ws: WebSocketUpgrade,
-    State(state): State<AppState>,
-) -> impl IntoResponse {
-    ws.on_upgrade(|socket| handle_socket(socket, state))
-}
-
-// Game session management
-struct GameSession {
-    id: SessionId,
-    theme: Theme,
-    mode: GameMode,
-    hive: HiveEngine,  // The actual HIVE reference implementation
-    players: HashMap<PlayerId, PlayerConnection>,
-    state: GameState,
-}
-```
+---
 
 ## MVP Scope
 
-### Phase 1: Core Engine + Multiplayer Foundation (5 weeks)
+### Phase 1: Core Turn-Based Engine
 
-**Goal**: Two players can join a game, one as Commander, one as Asset Operator
+- [ ] Turn structure (phases)
+- [ ] Skill check system (d20 + modifiers)
+- [ ] Basic composition bonuses
+- [ ] 2D map with hex grid (3D in Phase 2)
+- [ ] 5 piece classes
+- [ ] 5 encounter types
+- [ ] Solo mode
+- [ ] Basic web UI
 
-- [ ] Axum WebSocket server with session management
-- [ ] HIVE core engine integration (capability store, aggregation)
-- [ ] React frontend with basic map renderer
-- [ ] Commander view: full map, asset list, task panel
-- [ ] Operator view: mobile-friendly, asset-centric
-- [ ] 10-20 assets on a simple map
-- [ ] 3 asset types (drone, robot, operator)
-- [ ] Basic capability advertisement and aggregation
-- [ ] 2-3 task types with capability matching
-- [ ] Join flow: create game → share link → join with role
-- [ ] Military theme (default)
+**Deliverable**: Single-player tactical demo
 
-**Deliverable**: Playable 2-player demo at revolveteam.com/commander
+### Phase 2: Multiplayer + 3D Map
 
-### Phase 2: Head-to-Head + Scaling (4 weeks)
+- [ ] WebSocket multiplayer
+- [ ] Commander + Operator roles
+- [ ] 3D terrain map with Three.js
+- [ ] Zoom-based hierarchy view
+- [ ] Mobile operator UI
+- [ ] DM dashboard
 
-**Goal**: Competitive mode and support for more players
+**Deliverable**: Conference demo capability
 
-- [ ] Head-to-head mode (red vs blue teams)
-- [ ] Support 10+ concurrent players per session
+### Phase 3: Head-to-Head + Coalition
+
+- [ ] Competitive mode (two commanders)
+- [ ] Coalition mode (asset trading)
+- [ ] Cross-boundary parties
+- [ ] Authority delegation
 - [ ] Victory conditions and scoring
-- [ ] Real-time metrics display
-- [ ] Observer role (watch-only)
-- [ ] Game replay/playback foundation
 
-**Deliverable**: Competitive demos, early game theory experiments
+**Deliverable**: Game theory research platform
 
-### Phase 3: Audience Participation (3 weeks)
+### Phase 4: Polish + Themes
 
-**Goal**: Conference-ready presentation tool
+- [ ] Full terrain system
+- [ ] Dice roll animations
+- [ ] Sound effects
+- [ ] Alternative themes
+- [ ] Campaign mode (linked scenarios)
 
-- [ ] Mobile-friendly player UI
-- [ ] QR code join flow
-- [ ] Presenter dashboard
-- [ ] 10-50 concurrent participants
-- [ ] Simplified asset operator controls
-- [ ] Live metrics visualization
+**Deliverable**: Production-quality demo tool
 
-**Deliverable**: Conference demo capability, workshop tool
-
-### Phase 4: Cross-Boundary + Coalition (3 weeks)
-
-**Goal**: Demonstrate coalition task forces (Point 2)
-
-- [ ] Multi-owner assets (US, UK, AUS colors)
-- [ ] Ad-hoc task force creation via drag-select
-- [ ] Authority delegation UI
-- [ ] Ownership-aware capability sharing
-- [ ] OPCON/ADCON modeling
-
-**Deliverable**: AUKUS/NATO demo scenarios
-
-### Phase 5: Themes + Vertical Demos (4 weeks)
-
-**Goal**: Themed versions for target markets
-
-- [ ] Biology theme (DARPA BTO, biotech)
-- [ ] Logistics theme (ports, warehousing)
-- [ ] Manufacturing theme (Industry 4.0)
-- [ ] Agriculture theme (AgTech)
-- [ ] Theme switcher in UI
-
-**Deliverable**: Vertical-specific sales demos
-
-### Phase 6: Metrics + Coagency Research (3 weeks)
-
-**Goal**: Capture human-HIVE teaming data
-
-- [ ] Comprehensive metrics dashboard
-- [ ] Session recording/playback
-- [ ] Coagency score calculation
-- [ ] Head-to-head analytics
-- [ ] Export data for academic analysis
-
-**Deliverable**: Research-ready platform for human factors studies, game theory papers
-
-## Deployment Architecture
-
-### Primary: Cloud Multiplayer Server
-
-Multiplayer is the primary deployment mode, enabling demos, presentations, and research:
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    revolveteam.com                           │
-├──────────────────────────────────────────────────────────────┤
-│  Static Assets (Vercel/Cloudflare Pages)                    │
-│  ├── /                     Main website                     │
-│  ├── /commander/           Game client (React + WASM)       │
-│  └── /commander/join/:id   Direct game session link         │
-├──────────────────────────────────────────────────────────────┤
-│  API Subdomain: api.revolveteam.com                         │
-│  (Fly.io / Railway / Render)                                │
-│                                                              │
-│  Axum Server                                                │
-│  ├── WebSocket endpoint (/ws)                               │
-│  ├── Session management                                     │
-│  │   ├── Create game → returns session ID                  │
-│  │   ├── Join game → WebSocket connection                  │
-│  │   └── List public games                                  │
-│  ├── HIVE coordination engine                               │
-│  ├── Theme configuration serving                            │
-│  └── Metrics collection                                     │
-├──────────────────────────────────────────────────────────────┤
-│  Database (optional, for persistence)                       │
-│  ├── Session state (Redis or in-memory)                    │
-│  ├── Match history (Postgres/SQLite)                        │
-│  └── Research data export                                   │
-└──────────────────────────────────────────────────────────────┘
-```
-
-### Session Flow
-
-```
-Conference Presenter                    Audience Members
-       │                                      │
-       ▼                                      │
-┌──────────────┐                              │
-│ Create Game  │                              │
-│ Select Theme │                              │
-│ Set Mode     │                              │
-└──────┬───────┘                              │
-       │                                      │
-       ▼                                      │
-┌──────────────┐    QR Code / Short Link     │
-│ Session ID:  │ ───────────────────────────▶ │
-│ HIVE-7X3K    │    revolveteam.com/         │
-│              │    commander/join/7X3K       │
-└──────┬───────┘                              │
-       │                                      ▼
-       │                              ┌──────────────┐
-       │                              │ Join Game    │
-       │                              │ Select Role  │
-       │                              │ Pick Asset   │
-       │                              └──────┬───────┘
-       │                                     │
-       ▼                                     ▼
-┌─────────────────────────────────────────────────────┐
-│                  Live Game Session                  │
-│                                                     │
-│  Presenter: Commander view, full map               │
-│  Attendees: Asset operator views, mobile-friendly  │
-│  All: Real-time sync via WebSocket                 │
-└─────────────────────────────────────────────────────┘
-```
-
-### Infrastructure Cost Estimates
-
-| Component | Service | Cost (MVP) | Cost (Scale) |
-|-----------|---------|------------|--------------|
-| Static hosting | Cloudflare Pages | Free | Free |
-| Game server | Fly.io | $5-20/mo | $50-200/mo |
-| Database | Fly.io Postgres | Free tier | $15/mo |
-| Session state | Fly.io Redis | Free tier | $15/mo |
-| **Total** | | **~$25/mo** | **~$230/mo** |
-
-Fly.io's scale-to-zero means costs are minimal when not actively running demos.
-
-## Game Theory Validation
-
-HIVE Commander provides a controlled environment for studying coordination dynamics. Head-to-head play creates natural experimental conditions.
-
-### Competitive Dynamics Research
-
-Head-to-head mode enables rigorous study of coordination under adversarial pressure:
-
-#### Experiment 1: Coordination Speed Competition
-
-**Setup**: Equal assets, symmetric map, contested objectives
-**Measure**: Time from objective appearance to task completion
-**Hypothesis**: HIVE-assisted coordination outperforms manual coordination
-
-```
-Trial Design:
-┌─────────────────────────────────────────────────────────────────┐
-│  Round 1: Both players use HIVE recommendations                │
-│  Round 2: Both players ignore HIVE, manual coordination        │
-│  Round 3: Player A uses HIVE, Player B manual (swap roles)     │
-│                                                                 │
-│  Measure: Win rate, task completion time, coordination errors  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-#### Experiment 2: Capability Composition Strategies
-
-**Setup**: Asymmetric starting assets, multiple viable strategies
-**Measure**: Which capability compositions win in competition
-**Output**: Empirical data on optimal team composition
-
-**Research questions:**
-- Do players discover the same emergent capabilities HIVE predicts?
-- Are there compositions HIVE misses that humans find?
-- How do winning strategies change with different asset mixes?
-
-#### Experiment 3: Degradation Under Pressure
-
-**Setup**: Mid-game asset attrition (simulated losses)
-**Measure**: Recovery time, recomposition quality
-**Hypothesis**: HIVE's real-time reaggregation enables faster recovery
-
-```
-Attrition Scenarios:
-┌─────────────────────────────────────────────────────────────────┐
-│  Scenario A: Random 30% asset loss                             │
-│  Scenario B: Targeted loss of key capabilities                 │
-│  Scenario C: Network partition (temporary loss of visibility)  │
-│                                                                 │
-│  Measure: Time to reestablish capability coverage              │
-│  Measure: Task failure rate during recovery                    │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-#### Experiment 4: Coalition Formation Dynamics
-
-**Setup**: Three or more players with distinct assets
-**Measure**: When and how players form alliances
-**Research questions:**
-- What capability gaps drive coalition formation?
-- How stable are cross-boundary task forces?
-- Does HIVE's visibility into allied capabilities change behavior?
-
-### Coagency Performance Metrics
-
-The game measures human-HIVE teaming effectiveness across multiple dimensions:
-
-| Metric | Description | Collection Method |
-|--------|-------------|-------------------|
-| **Decision Latency** | Time from situation change to task assignment | Timestamp deltas |
-| **Trust Calibration** | Player acceptance rate of HIVE recommendations | Accept/reject logging |
-| **Override Rate** | How often player overrides HIVE's matching | Action comparison |
-| **Task Success** | Successful task completions | Outcome tracking |
-| **Coordination Overhead** | Player actions per task | Input counting |
-| **Recovery Speed** | Time to reestablish after disruption | State monitoring |
-| **Competitive Win Rate** | Wins when using HIVE vs manual | Match outcomes |
-
-### Academic Research Potential
-
-HIVE Commander data could support papers on:
-
-1. **Human-AI Teaming**: "Coordination Assistance Effects on Team Performance Under Adversarial Pressure"
-
-2. **Game Theory**: "Emergent Coalition Formation in Heterogeneous Multi-Agent Competition"
-
-3. **Military Operations Research**: "Hierarchical Capability Aggregation for Scalable C2"
-
-4. **Human Factors**: "Trust Development in AI-Assisted Coordination Systems"
-
-5. **Distributed Systems**: "CRDT-Based Real-Time State Synchronization for Interactive Simulation"
-
-### Data Collection Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     HIVE Commander Session                      │
-├─────────────────────────────────────────────────────────────────┤
-│  Event Stream                                                   │
-│  ├── Player actions (with timestamps)                          │
-│  ├── HIVE recommendations (accepted/rejected)                  │
-│  ├── Asset state changes                                        │
-│  ├── Task assignments and completions                          │
-│  ├── Capability recomputations                                 │
-│  └── Victory/defeat events                                      │
-├─────────────────────────────────────────────────────────────────┤
-│  Export Formats                                                 │
-│  ├── JSON event log (raw)                                      │
-│  ├── CSV summary statistics                                    │
-│  ├── Replay file (full session reconstruction)                 │
-│  └── R/Python-ready dataframes                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### IRB Considerations
-
-If used for formal research:
-- Informed consent for data collection
-- Anonymization of player identities
-- Opt-out mechanism for session recording
-- Data retention policies
-
-The game can operate in "research mode" (full logging) or "demo mode" (minimal logging) based on context.
+---
 
 ## Success Criteria
 
@@ -1147,199 +595,63 @@ The game can operate in "research mode" (full logging) or "demo mode" (minimal l
 
 | Criterion | Measure | Target |
 |-----------|---------|--------|
-| Time to "get it" | New user understands value prop | < 3 minutes |
-| Audience engagement | Conference attendees who participate | > 50% |
-| Memorable demos | "I was the drone" recall rate | > 80% |
-| Theme recognition | Users see relevance to their domain | > 70% |
+| Time to "get it" | New user understands composition | < 2 minutes |
+| Engagement | "I was the drone" recall | > 90% |
+| Teaching value | Audience asks about HIVE | > 50% |
 
 ### Technical Validation
 
 | Criterion | Measure | Target |
 |-----------|---------|--------|
-| API completeness | Game can express all demo scenarios | 100% |
-| Server performance | Concurrent sessions supported | 10+ |
-| Multiplayer latency | Action-to-update round trip | < 100ms |
-| Concurrent players | Audience mode participants per session | 50+ |
-| Theme switching | Change themes via config | Yes |
-| Mobile responsive | Operator UI works on phone | Yes |
+| Skill check accuracy | Computed DC matches intuition | > 80% |
+| Composition bonuses | Synergies reward good play | Playtest verified |
+| Turn latency | Phase transitions | < 500ms |
 
 ### Research Utility
 
 | Criterion | Measure | Target |
 |-----------|---------|--------|
-| Data export | Session data usable in R/Python | Yes |
-| Replay fidelity | Can reconstruct any session | 100% |
-| Metric coverage | All coagency metrics captured | 100% |
-| Head-to-head validity | Controlled experimental conditions | IRB-ready |
+| Composition data | Which synergies players discover | Logged |
+| Strategy patterns | Winning compositions | Analyzed |
+| Human-AI teaming | HIVE recommendation acceptance | Tracked |
 
-### Business Impact
-
-| Criterion | Measure | Target |
-|-----------|---------|--------|
-| Investor comprehension | "I get it now" reactions | > 80% |
-| Sales demo conversion | Leads to follow-up meeting | > 40% |
-| Theme relevance | Each theme generates vertical leads | 2+ per theme |
-| Conference value | Invitations to present/demo | 3+ events |
-
-## Risks and Mitigations
-
-| Risk | Impact | Likelihood | Mitigation |
-|------|--------|------------|------------|
-| Capability algebra doesn't feel intuitive | Confuses players | Medium | Iterate rules based on playtest feedback |
-| Scope creep into "real game" | Delays demo | High | Strict phase gates, "it's a demo first" mantra |
-| WebSocket scaling issues | Breaks large audiences | Low | Load test early, Fly.io auto-scaling |
-| Mobile experience poor | Audience participation suffers | Medium | Mobile-first design for participant UI |
-| Conference WiFi unreliable | Demo fails live | Medium | Use mobile hotspot, test beforehand |
-| Latency too high for real-time feel | Poor UX | Low | Fly.io edge deployment, optimize message size |
-| HIVE core API not game-ready | Blocks integration | Medium | Define game requirements early, adapt API |
-| Players don't understand roles | Confusion during demo | Medium | Clear onboarding flow, role tooltips |
-
-### Scope Control
-
-To prevent "game creep," each phase has a clear stopping point:
-
-1. **Phase 1 exit**: Two players can play (Commander + Operator), deployable
-2. **Phase 2 exit**: Head-to-head works, 10+ concurrent players
-3. **Phase 3 exit**: 30+ audience members can participate via phone
-4. **Phase 4 exit**: Coalition scenarios playable with cross-boundary task forces
-5. **Phase 5 exit**: Three themes fully functional
-6. **Phase 6 exit**: Data export works, one research study designed
-
-Each phase delivers standalone value. Phases can be paused if higher-priority work emerges.
+---
 
 ## Alternatives Considered
 
-### Axum Server + React Frontend (Chosen)
-- Pro: Server-side multiplayer is the primary use case
-- Pro: All game logic in Rust, validated against real HIVE implementation
-- Pro: React ecosystem is mature for web + mobile (via Expo)
-- Pro: WebSocket protocol allows any client (web, native, CLI)
-- Pro: Monorepo keeps types in sync (ts-rs for TypeScript generation)
-- Pro: No WASM compilation complexity
-- Pro: Easier iteration (server-side updates only for game balance)
-- Con: Requires internet for play (acceptable for demo use case)
+### RTS (Real-Time Strategy) - Rejected
+- Pro: Exciting, immediate
+- Con: Chaotic, hard to follow in demos
+- Con: Doesn't emphasize composition (the core HIVE value)
+- Con: Favors micro-management over thoughtful coordination
 
-### Local-Only WASM (Rejected)
-- Pro: No server costs, runs entirely in browser
-- Con: No multiplayer - the primary use case
-- Con: WASM compilation adds complexity
-- Con: Misses the core value: Commander + Operators playing together
+### Pure Chess - Rejected
+- Pro: Simple, well-understood
+- Con: Fixed pieces, no composition
+- Con: Abstract board doesn't show spatial/terrain context
+- Con: No narrative drama
 
-### Tauri Desktop App (Rejected)
-- Pro: Works offline, no internet required
-- Pro: All Rust stack
-- Con: Distribution friction (downloads, installs)
-- Con: Can't easily share sessions via link
-- Con: Multiplayer requires networking anyway - defeats the purpose
-- Con: Conference demos usually have internet (or hotspot)
-- Con: Mobile support immature compared to React Native/Expo
+### Card Game (Magic-style) - Rejected
+- Pro: Composition through deck building
+- Con: No spatial element (loses 3D map visualization)
+- Con: Abstract, not tangible for C2 demos
 
-### Pure Bevy Game Engine (Rejected)
-- Pro: All Rust, game-engine features
-- Con: Web deployment requires WASM anyway
-- Con: Overkill for 2D tactical map
-- Con: Learning curve for team
+### D&D-Style Tactical RPG - Chosen
+- Pro: Party composition is the core mechanic (exactly HIVE)
+- Pro: Skill checks map directly to capability matching
+- Pro: Turn-based means audience can follow
+- Pro: DM role fits presenter perfectly
+- Pro: 3D terrain adds spatial context
+- Pro: Memorable narrative ("remember when the drone rolled a nat 20?")
 
-### Unity/Unreal (Rejected)
-- Pro: Mature game engines
-- Con: Can't integrate HIVE Rust code directly
-- Con: Massive overhead for simple 2D tactical demo
-- Con: Licensing complexity
-
-### Mobile Framework Alternatives
-
-**Capacitor (Not chosen):**
-- Pro: Wraps existing web app in native shell
-- Con: Still fundamentally a web view, less native feel
-- Con: Performance ceiling lower than React Native
-
-**Flutter (Not chosen):**
-- Pro: Excellent cross-platform, good performance
-- Con: Dart language - different ecosystem from TypeScript/React
-- Con: Can't share code with web React components
-- Con: Learning curve for team familiar with React
-
-**Native Swift/Kotlin (Not chosen):**
-- Pro: Best possible native performance
-- Con: Two separate codebases (iOS + Android)
-- Con: No web support - would need third codebase
-- Con: Much higher development cost
-
-**Expo/React Native (Chosen for Phase 2+):**
-- Pro: Same React mental model as web
-- Pro: Single codebase → iOS, Android, Web
-- Pro: Expo Go enables instant phone testing
-- Pro: EAS Build eliminates Xcode/Android Studio pain
-- Pro: OTA updates bypass app store review
-- Con: Some native features require ejecting from Expo (unlikely for our use case)
+---
 
 ## References
 
 - ADR-001: CAP Protocol POC
 - ADR-004: Human-Machine Squad Composition
 - ADR-014: Distributed Coordination Primitives
-- ADR-018: AI Model Capability Advertisement
 - Industry Feedback: HIVE Hierarchy Visualization (2024-12-06)
-
-## Decision
-
-Proceed with **Axum server + React frontend** architecture for HIVE Commander, with both components in the **existing cap workspace** (monorepo approach).
-
-### Repository Structure
-
-```
-cap/
-├── hive-protocol/
-├── hive-mesh/
-├── hive-sim/
-├── hive-commander/           # Rust backend (Axum server) - workspace member
-│   ├── Cargo.toml
-│   └── src/
-│       ├── main.rs
-│       ├── game/             # Game session logic
-│       ├── ws/               # WebSocket handlers
-│       └── types/            # Shared types (generates TypeScript via ts-rs)
-│
-└── hive-commander-ui/        # Frontend (NOT a cargo crate, just npm project)
-    ├── package.json          # React/TypeScript/Vite
-    ├── tsconfig.json
-    └── src/
-```
-
-### Why Monorepo
-
-1. **Private repository**: The cap repo is not yet public, and we're not publishing crates to crates.io
-2. **Type sharing**: Backend can generate TypeScript types from Rust structs using `ts-rs`
-3. **Tight coupling**: Game server directly consumes `hive-protocol` APIs - changes should be atomic
-4. **Single CI**: API breaks are caught immediately when HIVE traits change
-5. **Future flexibility**: Can split out when/if we go public
-
-### CI Integration
-
-Add a new CI job for the frontend:
-
-```yaml
-  commander-ui:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: hive-commander-ui
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - run: npm ci
-      - run: npm run build
-      - run: npm test
-```
-
-### Targets
-
-1. MVP (Phase 1): Playable 2-player demo
-2. Web deployment on revolveteam.com/commander
-3. Mobile-friendly participant UI (Expo migration in Phase 2+ if needed)
-4. Metrics collection for coagency research
 
 ---
 
