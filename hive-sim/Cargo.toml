@@ -19,6 +19,7 @@ serde_json = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+hex = "0.4"
 
 # TUI dependencies (will be added later for visualization)
 # ratatui = "0.25"
