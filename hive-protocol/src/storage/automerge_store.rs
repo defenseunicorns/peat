@@ -1,6 +1,8 @@
-//! Automerge document storage with RocksDB persistence
+//! Automerge document storage with redb persistence
 //!
-//! This module provides persistent storage for Automerge CRDT documents using RocksDB.
+//! This module provides persistent storage for Automerge CRDT documents using redb,
+//! a pure Rust embedded database. This replaces the previous RocksDB implementation
+//! to eliminate C/C++ build dependencies and align with Iroh's storage layer.
 
 #[cfg(feature = "automerge-backend")]
 use crate::storage::traits::{Collection, DocumentPredicate};
@@ -9,7 +11,7 @@ use automerge::{transaction::Transactable, Automerge, ReadDoc};
 #[cfg(feature = "automerge-backend")]
 use lru::LruCache;
 #[cfg(feature = "automerge-backend")]
-use rocksdb::{IteratorMode, Options, DB};
+use redb::{Database, ReadableTableMetadata, TableDefinition};
 #[cfg(feature = "automerge-backend")]
 use std::num::NonZeroUsize;
 #[cfg(feature = "automerge-backend")]
@@ -22,7 +24,13 @@ use tokio::sync::broadcast;
 #[cfg(feature = "automerge-backend")]
 use anyhow::{Context, Result};
 
-/// Storage layer for Automerge documents with RocksDB persistence
+/// Table definition for document storage
+/// Key: document key as string bytes
+/// Value: serialized Automerge document bytes
+#[cfg(feature = "automerge-backend")]
+const DOCUMENTS_TABLE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("documents");
+
+/// Storage layer for Automerge documents with redb persistence
 ///
 /// # Change Notifications (Phase 6.3)
 ///
@@ -30,7 +38,7 @@ use anyhow::{Context, Result};
 /// Subscribers can listen for these notifications to trigger automatic sync.
 #[cfg(feature = "automerge-backend")]
 pub struct AutomergeStore {
-    db: Arc<DB>,
+    db: Arc<Database>,
     cache: Arc<RwLock<LruCache<String, Automerge>>>,
     /// Broadcast channel for notifying of document changes (Phase 6.3)
     /// Multiple subscribers can receive notifications (sync coordinator + observers)
@@ -41,12 +49,34 @@ pub struct AutomergeStore {
 impl AutomergeStore {
     /// Open or create storage at the given path
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        let mut opts = Options::default();
-        opts.create_if_missing(true);
-        opts.set_max_open_files(512);
-        opts.set_write_buffer_size(64 * 1024 * 1024);
+        // Ensure the directory exists
+        let path = path.as_ref();
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).ok();
+        }
 
-        let db = DB::open(&opts, path).context("Failed to open RocksDB")?;
+        // redb stores in a single file, append .redb extension if it's a directory path
+        let db_path = if path.is_dir() || !path.exists() {
+            std::fs::create_dir_all(path).ok();
+            path.join("automerge.redb")
+        } else {
+            path.to_path_buf()
+        };
+
+        let db = Database::create(&db_path).context("Failed to open redb database")?;
+
+        // Initialize the table (redb requires this on first use)
+        {
+            let write_txn = db
+                .begin_write()
+                .context("Failed to begin write transaction")?;
+            // Creating the table if it doesn't exist
+            let _ = write_txn.open_table(DOCUMENTS_TABLE);
+            write_txn
+                .commit()
+                .context("Failed to commit table creation")?;
+        }
+
         let cache = LruCache::new(NonZeroUsize::new(1000).unwrap());
 
         // Create broadcast channel for change notifications
@@ -68,9 +98,20 @@ impl AutomergeStore {
     /// Subscribers will receive the document key to trigger automatic sync.
     pub fn put(&self, key: &str, doc: &Automerge) -> Result<()> {
         let bytes = doc.save();
-        self.db
-            .put(key.as_bytes(), &bytes)
-            .context("Failed to write to RocksDB")?;
+
+        let write_txn = self
+            .db
+            .begin_write()
+            .context("Failed to begin write transaction")?;
+        {
+            let mut table = write_txn
+                .open_table(DOCUMENTS_TABLE)
+                .context("Failed to open documents table")?;
+            table
+                .insert(key.as_bytes(), bytes.as_slice())
+                .context("Failed to insert document")?;
+        }
+        write_txn.commit().context("Failed to commit write")?;
 
         self.cache
             .write()
@@ -93,9 +134,18 @@ impl AutomergeStore {
             }
         }
 
-        match self.db.get(key.as_bytes())? {
-            Some(bytes) => {
-                let doc = Automerge::load(&bytes).context("Failed to load Automerge document")?;
+        let read_txn = self
+            .db
+            .begin_read()
+            .context("Failed to begin read transaction")?;
+        let table = read_txn
+            .open_table(DOCUMENTS_TABLE)
+            .context("Failed to open documents table")?;
+
+        match table.get(key.as_bytes())? {
+            Some(value) => {
+                let bytes = value.value();
+                let doc = Automerge::load(bytes).context("Failed to load Automerge document")?;
 
                 self.cache
                     .write()
@@ -110,7 +160,18 @@ impl AutomergeStore {
 
     /// Delete a document
     pub fn delete(&self, key: &str) -> Result<()> {
-        self.db.delete(key.as_bytes())?;
+        let write_txn = self
+            .db
+            .begin_write()
+            .context("Failed to begin write transaction")?;
+        {
+            let mut table = write_txn
+                .open_table(DOCUMENTS_TABLE)
+                .context("Failed to open documents table")?;
+            table.remove(key.as_bytes())?;
+        }
+        write_txn.commit().context("Failed to commit delete")?;
+
         self.cache.write().unwrap().pop(key);
         Ok(())
     }
@@ -118,19 +179,28 @@ impl AutomergeStore {
     /// Scan documents with prefix
     pub fn scan_prefix(&self, prefix: &str) -> Result<Vec<(String, Automerge)>> {
         let mut results = Vec::new();
-        let iter = self.db.iterator(IteratorMode::From(
-            prefix.as_bytes(),
-            rocksdb::Direction::Forward,
-        ));
 
-        for item in iter {
-            let (key, value) = item?;
-            if !key.starts_with(prefix.as_bytes()) {
+        let read_txn = self
+            .db
+            .begin_read()
+            .context("Failed to begin read transaction")?;
+        let table = read_txn
+            .open_table(DOCUMENTS_TABLE)
+            .context("Failed to open documents table")?;
+
+        // Use range to scan from prefix onwards
+        let prefix_bytes = prefix.as_bytes();
+        for entry in table.range(prefix_bytes..)? {
+            let (key, value) = entry?;
+            let key_bytes = key.value();
+
+            // Stop if we've passed the prefix
+            if !key_bytes.starts_with(prefix_bytes) {
                 break;
             }
 
-            let key_str = String::from_utf8_lossy(&key).to_string();
-            let doc = Automerge::load(&value)?;
+            let key_str = String::from_utf8_lossy(key_bytes).to_string();
+            let doc = Automerge::load(value.value())?;
             results.push((key_str, doc));
         }
 
@@ -139,7 +209,16 @@ impl AutomergeStore {
 
     /// Count total documents
     pub fn count(&self) -> usize {
-        self.db.iterator(IteratorMode::Start).count()
+        let read_txn = match self.db.begin_read() {
+            Ok(txn) => txn,
+            Err(_) => return 0,
+        };
+        let table = match read_txn.open_table(DOCUMENTS_TABLE) {
+            Ok(t) => t,
+            Err(_) => return 0,
+        };
+
+        table.len().unwrap_or(0) as usize
     }
 
     /// Subscribe to document change notifications (Phase 6.3)
@@ -373,5 +452,54 @@ mod tests {
         assert_eq!(data1, b"data1");
         assert_eq!(data2, b"data2");
         assert_ne!(data1, data2);
+    }
+
+    #[test]
+    fn test_direct_put_and_get() {
+        let (store, _temp) = create_test_store();
+
+        let mut doc = Automerge::new();
+        doc.transact::<_, _, automerge::AutomergeError>(|tx| {
+            tx.put(automerge::ROOT, "key", "value")?;
+            Ok(())
+        })
+        .unwrap();
+
+        store.put("test-doc", &doc).unwrap();
+
+        let loaded = store.get("test-doc").unwrap().unwrap();
+        let value: String = loaded
+            .get(automerge::ROOT, "key")
+            .unwrap()
+            .unwrap()
+            .0
+            .to_string();
+        assert!(value.contains("value"));
+    }
+
+    #[test]
+    fn test_scan_prefix() {
+        let (store, _temp) = create_test_store();
+
+        let mut doc1 = Automerge::new();
+        doc1.transact::<_, _, automerge::AutomergeError>(|tx| {
+            tx.put(automerge::ROOT, "n", "1")?;
+            Ok(())
+        })
+        .unwrap();
+
+        let mut doc2 = Automerge::new();
+        doc2.transact::<_, _, automerge::AutomergeError>(|tx| {
+            tx.put(automerge::ROOT, "n", "2")?;
+            Ok(())
+        })
+        .unwrap();
+
+        store.put("prefix:a", &doc1).unwrap();
+        store.put("prefix:b", &doc2).unwrap();
+        store.put("other:c", &doc1).unwrap();
+
+        let results = store.scan_prefix("prefix:").unwrap();
+        assert_eq!(results.len(), 2);
     }
 }
