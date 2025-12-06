@@ -1,4 +1,4 @@
-//! Sync state persistence with RocksDB
+//! Sync state persistence with redb
 //!
 //! This module provides durable storage for Automerge sync state, enabling:
 //! - Persist sync heads per peer
@@ -7,7 +7,7 @@
 //!
 //! # Storage Schema
 //!
-//! Uses RocksDB with key prefixes:
+//! Uses redb with key prefixes:
 //! - `sync_state:{peer_id}:{doc_key}` → serialized automerge::sync::State
 //! - `checkpoint:{timestamp}` → snapshot metadata
 //! - `meta:last_checkpoint` → timestamp of last checkpoint
@@ -19,7 +19,7 @@ use automerge::sync::State as SyncState;
 #[cfg(feature = "automerge-backend")]
 use iroh::EndpointId;
 #[cfg(feature = "automerge-backend")]
-use rocksdb::{IteratorMode, Options, DB};
+use redb::{Database, TableDefinition};
 #[cfg(feature = "automerge-backend")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "automerge-backend")]
@@ -31,13 +31,25 @@ use std::sync::Arc;
 #[cfg(feature = "automerge-backend")]
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-/// Key prefixes for RocksDB storage
+/// Table for sync state storage
+#[cfg(feature = "automerge-backend")]
+const SYNC_STATE_TABLE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("sync_states");
+
+/// Table for checkpoint storage
+#[cfg(feature = "automerge-backend")]
+const CHECKPOINT_TABLE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("checkpoints");
+
+/// Table for metadata
+#[cfg(feature = "automerge-backend")]
+const META_TABLE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("meta");
+
+/// Key prefixes for storage
 #[cfg(feature = "automerge-backend")]
 const SYNC_STATE_PREFIX: &str = "sync_state:";
 #[cfg(feature = "automerge-backend")]
 const CHECKPOINT_PREFIX: &str = "checkpoint:";
 #[cfg(feature = "automerge-backend")]
-const META_LAST_CHECKPOINT: &str = "meta:last_checkpoint";
+const META_LAST_CHECKPOINT: &str = "last_checkpoint";
 
 /// Serializable wrapper for automerge::sync::State
 ///
@@ -121,8 +133,8 @@ pub struct PersistenceStats {
 /// fast recovery after restart without full resync.
 #[cfg(feature = "automerge-backend")]
 pub struct SyncStatePersistence {
-    /// RocksDB instance
-    db: Arc<DB>,
+    /// redb instance
+    db: Arc<Database>,
     /// Checkpoint interval (how often to create checkpoints)
     checkpoint_interval: Duration,
 }
@@ -131,12 +143,35 @@ pub struct SyncStatePersistence {
 impl SyncStatePersistence {
     /// Open or create sync state storage at the given path
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        let mut opts = Options::default();
-        opts.create_if_missing(true);
-        opts.set_max_open_files(128);
-        opts.set_write_buffer_size(16 * 1024 * 1024); // 16MB write buffer
+        let path = path.as_ref();
 
-        let db = DB::open(&opts, path).context("Failed to open sync state RocksDB")?;
+        // Ensure parent directory exists
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).ok();
+        }
+
+        // redb stores in a single file, append .redb extension if it's a directory path
+        let db_path = if path.is_dir() || !path.exists() {
+            std::fs::create_dir_all(path).ok();
+            path.join("sync_state.redb")
+        } else {
+            path.to_path_buf()
+        };
+
+        let db = Database::create(&db_path).context("Failed to open sync state redb")?;
+
+        // Initialize tables
+        {
+            let write_txn = db
+                .begin_write()
+                .context("Failed to begin write transaction")?;
+            let _ = write_txn.open_table(SYNC_STATE_TABLE);
+            let _ = write_txn.open_table(CHECKPOINT_TABLE);
+            let _ = write_txn.open_table(META_TABLE);
+            write_txn
+                .commit()
+                .context("Failed to commit table creation")?;
+        }
 
         Ok(Self {
             db: Arc::new(db),
@@ -177,9 +212,19 @@ impl SyncStatePersistence {
 
         let value = serde_json::to_vec(&persisted).context("Failed to serialize sync state")?;
 
-        self.db
-            .put(key.as_bytes(), &value)
-            .context("Failed to write sync state to RocksDB")?;
+        let write_txn = self
+            .db
+            .begin_write()
+            .context("Failed to begin write transaction")?;
+        {
+            let mut table = write_txn
+                .open_table(SYNC_STATE_TABLE)
+                .context("Failed to open sync state table")?;
+            table
+                .insert(key.as_bytes(), value.as_slice())
+                .context("Failed to write sync state")?;
+        }
+        write_txn.commit().context("Failed to commit write")?;
 
         tracing::trace!(
             "Saved sync state for peer {} doc {}: {} bytes",
@@ -199,10 +244,19 @@ impl SyncStatePersistence {
     ) -> Result<Option<(SyncState, u64)>> {
         let key = Self::sync_state_key(peer_id, doc_key);
 
-        match self.db.get(key.as_bytes())? {
-            Some(bytes) => {
+        let read_txn = self
+            .db
+            .begin_read()
+            .context("Failed to begin read transaction")?;
+        let table = read_txn
+            .open_table(SYNC_STATE_TABLE)
+            .context("Failed to open sync state table")?;
+
+        match table.get(key.as_bytes())? {
+            Some(value) => {
+                let bytes = value.value();
                 let persisted: PersistedSyncState =
-                    serde_json::from_slice(&bytes).context("Failed to deserialize sync state")?;
+                    serde_json::from_slice(bytes).context("Failed to deserialize sync state")?;
 
                 let state = persisted.to_sync_state()?;
 
@@ -222,9 +276,19 @@ impl SyncStatePersistence {
     /// Delete sync state for a peer and document
     pub fn delete_sync_state(&self, peer_id: &EndpointId, doc_key: &str) -> Result<()> {
         let key = Self::sync_state_key(peer_id, doc_key);
-        self.db
-            .delete(key.as_bytes())
-            .context("Failed to delete sync state")?;
+
+        let write_txn = self
+            .db
+            .begin_write()
+            .context("Failed to begin write transaction")?;
+        {
+            let mut table = write_txn
+                .open_table(SYNC_STATE_TABLE)
+                .context("Failed to open sync state table")?;
+            table.remove(key.as_bytes())?;
+        }
+        write_txn.commit().context("Failed to commit delete")?;
+
         Ok(())
     }
 
@@ -233,20 +297,24 @@ impl SyncStatePersistence {
         let prefix = format!("{}{}:", SYNC_STATE_PREFIX, hex::encode(peer_id.as_bytes()));
         let mut results = HashMap::new();
 
-        let iter = self.db.iterator(IteratorMode::From(
-            prefix.as_bytes(),
-            rocksdb::Direction::Forward,
-        ));
+        let read_txn = self
+            .db
+            .begin_read()
+            .context("Failed to begin read transaction")?;
+        let table = read_txn
+            .open_table(SYNC_STATE_TABLE)
+            .context("Failed to open sync state table")?;
 
-        for item in iter {
-            let (key, value) = item?;
-            let key_str = String::from_utf8_lossy(&key);
+        for entry in table.range(prefix.as_bytes()..)? {
+            let (key, value) = entry?;
+            let key_bytes = key.value();
+            let key_str = String::from_utf8_lossy(key_bytes);
 
             if !key_str.starts_with(&prefix) {
                 break;
             }
 
-            let persisted: PersistedSyncState = serde_json::from_slice(&value)?;
+            let persisted: PersistedSyncState = serde_json::from_slice(value.value())?;
             let state = persisted.to_sync_state()?;
             results.insert(persisted.doc_key.clone(), state);
         }
@@ -258,20 +326,24 @@ impl SyncStatePersistence {
     pub fn load_all(&self) -> Result<HashMap<(EndpointId, String), SyncState>> {
         let mut results = HashMap::new();
 
-        let iter = self.db.iterator(IteratorMode::From(
-            SYNC_STATE_PREFIX.as_bytes(),
-            rocksdb::Direction::Forward,
-        ));
+        let read_txn = self
+            .db
+            .begin_read()
+            .context("Failed to begin read transaction")?;
+        let table = read_txn
+            .open_table(SYNC_STATE_TABLE)
+            .context("Failed to open sync state table")?;
 
-        for item in iter {
-            let (key, value) = item?;
-            let key_str = String::from_utf8_lossy(&key);
+        for entry in table.range(SYNC_STATE_PREFIX.as_bytes()..)? {
+            let (key, value) = entry?;
+            let key_bytes = key.value();
+            let key_str = String::from_utf8_lossy(key_bytes);
 
             if !key_str.starts_with(SYNC_STATE_PREFIX) {
                 break;
             }
 
-            let persisted: PersistedSyncState = serde_json::from_slice(&value)?;
+            let persisted: PersistedSyncState = serde_json::from_slice(value.value())?;
 
             // Parse peer ID from hex
             let peer_id_bytes =
@@ -306,26 +378,32 @@ impl SyncStatePersistence {
         let mut total_bytes = 0;
         let mut peer_ids = std::collections::HashSet::new();
 
-        let iter = self.db.iterator(IteratorMode::From(
-            SYNC_STATE_PREFIX.as_bytes(),
-            rocksdb::Direction::Forward,
-        ));
+        {
+            let read_txn = self
+                .db
+                .begin_read()
+                .context("Failed to begin read transaction")?;
+            let table = read_txn
+                .open_table(SYNC_STATE_TABLE)
+                .context("Failed to open sync state table")?;
 
-        for item in iter {
-            let (key, value) = item?;
-            let key_str = String::from_utf8_lossy(&key);
+            for entry in table.range(SYNC_STATE_PREFIX.as_bytes()..)? {
+                let (key, value) = entry?;
+                let key_bytes = key.value();
+                let key_str = String::from_utf8_lossy(key_bytes);
 
-            if !key_str.starts_with(SYNC_STATE_PREFIX) {
-                break;
-            }
+                if !key_str.starts_with(SYNC_STATE_PREFIX) {
+                    break;
+                }
 
-            state_count += 1;
-            total_bytes += value.len();
+                state_count += 1;
+                total_bytes += value.value().len();
 
-            // Extract peer ID from key
-            if let Some(rest) = key_str.strip_prefix(SYNC_STATE_PREFIX) {
-                if let Some(peer_id) = rest.split(':').next() {
-                    peer_ids.insert(peer_id.to_string());
+                // Extract peer ID from key
+                if let Some(rest) = key_str.strip_prefix(SYNC_STATE_PREFIX) {
+                    if let Some(peer_id) = rest.split(':').next() {
+                        peer_ids.insert(peer_id.to_string());
+                    }
                 }
             }
         }
@@ -340,11 +418,28 @@ impl SyncStatePersistence {
         // Save checkpoint
         let checkpoint_key = format!("{}{}", CHECKPOINT_PREFIX, timestamp);
         let checkpoint_bytes = serde_json::to_vec(&checkpoint)?;
-        self.db.put(checkpoint_key.as_bytes(), &checkpoint_bytes)?;
 
-        // Update last checkpoint timestamp
-        self.db
-            .put(META_LAST_CHECKPOINT.as_bytes(), timestamp.to_be_bytes())?;
+        let write_txn = self
+            .db
+            .begin_write()
+            .context("Failed to begin write transaction")?;
+        {
+            let mut table = write_txn
+                .open_table(CHECKPOINT_TABLE)
+                .context("Failed to open checkpoint table")?;
+            table.insert(checkpoint_key.as_bytes(), checkpoint_bytes.as_slice())?;
+        }
+        {
+            // Update last checkpoint timestamp
+            let mut meta_table = write_txn
+                .open_table(META_TABLE)
+                .context("Failed to open meta table")?;
+            meta_table.insert(
+                META_LAST_CHECKPOINT.as_bytes(),
+                &timestamp.to_be_bytes()[..],
+            )?;
+        }
+        write_txn.commit().context("Failed to commit checkpoint")?;
 
         tracing::info!(
             "Created checkpoint: {} states, {} bytes, {} peers",
@@ -358,9 +453,18 @@ impl SyncStatePersistence {
 
     /// Get the last checkpoint
     pub fn get_last_checkpoint(&self) -> Result<Option<Checkpoint>> {
+        let read_txn = self
+            .db
+            .begin_read()
+            .context("Failed to begin read transaction")?;
+
         // Get last checkpoint timestamp
-        let timestamp_bytes = match self.db.get(META_LAST_CHECKPOINT.as_bytes())? {
-            Some(bytes) => bytes,
+        let meta_table = read_txn
+            .open_table(META_TABLE)
+            .context("Failed to open meta table")?;
+
+        let timestamp_bytes = match meta_table.get(META_LAST_CHECKPOINT.as_bytes())? {
+            Some(value) => value.value().to_vec(),
             None => return Ok(None),
         };
 
@@ -374,9 +478,13 @@ impl SyncStatePersistence {
 
         // Load checkpoint
         let checkpoint_key = format!("{}{}", CHECKPOINT_PREFIX, timestamp);
-        match self.db.get(checkpoint_key.as_bytes())? {
-            Some(bytes) => {
-                let checkpoint: Checkpoint = serde_json::from_slice(&bytes)?;
+        let checkpoint_table = read_txn
+            .open_table(CHECKPOINT_TABLE)
+            .context("Failed to open checkpoint table")?;
+
+        match checkpoint_table.get(checkpoint_key.as_bytes())? {
+            Some(value) => {
+                let checkpoint: Checkpoint = serde_json::from_slice(value.value())?;
                 Ok(Some(checkpoint))
             }
             None => Ok(None),
@@ -388,26 +496,33 @@ impl SyncStatePersistence {
         let mut stats = PersistenceStats::default();
         let mut peer_ids = std::collections::HashSet::new();
 
+        let read_txn = self
+            .db
+            .begin_read()
+            .context("Failed to begin read transaction")?;
+
         // Count sync states
-        let iter = self.db.iterator(IteratorMode::From(
-            SYNC_STATE_PREFIX.as_bytes(),
-            rocksdb::Direction::Forward,
-        ));
+        {
+            let table = read_txn
+                .open_table(SYNC_STATE_TABLE)
+                .context("Failed to open sync state table")?;
 
-        for item in iter {
-            let (key, value) = item?;
-            let key_str = String::from_utf8_lossy(&key);
+            for entry in table.range(SYNC_STATE_PREFIX.as_bytes()..)? {
+                let (key, value) = entry?;
+                let key_bytes = key.value();
+                let key_str = String::from_utf8_lossy(key_bytes);
 
-            if !key_str.starts_with(SYNC_STATE_PREFIX) {
-                break;
-            }
+                if !key_str.starts_with(SYNC_STATE_PREFIX) {
+                    break;
+                }
 
-            stats.state_count += 1;
-            stats.total_bytes += value.len();
+                stats.state_count += 1;
+                stats.total_bytes += value.value().len();
 
-            if let Some(rest) = key_str.strip_prefix(SYNC_STATE_PREFIX) {
-                if let Some(peer_id) = rest.split(':').next() {
-                    peer_ids.insert(peer_id.to_string());
+                if let Some(rest) = key_str.strip_prefix(SYNC_STATE_PREFIX) {
+                    if let Some(peer_id) = rest.split(':').next() {
+                        peer_ids.insert(peer_id.to_string());
+                    }
                 }
             }
         }
@@ -415,17 +530,18 @@ impl SyncStatePersistence {
         stats.peer_count = peer_ids.len();
 
         // Count checkpoints
-        let checkpoint_iter = self.db.iterator(IteratorMode::From(
-            CHECKPOINT_PREFIX.as_bytes(),
-            rocksdb::Direction::Forward,
-        ));
+        {
+            let checkpoint_table = read_txn
+                .open_table(CHECKPOINT_TABLE)
+                .context("Failed to open checkpoint table")?;
 
-        for item in checkpoint_iter {
-            let (key, _) = item?;
-            if !key.starts_with(CHECKPOINT_PREFIX.as_bytes()) {
-                break;
+            for entry in checkpoint_table.range(CHECKPOINT_PREFIX.as_bytes()..)? {
+                let (key, _) = entry?;
+                if !key.value().starts_with(CHECKPOINT_PREFIX.as_bytes()) {
+                    break;
+                }
+                stats.checkpoint_count += 1;
             }
-            stats.checkpoint_count += 1;
         }
 
         // Get last checkpoint timestamp
@@ -440,22 +556,28 @@ impl SyncStatePersistence {
     pub fn cleanup_old_checkpoints(&self, keep_count: usize) -> Result<usize> {
         let mut checkpoints: Vec<u64> = Vec::new();
 
-        let iter = self.db.iterator(IteratorMode::From(
-            CHECKPOINT_PREFIX.as_bytes(),
-            rocksdb::Direction::Forward,
-        ));
+        {
+            let read_txn = self
+                .db
+                .begin_read()
+                .context("Failed to begin read transaction")?;
+            let table = read_txn
+                .open_table(CHECKPOINT_TABLE)
+                .context("Failed to open checkpoint table")?;
 
-        for item in iter {
-            let (key, _) = item?;
-            let key_str = String::from_utf8_lossy(&key);
+            for entry in table.range(CHECKPOINT_PREFIX.as_bytes()..)? {
+                let (key, _) = entry?;
+                let key_bytes = key.value();
+                let key_str = String::from_utf8_lossy(key_bytes);
 
-            if !key_str.starts_with(CHECKPOINT_PREFIX) {
-                break;
-            }
+                if !key_str.starts_with(CHECKPOINT_PREFIX) {
+                    break;
+                }
 
-            if let Some(ts_str) = key_str.strip_prefix(CHECKPOINT_PREFIX) {
-                if let Ok(ts) = ts_str.parse::<u64>() {
-                    checkpoints.push(ts);
+                if let Some(ts_str) = key_str.strip_prefix(CHECKPOINT_PREFIX) {
+                    if let Ok(ts) = ts_str.parse::<u64>() {
+                        checkpoints.push(ts);
+                    }
                 }
             }
         }
@@ -465,10 +587,25 @@ impl SyncStatePersistence {
 
         // Delete old ones
         let mut deleted = 0;
-        for ts in checkpoints.iter().skip(keep_count) {
-            let key = format!("{}{}", CHECKPOINT_PREFIX, ts);
-            self.db.delete(key.as_bytes())?;
-            deleted += 1;
+        let to_delete: Vec<_> = checkpoints.iter().skip(keep_count).cloned().collect();
+
+        if !to_delete.is_empty() {
+            let write_txn = self
+                .db
+                .begin_write()
+                .context("Failed to begin write transaction")?;
+            {
+                let mut table = write_txn
+                    .open_table(CHECKPOINT_TABLE)
+                    .context("Failed to open checkpoint table")?;
+
+                for ts in to_delete {
+                    let key = format!("{}{}", CHECKPOINT_PREFIX, ts);
+                    table.remove(key.as_bytes())?;
+                    deleted += 1;
+                }
+            }
+            write_txn.commit().context("Failed to commit cleanup")?;
         }
 
         if deleted > 0 {
@@ -481,25 +618,45 @@ impl SyncStatePersistence {
     /// Delete all sync state for a peer (when peer is removed from mesh)
     pub fn delete_peer(&self, peer_id: &EndpointId) -> Result<usize> {
         let prefix = format!("{}{}:", SYNC_STATE_PREFIX, hex::encode(peer_id.as_bytes()));
-        let mut deleted = 0;
-
-        let iter = self.db.iterator(IteratorMode::From(
-            prefix.as_bytes(),
-            rocksdb::Direction::Forward,
-        ));
-
         let mut keys_to_delete = Vec::new();
-        for item in iter {
-            let (key, _) = item?;
-            if !key.starts_with(prefix.as_bytes()) {
-                break;
+
+        // First, collect keys to delete
+        {
+            let read_txn = self
+                .db
+                .begin_read()
+                .context("Failed to begin read transaction")?;
+            let table = read_txn
+                .open_table(SYNC_STATE_TABLE)
+                .context("Failed to open sync state table")?;
+
+            for entry in table.range(prefix.as_bytes()..)? {
+                let (key, _) = entry?;
+                let key_bytes = key.value();
+                if !key_bytes.starts_with(prefix.as_bytes()) {
+                    break;
+                }
+                keys_to_delete.push(key_bytes.to_vec());
             }
-            keys_to_delete.push(key.to_vec());
         }
 
-        for key in keys_to_delete {
-            self.db.delete(&key)?;
-            deleted += 1;
+        // Then delete them
+        let deleted = keys_to_delete.len();
+        if !keys_to_delete.is_empty() {
+            let write_txn = self
+                .db
+                .begin_write()
+                .context("Failed to begin write transaction")?;
+            {
+                let mut table = write_txn
+                    .open_table(SYNC_STATE_TABLE)
+                    .context("Failed to open sync state table")?;
+
+                for key in keys_to_delete {
+                    table.remove(key.as_slice())?;
+                }
+            }
+            write_txn.commit().context("Failed to commit delete")?;
         }
 
         if deleted > 0 {
