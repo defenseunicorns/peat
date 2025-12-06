@@ -444,6 +444,23 @@ impl SyncCapable for AutomergeBackend {
                         // Mark as having active handler
                         active_handlers.write().unwrap().insert(peer_id);
 
+                        // Issue #235: Trigger sync of all existing documents with new peer
+                        // Documents created before this peer connected need to be synced
+                        let coord_for_initial_sync = Arc::clone(&coordinator);
+                        let initial_sync_peer_id = peer_id;
+                        tokio::spawn(async move {
+                            if let Err(e) = coord_for_initial_sync
+                                .sync_all_documents_with_peer(initial_sync_peer_id)
+                                .await
+                            {
+                                tracing::warn!(
+                                    "Failed to sync existing documents with new peer {:?}: {}",
+                                    initial_sync_peer_id,
+                                    e
+                                );
+                            }
+                        });
+
                         let coordinator_clone = Arc::clone(&coordinator);
                         let sync_active_clone = Arc::clone(&sync_active);
                         let active_handlers_clone = Arc::clone(&active_handlers);

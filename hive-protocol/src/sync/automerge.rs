@@ -1389,6 +1389,7 @@ impl PeerDiscovery for IrohPeerDiscovery {
 // SyncEngine implementation for AutomergeIrohBackend
 struct IrohSyncEngine {
     backend: Arc<crate::storage::AutomergeBackend>,
+    transport: Arc<crate::network::IrohTransport>,
 }
 
 #[async_trait]
@@ -1428,6 +1429,87 @@ impl SyncEngine for IrohSyncEngine {
             source: None,
         })?;
         Ok(stats.peer_count > 0)
+    }
+
+    /// Connect to a peer using their EndpointId and addresses (Issue #235)
+    ///
+    /// This enables static peer configuration in containerlab and similar environments
+    /// where mDNS discovery may not work across network namespaces.
+    async fn connect_to_peer(&self, endpoint_id_hex: &str, addresses: &[String]) -> Result<bool> {
+        use crate::network::PeerInfo as NetworkPeerInfo;
+
+        // Parse the endpoint ID from hex
+        let endpoint_id_bytes = hex::decode(endpoint_id_hex)
+            .map_err(|e| Error::Internal(format!("Invalid endpoint_id_hex: {}", e)))?;
+
+        if endpoint_id_bytes.len() != 32 {
+            return Err(Error::Internal(format!(
+                "Invalid endpoint_id_hex length: expected 32 bytes, got {}",
+                endpoint_id_bytes.len()
+            )));
+        }
+
+        // Tie-breaking: only the peer with the lower EndpointId initiates the connection
+        // This prevents duplicate connections where both peers try to connect to each other
+        let our_endpoint_id = self.transport.endpoint_id();
+        let our_endpoint_hex = hex::encode(our_endpoint_id.as_bytes());
+
+        if our_endpoint_hex.as_str() > endpoint_id_hex {
+            // We have the higher EndpointId, so we should wait for them to connect to us
+            tracing::debug!(
+                our_endpoint = %our_endpoint_hex,
+                peer_endpoint = %endpoint_id_hex,
+                "Tie-breaking: peer has lower EndpointId, waiting for them to connect"
+            );
+            return Ok(false);
+        }
+
+        tracing::debug!(
+            our_endpoint = %our_endpoint_hex,
+            peer_endpoint = %endpoint_id_hex,
+            addresses = ?addresses,
+            "Tie-breaking: we have lower EndpointId, initiating connection"
+        );
+
+        // Create PeerInfo for the transport
+        let peer_info = NetworkPeerInfo {
+            name: format!("peer-{}", &endpoint_id_hex[..8]),
+            node_id: endpoint_id_hex.to_string(),
+            addresses: addresses.to_vec(),
+            relay_url: None,
+        };
+
+        // Attempt to connect via transport
+        // Returns Some(conn) if new connection, None if already connected
+        match self.transport.connect_peer(&peer_info).await {
+            Ok(Some(_conn)) => {
+                tracing::info!(
+                    peer_endpoint = %endpoint_id_hex,
+                    "Successfully connected to peer"
+                );
+                Ok(true)
+            }
+            Ok(None) => {
+                // Already connected (they initiated)
+                tracing::debug!(
+                    peer_endpoint = %endpoint_id_hex,
+                    "Already connected to peer (they initiated)"
+                );
+                Ok(true)
+            }
+            Err(e) => {
+                tracing::warn!(
+                    peer_endpoint = %endpoint_id_hex,
+                    error = %e,
+                    "Failed to connect to peer"
+                );
+                Err(Error::Network {
+                    message: format!("Failed to connect to peer: {}", e),
+                    peer_id: Some(endpoint_id_hex.to_string()),
+                    source: None,
+                })
+            }
+        }
     }
 }
 
@@ -1493,6 +1575,7 @@ impl DataSyncBackend for AutomergeIrohBackend {
     fn sync_engine(&self) -> Arc<dyn SyncEngine> {
         Arc::new(IrohSyncEngine {
             backend: Arc::clone(&self.backend),
+            transport: Arc::clone(&self.transport),
         })
     }
 
