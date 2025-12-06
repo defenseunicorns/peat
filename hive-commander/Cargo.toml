@@ -1,0 +1,10 @@
+[package]
+name = "hive-commander"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ratatui = "0.28"
+crossterm = "0.28"
+rand = "0.8"
+noise = "0.9"

@@ -1,7 +1,7 @@
 # ADR-031: HIVE Commander - Tactical Capability RPG
 
 ## Status
-Proposed
+Proposed (TUI prototype complete)
 
 ## Context
 
@@ -643,6 +643,45 @@ The D&D-style mechanics support multiple themes:
 - Pro: DM role fits presenter perfectly
 - Pro: 3D terrain adds spatial context
 - Pro: Memorable narrative ("remember when the drone rolled a nat 20?")
+
+---
+
+## Prototyping Notes
+
+### TUI Prototype (hive-commander crate)
+
+A terminal-based prototype was created to validate the intent-based command model concepts before investing in full graphical UI development.
+
+**Location**: `hive-commander/` crate in the workspace
+
+**What was built**:
+- Procedural terrain generation using Perlin noise (water, plains, forest, hills, mountains, urban, base)
+- Composed capability calculation from asset proximity (3-hex grouping)
+- Objective spawning with capability requirements (DET, TRK, STR, AUTH)
+- COA generation based on capability-to-objective matching
+- Turn-based gameplay with Select Objective → Select COA → Execute flow
+- Fog of war (enemies visible only within detection range)
+- Fuel management (only regenerates at base tiles)
+
+**Key learnings**:
+1. The intent-based command model feels right - selecting objectives and COAs is more strategic than moving individual pieces
+2. Composed capabilities effectively abstract away individual asset management
+3. Terminal UI has fundamental limitations for spatial reasoning in tactical scenarios
+4. A proper graphical UI (React Canvas/Three.js or game engine) is required for intuitive gameplay
+
+**Run the prototype**:
+```bash
+cargo run -p hive-commander
+```
+
+**Controls**:
+- `[1-3]` Select objective
+- `[A-C]` Select COA
+- `[ENTER]` Execute
+- `[R]` New game
+- `[Q]` Quit
+
+**Recommendation**: The TUI prototype validated the core game mechanics. Future development should proceed with the React/Three.js frontend described in this ADR, using the TUI prototype as a reference implementation for game logic.
 
 ---
 
