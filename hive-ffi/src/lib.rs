@@ -868,8 +868,6 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_connectedPeersJni<
     _class: JClass,
     handle: i64,
 ) -> JString<'a> {
-    let mut env = env;
-
     if handle == 0 {
         return env
             .new_string("[]")
