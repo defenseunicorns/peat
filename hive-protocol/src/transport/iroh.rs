@@ -9,10 +9,11 @@
 //! - **Peer Events (Issue #252)**: Emits `PeerEvent` notifications on connect/disconnect
 //! - **Connection Health**: Tracks connection establishment time and disconnect reasons
 
+use super::health::{HealthMonitor, HeartbeatConfig};
 use super::reconnection::{ReconnectionManager, ReconnectionPolicy};
 use super::{
-    DisconnectReason, MeshConnection, MeshTransport, NodeId, PeerEvent, PeerEventReceiver,
-    PeerEventSender, Result, TransportError, PEER_EVENT_CHANNEL_CAPACITY,
+    ConnectionHealth, DisconnectReason, MeshConnection, MeshTransport, NodeId, PeerEvent,
+    PeerEventReceiver, PeerEventSender, Result, TransportError, PEER_EVENT_CHANNEL_CAPACITY,
 };
 use crate::network::iroh_transport::IrohTransport;
 use crate::network::peer_config::PeerConfig;
@@ -80,6 +81,9 @@ pub struct IrohMeshTransport {
 
     /// Track which peers are from static config (vs discovered)
     static_peers: Arc<RwLock<std::collections::HashSet<NodeId>>>,
+
+    /// Health monitor for connection health tracking (Issue #254)
+    health_monitor: Arc<HealthMonitor>,
 }
 
 impl IrohMeshTransport {
@@ -127,6 +131,31 @@ impl IrohMeshTransport {
         cleanup_interval: Duration,
         reconnection_policy: ReconnectionPolicy,
     ) -> Self {
+        Self::with_full_config(
+            transport,
+            peer_config,
+            cleanup_interval,
+            reconnection_policy,
+            HeartbeatConfig::default(),
+        )
+    }
+
+    /// Create a new Iroh mesh transport with full configuration including health monitoring
+    ///
+    /// # Arguments
+    ///
+    /// * `transport` - Underlying IrohTransport
+    /// * `peer_config` - Static peer configuration for discovery
+    /// * `cleanup_interval` - Interval for stale peer cleanup
+    /// * `reconnection_policy` - Policy for automatic reconnection (Issue #253)
+    /// * `heartbeat_config` - Configuration for health monitoring (Issue #254)
+    pub fn with_full_config(
+        transport: Arc<IrohTransport>,
+        peer_config: PeerConfig,
+        cleanup_interval: Duration,
+        reconnection_policy: ReconnectionPolicy,
+        heartbeat_config: HeartbeatConfig,
+    ) -> Self {
         Self {
             transport,
             peer_config: Arc::new(RwLock::new(peer_config)),
@@ -138,7 +167,13 @@ impl IrohMeshTransport {
             cleanup_interval,
             reconnection: Arc::new(RwLock::new(ReconnectionManager::new(reconnection_policy))),
             static_peers: Arc::new(RwLock::new(std::collections::HashSet::new())),
+            health_monitor: Arc::new(HealthMonitor::new(heartbeat_config)),
         }
+    }
+
+    /// Get the health monitor for this transport
+    pub fn health_monitor(&self) -> &Arc<HealthMonitor> {
+        &self.health_monitor
     }
 
     /// Emit a peer event to all subscribers (Issue #252)
@@ -250,6 +285,7 @@ impl IrohMeshTransport {
         let static_peers = Arc::clone(&self.static_peers);
         let transport = Arc::clone(&self.transport);
         let peer_config = Arc::clone(&self.peer_config);
+        let health_monitor = Arc::clone(&self.health_monitor);
 
         tokio::spawn(async move {
             info!(
@@ -295,6 +331,9 @@ impl IrohMeshTransport {
                     for (peer_id, reason, connected_at) in dead_peers {
                         conns.remove(&peer_id);
 
+                        // Stop health monitoring for dead peer (Issue #254)
+                        health_monitor.stop_monitoring(&peer_id);
+
                         let event = PeerEvent::Disconnected {
                             peer_id: peer_id.clone(),
                             reason: reason.unwrap_or(DisconnectReason::Unknown),
@@ -313,7 +352,25 @@ impl IrohMeshTransport {
                     }
                 }
 
-                // Phase 2: Attempt due reconnections (Issue #253)
+                // Phase 2: Check health timeouts (Issue #254)
+                // This detects peers that have stopped responding to heartbeats
+                let newly_dead_from_health: Vec<NodeId> = health_monitor.check_timeouts();
+                for peer_id in newly_dead_from_health {
+                    // If health monitor declares peer dead, we should disconnect
+                    // The connection cleanup above will handle it on next iteration
+                    // But we can proactively schedule reconnection for static peers
+                    let is_static = static_peers.read().unwrap().contains(&peer_id);
+                    if is_static {
+                        let mut recon = reconnection.write().unwrap();
+                        recon.schedule_reconnect(peer_id.clone(), true);
+                        debug!(
+                            "Health monitor detected dead peer, scheduling reconnection: {}",
+                            peer_id
+                        );
+                    }
+                }
+
+                // Phase 3: Attempt due reconnections (Issue #253)
                 let due_peers: Vec<NodeId> = {
                     let recon = reconnection.read().unwrap();
                     if !recon.is_enabled() {
@@ -369,6 +426,9 @@ impl IrohMeshTransport {
                                 .unwrap()
                                 .insert(peer_id.clone(), mesh_conn);
                             reconnection.write().unwrap().reconnected(&peer_id);
+
+                            // Start health monitoring for reconnected peer (Issue #254)
+                            health_monitor.start_monitoring(peer_id.clone());
 
                             info!("Reconnected to peer: {} (attempt {})", peer_id, attempt);
                             emit_event(
@@ -463,6 +523,9 @@ impl MeshTransport for IrohMeshTransport {
             .stop_accept_loop()
             .map_err(|e| TransportError::ConnectionFailed(e.to_string()))?;
 
+        // Clear health monitoring (Issue #254)
+        self.health_monitor.clear();
+
         // Close all connections
         let connections = self
             .connections
@@ -525,6 +588,9 @@ impl MeshTransport for IrohMeshTransport {
                     .unwrap()
                     .insert(peer_id.clone(), mesh_conn.clone());
 
+                // Start health monitoring for this peer (Issue #254)
+                self.health_monitor.start_monitoring(peer_id.clone());
+
                 // Emit connected event (Issue #252)
                 self.emit_event(PeerEvent::Connected {
                     peer_id: peer_id.clone(),
@@ -554,6 +620,9 @@ impl MeshTransport for IrohMeshTransport {
     async fn disconnect(&self, peer_id: &NodeId) -> Result<()> {
         // Remove connection from map
         if let Some(conn) = self.connections.write().unwrap().remove(peer_id) {
+            // Stop health monitoring (Issue #254)
+            self.health_monitor.stop_monitoring(peer_id);
+
             // Emit disconnect event (Issue #252)
             let event = PeerEvent::Disconnected {
                 peer_id: peer_id.clone(),
@@ -588,6 +657,11 @@ impl MeshTransport for IrohMeshTransport {
         let (tx, rx) = mpsc::channel(PEER_EVENT_CHANNEL_CAPACITY);
         self.event_senders.write().unwrap().push(tx);
         rx
+    }
+
+    fn get_peer_health(&self, peer_id: &NodeId) -> Option<ConnectionHealth> {
+        // Return health from the HealthMonitor if available
+        self.health_monitor.get_health(peer_id)
     }
 }
 
