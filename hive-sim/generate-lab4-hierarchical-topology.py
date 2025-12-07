@@ -24,6 +24,21 @@ import sys
 import math
 
 
+def get_credential_env_vars(backend):
+    """Return the credential environment variables based on backend."""
+    if backend == "automerge":
+        return [
+            "        DITTO_APP_ID: test-formation",
+            "        HIVE_SECRET_KEY: aGl2ZS10ZXN0LWZvcm1hdGlvbi1zZWNyZXQta2V5LTA=",  # base64 of "hive-test-formation-secret-key-0" (32 bytes)
+        ]
+    else:
+        return [
+            "        DITTO_APP_ID: ${DITTO_APP_ID}",
+            "        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}",
+            "        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}",
+        ]
+
+
 def calculate_hierarchy(total_nodes):
     """
     Calculate optimal hierarchy structure for given node count.
@@ -52,10 +67,36 @@ def calculate_hierarchy(total_nodes):
         return (8, 4, 4, 6)
 
 
-def generate_lab4_topology(name, total_nodes, bandwidth):
+def get_tcp_connect(node_name, parent_name, parent_port, name, backend):
+    """Generate TCP_CONNECT env var for automerge backend.
+
+    Docker's embedded DNS resolves container names on user-defined networks.
+    Containerlab container names are: clab-{topology-name}-{node-name}
+    Format for automerge: "peer_name|hostname:port"
+    """
+    if backend != "automerge":
+        return []
+
+    # For automerge, we need TCP_CONNECT to connect to parent
+    if parent_name is None:
+        return []  # Company commander has no parent
+
+    # Use full container name as hostname (Docker DNS resolves this)
+    container_name = f"clab-{name}-{parent_name}"
+    return [f"        TCP_CONNECT: \"{parent_name}|{container_name}:{parent_port}\""]
+
+
+def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
     """Generate hierarchical topology for Lab 4."""
 
     soldiers_per_squad, squads_per_platoon, platoons_per_company, num_companies = calculate_hierarchy(total_nodes)
+
+    # Determine MODE and BACKEND based on backend parameter
+    # MODE controls the simulation behavior (writer/reader/hierarchical/flat_mesh)
+    # BACKEND controls which CRDT backend to use (ditto/automerge)
+    # For Lab 4, we always use "hierarchical" mode regardless of backend
+    mode = "hierarchical"
+    backend_env = backend  # "automerge" or "ditto"
 
     # Calculate actual node count
     soldiers = soldiers_per_squad * squads_per_platoon * platoons_per_company * num_companies
@@ -95,64 +136,92 @@ def generate_lab4_topology(name, total_nodes, bandwidth):
         ""
     ]
 
+    # Track port assignments for TCP_CONNECT
+    node_ports = {}  # node_id -> port
     node_counter = 0
 
-    # Generate hierarchy bottom-up
+    # Generate hierarchy - first pass: assign ports
     for company_idx in range(1, num_companies + 1):
         company_id = f"company-{company_idx}"
-
-        lines.append(f"    # ===== COMPANY {company_idx} =====")
-        lines.append("")
-
-        # Company commander
-        lines.extend([
-            f"    {company_id}-commander:",
-            "      kind: linux",
-            "      image: hive-sim-node:latest",
-            "      env:",
-            f"        NODE_ID: {company_id}-commander",
-            "        ROLE: company_commander",
-            "        PLATFORM_TYPE: soldier",
-            "        NODE_TYPE: soldier",
-            "        MODE: hierarchical",
-            f"        COMPANY_ID: {company_id}",
-            "        UPDATE_RATE_MS: \"5000\"",
-            "        TCP_LISTEN: \"12345\"",
-            "        DITTO_APP_ID: ${DITTO_APP_ID}",
-            "        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}",
-            "        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}",
-            ""
-        ])
+        commander_id = f"{company_id}-commander"
+        node_ports[commander_id] = 12345  # Company commanders all on 12345
 
         for platoon_idx in range(1, platoons_per_company + 1):
             platoon_id = f"{company_id}-platoon-{platoon_idx}"
-
-            lines.append(f"    # ----- Platoon {company_idx}-{platoon_idx} -----")
-            lines.append("")
-
-            # Platoon leader
-            lines.extend([
-                f"    {platoon_id}-leader:",
-                "      kind: linux",
-                "      image: hive-sim-node:latest",
-                "      env:",
-                f"        NODE_ID: {platoon_id}-leader",
-                "        ROLE: platoon_leader",
-                "        PLATFORM_TYPE: soldier",
-                "        NODE_TYPE: soldier",
-                "        MODE: hierarchical",
-                f"        PLATOON_ID: {platoon_id}",
-                "        UPDATE_RATE_MS: \"5000\"",
-                f"        TCP_LISTEN: \"{12346 + node_counter}\"",
-                "        DITTO_APP_ID: ${DITTO_APP_ID}",
-                "        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}",
-                "        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}",
-                ""
-            ])
+            leader_id = f"{platoon_id}-leader"
+            node_ports[leader_id] = 12346 + node_counter
             node_counter += 1
 
             for squad_idx in range(1, squads_per_platoon + 1):
                 squad_id = f"{platoon_id}-squad-{squad_idx}"
+                squad_leader_id = f"{squad_id}-leader"
+                node_ports[squad_leader_id] = 12346 + node_counter
+                node_counter += 1
+
+                for soldier_idx in range(1, soldiers_per_squad + 1):
+                    soldier_id = f"{squad_id}-soldier-{soldier_idx}"
+                    node_ports[soldier_id] = 12346 + node_counter
+                    node_counter += 1
+
+    # Reset counter for second pass
+    node_counter = 0
+
+    # Generate hierarchy - second pass: generate YAML with TCP_CONNECT
+    for company_idx in range(1, num_companies + 1):
+        company_id = f"company-{company_idx}"
+        commander_id = f"{company_id}-commander"
+
+        lines.append(f"    # ===== COMPANY {company_idx} =====")
+        lines.append("")
+
+        # Company commander (no parent to connect to)
+        cred_vars = get_credential_env_vars(backend)
+        tcp_connect = get_tcp_connect(commander_id, None, None, name, backend)
+        lines.extend([
+            f"    {commander_id}:",
+            "      kind: linux",
+            "      image: hive-sim-node:latest",
+            "      env:",
+            f"        NODE_ID: {commander_id}",
+            "        ROLE: company_commander",
+            "        PLATFORM_TYPE: soldier",
+            "        NODE_TYPE: soldier",
+            f"        MODE: {mode}",
+            f"        BACKEND: {backend_env}",
+            f"        COMPANY_ID: {company_id}",
+            "        UPDATE_RATE_MS: \"5000\"",
+            f"        TCP_LISTEN: \"{node_ports[commander_id]}\"",
+        ] + tcp_connect + cred_vars + [""])
+
+        for platoon_idx in range(1, platoons_per_company + 1):
+            platoon_id = f"{company_id}-platoon-{platoon_idx}"
+            leader_id = f"{platoon_id}-leader"
+
+            lines.append(f"    # ----- Platoon {company_idx}-{platoon_idx} -----")
+            lines.append("")
+
+            # Platoon leader connects to company commander
+            tcp_connect = get_tcp_connect(leader_id, commander_id, node_ports[commander_id], name, backend)
+            lines.extend([
+                f"    {leader_id}:",
+                "      kind: linux",
+                "      image: hive-sim-node:latest",
+                "      env:",
+                f"        NODE_ID: {leader_id}",
+                "        ROLE: platoon_leader",
+                "        PLATFORM_TYPE: soldier",
+                "        NODE_TYPE: soldier",
+                f"        MODE: {mode}",
+                f"        BACKEND: {backend_env}",
+                f"        PLATOON_ID: {platoon_id}",
+                "        UPDATE_RATE_MS: \"5000\"",
+                f"        TCP_LISTEN: \"{node_ports[leader_id]}\"",
+            ] + tcp_connect + cred_vars + [""])
+            node_counter += 1
+
+            for squad_idx in range(1, squads_per_platoon + 1):
+                squad_id = f"{platoon_id}-squad-{squad_idx}"
+                squad_leader_id = f"{squad_id}-leader"
 
                 # Squad leader
                 squad_members = []
@@ -160,31 +229,32 @@ def generate_lab4_topology(name, total_nodes, bandwidth):
                     soldier_id = f"{squad_id}-soldier-{soldier_idx}"
                     squad_members.append(soldier_id)
 
+                # Squad leader connects to platoon leader
+                tcp_connect = get_tcp_connect(squad_leader_id, leader_id, node_ports[leader_id], name, backend)
                 lines.extend([
-                    f"    {squad_id}-leader:",
+                    f"    {squad_leader_id}:",
                     "      kind: linux",
                     "      image: hive-sim-node:latest",
                     "      env:",
-                    f"        NODE_ID: {squad_id}-leader",
+                    f"        NODE_ID: {squad_leader_id}",
                     "        ROLE: squad_leader",
                     "        PLATFORM_TYPE: soldier",
                     "        NODE_TYPE: soldier",
-                    "        MODE: hierarchical",
+                    f"        MODE: {mode}",
+                    f"        BACKEND: {backend_env}",
                     f"        SQUAD_ID: {squad_id}",
                     f"        SQUAD_MEMBERS: \"{','.join(squad_members)}\"",
                     "        UPDATE_RATE_MS: \"5000\"",
-                    f"        TCP_LISTEN: \"{12346 + node_counter}\"",
-                    "        DITTO_APP_ID: ${DITTO_APP_ID}",
-                    "        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}",
-                    "        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}",
-                    ""
-                ])
+                    f"        TCP_LISTEN: \"{node_ports[squad_leader_id]}\"",
+                ] + tcp_connect + cred_vars + [""])
                 node_counter += 1
 
                 # Squad soldiers
                 for soldier_idx in range(1, soldiers_per_squad + 1):
                     soldier_id = f"{squad_id}-soldier-{soldier_idx}"
 
+                    # Soldiers connect to squad leader
+                    tcp_connect = get_tcp_connect(soldier_id, squad_leader_id, node_ports[squad_leader_id], name, backend)
                     lines.extend([
                         f"    {soldier_id}:",
                         "      kind: linux",
@@ -194,15 +264,12 @@ def generate_lab4_topology(name, total_nodes, bandwidth):
                         "        ROLE: soldier",
                         "        PLATFORM_TYPE: soldier",
                         "        NODE_TYPE: soldier",
-                        "        MODE: hierarchical",
+                        f"        MODE: {mode}",
+                        f"        BACKEND: {backend_env}",
                         f"        SQUAD_ID: {squad_id}",
                         "        UPDATE_RATE_MS: \"5000\"",
-                        f"        TCP_LISTEN: \"{12346 + node_counter}\"",
-                        "        DITTO_APP_ID: ${DITTO_APP_ID}",
-                        "        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}",
-                        "        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}",
-                        ""
-                    ])
+                        f"        TCP_LISTEN: \"{node_ports[soldier_id]}\"",
+                    ] + tcp_connect + cred_vars + [""])
                     node_counter += 1
 
         lines.append("")
@@ -231,14 +298,34 @@ def main():
         type=str,
         help="Output file path (default: topologies/lab4-hierarchical-{nodes}n-{bandwidth}.yaml)"
     )
+    parser.add_argument(
+        "--backend",
+        type=str,
+        choices=["ditto", "automerge"],
+        default="ditto",
+        help="Backend type: ditto (default) or automerge"
+    )
+    parser.add_argument(
+        "--name",
+        type=str,
+        help="Topology name (used for container DNS). Keep under 20 chars for DNS compatibility."
+    )
 
     args = parser.parse_args()
 
-    # Generate name
-    name = f"lab4-hierarchical-{args.nodes}n-{args.bandwidth}"
+    # Generate name based on backend - keep short for DNS label limit (63 chars)
+    # Container names will be: clab-{name}-{node-id}
+    # Longest node-id is ~40 chars: company-1-platoon-1-squad-1-soldier-1
+    # So name should be ~18 chars max to stay under 63
+    if args.name:
+        name = args.name
+    elif args.backend == "automerge":
+        name = f"am{args.nodes}n"  # e.g. "am24n" instead of "lab4-automerge-24n-1gbps"
+    else:
+        name = f"d{args.nodes}n"  # e.g. "d24n" for ditto
 
     # Generate topology
-    topology = generate_lab4_topology(name, args.nodes, args.bandwidth)
+    topology = generate_lab4_topology(name, args.nodes, args.bandwidth, args.backend)
 
     # Determine output path
     if args.output:

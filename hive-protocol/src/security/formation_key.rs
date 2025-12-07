@@ -119,27 +119,39 @@ impl FormationKey {
     /// # Arguments
     ///
     /// * `formation_id` - Unique identifier for the formation
-    /// * `base64_secret` - Base64-encoded 32-byte shared secret
+    /// * `base64_secret` - Base64-encoded shared secret (any length)
     ///
     /// # Returns
     ///
-    /// `FormationKey` or error if base64 is invalid or wrong length
+    /// `FormationKey` or error if base64 is invalid
+    ///
+    /// # Key Derivation
+    ///
+    /// - If the decoded secret is exactly 32 bytes, it's used directly
+    /// - Otherwise, SHA-256 is used to derive a 32-byte key from the input
+    ///
+    /// This allows using the same shared secret format as Ditto (EC private key)
+    /// while deriving a compatible symmetric key for Automerge peer authentication.
     pub fn from_base64(formation_id: &str, base64_secret: &str) -> Result<Self, SecurityError> {
         use base64::{engine::general_purpose::STANDARD, Engine};
+        use sha2::{Digest, Sha256};
 
         let secret_bytes = STANDARD.decode(base64_secret.trim()).map_err(|e| {
             SecurityError::AuthenticationFailed(format!("Invalid base64 shared secret: {}", e))
         })?;
 
-        if secret_bytes.len() != 32 {
-            return Err(SecurityError::AuthenticationFailed(format!(
-                "Shared secret must be 32 bytes, got {}",
-                secret_bytes.len()
-            )));
-        }
+        let secret: [u8; 32] = if secret_bytes.len() == 32 {
+            // Exact 32 bytes - use directly (backwards compatible)
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(&secret_bytes);
+            arr
+        } else {
+            // Derive 32-byte key using SHA-256 (supports EC keys, etc.)
+            let mut hasher = Sha256::new();
+            hasher.update(&secret_bytes);
+            hasher.finalize().into()
+        };
 
-        let mut secret = [0u8; 32];
-        secret.copy_from_slice(&secret_bytes);
         Ok(Self::new(formation_id, &secret))
     }
 
@@ -375,12 +387,33 @@ mod tests {
     }
 
     #[test]
-    fn test_formation_key_from_base64_wrong_length() {
+    fn test_formation_key_from_base64_derives_key_for_non_32_bytes() {
         use base64::{engine::general_purpose::STANDARD, Engine};
-        let short_secret = STANDARD.encode([0u8; 16]); // Only 16 bytes
 
+        // Short secret (16 bytes) - should be derived via SHA-256
+        let short_secret = STANDARD.encode([0u8; 16]);
         let result = FormationKey::from_base64("test", &short_secret);
-        assert!(result.is_err());
+        assert!(result.is_ok(), "Short key should be derived via SHA-256");
+
+        // Long secret (138 bytes like EC key) - should be derived via SHA-256
+        let long_secret = STANDARD.encode([0xABu8; 138]);
+        let result = FormationKey::from_base64("test", &long_secret);
+        assert!(
+            result.is_ok(),
+            "Long key (EC format) should be derived via SHA-256"
+        );
+
+        // Verify that different inputs produce different keys
+        let key1 = FormationKey::from_base64("test", &short_secret).unwrap();
+        let key2 = FormationKey::from_base64("test", &long_secret).unwrap();
+
+        // Create challenges to verify keys are different
+        let (nonce, _) = key1.create_challenge();
+        let response1 = key1.respond_to_challenge(&nonce);
+        assert!(
+            !key2.verify_response(&nonce, &response1),
+            "Different input keys should produce different derived keys"
+        );
     }
 
     #[test]
