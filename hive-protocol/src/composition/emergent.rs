@@ -523,6 +523,226 @@ impl CompositionRule for AuthorizationCoverageRule {
     }
 }
 
+/// Rule for detecting multi-domain coverage capability
+///
+/// Requires: Sensors or capabilities that cover multiple domains (Air, Surface, Subsurface)
+/// Emergent capability: Multi-domain battlespace awareness
+pub struct MultiDomainCoverageRule {
+    /// Minimum number of domains required for the rule to apply
+    min_domains: usize,
+    /// Minimum confidence threshold for sensors
+    min_confidence: f32,
+}
+
+impl MultiDomainCoverageRule {
+    /// Create a new multi-domain coverage rule
+    pub fn new(min_domains: usize, min_confidence: f32) -> Self {
+        Self {
+            min_domains: min_domains.max(2), // At least 2 domains for "multi"
+            min_confidence,
+        }
+    }
+
+    /// Create rule requiring all three domains
+    pub fn full_spectrum() -> Self {
+        Self::new(3, 0.7)
+    }
+
+    /// Create rule requiring any two domains
+    pub fn dual_domain() -> Self {
+        Self::new(2, 0.7)
+    }
+
+    /// Extract sensor type and infer domains
+    fn get_sensor_domains(cap: &Capability) -> crate::models::DomainSet {
+        use crate::models::{DomainSet, SensorType};
+
+        if cap.get_capability_type() != CapabilityType::Sensor {
+            return DomainSet::empty();
+        }
+
+        // Try to get sensor type from metadata
+        let sensor_type = serde_json::from_str::<serde_json::Value>(&cap.metadata_json)
+            .ok()
+            .and_then(|v| {
+                v.get("sensor_type").and_then(|s| s.as_str()).and_then(|s| {
+                    match s.to_lowercase().as_str() {
+                        "electro_optical" | "eo" | "camera" => Some(SensorType::ElectroOptical),
+                        "infrared" | "ir" | "thermal" => Some(SensorType::Infrared),
+                        "radar" | "rad" => Some(SensorType::Radar),
+                        "sonar" | "son" => Some(SensorType::Sonar),
+                        "acoustic" | "aco" => Some(SensorType::Acoustic),
+                        "sigint" | "sig" | "signals_intelligence" => Some(SensorType::Sigint),
+                        "mad" | "magnetic" => Some(SensorType::Mad),
+                        _ => None,
+                    }
+                })
+            });
+
+        if let Some(st) = sensor_type {
+            st.detection_domains()
+        } else {
+            // If sensor type not specified, check for explicit domains
+            serde_json::from_str::<serde_json::Value>(&cap.metadata_json)
+                .ok()
+                .and_then(|v| {
+                    v.get("detection_domains").and_then(|domains| {
+                        if let Some(arr) = domains.as_array() {
+                            let mut set = DomainSet::empty();
+                            for d in arr {
+                                if let Some(s) = d.as_str() {
+                                    if let Some(domain) = crate::models::Domain::parse(s) {
+                                        set.add(domain);
+                                    }
+                                }
+                            }
+                            Some(set)
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .unwrap_or_else(|| {
+                    // Default: assume surface + air for unknown sensors
+                    DomainSet::from_domains(&[
+                        crate::models::Domain::Surface,
+                        crate::models::Domain::Air,
+                    ])
+                })
+        }
+    }
+}
+
+impl Default for MultiDomainCoverageRule {
+    fn default() -> Self {
+        Self::dual_domain()
+    }
+}
+
+#[async_trait]
+impl CompositionRule for MultiDomainCoverageRule {
+    fn name(&self) -> &str {
+        "multi_domain_coverage"
+    }
+
+    fn description(&self) -> &str {
+        "Detects multi-domain coverage from sensors spanning air, surface, and/or subsurface"
+    }
+
+    fn applies_to(&self, capabilities: &[Capability]) -> bool {
+        use crate::models::DomainSet;
+
+        // Aggregate domains from all capabilities
+        let mut covered = DomainSet::empty();
+
+        for cap in capabilities {
+            if cap.confidence < self.min_confidence {
+                continue;
+            }
+
+            // Get domains this capability covers
+            let domains = Self::get_sensor_domains(cap);
+            covered = covered.union(&domains);
+        }
+
+        covered.count() >= self.min_domains
+    }
+
+    async fn compose(
+        &self,
+        capabilities: &[Capability],
+        _context: &CompositionContext,
+    ) -> Result<CompositionResult> {
+        use crate::models::{Domain, DomainSet};
+
+        let mut covered = DomainSet::empty();
+        let mut contributors: Vec<String> = Vec::new();
+        let mut domain_sensors: std::collections::HashMap<Domain, Vec<String>> =
+            std::collections::HashMap::new();
+        let mut min_confidence = 1.0f32;
+
+        for cap in capabilities {
+            if cap.confidence < self.min_confidence {
+                continue;
+            }
+
+            let domains = Self::get_sensor_domains(cap);
+
+            if !domains.is_empty() {
+                contributors.push(cap.id.clone());
+                min_confidence = min_confidence.min(cap.confidence);
+
+                for domain in domains.iter() {
+                    covered.add(domain);
+                    domain_sensors
+                        .entry(domain)
+                        .or_default()
+                        .push(cap.id.clone());
+                }
+            }
+        }
+
+        if covered.count() < self.min_domains {
+            return Ok(CompositionResult::new(vec![], 0.0));
+        }
+
+        // Calculate composition bonus based on coverage
+        let coverage_bonus = match covered.count() {
+            3 => 3, // Full spectrum
+            2 => 2, // Dual domain
+            _ => 1, // Single domain (shouldn't happen but safe)
+        };
+
+        // Confidence is minimum of all contributors, boosted slightly by coverage
+        let coverage_confidence = (min_confidence + (coverage_bonus as f32 * 0.05)).min(1.0);
+
+        let coverage_name = match covered.count() {
+            3 => "Full Spectrum Coverage",
+            2 => "Dual-Domain Coverage",
+            _ => "Domain Coverage",
+        };
+
+        let mut composed = Capability::new(
+            format!("emergent_multi_domain_{}", uuid::Uuid::new_v4()),
+            coverage_name.to_string(),
+            CapabilityType::Emergent,
+            coverage_confidence,
+        );
+
+        // Build domain coverage map for metadata
+        let domain_coverage: serde_json::Map<String, serde_json::Value> = domain_sensors
+            .iter()
+            .map(|(domain, sensors)| {
+                (
+                    domain.name().to_lowercase(),
+                    serde_json::Value::Array(
+                        sensors
+                            .iter()
+                            .map(|s| serde_json::Value::String(s.clone()))
+                            .collect(),
+                    ),
+                )
+            })
+            .collect();
+
+        composed.metadata_json = serde_json::to_string(&json!({
+            "composition_type": "emergent",
+            "pattern": "multi_domain_coverage",
+            "domains_covered": covered.to_vec().iter().map(|d| d.name()).collect::<Vec<_>>(),
+            "domain_count": covered.count(),
+            "coverage_bonus": coverage_bonus,
+            "domain_sensors": domain_coverage,
+            "is_full_spectrum": covered.count() == 3,
+            "can_detect_subsurface": covered.contains(Domain::Subsurface),
+            "description": format!("Multi-domain awareness across {} domains", covered.count())
+        }))
+        .unwrap_or_default();
+
+        Ok(CompositionResult::new(vec![composed], coverage_confidence)
+            .with_contributors(contributors))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -880,5 +1100,282 @@ mod tests {
 
         let result = rule.compose(&caps, &context).await.unwrap();
         assert!(!result.has_compositions()); // Advisor can't satisfy Commander requirement
+    }
+
+    // MultiDomainCoverageRule tests
+
+    #[tokio::test]
+    async fn test_multi_domain_dual_domain_coverage() {
+        let rule = MultiDomainCoverageRule::default(); // dual domain
+
+        // Radar (air+surface) + Sonar (subsurface+surface)
+        let mut radar = Capability::new(
+            "radar1".to_string(),
+            "Search Radar".to_string(),
+            CapabilityType::Sensor,
+            0.9,
+        );
+        radar.metadata_json = serde_json::to_string(&json!({
+            "sensor_type": "radar"
+        }))
+        .unwrap();
+
+        let mut sonar = Capability::new(
+            "sonar1".to_string(),
+            "Hull Sonar".to_string(),
+            CapabilityType::Sensor,
+            0.85,
+        );
+        sonar.metadata_json = serde_json::to_string(&json!({
+            "sensor_type": "sonar"
+        }))
+        .unwrap();
+
+        let caps = vec![radar, sonar];
+        let context = CompositionContext::new(vec!["ship1".to_string()]);
+
+        assert!(rule.applies_to(&caps));
+
+        let result = rule.compose(&caps, &context).await.unwrap();
+        assert!(result.has_compositions());
+
+        let composed = &result.composed_capabilities[0];
+        assert!(composed.name.contains("Coverage"));
+
+        let metadata: Value = serde_json::from_str(&composed.metadata_json).unwrap();
+        assert!(metadata["domain_count"].as_i64().unwrap() >= 2);
+        assert!(metadata["can_detect_subsurface"].as_bool().unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_multi_domain_full_spectrum() {
+        let rule = MultiDomainCoverageRule::full_spectrum();
+
+        // Need sensors covering all three domains
+        let mut radar = Capability::new(
+            "radar1".to_string(),
+            "Air Search Radar".to_string(),
+            CapabilityType::Sensor,
+            0.9,
+        );
+        radar.metadata_json = serde_json::to_string(&json!({
+            "sensor_type": "radar"
+        }))
+        .unwrap();
+
+        let mut sonar = Capability::new(
+            "sonar1".to_string(),
+            "Sonar".to_string(),
+            CapabilityType::Sensor,
+            0.85,
+        );
+        sonar.metadata_json = serde_json::to_string(&json!({
+            "sensor_type": "sonar"
+        }))
+        .unwrap();
+
+        // Together radar (air+surface) + sonar (subsurface+surface) = all 3 domains
+        let caps = vec![radar, sonar];
+        let context = CompositionContext::new(vec!["ship1".to_string()]);
+
+        assert!(rule.applies_to(&caps));
+
+        let result = rule.compose(&caps, &context).await.unwrap();
+        assert!(result.has_compositions());
+
+        let composed = &result.composed_capabilities[0];
+        assert_eq!(composed.name, "Full Spectrum Coverage");
+
+        let metadata: Value = serde_json::from_str(&composed.metadata_json).unwrap();
+        assert!(metadata["is_full_spectrum"].as_bool().unwrap());
+        assert_eq!(metadata["domain_count"].as_i64().unwrap(), 3);
+        assert_eq!(metadata["coverage_bonus"].as_i64().unwrap(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_multi_domain_insufficient_coverage() {
+        let rule = MultiDomainCoverageRule::full_spectrum();
+
+        // Only one sensor type = not full spectrum
+        let mut radar = Capability::new(
+            "radar1".to_string(),
+            "Radar".to_string(),
+            CapabilityType::Sensor,
+            0.9,
+        );
+        radar.metadata_json = serde_json::to_string(&json!({
+            "sensor_type": "radar"
+        }))
+        .unwrap();
+
+        let caps = vec![radar];
+        let _context = CompositionContext::new(vec!["node1".to_string()]);
+
+        // Radar only covers air+surface, not subsurface
+        assert!(!rule.applies_to(&caps));
+    }
+
+    #[tokio::test]
+    async fn test_multi_domain_low_confidence_filtered() {
+        let rule = MultiDomainCoverageRule::new(2, 0.8); // min 0.8 confidence
+
+        let mut radar = Capability::new(
+            "radar1".to_string(),
+            "Radar".to_string(),
+            CapabilityType::Sensor,
+            0.9, // Good
+        );
+        radar.metadata_json = serde_json::to_string(&json!({
+            "sensor_type": "radar"
+        }))
+        .unwrap();
+
+        let mut sonar = Capability::new(
+            "sonar1".to_string(),
+            "Sonar".to_string(),
+            CapabilityType::Sensor,
+            0.5, // Too low - should be filtered
+        );
+        sonar.metadata_json = serde_json::to_string(&json!({
+            "sensor_type": "sonar"
+        }))
+        .unwrap();
+
+        let caps = vec![radar, sonar];
+        let context = CompositionContext::new(vec!["node1".to_string()]);
+
+        // Sonar filtered due to low confidence, so only 2 domains from radar
+        assert!(rule.applies_to(&caps)); // radar still covers air+surface = 2 domains
+
+        let result = rule.compose(&caps, &context).await.unwrap();
+        assert!(result.has_compositions());
+
+        // Only radar should be a contributor
+        assert_eq!(result.contributing_capabilities.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_multi_domain_explicit_domains_in_metadata() {
+        let rule = MultiDomainCoverageRule::default();
+
+        // Sensor with explicit domain specification
+        let mut custom_sensor = Capability::new(
+            "custom1".to_string(),
+            "Custom Sensor".to_string(),
+            CapabilityType::Sensor,
+            0.9,
+        );
+        custom_sensor.metadata_json = serde_json::to_string(&json!({
+            "detection_domains": ["subsurface", "surface", "air"]
+        }))
+        .unwrap();
+
+        let caps = vec![custom_sensor];
+        let context = CompositionContext::new(vec!["node1".to_string()]);
+
+        // Single sensor covering all domains
+        assert!(rule.applies_to(&caps));
+
+        let result = rule.compose(&caps, &context).await.unwrap();
+        assert!(result.has_compositions());
+
+        let composed = &result.composed_capabilities[0];
+        let metadata: Value = serde_json::from_str(&composed.metadata_json).unwrap();
+        assert_eq!(metadata["domain_count"].as_i64().unwrap(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_multi_domain_acoustic_covers_all() {
+        let rule = MultiDomainCoverageRule::full_spectrum();
+
+        // Acoustic sensor covers all domains
+        let mut acoustic = Capability::new(
+            "acoustic1".to_string(),
+            "Acoustic Array".to_string(),
+            CapabilityType::Sensor,
+            0.85,
+        );
+        acoustic.metadata_json = serde_json::to_string(&json!({
+            "sensor_type": "acoustic"
+        }))
+        .unwrap();
+
+        let caps = vec![acoustic];
+        let context = CompositionContext::new(vec!["node1".to_string()]);
+
+        assert!(rule.applies_to(&caps));
+
+        let result = rule.compose(&caps, &context).await.unwrap();
+        assert!(result.has_compositions());
+
+        let composed = &result.composed_capabilities[0];
+        assert_eq!(composed.name, "Full Spectrum Coverage");
+    }
+
+    #[tokio::test]
+    async fn test_multi_domain_non_sensors_ignored() {
+        let rule = MultiDomainCoverageRule::default();
+
+        // Non-sensor capabilities should be ignored
+        let compute = Capability::new(
+            "compute1".to_string(),
+            "Compute".to_string(),
+            CapabilityType::Compute,
+            0.9,
+        );
+
+        let comms = Capability::new(
+            "comms1".to_string(),
+            "Radio".to_string(),
+            CapabilityType::Communication,
+            0.9,
+        );
+
+        let caps = vec![compute, comms];
+        let _context = CompositionContext::new(vec!["node1".to_string()]);
+
+        // No sensors = no domain coverage
+        assert!(!rule.applies_to(&caps));
+    }
+
+    #[tokio::test]
+    async fn test_multi_domain_mad_for_asw() {
+        let rule = MultiDomainCoverageRule::default();
+
+        // MAD operates from air/surface but detects subsurface
+        let mut mad = Capability::new(
+            "mad1".to_string(),
+            "MAD Boom".to_string(),
+            CapabilityType::Sensor,
+            0.8,
+        );
+        mad.metadata_json = serde_json::to_string(&json!({
+            "sensor_type": "mad"
+        }))
+        .unwrap();
+
+        let mut radar = Capability::new(
+            "radar1".to_string(),
+            "Surface Radar".to_string(),
+            CapabilityType::Sensor,
+            0.9,
+        );
+        radar.metadata_json = serde_json::to_string(&json!({
+            "sensor_type": "radar"
+        }))
+        .unwrap();
+
+        let caps = vec![mad, radar];
+        let context = CompositionContext::new(vec!["p3c".to_string()]); // ASW aircraft
+
+        assert!(rule.applies_to(&caps));
+
+        let result = rule.compose(&caps, &context).await.unwrap();
+        assert!(result.has_compositions());
+
+        let composed = &result.composed_capabilities[0];
+        let metadata: Value = serde_json::from_str(&composed.metadata_json).unwrap();
+        // MAD detects subsurface, radar detects air+surface = 3 domains
+        assert!(metadata["can_detect_subsurface"].as_bool().unwrap());
     }
 }

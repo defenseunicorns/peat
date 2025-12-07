@@ -13,3 +13,6 @@ futures = "0.3"
 
 # HIVE Protocol integration
 hive-protocol = { path = "../hive-protocol" }
+
+[dev-dependencies]
+tokio = { version = "1.0", features = ["rt", "macros"] }
