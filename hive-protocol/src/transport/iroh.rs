@@ -9,6 +9,7 @@
 //! - **Peer Events (Issue #252)**: Emits `PeerEvent` notifications on connect/disconnect
 //! - **Connection Health**: Tracks connection establishment time and disconnect reasons
 
+use super::reconnection::{ReconnectionManager, ReconnectionPolicy};
 use super::{
     DisconnectReason, MeshConnection, MeshTransport, NodeId, PeerEvent, PeerEventReceiver,
     PeerEventSender, Result, TransportError, PEER_EVENT_CHANNEL_CAPACITY,
@@ -73,6 +74,12 @@ pub struct IrohMeshTransport {
 
     /// Cleanup interval
     cleanup_interval: Duration,
+
+    /// Reconnection manager (Issue #253)
+    reconnection: Arc<RwLock<ReconnectionManager>>,
+
+    /// Track which peers are from static config (vs discovered)
+    static_peers: Arc<RwLock<std::collections::HashSet<NodeId>>>,
 }
 
 impl IrohMeshTransport {
@@ -98,6 +105,28 @@ impl IrohMeshTransport {
         peer_config: PeerConfig,
         cleanup_interval: Duration,
     ) -> Self {
+        Self::with_reconnection_policy(
+            transport,
+            peer_config,
+            cleanup_interval,
+            ReconnectionPolicy::default(),
+        )
+    }
+
+    /// Create a new Iroh mesh transport with full configuration
+    ///
+    /// # Arguments
+    ///
+    /// * `transport` - Underlying IrohTransport
+    /// * `peer_config` - Static peer configuration for discovery
+    /// * `cleanup_interval` - Interval for stale peer cleanup
+    /// * `reconnection_policy` - Policy for automatic reconnection (Issue #253)
+    pub fn with_reconnection_policy(
+        transport: Arc<IrohTransport>,
+        peer_config: PeerConfig,
+        cleanup_interval: Duration,
+        reconnection_policy: ReconnectionPolicy,
+    ) -> Self {
         Self {
             transport,
             peer_config: Arc::new(RwLock::new(peer_config)),
@@ -107,6 +136,8 @@ impl IrohMeshTransport {
             event_senders: Arc::new(RwLock::new(Vec::new())),
             cleanup_running: Arc::new(AtomicBool::new(false)),
             cleanup_interval,
+            reconnection: Arc::new(RwLock::new(ReconnectionManager::new(reconnection_policy))),
+            static_peers: Arc::new(RwLock::new(std::collections::HashSet::new())),
         }
     }
 
@@ -195,10 +226,12 @@ impl IrohMeshTransport {
         &self.transport
     }
 
-    /// Start the background cleanup task (Issue #244)
+    /// Start the background cleanup and reconnection task (Issue #244 + #253)
     ///
-    /// This spawns a task that periodically checks for dead connections
-    /// and emits disconnect events.
+    /// This spawns a task that periodically:
+    /// 1. Checks for dead connections and emits disconnect events
+    /// 2. Schedules static peers for reconnection
+    /// 3. Attempts due reconnections with exponential backoff
     fn start_cleanup_task(&self) {
         if self
             .cleanup_running
@@ -213,9 +246,26 @@ impl IrohMeshTransport {
         let event_senders = Arc::clone(&self.event_senders);
         let cleanup_running = Arc::clone(&self.cleanup_running);
         let interval = self.cleanup_interval;
+        let reconnection = Arc::clone(&self.reconnection);
+        let static_peers = Arc::clone(&self.static_peers);
+        let transport = Arc::clone(&self.transport);
+        let peer_config = Arc::clone(&self.peer_config);
 
         tokio::spawn(async move {
-            info!("Started peer cleanup task with interval {:?}", interval);
+            info!(
+                "Started peer cleanup/reconnection task with interval {:?}",
+                interval
+            );
+
+            // Helper to emit events
+            let emit_event = |event: PeerEvent, senders: &Arc<RwLock<Vec<PeerEventSender>>>| {
+                let mut senders = senders.write().unwrap();
+                senders.retain(|sender| match sender.try_send(event.clone()) {
+                    Ok(()) => true,
+                    Err(mpsc::error::TrySendError::Full(_)) => true,
+                    Err(mpsc::error::TrySendError::Closed(_)) => false,
+                });
+            };
 
             while cleanup_running.load(Ordering::SeqCst) {
                 tokio::time::sleep(interval).await;
@@ -224,7 +274,7 @@ impl IrohMeshTransport {
                     break;
                 }
 
-                // Check for dead connections
+                // Phase 1: Check for dead connections
                 let dead_peers: Vec<_> = {
                     let conns = connections.read().unwrap();
                     conns
@@ -236,9 +286,12 @@ impl IrohMeshTransport {
                         .collect()
                 };
 
-                // Remove dead connections and emit events
+                // Remove dead connections, emit events, schedule reconnection
                 if !dead_peers.is_empty() {
                     let mut conns = connections.write().unwrap();
+                    let static_set = static_peers.read().unwrap();
+                    let mut recon = reconnection.write().unwrap();
+
                     for (peer_id, reason, connected_at) in dead_peers {
                         conns.remove(&peer_id);
 
@@ -249,19 +302,122 @@ impl IrohMeshTransport {
                         };
 
                         debug!("Cleanup: Peer {} disconnected: {:?}", peer_id, event);
+                        emit_event(event, &event_senders);
 
-                        // Emit event to subscribers
-                        let mut senders = event_senders.write().unwrap();
-                        senders.retain(|sender| match sender.try_send(event.clone()) {
-                            Ok(()) => true,
-                            Err(mpsc::error::TrySendError::Full(_)) => true,
-                            Err(mpsc::error::TrySendError::Closed(_)) => false,
-                        });
+                        // Schedule reconnection for static peers (Issue #253)
+                        let is_static = static_set.contains(&peer_id);
+                        if is_static {
+                            recon.schedule_reconnect(peer_id.clone(), true);
+                            debug!("Scheduled reconnection for static peer: {}", peer_id);
+                        }
+                    }
+                }
+
+                // Phase 2: Attempt due reconnections (Issue #253)
+                let due_peers: Vec<NodeId> = {
+                    let recon = reconnection.read().unwrap();
+                    if !recon.is_enabled() {
+                        continue;
+                    }
+                    recon.due_reconnections()
+                };
+
+                for peer_id in due_peers {
+                    // Get current attempt info
+                    let (attempt, max_attempts) = {
+                        let recon = reconnection.read().unwrap();
+                        let state = recon.get_state(&peer_id);
+                        let attempt = state.map(|s| s.attempts + 1).unwrap_or(1);
+                        let max = recon.policy().max_retries;
+                        (attempt, max)
+                    };
+
+                    // Emit reconnecting event
+                    emit_event(
+                        PeerEvent::Reconnecting {
+                            peer_id: peer_id.clone(),
+                            attempt,
+                            max_attempts,
+                        },
+                        &event_senders,
+                    );
+
+                    // Try to reconnect
+                    let peer_info_opt = {
+                        let config = peer_config.read().unwrap();
+                        config
+                            .peers
+                            .iter()
+                            .find(|p| p.name == peer_id.as_str())
+                            .cloned()
+                    };
+
+                    let result = if let Some(peer_info) = peer_info_opt {
+                        transport.connect_peer(&peer_info).await
+                    } else {
+                        Err(anyhow::anyhow!("Peer not found in config: {}", peer_id))
+                    };
+
+                    match result {
+                        Ok(Some(conn)) => {
+                            // Success - new connection
+                            let connected_at = Instant::now();
+                            let mesh_conn =
+                                IrohMeshConnection::new(peer_id.clone(), conn, connected_at);
+                            connections
+                                .write()
+                                .unwrap()
+                                .insert(peer_id.clone(), mesh_conn);
+                            reconnection.write().unwrap().reconnected(&peer_id);
+
+                            info!("Reconnected to peer: {} (attempt {})", peer_id, attempt);
+                            emit_event(
+                                PeerEvent::Connected {
+                                    peer_id: peer_id.clone(),
+                                    connected_at,
+                                },
+                                &event_senders,
+                            );
+                        }
+                        Ok(None) => {
+                            // Already connected (they initiated)
+                            reconnection.write().unwrap().reconnected(&peer_id);
+                            info!(
+                                "Peer {} already connected (remote initiated), clearing reconnection",
+                                peer_id
+                            );
+                        }
+                        Err(e) => {
+                            let error_msg = e.to_string();
+                            let will_retry = {
+                                let mut recon = reconnection.write().unwrap();
+                                let will_retry = recon.failed(&peer_id, error_msg.clone());
+                                if !will_retry {
+                                    recon.remove(&peer_id);
+                                }
+                                will_retry
+                            };
+
+                            warn!(
+                                "Reconnection to {} failed (attempt {}): {} - will_retry={}",
+                                peer_id, attempt, error_msg, will_retry
+                            );
+
+                            emit_event(
+                                PeerEvent::ReconnectFailed {
+                                    peer_id: peer_id.clone(),
+                                    attempt,
+                                    error: error_msg,
+                                    will_retry,
+                                },
+                                &event_senders,
+                            );
+                        }
                     }
                 }
             }
 
-            info!("Stopped peer cleanup task");
+            info!("Stopped peer cleanup/reconnection task");
         });
     }
 
@@ -281,12 +437,16 @@ impl MeshTransport for IrohMeshTransport {
 
         // Load static peer config and register peers
         let config = self.peer_config.read().unwrap();
+        let mut static_peers = self.static_peers.write().unwrap();
         for peer_info in &config.peers {
             let node_id = NodeId::new(peer_info.name.clone());
             if let Ok(endpoint_id) = peer_info.endpoint_id() {
-                self.register_peer(node_id, endpoint_id);
+                self.register_peer(node_id.clone(), endpoint_id);
+                // Mark as static peer for reconnection (Issue #253)
+                static_peers.insert(node_id);
             }
         }
+        drop(static_peers);
 
         // Start background cleanup task (Issue #244)
         self.start_cleanup_task();
