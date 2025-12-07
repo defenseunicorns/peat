@@ -580,6 +580,38 @@ impl AiModelPlatform {
         self.status = OperationalStatus::Loading;
         self.inference_count = 0;
     }
+
+    /// Convert to ModelCapability for registry/query operations
+    ///
+    /// Creates a ModelCapability from this platform's current state.
+    pub fn to_model_capability(&self) -> crate::messages::ModelCapability {
+        use crate::messages::{ModelCapability, ModelPerformance};
+
+        let performance = ModelPerformance::new(
+            self.model.precision,
+            self.model.recall,
+            self.model.fps,
+        );
+        let performance = if let Some(latency) = self.model.latency_ms {
+            performance.with_latency(latency)
+        } else {
+            performance
+        };
+
+        let mut cap = ModelCapability::new(
+            &self.model.model_id,
+            &self.model.version,
+            &self.model.model_hash,
+            &self.model.model_type,
+            performance,
+        )
+        .with_status(self.status);
+
+        // Set runtime metrics
+        cap.inference_count = Some(self.inference_count);
+
+        cap
+    }
 }
 
 #[async_trait]

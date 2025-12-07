@@ -14,12 +14,17 @@
 //! the hive-protocol crate, not this application layer.
 
 use hive_protocol::cell::{AggregatedCapability, CapabilityAggregator};
+use hive_protocol::discovery::capability_query::{
+    CapabilityQuery, CapabilityQueryEngine, CapabilityStats, QueryMatch,
+};
 use hive_protocol::models::{CapabilityType, NodeConfig, NodeConfigExt, NodeState, NodeStateExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+use crate::messages::ModelCapability;
 use crate::platform::Platform;
+use crate::registry::ModelQuery;
 use crate::team::Team;
 
 // ============================================================================
@@ -70,6 +75,88 @@ impl std::fmt::Display for FormationCapabilitySummary {
             self.readiness_score * 100.0
         )
     }
+}
+
+// ============================================================================
+// Model Inventory Summary (Formation-level model view)
+// ============================================================================
+
+/// Formation-level AI model inventory
+///
+/// Provides a consolidated view of all AI models across the formation,
+/// supporting Issue #107 Phase 3: Hierarchical Aggregation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelInventorySummary {
+    /// Formation identifier
+    pub formation_id: String,
+    /// Total model instances across formation
+    pub total_models: usize,
+    /// Operational model count (ready, active, or degraded)
+    pub operational_models: usize,
+    /// Models by type (e.g., "detector": 5, "tracker": 3)
+    pub models_by_type: HashMap<String, usize>,
+    /// Models by version (e.g., "object_tracker:1.3.0": 4)
+    pub models_by_version: HashMap<String, usize>,
+    /// Platforms with each model (model_id -> [platform_ids])
+    pub model_platforms: HashMap<String, Vec<String>>,
+    /// Average performance by model type
+    pub avg_performance: HashMap<String, ModelPerformanceStats>,
+    /// Degraded models (platform_id, model_id, reason)
+    pub degraded_models: Vec<DegradedModelInfo>,
+}
+
+/// Aggregated performance statistics for a model type
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelPerformanceStats {
+    /// Average precision across instances
+    pub avg_precision: f64,
+    /// Average recall across instances
+    pub avg_recall: f64,
+    /// Average FPS across instances
+    pub avg_fps: f64,
+    /// Average latency in ms
+    pub avg_latency_ms: Option<f64>,
+    /// Number of instances contributing to these stats
+    pub instance_count: usize,
+}
+
+/// Information about a degraded model
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DegradedModelInfo {
+    /// Platform hosting the degraded model
+    pub platform_id: String,
+    /// Team containing the platform
+    pub team_name: String,
+    /// Model identifier
+    pub model_id: String,
+    /// Model version
+    pub model_version: String,
+    /// Degradation reason if known
+    pub reason: Option<String>,
+}
+
+/// Result of a model query across the formation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelQueryResult {
+    /// Matching platforms with their model capabilities
+    pub matches: Vec<PlatformModelMatch>,
+    /// Total matches found
+    pub total_matches: usize,
+    /// Teams represented in results
+    pub teams: Vec<String>,
+}
+
+/// A platform matching a model query
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlatformModelMatch {
+    /// Platform identifier
+    pub platform_id: String,
+    /// Platform name
+    pub platform_name: String,
+    /// Team name
+    pub team_name: String,
+    /// The matching model capability
+    pub model: ModelCapability,
 }
 
 // ============================================================================
@@ -197,6 +284,289 @@ impl Coordinator {
             readiness_score: self.readiness_score(),
             capability_confidence,
         }
+    }
+
+    // ========================================================================
+    // Model Query API (Issue #107 Phase 3)
+    // ========================================================================
+
+    /// Query models across the formation matching the given criteria
+    ///
+    /// Returns all platforms with models matching the query.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// // Find platforms with object_tracker >= v1.3.0 and precision >= 0.9
+    /// let query = ModelQuery::new()
+    ///     .with_model_id("object_tracker")
+    ///     .with_min_version("1.3.0")
+    ///     .with_min_precision(0.9)
+    ///     .operational();
+    /// let results = coordinator.query_models(&query);
+    /// ```
+    pub fn query_models(&self, query: &ModelQuery) -> ModelQueryResult {
+        let mut matches = Vec::new();
+        let mut teams_seen = Vec::new();
+
+        for team in &self.teams {
+            for platform in &team.members {
+                if let Platform::AiModel(ai_platform) = platform {
+                    let model_cap = ai_platform.to_model_capability();
+                    if query.matches(&model_cap) {
+                        matches.push(PlatformModelMatch {
+                            platform_id: ai_platform.id.clone(),
+                            platform_name: ai_platform.name.clone(),
+                            team_name: team.name.clone(),
+                            model: model_cap,
+                        });
+
+                        if !teams_seen.contains(&team.name) {
+                            teams_seen.push(team.name.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        ModelQueryResult {
+            total_matches: matches.len(),
+            matches,
+            teams: teams_seen,
+        }
+    }
+
+    /// Get a complete model inventory for the formation
+    ///
+    /// Provides aggregated statistics about all AI models across teams.
+    pub fn get_model_inventory(&self) -> ModelInventorySummary {
+        let mut total_models = 0;
+        let mut operational_models = 0;
+        let mut models_by_type: HashMap<String, usize> = HashMap::new();
+        let mut models_by_version: HashMap<String, usize> = HashMap::new();
+        let mut model_platforms: HashMap<String, Vec<String>> = HashMap::new();
+        let mut degraded_models = Vec::new();
+
+        // Collect performance data for averaging
+        let mut perf_by_type: HashMap<String, Vec<(f64, f64, f64, Option<f64>)>> = HashMap::new();
+
+        for team in &self.teams {
+            for platform in &team.members {
+                if let Platform::AiModel(ai_platform) = platform {
+                    let model_cap = ai_platform.to_model_capability();
+                    total_models += 1;
+
+                    // Count operational models
+                    if model_cap.is_operational() {
+                        operational_models += 1;
+                    }
+
+                    // Count by type
+                    *models_by_type.entry(model_cap.model_type.clone()).or_insert(0) += 1;
+
+                    // Count by version
+                    let version_key = format!("{}:{}", model_cap.model_id, model_cap.model_version);
+                    *models_by_version.entry(version_key).or_insert(0) += 1;
+
+                    // Track platforms per model
+                    model_platforms
+                        .entry(model_cap.model_id.clone())
+                        .or_default()
+                        .push(ai_platform.id.clone());
+
+                    // Collect performance data
+                    perf_by_type
+                        .entry(model_cap.model_type.clone())
+                        .or_default()
+                        .push((
+                            model_cap.performance.precision,
+                            model_cap.performance.recall,
+                            model_cap.performance.fps,
+                            model_cap.performance.latency_ms,
+                        ));
+
+                    // Track degraded models
+                    if model_cap.degraded {
+                        degraded_models.push(DegradedModelInfo {
+                            platform_id: ai_platform.id.clone(),
+                            team_name: team.name.clone(),
+                            model_id: model_cap.model_id.clone(),
+                            model_version: model_cap.model_version.clone(),
+                            reason: model_cap.degradation_reason.clone(),
+                        });
+                    }
+                }
+            }
+        }
+
+        // Calculate average performance by type
+        let mut avg_performance = HashMap::new();
+        for (model_type, perfs) in perf_by_type {
+            let count = perfs.len();
+            if count > 0 {
+                let sum_precision: f64 = perfs.iter().map(|(p, _, _, _)| p).sum();
+                let sum_recall: f64 = perfs.iter().map(|(_, r, _, _)| r).sum();
+                let sum_fps: f64 = perfs.iter().map(|(_, _, f, _)| f).sum();
+                let latencies: Vec<f64> = perfs.iter().filter_map(|(_, _, _, l)| *l).collect();
+
+                avg_performance.insert(
+                    model_type,
+                    ModelPerformanceStats {
+                        avg_precision: sum_precision / count as f64,
+                        avg_recall: sum_recall / count as f64,
+                        avg_fps: sum_fps / count as f64,
+                        avg_latency_ms: if latencies.is_empty() {
+                            None
+                        } else {
+                            Some(latencies.iter().sum::<f64>() / latencies.len() as f64)
+                        },
+                        instance_count: count,
+                    },
+                );
+            }
+        }
+
+        ModelInventorySummary {
+            formation_id: self.id.to_string(),
+            total_models,
+            operational_models,
+            models_by_type,
+            models_by_version,
+            model_platforms,
+            avg_performance,
+            degraded_models,
+        }
+    }
+
+    /// Find platforms that can run a specific model
+    ///
+    /// Useful for model deployment planning.
+    pub fn find_platforms_with_model(&self, model_id: &str) -> Vec<PlatformModelMatch> {
+        let query = ModelQuery::new().with_model_id(model_id);
+        self.query_models(&query).matches
+    }
+
+    /// Get all operational models of a specific type
+    pub fn get_operational_models_by_type(&self, model_type: &str) -> Vec<PlatformModelMatch> {
+        let query = ModelQuery::new()
+            .with_model_type(model_type)
+            .operational();
+        self.query_models(&query).matches
+    }
+
+    /// Count platforms meeting minimum model requirements
+    ///
+    /// Useful for capability assessment before tasking.
+    pub fn count_capable_platforms(
+        &self,
+        model_id: &str,
+        min_version: &str,
+        min_precision: f64,
+    ) -> usize {
+        let query = ModelQuery::new()
+            .with_model_id(model_id)
+            .with_min_version(min_version)
+            .with_min_precision(min_precision)
+            .operational();
+        self.query_models(&query).total_matches
+    }
+
+    // ========================================================================
+    // Generic Capability Query API (hive-protocol integration)
+    // ========================================================================
+
+    /// Query platforms by generic capabilities using hive-protocol's CapabilityQuery
+    ///
+    /// This provides a generic query interface that works with any capability
+    /// type defined in the hive-protocol schema.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use hive_protocol::discovery::CapabilityQuery;
+    /// use hive_protocol::models::CapabilityType;
+    ///
+    /// // Find platforms with sensor AND communication capabilities
+    /// let query = CapabilityQuery::builder()
+    ///     .require_type(CapabilityType::Sensor)
+    ///     .require_type(CapabilityType::Communication)
+    ///     .min_confidence(0.8)
+    ///     .build();
+    ///
+    /// let matches = coordinator.query_capabilities(&query);
+    /// for m in &matches {
+    ///     println!("Platform {} (score: {:.2})", m.entity.id, m.score);
+    /// }
+    /// ```
+    pub fn query_capabilities(&self, query: &CapabilityQuery) -> Vec<QueryMatch<NodeConfig>> {
+        let engine = CapabilityQueryEngine::new();
+
+        // Collect all platforms as NodeConfigs
+        let nodes: Vec<NodeConfig> = self
+            .teams
+            .iter()
+            .flat_map(|team| {
+                team.members.iter().map(|platform| {
+                    let (config, _state) = platform_to_node(platform);
+                    config
+                })
+            })
+            .collect();
+
+        engine.query_platforms(query, &nodes)
+    }
+
+    /// Get capability statistics across the formation
+    ///
+    /// Returns aggregated statistics about capability distribution.
+    pub fn get_capability_stats(&self) -> HashMap<CapabilityType, CapabilityStats> {
+        let engine = CapabilityQueryEngine::new();
+
+        let nodes: Vec<NodeConfig> = self
+            .teams
+            .iter()
+            .flat_map(|team| {
+                team.members.iter().map(|platform| {
+                    let (config, _state) = platform_to_node(platform);
+                    config
+                })
+            })
+            .collect();
+
+        engine.platform_capability_stats(&nodes)
+    }
+
+    /// Find platforms with a specific capability type
+    ///
+    /// Convenience method for common single-type queries.
+    pub fn find_platforms_with_capability(
+        &self,
+        cap_type: CapabilityType,
+        min_confidence: f32,
+    ) -> Vec<QueryMatch<NodeConfig>> {
+        let query = CapabilityQuery::builder()
+            .require_type(cap_type)
+            .min_confidence(min_confidence)
+            .build();
+
+        self.query_capabilities(&query)
+    }
+
+    /// Find platforms with multiple required capabilities
+    ///
+    /// Returns platforms that have ALL specified capability types.
+    pub fn find_platforms_with_capabilities(
+        &self,
+        cap_types: &[CapabilityType],
+        min_confidence: f32,
+    ) -> Vec<QueryMatch<NodeConfig>> {
+        let mut builder = CapabilityQuery::builder().min_confidence(min_confidence);
+
+        for cap_type in cap_types {
+            builder = builder.require_type(*cap_type);
+        }
+
+        self.query_capabilities(&builder.build())
     }
 }
 
@@ -454,5 +824,279 @@ mod tests {
         assert!(display.contains("Cameras: 2"));
         assert!(display.contains("Trackers: 2"));
         assert!(display.contains("85%"));
+    }
+
+    // ========================================================================
+    // Model Query Tests (Issue #107 Phase 3)
+    // ========================================================================
+
+    #[test]
+    fn test_query_models_by_id() {
+        let mut coordinator = Coordinator::new("Test Coordinator");
+        coordinator.register_team(create_test_team("Alpha", true));
+        coordinator.register_team(create_test_team("Bravo", false));
+
+        let query = ModelQuery::new().with_model_id("object_tracker");
+        let results = coordinator.query_models(&query);
+
+        assert_eq!(results.total_matches, 2);
+        assert_eq!(results.teams.len(), 2);
+    }
+
+    #[test]
+    fn test_query_models_by_version() {
+        let mut coordinator = Coordinator::new("Test Coordinator");
+        coordinator.register_team(create_test_team("Alpha", true));
+        coordinator.register_team(create_test_team("Bravo", false));
+
+        // Both teams have v1.2.0
+        let query = ModelQuery::new()
+            .with_model_id("object_tracker")
+            .with_min_version("1.2.0");
+        let results = coordinator.query_models(&query);
+        assert_eq!(results.total_matches, 2);
+
+        // Neither team has v2.0.0
+        let query = ModelQuery::new()
+            .with_model_id("object_tracker")
+            .with_min_version("2.0.0");
+        let results = coordinator.query_models(&query);
+        assert_eq!(results.total_matches, 0);
+    }
+
+    #[test]
+    fn test_query_models_by_type() {
+        let mut coordinator = Coordinator::new("Test Coordinator");
+        coordinator.register_team(create_test_team("Alpha", true));
+
+        let query = ModelQuery::new().with_model_type("detector_tracker");
+        let results = coordinator.query_models(&query);
+        assert_eq!(results.total_matches, 1);
+
+        let query = ModelQuery::new().with_model_type("classifier");
+        let results = coordinator.query_models(&query);
+        assert_eq!(results.total_matches, 0);
+    }
+
+    #[test]
+    fn test_get_model_inventory() {
+        let mut coordinator = Coordinator::new("Test Coordinator");
+        coordinator.register_team(create_test_team("Alpha", true));
+        coordinator.register_team(create_test_team("Bravo", false));
+
+        let inventory = coordinator.get_model_inventory();
+
+        assert_eq!(inventory.total_models, 2);
+        assert!(inventory.models_by_type.contains_key("detector_tracker"));
+        assert_eq!(inventory.models_by_type["detector_tracker"], 2);
+        assert!(inventory.models_by_version.contains_key("object_tracker:1.2.0"));
+        assert!(inventory.avg_performance.contains_key("detector_tracker"));
+    }
+
+    #[test]
+    fn test_find_platforms_with_model() {
+        let mut coordinator = Coordinator::new("Test Coordinator");
+        coordinator.register_team(create_test_team("Alpha", true));
+        coordinator.register_team(create_test_team("Bravo", false));
+
+        let matches = coordinator.find_platforms_with_model("object_tracker");
+        assert_eq!(matches.len(), 2);
+
+        let matches = coordinator.find_platforms_with_model("nonexistent");
+        assert_eq!(matches.len(), 0);
+    }
+
+    #[test]
+    fn test_count_capable_platforms() {
+        let mut coordinator = Coordinator::new("Test Coordinator");
+        coordinator.register_team(create_test_team("Alpha", true));
+        coordinator.register_team(create_test_team("Bravo", false));
+
+        // Models are in Loading state by default, so won't match operational query
+        // Let's test the query still works
+        let count = coordinator.count_capable_platforms("object_tracker", "1.0.0", 0.8);
+        // Loading state is not operational, so count should be 0
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_get_operational_models_by_type() {
+        let mut coordinator = Coordinator::new("Test Coordinator");
+        coordinator.register_team(create_test_team("Alpha", true));
+
+        // Models start in Loading state
+        let matches = coordinator.get_operational_models_by_type("detector_tracker");
+        assert_eq!(matches.len(), 0); // Loading is not operational
+    }
+
+    #[test]
+    fn test_model_query_result_structure() {
+        let mut coordinator = Coordinator::new("Test Coordinator");
+        coordinator.register_team(create_test_team("Alpha", true));
+
+        let query = ModelQuery::new().with_model_id("object_tracker");
+        let results = coordinator.query_models(&query);
+
+        assert_eq!(results.total_matches, 1);
+        assert_eq!(results.matches.len(), 1);
+
+        let m = &results.matches[0];
+        assert_eq!(m.team_name, "Alpha Team");
+        assert_eq!(m.model.model_id, "object_tracker");
+        assert_eq!(m.model.model_version, "1.2.0");
+    }
+
+    // ========================================================================
+    // Generic Capability Query Tests (hive-protocol integration)
+    // ========================================================================
+
+    #[test]
+    fn test_query_capabilities_with_sensor() {
+        use super::CapabilityQuery;
+
+        let mut coordinator = Coordinator::new("Test Coordinator");
+        coordinator.register_team(create_test_team("Alpha", true)); // UAV with EO/IR sensor
+
+        // Query for sensor capabilities
+        let query = CapabilityQuery::builder()
+            .require_type(CapabilityType::Sensor)
+            .build();
+
+        let matches = coordinator.query_capabilities(&query);
+
+        // UAV has sensor capability
+        assert!(!matches.is_empty());
+        // Matches should be sorted by score
+        if matches.len() > 1 {
+            assert!(matches[0].score >= matches[1].score);
+        }
+    }
+
+    #[test]
+    fn test_query_capabilities_with_compute() {
+        use super::CapabilityQuery;
+
+        let mut coordinator = Coordinator::new("Test Coordinator");
+        coordinator.register_team(create_test_team("Alpha", true));
+
+        // Query for compute capabilities (AI models have compute)
+        let query = CapabilityQuery::builder()
+            .require_type(CapabilityType::Compute)
+            .build();
+
+        let matches = coordinator.query_capabilities(&query);
+        assert!(!matches.is_empty());
+    }
+
+    #[test]
+    fn test_query_capabilities_multiple_types() {
+        use super::CapabilityQuery;
+
+        let mut coordinator = Coordinator::new("Test Coordinator");
+        coordinator.register_team(create_test_team("Alpha", true));
+
+        // Query for platforms with both sensor AND communication
+        let query = CapabilityQuery::builder()
+            .require_type(CapabilityType::Sensor)
+            .require_type(CapabilityType::Communication)
+            .build();
+
+        let matches = coordinator.query_capabilities(&query);
+        // Vehicles have both sensor and communication
+        assert!(!matches.is_empty());
+    }
+
+    #[test]
+    fn test_query_capabilities_with_confidence() {
+        use super::CapabilityQuery;
+
+        let mut coordinator = Coordinator::new("Test Coordinator");
+        coordinator.register_team(create_test_team("Alpha", true));
+
+        // Query with high confidence requirement
+        let query = CapabilityQuery::builder()
+            .require_type(CapabilityType::Sensor)
+            .min_confidence(0.9)
+            .build();
+
+        let high_conf_matches = coordinator.query_capabilities(&query);
+
+        // Query with low confidence requirement
+        let query = CapabilityQuery::builder()
+            .require_type(CapabilityType::Sensor)
+            .min_confidence(0.1)
+            .build();
+
+        let low_conf_matches = coordinator.query_capabilities(&query);
+
+        // Low confidence should match at least as many as high confidence
+        assert!(low_conf_matches.len() >= high_conf_matches.len());
+    }
+
+    #[test]
+    fn test_get_capability_stats() {
+        let mut coordinator = Coordinator::new("Test Coordinator");
+        coordinator.register_team(create_test_team("Alpha", true));
+        coordinator.register_team(create_test_team("Bravo", false));
+
+        let stats = coordinator.get_capability_stats();
+
+        // Should have stats for multiple capability types
+        assert!(!stats.is_empty());
+
+        // Communication should be present (all platforms have it)
+        if let Some(comm_stats) = stats.get(&CapabilityType::Communication) {
+            assert!(comm_stats.count >= 2);
+            assert!(comm_stats.avg_confidence > 0.0);
+        }
+    }
+
+    #[test]
+    fn test_find_platforms_with_capability() {
+        let mut coordinator = Coordinator::new("Test Coordinator");
+        coordinator.register_team(create_test_team("Alpha", true));
+
+        // Find platforms with sensor capability
+        let matches = coordinator.find_platforms_with_capability(CapabilityType::Sensor, 0.5);
+        assert!(!matches.is_empty());
+
+        // Each match should have a score
+        for m in &matches {
+            assert!(m.score > 0.0);
+            assert!(m.score <= 1.0);
+        }
+    }
+
+    #[test]
+    fn test_find_platforms_with_capabilities() {
+        let mut coordinator = Coordinator::new("Test Coordinator");
+        coordinator.register_team(create_test_team("Alpha", true));
+
+        // Find platforms with both sensor and communication
+        let cap_types = vec![CapabilityType::Sensor, CapabilityType::Communication];
+        let matches = coordinator.find_platforms_with_capabilities(&cap_types, 0.5);
+
+        // Should find vehicle platforms that have both
+        for m in &matches {
+            // Verify the platform has capabilities (it matched the query)
+            assert!(m.score > 0.0);
+        }
+    }
+
+    #[test]
+    fn test_capability_query_empty_formation() {
+        use super::CapabilityQuery;
+
+        let coordinator = Coordinator::new("Empty Coordinator");
+
+        let query = CapabilityQuery::builder()
+            .require_type(CapabilityType::Sensor)
+            .build();
+
+        let matches = coordinator.query_capabilities(&query);
+        assert!(matches.is_empty());
+
+        let stats = coordinator.get_capability_stats();
+        assert!(stats.is_empty());
     }
 }
