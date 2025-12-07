@@ -400,6 +400,129 @@ impl CompositionRule for StrikeChainRule {
     }
 }
 
+/// Rule for detecting authorization coverage capability
+///
+/// Checks if the composition has human-in-the-loop authorization coverage.
+/// Requires: Communication capability + Node with bound Operator having sufficient authority
+/// Emergent capability: Authorization/command coverage for the party
+pub struct AuthorizationCoverageRule {
+    /// Minimum authority level required
+    min_authority: crate::models::AuthorityLevel,
+}
+
+impl AuthorizationCoverageRule {
+    /// Create a new authorization coverage rule
+    pub fn new(min_authority: crate::models::AuthorityLevel) -> Self {
+        Self { min_authority }
+    }
+
+    /// Create rule requiring Commander authority (for lethal/critical actions)
+    pub fn commander_required() -> Self {
+        Self::new(crate::models::AuthorityLevel::Commander)
+    }
+
+    /// Create rule requiring Supervisor authority (for general override)
+    pub fn supervisor_required() -> Self {
+        Self::new(crate::models::AuthorityLevel::Supervisor)
+    }
+}
+
+impl Default for AuthorizationCoverageRule {
+    fn default() -> Self {
+        Self::commander_required()
+    }
+}
+
+#[async_trait]
+impl CompositionRule for AuthorizationCoverageRule {
+    fn name(&self) -> &str {
+        "authorization_coverage"
+    }
+
+    fn description(&self) -> &str {
+        "Detects authorization coverage from communication + human operator with sufficient authority"
+    }
+
+    fn applies_to(&self, capabilities: &[Capability]) -> bool {
+        // Requires at least Communication capability
+        // The actual authority check happens in compose() using context.node_configs
+        capabilities
+            .iter()
+            .any(|c| c.get_capability_type() == CapabilityType::Communication)
+    }
+
+    async fn compose(
+        &self,
+        capabilities: &[Capability],
+        context: &CompositionContext,
+    ) -> Result<CompositionResult> {
+        use crate::models::{AuthorityLevelExt, HumanMachinePairExt};
+
+        // Find best communication capability
+        let best_comms = capabilities
+            .iter()
+            .filter(|c| c.get_capability_type() == CapabilityType::Communication)
+            .max_by(|a, b| a.confidence.partial_cmp(&b.confidence).unwrap());
+
+        // Check for operator with sufficient authority
+        let max_authority = context.max_authority();
+
+        let has_sufficient_authority = max_authority
+            .map(|auth| auth >= self.min_authority)
+            .unwrap_or(false);
+
+        if let (Some(comms), true) = (best_comms, has_sufficient_authority) {
+            let authority = max_authority.unwrap();
+            let auth_score = authority.to_score() as f32;
+
+            // Confidence is combination of comms quality and authority level
+            let coverage_confidence = (comms.confidence * 0.4 + auth_score * 0.6).min(1.0);
+
+            let mut composed = Capability::new(
+                format!("emergent_auth_coverage_{}", uuid::Uuid::new_v4()),
+                "Authorization Coverage".to_string(),
+                CapabilityType::Emergent,
+                coverage_confidence,
+            );
+
+            // Find the node with the authorizing operator
+            let authorizing_node = context
+                .node_configs
+                .iter()
+                .find(|config| {
+                    config
+                        .operator_binding
+                        .as_ref()
+                        .and_then(|b| b.max_authority())
+                        .map(|a| a >= self.min_authority)
+                        .unwrap_or(false)
+                })
+                .map(|c| c.id.clone());
+
+            composed.metadata_json = serde_json::to_string(&json!({
+                "composition_type": "emergent",
+                "pattern": "authorization_coverage",
+                "components": {
+                    "communication": comms.id,
+                    "authorizing_node": authorizing_node,
+                },
+                "authority_level": format!("{:?}", authority),
+                "authorization_bonus": context.authorization_bonus(),
+                "can_authorize_strike": authority == crate::models::AuthorityLevel::Commander,
+                "description": "Human-in-the-loop authorization capability"
+            }))
+            .unwrap_or_default();
+
+            let contributors = vec![comms.id.clone()];
+
+            return Ok(CompositionResult::new(vec![composed], coverage_confidence)
+                .with_contributors(contributors));
+        }
+
+        Ok(CompositionResult::new(vec![], 0.0))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -600,5 +723,162 @@ mod tests {
         // Emergent confidence should be limited by weakest link
         let composed = &result.composed_capabilities[0];
         assert_eq!(composed.confidence, 0.5);
+    }
+
+    #[tokio::test]
+    async fn test_authorization_coverage_with_commander() {
+        use crate::models::{
+            AuthorityLevel, HumanMachinePair, HumanMachinePairExt, NodeConfig, NodeConfigExt,
+            Operator, OperatorExt, OperatorRank,
+        };
+
+        let rule = AuthorizationCoverageRule::default();
+
+        // Create communication capability
+        let comms = Capability::new(
+            "radio1".to_string(),
+            "Tactical Radio".to_string(),
+            CapabilityType::Communication,
+            0.9,
+        );
+
+        let caps = vec![comms];
+
+        // Create a node with a Commander-level operator
+        let operator = Operator::new(
+            "op1".to_string(),
+            "CPT Smith".to_string(),
+            OperatorRank::O3,
+            AuthorityLevel::Commander,
+            "11A".to_string(),
+        );
+
+        let binding = HumanMachinePair::one_to_one(operator, "node1".to_string());
+        let config = NodeConfig::with_operator("Command Post".to_string(), binding);
+
+        let context =
+            CompositionContext::new(vec!["node1".to_string()]).with_node_configs(vec![config]);
+
+        assert!(rule.applies_to(&caps));
+        assert!(context.has_commander());
+        assert_eq!(context.authorization_bonus(), 4); // Commander = 0.8 * 5 = 4
+
+        let result = rule.compose(&caps, &context).await.unwrap();
+        assert!(result.has_compositions());
+
+        let composed = &result.composed_capabilities[0];
+        assert_eq!(composed.name, "Authorization Coverage");
+
+        let metadata: Value = serde_json::from_str(&composed.metadata_json).unwrap();
+        assert!(metadata["can_authorize_strike"].as_bool().unwrap());
+        assert_eq!(metadata["authorization_bonus"].as_i64().unwrap(), 4);
+    }
+
+    #[tokio::test]
+    async fn test_authorization_coverage_without_operator() {
+        let rule = AuthorizationCoverageRule::default();
+
+        let comms = Capability::new(
+            "radio1".to_string(),
+            "Autonomous Radio".to_string(),
+            CapabilityType::Communication,
+            0.9,
+        );
+
+        let caps = vec![comms];
+
+        // No operator binding
+        let context = CompositionContext::new(vec!["node1".to_string()]);
+
+        assert!(rule.applies_to(&caps));
+        assert!(!context.has_commander());
+        assert_eq!(context.authorization_bonus(), 0);
+
+        let result = rule.compose(&caps, &context).await.unwrap();
+        assert!(!result.has_compositions()); // No authorization without human
+    }
+
+    #[tokio::test]
+    async fn test_authorization_coverage_supervisor_level() {
+        use crate::models::{
+            AuthorityLevel, HumanMachinePair, HumanMachinePairExt, NodeConfig, NodeConfigExt,
+            Operator, OperatorExt, OperatorRank,
+        };
+
+        // Use supervisor-level rule
+        let rule = AuthorizationCoverageRule::supervisor_required();
+
+        let comms = Capability::new(
+            "radio1".to_string(),
+            "Radio".to_string(),
+            CapabilityType::Communication,
+            0.85,
+        );
+
+        let caps = vec![comms];
+
+        // Create a node with Supervisor authority (not Commander)
+        let operator = Operator::new(
+            "op1".to_string(),
+            "SGT Jones".to_string(),
+            OperatorRank::E5,
+            AuthorityLevel::Supervisor,
+            "11B".to_string(),
+        );
+
+        let binding = HumanMachinePair::one_to_one(operator, "node1".to_string());
+        let config = NodeConfig::with_operator("Control Station".to_string(), binding);
+
+        let context =
+            CompositionContext::new(vec!["node1".to_string()]).with_node_configs(vec![config]);
+
+        // Supervisor level rule should find coverage
+        let result = rule.compose(&caps, &context).await.unwrap();
+        assert!(result.has_compositions());
+
+        let composed = &result.composed_capabilities[0];
+        let metadata: Value = serde_json::from_str(&composed.metadata_json).unwrap();
+        // Supervisor can't authorize strikes
+        assert!(!metadata["can_authorize_strike"].as_bool().unwrap());
+        // Supervisor = 0.5 * 5 = 2.5 rounds to 2 or 3
+        assert!(metadata["authorization_bonus"].as_i64().unwrap() >= 2);
+    }
+
+    #[tokio::test]
+    async fn test_authorization_coverage_insufficient_authority() {
+        use crate::models::{
+            AuthorityLevel, HumanMachinePair, HumanMachinePairExt, NodeConfig, NodeConfigExt,
+            Operator, OperatorExt, OperatorRank,
+        };
+
+        // Commander-level rule (default)
+        let rule = AuthorizationCoverageRule::default();
+
+        let comms = Capability::new(
+            "radio1".to_string(),
+            "Radio".to_string(),
+            CapabilityType::Communication,
+            0.9,
+        );
+
+        let caps = vec![comms];
+
+        // Only Advisor authority - not sufficient for Commander requirement
+        let operator = Operator::new(
+            "op1".to_string(),
+            "SPC Brown".to_string(),
+            OperatorRank::E4,
+            AuthorityLevel::Advisor,
+            "11B".to_string(),
+        );
+
+        let binding = HumanMachinePair::one_to_one(operator, "node1".to_string());
+        let config = NodeConfig::with_operator("Observation Post".to_string(), binding);
+
+        let context =
+            CompositionContext::new(vec!["node1".to_string()]).with_node_configs(vec![config]);
+
+        let result = rule.compose(&caps, &context).await.unwrap();
+        assert!(!result.has_compositions()); // Advisor can't satisfy Commander requirement
     }
 }

@@ -8,3 +8,8 @@ ratatui = "0.28"
 crossterm = "0.28"
 rand = "0.8"
 noise = "0.9"
+serde_json = "1.0"
+futures = "0.3"
+
+# HIVE Protocol integration
+hive-protocol = { path = "../hive-protocol" }
