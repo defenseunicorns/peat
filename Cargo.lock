@@ -2187,6 +2187,7 @@ name = "hive-commander"
 version = "0.1.0"
 dependencies = [
  "crossterm",
+ "futures",
  "hive-protocol",
  "noise",
  "rand 0.8.5",

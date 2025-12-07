@@ -14,6 +14,10 @@
 
 mod protocol_types;
 
+use protocol_types::{
+    EmergentCapabilityDetector, EmergentCapabilityType, PieceToProtocol, ProtocolBonusCalculator,
+};
+
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -527,7 +531,7 @@ impl GameState {
         }
     }
 
-    /// Compute composed capabilities from piece positions
+    /// Compute composed capabilities from piece positions using protocol types
     fn recompute_capabilities(&mut self) {
         self.capabilities.clear();
 
@@ -563,19 +567,16 @@ impl GameState {
                 }
             }
 
-            // Compute aggregated capabilities
-            let mut detect = 0;
-            let mut track = 0;
-            let mut strike = 0;
-            let mut recon = 0;
-            let mut authorize = 0;
-            let mut relay = 0;
+            // Collect piece data for this group
             let mut total_fuel = 0;
             let mut max_fuel = 0;
             let mut sum_x = 0;
             let mut sum_y = 0;
-
             let piece_ids: Vec<usize> = group.iter().map(|&idx| blue_pieces[idx].id).collect();
+
+            // Convert pieces to protocol types
+            let mut all_capabilities = Vec::new();
+            let mut node_configs = Vec::new();
 
             for &idx in &group {
                 let piece = blue_pieces[idx];
@@ -584,53 +585,60 @@ impl GameState {
                 total_fuel += piece.fuel;
                 max_fuel += piece.max_fuel;
 
-                match piece.piece_type {
-                    PieceType::Sensor(mode) => {
-                        detect += 3;
-                        track += 2;
-                        // Bonus for specific modes
-                        if mode == DetectionMode::Radar {
-                            detect += 1;
-                        }
-                    }
-                    PieceType::Scout => {
-                        recon += 3;
-                        detect += 1;
-                    }
-                    PieceType::Striker => {
-                        strike += 3;
-                    }
-                    PieceType::Support => {
-                        relay += 3;
-                    }
-                    PieceType::Authority => {
-                        authorize += 4;
-                        strike += 1; // Can authorize strikes
-                    }
-                }
+                // Convert to protocol types
+                let config = piece.to_node_config();
+                let caps = piece.to_capabilities();
+
+                node_configs.push(config);
+                all_capabilities.extend(caps);
             }
 
-            // Synergy bonuses
-            if group.len() >= 2 {
-                detect += 1; // Multi-sensor fusion
-            }
+            // Use ProtocolBonusCalculator for all bonuses
+            let detect = ProtocolBonusCalculator::detect_bonus(&all_capabilities);
+            let track = ProtocolBonusCalculator::track_bonus(&all_capabilities);
+            let mut strike = ProtocolBonusCalculator::strike_bonus(&all_capabilities);
+            let recon = ProtocolBonusCalculator::recon_bonus(&all_capabilities);
+            let authorize = ProtocolBonusCalculator::authorize_bonus(&node_configs);
+            let relay = ProtocolBonusCalculator::relay_bonus(&all_capabilities);
+
+            // Synergy bonuses (these could also be moved to composition rules)
+            let detect = if group.len() >= 2 {
+                detect + 1 // Multi-sensor fusion
+            } else {
+                detect
+            };
+
             if authorize > 0 && strike > 0 {
                 strike += 2; // Authorized strike bonus
             }
 
-            let name = format!(
-                "{}-{}",
-                if strike >= 3 {
-                    "STRIKE"
-                } else if detect >= 3 {
-                    "ISR"
-                } else if recon >= 3 {
-                    "RECON"
-                } else {
-                    "TASK"
-                },
-                cap_id + 1
-            );
+            // Use composition engine to detect emergent capabilities
+            let emergent_caps =
+                EmergentCapabilityDetector::detect_sync(&all_capabilities, &node_configs);
+
+            // Name based on detected emergent capabilities
+            let capability_type = if emergent_caps
+                .iter()
+                .any(|e| matches!(e, EmergentCapabilityType::StrikeChain { .. }))
+            {
+                "STRIKE"
+            } else if emergent_caps
+                .iter()
+                .any(|e| matches!(e, EmergentCapabilityType::IsrChain { .. }))
+            {
+                "ISR"
+            } else if recon >= 3 {
+                "RECON"
+            } else if emergent_caps
+                .iter()
+                .any(|e| matches!(e, EmergentCapabilityType::AuthorizationCoverage { .. }))
+            {
+                "CMD"
+            } else {
+                "TASK"
+            };
+
+            let name = format!("{}-{}", capability_type, cap_id + 1);
 
             self.capabilities.push(ComposedCapability {
                 id: cap_id,

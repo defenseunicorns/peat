@@ -246,6 +246,84 @@ impl ProtocolBonusCalculator {
     }
 }
 
+/// Emergent capability detection using the composition engine
+pub struct EmergentCapabilityDetector;
+
+/// Types of emergent capabilities that can be detected
+#[derive(Debug, Clone, PartialEq)]
+pub enum EmergentCapabilityType {
+    /// ISR chain: Sensor + Compute + Communication
+    IsrChain { confidence: f32 },
+    /// Strike chain: ISR + Payload + BDA sensor (requires human approval)
+    StrikeChain { confidence: f32 },
+    /// Authorization coverage: Communication + Operator with authority
+    AuthorizationCoverage { bonus: i32 },
+}
+
+impl EmergentCapabilityDetector {
+    /// Detect emergent capabilities from a set of protocol capabilities
+    pub async fn detect(
+        capabilities: &[Capability],
+        node_configs: &[NodeConfig],
+    ) -> Vec<EmergentCapabilityType> {
+        use hive_protocol::composition::{
+            emergent::{AuthorizationCoverageRule, IsrChainRule, StrikeChainRule},
+            CompositionContext, CompositionRule,
+        };
+
+        let mut detected = Vec::new();
+        let node_ids: Vec<String> = node_configs.iter().map(|c| c.id.clone()).collect();
+        let context = CompositionContext::new(node_ids).with_node_configs(node_configs.to_vec());
+
+        // Check for ISR Chain
+        let isr_rule = IsrChainRule::default();
+        if isr_rule.applies_to(capabilities) {
+            if let Ok(result) = isr_rule.compose(capabilities, &context).await {
+                if result.has_compositions() {
+                    detected.push(EmergentCapabilityType::IsrChain {
+                        confidence: result.confidence,
+                    });
+                }
+            }
+        }
+
+        // Check for Strike Chain
+        let strike_rule = StrikeChainRule::default();
+        if strike_rule.applies_to(capabilities) {
+            if let Ok(result) = strike_rule.compose(capabilities, &context).await {
+                if result.has_compositions() {
+                    detected.push(EmergentCapabilityType::StrikeChain {
+                        confidence: result.confidence,
+                    });
+                }
+            }
+        }
+
+        // Check for Authorization Coverage
+        let auth_rule = AuthorizationCoverageRule::default();
+        if auth_rule.applies_to(capabilities) {
+            if let Ok(result) = auth_rule.compose(capabilities, &context).await {
+                if result.has_compositions() {
+                    detected.push(EmergentCapabilityType::AuthorizationCoverage {
+                        bonus: context.authorization_bonus(),
+                    });
+                }
+            }
+        }
+
+        detected
+    }
+
+    /// Synchronous wrapper for detect (blocks on async)
+    pub fn detect_sync(
+        capabilities: &[Capability],
+        node_configs: &[NodeConfig],
+    ) -> Vec<EmergentCapabilityType> {
+        // Use a simple blocking approach since we're in a game loop
+        futures::executor::block_on(Self::detect(capabilities, node_configs))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
