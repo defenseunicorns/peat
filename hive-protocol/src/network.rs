@@ -22,6 +22,9 @@ pub mod peer_config;
 #[cfg(feature = "automerge-backend")]
 pub use formation_handshake::{perform_initiator_handshake, perform_responder_handshake};
 #[cfg(feature = "automerge-backend")]
-pub use iroh_transport::IrohTransport;
+pub use iroh_transport::{
+    IrohTransport, TransportEventReceiver, TransportEventSender, TransportPeerEvent,
+    TRANSPORT_EVENT_CHANNEL_CAPACITY,
+};
 #[cfg(feature = "automerge-backend")]
 pub use peer_config::{FormationConfig, LocalConfig, PeerConfig, PeerInfo};
