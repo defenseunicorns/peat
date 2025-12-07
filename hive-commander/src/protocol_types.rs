@@ -4,12 +4,22 @@
 //! (NodeConfig, Capability, Operator).
 
 use hive_protocol::models::{
-    AuthorityLevel, Capability, CapabilityExt, CapabilityType, HumanMachinePair,
+    AuthorityLevel, Capability, CapabilityExt, CapabilityType, Domain, DomainSet, HumanMachinePair,
     HumanMachinePairExt, NodeConfig, NodeConfigExt, Operator, OperatorExt, OperatorRank,
+    SensorType,
 };
 use serde_json::json;
 
 use crate::{DetectionMode, Piece, PieceType};
+
+/// Extension trait for pieces with domain information
+pub trait PieceDomain {
+    /// Get the primary operating domain for this piece
+    fn domain(&self) -> Domain;
+
+    /// Get all domains this piece's sensors can detect
+    fn detection_domains(&self) -> DomainSet;
+}
 
 /// Extension trait to convert game types to protocol types
 pub trait PieceToProtocol {
@@ -58,6 +68,8 @@ impl PieceToProtocol for Piece {
     fn to_capabilities(&self) -> Vec<Capability> {
         match self.piece_type {
             PieceType::Sensor(mode) => {
+                let sensor_type = mode.to_sensor_type();
+                let detection_domains = sensor_type.detection_domains();
                 let mut cap = Capability::new(
                     format!("sensor_{}_{}", self.id, mode.name().to_lowercase()),
                     format!("{} Sensor", mode.name()),
@@ -65,9 +77,10 @@ impl PieceToProtocol for Piece {
                     0.9, // High confidence
                 );
                 cap.metadata_json = serde_json::to_string(&json!({
-                    "sensor_type": mode.name().to_lowercase(),
+                    "sensor_type": mode.sensor_type(),
                     "range": mode.range(),
-                    "detection_mode": mode.name()
+                    "detection_mode": mode.name(),
+                    "detection_domains": detection_domains.to_vec().iter().map(|d| d.name().to_lowercase()).collect::<Vec<_>>()
                 }))
                 .unwrap_or_default();
                 vec![cap]
@@ -131,6 +144,35 @@ impl PieceToProtocol for Piece {
     }
 }
 
+impl PieceDomain for Piece {
+    fn domain(&self) -> Domain {
+        match self.piece_type {
+            // Sensors operate based on detection mode
+            PieceType::Sensor(mode) => match mode {
+                DetectionMode::Acoustic => Domain::Subsurface, // Primarily underwater
+                _ => Domain::Air,                              // Most sensors are airborne
+            },
+            PieceType::Scout => Domain::Air,   // Drones are airborne
+            PieceType::Striker => Domain::Air, // Strike drones are airborne
+            PieceType::Support => Domain::Surface, // Support is ground-based
+            PieceType::Authority => Domain::Surface, // Command posts are ground-based
+        }
+    }
+
+    fn detection_domains(&self) -> DomainSet {
+        match self.piece_type {
+            PieceType::Sensor(mode) => mode.to_sensor_type().detection_domains(),
+            PieceType::Scout => {
+                // Scouts have basic EO sensors
+                SensorType::ElectroOptical.detection_domains()
+            }
+            PieceType::Striker => DomainSet::empty(), // Strikers don't detect
+            PieceType::Support => DomainSet::empty(), // Support doesn't detect
+            PieceType::Authority => DomainSet::empty(), // Authority doesn't detect
+        }
+    }
+}
+
 /// Convert detection mode to sensor type string
 impl DetectionMode {
     pub fn sensor_type(self) -> &'static str {
@@ -140,6 +182,17 @@ impl DetectionMode {
             DetectionMode::Radar => "radar",
             DetectionMode::Acoustic => "acoustic",
             DetectionMode::SIGINT => "signals_intelligence",
+        }
+    }
+
+    /// Convert to protocol SensorType
+    pub fn to_sensor_type(self) -> SensorType {
+        match self {
+            DetectionMode::EO => SensorType::ElectroOptical,
+            DetectionMode::IR => SensorType::Infrared,
+            DetectionMode::Radar => SensorType::Radar,
+            DetectionMode::Acoustic => SensorType::Acoustic,
+            DetectionMode::SIGINT => SensorType::Sigint,
         }
     }
 }
@@ -258,6 +311,8 @@ pub enum EmergentCapabilityType {
     StrikeChain { confidence: f32 },
     /// Authorization coverage: Communication + Operator with authority
     AuthorizationCoverage { bonus: i32 },
+    /// Multi-domain coverage: Sensors covering multiple domains (air/surface/subsurface)
+    MultiDomainCoverage { domain_count: usize, bonus: i32 },
 }
 
 impl EmergentCapabilityDetector {
@@ -267,7 +322,9 @@ impl EmergentCapabilityDetector {
         node_configs: &[NodeConfig],
     ) -> Vec<EmergentCapabilityType> {
         use hive_protocol::composition::{
-            emergent::{AuthorizationCoverageRule, IsrChainRule, StrikeChainRule},
+            emergent::{
+                AuthorizationCoverageRule, IsrChainRule, MultiDomainCoverageRule, StrikeChainRule,
+            },
             CompositionContext, CompositionRule,
         };
 
@@ -306,6 +363,35 @@ impl EmergentCapabilityDetector {
                 if result.has_compositions() {
                     detected.push(EmergentCapabilityType::AuthorizationCoverage {
                         bonus: context.authorization_bonus(),
+                    });
+                }
+            }
+        }
+
+        // Check for Multi-Domain Coverage (dual domain first, then full spectrum)
+        let dual_domain_rule = MultiDomainCoverageRule::dual_domain();
+        if dual_domain_rule.applies_to(capabilities) {
+            if let Ok(result) = dual_domain_rule.compose(capabilities, &context).await {
+                if result.has_compositions() {
+                    // Check if we have full spectrum coverage
+                    let full_spectrum_rule = MultiDomainCoverageRule::full_spectrum();
+                    let domain_count = if let Ok(full_result) =
+                        full_spectrum_rule.compose(capabilities, &context).await
+                    {
+                        if full_result.has_compositions() {
+                            3
+                        } else {
+                            2
+                        }
+                    } else {
+                        2
+                    };
+
+                    // Bonus: +2 per domain covered
+                    let bonus = (domain_count * 2) as i32;
+                    detected.push(EmergentCapabilityType::MultiDomainCoverage {
+                        domain_count,
+                        bonus,
                     });
                 }
             }
@@ -508,5 +594,194 @@ mod tests {
 
         // One striker = 3
         assert_eq!(bonus, 3);
+    }
+
+    #[test]
+    fn test_piece_domain_sensor() {
+        let radar_piece = Piece {
+            id: 10,
+            piece_type: PieceType::Sensor(DetectionMode::Radar),
+            team: Team::Blue,
+            x: 0,
+            y: 0,
+            fuel: 100,
+            max_fuel: 100,
+        };
+
+        let acoustic_piece = Piece {
+            id: 11,
+            piece_type: PieceType::Sensor(DetectionMode::Acoustic),
+            team: Team::Blue,
+            x: 0,
+            y: 0,
+            fuel: 100,
+            max_fuel: 100,
+        };
+
+        // Radar is airborne
+        assert_eq!(radar_piece.domain(), Domain::Air);
+        // Acoustic is subsurface
+        assert_eq!(acoustic_piece.domain(), Domain::Subsurface);
+    }
+
+    #[test]
+    fn test_piece_detection_domains() {
+        let radar_piece = Piece {
+            id: 12,
+            piece_type: PieceType::Sensor(DetectionMode::Radar),
+            team: Team::Blue,
+            x: 0,
+            y: 0,
+            fuel: 100,
+            max_fuel: 100,
+        };
+
+        let acoustic_piece = Piece {
+            id: 13,
+            piece_type: PieceType::Sensor(DetectionMode::Acoustic),
+            team: Team::Blue,
+            x: 0,
+            y: 0,
+            fuel: 100,
+            max_fuel: 100,
+        };
+
+        // Radar detects air and surface
+        let radar_domains = radar_piece.detection_domains();
+        assert!(radar_domains.contains(Domain::Air));
+        assert!(radar_domains.contains(Domain::Surface));
+        assert!(!radar_domains.contains(Domain::Subsurface));
+
+        // Acoustic detects all domains (sound propagates everywhere)
+        let acoustic_domains = acoustic_piece.detection_domains();
+        assert!(acoustic_domains.contains(Domain::Subsurface));
+        assert!(acoustic_domains.contains(Domain::Surface));
+        assert!(acoustic_domains.contains(Domain::Air));
+    }
+
+    #[test]
+    fn test_sensor_capability_has_detection_domains() {
+        let radar_piece = Piece {
+            id: 14,
+            piece_type: PieceType::Sensor(DetectionMode::Radar),
+            team: Team::Blue,
+            x: 0,
+            y: 0,
+            fuel: 100,
+            max_fuel: 100,
+        };
+
+        let caps = radar_piece.to_capabilities();
+        assert_eq!(caps.len(), 1);
+
+        let metadata: serde_json::Value = serde_json::from_str(&caps[0].metadata_json).unwrap();
+        let detection_domains = metadata["detection_domains"].as_array().unwrap();
+
+        // Radar should have air and surface
+        assert!(detection_domains.iter().any(|d| d.as_str() == Some("air")));
+        assert!(detection_domains
+            .iter()
+            .any(|d| d.as_str() == Some("surface")));
+    }
+
+    #[test]
+    fn test_detection_mode_to_sensor_type() {
+        assert_eq!(
+            DetectionMode::EO.to_sensor_type(),
+            SensorType::ElectroOptical
+        );
+        assert_eq!(DetectionMode::IR.to_sensor_type(), SensorType::Infrared);
+        assert_eq!(DetectionMode::Radar.to_sensor_type(), SensorType::Radar);
+        assert_eq!(
+            DetectionMode::Acoustic.to_sensor_type(),
+            SensorType::Acoustic
+        );
+        assert_eq!(DetectionMode::SIGINT.to_sensor_type(), SensorType::Sigint);
+    }
+
+    #[tokio::test]
+    async fn test_multi_domain_coverage_detection() {
+        // Create sensors that cover multiple domains
+        let radar_piece = Piece {
+            id: 15,
+            piece_type: PieceType::Sensor(DetectionMode::Radar),
+            team: Team::Blue,
+            x: 0,
+            y: 0,
+            fuel: 100,
+            max_fuel: 100,
+        };
+
+        let acoustic_piece = Piece {
+            id: 16,
+            piece_type: PieceType::Sensor(DetectionMode::Acoustic),
+            team: Team::Blue,
+            x: 0,
+            y: 0,
+            fuel: 100,
+            max_fuel: 100,
+        };
+
+        let configs = vec![
+            radar_piece.to_node_config(),
+            acoustic_piece.to_node_config(),
+        ];
+        let mut capabilities = Vec::new();
+        capabilities.extend(radar_piece.to_capabilities());
+        capabilities.extend(acoustic_piece.to_capabilities());
+
+        let detected = EmergentCapabilityDetector::detect(&capabilities, &configs).await;
+
+        // Should detect multi-domain coverage (radar: air+surface, acoustic: subsurface = 3 domains)
+        let multi_domain = detected
+            .iter()
+            .find(|e| matches!(e, EmergentCapabilityType::MultiDomainCoverage { .. }));
+
+        assert!(
+            multi_domain.is_some(),
+            "Should detect multi-domain coverage"
+        );
+        if let Some(EmergentCapabilityType::MultiDomainCoverage {
+            domain_count,
+            bonus,
+        }) = multi_domain
+        {
+            assert_eq!(*domain_count, 3, "Should cover all 3 domains");
+            assert_eq!(*bonus, 6, "Full spectrum bonus should be +6");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_dual_domain_coverage_detection() {
+        // Create sensors that cover only 2 domains (air + surface from radar)
+        let radar_piece = Piece {
+            id: 17,
+            piece_type: PieceType::Sensor(DetectionMode::Radar),
+            team: Team::Blue,
+            x: 0,
+            y: 0,
+            fuel: 100,
+            max_fuel: 100,
+        };
+
+        let configs = vec![radar_piece.to_node_config()];
+        let capabilities = radar_piece.to_capabilities();
+
+        let detected = EmergentCapabilityDetector::detect(&capabilities, &configs).await;
+
+        // Should detect dual-domain coverage (radar: air+surface = 2 domains)
+        let multi_domain = detected
+            .iter()
+            .find(|e| matches!(e, EmergentCapabilityType::MultiDomainCoverage { .. }));
+
+        assert!(multi_domain.is_some(), "Should detect dual-domain coverage");
+        if let Some(EmergentCapabilityType::MultiDomainCoverage {
+            domain_count,
+            bonus,
+        }) = multi_domain
+        {
+            assert_eq!(*domain_count, 2, "Should cover 2 domains");
+            assert_eq!(*bonus, 4, "Dual domain bonus should be +4");
+        }
     }
 }

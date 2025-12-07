@@ -2193,6 +2193,7 @@ dependencies = [
  "rand 0.8.5",
  "ratatui",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]
