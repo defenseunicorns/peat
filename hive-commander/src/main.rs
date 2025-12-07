@@ -149,6 +149,7 @@ enum PieceType {
     Striker,
     Support,
     Authority,
+    Analyst, // AI/ML processing: CLASSIFY, PREDICT, FUSE
 }
 
 impl PieceType {
@@ -159,6 +160,7 @@ impl PieceType {
             PieceType::Striker => "St".to_string(),
             PieceType::Support => "Su".to_string(),
             PieceType::Authority => "Au".to_string(),
+            PieceType::Analyst => "An".to_string(),
         }
     }
 }
@@ -198,6 +200,10 @@ struct ComposedCapability {
     recon_bonus: i32,
     authorize_bonus: i32,
     relay_bonus: i32,
+    // Analyst capabilities (AI/ML)
+    classify_bonus: i32,
+    predict_bonus: i32,
+    fuse_bonus: i32,
     // Status
     total_fuel: i32,
     max_fuel: i32,
@@ -211,6 +217,10 @@ impl ComposedCapability {
             "⚔" // Strike package
         } else if self.detect_bonus >= 3 && self.track_bonus >= 2 {
             "◎" // ISR package
+        } else if self.fuse_bonus >= 2 && self.detect_bonus >= 2 {
+            "◆" // AI-augmented ISR
+        } else if self.classify_bonus >= 2 || self.predict_bonus >= 2 {
+            "◊" // Analysis cell
         } else if self.recon_bonus >= 2 {
             "◇" // Recon team
         } else if self.relay_bonus >= 2 {
@@ -223,8 +233,14 @@ impl ComposedCapability {
     fn primary_capability(&self) -> &'static str {
         if self.strike_bonus >= 3 && self.authorize_bonus >= 2 {
             "STRIKE_READY"
+        } else if self.fuse_bonus >= 2 && self.detect_bonus >= 3 {
+            "AI_ISR_PKG"
         } else if self.detect_bonus >= 3 && self.track_bonus >= 2 {
             "ISR_PACKAGE"
+        } else if self.classify_bonus >= 3 {
+            "ANALYSIS_CELL"
+        } else if self.predict_bonus >= 2 {
+            "PREDICT_CELL"
         } else if self.recon_bonus >= 3 {
             "RECON_TEAM"
         } else if self.relay_bonus >= 2 {
@@ -400,6 +416,7 @@ impl GameState {
             PieceType::Striker,
             PieceType::Support,
             PieceType::Authority,
+            PieceType::Analyst, // AI/ML processing unit
         ];
 
         for piece_type in blue_types {
@@ -426,6 +443,7 @@ impl GameState {
             PieceType::Striker,
             PieceType::Support,
             PieceType::Authority,
+            PieceType::Analyst,
         ];
 
         for piece_type in red_types {
@@ -601,6 +619,11 @@ impl GameState {
             let authorize = ProtocolBonusCalculator::authorize_bonus(&node_configs);
             let relay = ProtocolBonusCalculator::relay_bonus(&all_capabilities);
 
+            // Analyst capabilities (AI/ML)
+            let classify = ProtocolBonusCalculator::classify_bonus(&all_capabilities);
+            let predict = ProtocolBonusCalculator::predict_bonus(&all_capabilities);
+            let fuse = ProtocolBonusCalculator::fuse_bonus(&all_capabilities);
+
             // Synergy bonuses (these could also be moved to composition rules)
             let detect = if group.len() >= 2 {
                 detect + 1 // Multi-sensor fusion
@@ -612,6 +635,13 @@ impl GameState {
                 strike += 2; // Authorized strike bonus
             }
 
+            // AI-Augmented Ops synergy: Analyst + Sensor gives +2 to track
+            let track = if fuse > 0 && detect > 0 {
+                track + 2
+            } else {
+                track
+            };
+
             // Use composition engine to detect emergent capabilities
             let emergent_caps =
                 EmergentCapabilityDetector::detect_sync(&all_capabilities, &node_configs);
@@ -622,11 +652,15 @@ impl GameState {
                 .any(|e| matches!(e, EmergentCapabilityType::StrikeChain { .. }))
             {
                 "STRIKE"
+            } else if fuse > 0 && detect >= 3 {
+                "AI_ISR" // AI-augmented ISR
             } else if emergent_caps
                 .iter()
                 .any(|e| matches!(e, EmergentCapabilityType::IsrChain { .. }))
             {
                 "ISR"
+            } else if classify >= 3 || predict >= 2 {
+                "ANALYST" // Analysis cell
             } else if recon >= 3 {
                 "RECON"
             } else if emergent_caps
@@ -652,6 +686,9 @@ impl GameState {
                 recon_bonus: recon,
                 authorize_bonus: authorize,
                 relay_bonus: relay,
+                classify_bonus: classify,
+                predict_bonus: predict,
+                fuse_bonus: fuse,
                 total_fuel,
                 max_fuel,
                 team: Team::Blue,
