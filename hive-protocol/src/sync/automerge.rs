@@ -782,6 +782,29 @@ impl AutomergeIrohBackend {
         Arc::clone(&self.transport)
     }
 
+    /// Get the transport Arc pointer address (for debugging Issue #271)
+    ///
+    /// This returns the raw pointer address of the transport Arc, which can be used
+    /// to verify that cloned backends share the same transport instance.
+    /// If two backends show different addresses, they have different transports.
+    pub fn transport_arc_ptr(&self) -> *const crate::network::IrohTransport {
+        Arc::as_ptr(&self.transport)
+    }
+
+    /// Debug method to verify transport sharing (Issue #271)
+    ///
+    /// Logs the transport Arc pointer address. Call this on original and cloned
+    /// backends to verify they share the same transport instance.
+    pub fn debug_log_transport_ptr(&self, context: &str) {
+        tracing::debug!(
+            transport_ptr = ?Arc::as_ptr(&self.transport),
+            endpoint_id = %self.transport.endpoint_id(),
+            peer_count = self.transport.peer_count(),
+            context = context,
+            "AutomergeIrohBackend transport instance"
+        );
+    }
+
     /// Get this node's endpoint ID
     pub fn endpoint_id(&self) -> iroh::EndpointId {
         self.transport.endpoint_id()
@@ -1997,6 +2020,175 @@ mod iroh_credential_tests {
             error_msg.contains("Invalid shared_key format"),
             "Error should mention invalid format: {}",
             error_msg
+        );
+    }
+}
+
+/// Tests for Issue #271: Verify Clone correctly shares transport instance
+#[cfg(all(test, feature = "automerge-backend"))]
+mod issue_271_clone_tests {
+    use super::*;
+
+    /// Test that cloning AutomergeIrohBackend shares the same transport Arc
+    ///
+    /// Issue #271: When cloning AutomergeIrohBackend, the transport should be
+    /// shared (same Arc pointer), not duplicated. This ensures connections
+    /// accumulate correctly across all references to the backend.
+    #[tokio::test]
+    async fn test_clone_shares_transport_arc() {
+        // Create backend components
+        let temp_dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(crate::storage::AutomergeStore::open(temp_dir.path()).unwrap());
+        let transport = Arc::new(crate::network::IrohTransport::new().await.unwrap());
+
+        let original = AutomergeIrohBackend::from_parts(store, Arc::clone(&transport));
+        let cloned = original.clone();
+
+        // Verify transport Arc is shared (same pointer)
+        let original_transport_ptr = Arc::as_ptr(&original.transport());
+        let cloned_transport_ptr = Arc::as_ptr(&cloned.transport());
+
+        assert_eq!(
+            original_transport_ptr, cloned_transport_ptr,
+            "Clone should share the same transport Arc, but got different pointers:\n  Original: {:?}\n  Clone: {:?}",
+            original_transport_ptr, cloned_transport_ptr
+        );
+
+        // Verify both point to the same transport as the original Arc
+        let source_transport_ptr = Arc::as_ptr(&transport);
+        assert_eq!(
+            original_transport_ptr, source_transport_ptr,
+            "Original backend transport should be same as source transport Arc"
+        );
+    }
+
+    /// Test that cloning AutomergeIrohBackend shares the same backend Arc
+    #[tokio::test]
+    async fn test_clone_shares_backend_arc() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(crate::storage::AutomergeStore::open(temp_dir.path()).unwrap());
+        let transport = Arc::new(crate::network::IrohTransport::new().await.unwrap());
+
+        let original = AutomergeIrohBackend::from_parts(store, transport);
+        let cloned = original.clone();
+
+        // Verify backend Arc is shared (same pointer)
+        // We need to access the internal backend field - using a helper method
+        // Since backend is private, we verify via behavior: both should see same endpoint_id
+        assert_eq!(
+            original.endpoint_id(),
+            cloned.endpoint_id(),
+            "Clone should have same endpoint_id as original"
+        );
+    }
+
+    /// Test that transport peer_count is consistent across clone
+    ///
+    /// This verifies that if connections are managed via one reference,
+    /// they are visible via the clone (because they share the same transport).
+    #[tokio::test]
+    async fn test_clone_shares_peer_count() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(crate::storage::AutomergeStore::open(temp_dir.path()).unwrap());
+        let transport = Arc::new(crate::network::IrohTransport::new().await.unwrap());
+
+        let original = AutomergeIrohBackend::from_parts(store, Arc::clone(&transport));
+        let cloned = original.clone();
+
+        // Both should report the same peer count (0 initially)
+        let original_count = original.transport().peer_count();
+        let cloned_count = cloned.transport().peer_count();
+
+        assert_eq!(
+            original_count, cloned_count,
+            "Original and clone should report same peer_count"
+        );
+        assert_eq!(original_count, 0, "Initial peer count should be 0");
+
+        // Verify via source transport as well
+        assert_eq!(
+            transport.peer_count(),
+            original_count,
+            "Source transport should have same count"
+        );
+    }
+
+    /// Test that formation_key is shared across clone
+    #[tokio::test]
+    async fn test_clone_shares_formation_key() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(crate::storage::AutomergeStore::open(temp_dir.path()).unwrap());
+        let transport = Arc::new(crate::network::IrohTransport::new().await.unwrap());
+
+        let original = AutomergeIrohBackend::from_parts(store, transport);
+
+        // Initialize with credentials
+        let test_secret = crate::security::FormationKey::generate_secret();
+        let config = BackendConfig {
+            app_id: "test_formation".to_string(),
+            persistence_dir: temp_dir.path().to_path_buf(),
+            shared_key: Some(test_secret),
+            transport: TransportConfig::default(),
+            extra: std::collections::HashMap::new(),
+        };
+        original.initialize(config).await.unwrap();
+
+        // Clone after initialization
+        let cloned = original.clone();
+
+        // Both should see the formation key
+        let original_key = original.formation_key();
+        let cloned_key = cloned.formation_key();
+
+        assert!(original_key.is_some(), "Original should have formation key");
+        assert!(cloned_key.is_some(), "Clone should have formation key");
+        assert_eq!(
+            original_key.as_ref().map(|k| k.formation_id()),
+            cloned_key.as_ref().map(|k| k.formation_id()),
+            "Clone should share same formation key"
+        );
+    }
+
+    /// Test that initialized state is shared across clone
+    #[tokio::test]
+    async fn test_clone_shares_initialized_state() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(crate::storage::AutomergeStore::open(temp_dir.path()).unwrap());
+        let transport = Arc::new(crate::network::IrohTransport::new().await.unwrap());
+
+        let original = AutomergeIrohBackend::from_parts(store, transport);
+
+        // Before initialization
+        let cloned_before = original.clone();
+        assert!(
+            !original.is_ready().await,
+            "Original should not be ready before init"
+        );
+        assert!(
+            !cloned_before.is_ready().await,
+            "Clone should not be ready before init"
+        );
+
+        // Initialize original
+        let test_secret = crate::security::FormationKey::generate_secret();
+        let config = BackendConfig {
+            app_id: "test_formation".to_string(),
+            persistence_dir: temp_dir.path().to_path_buf(),
+            shared_key: Some(test_secret),
+            transport: TransportConfig::default(),
+            extra: std::collections::HashMap::new(),
+        };
+        original.initialize(config).await.unwrap();
+
+        // Clone created before init should NOW see it as ready
+        // (because initialized flag is in shared Arc<Mutex<bool>>)
+        assert!(
+            original.is_ready().await,
+            "Original should be ready after init"
+        );
+        assert!(
+            cloned_before.is_ready().await,
+            "Clone (created before init) should also be ready, proving Arc is shared"
         );
     }
 }
