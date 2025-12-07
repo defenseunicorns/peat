@@ -15,7 +15,7 @@ env:
 
 jobs:
   # ============================================
-  # Tier 1: Quick checks (always run, ~1 min)
+  # Quick checks (always run, parallel, ~3 min)
   # ============================================
   fmt:
     name: Format
@@ -54,10 +54,12 @@ jobs:
       - run: cargo clippy --all-targets --all-features --workspace --exclude hive-ffi -- -D warnings
 
   # ============================================
-  # Tier 2: Unit tests (always run, ~3 min)
+  # Tests (single compile, nextest for speed)
+  # PRs: all tests except E2E (~8 min)
+  # Main: all tests including E2E (~10 min)
   # ============================================
-  test-unit:
-    name: Unit Tests
+  test:
+    name: Test
     runs-on: ubuntu-latest
     steps:
       - name: Free disk space
@@ -78,88 +80,20 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          shared-key: test-unit
+          shared-key: test
 
-      - name: Run unit tests
+      - name: Run tests (excluding E2E for PRs)
+        if: github.event_name == 'pull_request'
         env:
           DITTO_APP_ID: ${{ secrets.DITTO_APP_ID }}
           DITTO_OFFLINE_TOKEN: ${{ secrets.DITTO_OFFLINE_TOKEN }}
           DITTO_SHARED_KEY: ${{ secrets.DITTO_SHARED_KEY }}
-        # Run only lib tests (unit tests) - fast
-        run: cargo nextest run --lib --all-features --workspace --exclude hive-ffi
-
-  # ============================================
-  # Tier 3: Integration tests (PRs only, ~5 min)
-  # ============================================
-  test-integration:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-    # Skip if PR has 'skip-integration' label
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-integration') }}
-    needs: [fmt, clippy, test-unit]
-    steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-          df -h
-
-      - uses: actions/checkout@v4
-
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler mold clang
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-          shared-key: test-integration
-
-      - name: Run integration tests (non-E2E)
-        env:
-          DITTO_APP_ID: ${{ secrets.DITTO_APP_ID }}
-          DITTO_OFFLINE_TOKEN: ${{ secrets.DITTO_OFFLINE_TOKEN }}
-          DITTO_SHARED_KEY: ${{ secrets.DITTO_SHARED_KEY }}
-        # Run tests from tests/ directories, excluding E2E tests
         run: cargo nextest run --all-features --workspace --exclude hive-ffi -E 'not test(e2e)'
 
-  # ============================================
-  # Tier 4: E2E tests (main branch or manual, ~10 min)
-  # ============================================
-  test-e2e:
-    name: E2E Tests
-    runs-on: ubuntu-latest
-    # Only run on main branch pushes or manual trigger
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
-    needs: [fmt, clippy, test-unit]
-    steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-          df -h
-
-      - uses: actions/checkout@v4
-
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler mold clang
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-          shared-key: test-e2e
-
-      - name: Run E2E tests
+      - name: Run all tests (including E2E for main)
+        if: github.event_name != 'pull_request'
         env:
           DITTO_APP_ID: ${{ secrets.DITTO_APP_ID }}
           DITTO_OFFLINE_TOKEN: ${{ secrets.DITTO_OFFLINE_TOKEN }}
           DITTO_SHARED_KEY: ${{ secrets.DITTO_SHARED_KEY }}
-        # Run only E2E tests
-        run: cargo nextest run --all-features --workspace --exclude hive-ffi -E 'test(e2e)'
+        run: cargo nextest run --all-features --workspace --exclude hive-ffi
