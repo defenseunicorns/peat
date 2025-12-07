@@ -38,6 +38,7 @@ impl PieceToProtocol for Piece {
             PieceType::Striker => "striker".to_string(),
             PieceType::Support => "support".to_string(),
             PieceType::Authority => "command_post".to_string(),
+            PieceType::Analyst => "analyst".to_string(),
         };
 
         let mut config = NodeConfig::new(platform_type);
@@ -140,6 +141,46 @@ impl PieceToProtocol for Piece {
                 );
                 vec![comms, compute]
             }
+            PieceType::Analyst => {
+                // Analyst has AI/ML capabilities: CLASSIFY, PREDICT, FUSE
+                let mut classify = Capability::new(
+                    format!("analyst_classify_{}", self.id),
+                    "AI Classification".to_string(),
+                    CapabilityType::Compute,
+                    0.85,
+                );
+                classify.metadata_json = serde_json::to_string(&json!({
+                    "ai_capability": "classify",
+                    "model_type": "target_recognition"
+                }))
+                .unwrap_or_default();
+
+                let mut predict = Capability::new(
+                    format!("analyst_predict_{}", self.id),
+                    "Predictive Analytics".to_string(),
+                    CapabilityType::Compute,
+                    0.75,
+                );
+                predict.metadata_json = serde_json::to_string(&json!({
+                    "ai_capability": "predict",
+                    "model_type": "trajectory_prediction"
+                }))
+                .unwrap_or_default();
+
+                let mut fuse = Capability::new(
+                    format!("analyst_fuse_{}", self.id),
+                    "Data Fusion".to_string(),
+                    CapabilityType::Compute,
+                    0.9,
+                );
+                fuse.metadata_json = serde_json::to_string(&json!({
+                    "ai_capability": "fuse",
+                    "model_type": "multi_source_fusion"
+                }))
+                .unwrap_or_default();
+
+                vec![classify, predict, fuse]
+            }
         }
     }
 }
@@ -156,6 +197,7 @@ impl PieceDomain for Piece {
             PieceType::Striker => Domain::Air, // Strike drones are airborne
             PieceType::Support => Domain::Surface, // Support is ground-based
             PieceType::Authority => Domain::Surface, // Command posts are ground-based
+            PieceType::Analyst => Domain::Surface, // Analysts are ground-based (processing centers)
         }
     }
 
@@ -169,6 +211,7 @@ impl PieceDomain for Piece {
             PieceType::Striker => DomainSet::empty(), // Strikers don't detect
             PieceType::Support => DomainSet::empty(), // Support doesn't detect
             PieceType::Authority => DomainSet::empty(), // Authority doesn't detect
+            PieceType::Analyst => DomainSet::empty(), // Analysts process, don't detect directly
         }
     }
 }
@@ -296,6 +339,63 @@ impl ProtocolBonusCalculator {
         let context = CompositionContext::new(vec![]).with_node_configs(configs.to_vec());
 
         context.authorization_bonus()
+    }
+
+    /// Calculate classify bonus from capabilities (AI target classification)
+    pub fn classify_bonus(capabilities: &[Capability]) -> i32 {
+        capabilities
+            .iter()
+            .filter(|c| c.capability_type == CapabilityType::Compute as i32)
+            .filter(|c| {
+                serde_json::from_str::<serde_json::Value>(&c.metadata_json)
+                    .ok()
+                    .and_then(|v| {
+                        v.get("ai_capability")
+                            .and_then(|a| a.as_str())
+                            .map(|s| s == "classify")
+                    })
+                    .unwrap_or(false)
+            })
+            .count() as i32
+            * 3
+    }
+
+    /// Calculate predict bonus from capabilities (AI prediction/trajectory)
+    pub fn predict_bonus(capabilities: &[Capability]) -> i32 {
+        capabilities
+            .iter()
+            .filter(|c| c.capability_type == CapabilityType::Compute as i32)
+            .filter(|c| {
+                serde_json::from_str::<serde_json::Value>(&c.metadata_json)
+                    .ok()
+                    .and_then(|v| {
+                        v.get("ai_capability")
+                            .and_then(|a| a.as_str())
+                            .map(|s| s == "predict")
+                    })
+                    .unwrap_or(false)
+            })
+            .count() as i32
+            * 2
+    }
+
+    /// Calculate fuse bonus from capabilities (multi-source data fusion)
+    pub fn fuse_bonus(capabilities: &[Capability]) -> i32 {
+        capabilities
+            .iter()
+            .filter(|c| c.capability_type == CapabilityType::Compute as i32)
+            .filter(|c| {
+                serde_json::from_str::<serde_json::Value>(&c.metadata_json)
+                    .ok()
+                    .and_then(|v| {
+                        v.get("ai_capability")
+                            .and_then(|a| a.as_str())
+                            .map(|s| s == "fuse")
+                    })
+                    .unwrap_or(false)
+            })
+            .count() as i32
+            * 3
     }
 }
 
@@ -783,5 +883,183 @@ mod tests {
             assert_eq!(*domain_count, 2, "Should cover 2 domains");
             assert_eq!(*bonus, 4, "Dual domain bonus should be +4");
         }
+    }
+
+    // =============================================================================
+    // ANALYST CLASS TESTS
+    // =============================================================================
+
+    #[test]
+    fn test_analyst_to_node_config() {
+        let analyst_piece = Piece {
+            id: 20,
+            piece_type: PieceType::Analyst,
+            team: Team::Blue,
+            x: 5,
+            y: 5,
+            fuel: 100,
+            max_fuel: 100,
+        };
+
+        let config = analyst_piece.to_node_config();
+
+        assert_eq!(config.id, "piece_20");
+        assert_eq!(config.platform_type, "analyst");
+    }
+
+    #[test]
+    fn test_analyst_to_capabilities() {
+        let analyst_piece = Piece {
+            id: 21,
+            piece_type: PieceType::Analyst,
+            team: Team::Blue,
+            x: 0,
+            y: 0,
+            fuel: 100,
+            max_fuel: 100,
+        };
+
+        let caps = analyst_piece.to_capabilities();
+
+        // Analyst should have 3 capabilities: classify, predict, fuse
+        assert_eq!(caps.len(), 3);
+
+        // All should be Compute type
+        for cap in &caps {
+            assert_eq!(cap.capability_type, CapabilityType::Compute as i32);
+        }
+
+        // Check that each AI capability is present
+        let ai_caps: Vec<String> = caps
+            .iter()
+            .filter_map(|c| {
+                serde_json::from_str::<serde_json::Value>(&c.metadata_json)
+                    .ok()
+                    .and_then(|v| {
+                        v.get("ai_capability")
+                            .and_then(|a| a.as_str())
+                            .map(String::from)
+                    })
+            })
+            .collect();
+
+        assert!(ai_caps.contains(&"classify".to_string()));
+        assert!(ai_caps.contains(&"predict".to_string()));
+        assert!(ai_caps.contains(&"fuse".to_string()));
+    }
+
+    #[test]
+    fn test_analyst_domain() {
+        let analyst_piece = Piece {
+            id: 22,
+            piece_type: PieceType::Analyst,
+            team: Team::Blue,
+            x: 0,
+            y: 0,
+            fuel: 100,
+            max_fuel: 100,
+        };
+
+        // Analysts are ground-based (Surface domain)
+        assert_eq!(analyst_piece.domain(), Domain::Surface);
+
+        // Analysts don't detect directly
+        let detection_domains = analyst_piece.detection_domains();
+        assert!(detection_domains.is_empty());
+    }
+
+    #[test]
+    fn test_classify_bonus_calculation() {
+        let analyst_piece = Piece {
+            id: 23,
+            piece_type: PieceType::Analyst,
+            team: Team::Blue,
+            x: 0,
+            y: 0,
+            fuel: 100,
+            max_fuel: 100,
+        };
+
+        let caps = analyst_piece.to_capabilities();
+        let bonus = ProtocolBonusCalculator::classify_bonus(&caps);
+
+        // One analyst = 3 (one classify capability * 3)
+        assert_eq!(bonus, 3);
+    }
+
+    #[test]
+    fn test_predict_bonus_calculation() {
+        let analyst_piece = Piece {
+            id: 24,
+            piece_type: PieceType::Analyst,
+            team: Team::Blue,
+            x: 0,
+            y: 0,
+            fuel: 100,
+            max_fuel: 100,
+        };
+
+        let caps = analyst_piece.to_capabilities();
+        let bonus = ProtocolBonusCalculator::predict_bonus(&caps);
+
+        // One analyst = 2 (one predict capability * 2)
+        assert_eq!(bonus, 2);
+    }
+
+    #[test]
+    fn test_fuse_bonus_calculation() {
+        let analyst_piece = Piece {
+            id: 25,
+            piece_type: PieceType::Analyst,
+            team: Team::Blue,
+            x: 0,
+            y: 0,
+            fuel: 100,
+            max_fuel: 100,
+        };
+
+        let caps = analyst_piece.to_capabilities();
+        let bonus = ProtocolBonusCalculator::fuse_bonus(&caps);
+
+        // One analyst = 3 (one fuse capability * 3)
+        assert_eq!(bonus, 3);
+    }
+
+    #[test]
+    fn test_analyst_symbol() {
+        let analyst_piece = Piece {
+            id: 26,
+            piece_type: PieceType::Analyst,
+            team: Team::Blue,
+            x: 0,
+            y: 0,
+            fuel: 100,
+            max_fuel: 100,
+        };
+
+        assert_eq!(analyst_piece.piece_type.symbol(), "An");
+    }
+
+    #[test]
+    fn test_analyst_no_detect_bonus() {
+        let analyst_piece = Piece {
+            id: 27,
+            piece_type: PieceType::Analyst,
+            team: Team::Blue,
+            x: 0,
+            y: 0,
+            fuel: 100,
+            max_fuel: 100,
+        };
+
+        let caps = analyst_piece.to_capabilities();
+
+        // Analyst should have no detect bonus (no sensors)
+        let detect = ProtocolBonusCalculator::detect_bonus(&caps);
+        assert_eq!(detect, 0);
+
+        // And no strike bonus
+        let strike = ProtocolBonusCalculator::strike_bonus(&caps);
+        assert_eq!(strike, 0);
     }
 }
