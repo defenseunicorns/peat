@@ -432,6 +432,255 @@ impl LoRaTransport {
 
 ---
 
+## Dynamic Range/Bandwidth Tradeoffs
+
+### The Range-Bandwidth Tradeoff
+
+Many radio technologies allow dynamically trading bandwidth for range. This is a critical capability for tactical operations where peer distance varies significantly.
+
+| Technology | Mechanism | Range Boost | Bandwidth Cost |
+|------------|-----------|-------------|----------------|
+| **Bluetooth LE** | Coded PHY (S=2) | 2x | 2x slower |
+| **Bluetooth LE** | Coded PHY (S=8) | 4x | 4x slower |
+| **LoRa** | Spreading Factor 7→12 | ~4x | ~20x slower |
+| **WiFi** | 802.11b vs 802.11ax | ~2x | ~100x slower |
+| **Tactical Radio** | Modulation scheme | Varies | Varies |
+
+### Range Mode Abstraction
+
+```rust
+/// Available range modes for a transport
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RangeMode {
+    /// Default/balanced mode
+    Standard,
+    /// Extended range at cost of bandwidth
+    Extended,
+    /// Maximum range (lowest bandwidth)
+    Maximum,
+    /// Custom configuration
+    Custom(u8),  // Transport-specific value
+}
+
+/// Range mode capabilities for a transport
+#[derive(Debug, Clone)]
+pub struct RangeModeConfig {
+    /// Available modes for this transport
+    pub available_modes: Vec<RangeMode>,
+    /// Current active mode
+    pub current_mode: RangeMode,
+    /// Capabilities per mode
+    pub mode_capabilities: HashMap<RangeMode, TransportCapabilities>,
+}
+
+/// Extended transport trait with range mode support
+#[async_trait]
+pub trait ConfigurableTransport: Transport {
+    /// Get available range modes
+    fn range_modes(&self) -> Option<&RangeModeConfig> {
+        None  // Default: not configurable
+    }
+
+    /// Set range mode (returns new capabilities)
+    async fn set_range_mode(&self, mode: RangeMode) -> Result<TransportCapabilities, TransportError> {
+        Err(TransportError::Other("Range mode not supported".into()))
+    }
+
+    /// Get recommended mode for target distance
+    fn recommend_mode_for_distance(&self, distance_meters: u32) -> Option<RangeMode> {
+        let config = self.range_modes()?;
+
+        // Find mode with sufficient range and best bandwidth
+        config.mode_capabilities
+            .iter()
+            .filter(|(_, caps)| caps.max_range_meters >= distance_meters)
+            .max_by_key(|(_, caps)| caps.max_bandwidth_bps)
+            .map(|(mode, _)| *mode)
+    }
+}
+```
+
+### Bluetooth LE Coded PHY Example
+
+```rust
+#[cfg(feature = "bluetooth")]
+impl ConfigurableTransport for BluetoothLETransport {
+    fn range_modes(&self) -> Option<&RangeModeConfig> {
+        Some(&self.range_config)
+    }
+
+    async fn set_range_mode(&self, mode: RangeMode) -> Result<TransportCapabilities, TransportError> {
+        let phy = match mode {
+            RangeMode::Standard => BlePhy::Le1M,      // Standard 1 Mbps
+            RangeMode::Extended => BlePhy::LeCoded2,  // Coded S=2, 500 kbps, 2x range
+            RangeMode::Maximum => BlePhy::LeCoded8,   // Coded S=8, 125 kbps, 4x range
+            _ => return Err(TransportError::Other("Unsupported mode".into())),
+        };
+
+        self.adapter.set_phy(phy).await?;
+
+        // Return new capabilities
+        Ok(match mode {
+            RangeMode::Standard => TransportCapabilities {
+                max_bandwidth_bps: 1_000_000,
+                max_range_meters: 100,
+                ..self.capabilities.clone()
+            },
+            RangeMode::Extended => TransportCapabilities {
+                max_bandwidth_bps: 500_000,
+                max_range_meters: 200,
+                battery_impact: 20,  // Slightly higher power
+                ..self.capabilities.clone()
+            },
+            RangeMode::Maximum => TransportCapabilities {
+                max_bandwidth_bps: 125_000,
+                max_range_meters: 400,
+                battery_impact: 25,
+                ..self.capabilities.clone()
+            },
+            _ => self.capabilities.clone(),
+        })
+    }
+}
+```
+
+### LoRa Adaptive Spreading Factor
+
+```rust
+#[cfg(feature = "lora")]
+impl ConfigurableTransport for LoRaTransport {
+    fn range_modes(&self) -> Option<&RangeModeConfig> {
+        Some(&self.range_config)
+    }
+
+    async fn set_range_mode(&self, mode: RangeMode) -> Result<TransportCapabilities, TransportError> {
+        let sf = match mode {
+            RangeMode::Standard => 7,   // SF7: ~6km, 21.9 kbps
+            RangeMode::Extended => 10,  // SF10: ~12km, 3.9 kbps
+            RangeMode::Maximum => 12,   // SF12: ~15km+, 1.1 kbps
+            RangeMode::Custom(sf) if (7..=12).contains(&sf) => sf,
+            _ => return Err(TransportError::Other("Invalid SF".into())),
+        };
+
+        self.radio.set_spreading_factor(sf).await?;
+
+        // Capabilities scale with spreading factor
+        let (bandwidth, range) = match sf {
+            7 => (21_900, 6_000),
+            8 => (12_500, 8_000),
+            9 => (7_000, 10_000),
+            10 => (3_900, 12_000),
+            11 => (2_100, 14_000),
+            12 => (1_100, 15_000),
+            _ => (5_000, 10_000),
+        };
+
+        Ok(TransportCapabilities {
+            max_bandwidth_bps: bandwidth,
+            max_range_meters: range,
+            typical_latency_ms: 100 + (sf as u32 - 7) * 100,  // Higher SF = more airtime
+            ..self.capabilities.clone()
+        })
+    }
+}
+```
+
+### TransportManager Integration
+
+The `TransportManager` should consider range requirements when selecting transports:
+
+```rust
+impl TransportManager {
+    /// Select transport with range mode adaptation
+    pub async fn select_transport_for_distance(
+        &self,
+        peer_id: &NodeId,
+        distance_meters: Option<u32>,
+        requirements: &MessageRequirements,
+    ) -> Result<(TransportType, Option<RangeMode>), TransportError> {
+        let transport_type = self.select_transport(peer_id, requirements)
+            .ok_or_else(|| TransportError::PeerNotFound(peer_id.to_string()))?;
+
+        let transport = self.transports.get(&transport_type).unwrap();
+
+        // Check if we need to adjust range mode
+        let range_mode = if let Some(dist) = distance_meters {
+            if let Some(configurable) = transport.as_configurable() {
+                configurable.recommend_mode_for_distance(dist)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Ok((transport_type, range_mode))
+    }
+
+    /// Send with automatic range adaptation
+    pub async fn send_adaptive(
+        &self,
+        peer_id: &NodeId,
+        data: &[u8],
+        requirements: MessageRequirements,
+        estimated_distance: Option<u32>,
+    ) -> Result<(), TransportError> {
+        let (transport_type, range_mode) = self
+            .select_transport_for_distance(peer_id, estimated_distance, &requirements)
+            .await?;
+
+        let transport = self.transports.get(&transport_type).unwrap();
+
+        // Adjust range mode if needed
+        if let Some(mode) = range_mode {
+            if let Some(configurable) = transport.as_configurable() {
+                configurable.set_range_mode(mode).await?;
+            }
+        }
+
+        // Send via transport
+        let conn = transport.connect(peer_id).await?;
+        // ... send data
+
+        Ok(())
+    }
+}
+```
+
+### Distance Estimation
+
+For automatic range mode selection, the system needs distance estimates:
+
+```rust
+/// How peer distance was determined
+#[derive(Debug, Clone)]
+pub enum DistanceSource {
+    /// GPS coordinates from both peers
+    Gps { confidence_meters: u32 },
+    /// Signal strength (RSSI) estimation
+    Rssi { estimated_meters: u32, variance: u32 },
+    /// Time-of-flight measurement
+    Tof { precision_ns: u32 },
+    /// Manual/configured
+    Configured,
+    /// Unknown distance
+    Unknown,
+}
+
+/// Peer distance information
+#[derive(Debug, Clone)]
+pub struct PeerDistance {
+    pub peer_id: NodeId,
+    pub distance_meters: u32,
+    pub source: DistanceSource,
+    pub last_updated: Instant,
+}
+```
+
+This integrates with the geographic beacon system (ADR-024) to provide distance estimates for range mode selection.
+
+---
+
 ## Implementation Plan
 
 ### Phase 1: Core Abstractions (Issue #255)
@@ -442,11 +691,12 @@ impl LoRaTransport {
 - [ ] Define `TransportType` enum
 - [ ] Define `Transport` trait extending `MeshTransport`
 - [ ] Define `MessageRequirements` and `MessagePriority`
+- [ ] Define `RangeMode` and `ConfigurableTransport` trait
 - [ ] Implement `Transport` for `IrohMeshTransport`
 - [ ] Add capability constants for QUIC transport
 - [ ] Unit tests for transport selection logic
 
-**Estimated scope**: ~500 lines new code, ~100 lines modifications
+**Estimated scope**: ~600 lines new code, ~100 lines modifications
 
 ### Phase 2: Transport Manager
 
@@ -661,6 +911,22 @@ FUNCTION calculate_score(transport, requirements):
 4. **Ditto Integration**: How does this work with DittoMeshTransport?
    - Ditto manages its own transport internally
    - May need to expose Ditto as a "black box" transport
+
+5. **Range Mode Coordination**: When should range mode changes be synchronized across peers?
+   - Option A: Sender-driven - sender sets mode based on estimated distance
+   - Option B: Negotiated - both peers agree on mode before communication
+   - Option C: Asymmetric - each direction can use different modes
+
+6. **Range Mode Latency**: Changing PHY/modulation takes time. How to minimize disruption?
+   - Cache mode per peer to avoid frequent changes
+   - Use hysteresis (don't change mode for small distance changes)
+   - Pre-configure mode based on expected operational radius
+
+7. **Distance Accuracy**: GPS may be unavailable or inaccurate. How to get reliable distance estimates?
+   - RSSI-based estimation (noisy but always available)
+   - Time-of-flight (requires hardware support)
+   - Manual configuration for static deployments
+   - Fallback to maximum range mode when unknown
 
 ---
 
