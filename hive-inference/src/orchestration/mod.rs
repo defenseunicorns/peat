@@ -1,27 +1,35 @@
-//! Model Update Coordination - Issue #177 / ADR-026
+//! Software Orchestration - Issue #177 / ADR-026
 //!
-//! Implements Phase 4 of Issue #107: Model Update Coordination
+//! This module implements software orchestration for HIVE:
+//!
+//! ## Modules
+//!
+//! - **`runtime`**: Runtime adapters for different artifact types (ONNX, containers, etc.)
+//! - **Update Coordination**: Rolling model updates across formations (Phase 1)
+//!
+//! ## Phase 1: Model Update Coordination
 //!
 //! The UpdateCoordinator manages rolling model updates across a formation:
 //! - Phased rollout to prevent capability fragmentation
 //! - Version compatibility checking
 //! - Rollback mechanism for failed updates
 //!
-//! ## Architecture
+//! ## Phase 2: Runtime Adapters
+//!
+//! The `RuntimeAdapter` trait provides an abstraction for artifact-type-specific
+//! activation and lifecycle management:
 //!
 //! ```text
 //! ┌─────────────────────────────────────────────────────────────────┐
-//! │  UpdateCoordinator                                               │
-//! │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
-//! │  │ RolloutPolicy   │  │ VersionChecker  │  │ RollbackManager │ │
-//! │  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
-//! └──────────────────────────┬──────────────────────────────────────┘
-//!                            │ coordinates updates on
-//! ┌──────────────────────────┴──────────────────────────────────────┐
-//! │  ModelRegistry (per platform)                                    │
-//! │  - start_update()                                                │
-//! │  - complete_update()                                             │
-//! │  - fail_update() + rollback                                      │
+//! │  OrchestrationService (Phase 3)                                  │
+//! │  ┌─────────────────────────────────────────────────────────────┐│
+//! │  │                    RuntimeAdapter trait                      ││
+//! │  └─────────────────────────────────────────────────────────────┘│
+//! │       ▲              ▲                ▲              ▲          │
+//! │  ┌────┴────┐   ┌─────┴─────┐   ┌──────┴──────┐   ┌───┴───┐     │
+//! │  │  Onnx   │   │ Container │   │   Process   │   │ Your  │     │
+//! │  │ Adapter │   │  Adapter  │   │   Adapter   │   │Adapter│     │
+//! │  └─────────┘   └───────────┘   └─────────────┘   └───────┘     │
 //! └─────────────────────────────────────────────────────────────────┘
 //! ```
 //!
@@ -29,8 +37,9 @@
 //!
 //! ```rust,ignore
 //! use hive_inference::orchestration::{UpdateCoordinator, RolloutConfig, UpdateRequest};
+//! use hive_inference::orchestration::runtime::{RuntimeAdapter, ArtifactType, SimulatedAdapter};
 //!
-//! // Create coordinator
+//! // Create update coordinator
 //! let coordinator = UpdateCoordinator::new(RolloutConfig::default());
 //!
 //! // Request a formation-wide update
@@ -44,7 +53,32 @@
 //!
 //! let plan = coordinator.plan_rollout(&formation, &request)?;
 //! coordinator.execute_rollout(plan).await?;
+//!
+//! // Use runtime adapters
+//! let adapter = SimulatedAdapter::new("test");
+//! let instance = adapter.activate(&ArtifactType::onnx_cuda(), &config, path).await?;
 //! ```
+
+pub mod adapters;
+pub mod runtime;
+pub mod service;
+
+// Re-export adapter types
+pub use adapters::{ContainerAdapter, OnnxRuntimeAdapter, ProcessAdapter};
+
+// Re-export service types
+pub use service::{
+    BlobStorage, CapabilityPublisher, DeploymentRequest, DeploymentResult, DeploymentStatus,
+    EventPublisher, InstanceRecord, OrchestrationService, SimulatedBlobStorage,
+    SimulatedCapabilityPublisher, SimulatedEventPublisher,
+};
+
+// Re-export runtime types
+pub use runtime::{
+    AnomalyOutput, AnomalySeverity, ArtifactType, ContainerRuntime, EventPriority, HealthStatus,
+    InstanceId, InstanceState, ModelSignature, PortMapping, ProductOutput, RoutingHint,
+    RuntimeAdapter, RuntimeError, RuntimeMetrics, RuntimeResult, SimulatedAdapter,
+};
 
 use crate::coordinator::Coordinator;
 use crate::messages::{ModelCapability, OperationalStatus};
