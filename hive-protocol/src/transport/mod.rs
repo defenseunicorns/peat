@@ -59,7 +59,10 @@ pub mod iroh;
 #[cfg(feature = "ditto-backend")]
 pub mod ditto;
 
+pub mod health;
 pub mod reconnection;
+
+pub use health::{HealthMonitor, HeartbeatConfig};
 
 /// Node identifier in the mesh network
 ///
