@@ -9,6 +9,7 @@
 //! - **Peer Events (Issue #252)**: Emits `PeerEvent` notifications on connect/disconnect
 //! - **Connection Health**: Tracks connection establishment time and disconnect reasons
 
+use super::capabilities::{Transport, TransportCapabilities};
 use super::health::{HealthMonitor, HeartbeatConfig};
 use super::reconnection::{ReconnectionManager, ReconnectionPolicy};
 use super::{
@@ -84,6 +85,9 @@ pub struct IrohMeshTransport {
 
     /// Health monitor for connection health tracking (Issue #254)
     health_monitor: Arc<HealthMonitor>,
+
+    /// Transport capabilities (Issue #255)
+    capabilities: TransportCapabilities,
 }
 
 impl IrohMeshTransport {
@@ -168,6 +172,7 @@ impl IrohMeshTransport {
             reconnection: Arc::new(RwLock::new(ReconnectionManager::new(reconnection_policy))),
             static_peers: Arc::new(RwLock::new(std::collections::HashSet::new())),
             health_monitor: Arc::new(HealthMonitor::new(heartbeat_config)),
+            capabilities: TransportCapabilities::quic(),
         }
     }
 
@@ -662,6 +667,33 @@ impl MeshTransport for IrohMeshTransport {
     fn get_peer_health(&self, peer_id: &NodeId) -> Option<ConnectionHealth> {
         // Return health from the HealthMonitor if available
         self.health_monitor.get_health(peer_id)
+    }
+}
+
+// =============================================================================
+// Transport Trait Implementation (Issue #255)
+// =============================================================================
+
+impl Transport for IrohMeshTransport {
+    fn capabilities(&self) -> &TransportCapabilities {
+        &self.capabilities
+    }
+
+    fn is_available(&self) -> bool {
+        // QUIC transport is always available when started
+        self.cleanup_running.load(Ordering::SeqCst)
+    }
+
+    fn signal_quality(&self) -> Option<u8> {
+        // QUIC over IP doesn't have a signal quality metric
+        // Could potentially use average RTT across connections as a proxy
+        None
+    }
+
+    fn can_reach(&self, peer_id: &NodeId) -> bool {
+        // Check if we have a mapping for this peer
+        // This means we know how to reach them (via static config or discovery)
+        self.node_to_endpoint.read().unwrap().contains_key(peer_id)
     }
 }
 

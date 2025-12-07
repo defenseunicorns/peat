@@ -59,10 +59,17 @@ pub mod iroh;
 #[cfg(feature = "ditto-backend")]
 pub mod ditto;
 
+pub mod capabilities;
 pub mod health;
+pub mod manager;
 pub mod reconnection;
 
+pub use capabilities::{
+    ConfigurableTransport, DistanceSource, MessagePriority, MessageRequirements, PeerDistance,
+    RangeMode, RangeModeConfig, Transport, TransportCapabilities, TransportType,
+};
 pub use health::{HealthMonitor, HeartbeatConfig};
+pub use manager::{TransportManager, TransportManagerConfig};
 
 /// Node identifier in the mesh network
 ///
