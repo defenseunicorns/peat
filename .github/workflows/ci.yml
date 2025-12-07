@@ -51,7 +51,10 @@ jobs:
           shared-key: clippy
 
       # Exclude hive-ffi: its cdylib conflicts with dittoffi symbols during linking
-      - run: cargo clippy --all-targets --all-features --workspace --exclude hive-ffi -- -D warnings
+      # Exclude hive-inference: has platform-specific features (GStreamer, CUDA) requiring system libs
+      - run: cargo clippy --all-targets --all-features --workspace --exclude hive-ffi --exclude hive-inference -- -D warnings
+      # Run clippy on hive-inference without optional features (no GStreamer/CUDA deps)
+      - run: cargo clippy -p hive-inference --all-targets -- -D warnings
 
   # ============================================
   # Tests (single compile, nextest for speed)
@@ -88,7 +91,9 @@ jobs:
           DITTO_APP_ID: ${{ secrets.DITTO_APP_ID }}
           DITTO_OFFLINE_TOKEN: ${{ secrets.DITTO_OFFLINE_TOKEN }}
           DITTO_SHARED_KEY: ${{ secrets.DITTO_SHARED_KEY }}
-        run: cargo nextest run --all-features --workspace --exclude hive-ffi -E 'not test(e2e)'
+        run: |
+          cargo nextest run --all-features --workspace --exclude hive-ffi --exclude hive-inference -E 'not test(e2e)'
+          cargo nextest run -p hive-inference -E 'not test(e2e)'
 
       - name: Run all tests (including E2E for main)
         if: github.event_name != 'pull_request'
@@ -96,4 +101,6 @@ jobs:
           DITTO_APP_ID: ${{ secrets.DITTO_APP_ID }}
           DITTO_OFFLINE_TOKEN: ${{ secrets.DITTO_OFFLINE_TOKEN }}
           DITTO_SHARED_KEY: ${{ secrets.DITTO_SHARED_KEY }}
-        run: cargo nextest run --all-features --workspace --exclude hive-ffi
+        run: |
+          cargo nextest run --all-features --workspace --exclude hive-ffi --exclude hive-inference
+          cargo nextest run -p hive-inference
