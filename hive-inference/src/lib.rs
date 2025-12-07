@@ -33,6 +33,7 @@ pub mod coordinator;
 pub mod inference;
 pub mod messages;
 pub mod models;
+pub mod orchestration;
 pub mod platform;
 pub mod registry;
 pub mod sync;
@@ -73,6 +74,11 @@ pub use registry::{
 
 // Message types (expanded for Issue #107)
 pub use messages::{OperationalStatus, ResourceRequirements};
+
+// Model update orchestration (Issue #177 / ADR-026)
+pub use orchestration::{
+    RolloutConfig, RolloutPlan, RolloutResult, UpdateCoordinator, UpdateError, UpdateRequest,
+};
 
 // Re-export hive-protocol capability query types for convenience
 pub use hive_protocol::discovery::capability_query::{
