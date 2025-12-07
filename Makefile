@@ -1,4 +1,4 @@
-.PHONY: help clean clean-ditto build test fmt clippy check pre-commit ci
+.PHONY: help clean clean-ditto build test test-unit test-integration test-e2e test-fast fmt clippy check pre-commit ci
 
 # ============================================
 # HIVE Protocol Development Makefile
@@ -9,12 +9,18 @@ help:
 	@echo ""
 	@echo "Development:"
 	@echo "  build        - Build all crates"
-	@echo "  test         - Run all tests"
 	@echo "  fmt          - Format code"
 	@echo "  clippy       - Run linter"
 	@echo "  check        - Run fmt + clippy + test"
 	@echo "  clean        - Remove build artifacts"
 	@echo "  clean-labs   - Clean up all containerlab topologies and containers"
+	@echo ""
+	@echo "Testing (Tiered - use these for fast iteration):"
+	@echo "  test-fast    - Unit tests only, ~30s (use during development)"
+	@echo "  test-unit    - Unit tests with nextest (~30s)"
+	@echo "  test-integration - Integration tests, no E2E (~2 min)"
+	@echo "  test-e2e     - E2E tests only (~5 min)"
+	@echo "  test         - All tests (unit + integration + E2E)"
 	@echo ""
 	@echo "Quick Validation:"
 	@echo "  validate              - Quick validation (Traditional 24-node) ⭐ Start here!"
@@ -62,36 +68,108 @@ build-docker:
 	@cd hive-sim && docker build -f Dockerfile -t hive-sim-node:latest ..
 	@echo "✓ Docker image built: hive-sim-node:latest"
 
-test: clean-ditto
-	@echo "Running tests..."
-	@if [ -f .env ]; then \
-		export $$(grep -v '^#' .env | xargs) && cargo test; \
+# ============================================
+# Tiered Testing (for fast development iteration)
+# ============================================
+
+# test-fast: Quickest feedback loop for development (~30s)
+# Use this during active development for rapid iteration
+test-fast: clean-ditto
+	@echo "Running unit tests (fast mode)..."
+	@if command -v cargo-nextest >/dev/null 2>&1; then \
+		if [ -f .env ]; then \
+			export $$(grep -v '^#' .env | xargs) && cargo nextest run --lib --no-fail-fast; \
+		else \
+			cargo nextest run --lib --no-fail-fast; \
+		fi; \
 	else \
-		cargo test; \
+		echo "Note: Install cargo-nextest for 2x faster tests: cargo install cargo-nextest"; \
+		if [ -f .env ]; then \
+			export $$(grep -v '^#' .env | xargs) && cargo test --lib; \
+		else \
+			cargo test --lib; \
+		fi; \
 	fi
 
-# Run functional/unit tests only (fast, for CI)
-test-functional: clean-ditto
-	@echo "Running functional/unit tests only..."
-	@if [ -f .env ]; then \
-		export $$(grep -v '^#' .env | xargs) && cargo test; \
+# test-unit: Unit tests only with nextest (~30s)
+test-unit: clean-ditto
+	@echo "Running unit tests..."
+	@if command -v cargo-nextest >/dev/null 2>&1; then \
+		if [ -f .env ]; then \
+			export $$(grep -v '^#' .env | xargs) && cargo nextest run --lib --workspace --exclude hive-ffi; \
+		else \
+			cargo nextest run --lib --workspace --exclude hive-ffi; \
+		fi; \
 	else \
-		cargo test; \
+		echo "Note: Install cargo-nextest for 2x faster tests: cargo install cargo-nextest"; \
+		if [ -f .env ]; then \
+			export $$(grep -v '^#' .env | xargs) && cargo test --lib --workspace --exclude hive-ffi; \
+		else \
+			cargo test --lib --workspace --exclude hive-ffi; \
+		fi; \
+	fi
+
+# test-integration: Integration tests excluding E2E (~2 min)
+test-integration: clean-ditto
+	@echo "Running integration tests (excluding E2E)..."
+	@if command -v cargo-nextest >/dev/null 2>&1; then \
+		if [ -f .env ]; then \
+			export $$(grep -v '^#' .env | xargs) && cargo nextest run --workspace --exclude hive-ffi -E 'not test(e2e)'; \
+		else \
+			cargo nextest run --workspace --exclude hive-ffi -E 'not test(e2e)'; \
+		fi; \
+	else \
+		echo "Note: Install cargo-nextest for 2x faster tests: cargo install cargo-nextest"; \
+		if [ -f .env ]; then \
+			export $$(grep -v '^#' .env | xargs) && cargo test --workspace --exclude hive-ffi; \
+		else \
+			cargo test --workspace --exclude hive-ffi; \
+		fi; \
+	fi
+
+# test-e2e: E2E tests only (~5 min)
+test-e2e: clean-ditto
+	@echo "Running E2E tests..."
+	@if [ ! -f .env ]; then \
+		echo "⚠️  Warning: .env file not found. Ditto tests may be skipped."; \
+		echo "   Create .env with DITTO_APP_ID, DITTO_OFFLINE_TOKEN, DITTO_SHARED_KEY"; \
+	fi
+	@if command -v cargo-nextest >/dev/null 2>&1; then \
+		if [ -f .env ]; then \
+			export $$(grep -v '^#' .env | xargs) && cargo nextest run --workspace --exclude hive-ffi -E 'test(e2e)'; \
+		else \
+			cargo nextest run --workspace --exclude hive-ffi -E 'test(e2e)'; \
+		fi; \
+	else \
+		echo "Note: Install cargo-nextest for 2x faster tests: cargo install cargo-nextest"; \
+		if [ -f .env ]; then \
+			export $$(grep -v '^#' .env | xargs) && cargo test --workspace --exclude hive-ffi e2e; \
+		else \
+			cargo test --workspace --exclude hive-ffi e2e; \
+		fi; \
+	fi
+
+# test: Run all tests (unit + integration + E2E)
+test: clean-ditto
+	@echo "Running all tests..."
+	@if command -v cargo-nextest >/dev/null 2>&1; then \
+		if [ -f .env ]; then \
+			export $$(grep -v '^#' .env | xargs) && cargo nextest run --workspace --exclude hive-ffi; \
+		else \
+			cargo nextest run --workspace --exclude hive-ffi; \
+		fi; \
+	else \
+		if [ -f .env ]; then \
+			export $$(grep -v '^#' .env | xargs) && cargo test --workspace --exclude hive-ffi; \
+		else \
+			cargo test --workspace --exclude hive-ffi; \
+		fi; \
 	fi
 
 # Run baseline comparison tests only (Containerlab-based)
 test-baseline:
 	@echo "Running baseline comparison tests..."
 	@cd hive-sim && ./run-baseline-comparison.sh
-
-# Run E2E integration tests
-test-e2e: clean-ditto
-	@echo "Running E2E integration tests..."
-	@if [ ! -f .env ]; then \
-		echo "⚠️  Warning: .env file not found. Ditto tests may be skipped."; \
-		echo "   Create .env with DITTO_APP_ID, DITTO_OFFLINE_TOKEN, DITTO_SHARED_KEY"; \
-	fi
-	cd hive-protocol && export $$(grep -v '^#' ../.env | xargs) && cargo test --test squad_formation_e2e --nocapture
 
 fmt:
 	@echo "Formatting code..."
@@ -107,23 +185,15 @@ check: fmt clippy test
 pre-commit: clean-ditto
 	@echo "Running pre-commit checks..."
 	@cargo fmt --all
-	@cargo clippy --all-targets --all-features -- -D warnings
-	@if [ -f .env ]; then \
-		export $$(grep -v '^#' .env | xargs) && cargo test; \
-	else \
-		cargo test; \
-	fi
+	@cargo clippy --all-targets --all-features --workspace --exclude hive-ffi -- -D warnings
+	@$(MAKE) test-unit
 	@echo "✅ Pre-commit checks passed!"
 
 ci: clean-ditto
 	@echo "Running CI pipeline..."
 	@cargo fmt --all -- --check
-	@cargo clippy --all-targets --all-features -- -D warnings
-	@if [ -f .env ]; then \
-		export $$(grep -v '^#' .env | xargs) && cargo test; \
-	else \
-		cargo test; \
-	fi
+	@cargo clippy --all-targets --all-features --workspace --exclude hive-ffi -- -D warnings
+	@$(MAKE) test-integration
 	@echo "✅ CI pipeline passed!"
 
 clean: clean-ditto
