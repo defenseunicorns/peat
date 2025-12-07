@@ -10,6 +10,7 @@ members = [
     "hive-mesh",
     "hive-ffi",
     "hive-commander",
+    "hive-inference",
 ]
 
 [workspace.package]
