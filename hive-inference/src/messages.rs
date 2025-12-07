@@ -620,7 +620,11 @@ impl ModelCapability {
     }
 
     /// Set framework and quantization
-    pub fn with_framework(mut self, framework: impl Into<String>, quantization: impl Into<String>) -> Self {
+    pub fn with_framework(
+        mut self,
+        framework: impl Into<String>,
+        quantization: impl Into<String>,
+    ) -> Self {
         self.framework = Some(framework.into());
         self.quantization = Some(quantization.into());
         self

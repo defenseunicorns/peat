@@ -135,6 +135,9 @@ pub struct DegradedModelInfo {
     pub reason: Option<String>,
 }
 
+/// Performance metrics tuple: (precision, recall, fps, latency_ms)
+type PerformanceMetrics = (f64, f64, f64, Option<f64>);
+
 /// Result of a model query across the formation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelQueryResult {
@@ -348,7 +351,7 @@ impl Coordinator {
         let mut degraded_models = Vec::new();
 
         // Collect performance data for averaging
-        let mut perf_by_type: HashMap<String, Vec<(f64, f64, f64, Option<f64>)>> = HashMap::new();
+        let mut perf_by_type: HashMap<String, Vec<PerformanceMetrics>> = HashMap::new();
 
         for team in &self.teams {
             for platform in &team.members {
@@ -362,7 +365,9 @@ impl Coordinator {
                     }
 
                     // Count by type
-                    *models_by_type.entry(model_cap.model_type.clone()).or_insert(0) += 1;
+                    *models_by_type
+                        .entry(model_cap.model_type.clone())
+                        .or_insert(0) += 1;
 
                     // Count by version
                     let version_key = format!("{}:{}", model_cap.model_id, model_cap.model_version);
@@ -448,9 +453,7 @@ impl Coordinator {
 
     /// Get all operational models of a specific type
     pub fn get_operational_models_by_type(&self, model_type: &str) -> Vec<PlatformModelMatch> {
-        let query = ModelQuery::new()
-            .with_model_type(model_type)
-            .operational();
+        let query = ModelQuery::new().with_model_type(model_type).operational();
         self.query_models(&query).matches
     }
 
@@ -889,7 +892,9 @@ mod tests {
         assert_eq!(inventory.total_models, 2);
         assert!(inventory.models_by_type.contains_key("detector_tracker"));
         assert_eq!(inventory.models_by_type["detector_tracker"], 2);
-        assert!(inventory.models_by_version.contains_key("object_tracker:1.2.0"));
+        assert!(inventory
+            .models_by_version
+            .contains_key("object_tracker:1.2.0"));
         assert!(inventory.avg_performance.contains_key("detector_tracker"));
     }
 

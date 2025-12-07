@@ -587,11 +587,8 @@ impl AiModelPlatform {
     pub fn to_model_capability(&self) -> crate::messages::ModelCapability {
         use crate::messages::{ModelCapability, ModelPerformance};
 
-        let performance = ModelPerformance::new(
-            self.model.precision,
-            self.model.recall,
-            self.model.fps,
-        );
+        let performance =
+            ModelPerformance::new(self.model.precision, self.model.recall, self.model.fps);
         let performance = if let Some(latency) = self.model.latency_ms {
             performance.with_latency(latency)
         } else {

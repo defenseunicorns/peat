@@ -29,8 +29,7 @@
 //! ```
 
 use crate::messages::{
-    CapabilityAdvertisement, ModelCapability, ModelPerformance, OperationalStatus,
-    ResourceMetrics,
+    CapabilityAdvertisement, ModelCapability, ModelPerformance, OperationalStatus, ResourceMetrics,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -187,7 +186,9 @@ pub struct RegisteredModel {
 impl RegisteredModel {
     /// Create a new registered model entry
     pub fn new(capability: ModelCapability) -> Self {
-        let baseline = Some(PerformanceBaseline::from_performance(&capability.performance));
+        let baseline = Some(PerformanceBaseline::from_performance(
+            &capability.performance,
+        ));
         Self {
             capability,
             baseline,
@@ -491,11 +492,7 @@ impl ModelRegistry {
     }
 
     /// Start a model update
-    pub fn start_update(
-        &mut self,
-        model_id: &str,
-        new_version: &str,
-    ) -> Result<(), RegistryError> {
+    pub fn start_update(&mut self, model_id: &str, new_version: &str) -> Result<(), RegistryError> {
         let (previous_status, from_version) = {
             let model = self
                 .models
@@ -724,11 +721,8 @@ impl ModelRegistry {
 
     /// Generate a capability advertisement from current state
     pub fn generate_advertisement(&self) -> CapabilityAdvertisement {
-        let models: Vec<ModelCapability> = self
-            .models
-            .values()
-            .map(|m| m.capability.clone())
-            .collect();
+        let models: Vec<ModelCapability> =
+            self.models.values().map(|m| m.capability.clone()).collect();
 
         CapabilityAdvertisement {
             platform_id: self.platform_id.clone(),
