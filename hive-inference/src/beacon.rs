@@ -632,22 +632,30 @@ impl HiveBeacon {
                 .clone()
                 .unwrap_or_else(|| model_spec.expected_performance.clone());
 
-            let model_cap = ModelCapability {
-                model_id: model_spec.model_id.clone(),
-                model_version: model_spec.version.clone(),
-                model_hash: model_spec.hash.clone(),
-                model_type: model_spec.model_type.clone(),
+            let mut model_cap = ModelCapability::new(
+                &model_spec.model_id,
+                &model_spec.version,
+                &model_spec.hash,
+                &model_spec.model_type,
                 performance,
-                operational_status: state.status,
-                input_signature: vec![format!(
-                    "image:{}x{}x{}",
-                    model_spec.input_size.0, model_spec.input_size.1, model_spec.input_size.2
-                )],
-                output_signature: vec![
-                    "detections:bbox,class,confidence".to_string(),
-                    "tracks:id,bbox,velocity".to_string(),
-                ],
-            };
+            )
+            .with_status(state.status)
+            .with_framework(&model_spec.framework, &model_spec.quantization)
+            .with_size(model_spec.size_bytes);
+
+            model_cap.input_signature = vec![format!(
+                "image:{}x{}x{}",
+                model_spec.input_size.0, model_spec.input_size.1, model_spec.input_size.2
+            )];
+            model_cap.output_signature = vec![
+                "detections:bbox,class,confidence".to_string(),
+                "tracks:id,bbox,velocity".to_string(),
+            ];
+            if !model_spec.class_labels.is_empty() {
+                model_cap.class_labels = model_spec.class_labels.clone();
+                model_cap.num_classes = Some(model_spec.num_classes);
+            }
+
             models.push(model_cap);
         }
 
