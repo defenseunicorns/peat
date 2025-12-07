@@ -9,6 +9,7 @@
 //! - **MeshTransport**: Connection establishment and management
 //! - **MeshConnection**: Active connection to a peer
 //! - **NodeId**: Mesh network node identifier
+//! - **PeerEvent**: Connection lifecycle events (Issue #252)
 //!
 //! ## Implementations
 //!
@@ -18,7 +19,7 @@
 //! ## Example
 //!
 //! ```ignore
-//! use hive_protocol::transport::{MeshTransport, NodeId};
+//! use hive_protocol::transport::{MeshTransport, NodeId, PeerEvent};
 //!
 //! // Create transport (Iroh or Ditto)
 //! let transport: Arc<dyn MeshTransport> = ...;
@@ -26,11 +27,22 @@
 //! // Start transport
 //! transport.start().await?;
 //!
+//! // Subscribe to peer events (Issue #252)
+//! let mut events = transport.subscribe_peer_events();
+//! tokio::spawn(async move {
+//!     while let Some(event) = events.recv().await {
+//!         match event {
+//!             PeerEvent::Connected { peer_id } => println!("Peer connected: {}", peer_id),
+//!             PeerEvent::Disconnected { peer_id, reason } => println!("Peer disconnected: {}", peer_id),
+//!         }
+//!     }
+//! });
+//!
 //! // Connect to peer
 //! let peer_id = NodeId::new("node-123".to_string());
 //! let conn = transport.connect(&peer_id).await?;
 //!
-//! // Check connection
+//! // Check connection (Issue #251 - now properly detects disconnection)
 //! assert!(conn.is_alive());
 //! assert_eq!(conn.peer_id(), &peer_id);
 //! ```
@@ -38,6 +50,8 @@
 use async_trait::async_trait;
 use std::error::Error as StdError;
 use std::fmt;
+use std::time::Instant;
+use tokio::sync::mpsc;
 
 #[cfg(feature = "automerge-backend")]
 pub mod iroh;
@@ -81,6 +95,161 @@ impl From<&str> for NodeId {
         Self(id.to_string())
     }
 }
+
+// =============================================================================
+// Peer Events (Issue #252)
+// =============================================================================
+
+/// Peer connection lifecycle events
+///
+/// Applications can subscribe to these events to react to peer state changes.
+/// This is particularly important for FFI consumers like ATAK.
+///
+/// # Example
+///
+/// ```ignore
+/// let mut events = transport.subscribe_peer_events();
+/// while let Some(event) = events.recv().await {
+///     match event {
+///         PeerEvent::Connected { peer_id, .. } => {
+///             log::info!("Peer connected: {}", peer_id);
+///         }
+///         PeerEvent::Disconnected { peer_id, reason, .. } => {
+///             log::warn!("Peer disconnected: {} - {:?}", peer_id, reason);
+///         }
+///         PeerEvent::Degraded { peer_id, health, .. } => {
+///             log::warn!("Peer degraded: {} - RTT: {}ms", peer_id, health.rtt_ms);
+///         }
+///     }
+/// }
+/// ```
+#[derive(Debug, Clone)]
+pub enum PeerEvent {
+    /// New peer connected successfully
+    Connected {
+        /// The peer's node ID
+        peer_id: NodeId,
+        /// When the connection was established
+        connected_at: Instant,
+    },
+
+    /// Peer disconnected
+    Disconnected {
+        /// The peer's node ID
+        peer_id: NodeId,
+        /// Reason for disconnection (if known)
+        reason: DisconnectReason,
+        /// How long the connection was active
+        connection_duration: std::time::Duration,
+    },
+
+    /// Connection quality degraded (optional, for health monitoring)
+    Degraded {
+        /// The peer's node ID
+        peer_id: NodeId,
+        /// Current health metrics
+        health: ConnectionHealth,
+    },
+}
+
+/// Reason for peer disconnection
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DisconnectReason {
+    /// Remote peer initiated close
+    RemoteClosed,
+    /// Connection timed out
+    Timeout,
+    /// Network error occurred
+    NetworkError(String),
+    /// Local side requested disconnect
+    LocalClosed,
+    /// Connection was idle too long
+    IdleTimeout,
+    /// Application-level error
+    ApplicationError(String),
+    /// Unknown reason
+    Unknown,
+}
+
+impl fmt::Display for DisconnectReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DisconnectReason::RemoteClosed => write!(f, "remote closed"),
+            DisconnectReason::Timeout => write!(f, "timeout"),
+            DisconnectReason::NetworkError(e) => write!(f, "network error: {}", e),
+            DisconnectReason::LocalClosed => write!(f, "local closed"),
+            DisconnectReason::IdleTimeout => write!(f, "idle timeout"),
+            DisconnectReason::ApplicationError(e) => write!(f, "application error: {}", e),
+            DisconnectReason::Unknown => write!(f, "unknown"),
+        }
+    }
+}
+
+/// Connection health metrics
+///
+/// Used for monitoring connection quality and detecting degradation.
+#[derive(Debug, Clone)]
+pub struct ConnectionHealth {
+    /// Round-trip time in milliseconds (smoothed average)
+    pub rtt_ms: u32,
+    /// RTT variance in milliseconds
+    pub rtt_variance_ms: u32,
+    /// Estimated packet loss percentage (0-100)
+    pub packet_loss_percent: u8,
+    /// Current connection state
+    pub state: ConnectionState,
+    /// Last successful communication
+    pub last_activity: Instant,
+}
+
+impl Default for ConnectionHealth {
+    fn default() -> Self {
+        Self {
+            rtt_ms: 0,
+            rtt_variance_ms: 0,
+            packet_loss_percent: 0,
+            state: ConnectionState::Healthy,
+            last_activity: Instant::now(),
+        }
+    }
+}
+
+/// Connection state for health monitoring
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConnectionState {
+    /// Connection is healthy
+    Healthy,
+    /// Connection is degraded (high latency/loss)
+    Degraded,
+    /// Connection is suspected dead (missed heartbeats)
+    Suspect,
+    /// Connection confirmed dead
+    Dead,
+}
+
+impl fmt::Display for ConnectionState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConnectionState::Healthy => write!(f, "healthy"),
+            ConnectionState::Degraded => write!(f, "degraded"),
+            ConnectionState::Suspect => write!(f, "suspect"),
+            ConnectionState::Dead => write!(f, "dead"),
+        }
+    }
+}
+
+/// Channel capacity for peer events
+pub const PEER_EVENT_CHANNEL_CAPACITY: usize = 256;
+
+/// Type alias for peer event receiver
+pub type PeerEventReceiver = mpsc::Receiver<PeerEvent>;
+
+/// Type alias for peer event sender
+pub type PeerEventSender = mpsc::Sender<PeerEvent>;
+
+// =============================================================================
+// Error Types
+// =============================================================================
 
 /// Error type for mesh transport operations
 #[derive(Debug)]
@@ -222,6 +391,38 @@ pub trait MeshTransport: Send + Sync {
     fn is_connected(&self, peer_id: &NodeId) -> bool {
         self.get_connection(peer_id).is_some()
     }
+
+    /// Subscribe to peer connection events (Issue #252)
+    ///
+    /// Returns a receiver channel that will receive `PeerEvent` notifications
+    /// for all peer lifecycle changes (connect, disconnect, degradation).
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let mut events = transport.subscribe_peer_events();
+    /// tokio::spawn(async move {
+    ///     while let Some(event) = events.recv().await {
+    ///         println!("Peer event: {:?}", event);
+    ///     }
+    /// });
+    /// ```
+    ///
+    /// # Notes
+    ///
+    /// - Multiple subscribers are supported
+    /// - Events are sent on a best-effort basis (non-blocking send)
+    /// - Channel has capacity of `PEER_EVENT_CHANNEL_CAPACITY`
+    fn subscribe_peer_events(&self) -> PeerEventReceiver;
+
+    /// Get connection health for a specific peer (Issue #254 preparation)
+    ///
+    /// Returns health metrics for the connection if available.
+    fn get_peer_health(&self, peer_id: &NodeId) -> Option<ConnectionHealth> {
+        // Default implementation - subclasses can override with actual health monitoring
+        self.get_connection(peer_id)
+            .map(|_| ConnectionHealth::default())
+    }
 }
 
 /// Active connection to a mesh peer
@@ -238,11 +439,32 @@ pub trait MeshConnection: Send + Sync {
     /// Get the remote peer's node ID
     fn peer_id(&self) -> &NodeId;
 
-    /// Check if connection is still alive
+    /// Check if connection is still alive (Issue #251)
     ///
-    /// For Iroh: Checks QUIC connection status
+    /// For Iroh: Checks QUIC connection status via `close_reason()`
     /// For Ditto: Always returns true (Ditto handles failures internally)
+    ///
+    /// # Returns
+    ///
+    /// - `true` if the connection is active and usable
+    /// - `false` if the connection has been closed or is dead
     fn is_alive(&self) -> bool;
+
+    /// Get the time when this connection was established
+    ///
+    /// Used for calculating connection duration in disconnect events.
+    fn connected_at(&self) -> Instant;
+
+    /// Get the disconnect reason if the connection is closed
+    ///
+    /// Returns `None` if the connection is still alive.
+    fn disconnect_reason(&self) -> Option<DisconnectReason> {
+        if self.is_alive() {
+            None
+        } else {
+            Some(DisconnectReason::Unknown)
+        }
+    }
 }
 
 #[cfg(test)]
