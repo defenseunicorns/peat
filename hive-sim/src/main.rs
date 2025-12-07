@@ -1408,9 +1408,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 node_id, squad_id, member_ids
                             );
 
-                            // Clone backend for aggregation loop
+                            // Clone backend for aggregation loop (Issue #271: verify transport sharing)
+                            let cloned_backend = (*automerge_backend).clone();
+
+                            // Issue #271 debug: Verify transport Arc is shared between original and clone
+                            let original_ptr = automerge_backend.transport_arc_ptr();
+                            let cloned_ptr = cloned_backend.transport_arc_ptr();
+                            if original_ptr != cloned_ptr {
+                                eprintln!(
+                                    "[{}] ⚠️  Issue #271 BUG: Transport Arc NOT shared!\n  Original: {:?}\n  Clone: {:?}",
+                                    node_id, original_ptr, cloned_ptr
+                                );
+                            } else {
+                                eprintln!(
+                                    "[{}] ✓ Issue #271: Transport Arc correctly shared: {:?}",
+                                    node_id, original_ptr
+                                );
+                            }
+
                             let backend_for_aggregation: Arc<Box<dyn DataSyncBackend>> =
-                                Arc::new(Box::new((*automerge_backend).clone()));
+                                Arc::new(Box::new(cloned_backend));
                             tokio::spawn(async move {
                                 if let Err(e) = squad_leader_aggregation_loop(
                                     coordinator,
