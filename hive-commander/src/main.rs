@@ -12,6 +12,8 @@
 #![allow(dead_code)]
 #![allow(clippy::upper_case_acronyms)]
 
+mod protocol_types;
+
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},

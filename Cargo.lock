@@ -2187,9 +2187,11 @@ name = "hive-commander"
 version = "0.1.0"
 dependencies = [
  "crossterm",
+ "hive-protocol",
  "noise",
  "rand 0.8.5",
  "ratatui",
+ "serde_json",
 ]
 
 [[package]]
