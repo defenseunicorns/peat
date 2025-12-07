@@ -4,10 +4,15 @@
 //! Since Ditto manages connections internally, this is largely a no-op wrapper that provides
 //! the uniform `MeshTransport` interface for topology management.
 
-use super::{MeshConnection, MeshTransport, NodeId, Result};
+use super::{
+    MeshConnection, MeshTransport, NodeId, PeerEventReceiver, PeerEventSender, Result,
+    PEER_EVENT_CHANNEL_CAPACITY,
+};
 use crate::sync::ditto::DittoBackend;
 use async_trait::async_trait;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
+use std::time::Instant;
+use tokio::sync::mpsc;
 
 /// Ditto-based mesh transport implementation
 ///
@@ -38,6 +43,9 @@ use std::sync::Arc;
 pub struct DittoMeshTransport {
     /// Underlying Ditto backend
     backend: Arc<DittoBackend>,
+
+    /// Event broadcaster for peer events (Issue #252)
+    event_senders: Arc<RwLock<Vec<PeerEventSender>>>,
 }
 
 impl DittoMeshTransport {
@@ -47,7 +55,10 @@ impl DittoMeshTransport {
     ///
     /// * `backend` - Underlying DittoBackend
     pub fn new(backend: Arc<DittoBackend>) -> Self {
-        Self { backend }
+        Self {
+            backend,
+            event_senders: Arc::new(RwLock::new(Vec::new())),
+        }
     }
 
     /// Get the underlying DittoBackend
@@ -101,6 +112,14 @@ impl MeshTransport for DittoMeshTransport {
         // For now, return empty vec - this will be improved in Phase 8.2
         vec![]
     }
+
+    fn subscribe_peer_events(&self) -> PeerEventReceiver {
+        let (tx, rx) = mpsc::channel(PEER_EVENT_CHANNEL_CAPACITY);
+        self.event_senders.write().unwrap().push(tx);
+        // Note: Ditto handles peer events internally via PresenceObserver
+        // In the future, we can bridge Ditto's events to this channel
+        rx
+    }
 }
 
 /// Ditto mesh connection implementation
@@ -110,12 +129,17 @@ impl MeshTransport for DittoMeshTransport {
 /// around the peer's NodeId.
 pub struct DittoMeshConnection {
     peer_id: NodeId,
+    /// When this virtual connection was created
+    connected_at: Instant,
 }
 
 impl DittoMeshConnection {
     /// Create a new Ditto mesh connection
     pub fn new(peer_id: NodeId) -> Self {
-        Self { peer_id }
+        Self {
+            peer_id,
+            connected_at: Instant::now(),
+        }
     }
 }
 
@@ -129,6 +153,10 @@ impl MeshConnection for DittoMeshConnection {
         // We assume the connection is alive if it exists
         // TODO: Query Ditto's peer list to verify actual reachability
         true
+    }
+
+    fn connected_at(&self) -> Instant {
+        self.connected_at
     }
 }
 

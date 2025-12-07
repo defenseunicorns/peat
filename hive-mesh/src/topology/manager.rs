@@ -895,6 +895,7 @@ mod tests {
 
     struct MockConnection {
         peer_id: NodeId,
+        connected_at: std::time::Instant,
     }
 
     impl MeshConnectionTrait for MockConnection {
@@ -904,6 +905,10 @@ mod tests {
 
         fn is_alive(&self) -> bool {
             true
+        }
+
+        fn connected_at(&self) -> std::time::Instant {
+            self.connected_at
         }
     }
 
@@ -923,6 +928,7 @@ mod tests {
             self.connections.write().unwrap().push(peer_id.clone());
             Ok(Box::new(MockConnection {
                 peer_id: peer_id.clone(),
+                connected_at: std::time::Instant::now(),
             }))
         }
 
@@ -935,6 +941,7 @@ mod tests {
             if self.has_connection(peer_id) {
                 Some(Box::new(MockConnection {
                     peer_id: peer_id.clone(),
+                    connected_at: std::time::Instant::now(),
                 }))
             } else {
                 None
@@ -947,6 +954,11 @@ mod tests {
 
         fn connected_peers(&self) -> Vec<NodeId> {
             self.connections.read().unwrap().clone()
+        }
+
+        fn subscribe_peer_events(&self) -> hive_protocol::transport::PeerEventReceiver {
+            let (_tx, rx) = tokio::sync::mpsc::channel(256);
+            rx
         }
     }
 
