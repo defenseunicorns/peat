@@ -42,7 +42,48 @@ use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(feature = "automerge-backend")]
 use std::sync::{Arc, RwLock};
 #[cfg(feature = "automerge-backend")]
+use tokio::sync::mpsc;
+#[cfg(feature = "automerge-backend")]
 use tokio::task::JoinHandle;
+
+// =============================================================================
+// Peer Events (Issue #275)
+// =============================================================================
+
+/// Transport-level peer event (Issue #275)
+///
+/// Emitted when connections are established or closed at the transport level.
+/// This is transport-agnostic - the same event type can be used for QUIC, Ditto, etc.
+#[cfg(feature = "automerge-backend")]
+#[derive(Debug, Clone)]
+pub enum TransportPeerEvent {
+    /// New peer connected
+    Connected {
+        /// The peer's endpoint ID
+        endpoint_id: EndpointId,
+        /// When the connection was established
+        connected_at: std::time::Instant,
+    },
+    /// Peer disconnected
+    Disconnected {
+        /// The peer's endpoint ID
+        endpoint_id: EndpointId,
+        /// Reason for disconnection
+        reason: String,
+    },
+}
+
+/// Channel capacity for transport peer events
+#[cfg(feature = "automerge-backend")]
+pub const TRANSPORT_EVENT_CHANNEL_CAPACITY: usize = 256;
+
+/// Type alias for transport event receiver
+#[cfg(feature = "automerge-backend")]
+pub type TransportEventReceiver = mpsc::Receiver<TransportPeerEvent>;
+
+/// Type alias for transport event sender
+#[cfg(feature = "automerge-backend")]
+pub type TransportEventSender = mpsc::Sender<TransportPeerEvent>;
 
 /// ALPN protocol identifier for HIVE Protocol Automerge sync
 #[cfg(feature = "automerge-backend")]
@@ -64,6 +105,9 @@ pub struct IrohTransport {
     /// mDNS discovery (optional, for automatic peer discovery on local network)
     #[allow(dead_code)]
     mdns_discovery: Option<MdnsDiscovery>,
+    /// Event senders for peer events (Issue #275)
+    /// Multiple receivers can subscribe via subscribe_peer_events()
+    event_senders: Arc<RwLock<Vec<TransportEventSender>>>,
 }
 
 #[cfg(feature = "automerge-backend")]
@@ -103,6 +147,7 @@ impl IrohTransport {
             accept_running: Arc::new(AtomicBool::new(false)),
             accept_task: Arc::new(RwLock::new(None)),
             mdns_discovery: None,
+            event_senders: Arc::new(RwLock::new(Vec::new())),
         })
     }
 
@@ -164,6 +209,7 @@ impl IrohTransport {
             accept_running: Arc::new(AtomicBool::new(false)),
             accept_task: Arc::new(RwLock::new(None)),
             mdns_discovery: Some(discovery),
+            event_senders: Arc::new(RwLock::new(Vec::new())),
         })
     }
 
@@ -232,6 +278,7 @@ impl IrohTransport {
             accept_running: Arc::new(AtomicBool::new(false)),
             accept_task: Arc::new(RwLock::new(None)),
             mdns_discovery: None,
+            event_senders: Arc::new(RwLock::new(Vec::new())),
         })
     }
 
@@ -292,6 +339,7 @@ impl IrohTransport {
             accept_running: Arc::new(AtomicBool::new(false)),
             accept_task: Arc::new(RwLock::new(None)),
             mdns_discovery: Some(discovery),
+            event_senders: Arc::new(RwLock::new(Vec::new())),
         })
     }
 
@@ -368,6 +416,7 @@ impl IrohTransport {
             accept_running: Arc::new(AtomicBool::new(false)),
             accept_task: Arc::new(RwLock::new(None)),
             mdns_discovery: Some(discovery),
+            event_senders: Arc::new(RwLock::new(Vec::new())),
         })
     }
 
@@ -460,6 +509,7 @@ impl IrohTransport {
             accept_running: Arc::new(AtomicBool::new(false)),
             accept_task: Arc::new(RwLock::new(None)),
             mdns_discovery: None,
+            event_senders: Arc::new(RwLock::new(Vec::new())),
         })
     }
 
@@ -552,6 +602,14 @@ impl IrohTransport {
         }
 
         connections.insert(remote_id, conn.clone());
+        drop(connections); // Release lock before emitting event
+
+        // Emit connect event (Issue #275)
+        self.emit_event(TransportPeerEvent::Connected {
+            endpoint_id: remote_id,
+            connected_at: std::time::Instant::now(),
+        });
+
         Ok(Some(conn))
     }
 
@@ -708,6 +766,14 @@ impl IrohTransport {
 
         // Store and return the new connection
         connections.insert(remote_id, conn.clone());
+        drop(connections); // Release lock before emitting event
+
+        // Emit connect event (Issue #275)
+        self.emit_event(TransportPeerEvent::Connected {
+            endpoint_id: remote_id,
+            connected_at: std::time::Instant::now(),
+        });
+
         Ok(Some(conn))
     }
 
@@ -720,8 +786,58 @@ impl IrohTransport {
     pub fn disconnect(&self, endpoint_id: &EndpointId) -> Result<()> {
         if let Some(conn) = self.connections.write().unwrap().remove(endpoint_id) {
             conn.close(0u32.into(), b"disconnecting");
+            // Emit disconnect event (Issue #275)
+            self.emit_event(TransportPeerEvent::Disconnected {
+                endpoint_id: *endpoint_id,
+                reason: "local disconnect".to_string(),
+            });
         }
         Ok(())
+    }
+
+    // =========================================================================
+    // Peer Events (Issue #275)
+    // =========================================================================
+
+    /// Subscribe to peer connection events
+    ///
+    /// Returns a receiver channel that will receive `TransportPeerEvent` notifications
+    /// for all connection lifecycle changes (connect, disconnect).
+    ///
+    /// Multiple subscribers are supported - each gets their own channel.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let mut events = transport.subscribe_peer_events();
+    /// tokio::spawn(async move {
+    ///     while let Some(event) = events.recv().await {
+    ///         match event {
+    ///             TransportPeerEvent::Connected { endpoint_id, .. } => {
+    ///                 println!("Peer connected: {:?}", endpoint_id);
+    ///             }
+    ///             TransportPeerEvent::Disconnected { endpoint_id, reason } => {
+    ///                 println!("Peer disconnected: {:?} - {}", endpoint_id, reason);
+    ///             }
+    ///         }
+    ///     }
+    /// });
+    /// ```
+    pub fn subscribe_peer_events(&self) -> TransportEventReceiver {
+        let (tx, rx) = mpsc::channel(TRANSPORT_EVENT_CHANNEL_CAPACITY);
+        self.event_senders.write().unwrap().push(tx);
+        rx
+    }
+
+    /// Emit a peer event to all subscribers (Issue #275)
+    ///
+    /// Called internally when connections are established or closed.
+    fn emit_event(&self, event: TransportPeerEvent) {
+        let senders = self.event_senders.read().unwrap();
+        for sender in senders.iter() {
+            // Non-blocking send - drop if channel is full
+            let _ = sender.try_send(event.clone());
+        }
     }
 
     /// Get the number of currently connected peers
@@ -746,16 +862,34 @@ impl IrohTransport {
     ///
     /// Called automatically by `peer_count()` and `connected_peers()`.
     /// Can also be called explicitly to clean up stale connections.
+    /// Emits disconnect events for removed connections (Issue #275).
     pub fn cleanup_closed_connections(&self) {
-        let mut connections = self.connections.write().unwrap();
-        connections.retain(|endpoint_id, conn| {
-            if conn.close_reason().is_some() {
-                tracing::debug!(?endpoint_id, "Removing closed connection from map");
-                false
-            } else {
-                true
-            }
-        });
+        // Collect closed connections to emit events after releasing lock
+        let closed_peers: Vec<(EndpointId, String)> = {
+            let mut connections = self.connections.write().unwrap();
+            let mut closed = Vec::new();
+
+            connections.retain(|endpoint_id, conn| {
+                if let Some(reason) = conn.close_reason() {
+                    tracing::debug!(?endpoint_id, "Removing closed connection from map");
+                    let reason_str = format!("{:?}", reason);
+                    closed.push((*endpoint_id, reason_str));
+                    false
+                } else {
+                    true
+                }
+            });
+
+            closed
+        };
+
+        // Emit disconnect events (Issue #275)
+        for (endpoint_id, reason) in closed_peers {
+            self.emit_event(TransportPeerEvent::Disconnected {
+                endpoint_id,
+                reason,
+            });
+        }
     }
 
     /// Start the accept loop to receive incoming connections
@@ -1089,5 +1223,81 @@ mod tests {
         // Cleanup - drop the Arcs (connections will close automatically)
         drop(transport_a);
         drop(transport_b);
+    }
+
+    #[tokio::test]
+    async fn test_peer_event_subscription() {
+        // Test that we can subscribe to peer events (Issue #275)
+        let transport = IrohTransport::new().await.unwrap();
+
+        // Subscribe to events
+        let mut rx = transport.subscribe_peer_events();
+
+        // Verify we can receive from the channel (it should timeout since no events yet)
+        let result = tokio::time::timeout(std::time::Duration::from_millis(50), rx.recv()).await;
+        assert!(result.is_err(), "Should timeout when no events");
+
+        transport.close().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_peer_event_on_connect() {
+        // Test that connect emits an event (Issue #275)
+        use std::sync::Arc;
+
+        // Use deterministic keys for reliable testing
+        let transport = Arc::new(IrohTransport::from_seed("test-event/node-a").await.unwrap());
+        let transport2 = Arc::new(IrohTransport::from_seed("test-event/node-b").await.unwrap());
+        let transport2_id = transport2.endpoint_id();
+        let transport2_addr = transport2.endpoint_addr();
+
+        // Subscribe to events BEFORE connecting
+        let mut rx = transport.subscribe_peer_events();
+
+        // Start accept on transport2
+        transport2.start_accept_loop().unwrap();
+
+        // Connect transport1 to transport2
+        if let Some(_conn) = transport.connect(transport2_addr).await.unwrap() {
+            // Give time for event to be emitted
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+            // Should have received a Connected event
+            let event =
+                tokio::time::timeout(std::time::Duration::from_millis(500), rx.recv()).await;
+            assert!(event.is_ok(), "Should receive connect event");
+
+            if let Ok(Some(TransportPeerEvent::Connected { endpoint_id, .. })) = event {
+                assert_eq!(
+                    endpoint_id, transport2_id,
+                    "Event should be for connected peer"
+                );
+            } else {
+                panic!("Expected Connected event");
+            }
+        }
+
+        // Cleanup - just drop the Arcs (connections will close)
+        drop(transport);
+        drop(transport2);
+    }
+
+    #[tokio::test]
+    async fn test_multiple_event_subscribers() {
+        // Test that multiple subscribers all receive events (Issue #275)
+        let transport = IrohTransport::new().await.unwrap();
+
+        // Subscribe twice
+        let mut rx1 = transport.subscribe_peer_events();
+        let mut rx2 = transport.subscribe_peer_events();
+
+        // Both should be able to receive (and timeout since no events)
+        let result1 = tokio::time::timeout(std::time::Duration::from_millis(50), rx1.recv()).await;
+        let result2 = tokio::time::timeout(std::time::Duration::from_millis(50), rx2.recv()).await;
+
+        assert!(result1.is_err(), "Subscriber 1 should timeout");
+        assert!(result2.is_err(), "Subscriber 2 should timeout");
+
+        transport.close().await.unwrap();
     }
 }

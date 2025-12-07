@@ -1053,6 +1053,8 @@ struct IrohPeerDiscovery {
     /// Formation key for peer authentication (required for secure connections)
     #[cfg(feature = "automerge-backend")]
     formation_key: Arc<std::sync::RwLock<Option<crate::security::FormationKey>>>,
+    /// Whether the event forwarder task is running (Issue #275)
+    event_forwarder_running: Arc<std::sync::atomic::AtomicBool>,
 }
 
 #[async_trait]
@@ -1491,6 +1493,80 @@ impl PeerDiscovery for IrohPeerDiscovery {
 
     fn on_peer_event(&self, callback: Box<dyn Fn(PeerEvent) + Send + Sync>) {
         self.peer_callbacks.lock().unwrap().push(callback);
+
+        // Start event forwarder on first callback registration (Issue #275)
+        // Use compare_exchange to ensure we only start once
+        if self
+            .event_forwarder_running
+            .compare_exchange(
+                false,
+                true,
+                std::sync::atomic::Ordering::SeqCst,
+                std::sync::atomic::Ordering::SeqCst,
+            )
+            .is_ok()
+        {
+            // Subscribe to transport events and forward to callbacks
+            let mut rx = self.transport.subscribe_peer_events();
+            let callbacks = Arc::clone(&self.peer_callbacks);
+            let running = Arc::clone(&self.event_forwarder_running);
+
+            // Spawn the forwarder task using std::thread with a tokio runtime
+            // (since on_peer_event is not async)
+            std::thread::spawn(move || {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to create event forwarder runtime");
+
+                rt.block_on(async move {
+                    use crate::network::TransportPeerEvent;
+
+                    while running.load(std::sync::atomic::Ordering::SeqCst) {
+                        match tokio::time::timeout(std::time::Duration::from_millis(100), rx.recv())
+                            .await
+                        {
+                            Ok(Some(transport_event)) => {
+                                // Convert TransportPeerEvent to PeerEvent
+                                let peer_event = match transport_event {
+                                    TransportPeerEvent::Connected { endpoint_id, .. } => {
+                                        PeerEvent::Connected(PeerInfo {
+                                            peer_id: format!("{:?}", endpoint_id),
+                                            address: None,
+                                            transport: TransportType::Tcp, // QUIC maps to TCP for now
+                                            connected: true,
+                                            last_seen: std::time::SystemTime::now(),
+                                            metadata: std::collections::HashMap::new(),
+                                        })
+                                    }
+                                    TransportPeerEvent::Disconnected {
+                                        endpoint_id,
+                                        reason,
+                                    } => PeerEvent::Disconnected {
+                                        peer_id: format!("{:?}", endpoint_id),
+                                        reason: Some(reason),
+                                    },
+                                };
+
+                                // Invoke all callbacks
+                                if let Ok(cbs) = callbacks.lock() {
+                                    for cb in cbs.iter() {
+                                        cb(peer_event.clone());
+                                    }
+                                }
+                            }
+                            Ok(None) => {
+                                // Channel closed, stop forwarder
+                                break;
+                            }
+                            Err(_) => {
+                                // Timeout - continue to check running flag
+                            }
+                        }
+                    }
+                });
+            });
+        }
     }
 
     async fn get_peer_info(&self, peer_id: &PeerId) -> Result<Option<PeerInfo>> {
@@ -1682,6 +1758,7 @@ impl DataSyncBackend for AutomergeIrohBackend {
             discovery_manager: Arc::clone(&self.discovery_manager),
             #[cfg(feature = "automerge-backend")]
             formation_key: Arc::clone(&self.formation_key),
+            event_forwarder_running: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         })
     }
 
