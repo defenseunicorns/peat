@@ -56,9 +56,11 @@
 //! ```
 
 mod aggregator;
+mod mesh_router;
 mod packet;
 mod router;
 
 pub use aggregator::{AggregationError, PacketAggregator, TelemetryPayload};
+pub use mesh_router::MeshRouter;
 pub use packet::{DataDirection, DataPacket, DataType};
-pub use router::{RoutingDecision, SelectiveRouter};
+pub use router::{DeduplicationConfig, RoutingDecision, SelectiveRouter};
