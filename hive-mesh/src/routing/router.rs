@@ -4,11 +4,20 @@
 //! - Whether data should be consumed (processed) by this node
 //! - Whether data should be forwarded to other nodes
 //! - Which peer should receive forwarded data
+//!
+//! ## Message Deduplication
+//!
+//! The router includes optional message deduplication to prevent routing loops.
+//! When enabled, each packet's ID is tracked and duplicate packets are automatically
+//! dropped. The deduplication cache uses a time-based eviction strategy.
 
 use super::packet::{DataDirection, DataPacket};
 use crate::beacon::HierarchyLevel;
 use crate::hierarchy::NodeRole;
 use crate::topology::TopologyState;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
 use tracing::{debug, trace, warn};
 
 /// Routing decision result
@@ -33,6 +42,34 @@ pub enum RoutingDecision {
     Drop,
 }
 
+/// Configuration for message deduplication
+#[derive(Debug, Clone)]
+pub struct DeduplicationConfig {
+    /// Whether deduplication is enabled
+    pub enabled: bool,
+    /// How long to remember seen packet IDs (default: 5 minutes)
+    pub ttl: Duration,
+    /// Maximum number of packet IDs to track (default: 10000)
+    pub max_entries: usize,
+}
+
+impl Default for DeduplicationConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            ttl: Duration::from_secs(300), // 5 minutes
+            max_entries: 10000,
+        }
+    }
+}
+
+/// Entry in the deduplication cache
+#[derive(Debug, Clone)]
+struct DeduplicationEntry {
+    /// When this packet was first seen
+    first_seen: Instant,
+}
+
 /// Selective router for hierarchical mesh networks
 ///
 /// Makes intelligent routing decisions based on:
@@ -40,48 +77,143 @@ pub enum RoutingDecision {
 /// - Data direction (upward/downward/lateral)
 /// - Topology state (selected peer, linked peers, lateral peers)
 ///
+/// # Message Deduplication
+///
+/// The router can optionally track seen packet IDs to prevent routing loops.
+/// Use `new_with_deduplication()` to enable this feature.
+///
 /// # Example
 ///
 /// ```ignore
-/// use hive_mesh::routing::{SelectiveRouter, DataPacket};
+/// use hive_mesh::routing::{SelectiveRouter, DataPacket, DeduplicationConfig};
 /// use hive_mesh::topology::TopologyState;
 ///
-/// let router = SelectiveRouter::new();
+/// // Create router with deduplication enabled
+/// let router = SelectiveRouter::new_with_deduplication(DeduplicationConfig::default());
 /// let state = get_topology_state();
 /// let packet = DataPacket::telemetry("node-123", vec![1, 2, 3]);
 ///
-/// // Check if we should consume this telemetry
-/// if router.should_consume(&packet, &state) {
-///     process_telemetry(&packet);
-/// }
+/// // Route will automatically deduplicate
+/// let decision = router.route(&packet, &state, "this-node");
 ///
-/// // Check if we should forward it upward
-/// if router.should_forward(&packet, &state) {
-///     if let Some(next) = router.next_hop(&packet, &state) {
-///         send_to_peer(&next, &packet);
-///     }
-/// }
+/// // Second call with same packet returns Drop (duplicate)
+/// let decision2 = router.route(&packet, &state, "this-node");
+/// assert_eq!(decision2, RoutingDecision::Drop);
 /// ```
 pub struct SelectiveRouter {
     /// Enable verbose logging for debugging
     verbose: bool,
+    /// Deduplication configuration
+    dedup_config: DeduplicationConfig,
+    /// Cache of seen packet IDs (packet_id -> entry)
+    seen_packets: Arc<RwLock<HashMap<String, DeduplicationEntry>>>,
 }
 
 impl SelectiveRouter {
-    /// Create a new selective router
+    /// Create a new selective router (deduplication disabled by default)
     pub fn new() -> Self {
-        Self { verbose: false }
+        Self {
+            verbose: false,
+            dedup_config: DeduplicationConfig {
+                enabled: false,
+                ..Default::default()
+            },
+            seen_packets: Arc::new(RwLock::new(HashMap::new())),
+        }
     }
 
     /// Create a new selective router with verbose logging
     pub fn new_verbose() -> Self {
-        Self { verbose: true }
+        Self {
+            verbose: true,
+            dedup_config: DeduplicationConfig {
+                enabled: false,
+                ..Default::default()
+            },
+            seen_packets: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Create a new selective router with deduplication enabled
+    pub fn new_with_deduplication(config: DeduplicationConfig) -> Self {
+        Self {
+            verbose: false,
+            dedup_config: config,
+            seen_packets: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Check if a packet has been seen before (for deduplication)
+    ///
+    /// Returns `true` if this is a duplicate packet that should be dropped.
+    /// If the packet is new, it's added to the seen cache.
+    fn is_duplicate(&self, packet_id: &str) -> bool {
+        if !self.dedup_config.enabled {
+            return false;
+        }
+
+        let now = Instant::now();
+
+        // Try to insert into cache
+        let mut cache = self.seen_packets.write().unwrap();
+
+        // Check if already seen and not expired
+        if let Some(entry) = cache.get(packet_id) {
+            if now.duration_since(entry.first_seen) < self.dedup_config.ttl {
+                if self.verbose {
+                    debug!("Duplicate packet detected: {}", packet_id);
+                }
+                return true;
+            }
+            // Entry expired, will be replaced below
+        }
+
+        // Evict expired entries if cache is getting full
+        if cache.len() >= self.dedup_config.max_entries {
+            self.evict_expired(&mut cache, now);
+
+            // If still full after eviction, remove oldest entry
+            if cache.len() >= self.dedup_config.max_entries {
+                if let Some(oldest_key) = cache
+                    .iter()
+                    .min_by_key(|(_, entry)| entry.first_seen)
+                    .map(|(k, _)| k.clone())
+                {
+                    cache.remove(&oldest_key);
+                }
+            }
+        }
+
+        // Record this packet
+        cache.insert(
+            packet_id.to_string(),
+            DeduplicationEntry { first_seen: now },
+        );
+
+        false
+    }
+
+    /// Evict expired entries from the cache
+    fn evict_expired(&self, cache: &mut HashMap<String, DeduplicationEntry>, now: Instant) {
+        cache.retain(|_, entry| now.duration_since(entry.first_seen) < self.dedup_config.ttl);
+    }
+
+    /// Get the number of entries in the deduplication cache
+    pub fn dedup_cache_size(&self) -> usize {
+        self.seen_packets.read().unwrap().len()
+    }
+
+    /// Clear the deduplication cache
+    pub fn clear_dedup_cache(&self) {
+        self.seen_packets.write().unwrap().clear();
     }
 
     /// Make a complete routing decision for a packet
     ///
     /// This is the primary entry point that combines should_consume,
     /// should_forward, and next_hop into a single decision.
+    ///
+    /// If deduplication is enabled, duplicate packets are automatically dropped.
     ///
     /// # Arguments
     ///
@@ -98,6 +230,14 @@ impl SelectiveRouter {
         state: &TopologyState,
         this_node_id: &str,
     ) -> RoutingDecision {
+        // Check for duplicate packet (if deduplication enabled)
+        if self.is_duplicate(&packet.packet_id) {
+            if self.verbose {
+                debug!("Packet {} is a duplicate, dropping", packet.packet_id);
+            }
+            return RoutingDecision::Drop;
+        }
+
         // Check if packet has reached max hops
         if packet.at_max_hops() {
             if self.verbose {
@@ -1037,5 +1177,123 @@ mod tests {
         // next_hop() should still work for backward compatibility
         let next_hop = router.next_hop(&packet, &state);
         assert_eq!(next_hop, Some("parent-node".to_string()));
+    }
+
+    // ============================================================================
+    // Message Deduplication Tests
+    // ============================================================================
+
+    #[test]
+    fn test_deduplication_disabled_by_default() {
+        let router = SelectiveRouter::new();
+        let state = create_test_state(HierarchyLevel::Squad, NodeRole::Member, true, 0, 0);
+        let packet = DataPacket::telemetry("sensor-1", vec![1, 2, 3]);
+
+        // Route same packet twice - should NOT be dropped (dedup disabled)
+        let decision1 = router.route(&packet, &state, "this-node");
+        let decision2 = router.route(&packet, &state, "this-node");
+
+        // Both should route normally (ConsumeAndForward)
+        assert!(matches!(
+            decision1,
+            RoutingDecision::ConsumeAndForward { .. }
+        ));
+        assert!(matches!(
+            decision2,
+            RoutingDecision::ConsumeAndForward { .. }
+        ));
+        assert_eq!(router.dedup_cache_size(), 0);
+    }
+
+    #[test]
+    fn test_deduplication_enabled() {
+        let router = SelectiveRouter::new_with_deduplication(DeduplicationConfig::default());
+        let state = create_test_state(HierarchyLevel::Squad, NodeRole::Member, true, 0, 0);
+        let packet = DataPacket::telemetry("sensor-1", vec![1, 2, 3]);
+
+        // First route should succeed
+        let decision1 = router.route(&packet, &state, "this-node");
+        assert!(matches!(
+            decision1,
+            RoutingDecision::ConsumeAndForward { .. }
+        ));
+        assert_eq!(router.dedup_cache_size(), 1);
+
+        // Second route of same packet should be dropped
+        let decision2 = router.route(&packet, &state, "this-node");
+        assert_eq!(decision2, RoutingDecision::Drop);
+        assert_eq!(router.dedup_cache_size(), 1); // No new entry added
+    }
+
+    #[test]
+    fn test_deduplication_different_packets() {
+        let router = SelectiveRouter::new_with_deduplication(DeduplicationConfig::default());
+        let state = create_test_state(HierarchyLevel::Squad, NodeRole::Member, true, 0, 0);
+        let packet1 = DataPacket::telemetry("sensor-1", vec![1, 2, 3]);
+        let packet2 = DataPacket::telemetry("sensor-2", vec![4, 5, 6]);
+
+        // Route two different packets - both should succeed
+        let decision1 = router.route(&packet1, &state, "this-node");
+        let decision2 = router.route(&packet2, &state, "this-node");
+
+        assert!(matches!(
+            decision1,
+            RoutingDecision::ConsumeAndForward { .. }
+        ));
+        assert!(matches!(
+            decision2,
+            RoutingDecision::ConsumeAndForward { .. }
+        ));
+        assert_eq!(router.dedup_cache_size(), 2);
+    }
+
+    #[test]
+    fn test_deduplication_cache_clear() {
+        let router = SelectiveRouter::new_with_deduplication(DeduplicationConfig::default());
+        let state = create_test_state(HierarchyLevel::Squad, NodeRole::Member, true, 0, 0);
+        let packet = DataPacket::telemetry("sensor-1", vec![1, 2, 3]);
+
+        // Route packet
+        let _ = router.route(&packet, &state, "this-node");
+        assert_eq!(router.dedup_cache_size(), 1);
+
+        // Clear cache
+        router.clear_dedup_cache();
+        assert_eq!(router.dedup_cache_size(), 0);
+
+        // Should be able to route same packet again
+        let decision = router.route(&packet, &state, "this-node");
+        assert!(matches!(
+            decision,
+            RoutingDecision::ConsumeAndForward { .. }
+        ));
+    }
+
+    #[test]
+    fn test_deduplication_config_defaults() {
+        let config = DeduplicationConfig::default();
+        assert!(config.enabled);
+        assert_eq!(config.ttl, Duration::from_secs(300));
+        assert_eq!(config.max_entries, 10000);
+    }
+
+    #[test]
+    fn test_deduplication_max_entries_eviction() {
+        let config = DeduplicationConfig {
+            enabled: true,
+            ttl: Duration::from_secs(300),
+            max_entries: 3, // Very small for testing
+        };
+        let router = SelectiveRouter::new_with_deduplication(config);
+        let state = create_test_state(HierarchyLevel::Squad, NodeRole::Member, true, 0, 0);
+
+        // Route 5 packets
+        for i in 0..5 {
+            let packet = DataPacket::telemetry(format!("sensor-{}", i), vec![i as u8]);
+            let _ = router.route(&packet, &state, "this-node");
+        }
+
+        // Cache should be limited to max_entries
+        assert!(router.dedup_cache_size() <= 3);
     }
 }

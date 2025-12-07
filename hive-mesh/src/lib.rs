@@ -14,8 +14,8 @@ pub use hierarchy::{
     HybridHierarchyStrategy, NodeRole, StaticHierarchyStrategy,
 };
 pub use routing::{
-    AggregationError, DataDirection, DataPacket, DataType, PacketAggregator, RoutingDecision,
-    SelectiveRouter, TelemetryPayload,
+    AggregationError, DataDirection, DataPacket, DataType, DeduplicationConfig, MeshRouter,
+    PacketAggregator, RoutingDecision, SelectiveRouter, TelemetryPayload,
 };
 pub use topology::{
     AutonomousOperationHandler, AutonomousState, InMemoryMetricsCollector, MetricsCollector,
