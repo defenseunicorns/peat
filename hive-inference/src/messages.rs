@@ -88,26 +88,63 @@ pub struct CapabilityAdvertisement {
 }
 
 /// AI model capability information
+///
+/// Comprehensive model metadata for capability advertisement and matching.
+/// Includes identification, performance metrics, resource requirements,
+/// and operational status per Issue #107 EPIC 4.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ModelCapability {
     /// Model identifier (e.g., "object_tracker")
     pub model_id: String,
-    /// Model version (e.g., "1.3.0")
+    /// Model version (semver, e.g., "1.3.0")
     pub model_version: String,
-    /// Hash of the model file for verification
+    /// SHA256 hash of the model file for verification
     pub model_hash: String,
-    /// Type of model (e.g., "detector_tracker")
+    /// Type of model (e.g., "detector", "tracker", "detector_tracker", "classifier")
     pub model_type: String,
-    /// Performance metrics
+    /// Performance metrics (precision, recall, fps, latency)
     pub performance: ModelPerformance,
     /// Current operational status
     pub operational_status: OperationalStatus,
-    /// Input data signature (optional)
+    /// Resource requirements for running this model
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource_requirements: Option<ResourceRequirements>,
+    /// Input data signature (e.g., "image:640x640x3")
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub input_signature: Vec<String>,
-    /// Output data signature (optional)
+    /// Output data signature (e.g., "detections:bbox,class,confidence")
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub output_signature: Vec<String>,
+    /// Model file size in bytes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_size_bytes: Option<u64>,
+    /// Framework used (e.g., "ONNX", "TensorRT", "PyTorch")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub framework: Option<String>,
+    /// Quantization type (e.g., "FP32", "FP16", "INT8")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quantization: Option<String>,
+    /// Class labels for classification/detection models
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub class_labels: Vec<String>,
+    /// Number of classes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub num_classes: Option<usize>,
+    /// When the model was loaded
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub loaded_at: Option<DateTime<Utc>>,
+    /// Total inference count since load
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inference_count: Option<u64>,
+    /// Last inference timestamp
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_inference_at: Option<DateTime<Utc>>,
+    /// Performance degradation detected (vs baseline)
+    #[serde(default)]
+    pub degraded: bool,
+    /// Degradation reason if applicable
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub degradation_reason: Option<String>,
 }
 
 /// Model performance metrics
@@ -125,19 +162,25 @@ pub struct ModelPerformance {
 }
 
 /// Operational status of a model or platform
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum OperationalStatus {
     /// Ready to process
     Ready,
     /// Currently processing
     Active,
-    /// Temporarily unavailable
+    /// Temporarily unavailable (performance degraded)
     Degraded,
     /// Not available
     Offline,
     /// Loading or initializing
     Loading,
+    /// Failed - requires intervention
+    Failed,
+    /// Updating - model update in progress
+    Updating,
+    /// Unloaded - model removed from memory
+    Unloaded,
 }
 
 /// Resource utilization metrics
@@ -155,6 +198,75 @@ pub struct ResourceMetrics {
     /// CPU utilization (0.0 - 1.0)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cpu_utilization: Option<f64>,
+}
+
+/// Resource requirements for running a model
+///
+/// Specifies the minimum and recommended resources needed to run an AI model.
+/// Used for capability matching when tasking platforms.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ResourceRequirements {
+    /// Minimum GPU memory required in MB
+    pub gpu_memory_mb: u64,
+    /// Minimum system memory required in MB
+    pub system_memory_mb: u64,
+    /// Minimum CUDA compute capability (e.g., 7.5, 8.6)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cuda_compute_capability: Option<f32>,
+    /// Whether TensorRT is required
+    #[serde(default)]
+    pub requires_tensorrt: bool,
+    /// Whether DLA (Deep Learning Accelerator) is supported
+    #[serde(default)]
+    pub supports_dla: bool,
+    /// Minimum CPU cores recommended
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_cores: Option<usize>,
+    /// Supported execution providers (e.g., "CUDA", "TensorRT", "CPU")
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub execution_providers: Vec<String>,
+}
+
+impl ResourceRequirements {
+    /// Create requirements for a typical edge AI model
+    pub fn edge_default() -> Self {
+        Self {
+            gpu_memory_mb: 512,
+            system_memory_mb: 1024,
+            cuda_compute_capability: Some(5.3), // Jetson TX1 minimum
+            requires_tensorrt: false,
+            supports_dla: false,
+            cpu_cores: Some(2),
+            execution_providers: vec!["CUDA".to_string(), "CPU".to_string()],
+        }
+    }
+
+    /// Create requirements for Jetson Orin Nano
+    pub fn jetson_orin_nano() -> Self {
+        Self {
+            gpu_memory_mb: 1024,
+            system_memory_mb: 2048,
+            cuda_compute_capability: Some(8.7),
+            requires_tensorrt: true,
+            supports_dla: false, // Orin Nano doesn't have DLA
+            cpu_cores: Some(4),
+            execution_providers: vec![
+                "TensorRT".to_string(),
+                "CUDA".to_string(),
+                "CPU".to_string(),
+            ],
+        }
+    }
+
+    /// Check if this platform meets the resource requirements
+    pub fn is_satisfied_by(&self, metrics: &ResourceMetrics) -> bool {
+        if let Some(total_mb) = metrics.memory_total_mb {
+            if total_mb < self.gpu_memory_mb {
+                return false;
+            }
+        }
+        true
+    }
 }
 
 // ============================================================================
@@ -464,7 +576,7 @@ impl CapabilityAdvertisement {
 }
 
 impl ModelCapability {
-    /// Create a new model capability
+    /// Create a new model capability with required fields
     pub fn new(
         model_id: impl Into<String>,
         model_version: impl Into<String>,
@@ -479,8 +591,19 @@ impl ModelCapability {
             model_type: model_type.into(),
             performance,
             operational_status: OperationalStatus::Ready,
+            resource_requirements: None,
             input_signature: Vec::new(),
             output_signature: Vec::new(),
+            model_size_bytes: None,
+            framework: None,
+            quantization: None,
+            class_labels: Vec::new(),
+            num_classes: None,
+            loaded_at: None,
+            inference_count: None,
+            last_inference_at: None,
+            degraded: false,
+            degradation_reason: None,
         }
     }
 
@@ -489,6 +612,99 @@ impl ModelCapability {
         self.operational_status = status;
         self
     }
+
+    /// Set resource requirements
+    pub fn with_resource_requirements(mut self, requirements: ResourceRequirements) -> Self {
+        self.resource_requirements = Some(requirements);
+        self
+    }
+
+    /// Set framework and quantization
+    pub fn with_framework(
+        mut self,
+        framework: impl Into<String>,
+        quantization: impl Into<String>,
+    ) -> Self {
+        self.framework = Some(framework.into());
+        self.quantization = Some(quantization.into());
+        self
+    }
+
+    /// Set model size
+    pub fn with_size(mut self, size_bytes: u64) -> Self {
+        self.model_size_bytes = Some(size_bytes);
+        self
+    }
+
+    /// Set class labels
+    pub fn with_classes(mut self, labels: Vec<String>) -> Self {
+        self.num_classes = Some(labels.len());
+        self.class_labels = labels;
+        self
+    }
+
+    /// Mark as loaded (sets loaded_at timestamp)
+    pub fn mark_loaded(mut self) -> Self {
+        self.loaded_at = Some(Utc::now());
+        self.operational_status = OperationalStatus::Ready;
+        self
+    }
+
+    /// Record an inference (updates counters and timestamp)
+    pub fn record_inference(&mut self) {
+        self.inference_count = Some(self.inference_count.unwrap_or(0) + 1);
+        self.last_inference_at = Some(Utc::now());
+        if self.operational_status == OperationalStatus::Ready {
+            self.operational_status = OperationalStatus::Active;
+        }
+    }
+
+    /// Mark as degraded with reason
+    pub fn mark_degraded(&mut self, reason: impl Into<String>) {
+        self.degraded = true;
+        self.degradation_reason = Some(reason.into());
+        self.operational_status = OperationalStatus::Degraded;
+    }
+
+    /// Clear degradation status
+    pub fn clear_degradation(&mut self) {
+        self.degraded = false;
+        self.degradation_reason = None;
+        if self.operational_status == OperationalStatus::Degraded {
+            self.operational_status = OperationalStatus::Ready;
+        }
+    }
+
+    /// Check if model meets minimum version requirement
+    pub fn meets_version(&self, min_version: &str) -> bool {
+        version_compare(&self.model_version, min_version) >= std::cmp::Ordering::Equal
+    }
+
+    /// Check if model meets minimum precision requirement
+    pub fn meets_precision(&self, min_precision: f64) -> bool {
+        self.performance.precision >= min_precision
+    }
+
+    /// Check if model is operational (ready, active, or degraded but functional)
+    pub fn is_operational(&self) -> bool {
+        matches!(
+            self.operational_status,
+            OperationalStatus::Ready | OperationalStatus::Active | OperationalStatus::Degraded
+        )
+    }
+}
+
+/// Simple semver comparison (major.minor.patch)
+fn version_compare(a: &str, b: &str) -> std::cmp::Ordering {
+    let parse = |s: &str| -> (u32, u32, u32) {
+        let parts: Vec<u32> = s.split('.').filter_map(|p| p.parse().ok()).collect();
+        (
+            parts.first().copied().unwrap_or(0),
+            parts.get(1).copied().unwrap_or(0),
+            parts.get(2).copied().unwrap_or(0),
+        )
+    };
+    parse(a).cmp(&parse(b))
 }
 
 impl ModelPerformance {

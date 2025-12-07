@@ -34,12 +34,16 @@ pub mod inference;
 pub mod messages;
 pub mod models;
 pub mod platform;
+pub mod registry;
 pub mod sync;
 pub mod team;
 pub mod testing;
 
 // Platform types and traits
-pub use coordinator::{Coordinator, FormationCapabilitySummary};
+pub use coordinator::{
+    Coordinator, DegradedModelInfo, FormationCapabilitySummary, ModelInventorySummary,
+    ModelPerformanceStats, ModelQueryResult, PlatformModelMatch,
+};
 pub use platform::{
     AiModelInfo, AiModelPlatform, AuthorityLevel, CapabilityProvider, OperatorPlatform, Platform,
     PlatformType, SensorCapability, VehiclePlatform,
@@ -60,3 +64,18 @@ pub use sync::{ConnectedPipeline, HiveSyncClient, SyncConfig, SyncStats};
 
 // HIVE beacon (edge device registration)
 pub use beacon::{BeaconConfig, CameraSpec, ComputeSpec, HiveBeacon, ModelSpec};
+
+// Model registry (Issue #107 EPIC 4)
+pub use registry::{
+    ModelEvent, ModelEventType, ModelQuery, ModelRegistry, PerformanceBaseline, RegisteredModel,
+    RegistryError,
+};
+
+// Message types (expanded for Issue #107)
+pub use messages::{OperationalStatus, ResourceRequirements};
+
+// Re-export hive-protocol capability query types for convenience
+pub use hive_protocol::discovery::capability_query::{
+    CapabilityQuery, CapabilityQueryBuilder, CapabilityQueryEngine, CapabilityStats, QueryMatch,
+};
+pub use hive_protocol::models::CapabilityType;
