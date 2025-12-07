@@ -57,6 +57,10 @@ pub const HIVE_EVENT_CONNECTED: c_int = 1;
 pub const HIVE_EVENT_DISCONNECTED: c_int = 2;
 /// Peer connection degraded event type
 pub const HIVE_EVENT_DEGRADED: c_int = 3;
+/// Event: Reconnection attempt in progress (Issue #253)
+pub const HIVE_EVENT_RECONNECTING: c_int = 4;
+/// Event: Reconnection attempt failed (Issue #253)
+pub const HIVE_EVENT_RECONNECT_FAILED: c_int = 5;
 
 // =============================================================================
 // Global State
@@ -537,6 +541,42 @@ fn invoke_callback(callback: PeerEventCallback, event: &PeerEvent) {
                 health_cstr.as_ptr(),
             );
         }
+        PeerEvent::Reconnecting {
+            peer_id,
+            attempt,
+            max_attempts,
+        } => {
+            let peer_id_cstr = CString::new(peer_id.to_string()).unwrap_or_default();
+            let info_cstr = CString::new(format!(
+                "attempt={}/{}",
+                attempt,
+                max_attempts.map_or("∞".to_string(), |m| m.to_string())
+            ))
+            .unwrap_or_default();
+            callback(
+                HIVE_EVENT_RECONNECTING,
+                peer_id_cstr.as_ptr(),
+                info_cstr.as_ptr(),
+            );
+        }
+        PeerEvent::ReconnectFailed {
+            peer_id,
+            attempt,
+            error,
+            will_retry,
+        } => {
+            let peer_id_cstr = CString::new(peer_id.to_string()).unwrap_or_default();
+            let info_cstr = CString::new(format!(
+                "attempt={}, error={}, will_retry={}",
+                attempt, error, will_retry
+            ))
+            .unwrap_or_default();
+            callback(
+                HIVE_EVENT_RECONNECT_FAILED,
+                peer_id_cstr.as_ptr(),
+                info_cstr.as_ptr(),
+            );
+        }
     }
 }
 
@@ -736,6 +776,8 @@ mod tests {
         assert_eq!(HIVE_EVENT_CONNECTED, 1);
         assert_eq!(HIVE_EVENT_DISCONNECTED, 2);
         assert_eq!(HIVE_EVENT_DEGRADED, 3);
+        assert_eq!(HIVE_EVENT_RECONNECTING, 4);
+        assert_eq!(HIVE_EVENT_RECONNECT_FAILED, 5);
     }
 
     #[test]

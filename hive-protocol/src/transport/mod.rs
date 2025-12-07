@@ -59,6 +59,8 @@ pub mod iroh;
 #[cfg(feature = "ditto-backend")]
 pub mod ditto;
 
+pub mod reconnection;
+
 /// Node identifier in the mesh network
 ///
 /// Uniquely identifies a node in the HIVE mesh. This is separate from
@@ -149,6 +151,28 @@ pub enum PeerEvent {
         peer_id: NodeId,
         /// Current health metrics
         health: ConnectionHealth,
+    },
+
+    /// Attempting to reconnect to a peer (Issue #253)
+    Reconnecting {
+        /// The peer's node ID
+        peer_id: NodeId,
+        /// Current attempt number (1-indexed)
+        attempt: u32,
+        /// Maximum attempts configured (None = infinite)
+        max_attempts: Option<u32>,
+    },
+
+    /// Reconnection attempt failed (Issue #253)
+    ReconnectFailed {
+        /// The peer's node ID
+        peer_id: NodeId,
+        /// Current attempt number
+        attempt: u32,
+        /// Error message
+        error: String,
+        /// Whether more retries will be attempted
+        will_retry: bool,
     },
 }
 
