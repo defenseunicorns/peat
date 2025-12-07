@@ -2,15 +2,28 @@
 //!
 //! This module provides a `MeshTransport` implementation backed by Iroh's QUIC transport.
 //! It integrates with static peer configuration for discovery and manages NodeId ↔ EndpointId mapping.
+//!
+//! ## Features
+//!
+//! - **Connection Liveness Detection (Issue #251)**: Uses QUIC `close_reason()` to detect disconnected peers
+//! - **Peer Events (Issue #252)**: Emits `PeerEvent` notifications on connect/disconnect
+//! - **Connection Health**: Tracks connection establishment time and disconnect reasons
 
-use super::{MeshConnection, MeshTransport, NodeId, Result, TransportError};
+use super::{
+    DisconnectReason, MeshConnection, MeshTransport, NodeId, PeerEvent, PeerEventReceiver,
+    PeerEventSender, Result, TransportError, PEER_EVENT_CHANNEL_CAPACITY,
+};
 use crate::network::iroh_transport::IrohTransport;
 use crate::network::peer_config::PeerConfig;
 use async_trait::async_trait;
 use iroh::endpoint::Connection;
 use iroh::EndpointId;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
+use tokio::sync::mpsc;
+use tracing::{debug, info, warn};
 
 /// Iroh-based mesh transport implementation
 ///
@@ -32,6 +45,9 @@ use std::sync::{Arc, RwLock};
 ///
 /// mesh_transport.start().await?;
 /// ```
+/// Default interval for stale peer cleanup (Issue #244)
+pub const DEFAULT_CLEANUP_INTERVAL: Duration = Duration::from_secs(5);
+
 pub struct IrohMeshTransport {
     /// Underlying Iroh transport
     transport: Arc<IrohTransport>,
@@ -47,6 +63,16 @@ pub struct IrohMeshTransport {
 
     /// Connections by NodeId
     connections: Arc<RwLock<HashMap<NodeId, IrohMeshConnection>>>,
+
+    /// Event broadcaster for peer events (Issue #252)
+    /// Multiple receivers can subscribe via subscribe_peer_events()
+    event_senders: Arc<RwLock<Vec<PeerEventSender>>>,
+
+    /// Whether the cleanup task is running (Issue #244)
+    cleanup_running: Arc<AtomicBool>,
+
+    /// Cleanup interval
+    cleanup_interval: Duration,
 }
 
 impl IrohMeshTransport {
@@ -57,12 +83,81 @@ impl IrohMeshTransport {
     /// * `transport` - Underlying IrohTransport
     /// * `peer_config` - Static peer configuration for discovery
     pub fn new(transport: Arc<IrohTransport>, peer_config: PeerConfig) -> Self {
+        Self::with_cleanup_interval(transport, peer_config, DEFAULT_CLEANUP_INTERVAL)
+    }
+
+    /// Create a new Iroh mesh transport with custom cleanup interval
+    ///
+    /// # Arguments
+    ///
+    /// * `transport` - Underlying IrohTransport
+    /// * `peer_config` - Static peer configuration for discovery
+    /// * `cleanup_interval` - Interval for stale peer cleanup
+    pub fn with_cleanup_interval(
+        transport: Arc<IrohTransport>,
+        peer_config: PeerConfig,
+        cleanup_interval: Duration,
+    ) -> Self {
         Self {
             transport,
             peer_config: Arc::new(RwLock::new(peer_config)),
             node_to_endpoint: Arc::new(RwLock::new(HashMap::new())),
             endpoint_to_node: Arc::new(RwLock::new(HashMap::new())),
             connections: Arc::new(RwLock::new(HashMap::new())),
+            event_senders: Arc::new(RwLock::new(Vec::new())),
+            cleanup_running: Arc::new(AtomicBool::new(false)),
+            cleanup_interval,
+        }
+    }
+
+    /// Emit a peer event to all subscribers (Issue #252)
+    ///
+    /// Non-blocking: if a subscriber's channel is full, the event is dropped for that subscriber.
+    /// Dead channels are automatically removed.
+    fn emit_event(&self, event: PeerEvent) {
+        let mut senders = self.event_senders.write().unwrap();
+
+        // Remove closed channels and send to remaining
+        senders.retain(|sender| {
+            match sender.try_send(event.clone()) {
+                Ok(()) => true,
+                Err(mpsc::error::TrySendError::Full(_)) => {
+                    warn!(
+                        "Peer event channel full, dropping event for one subscriber: {:?}",
+                        event
+                    );
+                    true // Keep the channel, just couldn't send this time
+                }
+                Err(mpsc::error::TrySendError::Closed(_)) => {
+                    debug!("Peer event subscriber disconnected, removing channel");
+                    false // Remove dead channel
+                }
+            }
+        });
+    }
+
+    /// Clean up dead connections and emit disconnect events (Issue #251 + #252)
+    ///
+    /// This should be called periodically to detect disconnected peers.
+    pub fn cleanup_dead_connections(&self) {
+        let mut connections = self.connections.write().unwrap();
+        let dead_peers: Vec<_> = connections
+            .iter()
+            .filter(|(_, conn)| !conn.is_alive())
+            .map(|(id, conn)| (id.clone(), conn.disconnect_reason(), conn.connected_at()))
+            .collect();
+
+        for (peer_id, reason, connected_at) in dead_peers {
+            connections.remove(&peer_id);
+
+            let event = PeerEvent::Disconnected {
+                peer_id: peer_id.clone(),
+                reason: reason.unwrap_or(DisconnectReason::Unknown),
+                connection_duration: connected_at.elapsed(),
+            };
+
+            debug!("Peer {} disconnected: {:?}", peer_id, event);
+            self.emit_event(event);
         }
     }
 
@@ -99,6 +194,81 @@ impl IrohMeshTransport {
     pub fn transport(&self) -> &Arc<IrohTransport> {
         &self.transport
     }
+
+    /// Start the background cleanup task (Issue #244)
+    ///
+    /// This spawns a task that periodically checks for dead connections
+    /// and emits disconnect events.
+    fn start_cleanup_task(&self) {
+        if self
+            .cleanup_running
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            // Already running
+            return;
+        }
+
+        let connections = Arc::clone(&self.connections);
+        let event_senders = Arc::clone(&self.event_senders);
+        let cleanup_running = Arc::clone(&self.cleanup_running);
+        let interval = self.cleanup_interval;
+
+        tokio::spawn(async move {
+            info!("Started peer cleanup task with interval {:?}", interval);
+
+            while cleanup_running.load(Ordering::SeqCst) {
+                tokio::time::sleep(interval).await;
+
+                if !cleanup_running.load(Ordering::SeqCst) {
+                    break;
+                }
+
+                // Check for dead connections
+                let dead_peers: Vec<_> = {
+                    let conns = connections.read().unwrap();
+                    conns
+                        .iter()
+                        .filter(|(_, conn)| !conn.is_alive())
+                        .map(|(id, conn)| {
+                            (id.clone(), conn.disconnect_reason(), conn.connected_at())
+                        })
+                        .collect()
+                };
+
+                // Remove dead connections and emit events
+                if !dead_peers.is_empty() {
+                    let mut conns = connections.write().unwrap();
+                    for (peer_id, reason, connected_at) in dead_peers {
+                        conns.remove(&peer_id);
+
+                        let event = PeerEvent::Disconnected {
+                            peer_id: peer_id.clone(),
+                            reason: reason.unwrap_or(DisconnectReason::Unknown),
+                            connection_duration: connected_at.elapsed(),
+                        };
+
+                        debug!("Cleanup: Peer {} disconnected: {:?}", peer_id, event);
+
+                        // Emit event to subscribers
+                        let mut senders = event_senders.write().unwrap();
+                        senders.retain(|sender| match sender.try_send(event.clone()) {
+                            Ok(()) => true,
+                            Err(mpsc::error::TrySendError::Full(_)) => true,
+                            Err(mpsc::error::TrySendError::Closed(_)) => false,
+                        });
+                    }
+                }
+            }
+
+            info!("Stopped peer cleanup task");
+        });
+    }
+
+    /// Stop the background cleanup task
+    fn stop_cleanup_task(&self) {
+        self.cleanup_running.store(false, Ordering::SeqCst);
+    }
 }
 
 #[async_trait]
@@ -118,10 +288,16 @@ impl MeshTransport for IrohMeshTransport {
             }
         }
 
+        // Start background cleanup task (Issue #244)
+        self.start_cleanup_task();
+
         Ok(())
     }
 
     async fn stop(&self) -> Result<()> {
+        // Stop cleanup task first (Issue #244)
+        self.stop_cleanup_task();
+
         // Stop accept loop
         self.transport
             .stop_accept_loop()
@@ -142,9 +318,14 @@ impl MeshTransport for IrohMeshTransport {
     }
 
     async fn connect(&self, peer_id: &NodeId) -> Result<Box<dyn MeshConnection>> {
-        // Check if already connected
+        // Check if already connected and still alive
         if let Some(conn) = self.get_connection(peer_id) {
-            return Ok(conn);
+            if conn.is_alive() {
+                return Ok(conn);
+            }
+            // Connection exists but is dead - clean it up first
+            debug!("Existing connection to {} is dead, reconnecting", peer_id);
+            self.cleanup_dead_connections();
         }
 
         // Resolve NodeId → EndpointId
@@ -177,11 +358,20 @@ impl MeshTransport for IrohMeshTransport {
         match conn_opt {
             Some(conn) => {
                 // New connection - wrap in MeshConnection and store
-                let mesh_conn = IrohMeshConnection::new(peer_id.clone(), conn);
+                let connected_at = Instant::now();
+                let mesh_conn = IrohMeshConnection::new(peer_id.clone(), conn, connected_at);
                 self.connections
                     .write()
                     .unwrap()
                     .insert(peer_id.clone(), mesh_conn.clone());
+
+                // Emit connected event (Issue #252)
+                self.emit_event(PeerEvent::Connected {
+                    peer_id: peer_id.clone(),
+                    connected_at,
+                });
+
+                debug!("Connected to peer: {}", peer_id);
                 Ok(Box::new(mesh_conn))
             }
             None => {
@@ -203,7 +393,15 @@ impl MeshTransport for IrohMeshTransport {
 
     async fn disconnect(&self, peer_id: &NodeId) -> Result<()> {
         // Remove connection from map
-        if let Some(_conn) = self.connections.write().unwrap().remove(peer_id) {
+        if let Some(conn) = self.connections.write().unwrap().remove(peer_id) {
+            // Emit disconnect event (Issue #252)
+            let event = PeerEvent::Disconnected {
+                peer_id: peer_id.clone(),
+                reason: DisconnectReason::LocalClosed,
+                connection_duration: conn.connected_at().elapsed(),
+            };
+            debug!("Disconnected from peer: {}", peer_id);
+            self.emit_event(event);
             // Connection will be closed when dropped
         }
         Ok(())
@@ -225,29 +423,62 @@ impl MeshTransport for IrohMeshTransport {
     fn connected_peers(&self) -> Vec<NodeId> {
         self.connections.read().unwrap().keys().cloned().collect()
     }
+
+    fn subscribe_peer_events(&self) -> PeerEventReceiver {
+        let (tx, rx) = mpsc::channel(PEER_EVENT_CHANNEL_CAPACITY);
+        self.event_senders.write().unwrap().push(tx);
+        rx
+    }
 }
 
 /// Iroh mesh connection implementation
 ///
 /// Wraps an Iroh QUIC connection with the `MeshConnection` interface.
+///
+/// ## Liveness Detection (Issue #251)
+///
+/// Uses QUIC `close_reason()` to detect when a connection has been closed.
+/// A connection is alive if `close_reason()` returns `None`.
 #[derive(Clone)]
 pub struct IrohMeshConnection {
     peer_id: NodeId,
     connection: Connection,
+    /// When this connection was established
+    connected_at: Instant,
 }
 
 impl IrohMeshConnection {
     /// Create a new Iroh mesh connection
-    pub fn new(peer_id: NodeId, connection: Connection) -> Self {
+    pub fn new(peer_id: NodeId, connection: Connection, connected_at: Instant) -> Self {
         Self {
             peer_id,
             connection,
+            connected_at,
         }
     }
 
     /// Get the underlying Iroh connection
     pub fn connection(&self) -> &Connection {
         &self.connection
+    }
+
+    /// Parse QUIC close reason into our DisconnectReason
+    fn parse_close_reason(&self) -> Option<DisconnectReason> {
+        self.connection.close_reason().map(|reason| {
+            // Iroh's close_reason returns a quinn::ConnectionError
+            // We convert it to our DisconnectReason enum
+            let reason_str = reason.to_string();
+
+            if reason_str.contains("timeout") || reason_str.contains("idle") {
+                DisconnectReason::IdleTimeout
+            } else if reason_str.contains("reset") || reason_str.contains("closed") {
+                DisconnectReason::RemoteClosed
+            } else if reason_str.contains("application") {
+                DisconnectReason::ApplicationError(reason_str)
+            } else {
+                DisconnectReason::NetworkError(reason_str)
+            }
+        })
     }
 }
 
@@ -256,11 +487,22 @@ impl MeshConnection for IrohMeshConnection {
         &self.peer_id
     }
 
+    /// Check if the connection is still alive (Issue #251)
+    ///
+    /// Uses QUIC's `close_reason()` to determine connection status.
+    /// Returns `true` if the connection is active, `false` if closed.
     fn is_alive(&self) -> bool {
-        // Iroh connections don't expose a direct is_closed() method
-        // For now, we assume the connection is alive if it exists
-        // TODO: Implement proper liveness check when Iroh provides API
-        true
+        // Connection is alive if there's no close reason
+        // close_reason() returns Some(reason) when connection is closed
+        self.connection.close_reason().is_none()
+    }
+
+    fn connected_at(&self) -> Instant {
+        self.connected_at
+    }
+
+    fn disconnect_reason(&self) -> Option<DisconnectReason> {
+        self.parse_close_reason()
     }
 }
 
