@@ -2,6 +2,7 @@
 
 pub mod capability;
 pub mod cell;
+pub mod domain;
 pub mod node;
 pub mod operator;
 pub mod role;
@@ -10,6 +11,7 @@ pub mod zone;
 // Re-export commonly used types at module level
 pub use capability::{Capability, CapabilityExt, CapabilityType};
 pub use cell::{CellConfig, CellConfigExt, CellState, CellStateExt};
+pub use domain::{DetectionCheck, Domain, DomainSet, SensorType};
 pub use node::{HealthStatus, NodeConfig, NodeConfigExt, NodeState, NodeStateExt};
 pub use operator::{
     AuthorityLevel, AuthorityLevelExt, BindingType, HumanMachinePair, HumanMachinePairExt,
