@@ -264,6 +264,11 @@ impl<T: MeshTransport + 'static, A: AuthenticationChannel + 'static> MeshTranspo
     fn is_connected(&self, peer_id: &NodeId) -> bool {
         self.is_authenticated(peer_id) && self.inner.is_connected(peer_id)
     }
+
+    fn subscribe_peer_events(&self) -> crate::transport::PeerEventReceiver {
+        // Delegate to inner transport - events are emitted at the transport layer
+        self.inner.subscribe_peer_events()
+    }
 }
 
 /// An authenticated connection wrapper.
@@ -289,6 +294,10 @@ impl MeshConnection for AuthenticatedConnection {
 
     fn is_alive(&self) -> bool {
         self.inner.is_alive()
+    }
+
+    fn connected_at(&self) -> std::time::Instant {
+        self.inner.connected_at()
     }
 }
 
@@ -331,15 +340,18 @@ mod tests {
             if !self.started.load(Ordering::SeqCst) {
                 return Err(TransportError::NotStarted);
             }
+            let now = std::time::Instant::now();
             let conn = MockConnection {
                 peer_id: peer_id.clone(),
                 alive: AtomicBool::new(true),
+                connected_at: now,
             };
             self.connections.write().unwrap().insert(
                 peer_id.to_string(),
                 MockConnection {
                     peer_id: peer_id.clone(),
                     alive: AtomicBool::new(true),
+                    connected_at: now,
                 },
             );
             Ok(Box::new(conn))
@@ -359,6 +371,7 @@ mod tests {
                     Box::new(MockConnection {
                         peer_id: c.peer_id.clone(),
                         alive: AtomicBool::new(c.alive.load(Ordering::SeqCst)),
+                        connected_at: c.connected_at,
                     }) as Box<dyn MeshConnection>
                 })
             })
@@ -374,11 +387,17 @@ mod tests {
                 .map(|c| c.values().map(|conn| conn.peer_id.clone()).collect())
                 .unwrap_or_default()
         }
+
+        fn subscribe_peer_events(&self) -> crate::transport::PeerEventReceiver {
+            let (_tx, rx) = tokio::sync::mpsc::channel(256);
+            rx
+        }
     }
 
     struct MockConnection {
         peer_id: NodeId,
         alive: AtomicBool,
+        connected_at: std::time::Instant,
     }
 
     impl MeshConnection for MockConnection {
@@ -388,6 +407,10 @@ mod tests {
 
         fn is_alive(&self) -> bool {
             self.alive.load(Ordering::SeqCst)
+        }
+
+        fn connected_at(&self) -> std::time::Instant {
+            self.connected_at
         }
     }
 
