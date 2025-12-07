@@ -1689,8 +1689,8 @@ fn log_metrics(event: &MetricsEvent) {
 /// Create a backend instance based on type
 async fn create_backend(
     backend_type: &str,
-    node_id: &str,
-    tcp_listen_port: Option<u16>,
+    #[allow(unused)] node_id: &str,
+    #[allow(unused)] tcp_listen_port: Option<u16>,
 ) -> Result<Box<dyn DataSyncBackend>, Box<dyn std::error::Error>> {
     match backend_type {
         "ditto" => Ok(Box::new(DittoBackend::new())),
