@@ -19,10 +19,11 @@ use async_trait::async_trait;
 use iroh::endpoint::Connection;
 use iroh::EndpointId;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 /// Iroh-based mesh transport implementation
 ///
@@ -44,6 +45,9 @@ use tracing::{debug, warn};
 ///
 /// mesh_transport.start().await?;
 /// ```
+/// Default interval for stale peer cleanup (Issue #244)
+pub const DEFAULT_CLEANUP_INTERVAL: Duration = Duration::from_secs(5);
+
 pub struct IrohMeshTransport {
     /// Underlying Iroh transport
     transport: Arc<IrohTransport>,
@@ -63,6 +67,12 @@ pub struct IrohMeshTransport {
     /// Event broadcaster for peer events (Issue #252)
     /// Multiple receivers can subscribe via subscribe_peer_events()
     event_senders: Arc<RwLock<Vec<PeerEventSender>>>,
+
+    /// Whether the cleanup task is running (Issue #244)
+    cleanup_running: Arc<AtomicBool>,
+
+    /// Cleanup interval
+    cleanup_interval: Duration,
 }
 
 impl IrohMeshTransport {
@@ -73,6 +83,21 @@ impl IrohMeshTransport {
     /// * `transport` - Underlying IrohTransport
     /// * `peer_config` - Static peer configuration for discovery
     pub fn new(transport: Arc<IrohTransport>, peer_config: PeerConfig) -> Self {
+        Self::with_cleanup_interval(transport, peer_config, DEFAULT_CLEANUP_INTERVAL)
+    }
+
+    /// Create a new Iroh mesh transport with custom cleanup interval
+    ///
+    /// # Arguments
+    ///
+    /// * `transport` - Underlying IrohTransport
+    /// * `peer_config` - Static peer configuration for discovery
+    /// * `cleanup_interval` - Interval for stale peer cleanup
+    pub fn with_cleanup_interval(
+        transport: Arc<IrohTransport>,
+        peer_config: PeerConfig,
+        cleanup_interval: Duration,
+    ) -> Self {
         Self {
             transport,
             peer_config: Arc::new(RwLock::new(peer_config)),
@@ -80,6 +105,8 @@ impl IrohMeshTransport {
             endpoint_to_node: Arc::new(RwLock::new(HashMap::new())),
             connections: Arc::new(RwLock::new(HashMap::new())),
             event_senders: Arc::new(RwLock::new(Vec::new())),
+            cleanup_running: Arc::new(AtomicBool::new(false)),
+            cleanup_interval,
         }
     }
 
@@ -167,6 +194,81 @@ impl IrohMeshTransport {
     pub fn transport(&self) -> &Arc<IrohTransport> {
         &self.transport
     }
+
+    /// Start the background cleanup task (Issue #244)
+    ///
+    /// This spawns a task that periodically checks for dead connections
+    /// and emits disconnect events.
+    fn start_cleanup_task(&self) {
+        if self
+            .cleanup_running
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            // Already running
+            return;
+        }
+
+        let connections = Arc::clone(&self.connections);
+        let event_senders = Arc::clone(&self.event_senders);
+        let cleanup_running = Arc::clone(&self.cleanup_running);
+        let interval = self.cleanup_interval;
+
+        tokio::spawn(async move {
+            info!("Started peer cleanup task with interval {:?}", interval);
+
+            while cleanup_running.load(Ordering::SeqCst) {
+                tokio::time::sleep(interval).await;
+
+                if !cleanup_running.load(Ordering::SeqCst) {
+                    break;
+                }
+
+                // Check for dead connections
+                let dead_peers: Vec<_> = {
+                    let conns = connections.read().unwrap();
+                    conns
+                        .iter()
+                        .filter(|(_, conn)| !conn.is_alive())
+                        .map(|(id, conn)| {
+                            (id.clone(), conn.disconnect_reason(), conn.connected_at())
+                        })
+                        .collect()
+                };
+
+                // Remove dead connections and emit events
+                if !dead_peers.is_empty() {
+                    let mut conns = connections.write().unwrap();
+                    for (peer_id, reason, connected_at) in dead_peers {
+                        conns.remove(&peer_id);
+
+                        let event = PeerEvent::Disconnected {
+                            peer_id: peer_id.clone(),
+                            reason: reason.unwrap_or(DisconnectReason::Unknown),
+                            connection_duration: connected_at.elapsed(),
+                        };
+
+                        debug!("Cleanup: Peer {} disconnected: {:?}", peer_id, event);
+
+                        // Emit event to subscribers
+                        let mut senders = event_senders.write().unwrap();
+                        senders.retain(|sender| match sender.try_send(event.clone()) {
+                            Ok(()) => true,
+                            Err(mpsc::error::TrySendError::Full(_)) => true,
+                            Err(mpsc::error::TrySendError::Closed(_)) => false,
+                        });
+                    }
+                }
+            }
+
+            info!("Stopped peer cleanup task");
+        });
+    }
+
+    /// Stop the background cleanup task
+    fn stop_cleanup_task(&self) {
+        self.cleanup_running.store(false, Ordering::SeqCst);
+    }
 }
 
 #[async_trait]
@@ -186,10 +288,16 @@ impl MeshTransport for IrohMeshTransport {
             }
         }
 
+        // Start background cleanup task (Issue #244)
+        self.start_cleanup_task();
+
         Ok(())
     }
 
     async fn stop(&self) -> Result<()> {
+        // Stop cleanup task first (Issue #244)
+        self.stop_cleanup_task();
+
         // Stop accept loop
         self.transport
             .stop_accept_loop()

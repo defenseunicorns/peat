@@ -23,6 +23,7 @@ use crate::transport::{MeshTransport, NodeId, PeerEvent};
 use serde::{Deserialize, Serialize};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock, RwLock};
 
 // =============================================================================
@@ -69,6 +70,13 @@ static LAST_ERROR: RwLock<Option<String>> = RwLock::new(None);
 
 /// Registered peer event callback
 static PEER_CALLBACK: RwLock<Option<PeerEventCallback>> = RwLock::new(None);
+
+/// Cancellation token for the callback thread
+static CALLBACK_CANCEL: OnceLock<Arc<AtomicBool>> = OnceLock::new();
+
+fn get_or_init_cancel_token() -> &'static Arc<AtomicBool> {
+    CALLBACK_CANCEL.get_or_init(|| Arc::new(AtomicBool::new(false)))
+}
 
 /// Type for peer event callbacks
 ///
@@ -212,21 +220,25 @@ pub extern "C" fn hive_get_connected_peers() -> *mut c_char {
     };
 
     let peer_ids = transport.connected_peers();
-    let now = chrono::Utc::now();
 
     let peers: Vec<PeerInfo> = peer_ids
         .into_iter()
         .map(|peer_id| {
-            let status = transport
+            let (status, connected_since) = transport
                 .get_connection(&peer_id)
-                .map(|c| if c.is_alive() { "healthy" } else { "dead" })
-                .unwrap_or("unknown");
+                .map(|c| {
+                    let status = if c.is_alive() { "healthy" } else { "dead" };
+                    // Calculate connected_since from Instant
+                    let duration_ago = c.connected_at().elapsed();
+                    let connected_at = chrono::Utc::now()
+                        - chrono::Duration::from_std(duration_ago).unwrap_or_default();
+                    (status, connected_at.to_rfc3339())
+                })
+                .unwrap_or(("unknown", chrono::Utc::now().to_rfc3339()));
 
-            // Note: We don't have exact connected_since without additional tracking
-            // For now, return current time as placeholder
             PeerInfo {
                 peer_id: peer_id.to_string(),
-                connected_since: now.to_rfc3339(),
+                connected_since,
                 status: status.to_string(),
             }
         })
@@ -339,6 +351,13 @@ pub unsafe extern "C" fn hive_get_peer_health(peer_id: *const c_char) -> *mut c_
     };
 
     let node_id = NodeId::new(peer_id_str.to_string());
+
+    // Check if peer is connected first
+    if !transport.is_connected(&node_id) {
+        set_last_error(format!("Peer not found: {}", peer_id_str));
+        return std::ptr::null_mut();
+    }
+
     let health = transport.get_peer_health(&node_id);
 
     let response = match health {
@@ -348,12 +367,15 @@ pub unsafe extern "C" fn hive_get_peer_health(peer_id: *const c_char) -> *mut c_
             packet_loss_percent: h.packet_loss_percent,
             state: format!("{}", h.state),
         },
-        None => PeerHealthResponse {
-            peer_id: peer_id_str.to_string(),
-            rtt_ms: 0,
-            packet_loss_percent: 0,
-            state: "unknown".to_string(),
-        },
+        None => {
+            // Peer is connected but no health data available - return defaults
+            PeerHealthResponse {
+                peer_id: peer_id_str.to_string(),
+                rtt_ms: 0,
+                packet_loss_percent: 0,
+                state: "unknown".to_string(),
+            }
+        }
     };
 
     match serde_json::to_string(&response) {
@@ -404,6 +426,10 @@ pub extern "C" fn hive_register_peer_callback(callback: Option<PeerEventCallback
         }
     };
 
+    // Reset cancellation token for new callback
+    let cancel_token = get_or_init_cancel_token();
+    cancel_token.store(false, Ordering::SeqCst);
+
     // Store the callback
     if let Ok(mut cb) = PEER_CALLBACK.write() {
         *cb = callback;
@@ -412,9 +438,9 @@ pub extern "C" fn hive_register_peer_callback(callback: Option<PeerEventCallback
     // If callback is set, spawn a task to forward events
     if callback.is_some() {
         let mut rx = transport.subscribe_peer_events();
+        let cancel = Arc::clone(cancel_token);
 
         // Spawn background task to handle events
-        // Note: In production, this should be tied to the runtime lifecycle
         std::thread::spawn(move || {
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -422,13 +448,32 @@ pub extern "C" fn hive_register_peer_callback(callback: Option<PeerEventCallback
                 .expect("Failed to create runtime");
 
             rt.block_on(async move {
-                while let Some(event) = rx.recv().await {
-                    if let Ok(cb_guard) = PEER_CALLBACK.read() {
-                        if let Some(cb) = *cb_guard {
-                            invoke_callback(cb, &event);
-                        } else {
-                            // Callback was unregistered, stop listening
+                loop {
+                    // Check cancellation
+                    if cancel.load(Ordering::SeqCst) {
+                        break;
+                    }
+
+                    // Use timeout to periodically check cancellation
+                    match tokio::time::timeout(std::time::Duration::from_millis(100), rx.recv())
+                        .await
+                    {
+                        Ok(Some(event)) => {
+                            if let Ok(cb_guard) = PEER_CALLBACK.read() {
+                                if let Some(cb) = *cb_guard {
+                                    invoke_callback(cb, &event);
+                                } else {
+                                    // Callback was unregistered, stop listening
+                                    break;
+                                }
+                            }
+                        }
+                        Ok(None) => {
+                            // Channel closed
                             break;
+                        }
+                        Err(_) => {
+                            // Timeout - continue loop to check cancellation
                         }
                     }
                 }
@@ -441,11 +486,17 @@ pub extern "C" fn hive_register_peer_callback(callback: Option<PeerEventCallback
 
 /// Unregister the peer event callback.
 ///
+/// This will stop the callback thread within 100ms.
+///
 /// # Returns
 ///
 /// - `HIVE_OK` on success
 #[no_mangle]
 pub extern "C" fn hive_unregister_peer_callback() -> c_int {
+    // Signal the callback thread to stop
+    get_or_init_cancel_token().store(true, Ordering::SeqCst);
+
+    // Clear the callback
     if let Ok(mut cb) = PEER_CALLBACK.write() {
         *cb = None;
     }
