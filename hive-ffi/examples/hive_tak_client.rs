@@ -33,19 +33,19 @@ struct FlightPattern {
     pattern_type: PatternType,
     center_lat: f64,
     center_lon: f64,
-    radius_deg: f64,      // Pattern radius in degrees
-    altitude_m: f64,      // Altitude in meters
-    speed_factor: f64,    // How fast the pattern progresses
+    radius_deg: f64,   // Pattern radius in degrees
+    altitude_m: f64,   // Altitude in meters
+    speed_factor: f64, // How fast the pattern progresses
     classification: &'static str,
     category: &'static str,
 }
 
 #[derive(Clone, Copy, Debug)]
 enum PatternType {
-    Orbit,        // Circular orbit
-    Racetrack,    // Oval racetrack pattern
-    Figure8,      // Figure-8 pattern
-    Lawnmower,    // Search pattern (back and forth)
+    Orbit,     // Circular orbit
+    Racetrack, // Oval racetrack pattern
+    Figure8,   // Figure-8 pattern
+    Lawnmower, // Search pattern (back and forth)
 }
 
 fn main() {
@@ -92,18 +92,18 @@ fn main() {
         FlightPattern {
             name: "HAWK-1",
             pattern_type: PatternType::Orbit,
-            center_lat: ATLANTA_LAT + 0.02,        // North of downtown
+            center_lat: ATLANTA_LAT + 0.02, // North of downtown
             center_lon: ATLANTA_LON - 0.01,
             radius_deg: 0.015,
             altitude_m: 300.0,
             speed_factor: 1.0,
-            classification: "a-f-A-M-F-Q",          // Friendly UAV
+            classification: "a-f-A-M-F-Q", // Friendly UAV
             category: "aircraft",
         },
         FlightPattern {
             name: "HAWK-2",
             pattern_type: PatternType::Racetrack,
-            center_lat: ATLANTA_LAT - 0.015,       // South of downtown
+            center_lat: ATLANTA_LAT - 0.015, // South of downtown
             center_lon: ATLANTA_LON + 0.02,
             radius_deg: 0.02,
             altitude_m: 250.0,
@@ -114,7 +114,7 @@ fn main() {
         FlightPattern {
             name: "SCOUT-1",
             pattern_type: PatternType::Figure8,
-            center_lat: ATLANTA_LAT,               // Over downtown
+            center_lat: ATLANTA_LAT, // Over downtown
             center_lon: ATLANTA_LON,
             radius_deg: 0.025,
             altitude_m: 400.0,
@@ -125,7 +125,7 @@ fn main() {
         FlightPattern {
             name: "SEARCH-1",
             pattern_type: PatternType::Lawnmower,
-            center_lat: ATLANTA_LAT + 0.01,        // East of downtown (near airport)
+            center_lat: ATLANTA_LAT + 0.01, // East of downtown (near airport)
             center_lon: ATLANTA_LON + 0.04,
             radius_deg: 0.03,
             altitude_m: 200.0,
@@ -177,10 +177,7 @@ fn main() {
         // Update track positions
         publish_flight_patterns(&node, &patterns, time_offset);
 
-        println!(
-            "[t={}s] Peers: {} | Tracks updated",
-            time_offset, peers
-        );
+        println!("[t={}s] Peers: {} | Tracks updated", time_offset, peers);
 
         if !connected.is_empty() {
             println!("  Connected: {:?}", connected);
@@ -214,7 +211,10 @@ fn calculate_position(pattern: &FlightPattern, time_secs: u64) -> (f64, f64, f64
             if cycle < PI / 2.0 {
                 // First straight
                 let progress = cycle / (PI / 2.0);
-                (pattern.radius_deg * 0.5, pattern.radius_deg * (progress - 0.5))
+                (
+                    pattern.radius_deg * 0.5,
+                    pattern.radius_deg * (progress - 0.5),
+                )
             } else if cycle < PI {
                 // First turn
                 let angle = (cycle - PI / 2.0) * 2.0;
@@ -225,7 +225,10 @@ fn calculate_position(pattern: &FlightPattern, time_secs: u64) -> (f64, f64, f64
             } else if cycle < 3.0 * PI / 2.0 {
                 // Second straight
                 let progress = (cycle - PI) / (PI / 2.0);
-                (-pattern.radius_deg * 0.5, pattern.radius_deg * (0.5 - progress))
+                (
+                    -pattern.radius_deg * 0.5,
+                    pattern.radius_deg * (0.5 - progress),
+                )
             } else {
                 // Second turn
                 let angle = (cycle - 3.0 * PI / 2.0) * 2.0 + PI;
@@ -362,10 +365,28 @@ fn publish_cells_and_platforms(node: &hive_ffi::HiveNode) {
 
     // Publish platforms
     let platforms = vec![
-        ("HAWK-1", "UAV", ATLANTA_LAT + 0.02, ATLANTA_LON - 0.01, 300.0),
-        ("HAWK-2", "UAV", ATLANTA_LAT - 0.015, ATLANTA_LON + 0.02, 250.0),
+        (
+            "HAWK-1",
+            "UAV",
+            ATLANTA_LAT + 0.02,
+            ATLANTA_LON - 0.01,
+            300.0,
+        ),
+        (
+            "HAWK-2",
+            "UAV",
+            ATLANTA_LAT - 0.015,
+            ATLANTA_LON + 0.02,
+            250.0,
+        ),
         ("SCOUT-1", "UAV", ATLANTA_LAT, ATLANTA_LON, 400.0),
-        ("SEARCH-1", "UAV", ATLANTA_LAT + 0.01, ATLANTA_LON + 0.04, 200.0),
+        (
+            "SEARCH-1",
+            "UAV",
+            ATLANTA_LAT + 0.01,
+            ATLANTA_LON + 0.04,
+            200.0,
+        ),
     ];
 
     for (name, ptype, lat, lon, alt) in platforms {
