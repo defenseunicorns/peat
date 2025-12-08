@@ -108,6 +108,4 @@ pub use hive_schema::capability::v1 as proto_capability;
 pub use hive_schema::track::v1 as proto_track;
 
 // Simulated UGV client for demo (Issue #331)
-pub use ugv_client::{
-    MissionCommand, MovementMode, PatrolPattern, UgvClient, UgvConfig, UgvState,
-};
+pub use ugv_client::{MissionCommand, MovementMode, PatrolPattern, UgvClient, UgvConfig, UgvState};

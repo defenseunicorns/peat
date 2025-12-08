@@ -123,10 +123,7 @@ pub enum MissionCommand {
         patrol_pattern: PatrolPattern,
     },
     /// Monitor a zone from a fixed position
-    MonitorZone {
-        center: (f64, f64),
-        radius_m: f64,
-    },
+    MonitorZone { center: (f64, f64), radius_m: f64 },
     /// Abort current mission and return to base
     Abort,
     /// Move to specific waypoint
@@ -644,8 +641,8 @@ fn offset_position(start: (f64, f64), bearing_deg: f64, distance_m: f64) -> (f64
     let d = distance_m / EARTH_RADIUS_M;
 
     let lat2 = (lat1.sin() * d.cos() + lat1.cos() * d.sin() * bearing.cos()).asin();
-    let lon2 = lon1
-        + (bearing.sin() * d.sin() * lat1.cos()).atan2(d.cos() - lat1.sin() * lat2.sin());
+    let lon2 =
+        lon1 + (bearing.sin() * d.sin() * lat1.cos()).atan2(d.cos() - lat1.sin() * lat2.sin());
 
     (lat2.to_degrees(), lon2.to_degrees())
 }

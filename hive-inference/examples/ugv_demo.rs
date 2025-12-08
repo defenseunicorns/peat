@@ -11,17 +11,13 @@
 //! 4. Publishes position updates as TrackUpdate messages
 //! 5. Responds to simulated mission commands
 
-use hive_inference::{
-    MissionCommand, MovementMode, PatrolPattern, UgvClient, UgvConfig, UgvState,
-};
+use hive_inference::{MissionCommand, MovementMode, PatrolPattern, UgvClient, UgvConfig, UgvState};
 use std::time::Duration;
 use tracing::{info, Level};
 
 fn main() {
     // Initialize logging
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     info!("=== HIVE UGV Demo ===");
     info!("Simulating Unmanned Ground Vehicle for M1 Vignette");
@@ -64,8 +60,14 @@ fn main() {
     let mut elapsed = Duration::ZERO;
     let mut last_position_log = Duration::ZERO;
 
-    info!("Running simulation for {} seconds...", sim_duration.as_secs());
-    info!("Position updates every {} ms\n", update_interval.as_millis());
+    info!(
+        "Running simulation for {} seconds...",
+        sim_duration.as_secs()
+    );
+    info!(
+        "Position updates every {} ms\n",
+        update_interval.as_millis()
+    );
 
     while elapsed < sim_duration {
         // Update UGV state
