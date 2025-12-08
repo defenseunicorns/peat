@@ -272,10 +272,23 @@ impl AutomergeCollection {
 #[cfg(feature = "automerge-backend")]
 impl Collection for AutomergeCollection {
     fn upsert(&self, doc_id: &str, data: Vec<u8>) -> Result<()> {
-        // Convert raw bytes to Automerge document
-        // For now, we store bytes directly in an Automerge document
-        // TODO: In Phase 2, this will convert protobuf → JSON → Automerge
-        let mut doc = Automerge::new();
+        // Get existing document or create a new one
+        // This is critical for CRDT sync: we must UPDATE the existing document
+        // rather than replacing it with a new one. If we create a new document,
+        // Automerge will see it as a conflicting branch and may pick the wrong
+        // value during merge.
+        let key = self.prefixed_key(doc_id);
+        let mut doc = match self.store.get(&key)? {
+            Some(existing) => {
+                // Fork the existing document to update it
+                existing.fork()
+            }
+            None => {
+                // No existing doc, create a new one
+                Automerge::new()
+            }
+        };
+
         match doc.transact(|tx| {
             tx.put(
                 automerge::ROOT,
@@ -284,9 +297,9 @@ impl Collection for AutomergeCollection {
             )?;
             Ok::<(), automerge::AutomergeError>(())
         }) {
-            Ok(_) => self.store.put(&self.prefixed_key(doc_id), &doc),
+            Ok(_) => self.store.put(&key, &doc),
             Err(e) => Err(anyhow::anyhow!(
-                "Failed to create Automerge document: {:?}",
+                "Failed to update Automerge document: {:?}",
                 e
             )),
         }
@@ -315,15 +328,55 @@ impl Collection for AutomergeCollection {
 
     fn scan(&self) -> Result<Vec<(String, Vec<u8>)>> {
         let docs = self.store.scan_prefix(&self.prefix)?;
+        tracing::debug!(
+            "AutomergeCollection.scan: prefix={}, found {} docs",
+            self.prefix,
+            docs.len()
+        );
         let mut results = Vec::new();
 
         for (key, doc) in docs {
+            tracing::debug!(
+                "AutomergeCollection.scan: processing key={}, doc_len={}",
+                key,
+                doc.save().len()
+            );
             if let Some(doc_id) = self.strip_prefix(&key) {
-                if let Ok(Some((automerge::Value::Scalar(scalar), _))) =
-                    doc.get(automerge::ROOT, "data")
-                {
-                    if let automerge::ScalarValue::Bytes(bytes) = scalar.as_ref() {
-                        results.push((doc_id.to_string(), bytes.to_vec()));
+                match doc.get(automerge::ROOT, "data") {
+                    Ok(Some((automerge::Value::Scalar(scalar), _))) => {
+                        if let automerge::ScalarValue::Bytes(bytes) = scalar.as_ref() {
+                            tracing::debug!(
+                                "AutomergeCollection.scan: found data bytes, doc_id={}, len={}",
+                                doc_id,
+                                bytes.len()
+                            );
+                            results.push((doc_id.to_string(), bytes.to_vec()));
+                        } else {
+                            tracing::debug!(
+                                "AutomergeCollection.scan: data is not Bytes, doc_id={}",
+                                doc_id
+                            );
+                        }
+                    }
+                    Ok(Some((value, _))) => {
+                        tracing::debug!(
+                            "AutomergeCollection.scan: data is not Scalar, doc_id={}, value_type={:?}",
+                            doc_id,
+                            value
+                        );
+                    }
+                    Ok(None) => {
+                        tracing::debug!(
+                            "AutomergeCollection.scan: no 'data' field, doc_id={}",
+                            doc_id
+                        );
+                    }
+                    Err(e) => {
+                        tracing::debug!(
+                            "AutomergeCollection.scan: error getting 'data', doc_id={}, err={}",
+                            doc_id,
+                            e
+                        );
                     }
                 }
             }

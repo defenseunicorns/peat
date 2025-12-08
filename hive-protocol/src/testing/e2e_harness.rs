@@ -22,16 +22,27 @@
 //! assert_eq!(event.status, FormationStatus::Ready);
 //! ```
 
+#[cfg(feature = "ditto-backend")]
 use crate::credentials::HiveCredentials;
+#[cfg(feature = "ditto-backend")]
 use crate::storage::ditto_store::{DittoConfig, DittoStore};
+#[cfg(feature = "ditto-backend")]
 use crate::sync::ditto::DittoBackend;
-use crate::sync::{BackendConfig, DataSyncBackend, TransportConfig};
+use crate::sync::DataSyncBackend;
+use crate::sync::{BackendConfig, TransportConfig};
 use crate::{Error, Result};
 use std::collections::HashMap;
 use std::sync::Arc;
+#[cfg(any(feature = "ditto-backend", feature = "automerge-backend"))]
 use std::time::Duration;
+#[cfg(feature = "ditto-backend")]
 use tokio::sync::mpsc;
+#[cfg(feature = "ditto-backend")]
 use tokio::time::timeout;
+#[cfg(all(feature = "automerge-backend", not(feature = "ditto-backend")))]
+#[allow(unused_imports)]
+use tracing::{debug, info};
+#[cfg(feature = "ditto-backend")]
 use tracing::{debug, info, warn};
 
 #[cfg(feature = "automerge-backend")]
@@ -87,6 +98,7 @@ impl E2EHarness {
     /// - Unique persistence directory
     /// - Shared app_id and shared_key for sync mesh
     /// - Uses mDNS/LAN discovery (no TCP listener/client)
+    #[cfg(feature = "ditto-backend")]
     pub async fn create_ditto_store(&mut self) -> Result<DittoStore> {
         self.create_ditto_store_with_tcp(None, None).await
     }
@@ -99,6 +111,7 @@ impl E2EHarness {
     /// # Arguments
     /// * `tcp_listen_port` - If Some(port), this instance will listen on that TCP port
     /// * `tcp_connect_address` - If Some(addr), this instance will connect to that address
+    #[cfg(feature = "ditto-backend")]
     pub async fn create_ditto_store_with_tcp(
         &mut self,
         tcp_listen_port: Option<u16>,
@@ -148,6 +161,7 @@ impl E2EHarness {
     /// - Unique persistence directory
     /// - Shared app_id and shared_key for sync mesh
     /// - Uses mDNS/LAN discovery (no TCP listener/client)
+    #[cfg(feature = "ditto-backend")]
     pub async fn create_ditto_backend(&mut self) -> Result<Arc<DittoBackend>> {
         self.create_ditto_backend_with_tcp(None, None).await
     }
@@ -160,6 +174,7 @@ impl E2EHarness {
     /// # Arguments
     /// * `tcp_listen_port` - If Some(port), this instance will listen on that TCP port
     /// * `tcp_connect_address` - If Some(addr), this instance will connect to that address
+    #[cfg(feature = "ditto-backend")]
     pub async fn create_ditto_backend_with_tcp(
         &mut self,
         tcp_listen_port: Option<u16>,
@@ -395,6 +410,7 @@ impl E2EHarness {
     ///
     /// Returns a receiver channel that will receive SquadState updates
     /// whenever the squad document changes in Ditto
+    #[cfg(feature = "ditto-backend")]
     pub async fn observe_cell(&self, store: &DittoStore, cell_id: &str) -> Result<CellObserver> {
         let (tx, rx) = mpsc::unbounded_channel();
 
@@ -441,6 +457,7 @@ impl E2EHarness {
     }
 
     /// Create a platform observer that triggers on document changes
+    #[cfg(feature = "ditto-backend")]
     pub async fn observe_node(&self, store: &DittoStore, node_id: &str) -> Result<NodeObserver> {
         let (tx, rx) = mpsc::unbounded_channel();
 
@@ -483,6 +500,7 @@ impl E2EHarness {
     ///
     /// Uses Ditto presence graph to detect when peers are connected
     /// Returns immediately when connection is established
+    #[cfg(feature = "ditto-backend")]
     pub async fn wait_for_peer_connection(
         &self,
         store1: &DittoStore,
@@ -517,6 +535,7 @@ impl E2EHarness {
     }
 
     /// Clean shutdown helper
+    #[cfg(feature = "ditto-backend")]
     pub async fn shutdown_store(&self, store: DittoStore) {
         store.stop_sync();
         drop(store);
@@ -525,6 +544,7 @@ impl E2EHarness {
 }
 
 /// Cell observer that emits events on document changes
+#[cfg(feature = "ditto-backend")]
 pub struct CellObserver {
     _sync_sub: Arc<dittolive_ditto::sync::SyncSubscription>,
     _observer: Arc<dittolive_ditto::store::StoreObserver>,
@@ -532,6 +552,7 @@ pub struct CellObserver {
     cell_id: String,
 }
 
+#[cfg(feature = "ditto-backend")]
 impl CellObserver {
     /// Wait for the next event with timeout
     pub async fn wait_for_event(
@@ -656,6 +677,7 @@ impl CellObserver {
     }
 }
 
+#[cfg(feature = "ditto-backend")]
 #[derive(Debug, Clone)]
 pub enum CellObserverEvent {
     /// Cell document changed (updated/inserted)
@@ -663,12 +685,14 @@ pub enum CellObserverEvent {
 }
 
 /// Node observer that emits events on document changes
+#[cfg(feature = "ditto-backend")]
 pub struct NodeObserver {
     _sync_sub: Arc<dittolive_ditto::sync::SyncSubscription>,
     _observer: Arc<dittolive_ditto::store::StoreObserver>,
     receiver: mpsc::UnboundedReceiver<NodeObserverEvent>,
 }
 
+#[cfg(feature = "ditto-backend")]
 impl NodeObserver {
     /// Wait for the next event with timeout
     pub async fn wait_for_event(
@@ -696,6 +720,7 @@ impl NodeObserver {
     }
 }
 
+#[cfg(feature = "ditto-backend")]
 #[derive(Debug, Clone)]
 pub enum NodeObserverEvent {
     /// Node document changed (updated/inserted)
@@ -714,6 +739,7 @@ mod tests {
     }
 
     /// Test harness creation (requires Ditto credentials)
+    #[cfg(feature = "ditto-backend")]
     #[tokio::test]
     async fn test_ditto_store_creation() {
         // Fail if Ditto credentials not properly configured
@@ -728,6 +754,7 @@ mod tests {
     }
 
     /// Test multiple isolated stores (requires Ditto credentials)
+    #[cfg(feature = "ditto-backend")]
     #[tokio::test]
     async fn test_multiple_isolated_stores() {
         // Fail if Ditto credentials not properly configured

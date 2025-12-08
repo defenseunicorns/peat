@@ -14,9 +14,7 @@ use std::collections::HashMap;
 /// Convert a serde_json::Value (object) into HashMap<String, Value>
 fn json_to_fields(value: serde_json::Value) -> HashMap<String, Value> {
     match value {
-        serde_json::Value::Object(map) => {
-            map.into_iter().map(|(k, v)| (k, v)).collect()
-        }
+        serde_json::Value::Object(map) => map.into_iter().collect(),
         _ => {
             let mut fields = HashMap::new();
             fields.insert("value".to_string(), value);
@@ -36,6 +34,8 @@ pub mod collections {
     pub const TRACKS: &str = "tracks";
     pub const COMMANDS: &str = "commands";
     pub const TEAMS: &str = "teams";
+    pub const BEACONS: &str = "beacons";
+    pub const DIRECTIVES: &str = "directives";
 }
 
 /// A node in the E2E test with its own sync backend
@@ -264,7 +264,10 @@ impl M1TestHarness {
         self.bravo.ai_model.mark_ready(2048);
 
         self.initialized = true;
-        info!("M1 test harness initialized with {} nodes", self.nodes.len());
+        info!(
+            "M1 test harness initialized with {} nodes",
+            self.nodes.len()
+        );
         Ok(())
     }
 
@@ -282,15 +285,18 @@ impl M1TestHarness {
         info!("Phase 1: Initialization (with real sync)");
         let start = Instant::now();
 
-        let alpha_node = self.nodes.get("alpha").ok_or_else(|| {
-            anyhow::anyhow!("Alpha node not found")
-        })?;
-        let bravo_node = self.nodes.get("bravo").ok_or_else(|| {
-            anyhow::anyhow!("Bravo node not found")
-        })?;
-        let coord_node = self.nodes.get("coordinator").ok_or_else(|| {
-            anyhow::anyhow!("Coordinator node not found")
-        })?;
+        let alpha_node = self
+            .nodes
+            .get("alpha")
+            .ok_or_else(|| anyhow::anyhow!("Alpha node not found"))?;
+        let bravo_node = self
+            .nodes
+            .get("bravo")
+            .ok_or_else(|| anyhow::anyhow!("Bravo node not found"))?;
+        let coord_node = self
+            .nodes
+            .get("coordinator")
+            .ok_or_else(|| anyhow::anyhow!("Coordinator node not found"))?;
 
         // Alpha advertises its capabilities
         let alpha_caps = self.alpha.team.get_aggregated_capabilities();
@@ -336,9 +342,9 @@ impl M1TestHarness {
 
         // Wait for sync to propagate to coordinator
         let sync_start = Instant::now();
-        let first_alpha_cap = alpha_caps.first().ok_or_else(|| {
-            anyhow::anyhow!("No Alpha capabilities")
-        })?;
+        let first_alpha_cap = alpha_caps
+            .first()
+            .ok_or_else(|| anyhow::anyhow!("No Alpha capabilities"))?;
 
         // Wait for coordinator to see Alpha's first capability
         let sync_result = timeout(
@@ -381,16 +387,15 @@ impl M1TestHarness {
         info!("Phase 2: Mission Tasking (with real sync)");
         let start = Instant::now();
 
-        let c2_node = self.nodes.get("c2").ok_or_else(|| {
-            anyhow::anyhow!("C2 node not found")
-        })?;
+        let c2_node = self
+            .nodes
+            .get("c2")
+            .ok_or_else(|| anyhow::anyhow!("C2 node not found"))?;
 
         // C2 issues track command
-        let cmd = self.c2.issue_track_command(
-            "Adult male, blue jacket, backpack",
-            Priority::High,
-            None,
-        );
+        let cmd =
+            self.c2
+                .issue_track_command("Adult male, blue jacket, backpack", Priority::High, None);
 
         // Store command in sync layer
         let cmd_doc = serde_json::json!({
@@ -409,9 +414,10 @@ impl M1TestHarness {
         self.metrics.record_message(MessageType::Command, cmd_size);
 
         // Wait for command to propagate to teams
-        let alpha_node = self.nodes.get("alpha").ok_or_else(|| {
-            anyhow::anyhow!("Alpha node not found")
-        })?;
+        let alpha_node = self
+            .nodes
+            .get("alpha")
+            .ok_or_else(|| anyhow::anyhow!("Alpha node not found"))?;
 
         let sync_start = Instant::now();
         let sync_result = timeout(
@@ -431,11 +437,13 @@ impl M1TestHarness {
                 info!("Command synced to Alpha in {:?}", latency);
             }
             Ok(Err(e)) => {
-                self.metrics.record_command_latency(Duration::from_millis(100));
+                self.metrics
+                    .record_command_latency(Duration::from_millis(100));
                 warn!("Command sync verification failed: {}", e);
             }
             Err(_) => {
-                self.metrics.record_command_latency(Duration::from_millis(100));
+                self.metrics
+                    .record_command_latency(Duration::from_millis(100));
                 warn!("Command sync timeout");
             }
         }
@@ -451,15 +459,20 @@ impl M1TestHarness {
     ///
     /// AI generates tracks that sync to C2
     pub async fn phase3_active_tracking(&mut self, num_updates: usize) -> anyhow::Result<Duration> {
-        info!("Phase 3: Active Tracking ({} updates, real sync)", num_updates);
+        info!(
+            "Phase 3: Active Tracking ({} updates, real sync)",
+            num_updates
+        );
         let start = Instant::now();
 
-        let alpha_node = self.nodes.get("alpha").ok_or_else(|| {
-            anyhow::anyhow!("Alpha node not found")
-        })?;
-        let c2_node = self.nodes.get("c2").ok_or_else(|| {
-            anyhow::anyhow!("C2 node not found")
-        })?;
+        let alpha_node = self
+            .nodes
+            .get("alpha")
+            .ok_or_else(|| anyhow::anyhow!("Alpha node not found"))?;
+        let c2_node = self
+            .nodes
+            .get("c2")
+            .ok_or_else(|| anyhow::anyhow!("C2 node not found"))?;
 
         for i in 0..num_updates {
             let track_start = Instant::now();
@@ -548,12 +561,14 @@ impl M1TestHarness {
         info!("Phase 4: Track Handoff (Alpha → Bravo, real sync)");
         let start = Instant::now();
 
-        let alpha_node = self.nodes.get("alpha").ok_or_else(|| {
-            anyhow::anyhow!("Alpha node not found")
-        })?;
-        let bravo_node = self.nodes.get("bravo").ok_or_else(|| {
-            anyhow::anyhow!("Bravo node not found")
-        })?;
+        let alpha_node = self
+            .nodes
+            .get("alpha")
+            .ok_or_else(|| anyhow::anyhow!("Alpha node not found"))?;
+        let bravo_node = self
+            .nodes
+            .get("bravo")
+            .ok_or_else(|| anyhow::anyhow!("Bravo node not found"))?;
 
         // Alpha initiates handoff
         let handoff_id = uuid::Uuid::new_v4().to_string();
@@ -568,7 +583,11 @@ impl M1TestHarness {
 
         let handoff_start = Instant::now();
         alpha_node
-            .store_document(collections::TRACKS, &format!("handoff-{}", handoff_id), handoff_doc)
+            .store_document(
+                collections::TRACKS,
+                &format!("handoff-{}", handoff_id),
+                handoff_doc,
+            )
             .await?;
 
         self.metrics.record_message(MessageType::Handoff, 1500);
@@ -639,8 +658,8 @@ impl M1TestHarness {
             .record_message(MessageType::ModelUpdateData, 45 * 1024 * 1024);
 
         // Update models locally
-        let new_model =
-            crate::platform::AiModelInfo::object_tracker("1.4.0").with_performance(0.95, 0.91, 18.0);
+        let new_model = crate::platform::AiModelInfo::object_tracker("1.4.0")
+            .with_performance(0.95, 0.91, 18.0);
         self.alpha.ai_model.update_model(new_model.clone());
         self.bravo.ai_model.update_model(new_model);
 
@@ -744,7 +763,11 @@ mod tests {
         let mut harness = M1TestHarness::new("test_init");
 
         let result = harness.initialize().await;
-        assert!(result.is_ok(), "Initialization should succeed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Initialization should succeed: {:?}",
+            result.err()
+        );
 
         assert!(harness.initialized);
         assert_eq!(harness.nodes.len(), 4); // alpha, bravo, coordinator, c2
