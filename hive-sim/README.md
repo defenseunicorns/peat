@@ -329,6 +329,27 @@ Ditto credentials are loaded from `.env` file via `--env-file` flag.
 - No credentials required
 - Peer discovery via static configuration or mDNS (Phase 7.3)
 
+**Circuit Breaker Configuration (Automerge backend only):**
+
+The circuit breaker prevents cascading failures when peers become unreachable. Configure via environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CIRCUIT_FAILURE_THRESHOLD` | 5 | Number of consecutive failures to trigger circuit open |
+| `CIRCUIT_FAILURE_WINDOW_SECS` | 5 | Time window for counting failures (seconds) |
+| `CIRCUIT_OPEN_TIMEOUT_SECS` | 5 | How long circuit stays open before trying half-open (seconds) |
+| `CIRCUIT_SUCCESS_THRESHOLD` | 2 | Successes needed to close circuit from half-open state |
+
+**Recommended settings by environment:**
+
+| Environment | Window | Timeout | Use Case |
+|-------------|--------|---------|----------|
+| Lab (single machine) | 2s | 2s | Fast iteration, predictable network |
+| Staging | 5s | 5s | Balanced (default) |
+| Production | 10-30s | 10-30s | Variable network, external dependencies |
+
+The topology generator (`generate-lab4-hierarchical-topology.py`) sets aggressive lab defaults (2s windows) automatically.
+
 ## Hierarchical Command Dissemination
 
 The simulator supports bidirectional hierarchical command flow with optional acknowledgment collection:
