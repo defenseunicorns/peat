@@ -331,11 +331,7 @@ async fn test_deployment_failure() {
 /// 4. C2 sends DeploymentDirective via sync
 /// 5. Edge processes directive, deploys model, updates beacon
 /// 6. C2 observes updated beacon - verifies AI capability NOW present
-///
-/// Note: This test requires network peer discovery which is not automatically
-/// configured in the test environment. Run with `--ignored` to execute.
 #[tokio::test]
-#[ignore = "requires network peer discovery - run with --ignored"]
 async fn test_beacon_capability_sync_e2e() {
     use hive_inference::beacon::{BeaconConfig, CameraSpec, HiveBeacon};
     use hive_inference::orchestration::{DirectiveHandler, OrchestrationService, SimulatedAdapter};
@@ -349,20 +345,96 @@ async fn test_beacon_capability_sync_e2e() {
     use std::time::Duration;
 
     // === Setup: Create two nodes with real sync ===
+    println!("=== E2E Test: Beacon Capability Sync ===");
+
+    // Initialize tracing for debugging
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("hive_protocol::storage::automerge_sync=debug,hive_protocol::storage::automerge_store=debug,hive_protocol::sync=debug")
+        .with_test_writer()
+        .try_init();
+
     let mut harness = E2EHarness::new("beacon_capability_e2e");
 
+    // Use explicit bind addresses for deterministic peer connection
+    let edge_addr: std::net::SocketAddr = "127.0.0.1:19301".parse().unwrap();
+    let c2_addr: std::net::SocketAddr = "127.0.0.1:19302".parse().unwrap();
+    println!("Edge addr: {}, C2 addr: {}", edge_addr, c2_addr);
+
     let edge_backend = harness
-        .create_automerge_backend()
+        .create_automerge_backend_with_bind(Some(edge_addr))
         .await
         .expect("Failed to create edge backend");
 
     let c2_backend = harness
-        .create_automerge_backend()
+        .create_automerge_backend_with_bind(Some(c2_addr))
         .await
         .expect("Failed to create C2 backend");
 
-    // Allow peer discovery
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    // Explicitly connect the peers using the proper sync_engine API which handles handshake
+    let edge_transport = edge_backend.transport();
+    let c2_endpoint_id = c2_backend.endpoint_id();
+    let c2_node_id_hex = hex::encode(c2_endpoint_id.as_bytes());
+
+    // Use sync_engine().connect_to_peer() which performs formation handshake
+    let connected = edge_backend
+        .sync_engine()
+        .connect_to_peer(&c2_node_id_hex, &[c2_addr.to_string()])
+        .await
+        .expect("Should connect edge to c2");
+    println!("Peer connection result: {}", connected);
+
+    // If connect_to_peer returned false, C2 has the lower ID and should connect to us instead
+    // In that case, have C2 connect to edge
+    if !connected {
+        let edge_endpoint_id = edge_backend.endpoint_id();
+        let edge_node_id_hex = hex::encode(edge_endpoint_id.as_bytes());
+
+        c2_backend
+            .sync_engine()
+            .connect_to_peer(&edge_node_id_hex, &[edge_addr.to_string()])
+            .await
+            .expect("Should connect c2 to edge");
+        println!("C2 initiated connection to edge");
+    }
+    println!("Peer connection established");
+
+    // Check connected peers
+    let edge_peers = edge_transport.connected_peers();
+    println!("Edge connected peers: {:?}", edge_peers.len());
+
+    // Start sync on both backends
+    println!("Starting sync on edge backend...");
+    edge_backend
+        .sync_engine()
+        .start_sync()
+        .await
+        .expect("Should start edge sync");
+
+    let edge_peers_after_edge_sync = edge_transport.connected_peers();
+    println!(
+        "Edge connected peers after edge sync: {:?}",
+        edge_peers_after_edge_sync.len()
+    );
+
+    println!("Starting sync on c2 backend...");
+    c2_backend
+        .sync_engine()
+        .start_sync()
+        .await
+        .expect("Should start c2 sync");
+
+    let edge_peers_after_c2_sync = edge_transport.connected_peers();
+    println!(
+        "Edge connected peers after c2 sync: {:?}",
+        edge_peers_after_c2_sync.len()
+    );
+
+    // Allow connection to establish
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    println!(
+        "After 200ms sleep, edge peers: {}",
+        edge_transport.connected_peers().len()
+    );
 
     // === Phase 1: Edge node starts with sensor-only capability ===
     // Create beacon with camera but NO AI model
@@ -401,11 +473,21 @@ async fn test_beacon_capability_sync_e2e() {
     }
     let doc = Document::with_id(&advertisement.platform_id, fields);
 
-    edge_backend
+    // Verify sync started and peers are connected
+    println!("Verifying sync state...");
+    let edge_peers_after_sync = edge_transport.connected_peers();
+    println!(
+        "Edge connected peers after sync start: {:?}",
+        edge_peers_after_sync.len()
+    );
+
+    println!("Storing beacon in edge backend...");
+    let doc_id = edge_backend
         .document_store()
         .upsert(collections::BEACONS, doc)
         .await
         .expect("Failed to store beacon");
+    println!("Beacon stored with doc_id: {}, waiting for sync...", doc_id);
 
     // === Phase 2: C2 observes beacon via sync ===
     // Wait for sync to propagate
@@ -534,8 +616,26 @@ async fn test_beacon_capability_sync_e2e() {
         .expect("Failed to update beacon");
 
     // === Phase 6: C2 observes updated beacon with AI capability ===
+    // The upsert triggers sync but it may be blocked by cooldown (100ms).
+    // Wait for cooldown to expire, then explicitly trigger sync to ensure
+    // the updated document is pushed to C2.
+    let beacon_doc_key = format!("{}:{}", collections::BEACONS, "edge-sensor-001");
+
+    // Wait for cooldown to expire completely
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    // Explicitly trigger sync - this clears stale sync state and sends fresh message
+    edge_backend
+        .as_ref()
+        .sync_document(&beacon_doc_key)
+        .await
+        .expect("Failed to sync beacon document");
+
+    // Allow sync messages to fully propagate (Automerge sync takes multiple round trips)
+    // Give extra time for the network round-trips to complete
     tokio::time::sleep(Duration::from_millis(500)).await;
 
+    // Query with simple retries - don't re-trigger sync which can cause race conditions
     let mut retries = 0;
     let final_beacon = loop {
         let results = c2_backend
@@ -555,10 +655,11 @@ async fn test_beacon_capability_sync_e2e() {
         }
 
         retries += 1;
-        if retries > 30 {
-            panic!("C2 did not see updated beacon with AI capability after 30 retries");
+        if retries > 20 {
+            panic!("C2 did not see updated beacon with AI capability after 20 retries");
         }
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Just wait - don't re-trigger sync to avoid race conditions
+        tokio::time::sleep(Duration::from_millis(250)).await;
     };
 
     // Verify C2 now sees AI capability
@@ -583,11 +684,7 @@ async fn test_beacon_capability_sync_e2e() {
 }
 
 /// Test that directive sync propagates between nodes
-///
-/// Note: This test requires network peer discovery which is not automatically
-/// configured in the test environment. Run with `--ignored` to execute.
 #[tokio::test]
-#[ignore = "requires network peer discovery - run with --ignored"]
 async fn test_directive_sync_e2e() {
     use hive_inference::testing::collections;
     use hive_protocol::distribution::{ArtifactSpec, DeploymentDirective, DeploymentScope};
@@ -599,18 +696,55 @@ async fn test_directive_sync_e2e() {
 
     let mut harness = E2EHarness::new("directive_sync_e2e");
 
+    // Use explicit bind addresses
+    let addr1: std::net::SocketAddr = "127.0.0.1:19311".parse().unwrap();
+    let addr2: std::net::SocketAddr = "127.0.0.1:19312".parse().unwrap();
+
     let node1 = harness
-        .create_automerge_backend()
+        .create_automerge_backend_with_bind(Some(addr1))
         .await
         .expect("Failed to create node1");
 
     let node2 = harness
-        .create_automerge_backend()
+        .create_automerge_backend_with_bind(Some(addr2))
         .await
         .expect("Failed to create node2");
 
-    // Allow peer discovery
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    // Explicitly connect the peers using sync_engine (handles formation handshake)
+    let node2_endpoint_id = node2.endpoint_id();
+    let node2_id_hex = hex::encode(node2_endpoint_id.as_bytes());
+
+    let connected = node1
+        .sync_engine()
+        .connect_to_peer(&node2_id_hex, &[addr2.to_string()])
+        .await
+        .expect("Should connect node1 to node2");
+
+    // If connect_to_peer returned false, node2 has the lower ID and should connect instead
+    if !connected {
+        let node1_endpoint_id = node1.endpoint_id();
+        let node1_id_hex = hex::encode(node1_endpoint_id.as_bytes());
+        node2
+            .sync_engine()
+            .connect_to_peer(&node1_id_hex, &[addr1.to_string()])
+            .await
+            .expect("Should connect node2 to node1");
+    }
+
+    // Start sync on both
+    node1
+        .sync_engine()
+        .start_sync()
+        .await
+        .expect("Should start sync on node1");
+    node2
+        .sync_engine()
+        .start_sync()
+        .await
+        .expect("Should start sync on node2");
+
+    // Allow connection to establish
+    tokio::time::sleep(Duration::from_millis(200)).await;
 
     // Node1 creates a directive
     let directive = DeploymentDirective::new("sync-test-directive")
@@ -637,6 +771,20 @@ async fn test_directive_sync_e2e() {
         .await
         .expect("Failed to store directive");
 
+    // Wait for cooldown to expire, then explicitly trigger sync
+    let directive_doc_key = format!("{}:{}", collections::DIRECTIVES, directive.directive_id);
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    // Explicitly trigger sync after cooldown expires
+    node1
+        .as_ref()
+        .sync_document(&directive_doc_key)
+        .await
+        .expect("Failed to sync directive document");
+
+    // Allow sync messages to propagate
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
     // Node2 should see the directive via sync
     let query = Query::Eq {
         field: "directive_id".to_string(),
@@ -644,7 +792,7 @@ async fn test_directive_sync_e2e() {
     };
 
     let mut found = false;
-    for _ in 0..30 {
+    for _ in 0..20 {
         let results = node2
             .document_store()
             .query(collections::DIRECTIVES, &query)
@@ -660,7 +808,7 @@ async fn test_directive_sync_e2e() {
             found = true;
             break;
         }
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        tokio::time::sleep(Duration::from_millis(250)).await;
     }
 
     assert!(found, "Node2 should receive directive from Node1 via sync");

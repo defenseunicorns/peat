@@ -810,6 +810,25 @@ impl AutomergeIrohBackend {
         self.transport.endpoint_id()
     }
 
+    /// Manually trigger sync for a specific document with all connected peers
+    ///
+    /// This is useful for testing or for explicit sync triggering when the
+    /// automatic sync triggered by upsert may have been blocked by cooldown.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_key` - The full document key (e.g., "beacons:edge-sensor-001")
+    pub async fn sync_document(&self, doc_key: &str) -> Result<()> {
+        self.backend
+            .sync_document(doc_key)
+            .await
+            .map_err(|e| Error::Network {
+                message: format!("Failed to sync document {}: {}", doc_key, e),
+                peer_id: None,
+                source: None,
+            })
+    }
+
     /// Add a discovery strategy to the peer discovery manager
     ///
     /// This allows configuring static peers, mDNS discovery, etc.
@@ -898,6 +917,19 @@ impl DocumentStore for IrohDocumentStore {
                 key: Some(doc_id.clone()),
                 source: None,
             })?;
+
+        // Trigger sync to push the document to connected peers
+        // The doc_key format is "collection:doc_id"
+        let doc_key = format!("{}:{}", collection, doc_id);
+        match self.backend.sync_document(&doc_key).await {
+            Ok(()) => {
+                tracing::debug!("Sync triggered for document {} after upsert", doc_key);
+            }
+            Err(e) => {
+                // Log but don't fail - sync is best-effort
+                tracing::debug!("Failed to sync document {} after upsert: {}", doc_key, e);
+            }
+        }
 
         Ok(doc_id)
     }
@@ -1579,6 +1611,7 @@ impl PeerDiscovery for IrohPeerDiscovery {
 struct IrohSyncEngine {
     backend: Arc<crate::storage::AutomergeBackend>,
     transport: Arc<crate::network::IrohTransport>,
+    formation_key: Option<crate::security::FormationKey>,
 }
 
 #[async_trait]
@@ -1671,12 +1704,44 @@ impl SyncEngine for IrohSyncEngine {
         // Attempt to connect via transport
         // Returns Some(conn) if new connection, None if already connected
         match self.transport.connect_peer(&peer_info).await {
-            Ok(Some(_conn)) => {
-                tracing::info!(
-                    peer_endpoint = %endpoint_id_hex,
-                    "Successfully connected to peer"
-                );
-                Ok(true)
+            Ok(Some(conn)) => {
+                // New connection - perform formation handshake
+                if let Some(ref formation_key) = self.formation_key {
+                    use crate::network::formation_handshake::perform_initiator_handshake;
+                    match perform_initiator_handshake(&conn, formation_key).await {
+                        Ok(()) => {
+                            tracing::info!(
+                                peer_endpoint = %endpoint_id_hex,
+                                "Successfully connected to peer and authenticated"
+                            );
+                            Ok(true)
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                peer_endpoint = %endpoint_id_hex,
+                                error = %e,
+                                "Peer authentication failed"
+                            );
+                            // Close the connection on auth failure
+                            if let Ok(peer_id) = peer_info.endpoint_id() {
+                                conn.close(1u32.into(), b"authentication failed");
+                                self.transport.disconnect(&peer_id).ok();
+                            }
+                            Err(Error::Network {
+                                message: format!("Peer authentication failed: {}", e),
+                                peer_id: Some(endpoint_id_hex.to_string()),
+                                source: None,
+                            })
+                        }
+                    }
+                } else {
+                    // No formation key - just report connected
+                    tracing::info!(
+                        peer_endpoint = %endpoint_id_hex,
+                        "Successfully connected to peer (no authentication)"
+                    );
+                    Ok(true)
+                }
             }
             Ok(None) => {
                 // Already connected (they initiated)
@@ -1766,6 +1831,7 @@ impl DataSyncBackend for AutomergeIrohBackend {
         Arc::new(IrohSyncEngine {
             backend: Arc::clone(&self.backend),
             transport: Arc::clone(&self.transport),
+            formation_key: self.formation_key(),
         })
     }
 

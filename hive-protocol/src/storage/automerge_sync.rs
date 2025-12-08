@@ -232,25 +232,49 @@ impl AutomergeSyncCoordinator {
 
     /// Inner sync method without error handling wrapper
     async fn initiate_sync_inner(&self, doc_key: &str, peer_id: EndpointId) -> Result<()> {
+        tracing::debug!(
+            "initiate_sync_inner: doc_key={}, peer={:?}",
+            doc_key,
+            peer_id
+        );
+
         // Get the document
         let doc = self
             .store
             .get(doc_key)?
             .context("Document not found for sync")?;
 
+        tracing::debug!("initiate_sync_inner: got doc, len={}", doc.save().len());
+
         // Get or create sync state for this peer
         let mut sync_state = self.get_or_create_sync_state(doc_key, peer_id);
 
         // Generate initial sync message using SyncDoc trait
-        let message = SyncDoc::generate_sync_message(&doc, &mut sync_state)
-            .context("No initial sync message to send")?;
+        let message = match SyncDoc::generate_sync_message(&doc, &mut sync_state) {
+            Some(msg) => {
+                tracing::debug!(
+                    "initiate_sync_inner: generated sync message, encoded_len={}",
+                    msg.clone().encode().len()
+                );
+                msg
+            }
+            None => {
+                tracing::debug!("initiate_sync_inner: generate_sync_message returned None");
+                return Err(anyhow::anyhow!("No initial sync message to send"));
+            }
+        };
 
         // Store updated sync state
         self.update_sync_state(doc_key, peer_id, sync_state);
 
         // Send message to peer with document key
+        tracing::debug!(
+            "initiate_sync_inner: sending sync message to peer {:?}",
+            peer_id
+        );
         self.send_sync_message_for_doc(peer_id, doc_key, &message)
             .await?;
+        tracing::debug!("initiate_sync_inner: sync message sent successfully");
 
         Ok(())
     }
@@ -292,12 +316,21 @@ impl AutomergeSyncCoordinator {
 
         // Get the document (or create empty one if doesn't exist)
         let mut doc = self.store.get(doc_key)?.unwrap_or_else(Automerge::new);
+        let doc_len_before = doc.save().len();
 
         // Get or create sync state for this peer
         let mut sync_state = self.get_or_create_sync_state(doc_key, peer_id);
 
         // Apply the sync message using SyncDoc trait
         SyncDoc::receive_sync_message(&mut doc, &mut sync_state, message)?;
+
+        let doc_len_after = doc.save().len();
+        tracing::debug!(
+            "receive_sync_message: doc {} size changed from {} to {} bytes",
+            doc_key,
+            doc_len_before,
+            doc_len_after
+        );
 
         // Save updated document
         self.store.put(doc_key, &doc)?;
@@ -460,6 +493,18 @@ impl AutomergeSyncCoordinator {
             .insert(peer_id, state);
     }
 
+    /// Clear sync state for a document (for all peers)
+    ///
+    /// This should be called when a document is modified locally, to ensure
+    /// the next sync attempt will generate a fresh sync message with the new
+    /// document heads rather than thinking peers are already up-to-date.
+    pub fn clear_sync_state_for_document(&self, doc_key: &str) {
+        let mut states = self.peer_states.write().unwrap();
+        if states.remove(doc_key).is_some() {
+            tracing::debug!("Cleared sync state for document {}", doc_key);
+        }
+    }
+
     /// Sync a specific document with a peer
     ///
     /// This initiates sync for a single document with a peer.
@@ -476,14 +521,26 @@ impl AutomergeSyncCoordinator {
     /// Sync a document with all connected peers
     ///
     /// This initiates sync for a single document with all currently connected peers.
+    /// Clears existing sync state first to ensure fresh sync messages are generated
+    /// even if the document was recently synced but has been modified locally.
     ///
     /// # Arguments
     ///
     /// * `doc_key` - The document identifier (e.g., "nodes:node-1")
     pub async fn sync_document_with_all_peers(&self, doc_key: &str) -> Result<()> {
         let peer_ids = self.transport.connected_peers();
+        tracing::info!(
+            "sync_document_with_all_peers: syncing {} with {} peers",
+            doc_key,
+            peer_ids.len()
+        );
+
+        // Clear sync state to ensure we generate fresh sync messages
+        // This is important after local document modifications
+        self.clear_sync_state_for_document(doc_key);
 
         for peer_id in peer_ids {
+            tracing::debug!("Syncing {} with peer {:?}", doc_key, peer_id);
             if let Err(e) = self.sync_document_with_peer(doc_key, peer_id).await {
                 tracing::warn!("Failed to sync {} with peer {:?}: {}", doc_key, peer_id, e);
             }
