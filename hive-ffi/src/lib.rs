@@ -16,6 +16,15 @@
 //! issues on Android. The JNI functions are exported with standard naming
 //! (Java_package_Class_method) and can be called directly via Android's NDK.
 
+// Allow pre-existing warnings in FFI code - will clean up incrementally
+#![allow(unused_variables)]
+#![allow(unused_mut)]
+#![allow(dead_code)]
+#![allow(clippy::incompatible_msrv)]
+#![allow(clippy::unnecessary_cast)]
+#![allow(clippy::single_match)]
+#![allow(clippy::items_after_test_module)]
+
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -2029,6 +2038,7 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_nativeInit(
 /// the JNI environment from inside the library's linker namespace.
 #[no_mangle]
 #[allow(non_snake_case)]
+#[allow(clippy::not_unsafe_ptr_arg_deref)] // JNI ABI requires raw pointer params
 pub extern "C" fn JNI_OnLoad(vm: *mut JavaVM, _reserved: *mut c_void) -> jint {
     // Log that we're being called
     #[cfg(target_os = "android")]
