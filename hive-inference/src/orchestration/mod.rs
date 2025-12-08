@@ -60,12 +60,16 @@
 //! ```
 
 pub mod adapters;
+pub mod fetcher;
 pub mod handler;
 pub mod runtime;
 pub mod service;
 
 // Re-export adapter types
 pub use adapters::{ContainerAdapter, OnnxRuntimeAdapter, ProcessAdapter};
+
+// Re-export fetcher types
+pub use fetcher::{FetchConfig, FetchError, FetchProgress, FetchResult, ModelFetcher};
 
 // Re-export handler for directive processing
 pub use handler::DirectiveHandler;

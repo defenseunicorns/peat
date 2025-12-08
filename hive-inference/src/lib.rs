@@ -89,6 +89,9 @@ pub use orchestration::{
     RolloutConfig, RolloutPlan, RolloutResult, UpdateCoordinator, UpdateError, UpdateRequest,
 };
 
+// Model fetcher for downloading models from URLs/blobs (Issue #319)
+pub use orchestration::{FetchConfig, FetchError, FetchProgress, FetchResult, ModelFetcher};
+
 // Re-export hive-protocol capability query types for convenience
 pub use hive_protocol::discovery::capability_query::{
     CapabilityQuery, CapabilityQueryBuilder, CapabilityQueryEngine, CapabilityStats, QueryMatch,
