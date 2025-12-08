@@ -36,5 +36,6 @@ pub use hive_extension::{HiveConfidence, HiveExtension, HiveHierarchy, HiveSourc
 pub use type_mapper::{Affiliation, CotType, CotTypeMapper, EntityClassification};
 pub use types::{
     CapabilityAdvertisement, FormationCapabilitySummary, HandoffMessage, HandoffState,
+    MissionBoundary, MissionPriority, MissionTarget, MissionTask, MissionTaskType,
     OperationalStatus, Position, TrackUpdate, Velocity,
 };
