@@ -60,11 +60,15 @@
 //! ```
 
 pub mod adapters;
+pub mod handler;
 pub mod runtime;
 pub mod service;
 
 // Re-export adapter types
 pub use adapters::{ContainerAdapter, OnnxRuntimeAdapter, ProcessAdapter};
+
+// Re-export handler for directive processing
+pub use handler::DirectiveHandler;
 
 // Re-export service types
 pub use service::{
