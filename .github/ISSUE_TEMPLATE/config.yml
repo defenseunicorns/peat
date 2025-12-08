@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: HIVE Protocol Documentation
+    url: https://revolveteam.com
+    about: Visit (r)evolve for HIVE Protocol documentation and resources
+  - name: Vignette Use Case
+    url: https://github.com/kitplummer/hive/blob/main/docs/VIGNETTE_USE_CASE.md
+    about: Reference the POI tracking vignette for demo requirements
