@@ -419,10 +419,11 @@ impl MissionTaskType {
 }
 
 /// Mission priority level
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MissionPriority {
     Critical,
     High,
+    #[default]
     Normal,
     Low,
 }
@@ -435,12 +436,6 @@ impl MissionPriority {
             Self::Normal => "NORMAL",
             Self::Low => "LOW",
         }
-    }
-}
-
-impl Default for MissionPriority {
-    fn default() -> Self {
-        Self::Normal
     }
 }
 
