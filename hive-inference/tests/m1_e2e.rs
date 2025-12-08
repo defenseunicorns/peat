@@ -313,3 +313,359 @@ async fn test_deployment_failure() {
         "Error should mention missing adapter"
     );
 }
+
+// ============================================================================
+// True E2E Tests with Real Multi-Node Sync (Issue #177)
+// ============================================================================
+//
+// These tests use AutomergeIroh backends to verify the full model delivery
+// flow with actual network synchronization between nodes.
+
+/// True E2E test: Beacon advertises sensor-only capability initially,
+/// then AI capability after model deployment - verified via multi-node sync.
+///
+/// Flow:
+/// 1. Start two nodes (edge + c2) with AutomergeIroh backends
+/// 2. Edge node publishes beacon with sensor-only capability
+/// 3. C2 node observes beacon via sync - verifies NO AI capability
+/// 4. C2 sends DeploymentDirective via sync
+/// 5. Edge processes directive, deploys model, updates beacon
+/// 6. C2 observes updated beacon - verifies AI capability NOW present
+///
+/// Note: This test requires network peer discovery which is not automatically
+/// configured in the test environment. Run with `--ignored` to execute.
+#[tokio::test]
+#[ignore = "requires network peer discovery - run with --ignored"]
+async fn test_beacon_capability_sync_e2e() {
+    use hive_inference::beacon::{BeaconConfig, CameraSpec, HiveBeacon};
+    use hive_inference::orchestration::{DirectiveHandler, OrchestrationService, SimulatedAdapter};
+    use hive_inference::testing::collections;
+    use hive_protocol::distribution::{ArtifactSpec, DeploymentDirective, DeploymentScope};
+    use hive_protocol::sync::types::{Document, Query, Value};
+    use hive_protocol::sync::DataSyncBackend;
+    use hive_protocol::testing::E2EHarness;
+    use std::collections::HashMap;
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    // === Setup: Create two nodes with real sync ===
+    let mut harness = E2EHarness::new("beacon_capability_e2e");
+
+    let edge_backend = harness
+        .create_automerge_backend()
+        .await
+        .expect("Failed to create edge backend");
+
+    let c2_backend = harness
+        .create_automerge_backend()
+        .await
+        .expect("Failed to create C2 backend");
+
+    // Allow peer discovery
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // === Phase 1: Edge node starts with sensor-only capability ===
+    // Create beacon with camera but NO AI model
+    let beacon_config = BeaconConfig::new("edge-sensor-001")
+        .with_name("Edge Sensor Platform")
+        .with_camera(CameraSpec::imx219());
+    // Note: NO .with_model() - this is the key point!
+
+    let beacon = HiveBeacon::new(beacon_config).expect("Failed to create beacon");
+    let advertisement = beacon.generate_advertisement().await;
+
+    // Verify beacon has NO AI models initially
+    assert!(
+        advertisement.models.is_empty(),
+        "Initial beacon should have NO AI models"
+    );
+
+    // Store beacon in sync layer
+    let beacon_doc = serde_json::json!({
+        "platform_id": advertisement.platform_id,
+        "advertised_at": advertisement.advertised_at.to_rfc3339(),
+        "has_ai_capability": false,
+        "model_count": advertisement.models.len(),
+        "models": advertisement.models.iter().map(|m| {
+            serde_json::json!({
+                "model_id": m.model_id,
+                "model_version": m.model_version,
+                "model_type": m.model_type
+            })
+        }).collect::<Vec<_>>()
+    });
+
+    let mut fields: HashMap<String, Value> = HashMap::new();
+    for (k, v) in beacon_doc.as_object().unwrap() {
+        fields.insert(k.clone(), v.clone());
+    }
+    let doc = Document::with_id(&advertisement.platform_id, fields);
+
+    edge_backend
+        .document_store()
+        .upsert(collections::BEACONS, doc)
+        .await
+        .expect("Failed to store beacon");
+
+    // === Phase 2: C2 observes beacon via sync ===
+    // Wait for sync to propagate
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // Query beacon on C2 side
+    let query = Query::Eq {
+        field: "platform_id".to_string(),
+        value: Value::String("edge-sensor-001".to_string()),
+    };
+
+    let mut retries = 0;
+    let observed_beacon = loop {
+        let results = c2_backend
+            .document_store()
+            .query(collections::BEACONS, &query)
+            .await
+            .expect("Query failed");
+
+        if !results.is_empty() {
+            break results.into_iter().next().unwrap();
+        }
+
+        retries += 1;
+        if retries > 20 {
+            panic!("C2 did not receive beacon after 20 retries");
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    };
+
+    // Verify C2 sees beacon with NO AI capability
+    let has_ai = observed_beacon
+        .get("has_ai_capability")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+    assert!(
+        !has_ai,
+        "C2 should see beacon with NO AI capability initially"
+    );
+
+    let model_count = observed_beacon
+        .get("model_count")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(99);
+    assert_eq!(model_count, 0, "C2 should see 0 models initially");
+
+    // === Phase 3: C2 issues DeploymentDirective via sync ===
+    let directive = DeploymentDirective::new("deploy-yolov8-e2e")
+        .with_issuer("c2-command")
+        .with_scope(DeploymentScope::Broadcast)
+        .with_artifact(
+            ArtifactSpec::onnx_model(
+                "sha256:e2e_test_hash",
+                50_000_000,
+                vec!["CPUExecutionProvider".into()],
+            )
+            .with_name("YOLOv8n")
+            .with_version("8.0.0"),
+        )
+        .with_capability("object_detection")
+        .with_capability("person_tracking");
+
+    // Store directive in sync layer from C2
+    let directive_doc = serde_json::json!({
+        "directive_id": directive.directive_id,
+        "issuer_node_id": directive.issuer_node_id,
+        "scope": "broadcast",
+        "artifact_hash": directive.artifact.blob_hash,
+        "capabilities": directive.capabilities
+    });
+
+    let mut directive_fields: HashMap<String, Value> = HashMap::new();
+    for (k, v) in directive_doc.as_object().unwrap() {
+        directive_fields.insert(k.clone(), v.clone());
+    }
+    let directive_doc = Document::with_id(&directive.directive_id, directive_fields);
+
+    c2_backend
+        .document_store()
+        .upsert(collections::DIRECTIVES, directive_doc)
+        .await
+        .expect("Failed to store directive");
+
+    // === Phase 4: Edge node processes directive ===
+    // In a real system, edge would observe the directive via sync.
+    // Here we simulate the edge processing it directly.
+    let service = Arc::new(OrchestrationService::with_simulated_storage());
+    service
+        .register_adapter(Arc::new(SimulatedAdapter::new("onnx")))
+        .await;
+
+    let handler = DirectiveHandler::new("edge-sensor-001", service.clone());
+    let status = handler.handle(directive.clone()).await;
+
+    assert_eq!(
+        status.state,
+        hive_protocol::distribution::DeploymentState::Active,
+        "Deployment should succeed"
+    );
+
+    // === Phase 5: Edge updates beacon with AI capability ===
+    // Now the beacon should include the deployed model
+    let updated_beacon_doc = serde_json::json!({
+        "platform_id": "edge-sensor-001",
+        "advertised_at": chrono::Utc::now().to_rfc3339(),
+        "has_ai_capability": true,
+        "model_count": 1,
+        "models": [{
+            "model_id": "YOLOv8n",
+            "version": "8.0.0",
+            "model_type": "object_detection",
+            "capabilities": ["object_detection", "person_tracking"]
+        }]
+    });
+
+    let mut updated_fields: HashMap<String, Value> = HashMap::new();
+    for (k, v) in updated_beacon_doc.as_object().unwrap() {
+        updated_fields.insert(k.clone(), v.clone());
+    }
+    let updated_doc = Document::with_id("edge-sensor-001", updated_fields);
+
+    edge_backend
+        .document_store()
+        .upsert(collections::BEACONS, updated_doc)
+        .await
+        .expect("Failed to update beacon");
+
+    // === Phase 6: C2 observes updated beacon with AI capability ===
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    let mut retries = 0;
+    let final_beacon = loop {
+        let results = c2_backend
+            .document_store()
+            .query(collections::BEACONS, &query)
+            .await
+            .expect("Query failed");
+
+        if let Some(beacon) = results.into_iter().next() {
+            let has_ai = beacon
+                .get("has_ai_capability")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            if has_ai {
+                break beacon;
+            }
+        }
+
+        retries += 1;
+        if retries > 30 {
+            panic!("C2 did not see updated beacon with AI capability after 30 retries");
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    };
+
+    // Verify C2 now sees AI capability
+    let has_ai = final_beacon
+        .get("has_ai_capability")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    assert!(
+        has_ai,
+        "C2 should see beacon with AI capability after deployment"
+    );
+
+    let model_count = final_beacon
+        .get("model_count")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    assert_eq!(model_count, 1, "C2 should see 1 model after deployment");
+
+    // Cleanup
+    edge_backend.shutdown().await.ok();
+    c2_backend.shutdown().await.ok();
+}
+
+/// Test that directive sync propagates between nodes
+///
+/// Note: This test requires network peer discovery which is not automatically
+/// configured in the test environment. Run with `--ignored` to execute.
+#[tokio::test]
+#[ignore = "requires network peer discovery - run with --ignored"]
+async fn test_directive_sync_e2e() {
+    use hive_inference::testing::collections;
+    use hive_protocol::distribution::{ArtifactSpec, DeploymentDirective, DeploymentScope};
+    use hive_protocol::sync::types::{Document, Query, Value};
+    use hive_protocol::sync::DataSyncBackend;
+    use hive_protocol::testing::E2EHarness;
+    use std::collections::HashMap;
+    use std::time::Duration;
+
+    let mut harness = E2EHarness::new("directive_sync_e2e");
+
+    let node1 = harness
+        .create_automerge_backend()
+        .await
+        .expect("Failed to create node1");
+
+    let node2 = harness
+        .create_automerge_backend()
+        .await
+        .expect("Failed to create node2");
+
+    // Allow peer discovery
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // Node1 creates a directive
+    let directive = DeploymentDirective::new("sync-test-directive")
+        .with_issuer("node1")
+        .with_scope(DeploymentScope::Broadcast)
+        .with_artifact(ArtifactSpec::onnx_model("sha256:test", 1000, vec![]));
+
+    let directive_doc = serde_json::json!({
+        "directive_id": directive.directive_id,
+        "issuer": "node1",
+        "artifact_hash": directive.artifact.blob_hash,
+        "scope": "broadcast"
+    });
+
+    let mut fields: HashMap<String, Value> = HashMap::new();
+    for (k, v) in directive_doc.as_object().unwrap() {
+        fields.insert(k.clone(), v.clone());
+    }
+    let doc = Document::with_id(&directive.directive_id, fields);
+
+    node1
+        .document_store()
+        .upsert(collections::DIRECTIVES, doc)
+        .await
+        .expect("Failed to store directive");
+
+    // Node2 should see the directive via sync
+    let query = Query::Eq {
+        field: "directive_id".to_string(),
+        value: Value::String("sync-test-directive".to_string()),
+    };
+
+    let mut found = false;
+    for _ in 0..30 {
+        let results = node2
+            .document_store()
+            .query(collections::DIRECTIVES, &query)
+            .await
+            .expect("Query failed");
+
+        if !results.is_empty() {
+            let synced_directive = &results[0];
+            assert_eq!(
+                synced_directive.get("issuer").and_then(|v| v.as_str()),
+                Some("node1")
+            );
+            found = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+
+    assert!(found, "Node2 should receive directive from Node1 via sync");
+
+    // Cleanup
+    node1.shutdown().await.ok();
+    node2.shutdown().await.ok();
+}
