@@ -26,6 +26,7 @@
 //! - **`beacon.v1`**: Discovery phase beacons and queries
 //! - **`composition.v1`**: Capability composition rules (additive, emergent, redundant, constraint)
 //! - **`model.v1`**: AI model deployment and distribution
+//! - **`sensor.v1`**: Sensor specifications (mount types, orientation, FOV, gimbal state)
 //!
 //! ## Three-Tier Hierarchy
 //!
@@ -130,6 +131,12 @@ pub mod cap {
     pub mod model {
         pub mod v1 {
             include!(concat!(env!("OUT_DIR"), "/cap.model.v1.rs"));
+        }
+    }
+
+    pub mod sensor {
+        pub mod v1 {
+            include!(concat!(env!("OUT_DIR"), "/cap.sensor.v1.rs"));
         }
     }
 }
