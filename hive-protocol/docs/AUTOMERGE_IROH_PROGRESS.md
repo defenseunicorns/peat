@@ -184,8 +184,26 @@ All tests passing in 2.69s:
 1. **Automatic Sync**: Document changes trigger sync automatically
 2. **Bidirectional**: Changes propagate in both directions
 3. **CRDT Merging**: Concurrent updates merge correctly
-4. **Error Handling**: Circuit breaker and retry logic active
+4. **Error Handling**: Circuit breaker and retry logic active (see below)
 5. **Metrics**: Bytes sent/received tracked per peer
+
+#### Circuit Breaker Configuration
+
+The circuit breaker (`sync_errors.rs`) is configurable via environment variables for different deployment scenarios:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CIRCUIT_FAILURE_THRESHOLD` | 5 | Failures to trigger circuit open |
+| `CIRCUIT_FAILURE_WINDOW_SECS` | 5 | Window for counting failures |
+| `CIRCUIT_OPEN_TIMEOUT_SECS` | 5 | Duration circuit stays open |
+| `CIRCUIT_SUCCESS_THRESHOLD` | 2 | Successes to close from half-open |
+
+**Tuning Guidelines:**
+- **Lab/single-machine**: 2-3s windows for fast iteration
+- **Staging**: 5s windows (default)
+- **Production**: 10-30s windows for network variability
+
+The topology generator sets aggressive defaults for lab environments automatically.
 
 ### ✅ Phase 6.3: Partition Detection Infrastructure (COMPLETE)
 
