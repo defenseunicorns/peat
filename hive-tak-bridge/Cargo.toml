@@ -19,6 +19,7 @@ hive-transport = { path = "../hive-transport" }
 # Async runtime
 tokio = { workspace = true }
 async-trait = { workspace = true }
+futures = "0.3"
 
 # Serialization
 serde = { workspace = true }

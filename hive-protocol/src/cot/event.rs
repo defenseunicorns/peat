@@ -4,6 +4,7 @@
 
 use chrono::{DateTime, Duration, Utc};
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
+use quick_xml::Reader;
 use quick_xml::Writer;
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
@@ -80,6 +81,242 @@ impl CotEvent {
 
         let result = writer.into_inner().into_inner();
         String::from_utf8(result).map_err(|e| CotError::Encoding(e.to_string()))
+    }
+
+    /// Parse a CoT event from XML string (Issue #318)
+    ///
+    /// Supports parsing mission task events and other CoT messages from TAK Server.
+    pub fn from_xml(xml: &str) -> Result<Self, CotError> {
+        let mut reader = Reader::from_str(xml);
+        reader.config_mut().trim_text(true);
+
+        let mut uid = None;
+        let mut cot_type = None;
+        let mut time = None;
+        let mut start = None;
+        let mut stale = None;
+        let mut how = String::from("m-g");
+        let mut point = None;
+        let mut detail = CotDetail::default();
+
+        let mut buf = Vec::new();
+        let mut in_detail = false;
+        let mut in_remarks = false;
+        let mut remarks_text = String::new();
+
+        loop {
+            match reader.read_event_into(&mut buf) {
+                Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
+                    let name = e.name();
+                    match name.as_ref() {
+                        b"event" => {
+                            // Parse event attributes
+                            for attr in e.attributes().flatten() {
+                                match attr.key.as_ref() {
+                                    b"uid" => {
+                                        uid =
+                                            Some(String::from_utf8_lossy(&attr.value).into_owned());
+                                    }
+                                    b"type" => {
+                                        cot_type = Some(CotType::new(&String::from_utf8_lossy(
+                                            &attr.value,
+                                        )));
+                                    }
+                                    b"time" => {
+                                        time = Self::parse_time(&attr.value);
+                                    }
+                                    b"start" => {
+                                        start = Self::parse_time(&attr.value);
+                                    }
+                                    b"stale" => {
+                                        stale = Self::parse_time(&attr.value);
+                                    }
+                                    b"how" => {
+                                        how = String::from_utf8_lossy(&attr.value).into_owned();
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                        b"point" => {
+                            let mut lat = 0.0;
+                            let mut lon = 0.0;
+                            let mut hae = 0.0;
+                            let mut ce = 9999999.0;
+                            let mut le = 9999999.0;
+
+                            for attr in e.attributes().flatten() {
+                                match attr.key.as_ref() {
+                                    b"lat" => {
+                                        lat = String::from_utf8_lossy(&attr.value)
+                                            .parse()
+                                            .unwrap_or(0.0);
+                                    }
+                                    b"lon" => {
+                                        lon = String::from_utf8_lossy(&attr.value)
+                                            .parse()
+                                            .unwrap_or(0.0);
+                                    }
+                                    b"hae" => {
+                                        hae = String::from_utf8_lossy(&attr.value)
+                                            .parse()
+                                            .unwrap_or(0.0);
+                                    }
+                                    b"ce" => {
+                                        ce = String::from_utf8_lossy(&attr.value)
+                                            .parse()
+                                            .unwrap_or(9999999.0);
+                                    }
+                                    b"le" => {
+                                        le = String::from_utf8_lossy(&attr.value)
+                                            .parse()
+                                            .unwrap_or(9999999.0);
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            point = Some(CotPoint::with_full(lat, lon, hae, ce, le));
+                        }
+                        b"detail" => {
+                            in_detail = true;
+                        }
+                        b"track" if in_detail => {
+                            let mut course = 0.0;
+                            let mut speed = 0.0;
+                            for attr in e.attributes().flatten() {
+                                match attr.key.as_ref() {
+                                    b"course" => {
+                                        course = String::from_utf8_lossy(&attr.value)
+                                            .parse()
+                                            .unwrap_or(0.0);
+                                    }
+                                    b"speed" => {
+                                        speed = String::from_utf8_lossy(&attr.value)
+                                            .parse()
+                                            .unwrap_or(0.0);
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            detail.track = Some(CotTrack { course, speed });
+                        }
+                        b"contact" if in_detail => {
+                            for attr in e.attributes().flatten() {
+                                if attr.key.as_ref() == b"callsign" {
+                                    detail.contact_callsign =
+                                        Some(String::from_utf8_lossy(&attr.value).into_owned());
+                                }
+                            }
+                        }
+                        b"remarks" if in_detail => {
+                            in_remarks = true;
+                            remarks_text.clear();
+                        }
+                        b"link" if in_detail => {
+                            let mut link_uid = String::new();
+                            let mut link_type = String::new();
+                            let mut relation = String::new();
+                            let mut link_remarks = None;
+
+                            for attr in e.attributes().flatten() {
+                                match attr.key.as_ref() {
+                                    b"uid" => {
+                                        link_uid =
+                                            String::from_utf8_lossy(&attr.value).into_owned();
+                                    }
+                                    b"type" => {
+                                        link_type =
+                                            String::from_utf8_lossy(&attr.value).into_owned();
+                                    }
+                                    b"relation" => {
+                                        relation =
+                                            String::from_utf8_lossy(&attr.value).into_owned();
+                                    }
+                                    b"remarks" => {
+                                        link_remarks =
+                                            Some(String::from_utf8_lossy(&attr.value).into_owned());
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            if !link_uid.is_empty() {
+                                detail.links.push(CotLink {
+                                    uid: link_uid,
+                                    cot_type: link_type,
+                                    relation,
+                                    remarks: link_remarks,
+                                });
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                Ok(Event::Text(ref e)) => {
+                    if in_remarks {
+                        remarks_text.push_str(&e.unescape().unwrap_or_default());
+                    }
+                }
+                Ok(Event::End(ref e)) => match e.name().as_ref() {
+                    b"detail" => in_detail = false,
+                    b"remarks" => {
+                        in_remarks = false;
+                        if !remarks_text.is_empty() {
+                            detail.remarks = Some(remarks_text.clone());
+                        }
+                    }
+                    _ => {}
+                },
+                Ok(Event::Eof) => break,
+                Err(e) => {
+                    return Err(CotError::XmlRead(format!(
+                        "XML parse error at position {}: {:?}",
+                        reader.buffer_position(),
+                        e
+                    )));
+                }
+                _ => {}
+            }
+            buf.clear();
+        }
+
+        let uid = uid.ok_or(CotError::MissingField("uid"))?;
+        let cot_type = cot_type.ok_or(CotError::MissingField("type"))?;
+        let point = point.ok_or(CotError::MissingField("point"))?;
+        let time = time.unwrap_or_else(Utc::now);
+        let start = start.unwrap_or(time);
+        let stale = stale.unwrap_or(time + Duration::minutes(5));
+
+        Ok(CotEvent {
+            version: "2.0".to_string(),
+            uid,
+            cot_type,
+            time,
+            start,
+            stale,
+            how,
+            point,
+            detail,
+        })
+    }
+
+    /// Parse ISO 8601 timestamp from bytes
+    fn parse_time(value: &[u8]) -> Option<DateTime<Utc>> {
+        let s = String::from_utf8_lossy(value);
+        DateTime::parse_from_rfc3339(&s)
+            .ok()
+            .map(|dt| dt.with_timezone(&Utc))
+            .or_else(|| {
+                // Try alternative format without timezone
+                chrono::NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S%.fZ")
+                    .ok()
+                    .map(|ndt| ndt.and_utc())
+            })
+            .or_else(|| {
+                // Try another common TAK format
+                chrono::NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%SZ")
+                    .ok()
+                    .map(|ndt| ndt.and_utc())
+            })
     }
 
     fn format_time(&self, time: &DateTime<Utc>) -> String {
@@ -440,6 +677,8 @@ pub enum CotError {
     MissingField(&'static str),
     /// XML writing error
     XmlWrite(String),
+    /// XML reading/parsing error
+    XmlRead(String),
     /// Encoding error
     Encoding(String),
 }
@@ -449,6 +688,7 @@ impl std::fmt::Display for CotError {
         match self {
             Self::MissingField(field) => write!(f, "Missing required field: {}", field),
             Self::XmlWrite(msg) => write!(f, "XML write error: {}", msg),
+            Self::XmlRead(msg) => write!(f, "XML read error: {}", msg),
             Self::Encoding(msg) => write!(f, "Encoding error: {}", msg),
         }
     }
@@ -564,5 +804,121 @@ mod tests {
         let xml = event.to_xml().unwrap();
         assert!(xml.contains("__group"));
         assert!(xml.contains("name=\"Alpha-Team\""));
+    }
+
+    // =========================================================================
+    // from_xml() tests (Issue #318)
+    // =========================================================================
+
+    #[test]
+    fn test_cot_event_from_xml_basic() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+            <event version="2.0" uid="TEST-001" type="a-f-G-E-S"
+                   time="2025-12-08T14:10:00Z" start="2025-12-08T14:10:00Z"
+                   stale="2025-12-08T14:15:00Z" how="m-g">
+                <point lat="33.7749" lon="-84.3958" hae="10.0" ce="5.0" le="3.0"/>
+                <detail>
+                    <remarks>Test event</remarks>
+                </detail>
+            </event>"#;
+
+        let event = CotEvent::from_xml(xml).unwrap();
+
+        assert_eq!(event.uid, "TEST-001");
+        assert_eq!(event.cot_type.as_str(), "a-f-G-E-S");
+        assert_eq!(event.how, "m-g");
+        assert_eq!(event.point.lat, 33.7749);
+        assert_eq!(event.point.lon, -84.3958);
+        assert_eq!(event.point.hae, 10.0);
+        assert_eq!(event.point.ce, 5.0);
+        assert_eq!(event.point.le, 3.0);
+        assert_eq!(event.detail.remarks.as_deref(), Some("Test event"));
+    }
+
+    #[test]
+    fn test_cot_event_from_xml_roundtrip() {
+        // Create an event, serialize to XML, parse back
+        let original = CotEvent::builder()
+            .uid("ROUNDTRIP-001")
+            .cot_type(CotType::new("a-f-G-U-C"))
+            .point(CotPoint::with_full(38.8977, -77.0365, 50.0, 10.0, 5.0))
+            .remarks("Roundtrip test")
+            .track(90.0, 5.5)
+            .build()
+            .unwrap();
+
+        let xml = original.to_xml().unwrap();
+        let parsed = CotEvent::from_xml(&xml).unwrap();
+
+        assert_eq!(parsed.uid, original.uid);
+        assert_eq!(parsed.cot_type.as_str(), original.cot_type.as_str());
+        assert_eq!(parsed.point.lat, original.point.lat);
+        assert_eq!(parsed.point.lon, original.point.lon);
+        assert_eq!(parsed.detail.remarks, original.detail.remarks);
+        assert!(parsed.detail.track.is_some());
+        assert_eq!(parsed.detail.track.as_ref().unwrap().course, 90.0);
+        assert_eq!(parsed.detail.track.as_ref().unwrap().speed, 5.5);
+    }
+
+    #[test]
+    fn test_cot_event_from_xml_mission_task() {
+        // Test parsing a mission task CoT event (t-x-m-c-c type)
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+            <event uid="MISSION-001" type="t-x-m-c-c" time="2025-12-08T14:05:00Z"
+                   start="2025-12-08T14:05:00Z" stale="2025-12-08T15:05:00Z" how="h-g-i-g-o">
+                <point lat="33.7756" lon="-84.3963" hae="0" ce="100" le="100"/>
+                <detail>
+                    <remarks>Track POI within designated area</remarks>
+                </detail>
+            </event>"#;
+
+        let event = CotEvent::from_xml(xml).unwrap();
+
+        assert_eq!(event.uid, "MISSION-001");
+        assert_eq!(event.cot_type.as_str(), "t-x-m-c-c");
+        assert_eq!(event.how, "h-g-i-g-o");
+        assert_eq!(event.point.lat, 33.7756);
+        assert_eq!(event.point.lon, -84.3963);
+    }
+
+    #[test]
+    fn test_cot_event_from_xml_with_contact() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+            <event uid="ALPHA-3" type="a-f-G-U-C" time="2025-12-08T14:00:00Z"
+                   start="2025-12-08T14:00:00Z" stale="2025-12-08T14:01:00Z" how="m-g">
+                <point lat="38.0" lon="-77.0" hae="0" ce="10" le="10"/>
+                <detail>
+                    <contact callsign="Alpha-3"/>
+                </detail>
+            </event>"#;
+
+        let event = CotEvent::from_xml(xml).unwrap();
+
+        assert_eq!(event.detail.contact_callsign.as_deref(), Some("Alpha-3"));
+    }
+
+    #[test]
+    fn test_cot_event_from_xml_missing_uid() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+            <event type="a-f-G" time="2025-12-08T14:00:00Z"
+                   start="2025-12-08T14:00:00Z" stale="2025-12-08T14:01:00Z" how="m-g">
+                <point lat="0" lon="0" hae="0" ce="10" le="10"/>
+                <detail/>
+            </event>"#;
+
+        let result = CotEvent::from_xml(xml);
+        assert!(matches!(result, Err(CotError::MissingField("uid"))));
+    }
+
+    #[test]
+    fn test_cot_event_from_xml_missing_point() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+            <event uid="TEST" type="a-f-G" time="2025-12-08T14:00:00Z"
+                   start="2025-12-08T14:00:00Z" stale="2025-12-08T14:01:00Z" how="m-g">
+                <detail/>
+            </event>"#;
+
+        let result = CotEvent::from_xml(xml);
+        assert!(matches!(result, Err(CotError::MissingField("point"))));
     }
 }
