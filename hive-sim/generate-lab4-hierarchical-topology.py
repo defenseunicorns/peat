@@ -39,6 +39,26 @@ def get_credential_env_vars(backend):
         ]
 
 
+def get_circuit_breaker_env_vars(failure_threshold=3, failure_window_secs=2, open_timeout_secs=2, success_threshold=2):
+    """Return circuit breaker configuration environment variables.
+
+    Lab environments (single machine): Use aggressive settings (1-3s windows)
+    Production environments: Use conservative settings (10-30s windows)
+
+    Args:
+        failure_threshold: Number of failures to trigger circuit open (default: 3)
+        failure_window_secs: Time window for counting failures in seconds (default: 2)
+        open_timeout_secs: How long circuit stays open in seconds (default: 2)
+        success_threshold: Successes needed to close from half-open (default: 2)
+    """
+    return [
+        f"        CIRCUIT_FAILURE_THRESHOLD: \"{failure_threshold}\"",
+        f"        CIRCUIT_FAILURE_WINDOW_SECS: \"{failure_window_secs}\"",
+        f"        CIRCUIT_OPEN_TIMEOUT_SECS: \"{open_timeout_secs}\"",
+        f"        CIRCUIT_SUCCESS_THRESHOLD: \"{success_threshold}\"",
+    ]
+
+
 def calculate_hierarchy(total_nodes):
     """
     Calculate optimal hierarchy structure for given node count.
@@ -176,6 +196,7 @@ def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
 
         # Company commander (no parent to connect to)
         cred_vars = get_credential_env_vars(backend)
+        circuit_vars = get_circuit_breaker_env_vars()  # Lab defaults: aggressive (2s windows)
         tcp_connect = get_tcp_connect(commander_id, None, None, name, backend)
         lines.extend([
             f"    {commander_id}:",
@@ -191,7 +212,7 @@ def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
             f"        COMPANY_ID: {company_id}",
             "        UPDATE_RATE_MS: \"5000\"",
             f"        TCP_LISTEN: \"{node_ports[commander_id]}\"",
-        ] + tcp_connect + cred_vars + [""])
+        ] + tcp_connect + cred_vars + circuit_vars + [""])
 
         for platoon_idx in range(1, platoons_per_company + 1):
             platoon_id = f"{company_id}-platoon-{platoon_idx}"
@@ -216,7 +237,7 @@ def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
                 f"        PLATOON_ID: {platoon_id}",
                 "        UPDATE_RATE_MS: \"5000\"",
                 f"        TCP_LISTEN: \"{node_ports[leader_id]}\"",
-            ] + tcp_connect + cred_vars + [""])
+            ] + tcp_connect + cred_vars + circuit_vars + [""])
             node_counter += 1
 
             for squad_idx in range(1, squads_per_platoon + 1):
@@ -246,7 +267,7 @@ def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
                     f"        SQUAD_MEMBERS: \"{','.join(squad_members)}\"",
                     "        UPDATE_RATE_MS: \"5000\"",
                     f"        TCP_LISTEN: \"{node_ports[squad_leader_id]}\"",
-                ] + tcp_connect + cred_vars + [""])
+                ] + tcp_connect + cred_vars + circuit_vars + [""])
                 node_counter += 1
 
                 # Squad soldiers
@@ -269,7 +290,7 @@ def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
                         f"        SQUAD_ID: {squad_id}",
                         "        UPDATE_RATE_MS: \"5000\"",
                         f"        TCP_LISTEN: \"{node_ports[soldier_id]}\"",
-                    ] + tcp_connect + cred_vars + [""])
+                    ] + tcp_connect + cred_vars + circuit_vars + [""])
                     node_counter += 1
 
         lines.append("")
