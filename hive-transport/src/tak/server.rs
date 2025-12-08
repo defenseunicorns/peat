@@ -1,14 +1,17 @@
 //! TAK Server TCP/SSL transport implementation
 
 use async_trait::async_trait;
+use futures::stream;
 use hive_protocol::cot::{CotEncoder, CotEvent, CotEventBuilder, CotPoint, CotType};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
-use tokio::sync::{mpsc, RwLock};
-use tracing::{debug, error, info, warn};
+use tokio::sync::{broadcast, RwLock};
+use tokio::task::JoinHandle;
+use tracing::{debug, error, info, trace, warn};
 
 use super::config::{TakProtocolVersion, TakTransportConfig, TakTransportMode};
 use super::error::TakError;
@@ -20,21 +23,26 @@ use super::traits::{CotEventStream, CotFilter, Priority, TakTransport};
 /// TAK Protocol magic byte
 const TAK_MAGIC: u8 = 0xBF;
 
+/// Buffer size for incoming event channel
+const INCOMING_CHANNEL_SIZE: usize = 256;
+
 /// TAK Server TCP/SSL transport implementation
 pub struct TakServerTransport {
     config: TakTransportConfig,
     address: SocketAddr,
     use_tls: bool,
-    connection: RwLock<Option<TcpStream>>,
+    /// Write half of the TCP connection (for sending)
+    write_stream: RwLock<Option<OwnedWriteHalf>>,
     connected: AtomicBool,
     queue: std::sync::RwLock<TakMessageQueue>,
     reconnect: std::sync::RwLock<ReconnectionManager>,
     metrics: Arc<TakMetrics>,
     #[allow(dead_code)] // Used for protobuf encoding in future
     encoder: CotEncoder,
-    /// Channel for incoming events
-    #[allow(dead_code)] // Used for subscription impl in future
-    incoming_tx: Option<mpsc::Sender<CotEvent>>,
+    /// Broadcast sender for incoming events (subscribers receive from this)
+    incoming_tx: broadcast::Sender<CotEvent>,
+    /// Handle to the reader task
+    reader_task: RwLock<Option<JoinHandle<()>>>,
 }
 
 impl TakServerTransport {
@@ -57,18 +65,20 @@ impl TakServerTransport {
         let queue = TakMessageQueue::new(config.queue.clone());
         let reconnect = ReconnectionManager::new(config.reconnect.clone());
         let encoder = CotEncoder::default();
+        let (incoming_tx, _) = broadcast::channel(INCOMING_CHANNEL_SIZE);
 
         Ok(Self {
             config,
             address,
             use_tls,
-            connection: RwLock::new(None),
+            write_stream: RwLock::new(None),
             connected: AtomicBool::new(false),
             queue: std::sync::RwLock::new(queue),
             reconnect: std::sync::RwLock::new(reconnect),
             metrics: Arc::new(TakMetrics::new()),
             encoder,
-            incoming_tx: None,
+            incoming_tx,
+            reader_task: RwLock::new(None),
         })
     }
 
@@ -92,8 +102,8 @@ impl TakServerTransport {
         Ok(stream)
     }
 
-    /// Send presence announcement
-    async fn send_presence(&self, stream: &mut TcpStream) -> Result<(), TakError> {
+    /// Send presence announcement on write half of split stream
+    async fn send_presence_on_write(&self, stream: &mut OwnedWriteHalf) -> Result<(), TakError> {
         let callsign = self
             .config
             .identity
@@ -121,7 +131,7 @@ impl TakServerTransport {
     /// Send a CoT event on the given stream
     async fn send_event_raw(
         &self,
-        stream: &mut TcpStream,
+        stream: &mut OwnedWriteHalf,
         event: &CotEvent,
     ) -> Result<(), TakError> {
         let xml = event
@@ -164,6 +174,218 @@ impl TakServerTransport {
         Ok(())
     }
 
+    /// Spawn the background reader task to receive CoT events from TAK server
+    fn spawn_reader_task(
+        read_half: OwnedReadHalf,
+        incoming_tx: broadcast::Sender<CotEvent>,
+        protocol_version: TakProtocolVersion,
+        metrics: Arc<TakMetrics>,
+    ) -> JoinHandle<()> {
+        tokio::spawn(async move {
+            let mut reader = BufReader::new(read_half);
+            let mut buffer = String::new();
+
+            info!("TAK reader task started");
+
+            loop {
+                buffer.clear();
+
+                // Read based on protocol version
+                let result = match protocol_version {
+                    TakProtocolVersion::RawXml => {
+                        // For raw XML (FreeTAKServer), read until we find </event>
+                        Self::read_raw_xml_event(&mut reader, &mut buffer).await
+                    }
+                    TakProtocolVersion::XmlTcp | TakProtocolVersion::ProtobufV1 => {
+                        // For framed protocols, read based on framing
+                        Self::read_framed_event(&mut reader, &mut buffer).await
+                    }
+                };
+
+                match result {
+                    Ok(true) => {
+                        // Successfully read an event
+                        trace!("Received raw CoT XML: {}", buffer.trim());
+                        match CotEvent::from_xml(&buffer) {
+                            Ok(event) => {
+                                metrics.record_receive(buffer.len());
+                                debug!(
+                                    "Parsed incoming CoT event: {} (type: {})",
+                                    event.uid,
+                                    event.cot_type.as_str()
+                                );
+                                // Send to all subscribers (ignore if no receivers)
+                                let _ = incoming_tx.send(event);
+                            }
+                            Err(e) => {
+                                warn!("Failed to parse CoT XML: {}", e);
+                                metrics.record_error(&format!("Parse error: {}", e));
+                            }
+                        }
+                    }
+                    Ok(false) => {
+                        // Connection closed
+                        info!("TAK server connection closed");
+                        break;
+                    }
+                    Err(e) => {
+                        error!("Error reading from TAK server: {}", e);
+                        metrics.record_error(&e.to_string());
+                        break;
+                    }
+                }
+            }
+
+            info!("TAK reader task stopped");
+        })
+    }
+
+    /// Read a raw XML CoT event (for FreeTAKServer)
+    async fn read_raw_xml_event(
+        reader: &mut BufReader<OwnedReadHalf>,
+        buffer: &mut String,
+    ) -> Result<bool, TakError> {
+        // Read until we get </event> end tag
+        // This is a simplified approach - real TAK servers may send multiple events
+        loop {
+            let bytes_read = reader.read_line(buffer).await.map_err(TakError::IoError)?;
+
+            if bytes_read == 0 {
+                return Ok(false); // EOF
+            }
+
+            // Check if we have a complete event
+            if buffer.contains("</event>") {
+                // Extract just the event XML
+                if let Some(start) = buffer.find("<event") {
+                    if let Some(end) = buffer.find("</event>") {
+                        let event_xml = buffer[start..=end + 7].to_string();
+                        buffer.clear();
+                        buffer.push_str(&event_xml);
+                        return Ok(true);
+                    }
+                }
+            }
+
+            // Safety limit to prevent memory exhaustion
+            if buffer.len() > 1024 * 1024 {
+                buffer.clear();
+                return Err(TakError::DecodingError("Event too large".into()));
+            }
+        }
+    }
+
+    /// Read a framed CoT event (TAK protocol with 0xBF magic)
+    async fn read_framed_event(
+        reader: &mut BufReader<OwnedReadHalf>,
+        buffer: &mut String,
+    ) -> Result<bool, TakError> {
+        use tokio::io::AsyncReadExt;
+
+        // Read magic byte
+        let mut magic = [0u8; 1];
+        match reader.read_exact(&mut magic).await {
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(false),
+            Err(e) => return Err(TakError::IoError(e)),
+        }
+
+        if magic[0] != TAK_MAGIC {
+            return Err(TakError::DecodingError(format!(
+                "Invalid magic byte: expected 0x{:02X}, got 0x{:02X}",
+                TAK_MAGIC, magic[0]
+            )));
+        }
+
+        // Read version/type byte
+        let mut version = [0u8; 1];
+        reader
+            .read_exact(&mut version)
+            .await
+            .map_err(TakError::IoError)?;
+
+        if version[0] == 0x00 {
+            // XML TCP: [0xBF][0x00][0xBF][payload]
+            // Read second magic
+            let mut magic2 = [0u8; 1];
+            reader
+                .read_exact(&mut magic2)
+                .await
+                .map_err(TakError::IoError)?;
+
+            if magic2[0] != TAK_MAGIC {
+                return Err(TakError::DecodingError("Invalid second magic byte".into()));
+            }
+
+            // Read until </event>
+            return Self::read_raw_xml_event(reader, buffer).await;
+        } else {
+            // Protobuf: [0xBF][varint_length][payload]
+            // The version byte is actually the first byte of the varint
+            let length = Self::read_varint_with_first(reader, version[0]).await?;
+
+            if length > 1024 * 1024 {
+                return Err(TakError::DecodingError("Message too large".into()));
+            }
+
+            let mut payload = vec![0u8; length as usize];
+            reader
+                .read_exact(&mut payload)
+                .await
+                .map_err(TakError::IoError)?;
+
+            // Try to parse as UTF-8 (could be XML or protobuf)
+            match String::from_utf8(payload) {
+                Ok(xml) => {
+                    *buffer = xml;
+                    Ok(true)
+                }
+                Err(_) => {
+                    // TODO: Handle protobuf decoding
+                    Err(TakError::DecodingError(
+                        "Protobuf decoding not implemented".into(),
+                    ))
+                }
+            }
+        }
+    }
+
+    /// Read a varint, given the first byte already read
+    async fn read_varint_with_first(
+        reader: &mut BufReader<OwnedReadHalf>,
+        first_byte: u8,
+    ) -> Result<u64, TakError> {
+        use tokio::io::AsyncReadExt;
+
+        let mut value: u64 = (first_byte & 0x7F) as u64;
+        let mut shift = 7;
+
+        if first_byte & 0x80 == 0 {
+            return Ok(value);
+        }
+
+        loop {
+            let mut byte = [0u8; 1];
+            reader
+                .read_exact(&mut byte)
+                .await
+                .map_err(TakError::IoError)?;
+
+            value |= ((byte[0] & 0x7F) as u64) << shift;
+
+            if byte[0] & 0x80 == 0 {
+                break;
+            }
+
+            shift += 7;
+            if shift > 63 {
+                return Err(TakError::DecodingError("Varint too large".into()));
+            }
+        }
+
+        Ok(value)
+    }
+
     /// Encode a value as a varint
     fn encode_varint(mut value: u64, buf: &mut Vec<u8>) {
         while value >= 0x80 {
@@ -174,7 +396,7 @@ impl TakServerTransport {
     }
 
     /// Drain queued messages after reconnection
-    async fn drain_queue(&self, stream: &mut TcpStream) -> Result<usize, TakError> {
+    async fn drain_queue(&self, stream: &mut OwnedWriteHalf) -> Result<usize, TakError> {
         let mut sent = 0;
         loop {
             let msg = {
@@ -207,16 +429,28 @@ impl TakServerTransport {
 #[async_trait]
 impl TakTransport for TakServerTransport {
     async fn connect(&mut self) -> Result<(), TakError> {
-        let mut stream = self.establish_connection().await?;
+        let stream = self.establish_connection().await?;
 
-        // Send initial presence
-        self.send_presence(&mut stream).await?;
+        // Split the stream into read and write halves
+        let (read_half, mut write_half) = stream.into_split();
+
+        // Send initial presence on write half
+        self.send_presence_on_write(&mut write_half).await?;
 
         // Drain any queued messages
-        self.drain_queue(&mut stream).await?;
+        self.drain_queue(&mut write_half).await?;
 
-        // Store connection
-        *self.connection.write().await = Some(stream);
+        // Spawn reader task for incoming events
+        let reader_task = Self::spawn_reader_task(
+            read_half,
+            self.incoming_tx.clone(),
+            self.config.protocol.version,
+            self.metrics.clone(),
+        );
+
+        // Store write stream and reader task
+        *self.write_stream.write().await = Some(write_half);
+        *self.reader_task.write().await = Some(reader_task);
         self.connected.store(true, Ordering::SeqCst);
         self.metrics.record_connect();
         self.reconnect.write().unwrap().reset();
@@ -225,10 +459,16 @@ impl TakTransport for TakServerTransport {
     }
 
     async fn disconnect(&mut self) -> Result<(), TakError> {
-        // Take stream out of lock before awaiting
-        let stream = { self.connection.write().await.take() };
+        info!("Disconnecting from TAK server");
+
+        // Stop the reader task
+        if let Some(task) = self.reader_task.write().await.take() {
+            task.abort();
+        }
+
+        // Close the write stream
+        let stream = { self.write_stream.write().await.take() };
         if let Some(mut stream) = stream {
-            info!("Disconnecting from TAK server");
             let _ = stream.shutdown().await;
         }
 
@@ -241,7 +481,7 @@ impl TakTransport for TakServerTransport {
     async fn send_cot(&self, event: &CotEvent, priority: Priority) -> Result<(), TakError> {
         if self.is_connected() {
             // Try to send directly - use async lock
-            let mut guard = self.connection.write().await;
+            let mut guard = self.write_stream.write().await;
             if let Some(stream) = guard.as_mut() {
                 match self.send_event_raw(stream, event).await {
                     Ok(()) => return Ok(()),
@@ -262,9 +502,40 @@ impl TakTransport for TakServerTransport {
         Ok(())
     }
 
-    async fn subscribe(&self, _filter: CotFilter) -> Result<CotEventStream, TakError> {
-        // TODO: Implement subscription with background reader task
-        Err(TakError::NotConnected)
+    async fn subscribe(&self, filter: CotFilter) -> Result<CotEventStream, TakError> {
+        if !self.is_connected() {
+            return Err(TakError::NotConnected);
+        }
+
+        // Create a new receiver from the broadcast channel
+        let rx = self.incoming_tx.subscribe();
+
+        // Return a stream that filters events based on the filter
+        let stream = stream::unfold((rx, filter), move |(mut rx, filter)| async move {
+            loop {
+                match rx.recv().await {
+                    Ok(event) => {
+                        // Apply filter
+                        if filter.matches(&event) {
+                            return Some((Ok(event), (rx, filter)));
+                        }
+                        // Skip events that don't match filter
+                        continue;
+                    }
+                    Err(broadcast::error::RecvError::Lagged(count)) => {
+                        warn!("Subscriber lagged, missed {} events", count);
+                        // Continue receiving
+                        continue;
+                    }
+                    Err(broadcast::error::RecvError::Closed) => {
+                        // Channel closed, end stream
+                        return None;
+                    }
+                }
+            }
+        });
+
+        Ok(Box::pin(stream))
     }
 
     fn is_connected(&self) -> bool {

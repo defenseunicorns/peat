@@ -376,6 +376,258 @@ pub struct AggregatedCapability {
     pub availability: f64,
 }
 
+// =============================================================================
+// Mission Task Types (Issue #318: TAK → HIVE direction)
+// =============================================================================
+
+/// Mission task type enumeration
+///
+/// Maps to CoT mission types as defined in CONTRACT_CORE_ATAK_TAK_BRIDGE.md
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MissionTaskType {
+    /// Track a specific target (CoT: t-x-m-c-c → TRACK_TARGET)
+    TrackTarget,
+    /// Search an area for targets (CoT: t-x-m-c-s → SEARCH_AREA)
+    SearchArea,
+    /// Monitor a zone continuously
+    MonitorZone,
+    /// Abort current mission (CoT: t-x-m-c-a)
+    Abort,
+}
+
+impl MissionTaskType {
+    /// Convert to string
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::TrackTarget => "TRACK_TARGET",
+            Self::SearchArea => "SEARCH_AREA",
+            Self::MonitorZone => "MONITOR_ZONE",
+            Self::Abort => "ABORT",
+        }
+    }
+
+    /// Parse from CoT type string
+    pub fn from_cot_type(cot_type: &str) -> Option<Self> {
+        match cot_type {
+            "t-x-m-c-c" => Some(Self::TrackTarget),
+            "t-x-m-c-s" => Some(Self::SearchArea),
+            "t-x-m-c-a" => Some(Self::Abort),
+            _ if cot_type.starts_with("t-x-m-c") => Some(Self::TrackTarget), // Default mission
+            _ => None,
+        }
+    }
+}
+
+/// Mission priority level
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MissionPriority {
+    Critical,
+    High,
+    Normal,
+    Low,
+}
+
+impl MissionPriority {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Critical => "CRITICAL",
+            Self::High => "HIGH",
+            Self::Normal => "NORMAL",
+            Self::Low => "LOW",
+        }
+    }
+}
+
+impl Default for MissionPriority {
+    fn default() -> Self {
+        Self::Normal
+    }
+}
+
+/// Target information for a mission
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MissionTarget {
+    /// Description of the target
+    pub description: String,
+    /// Last known position
+    pub last_known_position: Option<Position>,
+}
+
+/// Boundary definition for area missions
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MissionBoundary {
+    /// Boundary type
+    pub boundary_type: BoundaryType,
+    /// Polygon coordinates (for polygon type)
+    pub coordinates: Vec<Position>,
+    /// Radius in meters (for circle type)
+    pub radius_m: Option<f64>,
+}
+
+/// Type of boundary
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BoundaryType {
+    Polygon,
+    Circle,
+}
+
+/// Mission task from C2/TAK Server (Issue #318)
+///
+/// Represents a mission tasking command received from TAK Server.
+/// This is the HIVE representation of CoT mission task events.
+///
+/// CoT Event Types handled:
+/// - `t-x-m-c-c`: Track target command → TrackTarget
+/// - `t-x-m-c-s`: Search area command → SearchArea
+/// - `t-x-m-c-a`: Abort command → Abort
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MissionTask {
+    /// Unique task identifier (from CoT event@uid)
+    pub task_id: String,
+    /// Mission type
+    pub task_type: MissionTaskType,
+    /// When the task was issued (from CoT event@time)
+    pub issued_at: DateTime<Utc>,
+    /// Who issued the task (CoT source UID or callsign)
+    pub issued_by: String,
+    /// When the task expires (from CoT event@stale)
+    pub expires_at: DateTime<Utc>,
+    /// Target information (for TRACK_TARGET missions)
+    pub target: Option<MissionTarget>,
+    /// Boundary/area (for SEARCH_AREA, MONITOR_ZONE missions)
+    pub boundary: Option<MissionBoundary>,
+    /// Task priority
+    pub priority: MissionPriority,
+    /// Objective location (from CoT point)
+    pub objective_position: Option<Position>,
+    /// Raw remarks from CoT (for additional context)
+    pub remarks: Option<String>,
+}
+
+impl MissionTask {
+    /// Create a new mission task
+    pub fn new(
+        task_id: String,
+        task_type: MissionTaskType,
+        issued_by: String,
+        expires_at: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            task_id,
+            task_type,
+            issued_at: Utc::now(),
+            issued_by,
+            expires_at,
+            target: None,
+            boundary: None,
+            priority: MissionPriority::Normal,
+            objective_position: None,
+            remarks: None,
+        }
+    }
+
+    /// Create from a CoT event (Issue #318)
+    ///
+    /// Converts a mission-type CoT event to HIVE MissionTask format.
+    pub fn from_cot_event(event: &super::CotEvent) -> Result<Self, MissionTaskError> {
+        let task_type = MissionTaskType::from_cot_type(event.cot_type.as_str()).ok_or(
+            MissionTaskError::InvalidCotType(event.cot_type.as_str().to_string()),
+        )?;
+
+        let mut task = Self {
+            task_id: event.uid.clone(),
+            task_type,
+            issued_at: event.time,
+            issued_by: "TAK-Server".to_string(), // Could extract from CoT contact
+            expires_at: event.stale,
+            target: None,
+            boundary: None,
+            priority: MissionPriority::Normal,
+            objective_position: Some(Position::with_altitude(
+                event.point.lat,
+                event.point.lon,
+                event.point.hae,
+                Some(event.point.ce),
+            )),
+            remarks: event.detail.remarks.clone(),
+        };
+
+        // Extract target description from remarks if present
+        if let Some(ref remarks) = event.detail.remarks {
+            task.target = Some(MissionTarget {
+                description: remarks.clone(),
+                last_known_position: task.objective_position.clone(),
+            });
+        }
+
+        Ok(task)
+    }
+
+    /// Set target information
+    pub fn with_target(mut self, target: MissionTarget) -> Self {
+        self.target = Some(target);
+        self
+    }
+
+    /// Set boundary
+    pub fn with_boundary(mut self, boundary: MissionBoundary) -> Self {
+        self.boundary = Some(boundary);
+        self
+    }
+
+    /// Set priority
+    pub fn with_priority(mut self, priority: MissionPriority) -> Self {
+        self.priority = priority;
+        self
+    }
+
+    /// Set objective position
+    pub fn with_objective_position(mut self, position: Position) -> Self {
+        self.objective_position = Some(position);
+        self
+    }
+
+    /// Check if the mission is expired
+    pub fn is_expired(&self) -> bool {
+        Utc::now() > self.expires_at
+    }
+
+    /// Check if this is a mission-type CoT event
+    pub fn is_mission_cot_type(cot_type: &str) -> bool {
+        cot_type.starts_with("t-x-m-c")
+    }
+
+    /// Serialize to JSON for Automerge storage
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
+
+    /// Deserialize from JSON
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+}
+
+/// Errors that can occur when creating a MissionTask
+#[derive(Debug, Clone, PartialEq)]
+pub enum MissionTaskError {
+    /// CoT type is not a mission type
+    InvalidCotType(String),
+    /// Missing required field
+    MissingField(&'static str),
+}
+
+impl std::fmt::Display for MissionTaskError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidCotType(t) => write!(f, "Invalid CoT type for mission task: {}", t),
+            Self::MissingField(field) => write!(f, "Missing required field: {}", field),
+        }
+    }
+}
+
+impl std::error::Error for MissionTaskError {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -526,5 +778,306 @@ mod tests {
         assert_eq!(HandoffState::Transferred.as_str(), "TRANSFERRED");
         assert_eq!(HandoffState::Completed.as_str(), "COMPLETED");
         assert_eq!(HandoffState::Failed.as_str(), "FAILED");
+    }
+
+    // =======================================================================
+    // MissionTask Tests (Issue #318)
+    // =======================================================================
+
+    #[test]
+    fn test_mission_task_type_from_cot() {
+        assert_eq!(
+            MissionTaskType::from_cot_type("t-x-m-c-c"),
+            Some(MissionTaskType::TrackTarget)
+        );
+        assert_eq!(
+            MissionTaskType::from_cot_type("t-x-m-c-s"),
+            Some(MissionTaskType::SearchArea)
+        );
+        assert_eq!(
+            MissionTaskType::from_cot_type("t-x-m-c-a"),
+            Some(MissionTaskType::Abort)
+        );
+        // Generic mission defaults to TrackTarget
+        assert_eq!(
+            MissionTaskType::from_cot_type("t-x-m-c-z"),
+            Some(MissionTaskType::TrackTarget)
+        );
+        // Non-mission types return None
+        assert_eq!(MissionTaskType::from_cot_type("a-f-G-U-C"), None);
+    }
+
+    #[test]
+    fn test_mission_task_type_as_str() {
+        assert_eq!(MissionTaskType::TrackTarget.as_str(), "TRACK_TARGET");
+        assert_eq!(MissionTaskType::SearchArea.as_str(), "SEARCH_AREA");
+        assert_eq!(MissionTaskType::MonitorZone.as_str(), "MONITOR_ZONE");
+        assert_eq!(MissionTaskType::Abort.as_str(), "ABORT");
+    }
+
+    #[test]
+    fn test_mission_priority_default() {
+        let priority = MissionPriority::default();
+        assert_eq!(priority, MissionPriority::Normal);
+    }
+
+    #[test]
+    fn test_mission_priority_as_str() {
+        assert_eq!(MissionPriority::Critical.as_str(), "CRITICAL");
+        assert_eq!(MissionPriority::High.as_str(), "HIGH");
+        assert_eq!(MissionPriority::Normal.as_str(), "NORMAL");
+        assert_eq!(MissionPriority::Low.as_str(), "LOW");
+    }
+
+    #[test]
+    fn test_mission_task_new() {
+        let expires = Utc::now() + chrono::Duration::hours(2);
+        let task = MissionTask::new(
+            "MISSION-001".to_string(),
+            MissionTaskType::TrackTarget,
+            "CMD-ALPHA".to_string(),
+            expires,
+        );
+
+        assert_eq!(task.task_id, "MISSION-001");
+        assert_eq!(task.task_type, MissionTaskType::TrackTarget);
+        assert_eq!(task.issued_by, "CMD-ALPHA");
+        assert_eq!(task.priority, MissionPriority::Normal);
+        assert!(task.target.is_none());
+        assert!(task.boundary.is_none());
+    }
+
+    #[test]
+    fn test_mission_task_with_builder_methods() {
+        let expires = Utc::now() + chrono::Duration::hours(1);
+        let task = MissionTask::new(
+            "MISSION-002".to_string(),
+            MissionTaskType::SearchArea,
+            "CMD-BRAVO".to_string(),
+            expires,
+        )
+        .with_priority(MissionPriority::High)
+        .with_objective_position(Position::new(33.7749, -84.3958))
+        .with_target(MissionTarget {
+            description: "Suspicious vehicle".to_string(),
+            last_known_position: Some(Position::new(33.77, -84.39)),
+        });
+
+        assert_eq!(task.priority, MissionPriority::High);
+        assert!(task.objective_position.is_some());
+        assert!(task.target.is_some());
+        assert_eq!(
+            task.target.as_ref().unwrap().description,
+            "Suspicious vehicle"
+        );
+    }
+
+    #[test]
+    fn test_mission_task_is_expired() {
+        let past_expires = Utc::now() - chrono::Duration::hours(1);
+        let task = MissionTask::new(
+            "EXPIRED-001".to_string(),
+            MissionTaskType::TrackTarget,
+            "CMD".to_string(),
+            past_expires,
+        );
+        assert!(task.is_expired());
+
+        let future_expires = Utc::now() + chrono::Duration::hours(1);
+        let active_task = MissionTask::new(
+            "ACTIVE-001".to_string(),
+            MissionTaskType::TrackTarget,
+            "CMD".to_string(),
+            future_expires,
+        );
+        assert!(!active_task.is_expired());
+    }
+
+    #[test]
+    fn test_mission_task_is_mission_cot_type() {
+        assert!(MissionTask::is_mission_cot_type("t-x-m-c-c"));
+        assert!(MissionTask::is_mission_cot_type("t-x-m-c-s"));
+        assert!(MissionTask::is_mission_cot_type("t-x-m-c-a"));
+        assert!(!MissionTask::is_mission_cot_type("a-f-G-U-C"));
+        assert!(!MissionTask::is_mission_cot_type("b-m-p-s-p-l"));
+    }
+
+    #[test]
+    fn test_mission_task_json_roundtrip() {
+        let expires = Utc::now() + chrono::Duration::hours(2);
+        let task = MissionTask::new(
+            "JSON-001".to_string(),
+            MissionTaskType::SearchArea,
+            "CMD".to_string(),
+            expires,
+        )
+        .with_priority(MissionPriority::Critical)
+        .with_objective_position(Position::new(33.7749, -84.3958));
+
+        let json = task.to_json().expect("should serialize");
+        let restored = MissionTask::from_json(&json).expect("should deserialize");
+
+        assert_eq!(restored.task_id, task.task_id);
+        assert_eq!(restored.task_type, task.task_type);
+        assert_eq!(restored.priority, task.priority);
+    }
+
+    #[test]
+    fn test_mission_task_error_display() {
+        let err = MissionTaskError::InvalidCotType("a-f-G-U-C".to_string());
+        assert!(err.to_string().contains("Invalid CoT type"));
+
+        let err = MissionTaskError::MissingField("target");
+        assert!(err.to_string().contains("Missing required field"));
+    }
+
+    #[test]
+    fn test_mission_task_from_cot_event() {
+        use crate::cot::{CotEvent, CotPoint, CotType};
+
+        // Build a mission CoT event
+        let event = CotEvent {
+            version: "2.0".to_string(),
+            uid: "MISSION-TAK-001".to_string(),
+            cot_type: CotType::new("t-x-m-c-c"), // Track target
+            time: Utc::now(),
+            start: Utc::now(),
+            stale: Utc::now() + chrono::Duration::hours(2),
+            how: "m-g".to_string(),
+            point: CotPoint {
+                lat: 33.7749,
+                lon: -84.3958,
+                hae: 300.0,
+                ce: 10.0,
+                le: 10.0,
+            },
+            detail: crate::cot::CotDetail {
+                contact_callsign: Some("CMD-001".to_string()),
+                remarks: Some("Track suspicious vehicle in sector alpha".to_string()),
+                ..Default::default()
+            },
+        };
+
+        let task = MissionTask::from_cot_event(&event).expect("should convert");
+
+        assert_eq!(task.task_id, "MISSION-TAK-001");
+        assert_eq!(task.task_type, MissionTaskType::TrackTarget);
+        assert!(task.target.is_some());
+        assert_eq!(
+            task.target.as_ref().unwrap().description,
+            "Track suspicious vehicle in sector alpha"
+        );
+        assert!(task.objective_position.is_some());
+        let pos = task.objective_position.as_ref().unwrap();
+        assert_eq!(pos.lat, 33.7749);
+        assert_eq!(pos.lon, -84.3958);
+    }
+
+    #[test]
+    fn test_mission_task_from_cot_event_invalid_type() {
+        use crate::cot::{CotEvent, CotPoint, CotType};
+
+        // Build a non-mission CoT event
+        let event = CotEvent {
+            version: "2.0".to_string(),
+            uid: "UNIT-001".to_string(),
+            cot_type: CotType::new("a-f-G-U-C"), // Friendly ground unit, not a mission
+            time: Utc::now(),
+            start: Utc::now(),
+            stale: Utc::now() + chrono::Duration::hours(1),
+            how: "m-g".to_string(),
+            point: CotPoint::new(0.0, 0.0),
+            detail: Default::default(),
+        };
+
+        let result = MissionTask::from_cot_event(&event);
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            MissionTaskError::InvalidCotType(_)
+        ));
+    }
+
+    /// End-to-end test: XML → CotEvent → MissionTask (Issue #318)
+    #[test]
+    fn test_mission_task_from_xml_end_to_end() {
+        use crate::cot::CotEvent;
+
+        // Realistic mission task CoT XML from TAK Server
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+            <event uid="TASK-20251208-001" type="t-x-m-c-c" time="2025-12-08T14:05:00Z"
+                   start="2025-12-08T14:05:00Z" stale="2025-12-08T16:05:00Z" how="h-g-i-g-o">
+                <point lat="33.7756" lon="-84.3963" hae="300" ce="50" le="50"/>
+                <detail>
+                    <contact callsign="CMD-ALPHA"/>
+                    <remarks>Track suspicious vehicle in sector bravo, heading north on Main St</remarks>
+                </detail>
+            </event>"#;
+
+        // Parse XML to CotEvent
+        let event = CotEvent::from_xml(xml).expect("should parse XML");
+        assert_eq!(event.uid, "TASK-20251208-001");
+        assert_eq!(event.cot_type.as_str(), "t-x-m-c-c");
+
+        // Convert to MissionTask
+        let task = MissionTask::from_cot_event(&event).expect("should convert to MissionTask");
+
+        // Verify conversion
+        assert_eq!(task.task_id, "TASK-20251208-001");
+        assert_eq!(task.task_type, MissionTaskType::TrackTarget);
+        assert_eq!(task.issued_by, "TAK-Server");
+        assert!(task.target.is_some());
+        assert!(task
+            .target
+            .as_ref()
+            .unwrap()
+            .description
+            .contains("suspicious vehicle"));
+        assert!(task.objective_position.is_some());
+        let pos = task.objective_position.as_ref().unwrap();
+        assert!((pos.lat - 33.7756).abs() < 0.0001);
+        assert!((pos.lon - (-84.3963)).abs() < 0.0001);
+    }
+
+    /// Test search area mission type
+    #[test]
+    fn test_mission_task_search_area_from_xml() {
+        use crate::cot::CotEvent;
+
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+            <event uid="SEARCH-001" type="t-x-m-c-s" time="2025-12-08T14:00:00Z"
+                   start="2025-12-08T14:00:00Z" stale="2025-12-08T18:00:00Z" how="h-g-i-g-o">
+                <point lat="33.80" lon="-84.40" hae="0" ce="500" le="500"/>
+                <detail>
+                    <remarks>Search grid sector 7 for missing hiker</remarks>
+                </detail>
+            </event>"#;
+
+        let event = CotEvent::from_xml(xml).expect("should parse");
+        let task = MissionTask::from_cot_event(&event).expect("should convert");
+
+        assert_eq!(task.task_type, MissionTaskType::SearchArea);
+        assert_eq!(task.task_id, "SEARCH-001");
+    }
+
+    /// Test abort mission type
+    #[test]
+    fn test_mission_task_abort_from_xml() {
+        use crate::cot::CotEvent;
+
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+            <event uid="ABORT-001" type="t-x-m-c-a" time="2025-12-08T14:00:00Z"
+                   start="2025-12-08T14:00:00Z" stale="2025-12-08T14:30:00Z" how="h-g-i-g-o">
+                <point lat="0" lon="0" hae="0" ce="999999" le="999999"/>
+                <detail>
+                    <remarks>Abort current mission - RTB immediately</remarks>
+                </detail>
+            </event>"#;
+
+        let event = CotEvent::from_xml(xml).expect("should parse");
+        let task = MissionTask::from_cot_event(&event).expect("should convert");
+
+        assert_eq!(task.task_type, MissionTaskType::Abort);
+        assert!(task.remarks.as_ref().unwrap().contains("RTB"));
     }
 }
