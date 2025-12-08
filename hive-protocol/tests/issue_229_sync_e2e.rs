@@ -227,10 +227,9 @@ async fn test_add_peer_connection_visible() {
 /// This is the core test for Issue #229 - verifying that documents actually
 /// sync over connections established via add_peer().
 ///
-/// IGNORED: This test tracks Issue #229 and is expected to fail until the issue is fixed.
-/// Run with `cargo test -- --ignored` to check if the issue has been resolved.
+/// This test validates the Issue #229 fix - document sync now works after
+/// the sync state ordering fix (state updated only after successful send).
 #[tokio::test]
-#[ignore = "Issue #229: Document sync after add_peer is not yet fully working"]
 async fn test_document_sync_after_add_peer() {
     // Enable tracing to see sync debug messages
     let _ = tracing_subscriber::fmt()
@@ -432,6 +431,176 @@ async fn test_document_sync_after_add_peer() {
     }
 
     println!("✓ Document sync verified - Issue #229 may be fixed or not reproducible");
+
+    // Cleanup
+    let _ = backend_a.shutdown().await;
+    let _ = backend_b.shutdown().await;
+}
+
+/// Test fast connection using connect_to_discovered_peers_now()
+///
+/// This demonstrates the E2E test optimization: connecting peers immediately
+/// instead of waiting 1-7 seconds for the background task.
+///
+/// Expected: Connection establishes in <1 second (vs 7+ seconds with background task)
+#[tokio::test]
+async fn test_fast_connection_immediate() {
+    println!("=== Testing Fast Connection (connect_to_discovered_peers_now) ===");
+
+    let start_time = std::time::Instant::now();
+
+    // Create two nodes with specific ports
+    let temp_a = TempDir::new().expect("Failed to create temp dir A");
+    let temp_b = TempDir::new().expect("Failed to create temp dir B");
+
+    let addr_a: std::net::SocketAddr = "127.0.0.1:29010".parse().unwrap();
+    let addr_b: std::net::SocketAddr = "127.0.0.1:29011".parse().unwrap();
+
+    let transport_a = Arc::new(
+        IrohTransport::bind(addr_a)
+            .await
+            .expect("Failed to create transport A"),
+    );
+    let store_a = Arc::new(AutomergeStore::open(temp_a.path()).expect("Failed to create store A"));
+    let backend_a = Arc::new(AutomergeIrohBackend::from_parts(
+        Arc::clone(&store_a),
+        Arc::clone(&transport_a),
+    ));
+
+    let transport_b = Arc::new(
+        IrohTransport::bind(addr_b)
+            .await
+            .expect("Failed to create transport B"),
+    );
+    let store_b = Arc::new(AutomergeStore::open(temp_b.path()).expect("Failed to create store B"));
+    let backend_b = Arc::new(AutomergeIrohBackend::from_parts(
+        Arc::clone(&store_b),
+        Arc::clone(&transport_b),
+    ));
+
+    // Get endpoint info for discovery setup
+    let endpoint_a = transport_a.endpoint_id();
+    let endpoint_b = transport_b.endpoint_id();
+    println!("Node A: {:?} @ {:?}", endpoint_a, addr_a);
+    println!("Node B: {:?} @ {:?}", endpoint_b, addr_b);
+
+    // Setup bidirectional discovery
+    let peer_b_info = PeerInfo {
+        name: "Node B".to_string(),
+        node_id: hex::encode(endpoint_b.as_bytes()),
+        addresses: vec![addr_b.to_string()],
+        relay_url: None,
+    };
+    backend_a
+        .add_discovery_strategy(Box::new(StaticDiscovery::from_peers(vec![peer_b_info])))
+        .await
+        .expect("Failed to add discovery strategy A");
+
+    let peer_a_info = PeerInfo {
+        name: "Node A".to_string(),
+        node_id: hex::encode(endpoint_a.as_bytes()),
+        addresses: vec![addr_a.to_string()],
+        relay_url: None,
+    };
+    backend_b
+        .add_discovery_strategy(Box::new(StaticDiscovery::from_peers(vec![peer_a_info])))
+        .await
+        .expect("Failed to add discovery strategy B");
+
+    // Initialize with shared credentials
+    let test_secret = hive_protocol::security::FormationKey::generate_secret();
+
+    let config_a = BackendConfig {
+        app_id: "test-fast-connect".to_string(),
+        persistence_dir: temp_a.path().to_path_buf(),
+        shared_key: Some(test_secret.clone()),
+        transport: TransportConfig::default(),
+        extra: HashMap::new(),
+    };
+
+    let config_b = BackendConfig {
+        app_id: "test-fast-connect".to_string(),
+        persistence_dir: temp_b.path().to_path_buf(),
+        shared_key: Some(test_secret),
+        transport: TransportConfig::default(),
+        extra: HashMap::new(),
+    };
+
+    backend_a
+        .initialize(config_a)
+        .await
+        .expect("Failed to init A");
+    backend_b
+        .initialize(config_b)
+        .await
+        .expect("Failed to init B");
+
+    // Start sync (starts accept loops)
+    backend_a
+        .sync_engine()
+        .start_sync()
+        .await
+        .expect("Failed to start sync A");
+    backend_b
+        .sync_engine()
+        .start_sync()
+        .await
+        .expect("Failed to start sync B");
+
+    let setup_time = start_time.elapsed();
+    println!("Setup completed in {:?}", setup_time);
+
+    // Use FAST CONNECTION instead of waiting 7 seconds for background task
+    let connect_start = std::time::Instant::now();
+
+    // Give accept loops a moment to start
+    tokio::time::sleep(Duration::from_millis(50)).await;
+
+    // Connect immediately from both sides
+    let (result_a, result_b) = tokio::join!(
+        backend_a.connect_to_discovered_peers_now(),
+        backend_b.connect_to_discovered_peers_now()
+    );
+
+    println!(
+        "Connection attempts: A={:?}, B={:?}",
+        result_a.as_ref().map(|n| format!("{} new", n)),
+        result_b.as_ref().map(|n| format!("{} new", n))
+    );
+
+    // Small delay for handshake completion
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    let connect_time = connect_start.elapsed();
+    let total_time = start_time.elapsed();
+
+    // Verify connection established
+    let connected_a = transport_a.connected_peers();
+    let connected_b = transport_b.connected_peers();
+    println!(
+        "Node A connected to {} peers, Node B connected to {} peers",
+        connected_a.len(),
+        connected_b.len()
+    );
+
+    // Assert connection was made
+    assert!(
+        !connected_a.is_empty() || !connected_b.is_empty(),
+        "Should have at least one connection"
+    );
+
+    // Assert fast connection time (should be <1s, typically <200ms)
+    assert!(
+        connect_time < Duration::from_secs(1),
+        "Fast connection should take <1s, but took {:?}",
+        connect_time
+    );
+
+    println!(
+        "✓ FAST CONNECTION: {:?} (vs 7+ seconds with background task)",
+        connect_time
+    );
+    println!("✓ Total test time: {:?}", total_time);
 
     // Cleanup
     let _ = backend_a.shutdown().await;

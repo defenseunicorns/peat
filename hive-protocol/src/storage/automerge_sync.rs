@@ -242,15 +242,20 @@ impl AutomergeSyncCoordinator {
         let mut sync_state = self.get_or_create_sync_state(doc_key, peer_id);
 
         // Generate initial sync message using SyncDoc trait
-        let message = SyncDoc::generate_sync_message(&doc, &mut sync_state)
-            .context("No initial sync message to send")?;
+        // NOTE: generate_sync_message mutates sync_state internally to track which heads
+        // have been "prepared for sending". We must only persist this state AFTER
+        // successful send, otherwise retries will fail with "nothing to send".
+        let message = SyncDoc::generate_sync_message(&doc, &mut sync_state);
 
-        // Store updated sync state
-        self.update_sync_state(doc_key, peer_id, sync_state);
+        let message = message.context("No initial sync message to send")?;
 
-        // Send message to peer with document key
+        // Send message to peer with document key BEFORE updating sync state
+        // This ensures that if send fails, we can retry with the same state
         self.send_sync_message_for_doc(peer_id, doc_key, &message)
             .await?;
+
+        // Only update sync state AFTER successful send
+        self.update_sync_state(doc_key, peer_id, sync_state);
 
         Ok(())
     }
@@ -458,6 +463,32 @@ impl AutomergeSyncCoordinator {
             .entry(doc_key.to_string())
             .or_default()
             .insert(peer_id, state);
+    }
+
+    /// Clear all sync state for a peer (call on disconnect/reconnect)
+    ///
+    /// This removes sync state for a peer across ALL documents. Call this when:
+    /// - A peer disconnects (to allow fresh sync on reconnect)
+    /// - A peer reconnects (to ensure sync starts from scratch)
+    ///
+    /// Without this, reconnecting peers may fail to sync because the stale
+    /// sync state thinks "I already sent those changes" even though the peer
+    /// never received them.
+    pub fn clear_peer_sync_state(&self, peer_id: EndpointId) {
+        let mut states = self.peer_states.write().unwrap();
+        let mut cleared_count = 0;
+        for (_doc_key, peer_map) in states.iter_mut() {
+            if peer_map.remove(&peer_id).is_some() {
+                cleared_count += 1;
+            }
+        }
+        if cleared_count > 0 {
+            tracing::debug!(
+                "Cleared sync state for peer {:?} ({} document(s))",
+                peer_id,
+                cleared_count
+            );
+        }
     }
 
     /// Sync a specific document with a peer
@@ -807,5 +838,83 @@ mod tests {
         // Get same state again
         let _state2 = coordinator.get_or_create_sync_state("doc1", peer_id);
         assert_eq!(coordinator.peer_states.read().unwrap().len(), 1);
+    }
+
+    /// Diagnostic test for Issue #229 - sync message generation
+    #[tokio::test]
+    async fn test_sync_message_generation_diagnostic() {
+        use automerge::sync::SyncDoc;
+        use automerge::transaction::Transactable;
+
+        let (coordinator, _temp) = create_test_coordinator().await;
+        let peer_id = coordinator.transport.endpoint_id();
+
+        // Step 1: Create a document with actual data (simulating collection upsert)
+        let mut doc = Automerge::new();
+        let data = vec![1, 2, 3, 4, 5]; // Simulate serialized JSON
+        doc.transact(|tx| {
+            tx.put(
+                automerge::ROOT,
+                "data",
+                automerge::ScalarValue::Bytes(data.clone()),
+            )?;
+            Ok::<(), automerge::AutomergeError>(())
+        })
+        .expect("Transaction should succeed");
+
+        println!("Step 1: Created doc with heads: {:?}", doc.get_heads());
+        assert!(
+            !doc.get_heads().is_empty(),
+            "Document should have change history"
+        );
+
+        // Step 2: Store the document
+        let doc_key = "nodes:test-node-1";
+        coordinator
+            .store
+            .put(doc_key, &doc)
+            .expect("Store should succeed");
+        println!("Step 2: Stored document with key: {}", doc_key);
+
+        // Step 3: Load it back
+        let loaded_doc = coordinator
+            .store
+            .get(doc_key)
+            .expect("Get should succeed")
+            .expect("Document should exist");
+
+        println!(
+            "Step 3: Loaded doc with heads: {:?}",
+            loaded_doc.get_heads()
+        );
+        assert_eq!(
+            doc.get_heads(),
+            loaded_doc.get_heads(),
+            "Loaded doc should have same heads"
+        );
+
+        // Step 4: Try to generate sync message with fresh SyncState
+        let mut sync_state = coordinator.get_or_create_sync_state(doc_key, peer_id);
+        println!("Step 4: Created fresh sync state");
+
+        let message = SyncDoc::generate_sync_message(&loaded_doc, &mut sync_state);
+        println!(
+            "Step 5: generate_sync_message returned: {:?}",
+            message.is_some()
+        );
+
+        assert!(
+            message.is_some(),
+            "Should generate sync message for document with changes and fresh sync state"
+        );
+
+        // Extra: Test with SyncState::new() directly
+        let mut fresh_state = SyncState::new();
+        let message2 = SyncDoc::generate_sync_message(&loaded_doc, &mut fresh_state);
+        println!("Extra: SyncState::new() message: {:?}", message2.is_some());
+        assert!(
+            message2.is_some(),
+            "SyncState::new() should also produce a message"
+        );
     }
 }
