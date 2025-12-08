@@ -119,6 +119,12 @@ pub mod cap {
             include!(concat!(env!("OUT_DIR"), "/cap.security.v1.rs"));
         }
     }
+
+    pub mod track {
+        pub mod v1 {
+            include!(concat!(env!("OUT_DIR"), "/cap.track.v1.rs"));
+        }
+    }
 }
 
 // Re-export for convenience
@@ -155,5 +161,74 @@ mod tests {
         // If we got here, all packages are accessible
         assert_eq!(CapabilityType::Sensor as i32, 1);
         assert_eq!(Phase::Discovery as i32, 1);
+    }
+
+    #[test]
+    fn test_capability_advertisement_accessible() {
+        // Verify CapabilityAdvertisement is accessible from capability.v1
+        use capability::v1::{CapabilityAdvertisement, OperationalStatus, ResourceStatus};
+
+        let _cap_ad = CapabilityAdvertisement {
+            platform_id: "Alpha-3".to_string(),
+            advertised_at: None,
+            capabilities: vec![],
+            resources: None,
+            operational_status: OperationalStatus::Ready as i32,
+        };
+
+        let _resources = ResourceStatus {
+            compute_utilization: 0.5,
+            memory_utilization: 0.3,
+            power_level: 0.9,
+            storage_utilization: 0.2,
+            bandwidth_utilization: 0.1,
+            extra_json: String::new(),
+        };
+
+        assert_eq!(OperationalStatus::Ready as i32, 1);
+    }
+
+    #[test]
+    fn test_track_types_accessible() {
+        // Verify Track types are accessible from track.v1
+        use track::v1::{
+            SourceType, Track, TrackPosition, TrackSource, TrackState, TrackUpdate, UpdateType,
+        };
+
+        let _track = Track {
+            track_id: "TRK-001".to_string(),
+            classification: "person".to_string(),
+            confidence: 0.95,
+            position: Some(TrackPosition {
+                latitude: 38.0,
+                longitude: -122.0,
+                altitude: 0.0,
+                cep_m: 5.0,
+                vertical_error_m: 0.0,
+            }),
+            velocity: None,
+            state: TrackState::Confirmed as i32,
+            source: Some(TrackSource {
+                platform_id: "Alpha-3".to_string(),
+                sensor_id: "camera-1".to_string(),
+                model_version: "1.0.0".to_string(),
+                source_type: SourceType::AiModel as i32,
+            }),
+            attributes_json: r#"{"color":"red"}"#.to_string(),
+            first_seen: None,
+            last_seen: None,
+            observation_count: 5,
+        };
+
+        let _update = TrackUpdate {
+            update_type: UpdateType::New as i32,
+            track: Some(_track),
+            previous_track_id: String::new(),
+            timestamp: None,
+        };
+
+        assert_eq!(TrackState::Confirmed as i32, 2);
+        assert_eq!(SourceType::AiModel as i32, 2);
+        assert_eq!(UpdateType::New as i32, 1);
     }
 }

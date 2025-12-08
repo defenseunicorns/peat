@@ -10,6 +10,10 @@ description = "HIVE inference pipeline for edge AI and object tracking"
 [dependencies]
 # HIVE Protocol with AutomergeIroh backend (disable ditto-backend to avoid symbol conflicts)
 hive-protocol = { path = "../hive-protocol", default-features = false, features = ["automerge-backend"] }
+# HIVE Schema - proto-generated types for capability advertisement and tracks
+hive-schema = { path = "../hive-schema" }
+# Protobuf support for schema types
+prost = "0.13"
 
 # Async runtime
 tokio.workspace = true
@@ -66,6 +70,7 @@ llm-cuda = ["llm-inference", "llama-cpp-2/cuda"]
 edge-node = ["video-capture", "onnx-inference"]
 
 [dev-dependencies]
+hex = "0.4.3"
 tokio = { version = "1", features = ["full", "test-util"] }
 
 # Examples with feature requirements

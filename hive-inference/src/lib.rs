@@ -36,6 +36,7 @@ pub mod models;
 pub mod orchestration;
 pub mod platform;
 pub mod registry;
+pub mod schema;
 pub mod sync;
 pub mod team;
 pub mod testing;
@@ -85,3 +86,11 @@ pub use hive_protocol::discovery::capability_query::{
     CapabilityQuery, CapabilityQueryBuilder, CapabilityQueryEngine, CapabilityStats, QueryMatch,
 };
 pub use hive_protocol::models::CapabilityType;
+
+// Schema conversion traits for proto interoperability (Issue #299)
+pub use schema::{
+    DecodeProto, EncodeProto, FromProtoCapability, FromProtoTrack, ToProtoCapability, ToProtoTrack,
+};
+// Re-export hive-schema proto types
+pub use hive_schema::capability::v1 as proto_capability;
+pub use hive_schema::track::v1 as proto_track;

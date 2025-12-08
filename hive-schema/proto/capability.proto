@@ -59,3 +59,61 @@ message CapabilityResponse {
   // Total count of capabilities
   uint32 total_count = 2;
 }
+
+// ============================================================================
+// Capability Advertisement (Upward Flow)
+// ============================================================================
+
+// Capability advertisement message - flows upward from platforms
+//
+// Platforms periodically advertise their capabilities, allowing the hierarchy
+// to maintain an up-to-date view of available resources. This is a generic
+// advertisement that can include any capability type (sensors, compute, AI
+// models, mobility, etc.)
+message CapabilityAdvertisement {
+  // Platform identifier (e.g., "Alpha-3", "UAV-001")
+  string platform_id = 1;
+
+  // Timestamp of advertisement
+  common.v1.Timestamp advertised_at = 2;
+
+  // List of capabilities available on this platform
+  repeated Capability capabilities = 3;
+
+  // Current resource utilization (optional)
+  ResourceStatus resources = 4;
+
+  // Platform operational status
+  OperationalStatus operational_status = 5;
+}
+
+// Operational status of a platform
+enum OperationalStatus {
+  OPERATIONAL_STATUS_UNSPECIFIED = 0;
+  OPERATIONAL_STATUS_READY = 1;      // Ready to accept tasking
+  OPERATIONAL_STATUS_ACTIVE = 2;     // Currently executing task
+  OPERATIONAL_STATUS_DEGRADED = 3;   // Operating with reduced capability
+  OPERATIONAL_STATUS_OFFLINE = 4;    // Not available
+  OPERATIONAL_STATUS_MAINTENANCE = 5; // Under maintenance
+}
+
+// Resource utilization status
+message ResourceStatus {
+  // Compute utilization (0.0 - 1.0)
+  float compute_utilization = 1;
+
+  // Memory utilization (0.0 - 1.0)
+  float memory_utilization = 2;
+
+  // Power/battery level (0.0 - 1.0)
+  float power_level = 3;
+
+  // Storage utilization (0.0 - 1.0)
+  float storage_utilization = 4;
+
+  // Bandwidth utilization (0.0 - 1.0)
+  float bandwidth_utilization = 5;
+
+  // Additional resource metrics (JSON-encoded for extensibility)
+  string extra_json = 10;
+}

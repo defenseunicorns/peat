@@ -236,6 +236,146 @@ This contract defines the bidirectional interface between the Core protocol and 
 
 ---
 
+## Interface 3: Capability Advertisement (HIVE → CoT)
+
+### HIVE Schema: CapabilityAdvertisement (from capability.proto)
+
+```protobuf
+message CapabilityAdvertisement {
+  string platform_id = 1;                    // "Alpha-3"
+  Timestamp advertised_at = 2;               // Unix timestamp
+  repeated Capability capabilities = 3;      // List of capabilities
+  ResourceStatus resources = 4;              // Optional resource utilization
+  OperationalStatus operational_status = 5;  // READY, ACTIVE, DEGRADED, etc.
+}
+
+message Capability {
+  string id = 1;                    // "object_tracker"
+  string name = 2;                  // "Object Tracker Model"
+  CapabilityType capability_type = 3;  // COMPUTE, SENSOR, etc.
+  float confidence = 4;             // 0.0-1.0
+  string metadata_json = 5;         // AI model details
+}
+```
+
+### CoT Mapping: Platform Registration
+
+| HIVE Field | CoT Element/Attribute | Notes |
+|------------|----------------------|-------|
+| `platform_id` | `event@uid` | Direct mapping |
+| N/A | `event@type` | `a-f-G-U-C` (friendly ground unit, combat) |
+| `advertised_at` | `event@time`, `event@start` | ISO 8601 |
+| N/A | `event@stale` | `advertised_at + 60 seconds` (heartbeat) |
+| N/A | `event@how` | `m-g` (machine-generated) |
+| `operational_status` | `detail/status@readiness` | See status mapping |
+| `capabilities[].name` | `detail/remarks` | Comma-separated list |
+| `resources.compute_utilization` | `detail/_hive_@cpu` | Percentage (×100) |
+| `resources.memory_utilization` | `detail/_hive_@mem` | Percentage (×100) |
+| `resources.power_level` | `detail/_hive_@battery` | Percentage (×100) |
+| `capabilities[].metadata_json` | `detail/_hive_@models` | JSON array of model info |
+
+### Operational Status → CoT Mapping
+
+| HIVE OperationalStatus | CoT status@readiness | Description |
+|------------------------|---------------------|-------------|
+| `READY` | `true` | Platform ready for tasking |
+| `ACTIVE` | `true` | Platform executing task |
+| `DEGRADED` | `partial` | Reduced capability |
+| `OFFLINE` | `false` | Not available |
+| `MAINTENANCE` | `false` | Under maintenance |
+
+### Example Transformation
+
+**HIVE Input (CapabilityAdvertisement):**
+```json
+{
+  "platform_id": "Alpha-3",
+  "advertised_at": { "seconds": 1733670600, "nanos": 0 },
+  "capabilities": [
+    {
+      "id": "object_tracker",
+      "name": "Object Tracker v1.2",
+      "capability_type": "COMPUTE",
+      "confidence": 0.95,
+      "metadata_json": "{\"model_type\":\"detector_tracker\",\"fps\":15}"
+    }
+  ],
+  "resources": {
+    "compute_utilization": 0.65,
+    "memory_utilization": 0.50,
+    "power_level": 0.90
+  },
+  "operational_status": "READY"
+}
+```
+
+**CoT Output (Platform Registration):**
+```xml
+<event uid="Alpha-3" type="a-f-G-U-C" time="2025-12-08T14:30:00Z"
+       start="2025-12-08T14:30:00Z" stale="2025-12-08T14:31:00Z" how="m-g">
+  <point lat="0" lon="0" hae="0" ce="9999999" le="9999999"/>
+  <detail>
+    <status readiness="true"/>
+    <remarks>Capabilities: Object Tracker v1.2 (95%)</remarks>
+    <_hive_ cpu="65" mem="50" battery="90"
+            models="[{\"id\":\"object_tracker\",\"type\":\"detector_tracker\",\"fps\":15}]"/>
+  </detail>
+</event>
+```
+
+*Note: Position is placeholder (0,0) until actual GPS fix. Platform position comes from separate TrackUpdate or SA message.*
+
+---
+
+## Interface 4: Protobuf ↔ JSON Field Reference
+
+For implementation, here are the exact protobuf field mappings:
+
+### TrackUpdate (track.proto) → JSON
+
+| Protobuf Field | JSON Path | Type |
+|----------------|-----------|------|
+| `track.track_id` | `track_id` | string |
+| `track.classification` | `classification` | string |
+| `track.confidence` | `confidence` | float |
+| `track.position.latitude` | `position.lat` | double |
+| `track.position.longitude` | `position.lon` | double |
+| `track.position.altitude` | `position.hae` | float |
+| `track.position.cep_m` | `position.cep_m` | float |
+| `track.velocity.bearing` | `velocity.bearing` | float |
+| `track.velocity.speed_mps` | `velocity.speed_mps` | float |
+| `track.source.platform_id` | `source_platform` | string |
+| `track.source.sensor_id` | `source_model` | string |
+| `track.source.model_version` | `model_version` | string |
+| `track.attributes_json` | `attributes` | object (parsed) |
+| `timestamp.seconds` | `timestamp` | ISO 8601 |
+| `update_type` | N/A | Internal use |
+
+### HierarchicalCommand (command.proto) ← CoT Mission
+
+| CoT Element | Protobuf Field | Notes |
+|-------------|----------------|-------|
+| `event@uid` | `command_id` | Direct mapping |
+| `event@time` | `issued_at.seconds` | Parse ISO 8601 |
+| `event@stale` | `expires_at.seconds` | Parse ISO 8601 |
+| `detail/mission@type` | `mission_order.mission_type` | See enum mapping |
+| `detail/target@description` | `mission_order.description` | Target description |
+| `point@lat` | `mission_order.objective_location.latitude` | Target position |
+| `point@lon` | `mission_order.objective_location.longitude` | Target position |
+| N/A | `originator_id` | Set to TAK Server UID |
+| N/A | `target.scope` | Default to SQUAD |
+
+### Mission Type Mapping
+
+| CoT mission@type | HierarchicalCommand MissionType |
+|------------------|--------------------------------|
+| `TRACK_TARGET` | `ISR` (1) |
+| `SEARCH_AREA` | `ISR` (1) |
+| `MONITOR_ZONE` | `DEFENSIVE` (5) |
+| `ABORT` | N/A (cancel command) |
+
+---
+
 ## Core Team Responsibilities
 
 - [ ] Define HIVE schemas (TrackUpdate, MissionTask, etc.)

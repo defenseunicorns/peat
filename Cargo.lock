@@ -2529,12 +2529,15 @@ dependencies = [
  "gstreamer",
  "gstreamer-app",
  "gstreamer-video",
+ "hex",
  "hive-protocol",
+ "hive-schema",
  "image",
  "llama-cpp-2",
  "ndarray",
  "num_cpus",
  "ort",
+ "prost",
  "rand 0.9.2",
  "serde",
  "serde_json",
@@ -2671,6 +2674,26 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "hive-tak-bridge"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "clap",
+ "hex",
+ "hive-protocol",
+ "hive-transport",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
