@@ -842,6 +842,95 @@ impl AutomergeIrohBackend {
         Ok(())
     }
 
+    /// Immediately connect to all discovered peers
+    ///
+    /// This bypasses the background connection task's periodic interval, allowing
+    /// tests to establish connections without waiting 1-7 seconds for the next cycle.
+    ///
+    /// Returns the number of new connections established.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Add discovery strategy with peer info
+    /// backend_a.add_discovery_strategy(Box::new(StaticDiscovery::from_peers(vec![peer_b]))).await?;
+    /// backend_b.add_discovery_strategy(Box::new(StaticDiscovery::from_peers(vec![peer_a]))).await?;
+    ///
+    /// // Connect immediately instead of waiting for background task
+    /// backend_a.connect_to_discovered_peers_now().await?;
+    /// backend_b.connect_to_discovered_peers_now().await?;
+    /// ```
+    #[cfg(feature = "automerge-backend")]
+    pub async fn connect_to_discovered_peers_now(&self) -> Result<usize> {
+        use crate::network::formation_handshake::perform_initiator_handshake;
+        use crate::network::PeerInfo as NetworkPeerInfo;
+
+        let formation_key = self
+            .formation_key
+            .read()
+            .unwrap()
+            .clone()
+            .ok_or_else(|| Error::config_error("Backend not initialized", None))?;
+
+        // Get discovered peers
+        let manager = self.discovery_manager.read().await;
+        let discovered_peers = manager.get_peers().await;
+        drop(manager);
+
+        let mut new_connections = 0;
+
+        for peer in discovered_peers {
+            let network_peer_info = NetworkPeerInfo {
+                name: peer.name.clone(),
+                node_id: peer.node_id.clone(),
+                addresses: peer.addresses.clone(),
+                relay_url: peer.relay_url.clone(),
+            };
+
+            if let Ok(endpoint_id) = peer.endpoint_id() {
+                match self.transport.connect_peer(&network_peer_info).await {
+                    Ok(Some(conn)) => {
+                        // New connection - perform formation handshake
+                        match perform_initiator_handshake(&conn, &formation_key).await {
+                            Ok(()) => {
+                                tracing::debug!(
+                                    "Immediate connect: authenticated with peer {}",
+                                    peer.name
+                                );
+                                new_connections += 1;
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    "Immediate connect: peer {} failed auth: {}",
+                                    peer.name,
+                                    e
+                                );
+                                conn.close(1u32.into(), b"authentication failed");
+                                self.transport.disconnect(&endpoint_id).ok();
+                            }
+                        }
+                    }
+                    Ok(None) => {
+                        // Already connected (they initiated)
+                        tracing::debug!(
+                            "Immediate connect: already connected to {} (they initiated)",
+                            peer.name
+                        );
+                    }
+                    Err(e) => {
+                        tracing::debug!(
+                            "Immediate connect: failed to connect to {}: {}",
+                            peer.name,
+                            e
+                        );
+                    }
+                }
+            }
+        }
+
+        Ok(new_connections)
+    }
+
     /// Get access to the peer discovery information
     ///
     /// Returns a handle for querying discovered peers.

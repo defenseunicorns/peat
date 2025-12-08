@@ -1,0 +1,104 @@
+name: "🐛 Bug Report"
+description: "Report a bug or unexpected behavior"
+title: "[BUG] "
+labels: ["type/bug", "status/needs-triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Bug Report
+        Help us understand and fix the issue by providing detailed information.
+
+  - type: dropdown
+    id: team
+    attributes:
+      label: "Affected Component"
+      description: "Which team's code is affected?"
+      options:
+        - "Core (protocol, sync)"
+        - "ATAK (plugin, CoT)"
+        - "AI (inference, MLOps)"
+        - "Experiments (simulation)"
+        - "Unknown"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: "Severity"
+      description: "How severe is this bug?"
+      options:
+        - "Critical - Demo blocker, system crash"
+        - "High - Major feature broken"
+        - "Medium - Feature degraded but workaround exists"
+        - "Low - Minor issue, cosmetic"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Bug Description"
+      description: "Clear and concise description of the bug"
+      placeholder: "When I do X, Y happens instead of Z..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: "Steps to Reproduce"
+      description: "How can we reproduce this bug?"
+      value: |
+        1. Start the system with...
+        2. Execute command...
+        3. Observe...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Expected Behavior"
+      description: "What should happen?"
+      placeholder: "The system should..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: "Actual Behavior"
+      description: "What actually happens?"
+      placeholder: "Instead, the system..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: "Environment"
+      description: "Where does this occur?"
+      value: |
+        - OS: 
+        - HIVE Version: 
+        - Hardware (if relevant): 
+        - Network config:
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Logs / Error Messages"
+      description: "Include relevant logs or error output"
+      render: shell
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: "Workaround"
+      description: "Is there a temporary workaround?"
+      placeholder: "As a workaround, you can..."

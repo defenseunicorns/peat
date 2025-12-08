@@ -508,6 +508,11 @@ impl SyncCapable for AutomergeBackend {
                                 }
                             }
 
+                            // Clear sync state for this peer on disconnect
+                            // This ensures reconnecting peers can sync fresh instead of
+                            // failing with "no sync message to send" due to stale state
+                            coordinator_clone.clear_peer_sync_state(handler_peer_id);
+
                             // Remove from active handlers on exit
                             active_handlers_clone
                                 .write()

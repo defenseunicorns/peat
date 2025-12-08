@@ -251,11 +251,48 @@ pub struct CircuitBreakerConfig {
 #[cfg(feature = "automerge-backend")]
 impl Default for CircuitBreakerConfig {
     fn default() -> Self {
+        Self::from_env()
+    }
+}
+
+#[cfg(feature = "automerge-backend")]
+impl CircuitBreakerConfig {
+    /// Create config from environment variables with sensible defaults.
+    ///
+    /// Environment variables:
+    /// - `CIRCUIT_FAILURE_THRESHOLD`: Number of failures to trigger open (default: 5)
+    /// - `CIRCUIT_FAILURE_WINDOW_SECS`: Time window for counting failures (default: 5)
+    /// - `CIRCUIT_OPEN_TIMEOUT_SECS`: How long circuit stays open (default: 5)
+    /// - `CIRCUIT_SUCCESS_THRESHOLD`: Successes needed to close from half-open (default: 2)
+    ///
+    /// Lab environments (single machine): Use defaults or lower values (1-5s)
+    /// Production environments: Consider higher values (10-30s) for network variability
+    pub fn from_env() -> Self {
+        let failure_threshold = std::env::var("CIRCUIT_FAILURE_THRESHOLD")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(5);
+
+        let failure_window_secs = std::env::var("CIRCUIT_FAILURE_WINDOW_SECS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(5);
+
+        let open_timeout_secs = std::env::var("CIRCUIT_OPEN_TIMEOUT_SECS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(5);
+
+        let success_threshold = std::env::var("CIRCUIT_SUCCESS_THRESHOLD")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(2);
+
         Self {
-            failure_threshold: 5,
-            failure_window: Duration::from_secs(60),
-            open_timeout: Duration::from_secs(30),
-            success_threshold: 2,
+            failure_threshold,
+            failure_window: Duration::from_secs(failure_window_secs),
+            open_timeout: Duration::from_secs(open_timeout_secs),
+            success_threshold,
         }
     }
 }

@@ -98,6 +98,12 @@ hive-sim/
 ├── README.md               # This file
 ├── .env.example            # Example Ditto credentials
 │
+├── src/                    # Rust source code
+│   ├── main.rs             # Main simulation node binary
+│   └── utils/              # Utility modules
+│       ├── mod.rs          # Module exports
+│       └── time.rs         # Time utilities (now_micros, extract_timestamp_us)
+│
 ├── topologies/             # ContainerLab topology definitions
 │   ├── poc-2node.yaml      # 2-node baseline (no constraints)
 │   ├── poc-2node-constrained.yaml  # 2-node with tactical radio constraints
@@ -105,6 +111,30 @@ hive-sim/
 │
 └── scenarios/              # Shadow YAML scenarios (deprecated)
     └── *.yaml              # Old Shadow configs (kept for reference)
+```
+
+### Utils Module
+
+The `src/utils/` module provides reusable utility functions:
+
+#### `utils::time`
+
+Time-related utilities for timestamp handling:
+
+- **`now_micros() -> u128`**: Get current Unix timestamp in microseconds
+- **`extract_timestamp_us(val: &serde_json::Value) -> u128`**: Extract timestamps from various formats:
+  - Direct numeric values (u64, i64, f64)
+  - Protobuf-style `{seconds, nanos}` objects
+
+```rust
+use utils::time::{now_micros, extract_timestamp_us};
+
+// Get current time
+let timestamp = now_micros();
+
+// Extract from protobuf-style timestamp
+let json = serde_json::json!({"seconds": 1234567890, "nanos": 123456789});
+let timestamp_us = extract_timestamp_us(&json); // 1234567890123456
 ```
 
 ## Available Topologies
@@ -298,6 +328,27 @@ Ditto credentials are loaded from `.env` file via `--env-file` flag.
 **Automerge+Iroh Backend (when using `--backend automerge`):**
 - No credentials required
 - Peer discovery via static configuration or mDNS (Phase 7.3)
+
+**Circuit Breaker Configuration (Automerge backend only):**
+
+The circuit breaker prevents cascading failures when peers become unreachable. Configure via environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CIRCUIT_FAILURE_THRESHOLD` | 5 | Number of consecutive failures to trigger circuit open |
+| `CIRCUIT_FAILURE_WINDOW_SECS` | 5 | Time window for counting failures (seconds) |
+| `CIRCUIT_OPEN_TIMEOUT_SECS` | 5 | How long circuit stays open before trying half-open (seconds) |
+| `CIRCUIT_SUCCESS_THRESHOLD` | 2 | Successes needed to close circuit from half-open state |
+
+**Recommended settings by environment:**
+
+| Environment | Window | Timeout | Use Case |
+|-------------|--------|---------|----------|
+| Lab (single machine) | 2s | 2s | Fast iteration, predictable network |
+| Staging | 5s | 5s | Balanced (default) |
+| Production | 10-30s | 10-30s | Variable network, external dependencies |
+
+The topology generator (`generate-lab4-hierarchical-topology.py`) sets aggressive lab defaults (2s windows) automatically.
 
 ## Hierarchical Command Dissemination
 

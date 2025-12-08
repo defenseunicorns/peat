@@ -33,7 +33,7 @@ use crate::sync::{BackendConfig, TransportConfig};
 use crate::{Error, Result};
 use std::collections::HashMap;
 use std::sync::Arc;
-#[cfg(feature = "ditto-backend")]
+#[cfg(any(feature = "ditto-backend", feature = "automerge-backend"))]
 use std::time::Duration;
 #[cfg(feature = "ditto-backend")]
 use tokio::sync::mpsc;
@@ -41,7 +41,7 @@ use tokio::sync::mpsc;
 use tokio::time::timeout;
 #[cfg(all(feature = "automerge-backend", not(feature = "ditto-backend")))]
 #[allow(unused_imports)]
-use tracing::info;
+use tracing::{debug, info};
 #[cfg(feature = "ditto-backend")]
 use tracing::{debug, info, warn};
 
@@ -292,6 +292,118 @@ impl E2EHarness {
         self.temp_dirs.push(temp_dir);
 
         Ok(backend)
+    }
+
+    /// Immediately connect two Automerge backends
+    ///
+    /// This bypasses the background connection task's periodic interval, allowing
+    /// tests to establish connections in milliseconds instead of 1-7 seconds.
+    ///
+    /// Both backends must have been initialized with `start_sync()` called
+    /// (so the accept loop is running).
+    ///
+    /// # Returns
+    ///
+    /// Returns Ok(()) when at least one direction is connected.
+    /// Returns Err if neither side could establish a connection after retries.
+    ///
+    /// # Feature Gate
+    ///
+    /// Only available with the `automerge-backend` feature enabled.
+    #[cfg(feature = "automerge-backend")]
+    pub async fn connect_backends_now(
+        &self,
+        backend_a: &Arc<AutomergeIrohBackend>,
+        backend_b: &Arc<AutomergeIrohBackend>,
+    ) -> Result<()> {
+        // Give a tiny delay for accept loops to start
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        // Try connecting from both sides (deterministic tie-breaking means only one will succeed)
+        let (result_a, result_b) = tokio::join!(
+            backend_a.connect_to_discovered_peers_now(),
+            backend_b.connect_to_discovered_peers_now()
+        );
+
+        // Check if at least one connection was made
+        let count_a = result_a.unwrap_or(0);
+        let count_b = result_b.unwrap_or(0);
+
+        if count_a > 0 || count_b > 0 {
+            debug!(
+                "Fast connect: A made {} new, B made {} new",
+                count_a, count_b
+            );
+            return Ok(());
+        }
+
+        // Retry a few times with small delays (connection might still be establishing)
+        for i in 0..5 {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+
+            let (result_a, result_b) = tokio::join!(
+                backend_a.connect_to_discovered_peers_now(),
+                backend_b.connect_to_discovered_peers_now()
+            );
+
+            if result_a.unwrap_or(0) > 0 || result_b.unwrap_or(0) > 0 {
+                debug!("Fast connect succeeded on retry {}", i + 1);
+                return Ok(());
+            }
+
+            // Also check if they're already connected (from previous attempt)
+            let transport_a = backend_a.transport();
+            let transport_b = backend_b.transport();
+            if !transport_a.connected_peers().is_empty()
+                || !transport_b.connected_peers().is_empty()
+            {
+                debug!("Already connected on retry {}", i + 1);
+                return Ok(());
+            }
+        }
+
+        Err(Error::network_error(
+            "Failed to establish connection between backends after retries",
+            None,
+        ))
+    }
+
+    /// Wait for connection between Automerge backends with fast polling
+    ///
+    /// This uses immediate connect attempts rather than waiting for background tasks.
+    /// Typical connection time is 50-500ms instead of 1-7 seconds.
+    #[cfg(feature = "automerge-backend")]
+    pub async fn wait_for_automerge_connection(
+        &self,
+        backend_a: &Arc<AutomergeIrohBackend>,
+        backend_b: &Arc<AutomergeIrohBackend>,
+        timeout_duration: Duration,
+    ) -> Result<()> {
+        let start = std::time::Instant::now();
+
+        while start.elapsed() < timeout_duration {
+            // Try immediate connect
+            let _ = backend_a.connect_to_discovered_peers_now().await;
+            let _ = backend_b.connect_to_discovered_peers_now().await;
+
+            // Check if connected
+            let transport_a = backend_a.transport();
+            let transport_b = backend_b.transport();
+            if !transport_a.connected_peers().is_empty()
+                || !transport_b.connected_peers().is_empty()
+            {
+                info!("Connection established in {:?}", start.elapsed());
+                return Ok(());
+            }
+
+            // Small delay before retry
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+
+        Err(Error::network_error(
+            format!("Connection timeout after {:?}", timeout_duration),
+            None,
+        ))
     }
 
     /// Create a squad observer that triggers on document changes
