@@ -2,6 +2,31 @@
 
 > **Navigation Guide**: All documentation for the HIVE Protocol project, organized by category and purpose.
 
+---
+
+## 📚 User Guides (Start Here)
+
+| Guide | Audience | Description |
+|-------|----------|-------------|
+| [**Operator Guide**](guides/operator/OPERATOR_GUIDE.md) | System Admins, DevOps, Mission Operators | Installation, configuration, deployment, monitoring, troubleshooting |
+| [**Developer Guide**](guides/developer/DEVELOPER_GUIDE.md) | Software Engineers, Contributors | Architecture, API reference, extending HIVE, testing, contributing |
+
+### Quick Links by Task
+
+| I want to... | Go to... |
+|--------------|----------|
+| Deploy HIVE in production | [Operator Guide: Deployment](guides/operator/OPERATOR_GUIDE.md#5-deployment-patterns) |
+| Set up a development environment | [Developer Guide: Getting Started](guides/developer/DEVELOPER_GUIDE.md#2-getting-started) |
+| Understand the architecture | [Developer Guide: Architecture](guides/developer/DEVELOPER_GUIDE.md#3-architecture) |
+| Configure HIVE | [Operator Guide: Configuration](guides/operator/OPERATOR_GUIDE.md#4-configuration) |
+| Write tests | [Developer Guide: Testing](guides/developer/DEVELOPER_GUIDE.md#8-testing) |
+| Troubleshoot issues | [Operator Guide: Troubleshooting](guides/operator/OPERATOR_GUIDE.md#11-troubleshooting) |
+| Integrate with TAK/ATAK | [Operator Guide: TAK Integration](guides/operator/OPERATOR_GUIDE.md#9-takatak-integration) |
+| Extend HIVE with custom capabilities | [Developer Guide: Extending HIVE](guides/developer/DEVELOPER_GUIDE.md#7-extending-hive) |
+| Contribute to HIVE | [Developer Guide: Contributing](guides/developer/DEVELOPER_GUIDE.md#12-contributing) |
+
+---
+
 ## 🔍 For IP Due Diligence Reviewers
 
 **Start Here**:
@@ -88,11 +113,12 @@ Comprehensive testing strategy and implementation guides.
 
 ### By Audience
 
+- **Operators/System Admins**: [Operator Guide](guides/operator/OPERATOR_GUIDE.md) → Configuration → Troubleshooting
+- **Developers**: [Developer Guide](guides/developer/DEVELOPER_GUIDE.md) → Architecture → Testing → Contributing
 - **IP Evaluators**: IP_OVERVIEW.md → VALIDATION_RESULTS.md → patents/ → ADRs
 - **Technical Due Diligence**: IP_OVERVIEW.md → ADRs → TESTING_STRATEGY.md → DEVELOPMENT.md
 - **Architects**: ADRs → Technical Design Docs → TESTING_STRATEGY.md
-- **Developers**: DEVELOPMENT.md → TESTING_STRATEGY.md → Module docs
-- **QA/Testing**: TESTING_STRATEGY.md → E2E test docs
+- **QA/Testing**: TESTING_STRATEGY.md → [Developer Guide: Testing](guides/developer/DEVELOPER_GUIDE.md#8-testing)
 
 ### By Topic
 
@@ -189,6 +215,15 @@ When making significant changes:
 
 ---
 
-**Last Updated**: 2025-11-07
+## Documentation Planning & Maintenance
+
+| Document | Purpose |
+|----------|---------|
+| [DOCUMENTATION_PLAN.md](DOCUMENTATION_PLAN.md) | Documentation strategy, requirements, and standards |
+| [DOCUMENTATION_ISSUES.md](DOCUMENTATION_ISSUES.md) | GitHub issue templates for documentation work |
+
+---
+
+**Last Updated**: 2025-12-08
 **Maintained By**: HIVE Protocol Team
 **Questions?**: Check DEVELOPMENT.md for contribution guidelines
