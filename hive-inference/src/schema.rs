@@ -399,6 +399,7 @@ impl FromProtoTrack for TrackUpdate {
             source_model: source.sensor_id.clone(),
             model_version: source.model_version.clone(),
             timestamp,
+            latest_chipout_id: None, // Proto doesn't have chipout ID (handled separately)
         })
     }
 }

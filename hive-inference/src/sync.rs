@@ -22,7 +22,7 @@
 //! client.publish_capability(capability).await?;
 //! ```
 
-use crate::messages::{CapabilityAdvertisement, TrackUpdate};
+use crate::messages::{CapabilityAdvertisement, ChipoutDocument, TrackUpdate};
 use hive_protocol::sync::types::{Document, Query, Value};
 use hive_protocol::sync::DataSyncBackend;
 use serde::{Deserialize, Serialize};
@@ -42,6 +42,8 @@ pub mod collections {
     pub const COMMANDS: &str = "commands";
     /// Platform registrations
     pub const PLATFORMS: &str = "platforms";
+    /// Chipout images from detection triggers
+    pub const CHIPOUTS: &str = "chipouts";
 }
 
 /// Configuration for HIVE sync client
@@ -98,6 +100,8 @@ pub struct HiveSyncClient {
     tracks_published: u64,
     /// Capability advertisement counter
     capabilities_published: u64,
+    /// Chipout document counter
+    chipouts_published: u64,
 }
 
 impl HiveSyncClient {
@@ -112,6 +116,7 @@ impl HiveSyncClient {
             backend,
             tracks_published: 0,
             capabilities_published: 0,
+            chipouts_published: 0,
         }
     }
 
@@ -167,6 +172,63 @@ impl HiveSyncClient {
         );
 
         Ok(doc_id)
+    }
+
+    /// Publish a chipout document to the HIVE network
+    pub async fn publish_chipout(&mut self, chipout: &ChipoutDocument) -> anyhow::Result<String> {
+        let doc = self.chipout_to_document(chipout);
+        let doc_id = self
+            .backend
+            .document_store()
+            .upsert(collections::CHIPOUTS, doc)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to publish chipout: {}", e))?;
+
+        self.chipouts_published += 1;
+        debug!(
+            "Published chipout {} for track {} (total: {})",
+            chipout.chipout_id, chipout.track_id, self.chipouts_published
+        );
+
+        Ok(doc_id)
+    }
+
+    /// Publish multiple chipout documents in batch
+    pub async fn publish_chipouts(
+        &mut self,
+        chipouts: &[ChipoutDocument],
+    ) -> anyhow::Result<Vec<String>> {
+        let mut doc_ids = Vec::with_capacity(chipouts.len());
+        for chipout in chipouts {
+            let doc_id = self.publish_chipout(chipout).await?;
+            doc_ids.push(doc_id);
+        }
+        Ok(doc_ids)
+    }
+
+    /// Query chipouts by track ID
+    pub async fn query_chipouts_by_track(
+        &self,
+        track_id: &str,
+    ) -> anyhow::Result<Vec<ChipoutDocument>> {
+        let query = Query::Eq {
+            field: "track_id".to_string(),
+            value: Value::String(track_id.to_string()),
+        };
+
+        let docs = self
+            .backend
+            .document_store()
+            .query(collections::CHIPOUTS, &query)
+            .await
+            .map_err(|e| anyhow::anyhow!("Query failed: {}", e))?;
+
+        let chipouts: Vec<ChipoutDocument> = docs
+            .into_iter()
+            .filter_map(|doc| self.document_to_chipout(&doc).ok())
+            .collect();
+
+        Ok(chipouts)
     }
 
     /// Query tracks by source platform
@@ -239,6 +301,7 @@ impl HiveSyncClient {
         SyncStats {
             tracks_published: self.tracks_published,
             capabilities_published: self.capabilities_published,
+            chipouts_published: self.chipouts_published,
         }
     }
 
@@ -300,6 +363,14 @@ impl HiveSyncClient {
             fields.insert(
                 "attributes".to_string(),
                 serde_json::json!(track.attributes),
+            );
+        }
+
+        // Include latest chipout ID if available
+        if let Some(chipout_id) = &track.latest_chipout_id {
+            fields.insert(
+                "latest_chipout_id".to_string(),
+                serde_json::json!(chipout_id),
             );
         }
 
@@ -391,6 +462,11 @@ impl HiveSyncClient {
             })
             .unwrap_or_default();
 
+        let latest_chipout_id = doc
+            .get("latest_chipout_id")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+
         Ok(TrackUpdate {
             track_id,
             classification,
@@ -402,6 +478,7 @@ impl HiveSyncClient {
             source_model,
             model_version,
             timestamp,
+            latest_chipout_id,
         })
     }
 
@@ -431,6 +508,260 @@ impl HiveSyncClient {
         // Use platform_id as document ID (upserts update the same doc)
         Document::with_id(&cap.platform_id, fields)
     }
+
+    /// Convert ChipoutDocument to HIVE Document
+    fn chipout_to_document(&self, chipout: &ChipoutDocument) -> Document {
+        let mut fields = HashMap::new();
+
+        fields.insert(
+            "chipout_id".to_string(),
+            serde_json::json!(chipout.chipout_id),
+        );
+        fields.insert("track_id".to_string(), serde_json::json!(chipout.track_id));
+        fields.insert(
+            "timestamp".to_string(),
+            serde_json::json!(chipout.timestamp.to_rfc3339()),
+        );
+        fields.insert(
+            "source_platform".to_string(),
+            serde_json::json!(chipout.source_platform),
+        );
+
+        // Detection info
+        fields.insert(
+            "class_label".to_string(),
+            serde_json::json!(chipout.detection.class_label),
+        );
+        fields.insert(
+            "confidence".to_string(),
+            serde_json::json!(chipout.detection.confidence),
+        );
+        fields.insert(
+            "bbox".to_string(),
+            serde_json::json!(chipout.detection.bbox),
+        );
+        fields.insert(
+            "frame_size".to_string(),
+            serde_json::json!(chipout.detection.frame_size),
+        );
+        fields.insert(
+            "model_id".to_string(),
+            serde_json::json!(chipout.detection.model_id),
+        );
+        fields.insert(
+            "model_version".to_string(),
+            serde_json::json!(chipout.detection.model_version),
+        );
+
+        // Image info
+        fields.insert(
+            "image_format".to_string(),
+            serde_json::json!(chipout.image.format),
+        );
+        fields.insert(
+            "image_width".to_string(),
+            serde_json::json!(chipout.image.width),
+        );
+        fields.insert(
+            "image_height".to_string(),
+            serde_json::json!(chipout.image.height),
+        );
+        fields.insert(
+            "image_size_bytes".to_string(),
+            serde_json::json!(chipout.image.size_bytes),
+        );
+
+        if let Some(data_base64) = &chipout.image.data_base64 {
+            fields.insert(
+                "image_data_base64".to_string(),
+                serde_json::json!(data_base64),
+            );
+        }
+        if let Some(url) = &chipout.image.url {
+            fields.insert("image_url".to_string(), serde_json::json!(url));
+        }
+
+        // Trigger reason
+        fields.insert(
+            "trigger_reason".to_string(),
+            serde_json::json!(chipout.trigger_reason.to_string()),
+        );
+
+        // Attributes
+        if !chipout.attributes.is_empty() {
+            fields.insert(
+                "attributes".to_string(),
+                serde_json::json!(chipout.attributes),
+            );
+        }
+
+        // Include formation_id if configured
+        if let Some(formation_id) = &self.config.formation_id {
+            fields.insert("formation_id".to_string(), serde_json::json!(formation_id));
+        }
+
+        // Use chipout_id as document ID
+        Document::with_id(&chipout.chipout_id, fields)
+    }
+
+    /// Convert HIVE Document back to ChipoutDocument
+    fn document_to_chipout(&self, doc: &Document) -> anyhow::Result<ChipoutDocument> {
+        use crate::messages::{ChipoutDetection, ChipoutImage, ChipoutTrigger, ImageFormat};
+
+        let chipout_id = doc
+            .get("chipout_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing chipout_id"))?
+            .to_string();
+
+        let track_id = doc
+            .get("track_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing track_id"))?
+            .to_string();
+
+        let timestamp_str = doc
+            .get("timestamp")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing timestamp"))?;
+
+        let timestamp = chrono::DateTime::parse_from_rfc3339(timestamp_str)
+            .map_err(|e| anyhow::anyhow!("Invalid timestamp: {}", e))?
+            .with_timezone(&chrono::Utc);
+
+        let source_platform = doc
+            .get("source_platform")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing source_platform"))?
+            .to_string();
+
+        // Parse detection
+        let class_label = doc
+            .get("class_label")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing class_label"))?
+            .to_string();
+
+        let confidence = doc
+            .get("confidence")
+            .and_then(|v| v.as_f64())
+            .ok_or_else(|| anyhow::anyhow!("Missing confidence"))?;
+
+        let bbox: [u32; 4] = doc
+            .get("bbox")
+            .ok_or_else(|| anyhow::anyhow!("Missing bbox"))
+            .and_then(|v| {
+                serde_json::from_value(v.clone())
+                    .map_err(|e| anyhow::anyhow!("Invalid bbox: {}", e))
+            })?;
+
+        let frame_size: [u32; 2] = doc
+            .get("frame_size")
+            .ok_or_else(|| anyhow::anyhow!("Missing frame_size"))
+            .and_then(|v| {
+                serde_json::from_value(v.clone())
+                    .map_err(|e| anyhow::anyhow!("Invalid frame_size: {}", e))
+            })?;
+
+        let model_id = doc
+            .get("model_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing model_id"))?
+            .to_string();
+
+        let model_version = doc
+            .get("model_version")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing model_version"))?
+            .to_string();
+
+        let detection = ChipoutDetection {
+            class_label,
+            confidence,
+            bbox,
+            frame_size,
+            model_id,
+            model_version,
+        };
+
+        // Parse image
+        let format_str = doc
+            .get("image_format")
+            .and_then(|v| v.as_str())
+            .unwrap_or("jpeg");
+
+        let format = match format_str {
+            "png" => ImageFormat::Png,
+            _ => ImageFormat::Jpeg,
+        };
+
+        let width = doc.get("image_width").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+
+        let height = doc
+            .get("image_height")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as u32;
+
+        let size_bytes = doc
+            .get("image_size_bytes")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+
+        let data_base64 = doc
+            .get("image_data_base64")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+
+        let url = doc
+            .get("image_url")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+
+        let image = ChipoutImage {
+            format,
+            width,
+            height,
+            data_base64,
+            url,
+            size_bytes,
+        };
+
+        // Parse trigger reason
+        let trigger_str = doc
+            .get("trigger_reason")
+            .and_then(|v| v.as_str())
+            .unwrap_or("new_track");
+
+        let trigger_reason = match trigger_str {
+            "reacquire" => ChipoutTrigger::Reacquire,
+            "class_change" => ChipoutTrigger::ClassChange,
+            "high_confidence" => ChipoutTrigger::HighConfidence,
+            "periodic" => ChipoutTrigger::Periodic,
+            "manual" => ChipoutTrigger::Manual,
+            _ => ChipoutTrigger::NewTrack,
+        };
+
+        let attributes = doc
+            .get("attributes")
+            .and_then(|v| v.as_object())
+            .map(|obj| {
+                obj.iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect::<HashMap<String, serde_json::Value>>()
+            })
+            .unwrap_or_default();
+
+        Ok(ChipoutDocument {
+            chipout_id,
+            track_id,
+            timestamp,
+            source_platform,
+            detection,
+            image,
+            trigger_reason,
+            attributes,
+        })
+    }
 }
 
 /// Sync statistics
@@ -438,6 +769,7 @@ impl HiveSyncClient {
 pub struct SyncStats {
     pub tracks_published: u64,
     pub capabilities_published: u64,
+    pub chipouts_published: u64,
 }
 
 /// Connected inference pipeline with HIVE sync
@@ -506,6 +838,98 @@ where
     }
 }
 
+/// Connected inference pipeline with HIVE sync and chipout extraction
+///
+/// Extends ConnectedPipeline with automatic chipout extraction and publishing.
+pub struct ConnectedPipelineWithChipouts<D, T>
+where
+    D: crate::inference::Detector + Send + 'static,
+    T: crate::inference::Tracker + Send + 'static,
+{
+    pipeline: crate::inference::InferencePipeline<D, T>,
+    sync_client: HiveSyncClient,
+    chipout_extractor: crate::inference::ChipoutExtractor,
+}
+
+impl<D, T> ConnectedPipelineWithChipouts<D, T>
+where
+    D: crate::inference::Detector + Send + 'static,
+    T: crate::inference::Tracker + Send + 'static,
+{
+    /// Create a connected pipeline with chipout extraction
+    pub fn new(
+        pipeline: crate::inference::InferencePipeline<D, T>,
+        sync_client: HiveSyncClient,
+        chipout_extractor: crate::inference::ChipoutExtractor,
+    ) -> Self {
+        Self {
+            pipeline,
+            sync_client,
+            chipout_extractor,
+        }
+    }
+
+    /// Process a frame, extract chipouts, and publish all results to HIVE
+    pub async fn process_and_publish(
+        &mut self,
+        frame: crate::inference::VideoFrame,
+    ) -> anyhow::Result<PipelineOutputWithChipouts> {
+        // Process frame through inference pipeline
+        let output = self.pipeline.process(&frame).await?;
+
+        // Extract chipouts based on trigger conditions
+        let chipouts = self
+            .chipout_extractor
+            .evaluate_and_extract(&output.tracks, &frame);
+
+        // Publish track updates to HIVE
+        if !output.track_updates.is_empty() {
+            self.sync_client
+                .publish_track_updates(&output.track_updates)
+                .await?;
+        }
+
+        // Publish chipouts to HIVE
+        if !chipouts.is_empty() {
+            self.sync_client.publish_chipouts(&chipouts).await?;
+        }
+
+        Ok(PipelineOutputWithChipouts {
+            pipeline_output: output,
+            chipouts,
+        })
+    }
+
+    /// Get sync statistics
+    pub fn sync_stats(&self) -> SyncStats {
+        self.sync_client.stats()
+    }
+
+    /// Get reference to underlying pipeline
+    pub fn pipeline(&self) -> &crate::inference::InferencePipeline<D, T> {
+        &self.pipeline
+    }
+
+    /// Get mutable reference to chipout extractor
+    pub fn chipout_extractor_mut(&mut self) -> &mut crate::inference::ChipoutExtractor {
+        &mut self.chipout_extractor
+    }
+
+    /// Get mutable reference to sync client
+    pub fn sync_client_mut(&mut self) -> &mut HiveSyncClient {
+        &mut self.sync_client
+    }
+}
+
+/// Pipeline output with chipouts
+#[derive(Debug, Clone)]
+pub struct PipelineOutputWithChipouts {
+    /// Standard pipeline output (detections, tracks, track updates)
+    pub pipeline_output: crate::inference::PipelineOutput,
+    /// Chipouts extracted from this frame
+    pub chipouts: Vec<ChipoutDocument>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -532,6 +956,7 @@ mod tests {
             source_model: "Alpha-3".to_string(),
             model_version: "1.3.0".to_string(),
             timestamp: Utc::now(),
+            latest_chipout_id: None,
         }
     }
 
