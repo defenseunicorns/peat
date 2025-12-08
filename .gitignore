@@ -25,6 +25,7 @@ cap-protocol/.ditto*
 
 # Claude Code
 CLAUDE.md
+.mcp.json
 
 # Testing
 coverage/
