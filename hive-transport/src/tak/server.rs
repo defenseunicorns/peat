@@ -1,7 +1,7 @@
 //! TAK Server TCP/SSL transport implementation
 
 use async_trait::async_trait;
-use hive_protocol::cot::{CotEncoder, CotEvent, CotEventBuilder, CotType};
+use hive_protocol::cot::{CotEncoder, CotEvent, CotEventBuilder, CotPoint, CotType};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -102,10 +102,13 @@ impl TakServerTransport {
             .unwrap_or("HIVE-BRIDGE");
 
         let uid = format!("HIVE-{}", uuid::Uuid::new_v4());
+        // Default position at 0,0 for presence announcement
+        // Real position would come from configuration or GPS
         let presence = CotEventBuilder::new()
             .uid(&uid)
             .cot_type(CotType::new("a-f-G-U-C"))
             .how("m-g")
+            .point(CotPoint::new(0.0, 0.0))
             .build()
             .map_err(|e| {
                 TakError::EncodingError(format!("Failed to build presence event: {}", e))
@@ -128,6 +131,10 @@ impl TakServerTransport {
 
         // Frame the message based on protocol version
         let frame = match self.config.protocol.version {
+            TakProtocolVersion::RawXml => {
+                // Raw XML, no framing - for FreeTAKServer
+                payload.to_vec()
+            }
             TakProtocolVersion::XmlTcp => {
                 // XML framing: [0xBF][0x00][0xBF][payload]
                 let mut frame = Vec::with_capacity(3 + payload.len());

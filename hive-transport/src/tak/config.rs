@@ -136,6 +136,11 @@ impl Default for ProtocolConfig {
 /// TAK Protocol version selection
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum TakProtocolVersion {
+    /// Raw XML over TCP (no framing)
+    /// Payload: <xml_payload>
+    /// Use for: FreeTAKServer, simple integrations
+    RawXml,
+
     /// CoT XML over TCP (legacy, Version 0)
     /// Header: 0xbf 0x00 0xbf <xml_payload>
     /// Use for: debugging, legacy TAK Server compatibility

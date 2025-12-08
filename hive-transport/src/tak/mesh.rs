@@ -164,6 +164,10 @@ impl MeshSaTransport {
     /// Format: [0xBF][0x01][0xBF][varint_len][payload] for Protobuf
     fn frame_mesh_sa(&self, payload: &[u8]) -> Vec<u8> {
         match self.config.protocol.version {
+            TakProtocolVersion::RawXml => {
+                // Raw XML, no framing
+                payload.to_vec()
+            }
             TakProtocolVersion::XmlTcp => {
                 // XML framing
                 let mut frame = Vec::with_capacity(3 + payload.len());

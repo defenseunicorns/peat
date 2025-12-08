@@ -2675,6 +2675,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "hive-tak-bridge"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "clap",
+ "hex",
+ "hive-protocol",
+ "hive-transport",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "hive-transport"
 version = "0.1.0"
 dependencies = [
