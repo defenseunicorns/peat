@@ -239,6 +239,7 @@ async fn test_capability_sync_between_nodes() {
 async fn test_detection_to_track_flow() {
     use hive_inference::inference::BoundingBox;
     use hive_inference::inference::GroundTruthObject;
+    use hive_inference::inference::SimulatedDetectorConfig;
 
     let _ = tracing_subscriber::fmt()
         .with_env_filter("info")
@@ -248,7 +249,13 @@ async fn test_detection_to_track_flow() {
     println!("=== Test: Detection → Track Flow ===");
 
     // Create inference pipeline with simulated detector/tracker
-    let mut detector = SimulatedDetector::default_config();
+    // Use high recall config to ensure deterministic detection
+    let detector_config = SimulatedDetectorConfig {
+        recall: 1.0,              // Always detect (deterministic for test)
+        false_positive_rate: 0.0, // No false positives
+        ..Default::default()
+    };
+    let mut detector = SimulatedDetector::new(detector_config);
 
     // Add ground truth objects for the detector to find
     // GroundTruthObject::new(id, bbox, class_label, class_id)
