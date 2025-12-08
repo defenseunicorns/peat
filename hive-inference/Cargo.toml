@@ -35,6 +35,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rand = "0.9"
 num_cpus = "1"
 
+# Hash verification for model downloads
+sha2 = "0.10"
+
 # Video capture (GStreamer) - optional for environments without GStreamer
 gstreamer = { version = "0.23", optional = true }
 gstreamer-app = { version = "0.23", optional = true }
@@ -72,6 +75,7 @@ edge-node = ["video-capture", "onnx-inference"]
 [dev-dependencies]
 hex = "0.4.3"
 tokio = { version = "1", features = ["full", "test-util"] }
+tempfile = "3.10"
 
 # Examples with feature requirements
 [[example]]
