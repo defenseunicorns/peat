@@ -68,6 +68,7 @@
 //! }
 //! ```
 
+mod chipout;
 mod detector;
 mod harness;
 mod jetson;
@@ -91,6 +92,9 @@ pub use metrics::{InferenceMetrics, LatencyStats, MetricsSummary};
 pub use pipeline::{InferencePipeline, PipelineConfig, PipelineOutput};
 pub use tracker::{SimulatedTracker, Track, TrackState, Tracker, TrackerConfig, TrackerStats};
 pub use types::{BoundingBox, Classification, FrameMetadata, VideoFrame};
+
+// Chipout extraction
+pub use chipout::ChipoutExtractor;
 
 // Jetson-specific
 pub use jetson::{JetsonInfo, JetsonMetrics, JetsonStats};
