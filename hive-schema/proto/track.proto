@@ -1,0 +1,198 @@
+// Track definitions for CAP Protocol
+// Version: 1.0.0
+//
+// Tracks represent observed entities in the environment (ISR products).
+// These are the outputs of sensors, AI models, and human observers.
+// Tracks flow upward through the hierarchy for aggregation and fusion.
+
+syntax = "proto3";
+
+package cap.track.v1;
+
+import "common.proto";
+
+// ============================================================================
+// Track (ISR Product)
+// ============================================================================
+
+// Track represents an observed entity in the environment
+//
+// This is a generic ISR product that can represent anything being tracked:
+// persons, vehicles, aircraft, vessels, etc. The source can be any sensor,
+// AI model, or human observer.
+message Track {
+  // Unique track identifier (e.g., "TRK-001")
+  string track_id = 1;
+
+  // Classification of the tracked entity
+  string classification = 2;
+
+  // Confidence in the classification (0.0 - 1.0)
+  float confidence = 3;
+
+  // Current position estimate
+  TrackPosition position = 4;
+
+  // Velocity estimate (optional)
+  Velocity velocity = 5;
+
+  // Track state
+  TrackState state = 6;
+
+  // Source information
+  TrackSource source = 7;
+
+  // Additional attributes (JSON-encoded for extensibility)
+  // e.g., {"color": "red", "size": "large", "armed": true}
+  string attributes_json = 8;
+
+  // First observation timestamp
+  common.v1.Timestamp first_seen = 9;
+
+  // Most recent observation timestamp
+  common.v1.Timestamp last_seen = 10;
+
+  // Number of observations contributing to this track
+  uint32 observation_count = 11;
+}
+
+// Track position with uncertainty
+message TrackPosition {
+  // Latitude in degrees
+  double latitude = 1;
+
+  // Longitude in degrees
+  double longitude = 2;
+
+  // Altitude/elevation in meters (optional)
+  float altitude = 3;
+
+  // Circular Error Probable in meters (horizontal accuracy)
+  float cep_m = 4;
+
+  // Vertical error in meters (optional)
+  float vertical_error_m = 5;
+}
+
+// Velocity vector
+message Velocity {
+  // Bearing/heading in degrees (0-360, 0 = North)
+  float bearing = 1;
+
+  // Speed in meters per second
+  float speed_mps = 2;
+
+  // Vertical speed in m/s (positive = ascending)
+  float vertical_speed_mps = 3;
+}
+
+// Track state
+enum TrackState {
+  TRACK_STATE_UNSPECIFIED = 0;
+  TRACK_STATE_TENTATIVE = 1;    // New track, not yet confirmed
+  TRACK_STATE_CONFIRMED = 2;    // Track confirmed with multiple observations
+  TRACK_STATE_LOST = 3;         // Track lost (no recent observations)
+  TRACK_STATE_DROPPED = 4;      // Track dropped (stale, no longer tracked)
+}
+
+// Track source information
+message TrackSource {
+  // Platform that produced this track
+  string platform_id = 1;
+
+  // Sensor or capability that detected the entity
+  string sensor_id = 2;
+
+  // Model/algorithm version (for AI sources)
+  string model_version = 3;
+
+  // Source type
+  SourceType source_type = 4;
+}
+
+// Type of track source
+enum SourceType {
+  SOURCE_TYPE_UNSPECIFIED = 0;
+  SOURCE_TYPE_SENSOR = 1;       // Raw sensor (radar, camera, etc.)
+  SOURCE_TYPE_AI_MODEL = 2;     // AI/ML model processing
+  SOURCE_TYPE_HUMAN = 3;        // Human observer
+  SOURCE_TYPE_FUSED = 4;        // Fused from multiple sources
+}
+
+// ============================================================================
+// Track Update (Upward Flow Message)
+// ============================================================================
+
+// Track update message - flows upward from platforms
+//
+// Used to report new tracks, update existing tracks, or report track drops.
+// This is the primary ISR product message.
+message TrackUpdate {
+  // Update type
+  UpdateType update_type = 1;
+
+  // The track being reported/updated
+  Track track = 2;
+
+  // Previous track ID (for track merges)
+  string previous_track_id = 3;
+
+  // Timestamp of this update
+  common.v1.Timestamp timestamp = 4;
+}
+
+// Type of track update
+enum UpdateType {
+  UPDATE_TYPE_UNSPECIFIED = 0;
+  UPDATE_TYPE_NEW = 1;          // New track detected
+  UPDATE_TYPE_UPDATE = 2;       // Existing track updated
+  UPDATE_TYPE_DROP = 3;         // Track dropped
+  UPDATE_TYPE_MERGE = 4;        // Tracks merged (previous_track_id -> track_id)
+  UPDATE_TYPE_SPLIT = 5;        // Track split (track_id spawned from previous_track_id)
+}
+
+// ============================================================================
+// Track Query
+// ============================================================================
+
+// Query for tracks
+message TrackQuery {
+  // Filter by classification
+  repeated string classifications = 1;
+
+  // Filter by minimum confidence
+  float min_confidence = 2;
+
+  // Filter by geographic area (bounding box)
+  BoundingBox area = 3;
+
+  // Filter by state
+  repeated TrackState states = 4;
+
+  // Filter by source platform
+  repeated string source_platforms = 5;
+
+  // Maximum age in seconds (tracks older than this are excluded)
+  uint32 max_age_seconds = 6;
+}
+
+// Geographic bounding box
+message BoundingBox {
+  // Southwest corner
+  common.v1.Position southwest = 1;
+
+  // Northeast corner
+  common.v1.Position northeast = 2;
+}
+
+// Track query response
+message TrackResponse {
+  // Matching tracks
+  repeated Track tracks = 1;
+
+  // Total count
+  uint32 total_count = 2;
+
+  // Query timestamp
+  common.v1.Timestamp as_of = 3;
+}
