@@ -40,6 +40,9 @@ pub struct TrackUpdate {
     pub model_version: String,
     /// Timestamp of the observation
     pub timestamp: DateTime<Utc>,
+    /// Latest chipout ID for this track (if available)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latest_chipout_id: Option<String>,
 }
 
 /// Geographic position with circular error probable
@@ -483,6 +486,149 @@ pub enum TrackStatus {
 }
 
 // ============================================================================
+// Chipout Messages (Detection Image Extraction)
+// ============================================================================
+
+/// Chipout document - cropped detection image for analysis and storage
+///
+/// A chipout is extracted from a video frame when specific detection triggers
+/// occur (new track, reacquisition, high confidence, etc.). Chipouts are
+/// published to HIVE for consumption by ATAK and TAK Server.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ChipoutDocument {
+    /// Unique chipout identifier (format: "CHIP-{track_id}-{timestamp}")
+    pub chipout_id: String,
+    /// Associated track ID
+    pub track_id: String,
+    /// Timestamp of the chipout extraction
+    pub timestamp: DateTime<Utc>,
+    /// Source platform ID (sensor platform)
+    pub source_platform: String,
+    /// Detection information
+    pub detection: ChipoutDetection,
+    /// Image data
+    pub image: ChipoutImage,
+    /// Reason this chipout was triggered
+    pub trigger_reason: ChipoutTrigger,
+    /// Additional attributes (e.g., jacket_color, has_backpack)
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub attributes: HashMap<String, serde_json::Value>,
+}
+
+/// Detection information for a chipout
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ChipoutDetection {
+    /// Classification label (e.g., "person", "vehicle")
+    pub class_label: String,
+    /// Confidence score (0.0 - 1.0)
+    pub confidence: f64,
+    /// Bounding box in pixels [x, y, width, height]
+    pub bbox: [u32; 4],
+    /// Original frame dimensions [width, height]
+    pub frame_size: [u32; 2],
+    /// Model that produced this detection
+    pub model_id: String,
+    /// Model version
+    pub model_version: String,
+}
+
+/// Image data for a chipout
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ChipoutImage {
+    /// Image format (jpeg, png)
+    pub format: ImageFormat,
+    /// Image width in pixels
+    pub width: u32,
+    /// Image height in pixels
+    pub height: u32,
+    /// Base64-encoded image data (for inline storage)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_base64: Option<String>,
+    /// URL reference to externally stored image
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    /// Size of the image data in bytes
+    pub size_bytes: u64,
+}
+
+/// Image format for chipouts
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "lowercase")]
+pub enum ImageFormat {
+    /// JPEG format (lossy, smaller)
+    Jpeg,
+    /// PNG format (lossless, larger)
+    Png,
+}
+
+/// Trigger reason for chipout extraction
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum ChipoutTrigger {
+    /// First detection of a new track ID
+    NewTrack,
+    /// Track lost and found again
+    Reacquire,
+    /// Classification changed (e.g., unknown → person)
+    ClassChange,
+    /// Confidence crosses threshold
+    HighConfidence,
+    /// Periodic capture for active tracks
+    Periodic,
+    /// Manual/on-demand capture
+    Manual,
+}
+
+/// Configuration for chipout extraction
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChipoutConfig {
+    /// Enable chipout extraction
+    pub enabled: bool,
+    /// Minimum confidence threshold to trigger chipout
+    pub min_confidence: f64,
+    /// Class labels to extract chipouts for (empty = all)
+    pub class_filter: Vec<String>,
+    /// Padding around bounding box (fraction of bbox size, e.g., 0.1 = 10%)
+    pub bbox_padding: f32,
+    /// Maximum chipout width (will resize if larger)
+    pub max_width: u32,
+    /// Maximum chipout height (will resize if larger)
+    pub max_height: u32,
+    /// JPEG quality (0-100) when encoding
+    pub jpeg_quality: u8,
+    /// Image format for chipouts
+    pub format: ImageFormat,
+    /// Periodic capture interval in seconds (0 = disabled)
+    pub periodic_interval_secs: u64,
+    /// Whether to include full frame as context
+    pub include_full_frame: bool,
+    /// Enabled triggers
+    pub triggers: Vec<ChipoutTrigger>,
+}
+
+impl Default for ChipoutConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            min_confidence: 0.8,
+            class_filter: vec!["person".to_string(), "vehicle".to_string()],
+            bbox_padding: 0.1,
+            max_width: 640,
+            max_height: 480,
+            jpeg_quality: 85,
+            format: ImageFormat::Jpeg,
+            periodic_interval_secs: 0,
+            include_full_frame: false,
+            triggers: vec![
+                ChipoutTrigger::NewTrack,
+                ChipoutTrigger::Reacquire,
+                ChipoutTrigger::HighConfidence,
+            ],
+        }
+    }
+}
+
+// ============================================================================
 // Constructors and Helpers
 // ============================================================================
 
@@ -508,12 +654,19 @@ impl TrackUpdate {
             source_model: source_model.into(),
             model_version: model_version.into(),
             timestamp: Utc::now(),
+            latest_chipout_id: None,
         }
     }
 
     /// Set velocity
     pub fn with_velocity(mut self, velocity: Velocity) -> Self {
         self.velocity = Some(velocity);
+        self
+    }
+
+    /// Set latest chipout ID
+    pub fn with_chipout_id(mut self, chipout_id: impl Into<String>) -> Self {
+        self.latest_chipout_id = Some(chipout_id.into());
         self
     }
 
@@ -786,6 +939,121 @@ impl HandoffMessage {
     }
 }
 
+impl ChipoutDocument {
+    /// Create a new chipout document
+    pub fn new(
+        track_id: impl Into<String>,
+        source_platform: impl Into<String>,
+        detection: ChipoutDetection,
+        image: ChipoutImage,
+        trigger_reason: ChipoutTrigger,
+    ) -> Self {
+        let track_id = track_id.into();
+        let timestamp = Utc::now();
+        let chipout_id = format!("CHIP-{}-{}", track_id, timestamp.timestamp_millis());
+
+        Self {
+            chipout_id,
+            track_id,
+            timestamp,
+            source_platform: source_platform.into(),
+            detection,
+            image,
+            trigger_reason,
+            attributes: HashMap::new(),
+        }
+    }
+
+    /// Add an attribute
+    pub fn with_attribute(
+        mut self,
+        key: impl Into<String>,
+        value: impl Into<serde_json::Value>,
+    ) -> Self {
+        self.attributes.insert(key.into(), value.into());
+        self
+    }
+}
+
+impl ChipoutDetection {
+    /// Create a new chipout detection
+    pub fn new(
+        class_label: impl Into<String>,
+        confidence: f64,
+        bbox: [u32; 4],
+        frame_size: [u32; 2],
+        model_id: impl Into<String>,
+        model_version: impl Into<String>,
+    ) -> Self {
+        Self {
+            class_label: class_label.into(),
+            confidence,
+            bbox,
+            frame_size,
+            model_id: model_id.into(),
+            model_version: model_version.into(),
+        }
+    }
+}
+
+impl ChipoutImage {
+    /// Create a new chipout image with inline base64 data
+    pub fn from_base64(
+        format: ImageFormat,
+        width: u32,
+        height: u32,
+        data_base64: impl Into<String>,
+    ) -> Self {
+        let data = data_base64.into();
+        let size_bytes = data.len() as u64;
+        Self {
+            format,
+            width,
+            height,
+            data_base64: Some(data),
+            url: None,
+            size_bytes,
+        }
+    }
+
+    /// Create a chipout image with URL reference
+    pub fn from_url(format: ImageFormat, width: u32, height: u32, url: impl Into<String>) -> Self {
+        Self {
+            format,
+            width,
+            height,
+            data_base64: None,
+            url: Some(url.into()),
+            size_bytes: 0, // Unknown until fetched
+        }
+    }
+
+    /// Create an empty placeholder image
+    pub fn placeholder(width: u32, height: u32) -> Self {
+        Self {
+            format: ImageFormat::Jpeg,
+            width,
+            height,
+            data_base64: None,
+            url: None,
+            size_bytes: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ChipoutTrigger {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NewTrack => write!(f, "new_track"),
+            Self::Reacquire => write!(f, "reacquire"),
+            Self::ClassChange => write!(f, "class_change"),
+            Self::HighConfidence => write!(f, "high_confidence"),
+            Self::Periodic => write!(f, "periodic"),
+            Self::Manual => write!(f, "manual"),
+        }
+    }
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -970,5 +1238,78 @@ mod tests {
         let vel = Velocity::new(45.0, 1.2);
         assert_eq!(vel.bearing, 45.0);
         assert_eq!(vel.speed_mps, 1.2);
+    }
+
+    #[test]
+    fn test_chipout_document_json_roundtrip() {
+        let detection = ChipoutDetection::new(
+            "person",
+            0.92,
+            [100, 200, 150, 300],
+            [1920, 1080],
+            "yolov8n",
+            "1.0.0",
+        );
+
+        let image = ChipoutImage::from_base64(ImageFormat::Jpeg, 150, 300, "base64encodeddata");
+
+        let chipout = ChipoutDocument::new(
+            "TRACK-001",
+            "Alpha-3",
+            detection,
+            image,
+            ChipoutTrigger::NewTrack,
+        )
+        .with_attribute("jacket_color", "blue")
+        .with_attribute("has_backpack", true);
+
+        let json = serde_json::to_string_pretty(&chipout).unwrap();
+        let parsed: ChipoutDocument = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(chipout.track_id, parsed.track_id);
+        assert_eq!(chipout.source_platform, parsed.source_platform);
+        assert_eq!(chipout.detection.class_label, parsed.detection.class_label);
+        assert_eq!(chipout.detection.confidence, parsed.detection.confidence);
+        assert_eq!(chipout.image.format, parsed.image.format);
+        assert_eq!(chipout.trigger_reason, parsed.trigger_reason);
+        assert_eq!(
+            chipout.attributes.get("jacket_color"),
+            parsed.attributes.get("jacket_color")
+        );
+    }
+
+    #[test]
+    fn test_chipout_trigger_serialization() {
+        assert_eq!(
+            serde_json::to_string(&ChipoutTrigger::NewTrack).unwrap(),
+            "\"new_track\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ChipoutTrigger::Reacquire).unwrap(),
+            "\"reacquire\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ChipoutTrigger::HighConfidence).unwrap(),
+            "\"high_confidence\""
+        );
+    }
+
+    #[test]
+    fn test_image_format_serialization() {
+        assert_eq!(
+            serde_json::to_string(&ImageFormat::Jpeg).unwrap(),
+            "\"jpeg\""
+        );
+        assert_eq!(serde_json::to_string(&ImageFormat::Png).unwrap(), "\"png\"");
+    }
+
+    #[test]
+    fn test_chipout_config_default() {
+        let config = ChipoutConfig::default();
+        assert!(config.enabled);
+        assert_eq!(config.min_confidence, 0.8);
+        assert_eq!(config.class_filter, vec!["person", "vehicle"]);
+        assert_eq!(config.format, ImageFormat::Jpeg);
+        assert!(config.triggers.contains(&ChipoutTrigger::NewTrack));
     }
 }
