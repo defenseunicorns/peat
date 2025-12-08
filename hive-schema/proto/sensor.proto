@@ -1,0 +1,242 @@
+// Sensor definitions for CAP Protocol
+// Version: 1.0.0
+//
+// This module defines sensor specifications including mount types, orientation,
+// field of view, and gimbal capabilities. Sensors can be fixed (static FOV) or
+// articulated (PTZ, gimbal) with varying degrees of freedom.
+
+syntax = "proto3";
+
+package cap.sensor.v1;
+
+import "common.proto";
+
+// ============================================================================
+// Sensor Mount Types
+// ============================================================================
+
+// Type of sensor mount determining articulation capabilities
+enum SensorMountType {
+  SENSOR_MOUNT_TYPE_UNSPECIFIED = 0;
+
+  // Fixed mount with static field of view relative to platform
+  // Examples: body-mounted camera, fixed radar array
+  SENSOR_MOUNT_TYPE_FIXED = 1;
+
+  // Pan-Tilt-Zoom capable mount (typically 2-3 DOF)
+  // Examples: security cameras, observation posts
+  SENSOR_MOUNT_TYPE_PTZ = 2;
+
+  // Full gimbal mount (typically 2-3 DOF with stabilization)
+  // Examples: UAV camera gimbals, aircraft targeting pods
+  SENSOR_MOUNT_TYPE_GIMBAL = 3;
+
+  // Turret mount (typically 1-2 DOF, heavier duty)
+  // Examples: vehicle-mounted sensors, naval systems
+  SENSOR_MOUNT_TYPE_TURRET = 4;
+}
+
+// ============================================================================
+// Sensor Modality
+// ============================================================================
+
+// Sensor modality / imaging type
+enum SensorModality {
+  SENSOR_MODALITY_UNSPECIFIED = 0;
+
+  // Electro-Optical (visible light)
+  SENSOR_MODALITY_EO = 1;
+
+  // Infrared / Thermal (general)
+  SENSOR_MODALITY_IR = 2;
+
+  // Mid-Wave Infrared (3-5 micron)
+  SENSOR_MODALITY_MWIR = 3;
+
+  // Long-Wave Infrared (8-14 micron)
+  SENSOR_MODALITY_LWIR = 4;
+
+  // Radar (active RF)
+  SENSOR_MODALITY_RADAR = 5;
+
+  // LiDAR (laser scanning)
+  SENSOR_MODALITY_LIDAR = 6;
+
+  // Synthetic Aperture Radar
+  SENSOR_MODALITY_SAR = 7;
+
+  // Multi-spectral / Hyperspectral
+  SENSOR_MODALITY_MULTISPECTRAL = 8;
+
+  // Acoustic / Sonar
+  SENSOR_MODALITY_ACOUSTIC = 9;
+}
+
+// ============================================================================
+// Orientation and Field of View
+// ============================================================================
+
+// Sensor orientation relative to platform body frame
+//
+// Uses standard aerospace convention:
+// - Bearing: 0 = forward (nose), 90 = right, 180 = aft, 270 = left
+// - Elevation: 0 = level, positive = up, negative = down
+// - Roll: 0 = upright, positive = clockwise when looking forward
+message SensorOrientation {
+  // Bearing offset from platform heading (degrees, 0-360)
+  // 0 = forward, 90 = starboard/right, 180 = aft, 270 = port/left
+  float bearing_offset_deg = 1;
+
+  // Elevation offset from platform level (degrees, -90 to +90)
+  // 0 = level with platform, positive = above horizon, negative = below
+  float elevation_offset_deg = 2;
+
+  // Roll offset (degrees, -180 to +180)
+  // 0 = sensor upright, positive = clockwise rotation
+  float roll_offset_deg = 3;
+}
+
+// Sensor field of view specification
+message FieldOfView {
+  // Horizontal field of view (degrees)
+  // Typical values: 60-90 for wide angle, 10-30 for telephoto
+  float horizontal_deg = 1;
+
+  // Vertical field of view (degrees)
+  // Usually determined by aspect ratio: vertical = horizontal * (height/width)
+  float vertical_deg = 2;
+
+  // Diagonal field of view (degrees, optional)
+  // Can be computed from H/V FOV and aspect ratio
+  float diagonal_deg = 3;
+
+  // Maximum detection range (meters, optional)
+  // Depends on target size and environmental conditions
+  float max_range_m = 4;
+}
+
+// ============================================================================
+// Gimbal / PTZ Capabilities
+// ============================================================================
+
+// Articulation limits for PTZ, gimbal, or turret mounts
+message GimbalLimits {
+  // Pan range (degrees from center)
+  // Continuous rotation: -180 to +180 or 0 to 360
+  float pan_min_deg = 1;
+  float pan_max_deg = 2;
+
+  // Tilt range (degrees from level)
+  // Negative = down, positive = up
+  float tilt_min_deg = 3;
+  float tilt_max_deg = 4;
+
+  // Roll range (degrees, for 3-axis gimbals)
+  float roll_min_deg = 5;
+  float roll_max_deg = 6;
+
+  // Zoom range (multiplier, 1.0 = no zoom)
+  float zoom_min = 7;
+  float zoom_max = 8;
+
+  // Slew rates (degrees per second)
+  float pan_rate_max = 9;
+  float tilt_rate_max = 10;
+}
+
+// Current gimbal/PTZ state
+message GimbalState {
+  // Current pan position (degrees from center/forward)
+  float pan_deg = 1;
+
+  // Current tilt position (degrees from level)
+  float tilt_deg = 2;
+
+  // Current roll position (degrees, for 3-axis gimbals)
+  float roll_deg = 3;
+
+  // Current zoom level (multiplier)
+  float zoom = 4;
+
+  // Whether gimbal is actively tracking a target
+  bool tracking = 5;
+
+  // Target being tracked (if tracking == true)
+  string tracked_target_id = 6;
+}
+
+// ============================================================================
+// Complete Sensor Specification
+// ============================================================================
+
+// Complete sensor specification combining mount, orientation, FOV, and state
+message SensorSpec {
+  // Unique sensor identifier within the platform
+  // Format: lowercase alphanumeric with hyphens, e.g., "eo-main", "ir-turret"
+  string sensor_id = 1;
+
+  // Human-readable sensor name
+  // e.g., "Main Electro-Optical Camera", "Forward-Looking IR"
+  string name = 2;
+
+  // Mount type determining articulation capabilities
+  SensorMountType mount_type = 3;
+
+  // Base orientation relative to platform body frame
+  // For fixed mounts: the permanent orientation
+  // For articulated mounts: the "home" or default position
+  SensorOrientation base_orientation = 4;
+
+  // Field of view at 1x zoom
+  FieldOfView field_of_view = 5;
+
+  // Sensor modality (EO, IR, radar, etc.)
+  SensorModality modality = 6;
+
+  // Resolution (pixels)
+  uint32 resolution_width = 7;
+  uint32 resolution_height = 8;
+
+  // Frame rate (frames per second)
+  float frame_rate_fps = 9;
+
+  // Articulation limits (only for PTZ/gimbal/turret mounts)
+  // Should be null/empty for FIXED mount type
+  GimbalLimits gimbal_limits = 10;
+
+  // Current gimbal state (only for PTZ/gimbal/turret mounts)
+  // Should be null/empty for FIXED mount type
+  GimbalState current_state = 11;
+
+  // Timestamp of last state update
+  common.v1.Timestamp updated_at = 12;
+}
+
+// ============================================================================
+// Sensor Events
+// ============================================================================
+
+// Sensor status for health monitoring
+enum SensorStatus {
+  SENSOR_STATUS_UNSPECIFIED = 0;
+  SENSOR_STATUS_OPERATIONAL = 1;    // Normal operation
+  SENSOR_STATUS_DEGRADED = 2;       // Reduced capability
+  SENSOR_STATUS_CALIBRATING = 3;    // Calibration in progress
+  SENSOR_STATUS_STOWED = 4;         // Gimbal stowed/protected
+  SENSOR_STATUS_OFFLINE = 5;        // Not available
+}
+
+// Sensor state update message (flows upward with capability advertisements)
+message SensorStateUpdate {
+  // Platform this sensor belongs to
+  string platform_id = 1;
+
+  // Sensor specification with current state
+  SensorSpec sensor = 2;
+
+  // Current operational status
+  SensorStatus status = 3;
+
+  // Timestamp of this update
+  common.v1.Timestamp timestamp = 4;
+}
