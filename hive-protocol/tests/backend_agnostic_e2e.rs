@@ -383,10 +383,19 @@ async fn test_automerge_three_node_mesh() {
         .connect_peer(&peer_info_2)
         .await
         .expect("Should connect backend1 to backend2");
+
+    // Allow connection to stabilize before next connection attempt
+    // This prevents race conditions in CI environments with limited resources
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
     transport1
         .connect_peer(&peer_info_3)
         .await
         .expect("Should connect backend1 to backend3");
+
+    // Allow connection to stabilize
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
     transport2
         .connect_peer(&peer_info_3)
         .await
