@@ -682,7 +682,7 @@ mod tests {
         let p2 = (33.7759, -84.3958); // Due north
 
         let brg = bearing(p1, p2);
-        assert!(brg < 5.0 || brg > 355.0); // Should be ~0 (North)
+        assert!(!(5.0..=355.0).contains(&brg)); // Should be ~0 (North)
     }
 
     #[test]

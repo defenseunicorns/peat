@@ -11,7 +11,7 @@
 //! 4. Publishes position updates as TrackUpdate messages
 //! 5. Responds to simulated mission commands
 
-use hive_inference::{MissionCommand, MovementMode, PatrolPattern, UgvClient, UgvConfig, UgvState};
+use hive_inference::{MissionCommand, PatrolPattern, UgvClient, UgvConfig};
 use std::time::Duration;
 use tracing::{info, Level};
 
@@ -76,7 +76,7 @@ fn main() {
 
         // Log position every 2 seconds
         if elapsed - last_position_log >= Duration::from_secs(2) {
-            let track = ugv.get_position_update();
+            let _track = ugv.get_position_update();
             let (lat, lon) = ugv.position();
             info!(
                 "[{:>5.1}s] {} | Pos: ({:.5}, {:.5}) | Heading: {:.1}° | Battery: {:.0}%",
