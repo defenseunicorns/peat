@@ -21,14 +21,19 @@
 
 use anyhow::Result;
 use clap::Parser;
+use futures::StreamExt;
 use hive_protocol::cot::{
-    types::CapabilityInfo, CapabilityAdvertisement, OperationalStatus, Position, TrackUpdate,
+    types::CapabilityInfo, CapabilityAdvertisement, MissionTask, OperationalStatus, Position,
+    TrackUpdate,
 };
 use hive_protocol::network::IrohTransport;
 use hive_protocol::storage::{AutomergeBackend, AutomergeStore, StorageBackend};
 use hive_transport::tak::bridge::{BridgeConfig, HiveMessage, HiveTakBridge, PublishResult};
 use hive_transport::tak::server::TakServerTransport;
-use hive_transport::tak::{TakProtocolVersion, TakTransport, TakTransportConfig, TakTransportMode};
+use hive_transport::tak::{
+    CotEventStream, CotFilter, TakProtocolVersion, TakTransport, TakTransportConfig,
+    TakTransportMode,
+};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -171,6 +176,23 @@ async fn main() -> Result<()> {
         }
     }
 
+    // Subscribe to mission CoT events from TAK Server (do this before creating bridge)
+    // Filter for mission-type events: t-x-m-c-*
+    let mission_filter = CotFilter::all().with_type_prefix("t-x-m");
+    let tak_event_stream = match tak_transport.subscribe(mission_filter).await {
+        Ok(stream) => {
+            info!("Subscribed to TAK Server mission events");
+            Some(stream)
+        }
+        Err(e) => {
+            warn!(
+                "Failed to subscribe to TAK events (TAK→HIVE disabled): {}",
+                e
+            );
+            None
+        }
+    };
+
     // Create bridge
     let bridge_config = BridgeConfig::default();
     let bridge = Arc::new(HiveTakBridge::new(tak_transport, bridge_config));
@@ -239,17 +261,31 @@ async fn main() -> Result<()> {
         let change_rx = store.subscribe_to_changes();
         info!("Subscribed to document changes");
 
-        // Spawn the bridge relay task
+        // Spawn the HIVE → TAK relay task
         let bridge_clone = Arc::clone(&bridge);
         let collections_clone = collections.clone();
-        let relay_task = tokio::spawn(async move {
+        let hive_to_tak_task = tokio::spawn(async move {
             relay_hive_to_tak(change_rx, backend, bridge_clone, collections_clone).await;
         });
+
+        // Spawn the TAK → HIVE relay task (if subscription succeeded)
+        let tak_to_hive_task = if let Some(stream) = tak_event_stream {
+            let store_clone = Arc::clone(&store);
+            Some(tokio::spawn(async move {
+                relay_tak_to_hive(stream, store_clone).await;
+            }))
+        } else {
+            info!("TAK→HIVE relay disabled (no subscription)");
+            None
+        };
 
         // Wait for shutdown
         info!("Bridge running. Press Ctrl+C to stop.");
         tokio::signal::ctrl_c().await?;
-        relay_task.abort();
+        hive_to_tak_task.abort();
+        if let Some(task) = tak_to_hive_task {
+            task.abort();
+        }
     }
 
     info!("HIVE-TAK Bridge stopped");
@@ -451,6 +487,77 @@ fn parse_capability_document(data: &[u8], doc_id: &str) -> Option<HiveMessage> {
             None
         }
     }
+}
+
+/// Relay TAK Server mission events to HIVE mesh
+///
+/// Receives CoT events from TAK Server, converts mission-type events
+/// to MissionTask, and stores them in the Automerge "missions" collection.
+async fn relay_tak_to_hive(mut event_stream: CotEventStream, store: Arc<AutomergeStore>) {
+    info!("Starting TAK→HIVE relay loop");
+
+    while let Some(result) = event_stream.next().await {
+        match result {
+            Ok(event) => {
+                debug!(
+                    "Received CoT event from TAK: {} (type: {})",
+                    event.uid,
+                    event.cot_type.as_str()
+                );
+
+                // Check if this is a mission event
+                if !MissionTask::is_mission_cot_type(event.cot_type.as_str()) {
+                    debug!("Skipping non-mission event: {}", event.cot_type.as_str());
+                    continue;
+                }
+
+                // Convert to MissionTask
+                match MissionTask::from_cot_event(&event) {
+                    Ok(task) => {
+                        info!(
+                            "Converted mission task: {} (type: {})",
+                            task.task_id,
+                            task.task_type.as_str()
+                        );
+
+                        // Serialize to JSON for Automerge storage
+                        match task.to_json() {
+                            Ok(json) => {
+                                // Store in missions collection
+                                let collection = store.collection("missions");
+
+                                match collection.upsert(&task.task_id, json.into_bytes()) {
+                                    Ok(()) => {
+                                        info!("Stored mission task {} in HIVE mesh", task.task_id);
+                                    }
+                                    Err(e) => {
+                                        error!(
+                                            "Failed to store mission task {}: {}",
+                                            task.task_id, e
+                                        );
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                error!("Failed to serialize mission task {}: {}", task.task_id, e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Failed to convert CoT event {} to MissionTask: {}",
+                            event.uid, e
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                error!("Error receiving TAK event: {}", e);
+            }
+        }
+    }
+
+    info!("TAK→HIVE relay loop ended");
 }
 
 /// Demo function that sends simulated messages
