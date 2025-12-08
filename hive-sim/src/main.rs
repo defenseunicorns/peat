@@ -62,6 +62,10 @@
 //! 0: Success (document synced, all operations completed)
 //! 1: Failure (timeout, error, or document not received)
 
+mod utils;
+
+use utils::time::{extract_timestamp_us, now_micros};
+
 #[cfg(feature = "automerge-backend")]
 use hive_protocol::sync::automerge::AutomergeIrohBackend;
 use hive_protocol::sync::ditto::DittoBackend;
@@ -731,10 +735,29 @@ async fn platoon_leader_aggregation_loop(
         node_id
     );
 
-    // Derive squad IDs from platoon ID
-    // platoon-1 → [squad-1A, squad-1B]
-    // platoon-2 → [squad-2A, squad-2B], etc.
-    let squad_ids: Vec<String> = if let Some(platoon_num) = platoon_id.strip_prefix("platoon-") {
+    // Get squad IDs from environment variable if available, or derive from platoon ID
+    // SQUAD_IDS format: comma-separated list of squad IDs
+    // Fallback patterns:
+    //   - company-X-platoon-Y → [company-X-platoon-Y-squad-1, company-X-platoon-Y-squad-2, company-X-platoon-Y-squad-3]
+    //   - platoon-1 → [squad-1A, squad-1B]
+    let squad_ids: Vec<String> = if let Ok(squad_ids_str) = std::env::var("SQUAD_IDS") {
+        // Use environment variable if provided
+        squad_ids_str
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect()
+    } else if platoon_id.contains("-platoon-") {
+        // Hierarchical naming: company-X-platoon-Y → squad IDs with same prefix
+        // Default to 3 squads per platoon for hierarchical topology
+        let num_squads = std::env::var("SQUADS_PER_PLATOON")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(3);
+        (1..=num_squads)
+            .map(|i| format!("{}-squad-{}", platoon_id, i))
+            .collect()
+    } else if let Some(platoon_num) = platoon_id.strip_prefix("platoon-") {
+        // Legacy flat naming: platoon-1 → [squad-1A, squad-1B]
         vec![
             format!("squad-{}A", platoon_num),
             format!("squad-{}B", platoon_num),
@@ -743,6 +766,10 @@ async fn platoon_leader_aggregation_loop(
         // Fallback for test cases
         vec!["squad-alpha".to_string(), "squad-bravo".to_string()]
     };
+    println!(
+        "[{}] Using squad IDs for aggregation: {:?}",
+        node_id, squad_ids
+    );
 
     // Track unique document receptions by (doc_id, last_modified_us) for metrics deduplication
     // Using last_modified_us instead of created_at_us because created_at_us is immutable
@@ -888,7 +915,10 @@ async fn platoon_leader_aggregation_loop(
                         for doc in documents {
                             let received_at_us = now_micros();
                             if let Some(doc_id) = &doc.id {
-                                if doc_id.starts_with("squad-") {
+                                // Match squad summaries from both backends:
+                                // - Ditto: "squad-summary-{squad_id}" (starts with "squad-")
+                                // - Automerge: "{squad_id}" after prefix strip (e.g., "company-1-platoon-1-squad-1")
+                                if doc_id.starts_with("squad-") || doc_id.contains("-squad-") {
                                     // Extract timestamps with proper delta sync semantics
                                     let created_at_us = if let Some(ts) = doc.get("created_at_us") {
                                         ts.as_u64().unwrap_or(0) as u128
@@ -980,23 +1010,34 @@ async fn platoon_leader_aggregation_loop(
                         // Process document update (this is where P2P propagation is measured)
                         let received_at_us = now_micros();
                         if let Some(doc_id) = &document.id {
-                            if doc_id.starts_with("squad-") {
+                            // Match squad summaries from both backends:
+                            // - Ditto: "squad-summary-{squad_id}" (starts with "squad-")
+                            // - Automerge: "{squad_id}" after prefix strip (e.g., "company-1-platoon-1-squad-1")
+                            let matches =
+                                doc_id.starts_with("squad-") || doc_id.contains("-squad-");
+                            if matches {
                                 // Extract timestamps with proper delta sync semantics
+                                // Squad summaries use "aggregated_at" for their timestamp (protobuf format)
                                 let created_at_us = if let Some(ts) = document.get("created_at_us")
                                 {
-                                    ts.as_u64().unwrap_or(0) as u128
+                                    extract_timestamp_us(ts)
                                 } else if let Some(ts) = document.get("timestamp_us") {
-                                    ts.as_u64().unwrap_or(0) as u128
+                                    extract_timestamp_us(ts)
+                                } else if let Some(ts) = document.get("aggregated_at") {
+                                    extract_timestamp_us(ts)
                                 } else {
                                     0
                                 };
 
                                 // Note: Storage writes "last_update_us", so check that first
+                                // Squad summaries use "aggregated_at" as their modification time
                                 let last_modified_us =
                                     if let Some(ts) = document.get("last_update_us") {
-                                        ts.as_u64().unwrap_or(0) as u128
+                                        extract_timestamp_us(ts)
                                     } else if let Some(ts) = document.get("last_modified_us") {
-                                        ts.as_u64().unwrap_or(0) as u128
+                                        extract_timestamp_us(ts)
+                                    } else if let Some(ts) = document.get("aggregated_at") {
+                                        extract_timestamp_us(ts)
                                     } else {
                                         created_at_us
                                     };
@@ -1560,7 +1601,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         {
                             use hive_protocol::storage::HierarchicalStorageCapable;
 
-                            match change_stream_result {
+                            // Automerge uses different key format: squad-summary:{squad_id}
+                            // Create observer specifically for Automerge's key prefix
+                            let automerge_change_stream = backend.document_store().observe(
+                                "squad-summary", // Match AutomergeSummaryStorage key prefix
+                                &Query::All,     // All squad summaries
+                            );
+
+                            match automerge_change_stream {
                                 Ok(change_stream) => {
                                     let storage = automerge_backend.summary_storage();
                                     let coordinator =
@@ -1688,14 +1736,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-/// Get current Unix timestamp in microseconds
-fn now_micros() -> u128 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_micros()
-}
-
 /// Log metrics event as JSON to stderr (for parsing)
 fn log_metrics(event: &MetricsEvent) {
     if let Ok(json) = serde_json::to_string(event) {
@@ -1807,11 +1847,17 @@ fn create_backend_config(
         }
         #[cfg(feature = "automerge-backend")]
         "automerge" => {
-            // Automerge doesn't require app_id or shared_key
+            // Automerge requires shared_key for peer authentication (ADR-030)
+            // Try HIVE_SECRET_KEY first, fall back to DITTO_SHARED_KEY for compatibility
+            let shared_key =
+                std::env::var("HIVE_SECRET_KEY").or_else(|_| std::env::var("DITTO_SHARED_KEY"))?;
+            let app_id =
+                std::env::var("DITTO_APP_ID").unwrap_or_else(|_| format!("automerge-{}", node_id));
+
             BackendConfig {
-                app_id: format!("automerge-{}", node_id),
+                app_id,
                 persistence_dir,
-                shared_key: None,
+                shared_key: Some(shared_key),
                 transport,
                 extra: HashMap::new(),
             }
@@ -1900,19 +1946,34 @@ async fn connect_to_automerge_peers(
             &peer_endpoint_hex[..16]
         );
 
+        // Resolve hostname to IP addresses (containerlab uses Docker DNS)
+        let resolved_addrs: Vec<String> = match tokio::net::lookup_host(peer_addr).await {
+            Ok(addrs) => addrs.map(|a| a.to_string()).collect(),
+            Err(e) => {
+                eprintln!("[{}] ✗ Failed to resolve '{}': {}", node_id, peer_addr, e);
+                continue;
+            }
+        };
+
+        if resolved_addrs.is_empty() {
+            eprintln!("[{}] ✗ No addresses resolved for '{}'", node_id, peer_addr);
+            continue;
+        }
+
+        eprintln!(
+            "[{}] Resolved '{}' to {:?}",
+            node_id, peer_addr, resolved_addrs
+        );
+
         // Connect using the SyncEngine trait method
+        // Note: connect_to_peer uses connect_force() which bypasses tie-breaking,
+        // so it will always attempt to connect for static configurations
         match sync_engine
-            .connect_to_peer(&peer_endpoint_hex, &[peer_addr.to_string()])
+            .connect_to_peer(&peer_endpoint_hex, &resolved_addrs)
             .await
         {
-            Ok(true) => {
+            Ok(_) => {
                 eprintln!("[{}] ✓ Connected to peer '{}'", node_id, peer_name);
-            }
-            Ok(false) => {
-                eprintln!(
-                    "[{}] → Waiting for peer '{}' to connect (tie-breaking)",
-                    node_id, peer_name
-                );
             }
             Err(e) => {
                 eprintln!(
