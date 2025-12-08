@@ -98,6 +98,12 @@ hive-sim/
 ├── README.md               # This file
 ├── .env.example            # Example Ditto credentials
 │
+├── src/                    # Rust source code
+│   ├── main.rs             # Main simulation node binary
+│   └── utils/              # Utility modules
+│       ├── mod.rs          # Module exports
+│       └── time.rs         # Time utilities (now_micros, extract_timestamp_us)
+│
 ├── topologies/             # ContainerLab topology definitions
 │   ├── poc-2node.yaml      # 2-node baseline (no constraints)
 │   ├── poc-2node-constrained.yaml  # 2-node with tactical radio constraints
@@ -105,6 +111,30 @@ hive-sim/
 │
 └── scenarios/              # Shadow YAML scenarios (deprecated)
     └── *.yaml              # Old Shadow configs (kept for reference)
+```
+
+### Utils Module
+
+The `src/utils/` module provides reusable utility functions:
+
+#### `utils::time`
+
+Time-related utilities for timestamp handling:
+
+- **`now_micros() -> u128`**: Get current Unix timestamp in microseconds
+- **`extract_timestamp_us(val: &serde_json::Value) -> u128`**: Extract timestamps from various formats:
+  - Direct numeric values (u64, i64, f64)
+  - Protobuf-style `{seconds, nanos}` objects
+
+```rust
+use utils::time::{now_micros, extract_timestamp_us};
+
+// Get current time
+let timestamp = now_micros();
+
+// Extract from protobuf-style timestamp
+let json = serde_json::json!({"seconds": 1234567890, "nanos": 123456789});
+let timestamp_us = extract_timestamp_us(&json); // 1234567890123456
 ```
 
 ## Available Topologies
