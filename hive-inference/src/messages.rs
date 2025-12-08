@@ -295,6 +295,9 @@ pub struct ModelUpdatePackage {
     /// Content-addressed blob reference (e.g., "hive://blobs/sha256:...")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub blob_reference: Option<String>,
+    /// Direct URL to model file (alternative to blob_reference)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_url: Option<String>,
     /// Target platform IDs for deployment
     pub target_platforms: Vec<String>,
     /// Deployment policy
@@ -302,6 +305,12 @@ pub struct ModelUpdatePackage {
     /// Previous version for rollback support
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rollback_version: Option<String>,
+    /// Timestamp when deployment was initiated
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deployed_at: Option<DateTime<Utc>>,
+    /// Identity of deployer (e.g., "C2-WebTAK", "MLOps-Pipeline")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deployed_by: Option<String>,
     /// Additional metadata
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ModelMetadata>,
@@ -1129,9 +1138,12 @@ mod tests {
             model_hash: "sha256:b8d9c4e2f1a3".to_string(),
             model_size_bytes: 45_000_000,
             blob_reference: Some("hive://blobs/sha256:b8d9c4e2f1a3".to_string()),
+            model_url: None,
             target_platforms: vec!["Alpha-3".to_string(), "Bravo-3".to_string()],
             deployment_policy: DeploymentPolicy::Rolling,
             rollback_version: Some("1.2.0".to_string()),
+            deployed_at: Some(Utc::now()),
+            deployed_by: Some("C2-WebTAK".to_string()),
             metadata: Some(ModelMetadata {
                 changelog: Some("Improved low-light detection".to_string()),
                 training_date: Some("2025-11-26".to_string()),
