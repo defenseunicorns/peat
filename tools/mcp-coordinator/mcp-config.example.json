@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "hive-coordinator": {
+      "command": "node",
+      "args": ["${HIVE_REPO}/tools/mcp-coordinator/src/index.js"],
+      "env": {
+        "COORDINATOR_DB_PATH": "${HOME}/.hive-coordinator/coordinator.db"
+      }
+    }
+  }
+}

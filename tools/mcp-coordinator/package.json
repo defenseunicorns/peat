@@ -1,0 +1,23 @@
+{
+  "name": "hive-mcp-coordinator",
+  "version": "0.2.0",
+  "description": "MCP server for coordinating Claude Code team sessions",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "hive-mcp-coordinator": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "start:sse": "node src/index.js --sse",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "better-sqlite3": "^11.0.0",
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
