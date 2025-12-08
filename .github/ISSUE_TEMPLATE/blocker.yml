@@ -1,0 +1,99 @@
+name: "🚨 Blocker"
+description: "Report something blocking another team's progress"
+title: "[BLOCKER] "
+labels: ["type/blocker", "priority/p0-blocker", "status/needs-triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🚨 BLOCKER REPORT
+        Use this template when your team is BLOCKED and cannot proceed without resolution.
+        
+        **This will be flagged for immediate attention.**
+
+  - type: dropdown
+    id: blocked_team
+    attributes:
+      label: "Blocked Team"
+      description: "Which team is blocked?"
+      options:
+        - "Core"
+        - "ATAK"
+        - "AI"
+        - "Experiments"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: blocking_team
+    attributes:
+      label: "Blocking Team / Dependency"
+      description: "What or who is causing the block?"
+      options:
+        - "Core"
+        - "ATAK"
+        - "AI"
+        - "Experiments"
+        - "External dependency"
+        - "Infrastructure"
+        - "Unknown"
+    validations:
+      required: true
+
+  - type: input
+    id: blocking_issue
+    attributes:
+      label: "Blocking Issue (if known)"
+      description: "Link to the issue causing the block"
+      placeholder: "#123"
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Blocker Description"
+      description: "What is blocked and why?"
+      placeholder: "We cannot proceed with X because Y is not available..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: "Impact"
+      description: "What is the impact of this blocker?"
+      value: |
+        - **Phase affected**: 
+        - **Demo milestone at risk**: Yes / No
+        - **Team members idle**: 
+        - **Days until critical**:
+    validations:
+      required: true
+
+  - type: textarea
+    id: needed
+    attributes:
+      label: "What We Need"
+      description: "What specific deliverable would unblock you?"
+      placeholder: |
+        - Schema definition for X
+        - Mock data for Y
+        - Access to Z
+    validations:
+      required: true
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: "Attempted Workarounds"
+      description: "What have you tried?"
+      placeholder: "We attempted to work around this by..."
+
+  - type: input
+    id: contact
+    attributes:
+      label: "Contact for Escalation"
+      description: "Who should be contacted for immediate resolution?"
+      placeholder: "@username or email"
+    validations:
+      required: true

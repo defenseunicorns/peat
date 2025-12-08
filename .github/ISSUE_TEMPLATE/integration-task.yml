@@ -1,0 +1,121 @@
+name: "🔗 Integration Task"
+description: "Cross-team integration work item"
+title: "[INTEGRATION] "
+labels: ["type/integration", "status/needs-triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Integration Task
+        Use this template for work that requires coordination between multiple teams.
+        Tag all involved teams and define clear handoff points.
+
+  - type: checkboxes
+    id: teams_involved
+    attributes:
+      label: "Teams Involved"
+      description: "Select all teams that must coordinate on this task"
+      options:
+        - label: "Core (schema, protocol)"
+        - label: "ATAK (Android, CoT)"
+        - label: "AI (Jetson, inference)"
+        - label: "Experiments (simulation, validation)"
+        - label: "PM (coordination)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: "Vignette Phase"
+      description: "Which demo phase does this support?"
+      options:
+        - "Phase 1: Initialization & Capability Advertisement"
+        - "Phase 2: Mission Tasking"
+        - "Phase 3: Active Tracking"
+        - "Phase 4: Track Handoff"
+        - "Phase 5: MLOps Model Distribution"
+        - "Cross-cutting"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "Priority"
+      description: "How urgent is this integration?"
+      options:
+        - "P0 - Blocker (critical path, immediate)"
+        - "P1 - Critical (required for current sprint)"
+        - "P2 - Normal (standard priority)"
+        - "P3 - Low (nice to have)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Integration Description"
+      description: "What needs to be integrated? Why?"
+      placeholder: "This task integrates the AI team's capability advertisement output with the Core protocol's sync mechanism..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: "Dependencies"
+      description: "What must be complete before this integration can proceed?"
+      placeholder: |
+        - #123 Schema definition for CapabilityAdvertisement
+        - #124 AI team implements capability struct
+        - Core team provides test harness
+    validations:
+      required: true
+
+  - type: textarea
+    id: handoffs
+    attributes:
+      label: "Handoff Points"
+      description: "Define the sequence of handoffs between teams"
+      value: |
+        1. **[Team A]** delivers: 
+           - [ ] Deliverable description
+        2. **[Team B]** receives and implements:
+           - [ ] Implementation description
+        3. **[Both teams]** validate:
+           - [ ] Integration test passes
+    validations:
+      required: true
+
+  - type: textarea
+    id: test_plan
+    attributes:
+      label: "Integration Test Plan"
+      description: "How will we validate the integration works?"
+      value: |
+        **Setup:**
+        - Environment: Containerlab topology with Alpha team nodes
+        
+        **Steps:**
+        1. Start all nodes
+        2. Trigger capability advertisement
+        3. Verify sync to coordinator
+        
+        **Expected Results:**
+        - Coordinator receives capability within 5s
+        - Schema validates correctly
+        - ATAK displays capability status
+    validations:
+      required: true
+
+  - type: textarea
+    id: rollback
+    attributes:
+      label: "Rollback Plan"
+      description: "What if integration fails? How do we recover?"
+      placeholder: |
+        - Revert to mock data interface
+        - Teams continue parallel development
+        - Schedule follow-up integration attempt
