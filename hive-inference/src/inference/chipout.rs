@@ -499,11 +499,11 @@ mod tests {
         let frame = VideoFrame::simulated(1, 1920, 1080);
 
         // First frame - should trigger
-        let chipouts = extractor.evaluate_and_extract(&[track.clone()], &frame);
+        let chipouts = extractor.evaluate_and_extract(std::slice::from_ref(&track), &frame);
         assert_eq!(chipouts.len(), 1);
 
         // Second frame - should NOT trigger (same track, no changes)
-        let chipouts = extractor.evaluate_and_extract(&[track], &frame);
+        let chipouts = extractor.evaluate_and_extract(std::slice::from_ref(&track), &frame);
         assert_eq!(chipouts.len(), 0);
     }
 
@@ -515,13 +515,13 @@ mod tests {
         let frame = VideoFrame::simulated(1, 1920, 1080);
 
         // First frame
-        extractor.evaluate_and_extract(&[track.clone()], &frame);
+        extractor.evaluate_and_extract(std::slice::from_ref(&track), &frame);
 
         // Track disappears (empty frame)
         extractor.evaluate_and_extract(&[], &frame);
 
         // Track reappears - should trigger Reacquire
-        let chipouts = extractor.evaluate_and_extract(&[track], &frame);
+        let chipouts = extractor.evaluate_and_extract(std::slice::from_ref(&track), &frame);
         assert_eq!(chipouts.len(), 1);
         assert_eq!(chipouts[0].trigger_reason, ChipoutTrigger::Reacquire);
     }
@@ -530,9 +530,11 @@ mod tests {
     fn test_class_change_trigger() {
         let mut extractor = ChipoutExtractor::with_defaults("test-platform", "yolov8n", "1.0.0");
 
-        let mut config = ChipoutConfig::default();
-        config.class_filter = vec!["person".to_string(), "vehicle".to_string()];
-        config.triggers = vec![ChipoutTrigger::NewTrack, ChipoutTrigger::ClassChange];
+        let config = ChipoutConfig {
+            class_filter: vec!["person".to_string(), "vehicle".to_string()],
+            triggers: vec![ChipoutTrigger::NewTrack, ChipoutTrigger::ClassChange],
+            ..Default::default()
+        };
         extractor.config = config;
 
         let track1 = create_test_track("TRACK-001", "person", 0.9);
@@ -566,8 +568,10 @@ mod tests {
     fn test_class_filter() {
         let mut extractor = ChipoutExtractor::with_defaults("test-platform", "yolov8n", "1.0.0");
 
-        let mut config = ChipoutConfig::default();
-        config.class_filter = vec!["person".to_string()];
+        let config = ChipoutConfig {
+            class_filter: vec!["person".to_string()],
+            ..Default::default()
+        };
         extractor.config = config;
 
         // Track with non-matching class
@@ -575,7 +579,7 @@ mod tests {
         let frame = VideoFrame::simulated(1, 1920, 1080);
 
         // Should not trigger (bicycle not in filter)
-        let chipouts = extractor.evaluate_and_extract(&[track], &frame);
+        let chipouts = extractor.evaluate_and_extract(std::slice::from_ref(&track), &frame);
         assert_eq!(chipouts.len(), 0);
     }
 
