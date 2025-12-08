@@ -78,48 +78,28 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
 
     private fun createHiveNodeJni(context: Context) {
         try {
+            // IMPORTANT: Clean up any existing node before creating a new one.
+            // This prevents database lock issues when plugin reloads without ATAK restart.
+            if (hiveNodeJni != null) {
+                Log.i(TAG, "Destroying existing HIVE node before creating new one")
+                try {
+                    hiveNodeJni?.close()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error closing previous node: ${e.message}")
+                }
+                hiveNodeJni = null
+            }
+
             // Create storage directory for HIVE data
-            // ATAK plugins must use ATAK's root directory (atak/) on external storage
-            // The plugin context has no access to its own data directory
+            // CRITICAL: redb uses mmap which DOES NOT work on Android's FUSE-mounted
+            // external storage (/storage/emulated/0/). We MUST use internal app storage.
 
-            var hiveDir: File? = null
-
-            // Method 1: Use ATAK's FileSystemUtils to get the atak root
-            try {
-                val atakRoot = FileSystemUtils.getRoot()
-                Log.d(TAG, "ATAK root from FileSystemUtils: $atakRoot")
-                if (atakRoot != null && atakRoot.exists()) {
-                    hiveDir = File(atakRoot, "plugins/hive")
-                    if (!hiveDir.exists()) {
-                        val created = hiveDir.mkdirs()
-                        Log.d(TAG, "Created ATAK plugins/hive dir: $created")
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "FileSystemUtils.getRoot() failed: ${e.message}")
-            }
-
-            // Method 2: Fall back to standard external storage atak directory
-            if (hiveDir == null || !hiveDir.exists()) {
-                val externalStorage = Environment.getExternalStorageDirectory()
-                Log.d(TAG, "External storage: $externalStorage")
-                val atakDir = File(externalStorage, "atak/plugins/hive")
-                if (!atakDir.exists()) {
-                    val created = atakDir.mkdirs()
-                    Log.d(TAG, "Created external atak/plugins/hive dir: $created")
-                }
-                if (atakDir.exists()) {
-                    hiveDir = atakDir
-                }
-            }
-
-            // Method 3: Last resort - try /sdcard/atak directly
-            if (hiveDir == null || !hiveDir.exists()) {
-                hiveDir = File("/sdcard/atak/plugins/hive")
-                if (!hiveDir.exists()) {
-                    val created = hiveDir.mkdirs()
-                    Log.d(TAG, "Created /sdcard/atak/plugins/hive dir: $created")
-                }
+            // Use ATAK's internal data directory: /data/user/0/com.atakmap.app.civ/files/hive
+            // This is NOT the sdcard path - it's the app's private internal storage
+            val hiveDir = File("/data/user/0/com.atakmap.app.civ/files/hive")
+            if (!hiveDir.exists()) {
+                val created = hiveDir.mkdirs()
+                Log.d(TAG, "Created ATAK internal files/hive dir: $created")
             }
 
             Log.d(TAG, "HIVE dir: ${hiveDir.absolutePath}")

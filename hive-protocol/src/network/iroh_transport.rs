@@ -108,6 +108,8 @@ pub struct IrohTransport {
     /// Event senders for peer events (Issue #275)
     /// Multiple receivers can subscribe via subscribe_peer_events()
     event_senders: Arc<RwLock<Vec<TransportEventSender>>>,
+    /// Tokio runtime handle for spawning connection monitor tasks
+    runtime_handle: tokio::runtime::Handle,
 }
 
 #[cfg(feature = "automerge-backend")]
@@ -148,6 +150,7 @@ impl IrohTransport {
             accept_task: Arc::new(RwLock::new(None)),
             mdns_discovery: None,
             event_senders: Arc::new(RwLock::new(Vec::new())),
+            runtime_handle: tokio::runtime::Handle::current(),
         })
     }
 
@@ -210,6 +213,7 @@ impl IrohTransport {
             accept_task: Arc::new(RwLock::new(None)),
             mdns_discovery: Some(discovery),
             event_senders: Arc::new(RwLock::new(Vec::new())),
+            runtime_handle: tokio::runtime::Handle::current(),
         })
     }
 
@@ -279,6 +283,7 @@ impl IrohTransport {
             accept_task: Arc::new(RwLock::new(None)),
             mdns_discovery: None,
             event_senders: Arc::new(RwLock::new(Vec::new())),
+            runtime_handle: tokio::runtime::Handle::current(),
         })
     }
 
@@ -340,6 +345,7 @@ impl IrohTransport {
             accept_task: Arc::new(RwLock::new(None)),
             mdns_discovery: Some(discovery),
             event_senders: Arc::new(RwLock::new(Vec::new())),
+            runtime_handle: tokio::runtime::Handle::current(),
         })
     }
 
@@ -417,6 +423,7 @@ impl IrohTransport {
             accept_task: Arc::new(RwLock::new(None)),
             mdns_discovery: Some(discovery),
             event_senders: Arc::new(RwLock::new(Vec::new())),
+            runtime_handle: tokio::runtime::Handle::current(),
         })
     }
 
@@ -510,6 +517,7 @@ impl IrohTransport {
             accept_task: Arc::new(RwLock::new(None)),
             mdns_discovery: None,
             event_senders: Arc::new(RwLock::new(Vec::new())),
+            runtime_handle: tokio::runtime::Handle::current(),
         })
     }
 
@@ -609,6 +617,9 @@ impl IrohTransport {
             endpoint_id: remote_id,
             connected_at: std::time::Instant::now(),
         });
+
+        // Spawn connection close monitor for instant disconnect detection (Issue #275)
+        self.spawn_connection_monitor(remote_id, conn.clone());
 
         Ok(Some(conn))
     }
@@ -774,6 +785,9 @@ impl IrohTransport {
             connected_at: std::time::Instant::now(),
         });
 
+        // Spawn connection close monitor for instant disconnect detection (Issue #275)
+        self.spawn_connection_monitor(remote_id, conn.clone());
+
         Ok(Some(conn))
     }
 
@@ -838,6 +852,48 @@ impl IrohTransport {
             // Non-blocking send - drop if channel is full
             let _ = sender.try_send(event.clone());
         }
+    }
+
+    /// Spawn a task to monitor a connection for closure (Issue #275)
+    ///
+    /// This task awaits `connection.closed()` which completes immediately when
+    /// the connection closes, regardless of how (graceful, timeout, or abrupt).
+    /// When the connection closes, it removes it from the map and emits a
+    /// Disconnected event.
+    ///
+    /// This provides instant disconnect detection, unlike `cleanup_closed_connections()`
+    /// which only works after the QUIC idle timeout expires (~30 seconds).
+    fn spawn_connection_monitor(&self, endpoint_id: EndpointId, conn: Connection) {
+        let connections = Arc::clone(&self.connections);
+        let event_senders = Arc::clone(&self.event_senders);
+
+        self.runtime_handle.spawn(async move {
+            // Wait for the connection to close (this completes immediately when closed)
+            let close_reason = conn.closed().await;
+
+            tracing::info!(
+                ?endpoint_id,
+                ?close_reason,
+                "Connection closed, emitting disconnect event"
+            );
+
+            // Remove from connections map
+            {
+                let mut conns = connections.write().unwrap();
+                conns.remove(&endpoint_id);
+            }
+
+            // Emit disconnect event
+            let reason = format!("{:?}", close_reason);
+            let event = TransportPeerEvent::Disconnected {
+                endpoint_id,
+                reason,
+            };
+            let senders = event_senders.read().unwrap();
+            for sender in senders.iter() {
+                let _ = sender.try_send(event.clone());
+            }
+        });
     }
 
     /// Get the number of currently connected peers

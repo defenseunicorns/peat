@@ -115,6 +115,30 @@ object HiveJni {
     external fun freeNodeJni(handle: Long)
 
     /**
+     * Get all cells as JSON array string.
+     * @param handle Node handle from createNodeJni
+     * @return JSON array of cell objects, or "[]" on error
+     */
+    @JvmStatic
+    external fun getCellsJni(handle: Long): String
+
+    /**
+     * Get all tracks as JSON array string.
+     * @param handle Node handle from createNodeJni
+     * @return JSON array of track objects, or "[]" on error
+     */
+    @JvmStatic
+    external fun getTracksJni(handle: Long): String
+
+    /**
+     * Get all platforms as JSON array string.
+     * @param handle Node handle from createNodeJni
+     * @return JSON array of platform objects, or "[]" on error
+     */
+    @JvmStatic
+    external fun getPlatformsJni(handle: Long): String
+
+    /**
      * Test if JNI bindings are working.
      * @return true if JNI is functional
      */
@@ -192,6 +216,24 @@ class HiveNodeJni private constructor(private val handle: Long) : AutoCloseable 
      * @return true if sync started successfully
      */
     fun startSync(): Boolean = HiveJni.startSyncJni(handle)
+
+    /**
+     * Get all cells as JSON array string.
+     * @return JSON array of cell objects
+     */
+    fun getCellsJson(): String = HiveJni.getCellsJni(handle)
+
+    /**
+     * Get all tracks as JSON array string.
+     * @return JSON array of track objects
+     */
+    fun getTracksJson(): String = HiveJni.getTracksJni(handle)
+
+    /**
+     * Get all platforms as JSON array string.
+     * @return JSON array of platform objects
+     */
+    fun getPlatformsJson(): String = HiveJni.getPlatformsJni(handle)
 
     /**
      * Free the native node resources.
