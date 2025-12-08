@@ -14,6 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "proto/command.proto",
         "proto/security.proto",
         "proto/track.proto",
+        "proto/model.proto",
     ];
 
     // Configure prost to generate Rust code from .proto files
