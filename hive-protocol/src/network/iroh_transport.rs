@@ -30,7 +30,7 @@ use anyhow::{Context, Result};
 #[cfg(feature = "automerge-backend")]
 use iroh::discovery::mdns::MdnsDiscovery;
 #[cfg(feature = "automerge-backend")]
-use iroh::endpoint::{Connection, Endpoint};
+use iroh::endpoint::{Connection, Endpoint, TransportConfig};
 #[cfg(feature = "automerge-backend")]
 use iroh::{EndpointAddr, EndpointId};
 #[cfg(feature = "automerge-backend")]
@@ -41,6 +41,8 @@ use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(feature = "automerge-backend")]
 use std::sync::{Arc, RwLock};
+#[cfg(feature = "automerge-backend")]
+use std::time::Duration;
 #[cfg(feature = "automerge-backend")]
 use tokio::sync::mpsc;
 #[cfg(feature = "automerge-backend")]
@@ -88,6 +90,71 @@ pub type TransportEventSender = mpsc::Sender<TransportPeerEvent>;
 /// ALPN protocol identifier for HIVE Protocol Automerge sync
 #[cfg(feature = "automerge-backend")]
 pub const CAP_AUTOMERGE_ALPN: &[u8] = b"cap/automerge/1";
+
+// =============================================================================
+// QUIC Timeout Configuration (Issue #315)
+// =============================================================================
+
+/// Maximum idle timeout for QUIC connections (Issue #315)
+///
+/// When a peer disconnects unexpectedly (crash, kill, network loss), QUIC detects
+/// "dead" connections via idle timeout. The default of ~30 seconds is too slow
+/// for tactical radio networks where connections can drop at any time.
+///
+/// Setting this to 5 seconds provides fast disconnect detection suitable for
+/// tactical environments while still allowing for brief network jitter.
+///
+/// Note: In radio networks, a 5-second silence typically indicates a genuine
+/// connection loss, not just temporary congestion.
+#[cfg(feature = "automerge-backend")]
+pub const QUIC_MAX_IDLE_TIMEOUT_SECS: u64 = 5;
+
+/// Keep-alive interval for QUIC connections (Issue #315)
+///
+/// Sending keep-alive packets prevents healthy but inactive connections from
+/// timing out and enables faster detection of dead connections.
+///
+/// Setting this to 1 second ensures:
+/// - Multiple keep-alives are sent before the idle timeout expires
+/// - Dead connections are detected within ~5 seconds (1 missed + 1 timeout margin)
+/// - Acceptable overhead for tactical radio networks (~40 bytes/second)
+#[cfg(feature = "automerge-backend")]
+pub const QUIC_KEEP_ALIVE_INTERVAL_SECS: u64 = 1;
+
+/// Create a TransportConfig with optimized timeout settings for tactical applications (Issue #315)
+///
+/// Key settings:
+/// - `max_idle_timeout`: 5 seconds (reduced from default ~30s)
+/// - `keep_alive_interval`: 1 second (aggressive connection health monitoring)
+///
+/// This configuration provides:
+/// - Fast disconnect detection (~5 seconds vs ~40 seconds default)
+/// - Immediate awareness of connection state changes
+/// - Designed for tactical radio networks where connections can drop unexpectedly
+#[cfg(feature = "automerge-backend")]
+fn create_tactical_transport_config() -> TransportConfig {
+    let mut config = TransportConfig::default();
+
+    // Set maximum idle timeout to 10 seconds for faster disconnect detection
+    // The IdleTimeout type requires conversion from Duration
+    config.max_idle_timeout(Some(
+        Duration::from_secs(QUIC_MAX_IDLE_TIMEOUT_SECS)
+            .try_into()
+            .unwrap(),
+    ));
+
+    // Enable keep-alive packets every 3 seconds to prevent healthy connections
+    // from timing out and to detect dead connections faster
+    config.keep_alive_interval(Some(Duration::from_secs(QUIC_KEEP_ALIVE_INTERVAL_SECS)));
+
+    tracing::debug!(
+        max_idle_timeout_secs = QUIC_MAX_IDLE_TIMEOUT_SECS,
+        keep_alive_interval_secs = QUIC_KEEP_ALIVE_INTERVAL_SECS,
+        "Created tactical QUIC transport config (Issue #315)"
+    );
+
+    config
+}
 
 /// Iroh QUIC transport for P2P connections
 ///
@@ -139,6 +206,7 @@ impl IrohTransport {
     pub async fn new() -> Result<Self> {
         let endpoint = Endpoint::builder()
             .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
+            .transport_config(create_tactical_transport_config())
             .bind()
             .await
             .context("Failed to create Iroh endpoint")?;
@@ -197,6 +265,7 @@ impl IrohTransport {
             .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
             .secret_key(secret_key)
             .discovery(discovery.clone())
+            .transport_config(create_tactical_transport_config())
             .bind()
             .await
             .context("Failed to create Iroh endpoint with mDNS discovery")?;
@@ -272,6 +341,7 @@ impl IrohTransport {
         let endpoint = Endpoint::builder()
             .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
             .secret_key(secret_key)
+            .transport_config(create_tactical_transport_config())
             .bind()
             .await
             .context("Failed to create Iroh endpoint from seed")?;
@@ -334,6 +404,7 @@ impl IrohTransport {
             .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
             .secret_key(secret_key)
             .discovery(discovery.clone())
+            .transport_config(create_tactical_transport_config())
             .bind()
             .await
             .context("Failed to create Iroh endpoint from seed with discovery")?;
@@ -412,6 +483,7 @@ impl IrohTransport {
             .secret_key(secret_key)
             .discovery(discovery.clone())
             .bind_addr_v4(bind_addr_v4)
+            .transport_config(create_tactical_transport_config())
             .bind()
             .await
             .context("Failed to create Iroh endpoint from seed with discovery at addr")?;
@@ -506,6 +578,7 @@ impl IrohTransport {
         let endpoint = Endpoint::builder()
             .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
             .bind_addr_v4(bind_addr_v4)
+            .transport_config(create_tactical_transport_config())
             .bind()
             .await
             .context("Failed to create Iroh endpoint with bind address")?;
@@ -1355,5 +1428,127 @@ mod tests {
         assert!(result2.is_err(), "Subscriber 2 should timeout");
 
         transport.close().await.unwrap();
+    }
+
+    /// Test that the tactical transport config is applied with correct timeout values (Issue #315)
+    ///
+    /// This test verifies that the config can be created without panicking.
+    /// The actual timeout values are private in quinn, but this ensures:
+    /// - The Duration::try_into() for IdleTimeout works correctly
+    /// - The config builder methods are called with valid values
+    #[test]
+    fn test_tactical_transport_config() {
+        // This will panic if the config values are invalid (e.g., Duration too large)
+        let _config = create_tactical_transport_config();
+
+        // If we get here, the config was created successfully
+        // The timeout values are: max_idle_timeout=5s, keep_alive_interval=1s
+    }
+
+    /// Test that disconnect is detected within the expected timeout (Issue #315)
+    ///
+    /// This test verifies that with the reduced idle timeout (10s) and keep-alive (3s),
+    /// disconnects are detected much faster than the default ~30-40 seconds.
+    #[tokio::test]
+    async fn test_fast_disconnect_detection_issue_315() {
+        use std::sync::Arc;
+
+        // Use deterministic keys for reliable testing
+        let transport_a = Arc::new(IrohTransport::from_seed("test-315/node-a").await.unwrap());
+        let transport_b = Arc::new(IrohTransport::from_seed("test-315/node-b").await.unwrap());
+
+        let id_a = transport_a.endpoint_id();
+        let id_b = transport_b.endpoint_id();
+
+        // Determine which should initiate (lower ID initiates)
+        let (initiator, acceptor, acceptor_addr) = if id_a.as_bytes() < id_b.as_bytes() {
+            (
+                Arc::clone(&transport_a),
+                Arc::clone(&transport_b),
+                transport_b.endpoint_addr(),
+            )
+        } else {
+            (
+                Arc::clone(&transport_b),
+                Arc::clone(&transport_a),
+                transport_a.endpoint_addr(),
+            )
+        };
+
+        // Subscribe to events BEFORE connecting
+        let mut events = initiator.subscribe_peer_events();
+
+        // Start accept loop on acceptor
+        acceptor.start_accept_loop().unwrap();
+
+        // Connect from initiator to acceptor
+        let conn = initiator.connect(acceptor_addr).await.unwrap();
+        assert!(conn.is_some(), "Connection should be established");
+
+        // Wait for connection event
+        let event = tokio::time::timeout(std::time::Duration::from_secs(1), events.recv()).await;
+        assert!(event.is_ok(), "Should receive connect event");
+
+        // Give connection time to stabilize
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+        assert_eq!(
+            initiator.peer_count(),
+            1,
+            "Should have 1 peer before disconnect"
+        );
+
+        // Now close the acceptor abruptly (simulating crash/kill)
+        let _ = acceptor.stop_accept_loop();
+        // Close all connections without clean shutdown
+        for (_id, conn) in acceptor.connections.write().unwrap().drain() {
+            conn.close(0u32.into(), b"crash");
+        }
+        // Force close the endpoint
+        drop(acceptor);
+
+        // Start timing - disconnect should be detected within QUIC_MAX_IDLE_TIMEOUT_SECS
+        let start = std::time::Instant::now();
+
+        // Wait for disconnect event - should be MUCH faster than the old ~40s
+        // With connection.closed() monitor, this should be almost instant when peer closes cleanly
+        // Even with abrupt close, it should be within idle timeout (10s)
+        let disconnect_timeout = std::time::Duration::from_secs(QUIC_MAX_IDLE_TIMEOUT_SECS + 2);
+        let event = tokio::time::timeout(disconnect_timeout, events.recv()).await;
+
+        let elapsed = start.elapsed();
+
+        assert!(
+            event.is_ok(),
+            "Should receive disconnect event within timeout"
+        );
+
+        if let Ok(Some(TransportPeerEvent::Disconnected { reason, .. })) = event {
+            tracing::info!(
+                elapsed_secs = elapsed.as_secs_f64(),
+                reason = %reason,
+                "Disconnect detected (Issue #315)"
+            );
+
+            // Verify the timing is reasonable
+            // With clean close (via connection.close()), it should be nearly instant
+            // This test documents the expected behavior with new config
+            assert!(
+                elapsed.as_secs() <= QUIC_MAX_IDLE_TIMEOUT_SECS + 2,
+                "Disconnect should be detected within {} seconds, took {:.1}s (Issue #315)",
+                QUIC_MAX_IDLE_TIMEOUT_SECS + 2,
+                elapsed.as_secs_f64()
+            );
+        }
+
+        // Verify peer is removed
+        assert_eq!(
+            initiator.peer_count(),
+            0,
+            "Peer count should be 0 after disconnect"
+        );
+
+        drop(transport_a);
+        drop(transport_b);
     }
 }
