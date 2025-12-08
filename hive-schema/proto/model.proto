@@ -1,0 +1,237 @@
+// AI Model Deployment definitions for CAP Protocol
+// Version: 1.0.0
+//
+// Defines schema for distributing AI models from MLOps registries
+// to edge nodes via the HIVE mesh network.
+
+syntax = "proto3";
+
+package cap.model.v1;
+
+import "common.proto";
+
+// ============================================================================
+// Model Deployment (Downward Flow)
+// ============================================================================
+
+// Model deployment message - flows downward from C2 to platforms
+//
+// Used to distribute AI models from MLOps registries to edge platforms.
+// Supports rolling deployments, hash verification, and rollback.
+message ModelDeployment {
+  // Unique deployment identifier (e.g., "deploy-2025-001")
+  string deployment_id = 1;
+
+  // Model identifier (e.g., "yolov8-poi-v2.1")
+  string model_id = 2;
+
+  // Model version string
+  string model_version = 3;
+
+  // Type of model being deployed
+  ModelType model_type = 4;
+
+  // URL to download the model (HTTPS, S3, or blob reference)
+  string model_url = 5;
+
+  // SHA256 hash of the model file for verification
+  string checksum_sha256 = 6;
+
+  // Size of the model file in bytes
+  uint64 file_size_bytes = 7;
+
+  // Target platform IDs for deployment
+  repeated string target_platforms = 8;
+
+  // Deployment policy
+  DeploymentPolicy deployment_policy = 9;
+
+  // Priority of this deployment
+  DeploymentPriority priority = 10;
+
+  // Timestamp when deployment was initiated
+  common.v1.Timestamp deployed_at = 11;
+
+  // Identity of deployer (e.g., "C2-WebTAK", "MLOps-Pipeline")
+  string deployed_by = 12;
+
+  // Previous model version for rollback support
+  string rollback_model_id = 13;
+
+  // Additional model metadata
+  ModelMetadata metadata = 14;
+}
+
+// Type of AI model
+enum ModelType {
+  MODEL_TYPE_UNSPECIFIED = 0;
+  MODEL_TYPE_DETECTOR = 1;          // Object detection model (e.g., YOLO)
+  MODEL_TYPE_TRACKER = 2;           // Object tracking model (e.g., DeepSORT)
+  MODEL_TYPE_DETECTOR_TRACKER = 3;  // Combined detection + tracking
+  MODEL_TYPE_CLASSIFIER = 4;        // Classification model
+  MODEL_TYPE_SEGMENTATION = 5;      // Segmentation model
+  MODEL_TYPE_POSE = 6;              // Pose estimation model
+  MODEL_TYPE_CUSTOM = 99;           // Custom/other model type
+}
+
+// Deployment policy for rolling updates
+enum DeploymentPolicy {
+  DEPLOYMENT_POLICY_UNSPECIFIED = 0;
+  DEPLOYMENT_POLICY_IMMEDIATE = 1;    // Deploy immediately to all targets
+  DEPLOYMENT_POLICY_ROLLING = 2;      // Rolling deployment (one at a time)
+  DEPLOYMENT_POLICY_CANARY = 3;       // Canary deployment (test on subset first)
+  DEPLOYMENT_POLICY_SCHEDULED = 4;    // Deploy at scheduled time
+}
+
+// Deployment priority level
+enum DeploymentPriority {
+  DEPLOYMENT_PRIORITY_UNSPECIFIED = 0;
+  DEPLOYMENT_PRIORITY_LOW = 1;
+  DEPLOYMENT_PRIORITY_NORMAL = 2;
+  DEPLOYMENT_PRIORITY_HIGH = 3;
+  DEPLOYMENT_PRIORITY_CRITICAL = 4;   // Emergency deployment (e.g., security fix)
+}
+
+// Model metadata
+message ModelMetadata {
+  // Model format (e.g., "onnx", "tflite", "tensorrt")
+  string format = 1;
+
+  // Framework the model was trained with (e.g., "pytorch", "tensorflow")
+  string framework = 2;
+
+  // Input dimensions (e.g., "640x640x3")
+  string input_dimensions = 3;
+
+  // Model classes/labels (for detection/classification)
+  repeated string classes = 4;
+
+  // Minimum inference runtime version required
+  string min_runtime_version = 5;
+
+  // Hardware requirements
+  HardwareRequirements hardware_requirements = 6;
+
+  // Performance metrics from validation
+  ModelPerformanceMetrics performance_metrics = 7;
+
+  // Additional metadata (JSON-encoded for extensibility)
+  string extra_json = 10;
+}
+
+// Hardware requirements for running the model
+message HardwareRequirements {
+  // Minimum GPU memory in MB (0 if CPU-only)
+  uint32 min_gpu_memory_mb = 1;
+
+  // Minimum RAM in MB
+  uint32 min_ram_mb = 2;
+
+  // Minimum storage in MB
+  uint32 min_storage_mb = 3;
+
+  // Required accelerator type
+  AcceleratorType accelerator_type = 4;
+}
+
+// Accelerator type for inference
+enum AcceleratorType {
+  ACCELERATOR_TYPE_UNSPECIFIED = 0;
+  ACCELERATOR_TYPE_CPU = 1;           // CPU-only
+  ACCELERATOR_TYPE_CUDA = 2;          // NVIDIA CUDA GPU
+  ACCELERATOR_TYPE_TENSORRT = 3;      // NVIDIA TensorRT
+  ACCELERATOR_TYPE_JETSON = 4;        // NVIDIA Jetson (Orin, Xavier, etc.)
+  ACCELERATOR_TYPE_CORAL = 5;         // Google Coral TPU
+  ACCELERATOR_TYPE_OPENVINO = 6;      // Intel OpenVINO
+}
+
+// Performance metrics from model validation
+message ModelPerformanceMetrics {
+  // Mean Average Precision (mAP) for detection models
+  float map = 1;
+
+  // Inference time in milliseconds (average)
+  float inference_time_ms = 2;
+
+  // Frames per second on reference hardware
+  float fps = 3;
+
+  // Accuracy (for classification models)
+  float accuracy = 4;
+
+  // Reference hardware used for benchmarks
+  string benchmark_hardware = 5;
+}
+
+// ============================================================================
+// Model Deployment Status (Upward Flow)
+// ============================================================================
+
+// Model deployment status - flows upward from platforms
+//
+// Platforms report deployment progress and status back to C2.
+message ModelDeploymentStatus {
+  // Reference to the deployment
+  string deployment_id = 1;
+
+  // Platform reporting status
+  string platform_id = 2;
+
+  // Current status of deployment on this platform
+  DeploymentState state = 3;
+
+  // Progress percentage (0-100) for downloads
+  uint32 progress_percent = 4;
+
+  // Error message if deployment failed
+  string error_message = 5;
+
+  // Timestamp of this status update
+  common.v1.Timestamp updated_at = 6;
+
+  // Hash of downloaded file (for verification reporting)
+  string downloaded_hash = 7;
+
+  // Previous model version (before update)
+  string previous_version = 8;
+}
+
+// State of deployment on a platform
+enum DeploymentState {
+  DEPLOYMENT_STATE_UNSPECIFIED = 0;
+  DEPLOYMENT_STATE_PENDING = 1;       // Deployment received, not started
+  DEPLOYMENT_STATE_DOWNLOADING = 2;   // Currently downloading model
+  DEPLOYMENT_STATE_VERIFYING = 3;     // Verifying hash/integrity
+  DEPLOYMENT_STATE_INSTALLING = 4;    // Installing/loading model
+  DEPLOYMENT_STATE_COMPLETE = 5;      // Successfully deployed
+  DEPLOYMENT_STATE_FAILED = 6;        // Deployment failed
+  DEPLOYMENT_STATE_ROLLED_BACK = 7;   // Rolled back to previous version
+}
+
+// ============================================================================
+// Model Query and Response
+// ============================================================================
+
+// Query for available models
+message ModelQuery {
+  // Filter by model type
+  ModelType model_type = 1;
+
+  // Filter by platform compatibility
+  string platform_id = 2;
+
+  // Filter by minimum version
+  string min_version = 3;
+
+  // Filter by accelerator type
+  AcceleratorType accelerator_type = 4;
+}
+
+// Response containing available models
+message ModelCatalogResponse {
+  // List of available models
+  repeated ModelDeployment models = 1;
+
+  // Total count
+  uint32 total_count = 2;
+}
