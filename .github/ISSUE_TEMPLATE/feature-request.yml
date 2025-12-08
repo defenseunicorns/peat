@@ -1,0 +1,89 @@
+name: "✨ Feature Request"
+description: "Request a new feature or capability"
+title: "[FEATURE] "
+labels: ["type/enhancement", "status/needs-triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Feature Request
+        Describe the feature you'd like to add to HIVE Protocol.
+
+  - type: dropdown
+    id: team
+    attributes:
+      label: "Primary Team"
+      description: "Which team would own this feature?"
+      options:
+        - "Core"
+        - "ATAK"
+        - "AI"
+        - "Experiments"
+        - "Unknown / Cross-cutting"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: "Related Phase"
+      description: "Which demo phase would this support?"
+      options:
+        - "Phase 1: Initialization & Capability Advertisement"
+        - "Phase 2: Mission Tasking"
+        - "Phase 3: Active Tracking"
+        - "Phase 4: Track Handoff"
+        - "Phase 5: MLOps Model Distribution"
+        - "Not demo-specific"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Problem Statement"
+      description: "What problem does this feature solve?"
+      placeholder: "Currently, there is no way to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: "Proposed Solution"
+      description: "How should this feature work?"
+      placeholder: "I propose adding..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternatives Considered"
+      description: "What other approaches did you consider?"
+      placeholder: "Alternative approaches include..."
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: "Acceptance Criteria"
+      description: "How do we know this feature is complete?"
+      value: |
+        - [ ] Criteria 1
+        - [ ] Criteria 2
+        - [ ] Integration test passes
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "Suggested Priority"
+      description: "How important is this feature?"
+      options:
+        - "P1 - Critical for demo"
+        - "P2 - Important but not blocking"
+        - "P3 - Nice to have"
+    validations:
+      required: true

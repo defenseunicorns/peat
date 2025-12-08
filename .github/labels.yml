@@ -1,0 +1,177 @@
+# HIVE Protocol Demo - GitHub Labels Configuration
+# 
+# To apply these labels to your repository, use the GitHub CLI:
+#   gh label create "team/core" --color "0052CC" --description "Core protocol team"
+#
+# Or use a label sync tool like https://github.com/EndBug/label-sync
+#
+# Organization: (r)evolve - Revolve Team LLC
+# Repository: kitplummer/hive
+
+# =============================================================================
+# TEAM LABELS - Ownership and responsibility
+# =============================================================================
+
+- name: "team/core"
+  color: "0052CC"
+  description: "Core team: Schema, protocol, reference implementation"
+
+- name: "team/atak"
+  color: "5319E7"
+  description: "ATAK team: Android plugin, CoT translation, TAK integration"
+
+- name: "team/experiments"
+  color: "006B75"
+  description: "Experiments team: Scale labs, network simulation, validation"
+
+- name: "team/ai"
+  color: "D93F0B"
+  description: "AI team: Jetson inference, MLOps, model management"
+
+- name: "team/pm"
+  color: "FBCA04"
+  description: "Project management: Coordination, scheduling, stakeholders"
+
+# =============================================================================
+# VIGNETTE PHASE LABELS - Demo milestone tracking
+# =============================================================================
+
+- name: "phase/1-init"
+  color: "C2E0C6"
+  description: "Phase 1: Initialization & Capability Advertisement"
+
+- name: "phase/2-tasking"
+  color: "C2E0C6"
+  description: "Phase 2: Mission Tasking via TAK"
+
+- name: "phase/3-tracking"
+  color: "C2E0C6"
+  description: "Phase 3: Active Tracking & Track Updates"
+
+- name: "phase/4-handoff"
+  color: "C2E0C6"
+  description: "Phase 4: Cross-Network Track Handoff"
+
+- name: "phase/5-mlops"
+  color: "C2E0C6"
+  description: "Phase 5: MLOps Model Distribution & Hot-Swap"
+
+# =============================================================================
+# TYPE LABELS - Issue classification
+# =============================================================================
+
+- name: "type/schema"
+  color: "1D76DB"
+  description: "Schema definition or change"
+
+- name: "type/integration"
+  color: "1D76DB"
+  description: "Cross-team integration work"
+
+- name: "type/blocker"
+  color: "B60205"
+  description: "Blocking another team's progress"
+
+- name: "type/dependency"
+  color: "FBCA04"
+  description: "Has external or cross-team dependency"
+
+- name: "type/contract"
+  color: "5319E7"
+  description: "Interface contract definition"
+
+- name: "type/validation"
+  color: "0E8A16"
+  description: "Validation or acceptance testing"
+
+- name: "type/documentation"
+  color: "0075CA"
+  description: "Documentation update required"
+
+- name: "type/bug"
+  color: "D73A4A"
+  description: "Something isn't working"
+
+- name: "type/enhancement"
+  color: "A2EEEF"
+  description: "New feature or request"
+
+# =============================================================================
+# PRIORITY LABELS - Urgency classification
+# =============================================================================
+
+- name: "priority/p0-blocker"
+  color: "B60205"
+  description: "Critical: Blocks demo, immediate attention required"
+
+- name: "priority/p1-critical"
+  color: "D93F0B"
+  description: "High: Required for current sprint milestone"
+
+- name: "priority/p2-normal"
+  color: "FBCA04"
+  description: "Normal: Standard priority work item"
+
+- name: "priority/p3-low"
+  color: "0E8A16"
+  description: "Low: Nice to have, can defer"
+
+# =============================================================================
+# STATUS LABELS - Workflow state
+# =============================================================================
+
+- name: "status/needs-triage"
+  color: "D4C5F9"
+  description: "Needs team assignment and priority"
+
+- name: "status/blocked"
+  color: "B60205"
+  description: "Blocked by external dependency"
+
+- name: "status/in-review"
+  color: "FBCA04"
+  description: "PR submitted, awaiting review"
+
+- name: "status/integration-test"
+  color: "0E8A16"
+  description: "Ready for cross-team integration testing"
+
+- name: "status/demo-ready"
+  color: "0E8A16"
+  description: "Validated and ready for demo"
+
+# =============================================================================
+# COMPONENT LABELS - Technical area
+# =============================================================================
+
+- name: "component/schema"
+  color: "BFD4F2"
+  description: "JSON schema definitions"
+
+- name: "component/automerge"
+  color: "BFD4F2"
+  description: "Automerge CRDT sync engine"
+
+- name: "component/iroh"
+  color: "BFD4F2"
+  description: "Iroh networking layer"
+
+- name: "component/tak-bridge"
+  color: "BFD4F2"
+  description: "HIVE-TAK Bridge / CoT translation"
+
+- name: "component/atak-plugin"
+  color: "BFD4F2"
+  description: "ATAK Android plugin"
+
+- name: "component/jetson"
+  color: "BFD4F2"
+  description: "Jetson edge compute / inference"
+
+- name: "component/mlops"
+  color: "BFD4F2"
+  description: "Model distribution and lifecycle"
+
+- name: "component/containerlab"
+  color: "BFD4F2"
+  description: "Network simulation topology"
