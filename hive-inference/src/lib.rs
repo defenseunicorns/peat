@@ -40,6 +40,7 @@ pub mod schema;
 pub mod sync;
 pub mod team;
 pub mod testing;
+pub mod ugv_client;
 
 // Platform types and traits
 pub use coordinator::{
@@ -105,3 +106,6 @@ pub use schema::{
 // Re-export hive-schema proto types
 pub use hive_schema::capability::v1 as proto_capability;
 pub use hive_schema::track::v1 as proto_track;
+
+// Simulated UGV client for demo (Issue #331)
+pub use ugv_client::{MissionCommand, MovementMode, PatrolPattern, UgvClient, UgvConfig, UgvState};
