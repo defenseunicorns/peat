@@ -12,18 +12,44 @@
 //! # What It Does
 //!
 //! 1. Creates a HIVE node with mDNS discovery enabled
-//! 2. Publishes mock JSON documents to test sync
+//! 2. Publishes moving tracks that fly patterns over Atlanta
 //! 3. Starts P2P sync and waits for peers to discover via mDNS
 //!
 //! The ATAK plugin running with the same formation credentials
 //! should discover this node via mDNS and sync data.
 
 use hive_ffi::{create_node, NodeConfig};
+use std::f64::consts::PI;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+/// Atlanta area center coordinates
+const ATLANTA_LAT: f64 = 33.749;
+const ATLANTA_LON: f64 = -84.388;
+
+/// Flight pattern configuration
+struct FlightPattern {
+    name: &'static str,
+    pattern_type: PatternType,
+    center_lat: f64,
+    center_lon: f64,
+    radius_deg: f64,   // Pattern radius in degrees
+    altitude_m: f64,   // Altitude in meters
+    speed_factor: f64, // How fast the pattern progresses
+    classification: &'static str,
+    category: &'static str,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum PatternType {
+    Orbit,     // Circular orbit
+    Racetrack, // Oval racetrack pattern
+    Figure8,   // Figure-8 pattern
+    Lawnmower, // Search pattern (back and forth)
+}
+
 fn main() {
-    println!("=== HIVE TAK Test Client (mDNS Discovery) ===\n");
+    println!("=== HIVE TAK Test Client - Atlanta Flight Patterns ===\n");
 
     // Use same credentials as ATAK plugin defaults
     let app_id = std::env::var("HIVE_APP_ID").unwrap_or_else(|_| "default-atak-formation".into());
@@ -38,6 +64,7 @@ fn main() {
     println!("Configuration:");
     println!("  Formation: {}", app_id);
     println!("  Storage: {}", storage_path);
+    println!("  Area: Atlanta ({:.3}, {:.3})", ATLANTA_LAT, ATLANTA_LON);
     println!();
 
     println!("Creating HIVE node with mDNS discovery...");
@@ -60,8 +87,58 @@ fn main() {
     println!("Endpoint: {}", node.endpoint_addr());
     println!();
 
-    // Publish mock data using generic document API
-    publish_mock_data(&node);
+    // Define flight patterns over Atlanta
+    let patterns = vec![
+        FlightPattern {
+            name: "HAWK-1",
+            pattern_type: PatternType::Orbit,
+            center_lat: ATLANTA_LAT + 0.02, // North of downtown
+            center_lon: ATLANTA_LON - 0.01,
+            radius_deg: 0.015,
+            altitude_m: 300.0,
+            speed_factor: 1.0,
+            classification: "a-f-A-M-F-Q", // Friendly UAV
+            category: "aircraft",
+        },
+        FlightPattern {
+            name: "HAWK-2",
+            pattern_type: PatternType::Racetrack,
+            center_lat: ATLANTA_LAT - 0.015, // South of downtown
+            center_lon: ATLANTA_LON + 0.02,
+            radius_deg: 0.02,
+            altitude_m: 250.0,
+            speed_factor: 0.8,
+            classification: "a-f-A-M-F-Q",
+            category: "aircraft",
+        },
+        FlightPattern {
+            name: "SCOUT-1",
+            pattern_type: PatternType::Figure8,
+            center_lat: ATLANTA_LAT, // Over downtown
+            center_lon: ATLANTA_LON,
+            radius_deg: 0.025,
+            altitude_m: 400.0,
+            speed_factor: 0.6,
+            classification: "a-f-A-M-F-Q",
+            category: "aircraft",
+        },
+        FlightPattern {
+            name: "SEARCH-1",
+            pattern_type: PatternType::Lawnmower,
+            center_lat: ATLANTA_LAT + 0.01, // East of downtown (near airport)
+            center_lon: ATLANTA_LON + 0.04,
+            radius_deg: 0.03,
+            altitude_m: 200.0,
+            speed_factor: 0.5,
+            classification: "a-f-A-M-F-Q",
+            category: "aircraft",
+        },
+    ];
+
+    // Initial publish
+    let mut time_offset = 0u64;
+    publish_flight_patterns(&node, &patterns, time_offset);
+    publish_cells_and_platforms(&node);
 
     // Verify data was stored
     println!("\n--- Verifying stored data ---");
@@ -86,20 +163,24 @@ fn main() {
     }
     println!("Sync started. Initial peer count: {}", node.peer_count());
 
-    // Keep running to allow sync and peer discovery
-    println!("\nWaiting for mDNS peer discovery... (Ctrl+C to exit)");
+    // Keep running and update positions
+    println!("\nFlying patterns over Atlanta... (Ctrl+C to exit)");
     println!("ATAK plugin should discover this node via mDNS.\n");
 
     loop {
-        std::thread::sleep(std::time::Duration::from_secs(5));
+        std::thread::sleep(std::time::Duration::from_secs(2));
+        time_offset += 2;
+
         let peers = node.peer_count();
         let connected = node.connected_peers();
-        println!("Peer count: {} {:?}", peers, connected);
 
-        // Re-publish data periodically to update timestamps
-        if peers > 0 {
-            println!("  Refreshing data for sync...");
-            publish_mock_data(&node);
+        // Update track positions
+        publish_flight_patterns(&node, &patterns, time_offset);
+
+        println!("[t={}s] Peers: {} | Tracks updated", time_offset, peers);
+
+        if !connected.is_empty() {
+            println!("  Connected: {:?}", connected);
         }
     }
 }
@@ -111,118 +192,223 @@ fn current_timestamp() -> i64 {
         .as_millis() as i64
 }
 
-fn publish_mock_data(node: &hive_ffi::HiveNode) {
-    println!("--- Publishing mock data ---");
+/// Calculate position for a given flight pattern at a given time
+fn calculate_position(pattern: &FlightPattern, time_secs: u64) -> (f64, f64, f64) {
+    let t = (time_secs as f64) * pattern.speed_factor * 0.1; // Scale time for smooth movement
 
-    // Publish cells
-    let cells = vec![
-        serde_json::json!({
-            "id": "cell-alpha-001",
-            "name": "Alpha Team",
-            "status": "active",
-            "platform_count": 4,
-            "center_lat": 38.8977,
-            "center_lon": -77.0365,
-            "capabilities": ["ISR", "EW", "STRIKE"],
-            "formation_id": "formation-main",
-            "leader_id": "platform-uav-001",
-            "last_update": current_timestamp()
-        }),
-        serde_json::json!({
-            "id": "cell-bravo-002",
-            "name": "Bravo Team",
-            "status": "forming",
-            "platform_count": 2,
-            "center_lat": 38.9072,
-            "center_lon": -77.0369,
-            "capabilities": ["LOGISTICS", "COMMS"],
-            "formation_id": "formation-main",
-            "last_update": current_timestamp()
-        }),
-    ];
+    let (lat_offset, lon_offset) = match pattern.pattern_type {
+        PatternType::Orbit => {
+            // Simple circular orbit
+            let angle = t % (2.0 * PI);
+            (
+                pattern.radius_deg * angle.sin(),
+                pattern.radius_deg * angle.cos(),
+            )
+        }
+        PatternType::Racetrack => {
+            // Oval racetrack: two semicircles connected by straight segments
+            let cycle = t % (2.0 * PI);
+            if cycle < PI / 2.0 {
+                // First straight
+                let progress = cycle / (PI / 2.0);
+                (
+                    pattern.radius_deg * 0.5,
+                    pattern.radius_deg * (progress - 0.5),
+                )
+            } else if cycle < PI {
+                // First turn
+                let angle = (cycle - PI / 2.0) * 2.0;
+                (
+                    pattern.radius_deg * 0.5 * angle.cos(),
+                    pattern.radius_deg * 0.5 + pattern.radius_deg * 0.5 * angle.sin(),
+                )
+            } else if cycle < 3.0 * PI / 2.0 {
+                // Second straight
+                let progress = (cycle - PI) / (PI / 2.0);
+                (
+                    -pattern.radius_deg * 0.5,
+                    pattern.radius_deg * (0.5 - progress),
+                )
+            } else {
+                // Second turn
+                let angle = (cycle - 3.0 * PI / 2.0) * 2.0 + PI;
+                (
+                    pattern.radius_deg * 0.5 * angle.cos(),
+                    -pattern.radius_deg * 0.5 + pattern.radius_deg * 0.5 * angle.sin(),
+                )
+            }
+        }
+        PatternType::Figure8 => {
+            // Figure-8 using lemniscate of Bernoulli
+            let angle = t % (2.0 * PI);
+            let denom = 1.0 + angle.sin().powi(2);
+            (
+                pattern.radius_deg * angle.sin() / denom,
+                pattern.radius_deg * angle.sin() * angle.cos() / denom,
+            )
+        }
+        PatternType::Lawnmower => {
+            // Back and forth search pattern
+            let row_time = 10.0; // seconds per row
+            let total_rows = 6.0;
+            let cycle_time = row_time * total_rows;
+            let t_cycle = t % cycle_time;
+            let row = (t_cycle / row_time).floor();
+            let row_progress = (t_cycle % row_time) / row_time;
 
-    for cell in cells {
-        let id = cell["id"].as_str().unwrap();
-        let json = cell.to_string();
-        match node.put_document("cells", id, &json) {
-            Ok(()) => println!("  Published cell: {}", id),
-            Err(e) => eprintln!("  Error publishing cell {}: {:?}", id, e),
+            let lat_offset = pattern.radius_deg * (row / total_rows - 0.5);
+            let lon_offset = if row as i32 % 2 == 0 {
+                pattern.radius_deg * (row_progress - 0.5)
+            } else {
+                pattern.radius_deg * (0.5 - row_progress)
+            };
+            (lat_offset, lon_offset)
+        }
+    };
+
+    let lat = pattern.center_lat + lat_offset;
+    let lon = pattern.center_lon + lon_offset;
+    let alt = pattern.altitude_m;
+
+    (lat, lon, alt)
+}
+
+/// Calculate heading based on movement direction
+fn calculate_heading(pattern: &FlightPattern, time_secs: u64) -> f64 {
+    let (lat1, lon1, _) = calculate_position(pattern, time_secs);
+    let (lat2, lon2, _) = calculate_position(pattern, time_secs + 1);
+
+    let dlat = lat2 - lat1;
+    let dlon = lon2 - lon1;
+
+    let heading_rad = dlon.atan2(dlat);
+    let heading_deg = heading_rad.to_degrees();
+
+    // Normalize to 0-360
+    if heading_deg < 0.0 {
+        heading_deg + 360.0
+    } else {
+        heading_deg
+    }
+}
+
+/// Publish flight pattern tracks
+fn publish_flight_patterns(node: &hive_ffi::HiveNode, patterns: &[FlightPattern], time_secs: u64) {
+    let now = current_timestamp();
+
+    for (i, pattern) in patterns.iter().enumerate() {
+        let (lat, lon, alt) = calculate_position(pattern, time_secs);
+        let heading = calculate_heading(pattern, time_secs);
+
+        let track_id = format!("track-{}", pattern.name.to_lowercase().replace('-', "_"));
+
+        let track = serde_json::json!({
+            "id": track_id,
+            "source_platform": format!("platform-{}", pattern.name.to_lowercase()),
+            "cell_id": "cell-atlanta-001",
+            "formation_id": "atlanta-isr",
+            "lat": lat,
+            "lon": lon,
+            "hae": alt,
+            "heading": heading,
+            "speed": 25.0 + (i as f64 * 5.0),  // Varying speeds
+            "classification": pattern.classification,
+            "confidence": 0.95,
+            "category": pattern.category,
+            "attributes": {
+                "callsign": pattern.name,
+                "pattern": format!("{:?}", pattern.pattern_type),
+                "altitude_ft": (alt * 3.28084) as i32
+            },
+            "created_at": now,
+            "last_update": now
+        });
+
+        let json = track.to_string();
+        if let Err(e) = node.put_document("tracks", &track_id, &json) {
+            eprintln!("Error publishing track {}: {:?}", track_id, e);
+        } else {
+            // Sync the document to connected peers
+            if let Err(e) = node.sync_document("tracks", &track_id) {
+                // Only log at debug level - sync may fail if no peers connected yet
+                if node.peer_count() > 0 {
+                    eprintln!("Error syncing track {}: {:?}", track_id, e);
+                }
+            }
         }
     }
+}
 
-    // Publish tracks
-    let now = current_timestamp();
-    let tracks = vec![
-        serde_json::json!({
-            "id": "track-001",
-            "source_platform": "platform-uav-001",
-            "cell_id": "cell-alpha-001",
-            "lat": 38.8920,
-            "lon": -77.0300,
-            "hae": 0.0,
-            "classification": "a-h-G-U-C",
-            "confidence": 0.85,
-            "category": "vehicle",
-            "last_update": now
-        }),
-        serde_json::json!({
-            "id": "track-002",
-            "source_platform": "platform-uav-002",
-            "cell_id": "cell-alpha-001",
-            "lat": 38.8950,
-            "lon": -77.0280,
-            "classification": "a-h-G-U-C-I",
-            "confidence": 0.72,
-            "category": "person",
-            "last_update": now
-        }),
-    ];
+/// Publish cells and platforms (static data)
+fn publish_cells_and_platforms(node: &hive_ffi::HiveNode) {
+    println!("--- Publishing cells and platforms ---");
 
-    for track in tracks {
-        let id = track["id"].as_str().unwrap();
-        let json = track.to_string();
-        match node.put_document("tracks", id, &json) {
-            Ok(()) => println!("  Published track: {}", id),
-            Err(e) => eprintln!("  Error publishing track {}: {:?}", id, e),
-        }
+    // Publish Atlanta cell
+    let cell = serde_json::json!({
+        "id": "cell-atlanta-001",
+        "name": "Atlanta ISR Cell",
+        "status": "active",
+        "platform_count": 4,
+        "center_lat": ATLANTA_LAT,
+        "center_lon": ATLANTA_LON,
+        "capabilities": ["ISR", "SURVEILLANCE", "RECON"],
+        "formation_id": "atlanta-isr",
+        "leader_id": "platform-hawk_1",
+        "last_update": current_timestamp()
+    });
+
+    let json = cell.to_string();
+    match node.put_document("cells", "cell-atlanta-001", &json) {
+        Ok(()) => println!("  Published cell: cell-atlanta-001"),
+        Err(e) => eprintln!("  Error publishing cell: {:?}", e),
     }
 
     // Publish platforms
     let platforms = vec![
-        serde_json::json!({
-            "id": "platform-uav-001",
-            "name": "RAVEN-1",
-            "platform_type": "UAV",
-            "lat": 38.8990,
-            "lon": -77.0360,
-            "hae": 150.0,
-            "readiness": 0.95,
-            "cell_id": "cell-alpha-001",
-            "capabilities": ["ISR", "EW"],
-            "status": "ready",
-            "last_heartbeat": current_timestamp()
-        }),
-        serde_json::json!({
-            "id": "platform-uav-002",
-            "name": "RAVEN-2",
-            "platform_type": "UAV",
-            "lat": 38.8960,
-            "lon": -77.0380,
-            "hae": 120.0,
-            "readiness": 0.90,
-            "cell_id": "cell-alpha-001",
-            "capabilities": ["ISR"],
-            "status": "active",
-            "last_heartbeat": current_timestamp()
-        }),
+        (
+            "HAWK-1",
+            "UAV",
+            ATLANTA_LAT + 0.02,
+            ATLANTA_LON - 0.01,
+            300.0,
+        ),
+        (
+            "HAWK-2",
+            "UAV",
+            ATLANTA_LAT - 0.015,
+            ATLANTA_LON + 0.02,
+            250.0,
+        ),
+        ("SCOUT-1", "UAV", ATLANTA_LAT, ATLANTA_LON, 400.0),
+        (
+            "SEARCH-1",
+            "UAV",
+            ATLANTA_LAT + 0.01,
+            ATLANTA_LON + 0.04,
+            200.0,
+        ),
     ];
 
-    for platform in platforms {
-        let id = platform["id"].as_str().unwrap();
+    for (name, ptype, lat, lon, alt) in platforms {
+        let platform_id = format!("platform-{}", name.to_lowercase().replace('-', "_"));
+        let platform = serde_json::json!({
+            "id": platform_id,
+            "name": name,
+            "platform_type": ptype,
+            "lat": lat,
+            "lon": lon,
+            "hae": alt,
+            "readiness": 0.95,
+            "cell_id": "cell-atlanta-001",
+            "capabilities": ["ISR", "EO/IR"],
+            "status": "active",
+            "last_heartbeat": current_timestamp()
+        });
+
         let json = platform.to_string();
-        match node.put_document("platforms", id, &json) {
-            Ok(()) => println!("  Published platform: {}", id),
-            Err(e) => eprintln!("  Error publishing platform {}: {:?}", id, e),
+        match node.put_document("platforms", &platform_id, &json) {
+            Ok(()) => println!("  Published platform: {}", platform_id),
+            Err(e) => eprintln!("  Error publishing platform {}: {:?}", platform_id, e),
         }
     }
 }
