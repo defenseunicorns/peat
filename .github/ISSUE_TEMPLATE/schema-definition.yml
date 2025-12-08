@@ -1,0 +1,104 @@
+name: "📋 Schema Definition"
+description: "Define or modify a HIVE Protocol schema (Core team primary)"
+title: "[SCHEMA] "
+labels: ["type/schema", "team/core", "status/needs-triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Schema Definition Request
+        Use this template for defining new schemas or modifying existing ones.
+        Core team owns schema definitions; consuming teams should comment with requirements.
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: "Vignette Phase"
+      description: "Which demo phase requires this schema?"
+      options:
+        - "Phase 1: Initialization & Capability Advertisement"
+        - "Phase 2: Mission Tasking"
+        - "Phase 3: Active Tracking"
+        - "Phase 4: Track Handoff"
+        - "Phase 5: MLOps Model Distribution"
+        - "Cross-cutting (multiple phases)"
+    validations:
+      required: true
+
+  - type: input
+    id: schema_name
+    attributes:
+      label: "Schema Name"
+      description: "Name of the schema (e.g., CapabilityAdvertisement, TrackUpdate)"
+      placeholder: "CapabilityAdvertisement"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Schema Purpose"
+      description: "What does this schema represent? What data does it carry?"
+      placeholder: "This schema represents..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: fields
+    attributes:
+      label: "Required Fields"
+      description: "List the required fields with types and descriptions"
+      value: |
+        | Field | Type | Required | Description |
+        |-------|------|----------|-------------|
+        | id | string | Yes | Unique identifier |
+        | timestamp | ISO8601 | Yes | When this was generated |
+        |  |  |  |  |
+    validations:
+      required: true
+
+  - type: textarea
+    id: example
+    attributes:
+      label: "Example JSON"
+      description: "Provide an example JSON instance"
+      render: json
+      placeholder: |
+        {
+          "id": "example-001",
+          "timestamp": "2025-12-08T10:00:00Z"
+        }
+    validations:
+      required: true
+
+  - type: textarea
+    id: consumers
+    attributes:
+      label: "Consuming Teams"
+      description: "Which teams will consume this schema? Tag them for review."
+      placeholder: "@team-ai @team-atak @team-experiments"
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: "Acceptance Criteria"
+      description: "How do we know this schema is complete and correct?"
+      value: |
+        - [ ] Schema validates against JSON Schema draft-07
+        - [ ] All consuming teams can serialize/deserialize
+        - [ ] Example passes validation
+        - [ ] Integration test demonstrates end-to-end flow
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: "References"
+      description: "Link to ADRs, vignette sections, or external specs"
+      placeholder: |
+        - ADR-018: AI Model Capability Advertisement
+        - Vignette Section 4.1: Phase 1 Flow

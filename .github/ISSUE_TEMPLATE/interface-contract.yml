@@ -1,0 +1,159 @@
+name: "🤝 Interface Contract"
+description: "Define a cross-team interface contract"
+title: "[CONTRACT] "
+labels: ["type/contract", "type/integration", "status/needs-triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Interface Contract Definition
+        Use this template to define contracts between teams. Both teams must approve before implementation begins.
+        
+        **Process:**
+        1. Owner team creates contract issue
+        2. Consumer team reviews and comments
+        3. Both teams approve (add ✅ reaction)
+        4. Implementation proceeds
+        5. Integration test validates contract
+
+  - type: dropdown
+    id: owner_team
+    attributes:
+      label: "Owner Team (Defines)"
+      description: "Which team owns/defines this interface?"
+      options:
+        - "Core"
+        - "ATAK"
+        - "AI"
+        - "Experiments"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: consumer_team
+    attributes:
+      label: "Consumer Team (Implements)"
+      description: "Which team consumes this interface?"
+      options:
+        - "Core"
+        - "ATAK"
+        - "AI"
+        - "Experiments"
+    validations:
+      required: true
+
+  - type: input
+    id: contract_name
+    attributes:
+      label: "Contract Name"
+      description: "Short name for this interface (e.g., Core↔AI Capability)"
+      placeholder: "Core↔AI: CapabilityAdvertisement"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: "Required By Phase"
+      description: "Which demo phase requires this interface?"
+      options:
+        - "Phase 1: Initialization & Capability Advertisement"
+        - "Phase 2: Mission Tasking"
+        - "Phase 3: Active Tracking"
+        - "Phase 4: Track Handoff"
+        - "Phase 5: MLOps Model Distribution"
+    validations:
+      required: true
+
+  - type: textarea
+    id: interface_description
+    attributes:
+      label: "Interface Description"
+      description: "What does this interface do? What problem does it solve?"
+      placeholder: "This interface allows the AI team to advertise model capabilities to the Core protocol..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: data_format
+    attributes:
+      label: "Data Format / Schema"
+      description: "Define the data structure exchanged"
+      render: json
+      placeholder: |
+        {
+          "platform_id": "string (UUID)",
+          "model_id": "string",
+          "model_version": "semver string",
+          "performance": {
+            "precision": "float 0-1",
+            "recall": "float 0-1",
+            "fps": "integer"
+          }
+        }
+    validations:
+      required: true
+
+  - type: textarea
+    id: protocol
+    attributes:
+      label: "Protocol / Transport"
+      description: "How is this data exchanged? (HIVE sync, HTTP, CoT, etc.)"
+      placeholder: |
+        - Transport: HIVE Automerge document sync
+        - Collection: `capabilities`
+        - Sync frequency: On change + heartbeat every 30s
+    validations:
+      required: true
+
+  - type: textarea
+    id: owner_responsibilities
+    attributes:
+      label: "Owner Team Responsibilities"
+      description: "What must the owner team provide?"
+      value: |
+        - [ ] Define and publish schema
+        - [ ] Provide validation library/function
+        - [ ] Document serialization format
+        - [ ] Provide mock data for consumer testing
+    validations:
+      required: true
+
+  - type: textarea
+    id: consumer_responsibilities
+    attributes:
+      label: "Consumer Team Responsibilities"
+      description: "What must the consumer team implement?"
+      value: |
+        - [ ] Implement serialization matching schema
+        - [ ] Handle schema validation errors gracefully
+        - [ ] Emit data at required frequency
+        - [ ] Pass integration test
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: "Integration Acceptance Criteria"
+      description: "How do we validate the interface works?"
+      value: |
+        - [ ] Owner can deserialize consumer's output without errors
+        - [ ] Consumer can deserialize owner's mock data without errors
+        - [ ] Round-trip test passes (serialize → transmit → deserialize)
+        - [ ] Performance meets requirements (latency < X ms)
+    validations:
+      required: true
+
+  - type: textarea
+    id: error_handling
+    attributes:
+      label: "Error Handling"
+      description: "How should each team handle errors?"
+      placeholder: |
+        - Invalid schema: Log error, reject message, continue operating
+        - Missing required field: Use default value or reject
+        - Network failure: Retry with exponential backoff
+    validations:
+      required: true
