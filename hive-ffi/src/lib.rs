@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 // JNI support for Android
-use jni::objects::{JClass, JString, JValue, GlobalRef};
+use jni::objects::{GlobalRef, JClass, JString, JValue};
 use jni::sys::{jint, jstring, JavaVM, JNI_VERSION_1_6};
 use jni::JNIEnv;
 use std::os::raw::c_void;
@@ -30,7 +30,8 @@ use std::sync::{LazyLock, Mutex};
 static JAVA_VM: LazyLock<Mutex<Option<jni::JavaVM>>> = LazyLock::new(|| Mutex::new(None));
 
 // Global reference to PeerEventManager class
-static PEER_EVENT_MANAGER_CLASS: LazyLock<Mutex<Option<GlobalRef>>> = LazyLock::new(|| Mutex::new(None));
+static PEER_EVENT_MANAGER_CLASS: LazyLock<Mutex<Option<GlobalRef>>> =
+    LazyLock::new(|| Mutex::new(None));
 
 use hive_protocol::cot::{
     CotEncoder, Position as CotPosition, TrackUpdate, Velocity as CotVelocity,
@@ -1258,10 +1259,9 @@ impl HiveNode {
 // =============================================================================
 
 fn parse_cell_json(id: &str, json: &str) -> Result<CellInfo, HiveError> {
-    let v: serde_json::Value =
-        serde_json::from_str(json).map_err(|e| HiveError::InvalidInput {
-            msg: format!("Invalid JSON: {}", e),
-        })?;
+    let v: serde_json::Value = serde_json::from_str(json).map_err(|e| HiveError::InvalidInput {
+        msg: format!("Invalid JSON: {}", e),
+    })?;
 
     Ok(CellInfo {
         id: id.to_string(),
@@ -1300,10 +1300,9 @@ fn serialize_cell_json(cell: &CellInfo) -> Result<String, HiveError> {
 }
 
 fn parse_track_json(id: &str, json: &str) -> Result<TrackInfo, HiveError> {
-    let v: serde_json::Value =
-        serde_json::from_str(json).map_err(|e| HiveError::InvalidInput {
-            msg: format!("Invalid JSON: {}", e),
-        })?;
+    let v: serde_json::Value = serde_json::from_str(json).map_err(|e| HiveError::InvalidInput {
+        msg: format!("Invalid JSON: {}", e),
+    })?;
 
     Ok(TrackInfo {
         id: id.to_string(),
@@ -1319,10 +1318,7 @@ fn parse_track_json(id: &str, json: &str) -> Result<TrackInfo, HiveError> {
         cep: v["cep"].as_f64(),
         heading: v["heading"].as_f64(),
         speed: v["speed"].as_f64(),
-        classification: v["classification"]
-            .as_str()
-            .unwrap_or("a-u-G")
-            .to_string(),
+        classification: v["classification"].as_str().unwrap_or("a-u-G").to_string(),
         confidence: v["confidence"].as_f64().unwrap_or(0.5),
         category: TrackCategory::from_str(v["category"].as_str().unwrap_or("UNKNOWN")),
         created_at: v["created_at"].as_i64().unwrap_or(0),
@@ -1351,17 +1347,13 @@ fn serialize_track_json(track: &TrackInfo) -> Result<String, HiveError> {
 }
 
 fn parse_platform_json(id: &str, json: &str) -> Result<PlatformInfo, HiveError> {
-    let v: serde_json::Value =
-        serde_json::from_str(json).map_err(|e| HiveError::InvalidInput {
-            msg: format!("Invalid JSON: {}", e),
-        })?;
+    let v: serde_json::Value = serde_json::from_str(json).map_err(|e| HiveError::InvalidInput {
+        msg: format!("Invalid JSON: {}", e),
+    })?;
 
     Ok(PlatformInfo {
         id: id.to_string(),
-        platform_type: v["platform_type"]
-            .as_str()
-            .unwrap_or("unknown")
-            .to_string(),
+        platform_type: v["platform_type"].as_str().unwrap_or("unknown").to_string(),
         name: v["name"].as_str().unwrap_or(id).to_string(),
         status: PlatformStatus::from_str(v["status"].as_str().unwrap_or("OFFLINE")),
         lat: v["lat"].as_f64().unwrap_or(0.0),
@@ -1398,17 +1390,13 @@ fn serialize_platform_json(platform: &PlatformInfo) -> Result<String, HiveError>
 }
 
 fn parse_command_json(id: &str, json: &str) -> Result<CommandInfo, HiveError> {
-    let v: serde_json::Value =
-        serde_json::from_str(json).map_err(|e| HiveError::InvalidInput {
-            msg: format!("Invalid JSON: {}", e),
-        })?;
+    let v: serde_json::Value = serde_json::from_str(json).map_err(|e| HiveError::InvalidInput {
+        msg: format!("Invalid JSON: {}", e),
+    })?;
 
     Ok(CommandInfo {
         id: id.to_string(),
-        command_type: v["command_type"]
-            .as_str()
-            .unwrap_or("UNKNOWN")
-            .to_string(),
+        command_type: v["command_type"].as_str().unwrap_or("UNKNOWN").to_string(),
         target_id: v["target_id"].as_str().unwrap_or("").to_string(),
         parameters: v["parameters"].to_string(),
         priority: v["priority"].as_u64().unwrap_or(3) as u8,
@@ -2087,22 +2075,22 @@ pub extern "C" fn JNI_OnLoad(vm: *mut JavaVM, _reserved: *mut c_void) -> jint {
     // Try to find PeerEventManager class and store global reference for callbacks
     let peer_event_manager_class = "com/revolveteam/atak/hive/PeerEventManager";
     match env.find_class(peer_event_manager_class) {
-        Ok(class) => {
-            match env.new_global_ref(class) {
-                Ok(global_ref) => {
-                    *PEER_EVENT_MANAGER_CLASS.lock().unwrap() = Some(global_ref);
-                    #[cfg(target_os = "android")]
-                    android_log("JNI_OnLoad: PeerEventManager class found and cached");
-                }
-                Err(_) => {
-                    #[cfg(target_os = "android")]
-                    android_log("JNI_OnLoad: Failed to create global ref for PeerEventManager");
-                }
+        Ok(class) => match env.new_global_ref(class) {
+            Ok(global_ref) => {
+                *PEER_EVENT_MANAGER_CLASS.lock().unwrap() = Some(global_ref);
+                #[cfg(target_os = "android")]
+                android_log("JNI_OnLoad: PeerEventManager class found and cached");
             }
-        }
+            Err(_) => {
+                #[cfg(target_os = "android")]
+                android_log("JNI_OnLoad: Failed to create global ref for PeerEventManager");
+            }
+        },
         Err(_) => {
             #[cfg(target_os = "android")]
-            android_log("JNI_OnLoad: PeerEventManager class not found (OK if loading before class init)");
+            android_log(
+                "JNI_OnLoad: PeerEventManager class not found (OK if loading before class init)",
+            );
         }
     }
 
@@ -2296,7 +2284,10 @@ fn notify_peer_event(method_name: &str, peer_id: &str, reason: Option<&str>) {
         Ok(env) => env,
         Err(e) => {
             #[cfg(target_os = "android")]
-            android_log(&format!("notify_peer_event: Failed to attach thread: {:?}", e));
+            android_log(&format!(
+                "notify_peer_event: Failed to attach thread: {:?}",
+                e
+            ));
             return;
         }
     };
@@ -2348,6 +2339,9 @@ fn notify_peer_event(method_name: &str, peer_id: &str, reason: Option<&str>) {
         let _ = env.exception_clear();
     } else {
         #[cfg(target_os = "android")]
-        android_log(&format!("notify_peer_event: {} called for {}", method_name, peer_id));
+        android_log(&format!(
+            "notify_peer_event: {} called for {}",
+            method_name, peer_id
+        ));
     }
 }

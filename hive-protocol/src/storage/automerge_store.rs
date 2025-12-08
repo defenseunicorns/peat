@@ -68,10 +68,7 @@ impl AutomergeStore {
         if db_path.exists() {
             if let Ok(metadata) = std::fs::metadata(&db_path) {
                 if metadata.len() == 0 {
-                    tracing::warn!(
-                        "Removing corrupted 0-byte redb database at {:?}",
-                        db_path
-                    );
+                    tracing::warn!("Removing corrupted 0-byte redb database at {:?}", db_path);
                     std::fs::remove_file(&db_path).ok();
                 }
             }
