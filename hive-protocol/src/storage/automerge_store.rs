@@ -63,6 +63,20 @@ impl AutomergeStore {
             path.to_path_buf()
         };
 
+        // Check for corrupted (0-byte) database file and remove it
+        // This can happen on Android if the previous initialization was interrupted
+        if db_path.exists() {
+            if let Ok(metadata) = std::fs::metadata(&db_path) {
+                if metadata.len() == 0 {
+                    tracing::warn!(
+                        "Removing corrupted 0-byte redb database at {:?}",
+                        db_path
+                    );
+                    std::fs::remove_file(&db_path).ok();
+                }
+            }
+        }
+
         let db = Database::create(&db_path).context("Failed to open redb database")?;
 
         // Initialize the table (redb requires this on first use)
