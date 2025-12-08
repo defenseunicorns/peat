@@ -2,6 +2,8 @@ package com.revolveteam.atak.hive
 
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import com.atakmap.android.dropdown.DropDownMapComponent
 import com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter
 import com.atakmap.android.maps.MapView
@@ -9,6 +11,7 @@ import com.atakmap.coremap.log.Log
 import com.revolveteam.atak.hive.model.HiveCell
 import com.revolveteam.atak.hive.model.HivePlatform
 import com.revolveteam.atak.hive.model.HiveTrack
+import com.revolveteam.atak.hive.overlay.HiveTrackOverlay
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -25,10 +28,15 @@ class HiveMapComponent : DropDownMapComponent() {
 
     companion object {
         private const val TAG = "HiveMapComponent"
+        private const val REFRESH_INTERVAL_MS = 2000L // Refresh every 2 seconds
     }
 
     private lateinit var pluginContext: Context
+    private lateinit var mapView: MapView
     private var dropDownReceiver: HiveDropDownReceiver? = null
+    private var trackOverlay: HiveTrackOverlay? = null
+    private val refreshHandler = Handler(Looper.getMainLooper())
+    private var isRefreshing = false
 
     // Simple state management without coroutines
     private val _cells = mutableListOf<HiveCell>()
@@ -50,7 +58,12 @@ class HiveMapComponent : DropDownMapComponent() {
         super.onCreate(context, intent, view)
 
         pluginContext = context
+        mapView = view
         Log.d(TAG, "HiveMapComponent onCreate")
+
+        // Create track overlay for map markers
+        trackOverlay = HiveTrackOverlay(view)
+        Log.d(TAG, "Track overlay created")
 
         // Create dropdown receiver
         dropDownReceiver = HiveDropDownReceiver(view, context, this)
@@ -63,12 +76,56 @@ class HiveMapComponent : DropDownMapComponent() {
         // Update connection status based on HIVE node availability
         updateConnectionStatus()
 
+        // Start periodic refresh for map markers
+        startPeriodicRefresh()
+
         Log.d(TAG, "HiveMapComponent initialized")
     }
 
     override fun onDestroyImpl(context: Context, view: MapView) {
         Log.d(TAG, "HiveMapComponent onDestroy")
+        stopPeriodicRefresh()
+        trackOverlay?.dispose()
+        trackOverlay = null
         super.onDestroyImpl(context, view)
+    }
+
+    /**
+     * Start periodic refresh of track data and map markers
+     */
+    private fun startPeriodicRefresh() {
+        if (isRefreshing) return
+        isRefreshing = true
+        Log.i(TAG, "Starting periodic refresh (${REFRESH_INTERVAL_MS}ms interval)")
+        refreshHandler.post(refreshRunnable)
+    }
+
+    /**
+     * Stop periodic refresh
+     */
+    private fun stopPeriodicRefresh() {
+        isRefreshing = false
+        refreshHandler.removeCallbacks(refreshRunnable)
+        Log.i(TAG, "Stopped periodic refresh")
+    }
+
+    private val refreshRunnable = object : Runnable {
+        override fun run() {
+            if (!isRefreshing) return
+
+            try {
+                refreshData()
+                // Update map markers
+                trackOverlay?.updateTracks(_tracks)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in periodic refresh: ${e.message}", e)
+            }
+
+            // Schedule next refresh
+            if (isRefreshing) {
+                refreshHandler.postDelayed(this, REFRESH_INTERVAL_MS)
+            }
+        }
     }
 
     /**
@@ -321,6 +378,18 @@ class HiveMapComponent : DropDownMapComponent() {
      * Get the node manager - returns null in this simplified version
      */
     fun getNodeManager(): Any? = null
+
+    /**
+     * Get the number of track markers currently on the map
+     */
+    fun getMapMarkerCount(): Int = trackOverlay?.getMarkerCount() ?: 0
+
+    /**
+     * Force update of track markers on the map
+     */
+    fun updateMapMarkers() {
+        trackOverlay?.updateTracks(_tracks)
+    }
 
     /**
      * Connection status enumeration

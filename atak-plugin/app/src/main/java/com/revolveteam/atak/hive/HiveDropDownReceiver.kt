@@ -176,8 +176,9 @@ class HiveDropDownReceiver(
         container.addView(createSpacer(24))
 
         // Tracks section
+        val mapMarkerCount = mapComponent.getMapMarkerCount()
         val tracksTitle = TextView(pluginContext).apply {
-            text = "Tracks (${mapComponent.tracks.size})"
+            text = "Tracks (${mapComponent.tracks.size}) • Map: $mapMarkerCount"
             textSize = 16f
             setTextColor(Color.WHITE)
         }
