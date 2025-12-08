@@ -35,8 +35,7 @@ pub use hive_schema::common::v1::{Position as ProtoPosition, Timestamp as ProtoT
 pub use hive_schema::track::v1::{
     SourceType as ProtoSourceType, Track as ProtoTrack, TrackPosition as ProtoTrackPosition,
     TrackSource as ProtoTrackSource, TrackState as ProtoTrackState,
-    TrackUpdate as ProtoTrackUpdate, UpdateType as ProtoUpdateType,
-    Velocity as ProtoVelocity,
+    TrackUpdate as ProtoTrackUpdate, UpdateType as ProtoUpdateType, Velocity as ProtoVelocity,
 };
 
 // ============================================================================
@@ -79,11 +78,8 @@ pub trait FromProtoCapability {
 impl ToProtoCapability for CapabilityAdvertisement {
     fn to_proto(&self) -> ProtoCapabilityAdvertisement {
         // Convert ModelCapabilities to generic Capabilities
-        let capabilities: Vec<ProtoCapability> = self
-            .models
-            .iter()
-            .map(|model| model_capability_to_proto(model))
-            .collect();
+        let capabilities: Vec<ProtoCapability> =
+            self.models.iter().map(model_capability_to_proto).collect();
 
         // Convert resource metrics
         let resources = self.resources.as_ref().map(resource_metrics_to_proto);
@@ -159,7 +155,7 @@ fn model_capability_to_proto(model: &ModelCapability) -> ProtoCapability {
         id: model.model_id.clone(),
         name: format!("{} v{}", model.model_id, model.model_version),
         capability_type: ProtoCapabilityType::Compute as i32, // AI models are compute capabilities
-        confidence: model.performance.precision as f32, // Use precision as confidence proxy
+        confidence: model.performance.precision as f32,       // Use precision as confidence proxy
         metadata_json: metadata.to_string(),
         registered_at: model.loaded_at.as_ref().map(datetime_to_proto),
     }
@@ -223,7 +219,10 @@ fn proto_to_model_capability(proto: &ProtoCapability) -> Option<ModelCapability>
             .get("class_labels")
             .and_then(|v| serde_json::from_value(v.clone()).ok())
             .unwrap_or_default(),
-        num_classes: metadata.get("num_classes").and_then(|v| v.as_u64()).map(|n| n as usize),
+        num_classes: metadata
+            .get("num_classes")
+            .and_then(|v| v.as_u64())
+            .map(|n| n as usize),
         loaded_at: proto.registered_at.as_ref().map(proto_to_datetime),
         inference_count: None,
         last_inference_at: None,
@@ -244,10 +243,14 @@ fn resource_metrics_to_proto(metrics: &ResourceMetrics) -> ProtoResourceStatus {
         compute_utilization: metrics.gpu_utilization.unwrap_or(0.0) as f32,
         memory_utilization: metrics
             .memory_used_mb
-            .and_then(|used| metrics.memory_total_mb.map(|total| used as f32 / total as f32))
+            .and_then(|used| {
+                metrics
+                    .memory_total_mb
+                    .map(|total| used as f32 / total as f32)
+            })
             .unwrap_or(0.0),
-        power_level: 1.0, // Not tracked in current metrics
-        storage_utilization: 0.0, // Not tracked in current metrics
+        power_level: 1.0,           // Not tracked in current metrics
+        storage_utilization: 0.0,   // Not tracked in current metrics
         bandwidth_utilization: 0.0, // Not tracked in current metrics
         extra_json: serde_json::json!({
             "gpu_utilization": metrics.gpu_utilization,
