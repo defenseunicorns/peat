@@ -25,6 +25,7 @@ cap-protocol/.ditto*
 
 # Codex
 Codex.md
+.mcp.json
 
 # Testing
 coverage/
