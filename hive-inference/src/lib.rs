@@ -57,12 +57,15 @@ pub use team::{
 
 // Inference pipeline
 pub use inference::{
-    Detection, Detector, InferenceHarness, InferencePipeline, PipelineConfig, Scenario,
-    SimulatedDetector, SimulatedTracker, Track, Tracker, VideoFrame,
+    ChipoutExtractor, Detection, Detector, InferenceHarness, InferencePipeline, PipelineConfig,
+    Scenario, SimulatedDetector, SimulatedTracker, Track, Tracker, VideoFrame,
 };
 
 // HIVE sync integration
-pub use sync::{ConnectedPipeline, HiveSyncClient, SyncConfig, SyncStats};
+pub use sync::{
+    ConnectedPipeline, ConnectedPipelineWithChipouts, HiveSyncClient, PipelineOutputWithChipouts,
+    SyncConfig, SyncStats,
+};
 
 // HIVE beacon (edge device registration)
 pub use beacon::{BeaconConfig, CameraSpec, ComputeSpec, HiveBeacon, ModelSpec};
@@ -75,6 +78,11 @@ pub use registry::{
 
 // Message types (expanded for Issue #107)
 pub use messages::{OperationalStatus, ResourceRequirements};
+
+// Chipout types for detection-triggered image extraction (Issue #321)
+pub use messages::{
+    ChipoutConfig, ChipoutDetection, ChipoutDocument, ChipoutImage, ChipoutTrigger, ImageFormat,
+};
 
 // Model update orchestration (Issue #177 / ADR-026)
 pub use orchestration::{
