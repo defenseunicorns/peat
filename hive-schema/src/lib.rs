@@ -25,6 +25,7 @@
 //! ### Protocol Schemas
 //! - **`beacon.v1`**: Discovery phase beacons and queries
 //! - **`composition.v1`**: Capability composition rules (additive, emergent, redundant, constraint)
+//! - **`model.v1`**: AI model deployment and distribution
 //!
 //! ## Three-Tier Hierarchy
 //!
@@ -123,6 +124,12 @@ pub mod cap {
     pub mod track {
         pub mod v1 {
             include!(concat!(env!("OUT_DIR"), "/cap.track.v1.rs"));
+        }
+    }
+
+    pub mod model {
+        pub mod v1 {
+            include!(concat!(env!("OUT_DIR"), "/cap.model.v1.rs"));
         }
     }
 }
