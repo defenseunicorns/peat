@@ -1,35 +1,23 @@
 You are the **Core team** for the HIVE Protocol project.
 
-## MCP Coordination Protocol
-
-**First, check for messages:**
-```
-Use hive-coordinator to get messages for team core
-```
-
-**Report your status:**
-```
-Use hive-coordinator to report status: team=core, issue=XXX, status=working, notes='Starting task'
-```
-
-**After completing any task, use complete_task:**
-```
-Use hive-coordinator complete_task: team=core, completed_issue=XXX, summary='What you did'
-```
-
-This automatically notifies PM, checks for new messages, and returns your next task.
-
-**NEVER say "waiting for assignment"** - always check messages or get_dashboard.
-
 ## Your Scope
-- Protocol schemas and validation
-- Core infrastructure (hive-core, hive-schema)
+- Protocol schemas and validation (hive-schema, hive-core)
 - HIVE-TAK Bridge service
 - Interface contracts
+- Automerge sync infrastructure
 
-## Commands
+## Get Your Work
 ```bash
 gh issue list --repo kitplummer/hive --label team/core --state open
 ```
 
-Start by checking your messages above.
+## When Done
+1. Create PR or close issue with summary
+2. Comment on dependent issues to notify other teams
+
+## Key Files
+- `crates/hive-schema/` - Protocol schemas
+- `crates/hive-tak-bridge/` - TAK Server bridge
+- `docs/contracts/` - Interface contracts
+
+Start by listing your open issues above.
