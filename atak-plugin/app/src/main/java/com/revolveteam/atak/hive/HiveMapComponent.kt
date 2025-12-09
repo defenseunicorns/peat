@@ -8,6 +8,7 @@ import com.atakmap.android.dropdown.DropDownMapComponent
 import com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter
 import com.atakmap.android.maps.MapView
 import com.atakmap.coremap.log.Log
+import com.atakmap.coremap.maps.coords.GeoPoint
 import com.revolveteam.atak.hive.model.HiveCell
 import com.revolveteam.atak.hive.model.HivePlatform
 import com.revolveteam.atak.hive.model.HiveTrack
@@ -64,6 +65,16 @@ class HiveMapComponent : DropDownMapComponent() {
 
     val peerCount: Int get() = HivePluginLifecycle.getInstance()?.getPeerCount() ?: 0
 
+    // Selected cell for hierarchical navigation
+    private var _selectedCellId: String? = null
+    val selectedCellId: String? get() = _selectedCellId
+
+    private var _selectedCellName: String? = null
+    val selectedCellName: String? get() = _selectedCellName
+
+    /** Callback for when cell selection changes */
+    var onCellSelectionChanged: ((cellId: String?, cellName: String?) -> Unit)? = null
+
     override fun onCreate(context: Context, intent: Intent, view: MapView) {
         context.setTheme(R.style.ATAKPluginTheme)
         super.onCreate(context, intent, view)
@@ -78,6 +89,12 @@ class HiveMapComponent : DropDownMapComponent() {
 
         // Create cell overlay for cell boundaries (kept for cell metadata, but cell markers are secondary to platforms)
         cellOverlay = HiveCellOverlay(view)
+        cellOverlay?.onCellSelectedListener = object : HiveCellOverlay.OnCellSelectedListener {
+            override fun onCellSelected(cellId: String, cellName: String, centerLat: Double, centerLon: Double, radiusMeters: Double) {
+                selectCell(cellId, cellName)
+                zoomToCell(centerLat, centerLon, radiusMeters)
+            }
+        }
         Log.d(TAG, "Cell overlay created")
 
         // Create platform overlay for individual platform markers
@@ -407,10 +424,57 @@ class HiveMapComponent : DropDownMapComponent() {
     }
 
     /**
-     * Select a cell
+     * Select a cell for hierarchical navigation view.
+     * @param cellId The cell ID to select, or null to clear selection
+     * @param cellName The cell name for display
      */
-    fun selectCell(cellId: String) {
-        Log.d(TAG, "Cell selected: $cellId")
+    fun selectCell(cellId: String?, cellName: String? = null) {
+        _selectedCellId = cellId
+        _selectedCellName = cellName ?: cellId?.let { id ->
+            _cells.find { it.id == id }?.name
+        }
+        Log.d(TAG, "Cell selected: $cellId ($cellName)")
+        onCellSelectionChanged?.invoke(_selectedCellId, _selectedCellName)
+    }
+
+    /**
+     * Clear the selected cell and return to all-cells view.
+     */
+    fun clearCellSelection() {
+        selectCell(null, null)
+    }
+
+    /**
+     * Get platforms filtered by the currently selected cell.
+     * @return All platforms if no cell selected, otherwise only platforms in selected cell
+     */
+    fun getFilteredPlatforms(): List<HivePlatform> {
+        val selectedId = _selectedCellId ?: return _platforms.toList()
+        return _platforms.filter { it.cellId == selectedId }
+    }
+
+    /**
+     * Zoom the map to show the specified cell bounds.
+     * @param centerLat Center latitude
+     * @param centerLon Center longitude
+     * @param radiusMeters Radius in meters to show
+     */
+    fun zoomToCell(centerLat: Double, centerLon: Double, radiusMeters: Double) {
+        try {
+            val centerPoint = GeoPoint(centerLat, centerLon)
+            // Calculate appropriate zoom scale based on radius
+            // ATAK uses map scale where lower = more zoomed in
+            // Roughly: scale = radiusMeters * 2 / screenWidthPixels * metersPerPixel
+            // For simplicity, use a scale that shows ~2x the radius
+            val zoomScale = (radiusMeters * 4.0).coerceIn(500.0, 100000.0)
+
+            mapView.mapController.panTo(centerPoint, true)
+            mapView.mapController.zoomTo(zoomScale, true)
+
+            Log.i(TAG, "Zoomed to cell at ($centerLat, $centerLon) with radius ${radiusMeters}m")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to zoom to cell: ${e.message}", e)
+        }
     }
 
     /**

@@ -46,6 +46,11 @@ class HiveDropDownReceiver(
     init {
         // Register for peer events
         PeerEventManager.addListener(this)
+
+        // Register for cell selection changes
+        mapComponent.onCellSelectionChanged = { _, _ ->
+            refreshContentOnMainThread()
+        }
     }
 
     override fun disposeImpl() {
@@ -116,20 +121,40 @@ class HiveDropDownReceiver(
     }
 
     private fun buildContentContainer(): LinearLayout {
-        Log.d(TAG, "Building content - cells: ${mapComponent.cells.size}, tracks: ${mapComponent.tracks.size}, platforms: ${mapComponent.platforms.size}")
+        val selectedCellId = mapComponent.selectedCellId
+        val selectedCellName = mapComponent.selectedCellName
+
+        Log.d(TAG, "Building content - cells: ${mapComponent.cells.size}, tracks: ${mapComponent.tracks.size}, platforms: ${mapComponent.platforms.size}, selectedCell: $selectedCellId")
+
         val container = LinearLayout(pluginContext).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 32)
         }
 
-        // Header
+        // Header with optional back button for cell-filtered view
         val header = LinearLayout(pluginContext).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
 
+        // Back button when viewing a specific cell
+        if (selectedCellId != null) {
+            val backButton = Button(pluginContext).apply {
+                text = "←"
+                textSize = 16f
+                setTextColor(Color.WHITE)
+                setBackgroundColor(Color.parseColor("#444444"))
+                setPadding(24, 8, 24, 8)
+                setOnClickListener {
+                    mapComponent.clearCellSelection()
+                }
+            }
+            header.addView(backButton)
+            header.addView(createHorizontalSpacer(16))
+        }
+
         val title = TextView(pluginContext).apply {
-            text = "HIVE Manager"
+            text = if (selectedCellId != null) "Cell: $selectedCellName" else "HIVE Manager"
             textSize = 20f
             setTextColor(Color.WHITE)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
@@ -152,80 +177,99 @@ class HiveDropDownReceiver(
         // Spacer
         container.addView(createSpacer(24))
 
-        // PLI Broadcast section
-        val pliSection = createPliBroadcastSection()
-        container.addView(pliSection)
-        container.addView(createSpacer(24))
-
-        // Cells section
-        val cellsTitle = TextView(pluginContext).apply {
-            text = "Active Cells"
-            textSize = 16f
-            setTextColor(Color.WHITE)
-        }
-        container.addView(cellsTitle)
-        container.addView(createSpacer(12))
-
-        if (mapComponent.cells.isEmpty()) {
-            val noCells = TextView(pluginContext).apply {
-                text = "No active cells"
-                textSize = 14f
-                setTextColor(Color.GRAY)
-            }
-            container.addView(noCells)
-        } else {
-            mapComponent.cells.forEach { cell ->
-                container.addView(createCellCard(cell))
-                container.addView(createSpacer(8))
-            }
+        // PLI Broadcast section (only in main view)
+        if (selectedCellId == null) {
+            val pliSection = createPliBroadcastSection()
+            container.addView(pliSection)
+            container.addView(createSpacer(24))
         }
 
-        container.addView(createSpacer(24))
-
-        // Tracks section
-        val mapMarkerCount = mapComponent.getMapMarkerCount()
-        val tracksTitle = TextView(pluginContext).apply {
-            text = "Tracks (${mapComponent.tracks.size}) • Map: $mapMarkerCount"
-            textSize = 16f
-            setTextColor(Color.WHITE)
-        }
-        container.addView(tracksTitle)
-        container.addView(createSpacer(12))
-
-        if (mapComponent.tracks.isEmpty()) {
-            val noTracks = TextView(pluginContext).apply {
-                text = "No tracks"
-                textSize = 14f
-                setTextColor(Color.GRAY)
+        // Cells section (only in main view, not when viewing a specific cell)
+        if (selectedCellId == null) {
+            val cellsTitle = TextView(pluginContext).apply {
+                text = "Active Cells"
+                textSize = 16f
+                setTextColor(Color.WHITE)
             }
-            container.addView(noTracks)
-        } else {
-            mapComponent.tracks.forEach { track ->
-                container.addView(createTrackCard(track))
-                container.addView(createSpacer(8))
+            container.addView(cellsTitle)
+            container.addView(createSpacer(8))
+
+            val cellsHint = TextView(pluginContext).apply {
+                text = "Tap a cell on the map to view its platforms"
+                textSize = 11f
+                setTextColor(Color.parseColor("#888888"))
             }
+            container.addView(cellsHint)
+            container.addView(createSpacer(12))
+
+            if (mapComponent.cells.isEmpty()) {
+                val noCells = TextView(pluginContext).apply {
+                    text = "No active cells"
+                    textSize = 14f
+                    setTextColor(Color.GRAY)
+                }
+                container.addView(noCells)
+            } else {
+                mapComponent.cells.forEach { cell ->
+                    container.addView(createCellCard(cell))
+                    container.addView(createSpacer(8))
+                }
+            }
+
+            container.addView(createSpacer(24))
         }
 
-        container.addView(createSpacer(24))
+        // Tracks section (only in main view)
+        if (selectedCellId == null) {
+            val mapMarkerCount = mapComponent.getMapMarkerCount()
+            val tracksTitle = TextView(pluginContext).apply {
+                text = "Tracks (${mapComponent.tracks.size}) • Map: $mapMarkerCount"
+                textSize = 16f
+                setTextColor(Color.WHITE)
+            }
+            container.addView(tracksTitle)
+            container.addView(createSpacer(12))
 
-        // Platforms section
+            if (mapComponent.tracks.isEmpty()) {
+                val noTracks = TextView(pluginContext).apply {
+                    text = "No tracks"
+                    textSize = 14f
+                    setTextColor(Color.GRAY)
+                }
+                container.addView(noTracks)
+            } else {
+                mapComponent.tracks.forEach { track ->
+                    container.addView(createTrackCard(track))
+                    container.addView(createSpacer(8))
+                }
+            }
+
+            container.addView(createSpacer(24))
+        }
+
+        // Platforms section - filtered when cell is selected
+        val filteredPlatforms = mapComponent.getFilteredPlatforms()
         val platformsTitle = TextView(pluginContext).apply {
-            text = "Platforms (${mapComponent.platforms.size})"
+            text = if (selectedCellId != null) {
+                "Platforms in Cell (${filteredPlatforms.size})"
+            } else {
+                "Platforms (${mapComponent.platforms.size})"
+            }
             textSize = 16f
             setTextColor(Color.WHITE)
         }
         container.addView(platformsTitle)
         container.addView(createSpacer(12))
 
-        if (mapComponent.platforms.isEmpty()) {
+        if (filteredPlatforms.isEmpty()) {
             val noPlatforms = TextView(pluginContext).apply {
-                text = "No platforms"
+                text = if (selectedCellId != null) "No platforms in this cell" else "No platforms"
                 textSize = 14f
                 setTextColor(Color.GRAY)
             }
             container.addView(noPlatforms)
         } else {
-            mapComponent.platforms.forEach { platform ->
+            filteredPlatforms.forEach { platform ->
                 container.addView(createPlatformCard(platform))
                 container.addView(createSpacer(8))
             }
@@ -246,6 +290,15 @@ class HiveDropDownReceiver(
         container.addView(infoCard)
 
         return container
+    }
+
+    private fun createHorizontalSpacer(widthDp: Int): View {
+        return View(pluginContext).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                (widthDp * pluginContext.resources.displayMetrics.density).toInt(),
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
+        }
     }
 
     private fun createSpacer(heightDp: Int): View {

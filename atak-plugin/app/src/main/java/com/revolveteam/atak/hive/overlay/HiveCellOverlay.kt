@@ -2,7 +2,10 @@ package com.revolveteam.atak.hive.overlay
 
 import android.graphics.Color
 import com.atakmap.android.drawing.mapItems.DrawingCircle
+import com.atakmap.android.maps.MapEvent
+import com.atakmap.android.maps.MapEventDispatcher
 import com.atakmap.android.maps.MapGroup
+import com.atakmap.android.maps.MapItem
 import com.atakmap.android.maps.MapView
 import com.atakmap.coremap.log.Log
 import com.atakmap.coremap.maps.coords.GeoPoint
@@ -21,8 +24,16 @@ import kotlin.math.*
  * - Circle color based on cell status (active=green, degraded=yellow, offline=red)
  * - Circle is semi-transparent with a colored border
  * - Label shows cell name
+ * - Tap on circle to zoom and view contained platforms
  */
 class HiveCellOverlay(private val mapView: MapView) {
+
+    /**
+     * Callback interface for cell selection events.
+     */
+    interface OnCellSelectedListener {
+        fun onCellSelected(cellId: String, cellName: String, centerLat: Double, centerLon: Double, radiusMeters: Double)
+    }
 
     companion object {
         private const val TAG = "HiveCellOverlay"
@@ -33,9 +44,44 @@ class HiveCellOverlay(private val mapView: MapView) {
 
     private var mapGroup: MapGroup? = null
     private val cellCircles = mutableMapOf<String, DrawingCircle>()
+    private val cellBounds = mutableMapOf<String, CellBounds>()
+
+    /** Listener for cell selection events */
+    var onCellSelectedListener: OnCellSelectedListener? = null
+
+    /** Data class to store cell bounds for zoom calculations */
+    data class CellBounds(
+        val centerLat: Double,
+        val centerLon: Double,
+        val radiusMeters: Double,
+        val cellName: String
+    )
+
+    /** Map event listener for handling cell clicks */
+    private val mapEventListener = MapEventDispatcher.MapEventDispatchListener { event ->
+        if (event.type == MapEvent.ITEM_CLICK) {
+            val item = event.item
+            if (item != null && item.getMetaString("hiveCellId", "").isNotEmpty()) {
+                val cellId = item.getMetaString("hiveCellId", "")
+                val bounds = cellBounds[cellId]
+                if (bounds != null) {
+                    Log.i(TAG, "Cell clicked: $cellId (${bounds.cellName})")
+                    onCellSelectedListener?.onCellSelected(
+                        cellId,
+                        bounds.cellName,
+                        bounds.centerLat,
+                        bounds.centerLon,
+                        bounds.radiusMeters
+                    )
+                }
+            }
+        }
+    }
 
     init {
         initMapGroup()
+        // Register for map item click events
+        mapView.mapEventDispatcher.addMapEventListener(MapEvent.ITEM_CLICK, mapEventListener)
     }
 
     private fun initMapGroup() {
@@ -187,9 +233,13 @@ class HiveCellOverlay(private val mapView: MapView) {
             circle.title = cellName
             circle.setMetaString("hiveCellId", cellId)
             circle.setMetaInteger("platformCount", platforms.size)
+            circle.setClickable(true)
 
             group.addItem(circle)
             cellCircles[cellId] = circle
+
+            // Store bounds for zoom calculations
+            cellBounds[cellId] = CellBounds(centerLat, centerLon, radius, cellName)
 
             Log.d(TAG, "Created bounding circle for cell: $cellId (${platforms.size} platforms, ${radius.toInt()}m radius)")
         } catch (e: Exception) {
@@ -214,6 +264,13 @@ class HiveCellOverlay(private val mapView: MapView) {
 
             // Update metadata
             circle.setMetaInteger("platformCount", platforms.size)
+
+            // Update stored bounds
+            val cellId = circle.getMetaString("hiveCellId", "")
+            val cellName = cell?.name ?: "Cell $cellId"
+            if (cellId.isNotEmpty()) {
+                cellBounds[cellId] = CellBounds(centerLat, centerLon, radius, cellName)
+            }
 
             Log.v(TAG, "Updated bounding circle: ${platforms.size} platforms, ${radius.toInt()}m radius")
         } catch (e: Exception) {
@@ -242,6 +299,7 @@ class HiveCellOverlay(private val mapView: MapView) {
             circle.dispose()
             Log.d(TAG, "Removed bounding circle for cell: $cellId")
         }
+        cellBounds.remove(cellId)
     }
 
     /**
@@ -261,6 +319,7 @@ class HiveCellOverlay(private val mapView: MapView) {
             circle.dispose()
         }
         cellCircles.clear()
+        cellBounds.clear()
         Log.i(TAG, "Cleared all cell bounding circles")
     }
 
@@ -273,12 +332,23 @@ class HiveCellOverlay(private val mapView: MapView) {
      * Dispose of the overlay and clean up resources.
      */
     fun dispose() {
+        // Unregister map event listener
+        mapView.mapEventDispatcher.removeMapEventListener(MapEvent.ITEM_CLICK, mapEventListener)
+
         clearAll()
         mapGroup?.let { group ->
             // Don't remove the Drawing Objects group as other components may use it
             mapView.rootGroup?.findMapGroup("Drawing Objects")?.removeGroup(group)
         }
         mapGroup = null
+        onCellSelectedListener = null
         Log.i(TAG, "HiveCellOverlay disposed")
     }
+
+    /**
+     * Get the bounds for a specific cell.
+     * @param cellId The cell ID to look up
+     * @return CellBounds if found, null otherwise
+     */
+    fun getCellBounds(cellId: String): CellBounds? = cellBounds[cellId]
 }
