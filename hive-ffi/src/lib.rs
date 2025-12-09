@@ -33,6 +33,11 @@ static JAVA_VM: LazyLock<Mutex<Option<jni::JavaVM>>> = LazyLock::new(|| Mutex::n
 static PEER_EVENT_MANAGER_CLASS: LazyLock<Mutex<Option<GlobalRef>>> =
     LazyLock::new(|| Mutex::new(None));
 
+// Global HIVE node handle that survives APK replacement
+// This allows Kotlin code to recover the node connection after plugin hot-swap
+#[cfg(feature = "sync")]
+static GLOBAL_NODE_HANDLE: LazyLock<Mutex<i64>> = LazyLock::new(|| Mutex::new(0));
+
 use hive_protocol::cot::{
     CotEncoder, Position as CotPosition, TrackUpdate, Velocity as CotVelocity,
 };
@@ -1611,13 +1616,40 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_createNodeJni(
             #[cfg(target_os = "android")]
             android_log("createNodeJni: Node created successfully");
             // Return the Arc pointer as a handle
-            Arc::into_raw(node) as i64
+            let handle = Arc::into_raw(node) as i64;
+            // Store globally so it survives APK replacement
+            if let Ok(mut global) = GLOBAL_NODE_HANDLE.lock() {
+                *global = handle;
+                #[cfg(target_os = "android")]
+                android_log(&format!("createNodeJni: Stored global handle: {}", handle));
+            }
+            handle
         }
         Err(e) => {
             #[cfg(target_os = "android")]
             android_log(&format!("createNodeJni: Error creating node: {:?}", e));
             0
         }
+    }
+}
+
+/// JNI: Get the global node handle (survives APK replacement)
+///
+/// Kotlin signature: external fun getGlobalNodeHandleJni(): Long
+#[cfg(feature = "sync")]
+#[no_mangle]
+pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_getGlobalNodeHandleJni(
+    _env: JNIEnv,
+    _class: JClass,
+) -> i64 {
+    match GLOBAL_NODE_HANDLE.lock() {
+        Ok(handle) => {
+            let h = *handle;
+            #[cfg(target_os = "android")]
+            android_log(&format!("getGlobalNodeHandleJni: Returning handle: {}", h));
+            h
+        }
+        Err(_) => 0,
     }
 }
 
