@@ -11,6 +11,7 @@ import com.atakmap.coremap.log.Log
 import com.revolveteam.atak.hive.model.HiveCell
 import com.revolveteam.atak.hive.model.HivePlatform
 import com.revolveteam.atak.hive.model.HiveTrack
+import com.revolveteam.atak.hive.overlay.HiveCellOverlay
 import com.revolveteam.atak.hive.overlay.HiveTrackOverlay
 import org.json.JSONArray
 import org.json.JSONObject
@@ -35,6 +36,7 @@ class HiveMapComponent : DropDownMapComponent() {
     private lateinit var mapView: MapView
     private var dropDownReceiver: HiveDropDownReceiver? = null
     private var trackOverlay: HiveTrackOverlay? = null
+    private var cellOverlay: HiveCellOverlay? = null
     private val refreshHandler = Handler(Looper.getMainLooper())
     private var isRefreshing = false
 
@@ -72,6 +74,10 @@ class HiveMapComponent : DropDownMapComponent() {
         trackOverlay = HiveTrackOverlay(view)
         Log.d(TAG, "Track overlay created")
 
+        // Create cell overlay for cell boundaries
+        cellOverlay = HiveCellOverlay(view)
+        Log.d(TAG, "Cell overlay created")
+
         // Create self-position broadcaster for PLI
         selfPositionBroadcaster = SelfPositionBroadcaster(view)
         selfPositionBroadcaster?.onBroadcastCallback = { success, message ->
@@ -104,6 +110,8 @@ class HiveMapComponent : DropDownMapComponent() {
         selfPositionBroadcaster = null
         trackOverlay?.dispose()
         trackOverlay = null
+        cellOverlay?.dispose()
+        cellOverlay = null
         super.onDestroyImpl(context, view)
     }
 
@@ -132,8 +140,9 @@ class HiveMapComponent : DropDownMapComponent() {
 
             try {
                 refreshData()
-                // Update map markers
+                // Update map overlays
                 trackOverlay?.updateTracks(_tracks)
+                cellOverlay?.updateCells(_cells)
             } catch (e: Exception) {
                 Log.e(TAG, "Error in periodic refresh: ${e.message}", e)
             }
@@ -405,10 +414,16 @@ class HiveMapComponent : DropDownMapComponent() {
     fun getMapMarkerCount(): Int = trackOverlay?.getMarkerCount() ?: 0
 
     /**
+     * Get the number of cell visualizations currently on the map
+     */
+    fun getCellMarkerCount(): Int = cellOverlay?.getCellCount() ?: 0
+
+    /**
      * Force update of track markers on the map
      */
     fun updateMapMarkers() {
         trackOverlay?.updateTracks(_tracks)
+        cellOverlay?.updateCells(_cells)
     }
 
     /**
