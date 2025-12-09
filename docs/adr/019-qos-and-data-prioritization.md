@@ -949,6 +949,268 @@ pub enum EnforcementMode {
 - RFC 2474: Definition of the Differentiated Services Field (DiffServ)
 - STANAG 4586: Standard Interfaces of UAV Control System (UCS)
 
+## Amendment: Sync Modes and Subscription Granularity
+
+**Date**: 2025-12-09
+**Related**: Issue #346 (Automerge-iroh sync not flowing in hierarchical topologies)
+
+### The Missing Dimension: Delta Retention
+
+The original ADR addresses **what** data syncs first (priority ordering) but not **how much history** syncs. This distinction is critical:
+
+```
+Current Behavior (Issue #346):
+├─ Squad Leader offline for 5 minutes
+├─ 7 soldiers sending beacons every second = 2,100 beacon updates
+├─ On reconnection: ALL 2,100 deltas must sync
+├─ Broadcast channel lags, messages dropped
+└─ Documents never reach Platoon Leader
+
+Desired Behavior with Sync Modes:
+├─ Squad Leader offline for 5 minutes
+├─ Beacons configured as "LatestOnly" sync mode
+├─ On reconnection: Only 7 current positions sync (one per soldier)
+├─ Sync completes in milliseconds
+└─ Platoon Leader receives current state immediately
+```
+
+### Sync Mode Classification
+
+```rust
+/// Determines how much document history syncs between peers
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyncMode {
+    /// Sync all deltas - observers see every historical change
+    /// Use for: Audit logs, event streams, mission recordings
+    FullHistory,
+
+    /// Sync only current document state, discard intermediate deltas
+    /// Use for: Positions, status updates, health telemetry
+    LatestOnly,
+
+    /// Sync deltas within a time window, discard older
+    /// Use for: Recent track history, last N minutes of updates
+    WindowedHistory { window_seconds: u64 },
+}
+
+/// Extended QoS policy with sync mode
+#[derive(Debug, Clone)]
+pub struct QoSPolicy {
+    pub priority_class: QoSClass,      // P1-P5 (from original ADR)
+    pub sync_mode: SyncMode,           // NEW: How much history to sync
+    pub max_latency_ms: Option<u64>,
+    pub ttl_seconds: Option<u64>,
+    pub retention_priority: u8,
+}
+```
+
+### Sync Mode Behavior Matrix
+
+| Sync Mode | Automerge Sync | Reconnection Cost | Observer Behavior |
+|-----------|----------------|-------------------|-------------------|
+| **FullHistory** | Delta-based (`generate_sync_message`) | O(n) where n = missed updates | See every historical change |
+| **LatestOnly** | State-based (`doc.save()`) | O(1) constant | See only current state |
+| **WindowedHistory** | Delta-based with time filter | O(w) where w = window size | See changes within window |
+
+### Implementation with Automerge
+
+```rust
+impl AutomergeSyncCoordinator {
+    /// Sync document respecting QoS sync mode
+    pub async fn sync_with_mode(
+        &self,
+        doc_key: &str,
+        peer_id: EndpointId,
+        policy: &QoSPolicy,
+    ) -> Result<()> {
+        match policy.sync_mode {
+            SyncMode::FullHistory => {
+                // Current behavior: delta-based sync
+                self.sync_document_with_peer(doc_key, peer_id).await
+            }
+            SyncMode::LatestOnly => {
+                // New: Send full document state, no sync protocol
+                let doc = self.store.get(doc_key)?
+                    .context("Document not found")?;
+                let state_bytes = doc.save();
+                self.send_state_snapshot(peer_id, doc_key, state_bytes).await
+            }
+            SyncMode::WindowedHistory { window_seconds } => {
+                // New: Filter sync messages by timestamp
+                let cutoff = Instant::now() - Duration::from_secs(window_seconds);
+                self.sync_document_with_time_filter(doc_key, peer_id, cutoff).await
+            }
+        }
+    }
+}
+```
+
+### Subscription Granularity
+
+**Current HIVE subscription model:**
+```rust
+// Subscribe to entire collection
+backend.subscribe("beacons", Query::All).await?;
+```
+
+**Ditto's DQL provides spatial/attribute filtering:**
+```javascript
+// Ditto example - subscribe to nearby beacons only
+ditto.store.collection("beacons")
+    .find("distance(position, $myPosition) < 5000 AND squad_id == $mySquad")
+    .subscribe();
+```
+
+**Proposed HIVE extension:**
+```rust
+/// Enhanced query with spatial and attribute predicates
+pub enum Query {
+    All,
+    ById(DocumentId),
+    Filter(FilterPredicate),
+
+    // NEW: Spatial queries
+    WithinRadius { center: GeoPoint, radius_meters: f64 },
+    WithinBounds { min: GeoPoint, max: GeoPoint },
+
+    // NEW: Compound queries
+    And(Box<Query>, Box<Query>),
+    Or(Box<Query>, Box<Query>),
+}
+
+/// Subscription with QoS policy
+pub struct Subscription {
+    pub collection: String,
+    pub query: Query,
+    pub qos_policy: QoSPolicy,  // Includes sync_mode
+}
+
+// Usage: Subscribe to nearby beacons with LatestOnly sync
+let subscription = backend.subscribe_with_qos(
+    "beacons",
+    Query::WithinRadius {
+        center: my_position,
+        radius_meters: 5000.0
+    },
+    QoSPolicy {
+        priority_class: QoSClass::Low,
+        sync_mode: SyncMode::LatestOnly,
+        ..Default::default()
+    }
+).await?;
+```
+
+### Default Sync Modes by Data Type
+
+| Data Type | Default Sync Mode | Rationale |
+|-----------|-------------------|-----------|
+| Position/Beacon | LatestOnly | Only current location matters |
+| Health/Status | LatestOnly | Only current state matters |
+| Contact Reports | FullHistory | All sightings are important |
+| Commands | FullHistory | Audit trail required |
+| Images/Media | LatestOnly | Only latest version needed |
+| Audit Logs | FullHistory | Complete history required |
+| Track History | WindowedHistory(300) | Last 5 minutes useful |
+| Capability State | WindowedHistory(60) | Recent changes useful |
+
+### Impact on Issue #346
+
+The current sync failure at scale is caused by:
+1. Every document change triggers broadcast notification
+2. Broadcast channel capacity (8192) overwhelmed under load
+3. Lagged messages trigger expensive full resync
+
+With sync modes:
+1. **LatestOnly** documents don't need delta tracking at all
+2. Reconnection sends current state, not history
+3. Broadcast channel only needs to track "document changed", not each delta
+4. Full resync is cheap (just current state per document)
+
+**Estimated impact:**
+- Current: 2,100 delta syncs after 5-minute disconnect (7 soldiers × 60 sec × 5 min)
+- With LatestOnly: 7 state syncs after 5-minute disconnect
+- **300× reduction in reconnection sync traffic**
+
+### Observer Behavior with Sync Modes
+
+```rust
+/// Observer callback receives mode-appropriate events
+pub enum ChangeEvent {
+    /// Initial snapshot when subscription starts
+    Initial { documents: Vec<Document> },
+
+    /// Document updated (FullHistory: every delta, LatestOnly: current state)
+    Updated { collection: String, document: Document },
+
+    /// NEW: For FullHistory mode - individual delta applied
+    DeltaApplied {
+        collection: String,
+        doc_id: DocumentId,
+        delta: AutomergeDelta,
+        resulting_state: Document,
+    },
+
+    /// Document removed
+    Removed { collection: String, doc_id: DocumentId },
+}
+
+// Observer behavior depends on sync mode:
+//
+// FullHistory subscription:
+//   - Receives DeltaApplied for each historical change
+//   - Can reconstruct full history
+//   - More events, higher bandwidth
+//
+// LatestOnly subscription:
+//   - Receives Updated with current state only
+//   - No history available
+//   - Fewer events, lower bandwidth
+```
+
+### Configuration Example
+
+```yaml
+# config/qos_policies.yaml
+
+collections:
+  beacons:
+    priority_class: low
+    sync_mode: latest_only
+    ttl_seconds: 300
+
+  contact_reports:
+    priority_class: critical
+    sync_mode: full_history
+    ttl_seconds: null  # Never expire
+
+  track_history:
+    priority_class: low
+    sync_mode: windowed_history
+    window_seconds: 300  # Last 5 minutes
+
+  squad_summaries:
+    priority_class: high
+    sync_mode: latest_only  # Only current aggregation matters
+```
+
+### Implementation Phases
+
+**Phase 1 (Immediate - Issue #346 fix):**
+- Add `SyncMode` enum
+- Implement `LatestOnly` mode using `doc.save()`
+- Add per-collection sync mode configuration
+- Default beacons/status to `LatestOnly`
+
+**Phase 2 (Short-term):**
+- Implement `WindowedHistory` with time-based filtering
+- Add spatial query support (`WithinRadius`, `WithinBounds`)
+- Extend subscription API with QoS policy
+
+**Phase 3 (Medium-term):**
+- Compound queries (`And`, `Or`)
+- Dynamic subscription updates (change query without re-subscribing)
+- Sync mode metrics and observability
+
 ## Future Work
 
 ### Phase 5: Advanced Features (Post-MVP)
