@@ -120,6 +120,5 @@ pub use ugv_client::{MissionCommand, MovementMode, PatrolPattern, UgvClient, Ugv
 
 // Schema conversion for model.proto and sensor.proto (Issue #319, #335)
 pub use schema_convert::{ModelSpecProtoExt, SensorCapabilityProtoExt};
-// Re-export hive-schema model and sensor proto types
+// Re-export hive-schema model proto types (sensor already exported above as proto_sensor)
 pub use hive_schema::model::v1 as proto_model;
-pub use hive_schema::sensor::v1 as proto_sensor;

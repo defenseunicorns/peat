@@ -17,8 +17,8 @@ use crate::beacon::{CameraSpec, ModelSpec};
 use crate::messages::ModelPerformance;
 use crate::platform::SensorCapability;
 use hive_schema::model::v1::{
-    AcceleratorType, HardwareRequirements, ModelDeployment, ModelMetadata,
-    ModelPerformanceMetrics, ModelType,
+    AcceleratorType, HardwareRequirements, ModelDeployment, ModelMetadata, ModelPerformanceMetrics,
+    ModelType,
 };
 use hive_schema::sensor::v1::{
     FieldOfView, SensorModality, SensorMountType, SensorOrientation, SensorSpec,
@@ -59,7 +59,7 @@ impl From<&ModelSpec> for ModelDeployment {
             file_size_bytes: spec.size_bytes,
             target_platforms: vec![],
             deployment_policy: 0, // Unspecified
-            priority: 0,         // Unspecified
+            priority: 0,          // Unspecified
             deployed_at: None,
             deployed_by: String::new(),
             rollback_model_id: String::new(),
@@ -80,11 +80,7 @@ impl From<&ModelSpec> for ModelDeployment {
                 }),
                 performance_metrics: Some(ModelPerformanceMetrics {
                     map: spec.expected_performance.precision as f32,
-                    inference_time_ms: spec
-                        .expected_performance
-                        .latency_ms
-                        .unwrap_or(0.0)
-                        as f32,
+                    inference_time_ms: spec.expected_performance.latency_ms.unwrap_or(0.0) as f32,
                     fps: spec.expected_performance.fps as f32,
                     accuracy: spec.expected_performance.precision as f32,
                     benchmark_hardware: "Jetson Orin Nano".to_string(),
@@ -275,7 +271,7 @@ impl TryFrom<&SensorSpec> for CameraSpec {
             hfov_degrees: hfov,
             vfov_degrees: vfov,
             dfov_degrees: dfov,
-            pixel_size_um: 1.5, // Default
+            pixel_size_um: 1.5,         // Default
             sensor_size_mm: (6.0, 4.0), // Default
         })
     }
@@ -352,7 +348,10 @@ impl From<&SensorSpec> for SensorCapability {
 
         SensorCapability {
             sensor_type: sensor_type.to_string(),
-            resolution: Some(format!("{}x{}", proto.resolution_width, proto.resolution_height)),
+            resolution: Some(format!(
+                "{}x{}",
+                proto.resolution_width, proto.resolution_height
+            )),
             fov_degrees: fov,
             range_m: range,
             frame_rate: Some(proto.frame_rate_fps as f64),
