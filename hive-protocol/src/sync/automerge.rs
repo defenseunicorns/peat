@@ -308,6 +308,47 @@ impl AutomergeBackend {
                 // Custom queries not supported in initial implementation
                 Err(Error::Internal("Custom queries not yet supported".into()))
             }
+
+            // === Spatial queries (Issue #356) ===
+            Query::WithinRadius {
+                center,
+                radius_meters,
+                lat_field,
+                lon_field,
+            } => {
+                let lat_key = lat_field.as_deref().unwrap_or("lat");
+                let lon_key = lon_field.as_deref().unwrap_or("lon");
+
+                if let (Some(lat_val), Some(lon_val)) = (
+                    document.fields.get(lat_key).and_then(|v| v.as_f64()),
+                    document.fields.get(lon_key).and_then(|v| v.as_f64()),
+                ) {
+                    let doc_point = GeoPoint::new(lat_val, lon_val);
+                    Ok(doc_point.within_radius(center, *radius_meters))
+                } else {
+                    Ok(false)
+                }
+            }
+
+            Query::WithinBounds {
+                min,
+                max,
+                lat_field,
+                lon_field,
+            } => {
+                let lat_key = lat_field.as_deref().unwrap_or("lat");
+                let lon_key = lon_field.as_deref().unwrap_or("lon");
+
+                if let (Some(lat_val), Some(lon_val)) = (
+                    document.fields.get(lat_key).and_then(|v| v.as_f64()),
+                    document.fields.get(lon_key).and_then(|v| v.as_f64()),
+                ) {
+                    let doc_point = GeoPoint::new(lat_val, lon_val);
+                    Ok(doc_point.within_bounds(min, max))
+                } else {
+                    Ok(false)
+                }
+            }
         }
     }
 
@@ -2108,6 +2149,47 @@ fn matches_query(doc: &Document, query: &Query) -> bool {
         Query::And(queries) => queries.iter().all(|q| matches_query(doc, q)),
         Query::Or(queries) => queries.iter().any(|q| matches_query(doc, q)),
         Query::Custom(_) => false,
+
+        // === Spatial queries (Issue #356) ===
+        Query::WithinRadius {
+            center,
+            radius_meters,
+            lat_field,
+            lon_field,
+        } => {
+            let lat_key = lat_field.as_deref().unwrap_or("lat");
+            let lon_key = lon_field.as_deref().unwrap_or("lon");
+
+            if let (Some(lat_val), Some(lon_val)) = (
+                doc.get(lat_key).and_then(|v| v.as_f64()),
+                doc.get(lon_key).and_then(|v| v.as_f64()),
+            ) {
+                let doc_point = GeoPoint::new(lat_val, lon_val);
+                doc_point.within_radius(center, *radius_meters)
+            } else {
+                false
+            }
+        }
+
+        Query::WithinBounds {
+            min,
+            max,
+            lat_field,
+            lon_field,
+        } => {
+            let lat_key = lat_field.as_deref().unwrap_or("lat");
+            let lon_key = lon_field.as_deref().unwrap_or("lon");
+
+            if let (Some(lat_val), Some(lon_val)) = (
+                doc.get(lat_key).and_then(|v| v.as_f64()),
+                doc.get(lon_key).and_then(|v| v.as_f64()),
+            ) {
+                let doc_point = GeoPoint::new(lat_val, lon_val);
+                doc_point.within_bounds(min, max)
+            } else {
+                false
+            }
+        }
     }
 }
 
