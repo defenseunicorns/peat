@@ -671,6 +671,78 @@ impl UgvClient {
     pub fn sensor(&self) -> Option<&SensorSpec> {
         self.config.sensor.as_ref()
     }
+
+    /// Handle a detection event from the inference pipeline
+    ///
+    /// This method allows the UGV to react to detections from the AI pipeline.
+    /// When configured to track specific classes, the UGV will pursue detected targets.
+    ///
+    /// # Arguments
+    /// * `track` - The track update from the inference pipeline
+    /// * `target_classes` - Classes to track (e.g., ["person", "vehicle"])
+    ///
+    /// # Returns
+    /// `true` if the UGV started tracking the detection, `false` otherwise
+    pub fn handle_detection(&mut self, track: &TrackUpdate, target_classes: &[String]) -> bool {
+        // Check if this detection matches our target classes
+        let class_match = target_classes.is_empty()
+            || target_classes
+                .iter()
+                .any(|c| c.eq_ignore_ascii_case(&track.classification));
+
+        if !class_match {
+            debug!(
+                "UGV ignoring detection class '{}' (targets: {:?})",
+                track.classification, target_classes
+            );
+            return false;
+        }
+
+        // Check confidence threshold (> 0.5 for reliable tracking)
+        if track.confidence < 0.5 {
+            debug!(
+                "UGV ignoring low-confidence detection ({:.2})",
+                track.confidence
+            );
+            return false;
+        }
+
+        // If already tracking something with higher confidence, ignore
+        if self.state == UgvState::Tracking {
+            // Continue with current target unless this is significantly better
+            debug!("UGV already tracking, updating target position");
+            self.update_target_position((track.position.lat, track.position.lon));
+            return true;
+        }
+
+        // Start tracking this detection
+        info!(
+            "UGV '{}' detected {} at ({:.5}, {:.5}) - starting pursuit",
+            self.config.platform_id, track.classification, track.position.lat, track.position.lon
+        );
+
+        self.handle_mission(MissionCommand::TrackTarget {
+            target_id: track.track_id.clone(),
+            last_known_position: (track.position.lat, track.position.lon),
+        });
+
+        true
+    }
+
+    /// Get the current mission command (if any)
+    pub fn current_mission(&self) -> Option<&MissionCommand> {
+        self.current_mission.as_ref()
+    }
+
+    /// Check if UGV is actively tracking a target
+    pub fn is_tracking(&self) -> bool {
+        self.state == UgvState::Tracking
+    }
+
+    /// Check if UGV has reached its destination
+    pub fn has_reached_destination(&self) -> bool {
+        matches!(self.state, UgvState::Idle | UgvState::Monitoring)
+    }
 }
 
 // ============================================================================
@@ -851,5 +923,131 @@ mod tests {
         });
 
         assert_eq!(ugv.state(), UgvState::Patrolling);
+    }
+
+    #[test]
+    fn test_handle_detection_matching_class() {
+        let config = UgvConfig::new("UGV-Test-1").with_position(33.7749, -84.3958);
+        let mut ugv = UgvClient::new(config);
+
+        // Create a detection track
+        let track = TrackUpdate {
+            track_id: "TRK-001".to_string(),
+            classification: "person".to_string(),
+            confidence: 0.85,
+            position: Position {
+                lat: 33.7760,
+                lon: -84.3950,
+                cep_m: Some(5.0),
+                hae: None,
+            },
+            velocity: None,
+            attributes: HashMap::new(),
+            source_platform: "AI-Model".to_string(),
+            source_model: "YOLOv8".to_string(),
+            model_version: "1.0".to_string(),
+            timestamp: Utc::now(),
+            latest_chipout_id: None,
+        };
+
+        let target_classes = vec!["person".to_string(), "vehicle".to_string()];
+        let started = ugv.handle_detection(&track, &target_classes);
+
+        assert!(started);
+        assert_eq!(ugv.state(), UgvState::Tracking);
+        assert!(ugv.is_tracking());
+    }
+
+    #[test]
+    fn test_handle_detection_non_matching_class() {
+        let config = UgvConfig::new("UGV-Test-1").with_position(33.7749, -84.3958);
+        let mut ugv = UgvClient::new(config);
+
+        let track = TrackUpdate {
+            track_id: "TRK-002".to_string(),
+            classification: "bird".to_string(),
+            confidence: 0.9,
+            position: Position {
+                lat: 33.7760,
+                lon: -84.3950,
+                cep_m: Some(5.0),
+                hae: None,
+            },
+            velocity: None,
+            attributes: HashMap::new(),
+            source_platform: "AI-Model".to_string(),
+            source_model: "YOLOv8".to_string(),
+            model_version: "1.0".to_string(),
+            timestamp: Utc::now(),
+            latest_chipout_id: None,
+        };
+
+        let target_classes = vec!["person".to_string()];
+        let started = ugv.handle_detection(&track, &target_classes);
+
+        assert!(!started);
+        assert_eq!(ugv.state(), UgvState::Idle);
+    }
+
+    #[test]
+    fn test_handle_detection_low_confidence() {
+        let config = UgvConfig::new("UGV-Test-1").with_position(33.7749, -84.3958);
+        let mut ugv = UgvClient::new(config);
+
+        let track = TrackUpdate {
+            track_id: "TRK-003".to_string(),
+            classification: "person".to_string(),
+            confidence: 0.3, // Low confidence
+            position: Position {
+                lat: 33.7760,
+                lon: -84.3950,
+                cep_m: Some(5.0),
+                hae: None,
+            },
+            velocity: None,
+            attributes: HashMap::new(),
+            source_platform: "AI-Model".to_string(),
+            source_model: "YOLOv8".to_string(),
+            model_version: "1.0".to_string(),
+            timestamp: Utc::now(),
+            latest_chipout_id: None,
+        };
+
+        let target_classes = vec!["person".to_string()];
+        let started = ugv.handle_detection(&track, &target_classes);
+
+        assert!(!started);
+        assert_eq!(ugv.state(), UgvState::Idle);
+    }
+
+    #[test]
+    fn test_handle_detection_empty_target_classes() {
+        let config = UgvConfig::new("UGV-Test-1").with_position(33.7749, -84.3958);
+        let mut ugv = UgvClient::new(config);
+
+        let track = TrackUpdate {
+            track_id: "TRK-004".to_string(),
+            classification: "anything".to_string(),
+            confidence: 0.8,
+            position: Position {
+                lat: 33.7760,
+                lon: -84.3950,
+                cep_m: Some(5.0),
+                hae: None,
+            },
+            velocity: None,
+            attributes: HashMap::new(),
+            source_platform: "AI-Model".to_string(),
+            source_model: "YOLOv8".to_string(),
+            model_version: "1.0".to_string(),
+            timestamp: Utc::now(),
+            latest_chipout_id: None,
+        };
+
+        // Empty target classes means track anything
+        let started = ugv.handle_detection(&track, &[]);
+
+        assert!(started);
+        assert_eq!(ugv.state(), UgvState::Tracking);
     }
 }
