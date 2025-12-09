@@ -1,0 +1,362 @@
+// AI/ML Tasking definitions for CAP Protocol
+// Version: 1.0.0
+//
+// Defines schema for tasking edge AI platforms with detection and
+// classification requirements. Tasks flow downward from C2 to platforms,
+// specifying what to detect, how to filter, and what products to return.
+
+syntax = "proto3";
+
+package cap.tasking.v1;
+
+import "common.proto";
+import "product.proto";
+
+// ============================================================================
+// Detection Task (Downward Flow: C2 -> Platform)
+// ============================================================================
+
+// Detection task - specifies what an AI platform should detect and report
+//
+// This message flows downward from C2 to edge platforms, configuring the
+// detection pipeline with target classes, thresholds, and product delivery.
+message DetectionTask {
+  // Unique task identifier (e.g., "TASK-2025-001")
+  string task_id = 1;
+
+  // Human-readable task name
+  string name = 2;
+
+  // Task description/purpose
+  string description = 3;
+
+  // Target classes to detect (e.g., ["person", "boat", "vehicle"])
+  // If empty, detect all classes the model supports
+  repeated string target_classes = 4;
+
+  // Detection filtering parameters
+  DetectionFilter filter = 5;
+
+  // What products to generate and send upward
+  ProductDelivery product_delivery = 6;
+
+  // Geographic area of interest (optional)
+  AreaOfInterest area_of_interest = 7;
+
+  // Task scheduling and duration
+  TaskSchedule schedule = 8;
+
+  // Task priority
+  TaskPriority priority = 9;
+
+  // Issuing authority
+  string issued_by = 10;
+
+  // Timestamp when task was issued
+  common.v1.Timestamp issued_at = 11;
+
+  // Target platform IDs (empty = broadcast to all capable platforms)
+  repeated string target_platforms = 12;
+}
+
+// Detection filtering parameters
+message DetectionFilter {
+  // Minimum confidence threshold (0.0 - 1.0) for reporting
+  // Detections below this threshold are not reported
+  float min_confidence = 1;
+
+  // Priority classes - always report immediately regardless of batching
+  repeated string priority_classes = 2;
+
+  // Ignore classes - never report these even if detected
+  repeated string ignore_classes = 3;
+
+  // Minimum bounding box area (pixels^2) - filter tiny detections
+  uint32 min_bbox_area = 4;
+
+  // Maximum detections per frame (0 = unlimited)
+  uint32 max_detections_per_frame = 5;
+
+  // De-duplication: minimum time (seconds) between reports for same track
+  float min_report_interval_s = 6;
+}
+
+// Product delivery configuration
+message ProductDelivery {
+  // Which product types to generate
+  repeated product.v1.ProductType product_types = 1;
+
+  // When to generate image chipouts
+  repeated product.v1.ImageTrigger chipout_triggers = 2;
+
+  // Chipout configuration
+  ChipoutConfig chipout_config = 3;
+
+  // Track update frequency
+  TrackReportingConfig track_reporting = 4;
+
+  // Batching configuration (for bandwidth optimization)
+  BatchingConfig batching = 5;
+}
+
+// Chipout (image extraction) configuration
+message ChipoutConfig {
+  // Image format for chipouts
+  product.v1.ImageFormat format = 1;
+
+  // JPEG quality (1-100, only applies to JPEG format)
+  uint32 jpeg_quality = 2;
+
+  // Maximum dimension (width or height) for chipout images
+  // Image will be scaled down if larger
+  uint32 max_dimension = 3;
+
+  // Padding around detection bbox (percentage, e.g., 0.1 = 10%)
+  float padding_percent = 4;
+
+  // Include full frame with chipout? (for context)
+  bool include_full_frame = 5;
+
+  // Full frame JPEG quality (typically lower than chipout)
+  uint32 full_frame_jpeg_quality = 6;
+
+  // Maximum full frame dimension
+  uint32 full_frame_max_dimension = 7;
+}
+
+// Track reporting configuration
+message TrackReportingConfig {
+  // Report all track updates or only significant changes
+  TrackReportMode mode = 1;
+
+  // For SIGNIFICANT_ONLY mode: minimum position change (meters)
+  float min_position_change_m = 2;
+
+  // For SIGNIFICANT_ONLY mode: minimum confidence change
+  float min_confidence_change = 3;
+
+  // Maximum time between track reports even if no significant change
+  float max_report_interval_s = 4;
+}
+
+// Track reporting mode
+enum TrackReportMode {
+  TRACK_REPORT_MODE_UNSPECIFIED = 0;
+  TRACK_REPORT_ALL = 1;           // Report every track update
+  TRACK_REPORT_SIGNIFICANT = 2;   // Only report significant changes
+  TRACK_REPORT_ON_CHANGE = 3;     // Report on state changes (new, lost, etc.)
+}
+
+// Batching configuration for bandwidth optimization
+message BatchingConfig {
+  // Enable batching (combine multiple updates into one message)
+  bool enabled = 1;
+
+  // Maximum batch size (number of updates)
+  uint32 max_batch_size = 2;
+
+  // Maximum batch delay (seconds) before sending partial batch
+  float max_batch_delay_s = 3;
+
+  // Priority updates bypass batching
+  bool priority_bypasses_batch = 4;
+}
+
+// Geographic area of interest
+message AreaOfInterest {
+  // AOI type
+  oneof aoi {
+    CircularAOI circular = 1;
+    PolygonAOI polygon = 2;
+    BoundingBoxAOI bbox = 3;
+  }
+}
+
+// Circular area of interest
+message CircularAOI {
+  common.v1.Position center = 1;
+  float radius_m = 2;
+}
+
+// Polygon area of interest
+message PolygonAOI {
+  // Vertices of the polygon (minimum 3)
+  repeated common.v1.Position vertices = 1;
+}
+
+// Bounding box area of interest
+message BoundingBoxAOI {
+  common.v1.Position northwest = 1;
+  common.v1.Position southeast = 2;
+}
+
+// Task scheduling
+message TaskSchedule {
+  // When to start the task (empty = immediately)
+  common.v1.Timestamp start_time = 1;
+
+  // When the task expires (empty = no expiration)
+  common.v1.Timestamp end_time = 2;
+
+  // Duration in seconds (alternative to end_time)
+  uint32 duration_s = 3;
+
+  // Recurring schedule (e.g., "every 30 minutes for 5 minutes")
+  RecurringSchedule recurring = 4;
+}
+
+// Recurring schedule
+message RecurringSchedule {
+  // Interval between task activations (seconds)
+  uint32 interval_s = 1;
+
+  // Duration of each activation (seconds)
+  uint32 active_duration_s = 2;
+
+  // Maximum number of recurrences (0 = unlimited)
+  uint32 max_recurrences = 3;
+}
+
+// Task priority
+enum TaskPriority {
+  TASK_PRIORITY_UNSPECIFIED = 0;
+  TASK_PRIORITY_LOW = 1;        // Background task
+  TASK_PRIORITY_NORMAL = 2;     // Standard priority
+  TASK_PRIORITY_HIGH = 3;       // Time-sensitive
+  TASK_PRIORITY_CRITICAL = 4;   // Mission-critical, preempt other tasks
+}
+
+// ============================================================================
+// Task Status (Upward Flow: Platform -> C2)
+// ============================================================================
+
+// Task status report from platform
+message TaskStatus {
+  // Reference to the task
+  string task_id = 1;
+
+  // Platform reporting status
+  string platform_id = 2;
+
+  // Current state of the task
+  TaskState state = 3;
+
+  // Statistics since task started
+  TaskStatistics statistics = 4;
+
+  // Error message if task failed
+  string error_message = 5;
+
+  // Timestamp of this status update
+  common.v1.Timestamp updated_at = 6;
+}
+
+// Task execution state
+enum TaskState {
+  TASK_STATE_UNSPECIFIED = 0;
+  TASK_STATE_PENDING = 1;       // Task received, not started
+  TASK_STATE_SCHEDULED = 2;     // Waiting for start_time
+  TASK_STATE_ACTIVE = 3;        // Currently executing
+  TASK_STATE_PAUSED = 4;        // Temporarily paused
+  TASK_STATE_COMPLETED = 5;     // Task completed (reached end_time)
+  TASK_STATE_CANCELLED = 6;     // Task cancelled by operator
+  TASK_STATE_FAILED = 7;        // Task failed (error)
+}
+
+// Task execution statistics
+message TaskStatistics {
+  // Number of frames processed
+  uint64 frames_processed = 1;
+
+  // Total detections (before filtering)
+  uint64 total_detections = 2;
+
+  // Detections reported (after filtering)
+  uint64 reported_detections = 3;
+
+  // Tracks created
+  uint32 tracks_created = 4;
+
+  // Tracks currently active
+  uint32 tracks_active = 5;
+
+  // Chipouts generated
+  uint32 chipouts_generated = 6;
+
+  // Products sent
+  uint32 products_sent = 7;
+
+  // Average inference time (ms)
+  float avg_inference_time_ms = 8;
+
+  // Average FPS
+  float avg_fps = 9;
+
+  // Task uptime (seconds)
+  float uptime_s = 10;
+}
+
+// ============================================================================
+// Task Control Commands
+// ============================================================================
+
+// Command to control an active task
+message TaskControl {
+  // Task to control
+  string task_id = 1;
+
+  // Control action
+  TaskControlAction action = 2;
+
+  // Modifications to task (for UPDATE action)
+  DetectionTask updated_task = 3;
+
+  // Issued by
+  string issued_by = 4;
+
+  // Timestamp
+  common.v1.Timestamp issued_at = 5;
+}
+
+// Task control actions
+enum TaskControlAction {
+  TASK_CONTROL_UNSPECIFIED = 0;
+  TASK_CONTROL_PAUSE = 1;     // Pause task execution
+  TASK_CONTROL_RESUME = 2;    // Resume paused task
+  TASK_CONTROL_CANCEL = 3;    // Cancel task
+  TASK_CONTROL_UPDATE = 4;    // Update task parameters
+}
+
+// ============================================================================
+// Task Query
+// ============================================================================
+
+// Query for tasks
+message TaskQuery {
+  // Filter by platform ID
+  string platform_id = 1;
+
+  // Filter by task state
+  repeated TaskState states = 2;
+
+  // Filter by priority
+  TaskPriority min_priority = 3;
+
+  // Include task statistics
+  bool include_statistics = 4;
+}
+
+// Task query response
+message TaskQueryResponse {
+  // Matching tasks with their status
+  repeated TaskWithStatus tasks = 1;
+
+  // Total count
+  uint32 total_count = 2;
+}
+
+// Task with its current status
+message TaskWithStatus {
+  DetectionTask task = 1;
+  TaskStatus status = 2;
+}

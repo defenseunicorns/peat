@@ -14,6 +14,7 @@ mod effector;
 mod model;
 mod product;
 mod sensor;
+mod tasking;
 mod track;
 
 /// Validation error types
@@ -43,4 +44,5 @@ pub use effector::*;
 pub use model::*;
 pub use product::*;
 pub use sensor::*;
+pub use tasking::*;
 pub use track::*;
