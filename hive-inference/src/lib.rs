@@ -37,6 +37,7 @@ pub mod orchestration;
 pub mod platform;
 pub mod registry;
 pub mod schema;
+pub mod schema_convert;
 pub mod sync;
 pub mod team;
 pub mod testing;
@@ -116,3 +117,8 @@ pub use hive_schema::sensor::v1::{
 
 // Simulated UGV client for demo (Issue #331)
 pub use ugv_client::{MissionCommand, MovementMode, PatrolPattern, UgvClient, UgvConfig, UgvState};
+
+// Schema conversion for model.proto and sensor.proto (Issue #319, #335)
+pub use schema_convert::{ModelSpecProtoExt, SensorCapabilityProtoExt};
+// Re-export hive-schema model proto types (sensor already exported above as proto_sensor)
+pub use hive_schema::model::v1 as proto_model;

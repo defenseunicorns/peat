@@ -277,6 +277,17 @@ impl SensorCapability {
             frame_rate: Some(30.0),
         }
     }
+
+    /// Convert to proto SensorSpec with the given sensor ID
+    pub fn to_proto_sensor_spec(&self, sensor_id: &str) -> hive_schema::sensor::v1::SensorSpec {
+        use crate::schema_convert::SensorCapabilityProtoExt;
+        self.to_sensor_spec(sensor_id)
+    }
+
+    /// Create from proto SensorSpec
+    pub fn from_proto(proto: &hive_schema::sensor::v1::SensorSpec) -> Self {
+        proto.into()
+    }
 }
 
 /// Vehicle platform (UGV/UAV) with sensors
@@ -354,6 +365,15 @@ impl VehiclePlatform {
         if self.battery_level < 0.1 {
             self.status = OperationalStatus::Degraded;
         }
+    }
+
+    /// Get all sensors as proto SensorSpec messages
+    pub fn sensors_as_proto(&self) -> Vec<hive_schema::sensor::v1::SensorSpec> {
+        self.sensors
+            .iter()
+            .enumerate()
+            .map(|(i, sensor)| sensor.to_proto_sensor_spec(&format!("{}-sensor-{}", self.id, i)))
+            .collect()
     }
 }
 
