@@ -697,6 +697,74 @@ impl IrohTransport {
         Ok(Some(conn))
     }
 
+    /// Connect to a peer, bypassing tie-breaking (Issue #346)
+    ///
+    /// This method ALWAYS attempts the connection regardless of endpoint ID ordering.
+    /// Use this for static configurations (TCP_CONNECT) where only one side has the
+    /// peer in their config.
+    ///
+    /// # Arguments
+    ///
+    /// * `addr` - Peer's EndpointAddr
+    ///
+    /// # Returns
+    ///
+    /// `Ok(conn)` - Connection (new or existing)
+    /// `Err(e)` - Connection failed
+    ///
+    /// # When to use
+    ///
+    /// - Static peer configuration (containerlab, etc.)
+    /// - Unidirectional topology configs where only child knows about parent
+    ///
+    /// For mDNS/dynamic discovery where both peers might try to connect, use
+    /// `connect()` instead which applies tie-breaking.
+    pub async fn connect_force(&self, addr: EndpointAddr) -> Result<Connection> {
+        let remote_id = addr.id;
+
+        // Check if we already have a connection to this peer
+        {
+            let connections = self.connections.read().unwrap();
+            if let Some(existing) = connections.get(&remote_id) {
+                tracing::debug!("Already have connection to {:?}, reusing", remote_id);
+                return Ok(existing.clone());
+            }
+        }
+
+        tracing::debug!(
+            remote_id = %remote_id,
+            "Force connecting to peer (bypassing tie-breaking for static config)"
+        );
+
+        let conn = self
+            .endpoint
+            .connect(addr, CAP_AUTOMERGE_ALPN)
+            .await
+            .context("Failed to connect to peer")?;
+
+        // Store connection
+        let mut connections = self.connections.write().unwrap();
+        if let Some(old) = connections.remove(&remote_id) {
+            // Replace existing connection (could be from accept loop racing)
+            tracing::debug!("Replacing existing connection to {:?}", remote_id);
+            old.close(0u32.into(), b"replaced by force connect");
+        }
+
+        connections.insert(remote_id, conn.clone());
+        drop(connections);
+
+        // Emit connect event (Issue #275)
+        self.emit_event(TransportPeerEvent::Connected {
+            endpoint_id: remote_id,
+            connected_at: std::time::Instant::now(),
+        });
+
+        // Spawn connection monitor
+        self.spawn_connection_monitor(remote_id, conn.clone());
+
+        Ok(conn)
+    }
+
     /// Connect to a peer using PeerInfo from static configuration
     ///
     /// # Arguments
@@ -717,6 +785,30 @@ impl IrohTransport {
     ///     // Do initiator handshake
     /// }
     /// ```
+    /// Connect to a peer using PeerInfo, bypassing tie-breaking (Issue #346)
+    ///
+    /// Use this for static configurations where the config is unidirectional.
+    ///
+    /// # Arguments
+    ///
+    /// * `peer` - PeerInfo with node_id and direct addresses
+    ///
+    /// # Returns
+    ///
+    /// `Ok(conn)` - Connection (new or existing)
+    /// `Err(e)` - Connection failed
+    pub async fn connect_peer_force(&self, peer: &PeerInfo) -> Result<Connection> {
+        let endpoint_id = peer.endpoint_id()?;
+        let socket_addrs = peer.socket_addrs()?;
+
+        let mut addr = EndpointAddr::new(endpoint_id);
+        for socket_addr in socket_addrs {
+            addr = addr.with_ip_addr(socket_addr);
+        }
+
+        self.connect_force(addr).await
+    }
+
     pub async fn connect_peer(&self, peer: &PeerInfo) -> Result<Option<Connection>> {
         let endpoint_id = peer.endpoint_id()?;
         let socket_addrs = peer.socket_addrs()?;

@@ -1989,8 +1989,8 @@ async fn connect_to_automerge_peers(
         );
 
         // Connect using the SyncEngine trait method with retry logic
-        // Note: connect_to_peer uses connect_force() which bypasses tie-breaking,
-        // so it will always attempt to connect for static configurations
+        // Issue #346: connect_to_peer now uses connect_peer_force() which bypasses
+        // tie-breaking, ensuring connections work for static configurations
         // Retry connection up to 10 times with 3-second intervals to handle
         // timing issues where the peer's listener isn't ready yet
         let mut connected = false;
