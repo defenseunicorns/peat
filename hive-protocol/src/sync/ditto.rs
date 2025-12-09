@@ -370,6 +370,40 @@ fn query_to_dql(query: &Query) -> String {
         }
         Query::All => "true".to_string(),
         Query::Custom(dql) => dql.clone(),
+
+        // === Spatial queries (Issue #356) ===
+        // Note: Ditto has native spatial query support. For real Ditto integration,
+        // these would use Ditto's GEO_DISTANCE and bounding box functions.
+        // This mock implementation generates DQL-like syntax for testing.
+        Query::WithinRadius {
+            center,
+            radius_meters,
+            lat_field,
+            lon_field,
+        } => {
+            let lat_key = lat_field.as_deref().unwrap_or("lat");
+            let lon_key = lon_field.as_deref().unwrap_or("lon");
+            // Ditto DQL spatial syntax (mock)
+            format!(
+                "GEO_DISTANCE({}, {}, {}, {}) <= {}",
+                lat_key, lon_key, center.lat, center.lon, radius_meters
+            )
+        }
+
+        Query::WithinBounds {
+            min,
+            max,
+            lat_field,
+            lon_field,
+        } => {
+            let lat_key = lat_field.as_deref().unwrap_or("lat");
+            let lon_key = lon_field.as_deref().unwrap_or("lon");
+            // Ditto DQL bounding box syntax (mock)
+            format!(
+                "({} >= {} AND {} <= {} AND {} >= {} AND {} <= {})",
+                lat_key, min.lat, lat_key, max.lat, lon_key, min.lon, lon_key, max.lon
+            )
+        }
     }
 }
 
