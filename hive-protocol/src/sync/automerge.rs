@@ -304,6 +304,9 @@ impl AutomergeBackend {
                 Ok(false)
             }
 
+            // === Negation query (Issue #357) ===
+            Query::Not(inner) => Ok(!self.matches_query(document, inner)?),
+
             Query::Custom(_) => {
                 // Custom queries not supported in initial implementation
                 Err(Error::Internal("Custom queries not yet supported".into()))
@@ -2190,6 +2193,9 @@ fn matches_query(doc: &Document, query: &Query) -> bool {
                 false
             }
         }
+
+        // === Negation query (Issue #357) ===
+        Query::Not(inner) => !matches_query(doc, inner),
     }
 }
 
