@@ -1,0 +1,472 @@
+// Actuator definitions for CAP Protocol
+// Version: 1.0.0
+//
+// This module defines actuator specifications for platform control systems.
+// Actuators include linear/rotary motors, grippers, valves, and other
+// controlled mechanisms. Relevant for port operations (gates, barriers, cranes),
+// robotic systems, and weapon/effector interfaces.
+
+syntax = "proto3";
+
+package cap.actuator.v1;
+
+import "common.proto";
+
+// ============================================================================
+// Actuator Types
+// ============================================================================
+
+// Primary classification of actuator mechanism
+enum ActuatorType {
+  ACTUATOR_TYPE_UNSPECIFIED = 0;
+
+  // Linear motion actuator (single axis translation)
+  // Examples: hydraulic cylinders, ball screws, linear motors
+  ACTUATOR_TYPE_LINEAR = 1;
+
+  // Rotary motion actuator (single axis rotation)
+  // Examples: servo motors, stepper motors, hydraulic rotary actuators
+  ACTUATOR_TYPE_ROTARY = 2;
+
+  // Multi-axis articulated system
+  // Examples: robotic arms, crane jibs, manipulators
+  ACTUATOR_TYPE_ARTICULATED = 3;
+
+  // Gripping/clamping mechanism
+  // Examples: robotic grippers, cargo clamps, magnetic lifters
+  ACTUATOR_TYPE_GRIPPER = 4;
+
+  // Valve or flow control
+  // Examples: hydraulic valves, gate valves, ball valves
+  ACTUATOR_TYPE_VALVE = 5;
+
+  // Barrier or gate mechanism
+  // Examples: boom barriers, rolling gates, security doors
+  ACTUATOR_TYPE_BARRIER = 6;
+
+  // Locking mechanism
+  // Examples: electronic locks, latches, deadbolts
+  ACTUATOR_TYPE_LOCK = 7;
+
+  // Winch or cable system
+  // Examples: crane hoists, tow winches, cable reels
+  ACTUATOR_TYPE_WINCH = 8;
+
+  // Continuous track or conveyor
+  // Examples: conveyor belts, tracked vehicles, escalators
+  ACTUATOR_TYPE_CONVEYOR = 9;
+}
+
+// ============================================================================
+// Actuator Mount and Installation
+// ============================================================================
+
+// How the actuator is mounted/installed
+enum ActuatorMount {
+  ACTUATOR_MOUNT_UNSPECIFIED = 0;
+
+  // Permanently fixed to structure or platform
+  ACTUATOR_MOUNT_FIXED = 1;
+
+  // On an articulated base (can be repositioned)
+  ACTUATOR_MOUNT_ARTICULATED = 2;
+
+  // Portable/deployable unit
+  ACTUATOR_MOUNT_PORTABLE = 3;
+
+  // Vehicle-mounted
+  ACTUATOR_MOUNT_VEHICLE = 4;
+}
+
+// Power/drive system type
+enum ActuatorDrive {
+  ACTUATOR_DRIVE_UNSPECIFIED = 0;
+
+  // Electric motor (DC or AC)
+  ACTUATOR_DRIVE_ELECTRIC = 1;
+
+  // Hydraulic (oil pressure)
+  ACTUATOR_DRIVE_HYDRAULIC = 2;
+
+  // Pneumatic (air pressure)
+  ACTUATOR_DRIVE_PNEUMATIC = 3;
+
+  // Manual (human-powered)
+  ACTUATOR_DRIVE_MANUAL = 4;
+
+  // Hybrid (multiple systems)
+  ACTUATOR_DRIVE_HYBRID = 5;
+}
+
+// ============================================================================
+// Motion Limits and Capabilities
+// ============================================================================
+
+// Linear actuator limits (single axis translation)
+message LinearLimits {
+  // Position range (meters from home/retracted position)
+  float position_min_m = 1;
+  float position_max_m = 2;
+
+  // Maximum velocity (meters per second)
+  float velocity_max_mps = 3;
+
+  // Maximum acceleration (meters per second squared)
+  float acceleration_max = 4;
+
+  // Maximum force/thrust (Newtons)
+  float force_max_n = 5;
+}
+
+// Rotary actuator limits (single axis rotation)
+message RotaryLimits {
+  // Angle range (degrees)
+  // Continuous rotation: -180 to +180 or 0 to 360
+  float angle_min_deg = 1;
+  float angle_max_deg = 2;
+
+  // Maximum angular velocity (degrees per second)
+  float velocity_max_dps = 3;
+
+  // Maximum angular acceleration (degrees per second squared)
+  float acceleration_max = 4;
+
+  // Maximum torque (Newton-meters)
+  float torque_max_nm = 5;
+
+  // Whether continuous rotation is supported
+  bool continuous_rotation = 6;
+}
+
+// Gripper limits
+message GripperLimits {
+  // Opening range (meters between grip surfaces)
+  float aperture_min_m = 1;
+  float aperture_max_m = 2;
+
+  // Maximum grip force (Newtons)
+  float grip_force_max_n = 3;
+
+  // Maximum payload weight (kg)
+  float payload_max_kg = 4;
+}
+
+// Valve limits
+message ValveLimits {
+  // Opening range (0.0 = closed, 1.0 = fully open)
+  float position_min = 1;
+  float position_max = 2;
+
+  // Actuation time (seconds for full travel)
+  float full_travel_time_s = 3;
+
+  // Maximum flow rate (application-specific units in metadata)
+  float flow_rate_max = 4;
+
+  // Maximum pressure rating (Pascals or application-specific)
+  float pressure_max_pa = 5;
+}
+
+// Barrier/gate limits
+message BarrierLimits {
+  // Opening range (0.0 = closed, 1.0 = fully open)
+  float position_min = 1;
+  float position_max = 2;
+
+  // Operation time (seconds for full open/close)
+  float full_cycle_time_s = 3;
+
+  // Clear width when open (meters)
+  float clear_width_m = 4;
+
+  // Clear height when open (meters)
+  float clear_height_m = 5;
+}
+
+// Winch limits
+message WinchLimits {
+  // Cable length range (meters)
+  float cable_min_m = 1;
+  float cable_max_m = 2;
+
+  // Maximum line speed (meters per second)
+  float line_speed_max_mps = 3;
+
+  // Maximum line tension (Newtons)
+  float tension_max_n = 4;
+
+  // Maximum payload (kg at max cable length)
+  float payload_max_kg = 5;
+}
+
+// ============================================================================
+// Current State
+// ============================================================================
+
+// Linear actuator state
+message LinearState {
+  // Current position (meters from home)
+  float position_m = 1;
+
+  // Current velocity (meters per second)
+  float velocity_mps = 2;
+
+  // Current force (Newtons, positive = extending)
+  float force_n = 3;
+}
+
+// Rotary actuator state
+message RotaryState {
+  // Current angle (degrees)
+  float angle_deg = 1;
+
+  // Current angular velocity (degrees per second)
+  float velocity_dps = 2;
+
+  // Current torque (Newton-meters)
+  float torque_nm = 3;
+}
+
+// Gripper state
+message GripperState {
+  // Current aperture (meters between grip surfaces)
+  float aperture_m = 1;
+
+  // Current grip force (Newtons)
+  float grip_force_n = 2;
+
+  // Whether object is detected in gripper
+  bool object_detected = 3;
+
+  // Estimated payload weight (kg, if load cell available)
+  float payload_kg = 4;
+}
+
+// Valve state
+message ValveState {
+  // Current position (0.0 = closed, 1.0 = fully open)
+  float position = 1;
+
+  // Current flow rate (application-specific units)
+  float flow_rate = 2;
+
+  // Current pressure (Pascals)
+  float pressure_pa = 3;
+}
+
+// Barrier/gate state
+message BarrierState {
+  // Current position (0.0 = closed, 1.0 = fully open)
+  float position = 1;
+
+  // Whether fully closed
+  bool is_closed = 2;
+
+  // Whether fully open
+  bool is_open = 3;
+
+  // Whether obstruction detected
+  bool obstruction_detected = 4;
+}
+
+// Winch state
+message WinchState {
+  // Current cable out (meters)
+  float cable_out_m = 1;
+
+  // Current line speed (meters per second, positive = paying out)
+  float line_speed_mps = 2;
+
+  // Current line tension (Newtons)
+  float tension_n = 3;
+
+  // Estimated payload (kg)
+  float payload_kg = 4;
+}
+
+// Lock state
+message LockState {
+  // Whether lock is engaged
+  bool is_locked = 1;
+
+  // Whether bolt is fully extended
+  bool bolt_extended = 2;
+
+  // Last unlock time
+  common.v1.Timestamp last_unlock_time = 3;
+
+  // Last lock time
+  common.v1.Timestamp last_lock_time = 4;
+}
+
+// ============================================================================
+// Complete Actuator Specification
+// ============================================================================
+
+// Complete actuator specification
+message ActuatorSpec {
+  // Unique actuator identifier within the platform
+  // Format: lowercase alphanumeric with hyphens, e.g., "gate-main", "crane-hoist"
+  string actuator_id = 1;
+
+  // Human-readable name
+  // e.g., "Main Entry Gate", "Container Crane Hoist", "Forward Lock"
+  string name = 2;
+
+  // Primary actuator type
+  ActuatorType actuator_type = 3;
+
+  // Mount/installation type
+  ActuatorMount mount = 4;
+
+  // Drive system type
+  ActuatorDrive drive = 5;
+
+  // Type-specific limits (one of)
+  oneof limits {
+    LinearLimits linear_limits = 10;
+    RotaryLimits rotary_limits = 11;
+    GripperLimits gripper_limits = 12;
+    ValveLimits valve_limits = 13;
+    BarrierLimits barrier_limits = 14;
+    WinchLimits winch_limits = 15;
+  }
+
+  // Type-specific current state (one of)
+  oneof state {
+    LinearState linear_state = 20;
+    RotaryState rotary_state = 21;
+    GripperState gripper_state = 22;
+    ValveState valve_state = 23;
+    BarrierState barrier_state = 24;
+    WinchState winch_state = 25;
+    LockState lock_state = 26;
+  }
+
+  // Timestamp of last state update
+  common.v1.Timestamp updated_at = 30;
+
+  // Additional metadata (JSON format for extensibility)
+  // Can include manufacturer info, maintenance schedules, etc.
+  string metadata_json = 31;
+}
+
+// ============================================================================
+// Actuator Status and Events
+// ============================================================================
+
+// Operational status of actuator
+enum ActuatorStatus {
+  ACTUATOR_STATUS_UNSPECIFIED = 0;
+  ACTUATOR_STATUS_OPERATIONAL = 1;    // Normal operation
+  ACTUATOR_STATUS_MOVING = 2;         // Currently in motion
+  ACTUATOR_STATUS_HOLDING = 3;        // Holding position under load
+  ACTUATOR_STATUS_STALLED = 4;        // Motion blocked/overloaded
+  ACTUATOR_STATUS_FAULT = 5;          // Error condition
+  ACTUATOR_STATUS_EMERGENCY_STOP = 6; // E-stop activated
+  ACTUATOR_STATUS_DISABLED = 7;       // Disabled by operator
+  ACTUATOR_STATUS_CALIBRATING = 8;    // Calibration in progress
+  ACTUATOR_STATUS_OFFLINE = 9;        // Not available
+}
+
+// Actuator state update message (flows upward with capability advertisements)
+message ActuatorStateUpdate {
+  // Platform this actuator belongs to
+  string platform_id = 1;
+
+  // Actuator specification with current state
+  ActuatorSpec actuator = 2;
+
+  // Current operational status
+  ActuatorStatus status = 3;
+
+  // Timestamp of this update
+  common.v1.Timestamp timestamp = 4;
+}
+
+// ============================================================================
+// Actuator Commands
+// ============================================================================
+
+// Command type for actuator control
+enum ActuatorCommandType {
+  ACTUATOR_COMMAND_UNSPECIFIED = 0;
+
+  // Move to target position
+  ACTUATOR_COMMAND_MOVE_TO = 1;
+
+  // Move at specified velocity
+  ACTUATOR_COMMAND_MOVE_VELOCITY = 2;
+
+  // Stop motion (controlled deceleration)
+  ACTUATOR_COMMAND_STOP = 3;
+
+  // Emergency stop (immediate halt)
+  ACTUATOR_COMMAND_EMERGENCY_STOP = 4;
+
+  // Return to home/default position
+  ACTUATOR_COMMAND_HOME = 5;
+
+  // Engage/close (for grippers, locks, barriers)
+  ACTUATOR_COMMAND_ENGAGE = 6;
+
+  // Disengage/open (for grippers, locks, barriers)
+  ACTUATOR_COMMAND_DISENGAGE = 7;
+
+  // Hold current position
+  ACTUATOR_COMMAND_HOLD = 8;
+
+  // Release/free motion (disable holding)
+  ACTUATOR_COMMAND_RELEASE = 9;
+}
+
+// Command message for actuator control (flows downward from C2)
+message ActuatorCommand {
+  // Command identifier
+  string command_id = 1;
+
+  // Target platform
+  string platform_id = 2;
+
+  // Target actuator
+  string actuator_id = 3;
+
+  // Command type
+  ActuatorCommandType command_type = 4;
+
+  // Target position (for MOVE_TO, type-specific interpretation)
+  float target_position = 5;
+
+  // Target velocity (for MOVE_VELOCITY, type-specific interpretation)
+  float target_velocity = 6;
+
+  // Priority level (higher = more urgent)
+  int32 priority = 7;
+
+  // Command originator
+  string issued_by = 8;
+
+  // Timestamp when command was issued
+  common.v1.Timestamp issued_at = 9;
+
+  // Optional expiry time (command ignored if received after)
+  common.v1.Timestamp expires_at = 10;
+}
+
+// Command acknowledgment
+message ActuatorCommandAck {
+  // Original command ID
+  string command_id = 1;
+
+  // Whether command was accepted
+  bool accepted = 2;
+
+  // Reason if rejected
+  string rejection_reason = 3;
+
+  // Estimated completion time (if accepted)
+  common.v1.Timestamp estimated_completion = 4;
+
+  // Timestamp of acknowledgment
+  common.v1.Timestamp acknowledged_at = 5;
+}
