@@ -690,6 +690,7 @@ impl SyncCapable for AutomergeBackend {
         let mut change_rx = self.store.subscribe_to_changes();
         let coordinator = self.sync_coordinator.clone().unwrap();
         let sync_active = Arc::clone(&self.sync_active);
+        let store_for_resync = Arc::clone(&self.store);
 
         let auto_task = tokio::spawn(async move {
             tracing::debug!("Automatic sync task started");
@@ -710,8 +711,33 @@ impl SyncCapable for AutomergeBackend {
                         }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        // Some messages were skipped due to slow receiver
-                        tracing::warn!("Change notification lagged, skipped {} messages", n);
+                        // Issue #346: When lagged, we MUST resync all documents to ensure
+                        // none are permanently lost. This is critical for hierarchical topologies
+                        // where documents must flow up the hierarchy.
+                        tracing::warn!(
+                            "Change notification lagged, skipped {} messages - triggering full resync",
+                            n
+                        );
+
+                        // Sync ALL documents with all connected peers to catch up
+                        // This is expensive but necessary to ensure consistency
+                        if let Ok(all_docs) = store_for_resync.scan_prefix("") {
+                            tracing::info!(
+                                "Resyncing {} documents after lag recovery",
+                                all_docs.len()
+                            );
+                            for (doc_key, _doc) in all_docs {
+                                if let Err(e) =
+                                    coordinator.sync_document_with_all_peers(&doc_key).await
+                                {
+                                    tracing::debug!(
+                                        "Resync failed for document {}: {}",
+                                        doc_key,
+                                        e
+                                    );
+                                }
+                            }
+                        }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => {
                         // Channel closed

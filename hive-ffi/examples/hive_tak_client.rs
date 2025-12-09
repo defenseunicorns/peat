@@ -179,10 +179,7 @@ fn main() {
         publish_flight_patterns(&node, &patterns, time_offset);
 
         // Check for received platforms (ATAK PLI)
-        let platforms = match node.get_platforms() {
-            Ok(p) => p,
-            Err(_) => vec![],
-        };
+        let platforms = node.get_platforms().unwrap_or_default();
 
         // Log new platforms received from ATAK
         if platforms.len() != last_platform_count {
