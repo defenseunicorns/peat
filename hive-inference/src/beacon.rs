@@ -747,6 +747,20 @@ impl HiveBeacon {
 
         registration
     }
+
+    /// Generate a proto ModelDeployment from the configured model
+    ///
+    /// Returns None if no model is configured.
+    pub fn to_proto_model_deployment(&self) -> Option<hive_schema::model::v1::ModelDeployment> {
+        self.config.model.as_ref().map(|m| m.into())
+    }
+
+    /// Generate a proto SensorSpec from the configured camera
+    ///
+    /// Returns None if no camera is configured.
+    pub fn to_proto_sensor_spec(&self) -> Option<hive_schema::sensor::v1::SensorSpec> {
+        self.config.camera.as_ref().map(|c| c.into())
+    }
 }
 
 /// COCO class labels (80 classes)
