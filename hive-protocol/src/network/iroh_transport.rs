@@ -691,19 +691,23 @@ impl IrohTransport {
                     // We have lower ID - keep OUR outgoing connection, close theirs
                     tracing::info!(
                         remote_id = %remote_id,
-                        "Conflict resolved: we have lower ID, keeping our outgoing connection"
+                        our_id = %our_id,
+                        "Conflict resolved in connect(): we have lower ID, closing their incoming connection"
                     );
                     if let Some(old) = connections.remove(&remote_id) {
-                        old.close(0u32.into(), b"conflict_resolution_lower_wins");
+                        // Use code 100 for "connect path conflict resolution"
+                        old.close(100u32.into(), b"conflict_connect_lower_wins");
                     }
                 } else {
                     // They have lower ID - keep THEIR connection, don't store ours
                     // Return None to indicate accept path is handling
                     tracing::info!(
                         remote_id = %remote_id,
-                        "Conflict resolved: they have lower ID, accept path handling"
+                        our_id = %our_id,
+                        "Conflict resolved in connect(): they have lower ID, closing our outgoing connection"
                     );
-                    conn.close(0u32.into(), b"conflict_resolution_lower_wins");
+                    // Use code 101 for "connect path yielding to accept"
+                    conn.close(101u32.into(), b"conflict_connect_yield");
                     return Ok(None);
                 }
             }
@@ -917,23 +921,25 @@ impl IrohTransport {
                 if they_are_lower {
                     // They have lower ID - they should be initiator
                     // This incoming connection IS from them initiating - keep it
-                    tracing::debug!(
-                        ?our_id,
-                        ?remote_id,
-                        "Conflict resolution: keeping incoming (they have lower ID)"
+                    tracing::info!(
+                        our_id = %our_id,
+                        remote_id = %remote_id,
+                        "Conflict resolved in accept(): they have lower ID, closing our outgoing connection"
                     );
                     if let Some(old) = connections.remove(&remote_id) {
-                        old.close(0u32.into(), b"conflict_resolution_lower_wins");
+                        // Use code 102 for "accept path closing outgoing"
+                        old.close(102u32.into(), b"conflict_accept_closing_outgoing");
                     }
                 } else {
                     // We have lower ID - our outgoing connection should be kept
                     // Reject this incoming connection
-                    tracing::debug!(
-                        ?our_id,
-                        ?remote_id,
-                        "Conflict resolution: keeping existing (we have lower ID)"
+                    tracing::info!(
+                        our_id = %our_id,
+                        remote_id = %remote_id,
+                        "Conflict resolved in accept(): we have lower ID, rejecting incoming connection"
                     );
-                    conn.close(0u32.into(), b"conflict_resolution_lower_wins");
+                    // Use code 103 for "accept path rejecting incoming"
+                    conn.close(103u32.into(), b"conflict_accept_reject_incoming");
                     drop(connections);
                     return Ok(None);
                 }
@@ -1117,11 +1123,41 @@ impl IrohTransport {
 
             connections.retain(|endpoint_id, conn| {
                 if let Some(reason) = conn.close_reason() {
-                    eprintln!(
-                        "[CLEANUP] Removing closed connection to {:?}, reason: {:?}",
-                        endpoint_id, reason
-                    );
+                    // Issue #346: Enhanced diagnostic logging for connection closures
+                    // Parse the close reason to identify the source
                     let reason_str = format!("{:?}", reason);
+                    let close_source = if reason_str.contains("100")
+                        || reason_str.contains("conflict_connect_lower_wins")
+                    {
+                        "connect() conflict resolution (we had lower ID)"
+                    } else if reason_str.contains("101")
+                        || reason_str.contains("conflict_connect_yield")
+                    {
+                        "connect() yielding to accept path"
+                    } else if reason_str.contains("102")
+                        || reason_str.contains("conflict_accept_closing_outgoing")
+                    {
+                        "accept() closing our outgoing connection"
+                    } else if reason_str.contains("103")
+                        || reason_str.contains("conflict_accept_reject_incoming")
+                    {
+                        "accept() rejecting incoming connection"
+                    } else if reason_str.contains("authentication") {
+                        "authentication failure"
+                    } else if reason_str.contains("TimedOut") {
+                        "QUIC idle timeout (no keep-alives received)"
+                    } else if reason_str.contains("LocallyClosed") {
+                        "local close (unknown source)"
+                    } else {
+                        "other"
+                    };
+
+                    tracing::warn!(
+                        endpoint_id = %endpoint_id,
+                        reason = %reason_str,
+                        close_source = %close_source,
+                        "[CLEANUP] Removing closed connection"
+                    );
                     closed.push((*endpoint_id, reason_str));
                     false
                 } else {
@@ -1555,7 +1591,7 @@ mod tests {
 
     /// Test that disconnect is detected within the expected timeout (Issue #315)
     ///
-    /// This test verifies that with the reduced idle timeout (10s) and keep-alive (3s),
+    /// This test verifies that with the reduced idle timeout (5s) and keep-alive (1s),
     /// disconnects are detected much faster than the default ~30-40 seconds.
     #[tokio::test]
     async fn test_fast_disconnect_detection_issue_315() {
