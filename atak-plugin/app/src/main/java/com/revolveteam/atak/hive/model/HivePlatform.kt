@@ -59,6 +59,9 @@ data class HivePlatform(
         /** Human operator */
         OPERATOR,
 
+        /** Soldier/dismount (ATAK PLI) */
+        SOLDIER,
+
         /** Fixed sensor */
         SENSOR,
 
@@ -103,6 +106,7 @@ data class HivePlatform(
         PlatformType.USV -> "a-f-S-X"          // Friendly Surface - Other
         PlatformType.UUV -> "a-f-U-X"          // Friendly Subsurface - Other
         PlatformType.OPERATOR -> "a-f-G-U-C-I" // Friendly Ground Unit - Infantry
+        PlatformType.SOLDIER -> "a-f-G-U-C-I"  // Friendly Ground Unit - Infantry (PLI)
         PlatformType.SENSOR -> "a-f-G-E-S"     // Friendly Ground Equipment - Sensor
         PlatformType.UNKNOWN -> "a-u-G"        // Unknown Ground
     }

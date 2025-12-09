@@ -446,7 +446,11 @@ fn publish_cells_and_platforms(node: &hive_ffi::HiveNode) {
 }
 
 /// Update platform positions and heartbeats (called every refresh cycle)
-fn update_platform_positions(node: &hive_ffi::HiveNode, patterns: &[FlightPattern], time_secs: u64) {
+fn update_platform_positions(
+    node: &hive_ffi::HiveNode,
+    patterns: &[FlightPattern],
+    time_secs: u64,
+) {
     let now = current_timestamp();
 
     for pattern in patterns {
