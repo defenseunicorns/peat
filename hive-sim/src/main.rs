@@ -1213,10 +1213,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if let Some(port) = tcp_listen_port {
-        println!("[{}] TCP: Will listen on port {}", node_id, port);
+        // Note: For automerge backend, this is actually QUIC (UDP), not TCP
+        // The env var name is TCP_LISTEN for Ditto compatibility but automerge uses QUIC
+        if backend_type == "automerge" {
+            println!("[{}] QUIC: Will listen on UDP port {}", node_id, port);
+        } else {
+            println!("[{}] TCP: Will listen on port {}", node_id, port);
+        }
     }
     if let Some(ref addr) = tcp_connect_addr {
-        println!("[{}] TCP: Will connect to {}", node_id, addr);
+        if backend_type == "automerge" {
+            println!("[{}] QUIC: Will connect to {}", node_id, addr);
+        } else {
+            println!("[{}] TCP: Will connect to {}", node_id, addr);
+        }
     }
 
     // Create backend

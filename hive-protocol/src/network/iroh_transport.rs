@@ -917,14 +917,32 @@ impl IrohTransport {
     /// connection and accept the new one.
     ///
     /// Callers MUST check for `None` and skip authentication in that case.
+    ///
+    /// # Error Handling (Issue #346)
+    ///
+    /// - Returns `Ok(None)` for transient errors (failed QUIC handshake, connection timeout)
+    /// - Returns `Err` only when the endpoint is closed (accept loop should stop)
+    ///
+    /// This ensures the accept loop survives transient network issues.
     pub async fn accept(&self) -> Result<Option<Connection>> {
         let incoming = self
             .endpoint
             .accept()
             .await
-            .context("No incoming connection")?;
+            .context("Endpoint closed - no more incoming connections")?;
 
-        let conn = incoming.await.context("Failed to accept connection")?;
+        // Issue #346: Handle transient errors gracefully
+        // If the QUIC handshake fails (e.g., timeout, client abort), don't kill the accept loop
+        let conn = match incoming.await {
+            Ok(conn) => conn,
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    "Incoming connection failed during QUIC handshake (transient, continuing)"
+                );
+                return Ok(None); // Transient error - accept loop should continue
+            }
+        };
         let remote_id = conn.remote_id();
 
         let mut connections = self.connections.write().unwrap();

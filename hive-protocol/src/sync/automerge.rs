@@ -1209,13 +1209,18 @@ impl PeerDiscovery for IrohPeerDiscovery {
             tokio::spawn(async move {
                 use crate::network::formation_handshake::perform_responder_handshake;
 
+                // Issue #346: Track consecutive errors to detect permanent failures
+                let mut consecutive_errors = 0u32;
+                const MAX_CONSECUTIVE_ERRORS: u32 = 10;
+
                 loop {
                     // Accept incoming connection
                     // Note (Issue #229): accept() returns Option<Connection>
                     // - Some(conn) = new connection that needs authentication
-                    // - None = duplicate connection (already have one to this peer), skip handshake
+                    // - None = duplicate/transient (already handled or failed QUIC handshake)
                     match transport.accept().await {
                         Ok(Some(conn)) => {
+                            consecutive_errors = 0; // Reset on success
                             let peer_id = conn.remote_id();
                             tracing::debug!("Accepted connection from: {:?}", peer_id);
 
@@ -1238,18 +1243,48 @@ impl PeerDiscovery for IrohPeerDiscovery {
                             }
                         }
                         Ok(None) => {
-                            // Duplicate connection - already have one to this peer (Issue #229)
-                            // Skip handshake since the existing connection is already authenticated
-                            tracing::debug!("Duplicate connection closed, using existing");
+                            // Issue #346: This now includes transient errors (failed QUIC handshake)
+                            // as well as duplicate connections. Either way, continue accepting.
+                            consecutive_errors = 0; // Reset - we're still accepting
+                            tracing::debug!(
+                                "Accept returned None (duplicate conn or transient error), continuing"
+                            );
                         }
                         Err(e) => {
-                            // Accept loop stopped or endpoint closed
-                            tracing::debug!("Accept loop ended: {}", e);
-                            break;
+                            // Issue #346: Only fatal errors (endpoint closed) should stop the loop
+                            // But add a circuit breaker for repeated failures
+                            consecutive_errors += 1;
+                            let error_msg = format!("{}", e);
+
+                            if error_msg.contains("Endpoint closed")
+                                || error_msg.contains("no more")
+                            {
+                                tracing::info!("Accept loop stopped: endpoint closed");
+                                break;
+                            }
+
+                            if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
+                                tracing::error!(
+                                    consecutive_errors,
+                                    error = %e,
+                                    "Accept loop stopping after {} consecutive errors",
+                                    MAX_CONSECUTIVE_ERRORS
+                                );
+                                break;
+                            }
+
+                            tracing::warn!(
+                                error = %e,
+                                consecutive_errors,
+                                "Accept error (will retry, {} more before stopping)",
+                                MAX_CONSECUTIVE_ERRORS - consecutive_errors
+                            );
+                            // Small delay before retrying to avoid tight error loop
+                            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                         }
                     }
                 }
-                tracing::debug!("Authenticated accept loop stopped");
+                tracing::info!("Authenticated accept loop stopped");
             });
         }
 
