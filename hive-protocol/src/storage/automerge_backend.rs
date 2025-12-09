@@ -558,10 +558,13 @@ impl SyncCapable for AutomergeBackend {
             tracing::debug!("Event-based sync handler spawner stopped");
         });
 
-        // Also keep polling for connections that might be missed (belt and suspenders)
-        // This is a fallback - the event-based spawning above should handle most connections
+        // Issue #346: Polling fallback - runs infrequently since event-based spawning is primary.
+        // The longer interval (5s) ensures handshakes complete before we try to sync.
+        // This is just a safety net in case Connected events are missed.
         let task = tokio::spawn(async move {
-            // Check for new connections every 100ms as backup
+            // Initial delay to allow handshakes to complete
+            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
             while sync_active.load(Ordering::Relaxed) {
                 let peer_ids = transport.connected_peers();
 
@@ -576,8 +579,9 @@ impl SyncCapable for AutomergeBackend {
                     );
                 }
 
-                // Check for new connections periodically (much less critical now)
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                // Issue #346: Increased interval to 5s to ensure handshakes complete
+                // Primary sync handler spawning is event-based (Connected events)
+                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
             }
 
             tracing::debug!("Incoming sync handler manager stopped");
@@ -595,6 +599,9 @@ impl SyncCapable for AutomergeBackend {
         let active_heartbeat_handlers = Arc::clone(&self.active_heartbeat_handlers);
 
         let heartbeat_rx_task = tokio::spawn(async move {
+            // Issue #346: Initial delay to allow handshakes to complete
+            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
             while sync_active_heartbeat_rx.load(Ordering::Relaxed) {
                 let peer_ids = transport_heartbeat_rx.connected_peers();
 
@@ -667,8 +674,8 @@ impl SyncCapable for AutomergeBackend {
                     }
                 }
 
-                // Check for new connections periodically
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                // Issue #346: Increased interval to ensure handshakes complete first
+                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
             }
 
             tracing::debug!("Incoming heartbeat handler manager stopped");

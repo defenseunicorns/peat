@@ -92,8 +92,8 @@ async fn test_two_node_mdns_discovery() {
             assert_eq!(transport1.peer_count(), 1);
         }
         Ok(None) => {
-            tracing::info!("Connection already exists or skipped due to tie-breaking");
-            // This is valid - may already be connected or tie-breaking applies
+            // Accept path is handling - this is valid
+            tracing::info!("Connection handled by accept path");
         }
         Err(e) => {
             // mDNS discovery may not work in all test environments
@@ -147,8 +147,8 @@ async fn test_direct_connection_with_discovery_enabled() {
     let conn = initiator
         .connect(responder_addr)
         .await
-        .unwrap()
-        .expect("Lower ID should successfully initiate connection");
+        .expect("Connection should succeed")
+        .expect("Should get new connection");
 
     // Verify connection
     assert_eq!(conn.remote_id(), responder.endpoint_id());
@@ -242,8 +242,8 @@ async fn test_containerlab_static_configuration() {
     let conn = transport1
         .connect(node2_addr)
         .await
-        .unwrap()
-        .expect("Expected new connection");
+        .expect("Connection should succeed")
+        .expect("Should get new connection");
 
     // Verify connection established with expected peer
     assert_eq!(conn.remote_id(), endpoint_ids[1].1);

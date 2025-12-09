@@ -812,8 +812,8 @@ async fn test_automerge_different_credentials_rejected() {
             }
         }
         Ok(None) => {
-            // Connection skipped due to tie-breaking - this is also acceptable
-            println!("  ✓ Connection skipped due to tie-breaking");
+            // Accept path handling - also acceptable
+            println!("  ✓ Connection handled by accept path");
         }
         Err(e) => {
             // Connection failed - this is also acceptable
@@ -906,8 +906,8 @@ async fn test_automerge_same_credentials_accepted() {
     let conn = initiator_transport
         .connect(responder_addr)
         .await
-        .expect("Should connect at QUIC level")
-        .expect("Lower ID should successfully initiate connection");
+        .expect("Connection should succeed")
+        .expect("Should get new connection");
 
     // Perform handshake
     use hive_protocol::network::formation_handshake::perform_initiator_handshake;

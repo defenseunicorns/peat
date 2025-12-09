@@ -103,10 +103,10 @@ async fn test_automerge_three_node_mesh() {
     // Get transports, formation keys, and endpoint IDs
     let transport1 = backend1.transport();
     let transport2 = backend2.transport();
-    let transport3 = backend3.transport();
+    let _transport3 = backend3.transport();
     let formation_key1 = backend1.formation_key().expect("Should have formation key");
     let formation_key2 = backend2.formation_key().expect("Should have formation key");
-    let formation_key3 = backend3.formation_key().expect("Should have formation key");
+    let _formation_key3 = backend3.formation_key().expect("Should have formation key");
 
     let endpoint1_id = backend1.endpoint_id();
     let endpoint2_id = backend2.endpoint_id();
@@ -115,7 +115,7 @@ async fn test_automerge_three_node_mesh() {
     // Create PeerInfo for ALL backends (needed for bidirectional connection attempts)
     // Due to tie-breaking (Issue #229), only the side with LOWER endpoint ID initiates.
     // We must attempt connections in BOTH directions so that one side succeeds.
-    let peer1_info = hive_protocol::network::PeerInfo {
+    let _peer1_info = hive_protocol::network::PeerInfo {
         name: "backend1".to_string(),
         node_id: hex::encode(endpoint1_id.as_bytes()),
         addresses: vec![addr1.to_string()],
@@ -137,74 +137,43 @@ async fn test_automerge_three_node_mesh() {
     };
 
     // Full mesh: Each pair attempts connection in BOTH directions.
-    // Due to tie-breaking, only one direction per pair will succeed (the side with lower ID).
-    // The other direction will return Ok(None) which we handle gracefully.
+    // Connect all pairs - conflict resolution is handled by transport layer
     use hive_protocol::network::formation_handshake::perform_initiator_handshake;
 
-    // Pair 1-2: Both sides try to connect, one will succeed based on ID order
+    // Pair 1-2
     if let Some(conn) = transport1
         .connect_peer(&peer2_info)
         .await
-        .expect("Should attempt node1 to node2")
+        .expect("Should connect node1 to node2")
     {
         perform_initiator_handshake(&conn, &formation_key1)
             .await
             .expect("Should authenticate node1 to node2");
-        println!("    Node1 → Node2 connected (node1 has lower ID)");
-    }
-    if let Some(conn) = transport2
-        .connect_peer(&peer1_info)
-        .await
-        .expect("Should attempt node2 to node1")
-    {
-        perform_initiator_handshake(&conn, &formation_key2)
-            .await
-            .expect("Should authenticate node2 to node1");
-        println!("    Node2 → Node1 connected (node2 has lower ID)");
+        println!("    Node1 → Node2 connected");
     }
 
-    // Pair 1-3: Both sides try to connect
+    // Pair 1-3
     if let Some(conn) = transport1
         .connect_peer(&peer3_info)
         .await
-        .expect("Should attempt node1 to node3")
+        .expect("Should connect node1 to node3")
     {
         perform_initiator_handshake(&conn, &formation_key1)
             .await
             .expect("Should authenticate node1 to node3");
-        println!("    Node1 → Node3 connected (node1 has lower ID)");
-    }
-    if let Some(conn) = transport3
-        .connect_peer(&peer1_info)
-        .await
-        .expect("Should attempt node3 to node1")
-    {
-        perform_initiator_handshake(&conn, &formation_key3)
-            .await
-            .expect("Should authenticate node3 to node1");
-        println!("    Node3 → Node1 connected (node3 has lower ID)");
+        println!("    Node1 → Node3 connected");
     }
 
-    // Pair 2-3: Both sides try to connect
+    // Pair 2-3
     if let Some(conn) = transport2
         .connect_peer(&peer3_info)
         .await
-        .expect("Should attempt node2 to node3")
+        .expect("Should connect node2 to node3")
     {
         perform_initiator_handshake(&conn, &formation_key2)
             .await
             .expect("Should authenticate node2 to node3");
-        println!("    Node2 → Node3 connected (node2 has lower ID)");
-    }
-    if let Some(conn) = transport3
-        .connect_peer(&peer2_info)
-        .await
-        .expect("Should attempt node3 to node2")
-    {
-        perform_initiator_handshake(&conn, &formation_key3)
-            .await
-            .expect("Should authenticate node3 to node2");
-        println!("    Node3 → Node2 connected (node3 has lower ID)");
+        println!("    Node2 → Node3 connected");
     }
 
     println!("  ✓ Full mesh connected with authentication (3 bidirectional pairs)");

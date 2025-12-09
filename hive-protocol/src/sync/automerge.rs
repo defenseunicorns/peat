@@ -890,6 +890,23 @@ impl AutomergeIrohBackend {
             if let Ok(endpoint_id) = peer.endpoint_id() {
                 match self.transport.connect_peer(&network_peer_info).await {
                     Ok(Some(conn)) => {
+                        // Issue #346: Give the accept loop a moment to process any
+                        // incoming connection from this peer. In symmetric discovery
+                        // (both peers have each other in config), both will connect
+                        // simultaneously and the accept loop needs time to process
+                        // the incoming connection and do conflict resolution.
+                        tokio::task::yield_now().await;
+                        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+
+                        // Check if connection was closed by conflict resolution
+                        if conn.close_reason().is_some() {
+                            tracing::debug!(
+                                "Immediate connect: peer {} superseded by accept path",
+                                peer.name
+                            );
+                            continue;
+                        }
+
                         // New connection - perform formation handshake
                         match perform_initiator_handshake(&conn, &formation_key).await {
                             Ok(()) => {
@@ -897,6 +914,8 @@ impl AutomergeIrohBackend {
                                     "Immediate connect: authenticated with peer {}",
                                     peer.name
                                 );
+                                // Issue #346: Emit Connected AFTER successful handshake
+                                self.transport.emit_peer_connected(endpoint_id);
                                 new_connections += 1;
                             }
                             Err(e) => {
@@ -906,14 +925,16 @@ impl AutomergeIrohBackend {
                                     e
                                 );
                                 conn.close(1u32.into(), b"authentication failed");
-                                self.transport.disconnect(&endpoint_id).ok();
+                                // Issue #346: Don't call disconnect() here - the connection
+                                // in the map might be a different one after conflict resolution.
+                                // conn.close() is sufficient; close monitor handles cleanup.
                             }
                         }
                     }
                     Ok(None) => {
-                        // Already connected (they initiated)
+                        // Accept path is handling connection - no action needed
                         tracing::debug!(
-                            "Immediate connect: already connected to {} (they initiated)",
+                            "Immediate connect: peer {} handled by accept path",
                             peer.name
                         );
                     }
@@ -1222,23 +1243,22 @@ impl PeerDiscovery for IrohPeerDiscovery {
                         Ok(Some(conn)) => {
                             consecutive_errors = 0; // Reset on success
                             let peer_id = conn.remote_id();
-                            tracing::debug!("Accepted connection from: {:?}", peer_id);
 
                             // Perform formation handshake to authenticate peer
                             match perform_responder_handshake(&conn, &formation_key_accept).await {
                                 Ok(()) => {
-                                    tracing::info!("Peer {:?} authenticated successfully", peer_id);
-                                    // Connection is already stored by transport.accept()
+                                    // Issue #346: Emit Connected AFTER successful handshake
+                                    transport.emit_peer_connected(peer_id);
                                 }
                                 Err(e) => {
                                     tracing::warn!(
-                                        "Peer {:?} failed authentication: {}. Closing connection.",
-                                        peer_id,
-                                        e
+                                        ?peer_id,
+                                        error = %e,
+                                        "Formation handshake failed"
                                     );
-                                    // Close the unauthenticated connection
+                                    // Close the unauthenticated connection - connection monitor
+                                    // will handle cleanup (Issue #346 stable_id check)
                                     conn.close(1u32.into(), b"authentication failed");
-                                    transport.disconnect(&peer_id).ok();
                                 }
                             }
                         }
@@ -1246,9 +1266,6 @@ impl PeerDiscovery for IrohPeerDiscovery {
                             // Issue #346: This now includes transient errors (failed QUIC handshake)
                             // as well as duplicate connections. Either way, continue accepting.
                             consecutive_errors = 0; // Reset - we're still accepting
-                            tracing::debug!(
-                                "Accept returned None (duplicate conn or transient error), continuing"
-                            );
                         }
                         Err(e) => {
                             // Issue #346: Only fatal errors (endpoint closed) should stop the loop
@@ -1345,6 +1362,8 @@ impl PeerDiscovery for IrohPeerDiscovery {
                                                 peer_id = %peer_id,
                                                 "mDNS peer connected and authenticated"
                                             );
+                                            // Issue #346: Emit Connected AFTER successful handshake
+                                            transport.emit_peer_connected(peer_id);
                                         }
                                         Err(e) => {
                                             tracing::warn!(
@@ -1358,10 +1377,10 @@ impl PeerDiscovery for IrohPeerDiscovery {
                                     }
                                 }
                                 Ok(None) => {
-                                    // Already connected (they initiated) - per tie-breaking
+                                    // Accept path is handling connection
                                     tracing::debug!(
                                         peer_id = %peer_id,
-                                        "mDNS peer already connected (they initiated)"
+                                        "mDNS peer connection handled by accept path"
                                     );
                                 }
                                 Err(e) => {
@@ -1424,11 +1443,30 @@ impl PeerDiscovery for IrohPeerDiscovery {
                         // Try to connect to the peer
                         // connect_peer() returns Option<Connection> (Issue #229):
                         // - Some(conn): New connection, we need to do initiator handshake
-                        // - None: Already connected via their initiative, no handshake needed
+                        // - None: Already connected via accept path, no action needed
                         if let Ok(endpoint_id) = peer.endpoint_id() {
                             match transport.connect_peer(&network_peer_info).await {
                                 Ok(Some(conn)) => {
-                                    // New connection - perform formation handshake to authenticate
+                                    // Issue #346: Give the accept loop a moment to process any
+                                    // incoming connection from this peer. In symmetric discovery
+                                    // (both peers have each other in config), both will connect
+                                    // simultaneously and the accept loop needs time to process
+                                    // the incoming connection and do conflict resolution.
+                                    tokio::task::yield_now().await;
+                                    tokio::time::sleep(tokio::time::Duration::from_millis(10))
+                                        .await;
+
+                                    // Check if connection was closed by conflict resolution
+                                    // (accept path superseded this connection).
+                                    if conn.close_reason().is_some() {
+                                        tracing::debug!(
+                                            "Peer {} connection superseded by accept path",
+                                            peer.name
+                                        );
+                                        continue;
+                                    }
+
+                                    // New connection - perform formation handshake
                                     match perform_initiator_handshake(&conn, &formation_key_connect)
                                         .await
                                     {
@@ -1437,6 +1475,8 @@ impl PeerDiscovery for IrohPeerDiscovery {
                                                 "Connected and authenticated with peer: {}",
                                                 peer.name
                                             );
+                                            // Issue #346: Emit Connected AFTER successful handshake
+                                            transport.emit_peer_connected(endpoint_id);
                                             made_new_connection = true;
                                         }
                                         Err(e) => {
@@ -1445,17 +1485,17 @@ impl PeerDiscovery for IrohPeerDiscovery {
                                                 peer.name,
                                                 e
                                             );
-                                            // Disconnect unauthenticated peer
+                                            // Issue #346: Don't call disconnect() here - the connection
+                                            // in the map might be a different one after conflict resolution.
+                                            // conn.close() is sufficient; close monitor handles cleanup.
                                             conn.close(1u32.into(), b"authentication failed");
-                                            transport.disconnect(&endpoint_id).ok();
                                         }
                                     }
                                 }
                                 Ok(None) => {
-                                    // Already connected - they are the initiator (Issue #229)
-                                    // Their accept loop will handle the handshake
+                                    // Accept path is handling connection
                                     tracing::debug!(
-                                        "Already connected to peer {} (they initiated)",
+                                        "Peer {} connection handled by accept path",
                                         peer.name
                                     );
                                 }
@@ -1591,9 +1631,7 @@ impl PeerDiscovery for IrohPeerDiscovery {
             relay_url: None,
         };
 
-        // Connect to peer (Issue #229: returns Option<Connection>)
-        // - Some(conn): New connection, we need to do initiator handshake
-        // - None: Already connected via their initiative, no handshake needed
+        // Connect to peer (conflict resolution handled by transport layer)
         let conn_opt =
             self.transport
                 .connect_peer(&peer_info)
@@ -1609,11 +1647,13 @@ impl PeerDiscovery for IrohPeerDiscovery {
         if let Some(conn) = conn_opt {
             use crate::network::formation_handshake::perform_initiator_handshake;
 
+            let endpoint_id = conn.remote_id();
             if let Err(e) = perform_initiator_handshake(&conn, &formation_key).await {
-                // Authentication failed - disconnect
-                let endpoint_id = conn.remote_id();
+                // Authentication failed - close the connection
+                // Issue #346: Don't call disconnect() here - the connection
+                // in the map might be a different one after conflict resolution.
+                // conn.close() is sufficient; close monitor handles cleanup.
                 conn.close(1u32.into(), b"authentication failed");
-                self.transport.disconnect(&endpoint_id).ok();
 
                 return Err(Error::Network {
                     message: format!("Peer authentication failed: {}", e),
@@ -1621,7 +1661,10 @@ impl PeerDiscovery for IrohPeerDiscovery {
                     source: None,
                 });
             }
+            // Issue #346: Emit Connected AFTER successful handshake
+            self.transport.emit_peer_connected(endpoint_id);
         }
+        // If conn_opt is None, accept path is handling the connection
 
         Ok(())
     }
@@ -1826,10 +1869,20 @@ impl SyncEngine for IrohSyncEngine {
             relay_url: None,
         };
 
-        // Issue #346: Use connect_peer_force for static configurations
-        // This bypasses tie-breaking since we're explicitly told to connect
-        match self.transport.connect_peer_force(&peer_info).await {
-            Ok(conn) => {
+        // Issue #346: connect_peer returns Option<Connection>
+        // - Some(conn): New connection, we need to do initiator handshake
+        // - None: Accept path is handling, no action needed
+        match self.transport.connect_peer(&peer_info).await {
+            Ok(Some(conn)) => {
+                // Issue #346: Check if connection was closed by conflict resolution
+                if conn.close_reason().is_some() {
+                    tracing::debug!(
+                        peer_endpoint = %endpoint_id_hex,
+                        "Connection superseded by accept path"
+                    );
+                    return Ok(false);
+                }
+
                 // New connection - perform formation handshake
                 if let Some(ref formation_key) = self.formation_key {
                     use crate::network::formation_handshake::perform_initiator_handshake;
@@ -1867,6 +1920,15 @@ impl SyncEngine for IrohSyncEngine {
                     );
                     Ok(true)
                 }
+            }
+            Ok(None) => {
+                // Accept path is handling connection
+                tracing::debug!(
+                    peer_endpoint = %endpoint_id_hex,
+                    "Connection handled by accept path"
+                );
+                // Return true since a connection will be established via accept path
+                Ok(true)
             }
             Err(e) => {
                 tracing::warn!(

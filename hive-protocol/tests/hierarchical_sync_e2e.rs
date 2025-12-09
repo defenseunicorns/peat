@@ -136,15 +136,22 @@ async fn test_hierarchical_sync_soldiers_to_leader() {
     };
 
     for (i, transport) in soldier_transports.iter().enumerate() {
-        // Each soldier connects to the leader - use connect_peer_force to bypass tie-breaking
-        // In hierarchical topology, soldiers ALWAYS connect UP to the leader
-        match transport.connect_peer_force(&leader_peer_info).await {
-            Ok(conn) => {
-                // Perform handshake
+        // Each soldier connects to the leader
+        // connect_peer returns Option<Connection>: Some = new connection, None = accept path handling
+        match transport.connect_peer(&leader_peer_info).await {
+            Ok(Some(conn)) => {
+                // New connection - perform handshake
                 match perform_initiator_handshake(&conn, &soldier_formation_keys[i]).await {
                     Ok(_) => println!("   Soldier {} → Leader: connected + authenticated", i + 1),
                     Err(e) => println!("   Soldier {} → Leader: handshake failed: {}", i + 1, e),
                 }
+            }
+            Ok(None) => {
+                // Accept path handling connection
+                println!(
+                    "   Soldier {} → Leader: connection handled by accept path",
+                    i + 1
+                );
             }
             Err(e) => println!("   Soldier {} → Leader: connection failed: {}", i + 1, e),
         }
@@ -366,8 +373,8 @@ async fn test_hierarchical_sync_leader_to_soldiers() {
     };
 
     for (i, transport) in soldier_transports.iter().enumerate() {
-        // Use connect_peer_force - soldiers always connect UP in hierarchical topology
-        if let Ok(conn) = transport.connect_peer_force(&leader_peer_info).await {
+        // connect_peer returns Option<Connection>: Some = new connection, None = accept path handling
+        if let Ok(Some(conn)) = transport.connect_peer(&leader_peer_info).await {
             let _ = perform_initiator_handshake(&conn, &soldier_formation_keys[i]).await;
         }
     }
