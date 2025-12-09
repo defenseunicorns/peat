@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
 import android.view.View
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -115,6 +116,7 @@ class HiveDropDownReceiver(
     }
 
     private fun buildContentContainer(): LinearLayout {
+        Log.d(TAG, "Building content - cells: ${mapComponent.cells.size}, tracks: ${mapComponent.tracks.size}, platforms: ${mapComponent.platforms.size}")
         val container = LinearLayout(pluginContext).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 32)
@@ -148,6 +150,11 @@ class HiveDropDownReceiver(
         container.addView(header)
 
         // Spacer
+        container.addView(createSpacer(24))
+
+        // PLI Broadcast section
+        val pliSection = createPliBroadcastSection()
+        container.addView(pliSection)
         container.addView(createSpacer(24))
 
         // Cells section
@@ -478,6 +485,74 @@ class HiveDropDownReceiver(
         }
 
         return card
+    }
+
+    private fun createPliBroadcastSection(): View {
+        val section = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        // Title
+        val title = TextView(pluginContext).apply {
+            text = "PLI Broadcast"
+            textSize = 16f
+            setTextColor(Color.WHITE)
+        }
+        section.addView(title)
+        section.addView(createSpacer(12))
+
+        // Card with toggle and status
+        val card = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#2d2d2d"))
+            setPadding(24, 16, 24, 16)
+        }
+
+        // Description
+        val description = TextView(pluginContext).apply {
+            text = "Share your position with HIVE network peers"
+            textSize = 12f
+            setTextColor(Color.GRAY)
+        }
+        card.addView(description)
+        card.addView(createSpacer(12))
+
+        // Toggle button row
+        val buttonRow = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val isEnabled = mapComponent.pliBroadcastEnabled
+        val toggleButton = Button(pluginContext).apply {
+            text = if (isEnabled) "Stop Broadcasting" else "Start Broadcasting"
+            setBackgroundColor(if (isEnabled) Color.parseColor("#F44336") else Color.parseColor("#4CAF50"))
+            setTextColor(Color.WHITE)
+            textSize = 12f
+            setPadding(32, 16, 32, 16)
+
+            setOnClickListener {
+                val newState = !mapComponent.pliBroadcastEnabled
+                mapComponent.setPliBroadcastEnabled(newState)
+                // Refresh the UI to show updated state
+                handler.postDelayed({ refreshContent() }, 100)
+            }
+        }
+        buttonRow.addView(toggleButton)
+        card.addView(buttonRow)
+        card.addView(createSpacer(12))
+
+        // Status indicator
+        val statusColor = if (isEnabled) Color.parseColor("#4CAF50") else Color.GRAY
+        val statusText = TextView(pluginContext).apply {
+            text = "Status: ${mapComponent.lastBroadcastStatus}"
+            textSize = 11f
+            setTextColor(statusColor)
+        }
+        card.addView(statusText)
+
+        section.addView(card)
+        return section
     }
 
     override fun onDropDownSelectionRemoved() {}

@@ -38,6 +38,13 @@ class HiveMapComponent : DropDownMapComponent() {
     private val refreshHandler = Handler(Looper.getMainLooper())
     private var isRefreshing = false
 
+    // Self-position broadcaster for PLI
+    private var selfPositionBroadcaster: SelfPositionBroadcaster? = null
+    private var _pliBroadcastEnabled = false
+    val pliBroadcastEnabled: Boolean get() = _pliBroadcastEnabled
+    private var _lastBroadcastStatus: String = "Not started"
+    val lastBroadcastStatus: String get() = _lastBroadcastStatus
+
     // Simple state management without coroutines
     private val _cells = mutableListOf<HiveCell>()
     val cells: List<HiveCell> get() = _cells.toList()
@@ -65,6 +72,14 @@ class HiveMapComponent : DropDownMapComponent() {
         trackOverlay = HiveTrackOverlay(view)
         Log.d(TAG, "Track overlay created")
 
+        // Create self-position broadcaster for PLI
+        selfPositionBroadcaster = SelfPositionBroadcaster(view)
+        selfPositionBroadcaster?.onBroadcastCallback = { success, message ->
+            _lastBroadcastStatus = message
+            Log.d(TAG, "PLI broadcast: $success - $message")
+        }
+        Log.d(TAG, "Self-position broadcaster created")
+
         // Create dropdown receiver
         dropDownReceiver = HiveDropDownReceiver(view, context, this)
 
@@ -85,6 +100,8 @@ class HiveMapComponent : DropDownMapComponent() {
     override fun onDestroyImpl(context: Context, view: MapView) {
         Log.d(TAG, "HiveMapComponent onDestroy")
         stopPeriodicRefresh()
+        selfPositionBroadcaster?.stop()
+        selfPositionBroadcaster = null
         trackOverlay?.dispose()
         trackOverlay = null
         super.onDestroyImpl(context, view)
@@ -392,6 +409,29 @@ class HiveMapComponent : DropDownMapComponent() {
      */
     fun updateMapMarkers() {
         trackOverlay?.updateTracks(_tracks)
+    }
+
+    /**
+     * Enable or disable PLI (self-position) broadcasting to HIVE network.
+     * @param enabled true to start broadcasting, false to stop
+     */
+    fun setPliBroadcastEnabled(enabled: Boolean) {
+        _pliBroadcastEnabled = enabled
+        if (enabled) {
+            selfPositionBroadcaster?.start()
+            Log.i(TAG, "PLI broadcast enabled")
+        } else {
+            selfPositionBroadcaster?.stop()
+            _lastBroadcastStatus = "Disabled"
+            Log.i(TAG, "PLI broadcast disabled")
+        }
+    }
+
+    /**
+     * Manually trigger a single PLI broadcast (for testing).
+     */
+    fun broadcastPliNow() {
+        selfPositionBroadcaster?.broadcastNow()
     }
 
     /**

@@ -167,6 +167,7 @@ fn main() {
     println!("\nFlying patterns over Atlanta... (Ctrl+C to exit)");
     println!("ATAK plugin should discover this node via mDNS.\n");
 
+    let mut last_platform_count = 0;
     loop {
         std::thread::sleep(std::time::Duration::from_secs(2));
         time_offset += 2;
@@ -176,6 +177,36 @@ fn main() {
 
         // Update track positions
         publish_flight_patterns(&node, &patterns, time_offset);
+
+        // Check for received platforms (ATAK PLI)
+        let platforms = match node.get_platforms() {
+            Ok(p) => p,
+            Err(_) => vec![],
+        };
+
+        // Log new platforms received from ATAK
+        if platforms.len() != last_platform_count {
+            println!(
+                "\n=== Received {} platforms from network ===",
+                platforms.len()
+            );
+            for p in &platforms {
+                // Skip our own platforms (they have "platform-" prefix)
+                if p.id.starts_with("platform-") {
+                    continue;
+                }
+                println!(
+                    "  [PLI] {} ({}) @ {:.4}, {:.4} - {}",
+                    p.name,
+                    p.id,
+                    p.lat,
+                    p.lon,
+                    p.status.as_str()
+                );
+            }
+            println!();
+            last_platform_count = platforms.len();
+        }
 
         println!("[t={}s] Peers: {} | Tracks updated", time_offset, peers);
 
