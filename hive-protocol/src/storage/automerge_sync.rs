@@ -43,6 +43,8 @@ use super::sync_errors::{SyncError, SyncErrorHandler};
 #[cfg(feature = "automerge-backend")]
 use crate::network::iroh_transport::IrohTransport;
 #[cfg(feature = "automerge-backend")]
+use crate::qos::{SyncMode, SyncModeRegistry};
+#[cfg(feature = "automerge-backend")]
 use anyhow::{Context, Result};
 #[cfg(feature = "automerge-backend")]
 use automerge::sync::{Message as SyncMessage, State as SyncState, SyncDoc};
@@ -63,6 +65,31 @@ use std::time::SystemTime;
 #[cfg(feature = "automerge-backend")]
 #[allow(unused_imports)] // Used in sync message send/receive methods
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+/// Wire format message type prefix (Issue #355)
+///
+/// Used to distinguish between delta-based sync messages and state snapshots.
+#[cfg(feature = "automerge-backend")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum SyncMessageType {
+    /// Delta-based sync message (Automerge sync protocol)
+    DeltaSync = 0x00,
+    /// Full state snapshot (doc.save() bytes)
+    StateSnapshot = 0x01,
+}
+
+/// Received sync payload (Issue #355)
+///
+/// Can be either a delta-based sync message or a state snapshot.
+#[cfg(feature = "automerge-backend")]
+#[derive(Debug)]
+pub enum ReceivedSyncPayload {
+    /// Delta-based sync message from Automerge protocol
+    Delta(SyncMessage),
+    /// Full document state snapshot (from LatestOnly mode)
+    StateSnapshot(Vec<u8>),
+}
 
 /// Per-peer sync statistics
 #[cfg(feature = "automerge-backend")]
@@ -91,6 +118,7 @@ pub struct PeerSyncStats {
 /// - ✅ Error handling with retry logic and circuit breaker (Phase 5)
 /// - ✅ Partition detection with heartbeat mechanism (Phase 6.3)
 /// - ✅ Flow control and backpressure (Issue #97)
+/// - ✅ Sync modes: LatestOnly vs FullHistory (Issue #355)
 #[cfg(feature = "automerge-backend")]
 pub struct AutomergeSyncCoordinator {
     /// Reference to the AutomergeStore
@@ -113,6 +141,8 @@ pub struct AutomergeSyncCoordinator {
     partition_detector: Arc<PartitionDetector>,
     /// Flow controller for rate limiting and backpressure
     flow_controller: Arc<FlowController>,
+    /// Sync mode registry for per-collection sync mode configuration (Issue #355)
+    sync_mode_registry: Arc<SyncModeRegistry>,
 }
 
 #[cfg(feature = "automerge-backend")]
@@ -149,7 +179,52 @@ impl AutomergeSyncCoordinator {
             error_handler: Arc::new(SyncErrorHandler::new()),
             partition_detector: Arc::new(PartitionDetector::new()),
             flow_controller: Arc::new(FlowController::with_config(flow_config)),
+            sync_mode_registry: Arc::new(SyncModeRegistry::with_defaults()),
         }
+    }
+
+    /// Create a new sync coordinator with custom sync mode registry
+    ///
+    /// # Arguments
+    ///
+    /// * `store` - The AutomergeStore managing documents
+    /// * `transport` - The IrohTransport for P2P connections
+    /// * `sync_mode_registry` - Custom sync mode configuration
+    pub fn with_sync_modes(
+        store: Arc<AutomergeStore>,
+        transport: Arc<IrohTransport>,
+        sync_mode_registry: Arc<SyncModeRegistry>,
+    ) -> Self {
+        Self {
+            store,
+            transport,
+            peer_states: Arc::new(RwLock::new(HashMap::new())),
+            peer_stats: Arc::new(RwLock::new(HashMap::new())),
+            total_bytes_sent: Arc::new(AtomicU64::new(0)),
+            total_bytes_received: Arc::new(AtomicU64::new(0)),
+            error_handler: Arc::new(SyncErrorHandler::new()),
+            partition_detector: Arc::new(PartitionDetector::new()),
+            flow_controller: Arc::new(FlowController::with_config(FlowControlConfig::default())),
+            sync_mode_registry,
+        }
+    }
+
+    /// Get the sync mode registry for runtime configuration
+    pub fn sync_mode_registry(&self) -> &Arc<SyncModeRegistry> {
+        &self.sync_mode_registry
+    }
+
+    /// Extract collection name from document key
+    ///
+    /// Document keys are formatted as "collection:doc_id" (e.g., "beacons:beacon-1")
+    fn collection_from_doc_key(doc_key: &str) -> &str {
+        doc_key.split(':').next().unwrap_or(doc_key)
+    }
+
+    /// Get sync mode for a document key
+    fn sync_mode_for_doc(&self, doc_key: &str) -> SyncMode {
+        let collection = Self::collection_from_doc_key(doc_key);
+        self.sync_mode_registry.get(collection)
     }
 
     /// Initiate sync for a document with a peer
@@ -231,11 +306,23 @@ impl AutomergeSyncCoordinator {
     }
 
     /// Inner sync method without error handling wrapper
+    ///
+    /// Checks the sync mode for the collection and uses either:
+    /// - **FullHistory**: Delta-based sync via `generate_sync_message()`
+    /// - **LatestOnly**: State-based sync via `doc.save()` (Issue #355)
     async fn initiate_sync_inner(&self, doc_key: &str, peer_id: EndpointId) -> Result<()> {
         tracing::debug!(
             "initiate_sync_inner: doc_key={}, peer={:?}",
             doc_key,
             peer_id
+        );
+
+        // Check sync mode for this collection (Issue #355)
+        let sync_mode = self.sync_mode_for_doc(doc_key);
+        tracing::debug!(
+            "initiate_sync_inner: sync_mode={} for {}",
+            sync_mode,
+            doc_key
         );
 
         // Get the document
@@ -244,8 +331,40 @@ impl AutomergeSyncCoordinator {
             .get(doc_key)?
             .context("Document not found for sync")?;
 
-        tracing::debug!("initiate_sync_inner: got doc, len={}", doc.save().len());
+        let doc_bytes = doc.save();
+        tracing::debug!("initiate_sync_inner: got doc, len={}", doc_bytes.len());
 
+        // Use appropriate sync method based on mode
+        match sync_mode {
+            SyncMode::LatestOnly => {
+                // Issue #355: Send full document state instead of delta sync
+                // This is much more efficient for high-frequency data like beacons
+                tracing::debug!(
+                    "initiate_sync_inner: using LatestOnly mode, sending {} bytes state snapshot",
+                    doc_bytes.len()
+                );
+                self.send_state_snapshot(peer_id, doc_key, &doc_bytes)
+                    .await?;
+                tracing::debug!("initiate_sync_inner: state snapshot sent successfully");
+                Ok(())
+            }
+            SyncMode::FullHistory | SyncMode::WindowedHistory { .. } => {
+                // Traditional delta-based sync
+                // WindowedHistory uses same path but receiver will filter (Phase 2)
+                self.initiate_delta_sync(doc_key, peer_id, &doc).await
+            }
+        }
+    }
+
+    /// Initiate delta-based sync (FullHistory mode)
+    ///
+    /// Uses Automerge's sync protocol to exchange deltas.
+    async fn initiate_delta_sync(
+        &self,
+        doc_key: &str,
+        peer_id: EndpointId,
+        doc: &Automerge,
+    ) -> Result<()> {
         // Get or create sync state for this peer
         let mut sync_state = self.get_or_create_sync_state(doc_key, peer_id);
 
@@ -253,16 +372,16 @@ impl AutomergeSyncCoordinator {
         // NOTE: generate_sync_message mutates sync_state internally to track which heads
         // have been "prepared for sending". We must only persist this state AFTER
         // successful send, otherwise retries will fail with "nothing to send".
-        let message = match SyncDoc::generate_sync_message(&doc, &mut sync_state) {
+        let message = match SyncDoc::generate_sync_message(doc, &mut sync_state) {
             Some(msg) => {
                 tracing::debug!(
-                    "initiate_sync_inner: generated sync message, encoded_len={}",
+                    "initiate_delta_sync: generated sync message, encoded_len={}",
                     msg.clone().encode().len()
                 );
                 msg
             }
             None => {
-                tracing::debug!("initiate_sync_inner: generate_sync_message returned None");
+                tracing::debug!("initiate_delta_sync: generate_sync_message returned None");
                 return Err(anyhow::anyhow!("No initial sync message to send"));
             }
         };
@@ -270,15 +389,100 @@ impl AutomergeSyncCoordinator {
         // Send message to peer with document key BEFORE updating sync state
         // This ensures that if send fails, we can retry with the same state
         tracing::debug!(
-            "initiate_sync_inner: sending sync message to peer {:?}",
+            "initiate_delta_sync: sending sync message to peer {:?}",
             peer_id
         );
         self.send_sync_message_for_doc(peer_id, doc_key, &message)
             .await?;
-        tracing::debug!("initiate_sync_inner: sync message sent successfully");
+        tracing::debug!("initiate_delta_sync: sync message sent successfully");
 
         // Only update sync state AFTER successful send
         self.update_sync_state(doc_key, peer_id, sync_state);
+
+        Ok(())
+    }
+
+    /// Send a state snapshot for LatestOnly sync mode (Issue #355)
+    ///
+    /// Instead of delta-based sync, sends the full document state.
+    /// This is ~300× more efficient for high-frequency data after reconnection.
+    ///
+    /// # Wire Format
+    ///
+    /// ```text
+    /// [2 bytes: doc_key_len][N bytes: doc_key][1 byte: msg_type=0x01][4 bytes: state_len][M bytes: state]
+    /// ```
+    async fn send_state_snapshot(
+        &self,
+        peer_id: EndpointId,
+        doc_key: &str,
+        state_bytes: &[u8],
+    ) -> Result<()> {
+        // Get connection to peer
+        let conn = self
+            .transport
+            .get_connection(&peer_id)
+            .context("No connection to peer")?;
+
+        // Open a bidirectional stream
+        let (mut send, _recv) = conn
+            .open_bi()
+            .await
+            .context("Failed to open bidirectional stream")?;
+
+        // Encode doc_key as UTF-8 bytes
+        let doc_key_bytes = doc_key.as_bytes();
+        let doc_key_len = doc_key_bytes.len() as u16;
+
+        // Write doc_key length prefix (2 bytes, big-endian)
+        send.write_all(&doc_key_len.to_be_bytes())
+            .await
+            .context("Failed to write doc_key length")?;
+
+        // Write doc_key
+        send.write_all(doc_key_bytes)
+            .await
+            .context("Failed to write doc_key")?;
+
+        // Write message type (1 byte) - StateSnapshot = 0x01
+        send.write_all(&[SyncMessageType::StateSnapshot as u8])
+            .await
+            .context("Failed to write message type")?;
+
+        // Write state length prefix (4 bytes, big-endian)
+        let state_len = state_bytes.len() as u32;
+        send.write_all(&state_len.to_be_bytes())
+            .await
+            .context("Failed to write state length")?;
+
+        // Write the state bytes
+        send.write_all(state_bytes)
+            .await
+            .context("Failed to write state bytes")?;
+
+        // Finish the stream
+        send.finish().context("Failed to finish stream")?;
+
+        // Track statistics: bytes sent = doc_key overhead + type + state size
+        let total_bytes = 2 + doc_key_bytes.len() + 1 + 4 + state_bytes.len();
+        self.total_bytes_sent
+            .fetch_add(total_bytes as u64, Ordering::Relaxed);
+
+        // Update per-peer statistics
+        {
+            let mut stats = self.peer_stats.write().unwrap();
+            let peer_stat = stats.entry(peer_id).or_default();
+            peer_stat.bytes_sent += total_bytes as u64;
+            peer_stat.sync_count += 1;
+            peer_stat.last_sync = Some(SystemTime::now());
+        }
+
+        tracing::debug!(
+            "Sent state snapshot for {} to {:?}: {} bytes",
+            doc_key,
+            peer_id,
+            total_bytes
+        );
 
         Ok(())
     }
@@ -360,7 +564,10 @@ impl AutomergeSyncCoordinator {
 
     /// Send a sync message to a peer over Iroh stream
     ///
-    /// Wire format: [2 bytes: doc_key length][N bytes: doc_key UTF-8][4 bytes: message length][M bytes: encoded message]
+    /// Wire format (v2 with message type - Issue #355):
+    /// ```text
+    /// [2 bytes: doc_key_len][N bytes: doc_key][1 byte: msg_type=0x00][4 bytes: msg_len][M bytes: msg]
+    /// ```
     async fn send_sync_message_for_doc(
         &self,
         peer_id: EndpointId,
@@ -393,6 +600,11 @@ impl AutomergeSyncCoordinator {
             .await
             .context("Failed to write doc_key")?;
 
+        // Write message type (1 byte) - DeltaSync = 0x00 (Issue #355)
+        send.write_all(&[SyncMessageType::DeltaSync as u8])
+            .await
+            .context("Failed to write message type")?;
+
         // Encode the sync message (clone since encode() takes ownership)
         let encoded = message.clone().encode();
 
@@ -410,8 +622,8 @@ impl AutomergeSyncCoordinator {
         // Finish the stream
         send.finish().context("Failed to finish stream")?;
 
-        // Track statistics: bytes sent = doc_key overhead + message size
-        let total_bytes = 2 + doc_key_bytes.len() + 4 + encoded.len();
+        // Track statistics: bytes sent = doc_key overhead + type + message size
+        let total_bytes = 2 + doc_key_bytes.len() + 1 + 4 + encoded.len();
         self.total_bytes_sent
             .fetch_add(total_bytes as u64, Ordering::Relaxed);
 
@@ -425,7 +637,7 @@ impl AutomergeSyncCoordinator {
         }
 
         tracing::debug!(
-            "Sent sync message for {} to {:?}: {} bytes",
+            "Sent delta sync message for {} to {:?}: {} bytes",
             doc_key,
             peer_id,
             total_bytes
@@ -434,15 +646,18 @@ impl AutomergeSyncCoordinator {
         Ok(())
     }
 
-    /// Receive a sync message from a peer over Iroh stream
+    /// Receive a sync payload from a peer over Iroh stream (Issue #355)
     ///
-    /// Wire format: [2 bytes: doc_key length][N bytes: doc_key UTF-8][4 bytes: message length][M bytes: encoded message]
+    /// Wire format (v2 with message type):
+    /// ```text
+    /// [2 bytes: doc_key_len][N bytes: doc_key][1 byte: msg_type][4 bytes: payload_len][M bytes: payload]
+    /// ```
     ///
-    /// Returns (doc_key, message, total_bytes_received)
-    async fn receive_sync_message_from_stream(
+    /// Returns (doc_key, payload, total_bytes_received)
+    async fn receive_sync_payload_from_stream(
         &self,
         mut recv: iroh::endpoint::RecvStream,
-    ) -> Result<(String, SyncMessage, usize)> {
+    ) -> Result<(String, ReceivedSyncPayload, usize)> {
         // Read doc_key length prefix (2 bytes, big-endian)
         let mut doc_key_len_bytes = [0u8; 2];
         recv.read_exact(&mut doc_key_len_bytes)
@@ -458,26 +673,73 @@ impl AutomergeSyncCoordinator {
         let doc_key =
             String::from_utf8(doc_key_bytes).context("Failed to parse doc_key as UTF-8")?;
 
-        // Read message length prefix (4 bytes, big-endian)
-        let mut message_len_bytes = [0u8; 4];
-        recv.read_exact(&mut message_len_bytes)
+        // Read message type (1 byte) - Issue #355
+        let mut msg_type_byte = [0u8; 1];
+        recv.read_exact(&mut msg_type_byte)
             .await
-            .context("Failed to read message length")?;
-        let message_len = u32::from_be_bytes(message_len_bytes) as usize;
+            .context("Failed to read message type")?;
 
-        // Read the message
-        let mut buffer = vec![0u8; message_len];
+        // Read payload length prefix (4 bytes, big-endian)
+        let mut payload_len_bytes = [0u8; 4];
+        recv.read_exact(&mut payload_len_bytes)
+            .await
+            .context("Failed to read payload length")?;
+        let payload_len = u32::from_be_bytes(payload_len_bytes) as usize;
+
+        // Read the payload
+        let mut buffer = vec![0u8; payload_len];
         recv.read_exact(&mut buffer)
             .await
-            .context("Failed to read message")?;
+            .context("Failed to read payload")?;
 
-        // Decode the sync message
-        let message = SyncMessage::decode(&buffer).context("Failed to decode sync message")?;
+        // Calculate total bytes: doc_key overhead + type + payload size
+        let total_bytes = 2 + doc_key_len + 1 + 4 + payload_len;
 
-        // Calculate total bytes: doc_key overhead + message size
-        let total_bytes = 2 + doc_key_len + 4 + message_len;
+        // Parse based on message type
+        let payload = match msg_type_byte[0] {
+            0x00 => {
+                // DeltaSync - decode as Automerge sync message
+                let message =
+                    SyncMessage::decode(&buffer).context("Failed to decode sync message")?;
+                ReceivedSyncPayload::Delta(message)
+            }
+            0x01 => {
+                // StateSnapshot - raw Automerge document bytes
+                tracing::debug!(
+                    "Received state snapshot for {}: {} bytes",
+                    doc_key,
+                    buffer.len()
+                );
+                ReceivedSyncPayload::StateSnapshot(buffer)
+            }
+            other => {
+                return Err(anyhow::anyhow!(
+                    "Unknown sync message type: 0x{:02x}",
+                    other
+                ));
+            }
+        };
 
-        Ok((doc_key, message, total_bytes))
+        Ok((doc_key, payload, total_bytes))
+    }
+
+    /// Legacy receive function for backwards compatibility
+    ///
+    /// Calls the new payload receiver and extracts delta sync message.
+    /// Returns error if a state snapshot is received (caller should use new API).
+    async fn receive_sync_message_from_stream(
+        &self,
+        recv: iroh::endpoint::RecvStream,
+    ) -> Result<(String, SyncMessage, usize)> {
+        let (doc_key, payload, total_bytes) = self.receive_sync_payload_from_stream(recv).await?;
+
+        match payload {
+            ReceivedSyncPayload::Delta(message) => Ok((doc_key, message, total_bytes)),
+            ReceivedSyncPayload::StateSnapshot(_) => Err(anyhow::anyhow!(
+                "Received state snapshot but expected delta sync message for {}",
+                doc_key
+            )),
+        }
     }
 
     /// Get or create sync state for a peer
@@ -652,12 +914,91 @@ impl AutomergeSyncCoordinator {
         _send: iroh::endpoint::SendStream,
         recv: iroh::endpoint::RecvStream,
     ) -> Result<()> {
-        // Receive the sync message (includes doc_key in wire format)
-        let (doc_key, message, message_size) = self.receive_sync_message_from_stream(recv).await?;
+        // Receive the sync payload (includes doc_key and message type in wire format)
+        let (doc_key, payload, payload_size) = self.receive_sync_payload_from_stream(recv).await?;
 
-        // Process the message with statistics tracking
-        self.receive_sync_message(&doc_key, peer_id, message, message_size)
-            .await?;
+        // Process based on payload type (Issue #355)
+        match payload {
+            ReceivedSyncPayload::Delta(message) => {
+                // Traditional delta-based sync
+                self.receive_sync_message(&doc_key, peer_id, message, payload_size)
+                    .await?;
+            }
+            ReceivedSyncPayload::StateSnapshot(state_bytes) => {
+                // LatestOnly mode: apply full state snapshot
+                self.apply_state_snapshot(&doc_key, peer_id, state_bytes, payload_size)
+                    .await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Apply a state snapshot to a document (Issue #355)
+    ///
+    /// Used for LatestOnly sync mode. Replaces the local document with the
+    /// received state, or merges if the document already exists.
+    async fn apply_state_snapshot(
+        &self,
+        doc_key: &str,
+        peer_id: EndpointId,
+        state_bytes: Vec<u8>,
+        payload_size: usize,
+    ) -> Result<()> {
+        // Track statistics first
+        self.total_bytes_received
+            .fetch_add(payload_size as u64, Ordering::Relaxed);
+
+        // Update per-peer statistics
+        {
+            let mut stats = self.peer_stats.write().unwrap();
+            let peer_stat = stats.entry(peer_id).or_default();
+            peer_stat.bytes_received += payload_size as u64;
+            peer_stat.sync_count += 1;
+            peer_stat.last_sync = Some(SystemTime::now());
+        }
+
+        tracing::debug!(
+            "Applying state snapshot for {} from {:?}: {} bytes",
+            doc_key,
+            peer_id,
+            state_bytes.len()
+        );
+
+        // Load the received document
+        let received_doc =
+            Automerge::load(&state_bytes).context("Failed to load state snapshot")?;
+
+        // Check if we have an existing document
+        let mut received_doc = received_doc;
+        match self.store.get(doc_key) {
+            Ok(Some(mut existing_doc)) => {
+                // Merge the received state into our existing document
+                // This handles the case where both sides have made changes
+                existing_doc
+                    .merge(&mut received_doc)
+                    .context("Failed to merge state snapshot")?;
+
+                // Update the store (this triggers change notification via broadcast channel)
+                self.store.put(doc_key, &existing_doc)?;
+
+                tracing::debug!("Merged state snapshot into existing document {}", doc_key);
+            }
+            Ok(None) => {
+                // No existing document, just store the received one
+                self.store.put(doc_key, &received_doc)?;
+
+                tracing::debug!("Stored new document {} from state snapshot", doc_key);
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Error checking existing document {}: {}, storing received state",
+                    doc_key,
+                    e
+                );
+                self.store.put(doc_key, &received_doc)?;
+            }
+        }
 
         Ok(())
     }
