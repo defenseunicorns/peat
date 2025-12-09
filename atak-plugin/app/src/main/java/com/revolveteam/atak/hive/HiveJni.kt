@@ -146,6 +146,15 @@ object HiveJni {
     external fun getPlatformsJni(handle: Long): String
 
     /**
+     * Publish a platform (self-position/PLI) to the HIVE network.
+     * @param handle Node handle from createNodeJni
+     * @param platformJson JSON string representing the platform data
+     * @return true if published successfully
+     */
+    @JvmStatic
+    external fun publishPlatformJni(handle: Long, platformJson: String): Boolean
+
+    /**
      * Test if JNI bindings are working.
      * @return true if JNI is functional
      */
@@ -303,6 +312,13 @@ class HiveNodeJni private constructor(private val handle: Long) : AutoCloseable 
      * @return JSON array of platform objects
      */
     fun getPlatformsJson(): String = HiveJni.getPlatformsJni(handle)
+
+    /**
+     * Publish a platform (self-position/PLI) to the HIVE network.
+     * @param platformJson JSON string representing the platform data
+     * @return true if published successfully
+     */
+    fun publishPlatform(platformJson: String): Boolean = HiveJni.publishPlatformJni(handle, platformJson)
 
     /**
      * Free the native node resources.
