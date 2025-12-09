@@ -76,6 +76,7 @@ pub mod recovery;
 pub mod registry;
 pub mod retention;
 pub mod storage;
+pub mod sync_mode;
 pub mod sync_queue;
 
 use serde::{Deserialize, Serialize};
@@ -100,6 +101,7 @@ pub use retention::{RetentionPolicies, RetentionPolicy};
 pub use storage::{
     ClassStorageMetrics, EvictionCandidate, QoSAwareStorage, StorageMetrics, StoredDocument,
 };
+pub use sync_mode::{SyncMode, SyncModeRegistry};
 pub use sync_queue::{PendingSync, PrioritySyncQueue, QueueStats};
 
 /// 5-level priority classification (ADR-019)
