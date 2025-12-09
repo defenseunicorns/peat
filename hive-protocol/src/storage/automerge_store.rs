@@ -108,6 +108,20 @@ impl AutomergeStore {
     /// This method emits a change notification after successfully persisting the document.
     /// Subscribers will receive the document key to trigger automatic sync.
     pub fn put(&self, key: &str, doc: &Automerge) -> Result<()> {
+        self.put_inner(key, doc, true)
+    }
+
+    /// Save an Automerge document without emitting change notification (Issue #346)
+    ///
+    /// Use this method when storing documents received via sync to avoid
+    /// triggering a sync-back that would be blocked by cooldown and waste resources.
+    /// The sending peer already has this document, so syncing back is unnecessary.
+    pub fn put_without_notify(&self, key: &str, doc: &Automerge) -> Result<()> {
+        self.put_inner(key, doc, false)
+    }
+
+    /// Internal put implementation
+    fn put_inner(&self, key: &str, doc: &Automerge, notify: bool) -> Result<()> {
         let bytes = doc.save();
 
         let write_txn = self
@@ -130,8 +144,11 @@ impl AutomergeStore {
             .put(key.to_string(), doc.clone());
 
         // Notify subscribers of the change (Phase 6.3)
-        // Ignore send errors - if no one is listening, that's fine
-        let _ = self.change_tx.send(key.to_string());
+        // Skip notification for documents received via sync (Issue #346)
+        if notify {
+            // Ignore send errors - if no one is listening, that's fine
+            let _ = self.change_tx.send(key.to_string());
+        }
 
         Ok(())
     }

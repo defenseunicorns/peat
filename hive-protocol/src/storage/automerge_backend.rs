@@ -243,6 +243,104 @@ impl AutomergeBackend {
             anyhow::bail!("Cannot sync: backend created without transport")
         }
     }
+
+    /// Spawn a sync handler for a specific peer (Issue #346)
+    ///
+    /// This is called both by the event-based handler spawner (for immediate response)
+    /// and by the polling-based fallback (for any connections that might be missed).
+    ///
+    /// The function is idempotent - if a handler already exists for this peer, it does nothing.
+    fn spawn_sync_handler_for_peer(
+        peer_id: EndpointId,
+        transport: &Arc<IrohTransport>,
+        coordinator: &Arc<AutomergeSyncCoordinator>,
+        sync_active: &Arc<AtomicBool>,
+        active_handlers: &Arc<RwLock<HashSet<EndpointId>>>,
+    ) {
+        // Skip if we already have a handler for this connection
+        {
+            let handlers = active_handlers.read().unwrap();
+            if handlers.contains(&peer_id) {
+                return;
+            }
+        }
+
+        // Get connection and spawn continuous handler
+        if let Some(conn) = transport.get_connection(&peer_id) {
+            // Mark as having active handler
+            active_handlers.write().unwrap().insert(peer_id);
+
+            // Trigger sync of all existing documents with new peer (Issue #235)
+            let coord_for_initial_sync = Arc::clone(coordinator);
+            let initial_sync_peer_id = peer_id;
+            tokio::spawn(async move {
+                if let Err(e) = coord_for_initial_sync
+                    .sync_all_documents_with_peer(initial_sync_peer_id)
+                    .await
+                {
+                    tracing::warn!(
+                        "Failed to sync existing documents with new peer {:?}: {}",
+                        initial_sync_peer_id,
+                        e
+                    );
+                }
+            });
+
+            let coordinator_clone = Arc::clone(coordinator);
+            let sync_active_clone = Arc::clone(sync_active);
+            let active_handlers_clone = Arc::clone(active_handlers);
+            let handler_peer_id = peer_id;
+
+            // Spawn continuous handler that loops accepting streams
+            tokio::spawn(async move {
+                tracing::debug!(
+                    "Started continuous sync handler for peer {:?}",
+                    handler_peer_id
+                );
+
+                // Loop accepting streams until connection closes or sync stops
+                while sync_active_clone.load(Ordering::Relaxed) {
+                    match conn.accept_bi().await {
+                        Ok((send, recv)) => {
+                            // Handle this stream in a separate task for parallelism
+                            let coord = Arc::clone(&coordinator_clone);
+                            let stream_peer_id = handler_peer_id;
+                            tokio::spawn(async move {
+                                if let Err(e) = coord
+                                    .handle_incoming_sync_stream(stream_peer_id, send, recv)
+                                    .await
+                                {
+                                    tracing::debug!("Error handling sync stream: {}", e);
+                                }
+                            });
+                        }
+                        Err(e) => {
+                            // Connection closed or error - exit handler
+                            tracing::debug!(
+                                "Sync handler for {:?} exiting: {}",
+                                handler_peer_id,
+                                e
+                            );
+                            break;
+                        }
+                    }
+                }
+
+                // Clear sync state for this peer on disconnect
+                coordinator_clone.clear_peer_sync_state(handler_peer_id);
+
+                // Remove from active handlers on exit
+                active_handlers_clone
+                    .write()
+                    .unwrap()
+                    .remove(&handler_peer_id);
+                tracing::debug!(
+                    "Stopped continuous sync handler for peer {:?}",
+                    handler_peer_id
+                );
+            });
+        }
+    }
 }
 
 #[cfg(feature = "automerge-backend")]
@@ -418,112 +516,64 @@ impl SyncCapable for AutomergeBackend {
         // The accept loop in IrohTransport accepts connections, and we need a stream
         // accept loop for each connection to handle incoming sync messages.
         //
-        // Spawn continuous per-connection handlers instead of polling every 100ms.
-        // This dramatically reduces latency from 100ms+ per sync to near-instant.
+        // Issue #346: Use event-based handler spawning to avoid race conditions.
+        // Previously, we only polled every 100ms which could miss sync messages
+        // sent immediately after connection establishment.
         let transport = self.transport.clone().unwrap();
         let coordinator = self.sync_coordinator.clone().unwrap();
         let sync_active = Arc::clone(&self.sync_active);
         let active_handlers = Arc::clone(&self.active_sync_handlers);
 
+        // Issue #346: Event-based handler spawning
+        // Subscribe to connection events and spawn handlers IMMEDIATELY when peers connect.
+        // This eliminates the race condition where sync messages arrive before the
+        // polling-based handler has a chance to run.
+        let transport_events = transport.subscribe_peer_events();
+        let transport_for_events = Arc::clone(&transport);
+        let coordinator_for_events = Arc::clone(&coordinator);
+        let sync_active_for_events = Arc::clone(&sync_active);
+        let active_handlers_for_events = Arc::clone(&active_handlers);
+
+        tokio::spawn(async move {
+            let mut events = transport_events;
+            while let Some(event) = events.recv().await {
+                if !sync_active_for_events.load(Ordering::Relaxed) {
+                    break;
+                }
+                if let crate::network::iroh_transport::TransportPeerEvent::Connected {
+                    endpoint_id,
+                    ..
+                } = event
+                {
+                    // Spawn handler immediately for new connection
+                    Self::spawn_sync_handler_for_peer(
+                        endpoint_id,
+                        &transport_for_events,
+                        &coordinator_for_events,
+                        &sync_active_for_events,
+                        &active_handlers_for_events,
+                    );
+                }
+            }
+            tracing::debug!("Event-based sync handler spawner stopped");
+        });
+
+        // Also keep polling for connections that might be missed (belt and suspenders)
+        // This is a fallback - the event-based spawning above should handle most connections
         let task = tokio::spawn(async move {
-            // Check for new connections every 100ms, but spawn CONTINUOUS handlers
+            // Check for new connections every 100ms as backup
             while sync_active.load(Ordering::Relaxed) {
                 let peer_ids = transport.connected_peers();
 
                 for peer_id in peer_ids {
-                    // Skip if we already have a handler for this connection
-                    {
-                        let handlers = active_handlers.read().unwrap();
-                        if handlers.contains(&peer_id) {
-                            continue;
-                        }
-                    }
-
-                    // Get connection and spawn continuous handler
-                    if let Some(conn) = transport.get_connection(&peer_id) {
-                        // Mark as having active handler
-                        active_handlers.write().unwrap().insert(peer_id);
-
-                        // Issue #235: Trigger sync of all existing documents with new peer
-                        // Documents created before this peer connected need to be synced
-                        let coord_for_initial_sync = Arc::clone(&coordinator);
-                        let initial_sync_peer_id = peer_id;
-                        tokio::spawn(async move {
-                            if let Err(e) = coord_for_initial_sync
-                                .sync_all_documents_with_peer(initial_sync_peer_id)
-                                .await
-                            {
-                                tracing::warn!(
-                                    "Failed to sync existing documents with new peer {:?}: {}",
-                                    initial_sync_peer_id,
-                                    e
-                                );
-                            }
-                        });
-
-                        let coordinator_clone = Arc::clone(&coordinator);
-                        let sync_active_clone = Arc::clone(&sync_active);
-                        let active_handlers_clone = Arc::clone(&active_handlers);
-                        let handler_peer_id = peer_id;
-
-                        // Spawn continuous handler that loops accepting streams
-                        tokio::spawn(async move {
-                            tracing::debug!(
-                                "Started continuous sync handler for peer {:?}",
-                                handler_peer_id
-                            );
-
-                            // Loop accepting streams until connection closes or sync stops
-                            while sync_active_clone.load(Ordering::Relaxed) {
-                                match conn.accept_bi().await {
-                                    Ok((send, recv)) => {
-                                        // Handle this stream in a separate task for parallelism
-                                        let coord = Arc::clone(&coordinator_clone);
-                                        let stream_peer_id = handler_peer_id;
-                                        tokio::spawn(async move {
-                                            if let Err(e) = coord
-                                                .handle_incoming_sync_stream(
-                                                    stream_peer_id,
-                                                    send,
-                                                    recv,
-                                                )
-                                                .await
-                                            {
-                                                tracing::debug!(
-                                                    "Error handling sync stream: {}",
-                                                    e
-                                                );
-                                            }
-                                        });
-                                    }
-                                    Err(e) => {
-                                        // Connection closed or error - exit handler
-                                        tracing::debug!(
-                                            "Sync handler for {:?} exiting: {}",
-                                            handler_peer_id,
-                                            e
-                                        );
-                                        break;
-                                    }
-                                }
-                            }
-
-                            // Clear sync state for this peer on disconnect
-                            // This ensures reconnecting peers can sync fresh instead of
-                            // failing with "no sync message to send" due to stale state
-                            coordinator_clone.clear_peer_sync_state(handler_peer_id);
-
-                            // Remove from active handlers on exit
-                            active_handlers_clone
-                                .write()
-                                .unwrap()
-                                .remove(&handler_peer_id);
-                            tracing::debug!(
-                                "Stopped continuous sync handler for peer {:?}",
-                                handler_peer_id
-                            );
-                        });
-                    }
+                    // Use the same helper function as event-based spawning
+                    Self::spawn_sync_handler_for_peer(
+                        peer_id,
+                        &transport,
+                        &coordinator,
+                        &sync_active,
+                        &active_handlers,
+                    );
                 }
 
                 // Check for new connections periodically (much less critical now)

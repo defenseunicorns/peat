@@ -336,8 +336,11 @@ impl AutomergeSyncCoordinator {
             doc_len_after
         );
 
-        // Save updated document
-        self.store.put(doc_key, &doc)?;
+        // Save updated document WITHOUT triggering change notification (Issue #346)
+        // The sender already has this document, so syncing back would be wasteful
+        // and blocked by cooldown anyway. The response message below handles any
+        // differences we have that they need.
+        self.store.put_without_notify(doc_key, &doc)?;
 
         // Generate response message
         if let Some(response) = SyncDoc::generate_sync_message(&doc, &mut sync_state) {
