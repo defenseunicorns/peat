@@ -79,7 +79,7 @@ pub async fn perform_initiator_handshake(
         connection.open_bi(),
     )
     .await
-    .context("Handshake stream open timeout")?
+    .map_err(|_| anyhow::anyhow!("Handshake stream open timeout"))?
     .context("Failed to open handshake stream")?;
 
     // Step 1: Send our formation ID to trigger the handshake
@@ -174,7 +174,7 @@ pub async fn perform_responder_handshake(
         connection.accept_bi(),
     )
     .await
-    .context("Handshake stream accept timeout")?
+    .map_err(|_| anyhow::anyhow!("Handshake stream accept timeout"))?
     .context("Failed to accept handshake stream")?;
 
     // Step 1: Receive initiator's formation ID
@@ -292,12 +292,12 @@ mod tests {
         // Small additional delay to ensure accept() is called
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
-        // Initiator connects and handshakes (initiator has lower ID, so connect should succeed)
+        // Initiator connects and handshakes (conflict resolution handled by transport layer)
         let conn = initiator
             .connect(responder_addr)
             .await
-            .unwrap()
-            .expect("Lower ID should successfully initiate connection");
+            .expect("Connection should succeed")
+            .expect("Should get new connection (not handled by accept)");
         let initiator_result = perform_initiator_handshake(&conn, &initiator_key).await;
 
         // Wait for responder

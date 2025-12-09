@@ -83,12 +83,9 @@ async fn test_add_peer_connection_visible() {
     let temp_a = TempDir::new().expect("Failed to create temp dir A");
     let temp_b = TempDir::new().expect("Failed to create temp dir B");
 
-    // Use specific ports for deterministic connection
-    let addr_a: std::net::SocketAddr = "127.0.0.1:29001".parse().unwrap();
-    let addr_b: std::net::SocketAddr = "127.0.0.1:29002".parse().unwrap();
-
+    // Use port 0 to let OS assign unique ports (supports parallel test execution)
     let transport_a = Arc::new(
-        IrohTransport::bind(addr_a)
+        IrohTransport::new()
             .await
             .expect("Failed to create transport A"),
     );
@@ -99,7 +96,7 @@ async fn test_add_peer_connection_visible() {
     ));
 
     let transport_b = Arc::new(
-        IrohTransport::bind(addr_b)
+        IrohTransport::new()
             .await
             .expect("Failed to create transport B"),
     );
@@ -109,19 +106,22 @@ async fn test_add_peer_connection_visible() {
         Arc::clone(&transport_b),
     ));
 
-    // Get endpoint IDs
+    // Get endpoint info (address from endpoint_addr())
     let endpoint_a = transport_a.endpoint_id();
     let endpoint_b = transport_b.endpoint_id();
+    let addr_a = transport_a.endpoint_addr();
+    let addr_b = transport_b.endpoint_addr();
     println!("Node A: {:?}", endpoint_a);
     println!("Node B: {:?}", endpoint_b);
 
     // Configure bidirectional discovery (both nodes know about each other)
     // This is required because with deterministic tie-breaking, only the lower ID initiates
+    // Use EndpointAddr for reliable connection (includes relay and direct addresses)
     let peer_b_info = PeerInfo {
         name: "Node B".to_string(),
         node_id: hex::encode(endpoint_b.as_bytes()),
-        addresses: vec![addr_b.to_string()],
-        relay_url: None,
+        addresses: addr_b.ip_addrs().map(|a| a.to_string()).collect(),
+        relay_url: addr_b.relay_urls().next().map(|u| u.to_string()),
     };
     backend_a
         .add_discovery_strategy(Box::new(StaticDiscovery::from_peers(vec![peer_b_info])))
@@ -131,8 +131,8 @@ async fn test_add_peer_connection_visible() {
     let peer_a_info = PeerInfo {
         name: "Node A".to_string(),
         node_id: hex::encode(endpoint_a.as_bytes()),
-        addresses: vec![addr_a.to_string()],
-        relay_url: None,
+        addresses: addr_a.ip_addrs().map(|a| a.to_string()).collect(),
+        relay_url: addr_a.relay_urls().next().map(|u| u.to_string()),
     };
     backend_b
         .add_discovery_strategy(Box::new(StaticDiscovery::from_peers(vec![peer_a_info])))
@@ -239,15 +239,12 @@ async fn test_document_sync_after_add_peer() {
 
     println!("=== Issue #229: Testing Document Sync After add_peer() ===");
 
-    // Create two nodes
+    // Create two nodes with OS-assigned ports (supports parallel test execution)
     let temp_a = TempDir::new().expect("Failed to create temp dir A");
     let temp_b = TempDir::new().expect("Failed to create temp dir B");
 
-    let addr_a: std::net::SocketAddr = "127.0.0.1:29003".parse().unwrap();
-    let addr_b: std::net::SocketAddr = "127.0.0.1:29004".parse().unwrap();
-
     let transport_a = Arc::new(
-        IrohTransport::bind(addr_a)
+        IrohTransport::new()
             .await
             .expect("Failed to create transport A"),
     );
@@ -258,7 +255,7 @@ async fn test_document_sync_after_add_peer() {
     ));
 
     let transport_b = Arc::new(
-        IrohTransport::bind(addr_b)
+        IrohTransport::new()
             .await
             .expect("Failed to create transport B"),
     );
@@ -268,15 +265,17 @@ async fn test_document_sync_after_add_peer() {
         Arc::clone(&transport_b),
     ));
 
-    // Setup bidirectional discovery
+    // Setup bidirectional discovery using EndpointAddr for reliable connection
     let endpoint_a = transport_a.endpoint_id();
     let endpoint_b = transport_b.endpoint_id();
+    let addr_a = transport_a.endpoint_addr();
+    let addr_b = transport_b.endpoint_addr();
 
     let peer_b_info = PeerInfo {
         name: "Node B".to_string(),
         node_id: hex::encode(endpoint_b.as_bytes()),
-        addresses: vec![addr_b.to_string()],
-        relay_url: None,
+        addresses: addr_b.ip_addrs().map(|a| a.to_string()).collect(),
+        relay_url: addr_b.relay_urls().next().map(|u| u.to_string()),
     };
     backend_a
         .add_discovery_strategy(Box::new(StaticDiscovery::from_peers(vec![peer_b_info])))
@@ -286,8 +285,8 @@ async fn test_document_sync_after_add_peer() {
     let peer_a_info = PeerInfo {
         name: "Node A".to_string(),
         node_id: hex::encode(endpoint_a.as_bytes()),
-        addresses: vec![addr_a.to_string()],
-        relay_url: None,
+        addresses: addr_a.ip_addrs().map(|a| a.to_string()).collect(),
+        relay_url: addr_a.relay_urls().next().map(|u| u.to_string()),
     };
     backend_b
         .add_discovery_strategy(Box::new(StaticDiscovery::from_peers(vec![peer_a_info])))
@@ -449,15 +448,12 @@ async fn test_fast_connection_immediate() {
 
     let start_time = std::time::Instant::now();
 
-    // Create two nodes with specific ports
+    // Create two nodes with OS-assigned ports (supports parallel test execution)
     let temp_a = TempDir::new().expect("Failed to create temp dir A");
     let temp_b = TempDir::new().expect("Failed to create temp dir B");
 
-    let addr_a: std::net::SocketAddr = "127.0.0.1:29010".parse().unwrap();
-    let addr_b: std::net::SocketAddr = "127.0.0.1:29011".parse().unwrap();
-
     let transport_a = Arc::new(
-        IrohTransport::bind(addr_a)
+        IrohTransport::new()
             .await
             .expect("Failed to create transport A"),
     );
@@ -468,7 +464,7 @@ async fn test_fast_connection_immediate() {
     ));
 
     let transport_b = Arc::new(
-        IrohTransport::bind(addr_b)
+        IrohTransport::new()
             .await
             .expect("Failed to create transport B"),
     );
@@ -478,18 +474,20 @@ async fn test_fast_connection_immediate() {
         Arc::clone(&transport_b),
     ));
 
-    // Get endpoint info for discovery setup
+    // Get endpoint info for discovery setup using EndpointAddr
     let endpoint_a = transport_a.endpoint_id();
     let endpoint_b = transport_b.endpoint_id();
-    println!("Node A: {:?} @ {:?}", endpoint_a, addr_a);
-    println!("Node B: {:?} @ {:?}", endpoint_b, addr_b);
+    let addr_a = transport_a.endpoint_addr();
+    let addr_b = transport_b.endpoint_addr();
+    println!("Node A: {:?}", endpoint_a);
+    println!("Node B: {:?}", endpoint_b);
 
     // Setup bidirectional discovery
     let peer_b_info = PeerInfo {
         name: "Node B".to_string(),
         node_id: hex::encode(endpoint_b.as_bytes()),
-        addresses: vec![addr_b.to_string()],
-        relay_url: None,
+        addresses: addr_b.ip_addrs().map(|a| a.to_string()).collect(),
+        relay_url: addr_b.relay_urls().next().map(|u| u.to_string()),
     };
     backend_a
         .add_discovery_strategy(Box::new(StaticDiscovery::from_peers(vec![peer_b_info])))
@@ -499,8 +497,8 @@ async fn test_fast_connection_immediate() {
     let peer_a_info = PeerInfo {
         name: "Node A".to_string(),
         node_id: hex::encode(endpoint_a.as_bytes()),
-        addresses: vec![addr_a.to_string()],
-        relay_url: None,
+        addresses: addr_a.ip_addrs().map(|a| a.to_string()).collect(),
+        relay_url: addr_a.relay_urls().next().map(|u| u.to_string()),
     };
     backend_b
         .add_discovery_strategy(Box::new(StaticDiscovery::from_peers(vec![peer_a_info])))

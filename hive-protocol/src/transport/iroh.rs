@@ -422,7 +422,7 @@ impl IrohMeshTransport {
 
                     match result {
                         Ok(Some(conn)) => {
-                            // Success - new connection
+                            // Success - new connection established
                             let connected_at = Instant::now();
                             let mesh_conn =
                                 IrohMeshConnection::new(peer_id.clone(), conn, connected_at);
@@ -445,12 +445,9 @@ impl IrohMeshTransport {
                             );
                         }
                         Ok(None) => {
-                            // Already connected (they initiated)
+                            // Accept path is handling connection
                             reconnection.write().unwrap().reconnected(&peer_id);
-                            info!(
-                                "Peer {} already connected (remote initiated), clearing reconnection",
-                                peer_id
-                            );
+                            debug!("Reconnection to {} handled by accept path", peer_id);
                         }
                         Err(e) => {
                             let error_msg = e.to_string();
@@ -576,7 +573,7 @@ impl MeshTransport for IrohMeshTransport {
                 .ok_or_else(|| TransportError::PeerNotFound(peer_id.as_str().to_string()))?
         };
 
-        // Connect using IrohTransport (Issue #229: returns Option<Connection>)
+        // Connect using IrohTransport (conflict resolution handled by transport layer)
         let conn_opt = self
             .transport
             .connect_peer(&peer_info)
@@ -606,7 +603,7 @@ impl MeshTransport for IrohMeshTransport {
                 Ok(Box::new(mesh_conn))
             }
             None => {
-                // Already connected (they were initiator) - return existing connection
+                // Accept path is handling - check if connection exists
                 self.connections
                     .read()
                     .unwrap()
@@ -615,7 +612,7 @@ impl MeshTransport for IrohMeshTransport {
                     .map(|c| Box::new(c) as Box<dyn MeshConnection>)
                     .ok_or_else(|| {
                         TransportError::ConnectionFailed(
-                            "Connection exists in transport but not in mesh".to_string(),
+                            "Connection being handled by accept path".to_string(),
                         )
                     })
             }

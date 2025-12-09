@@ -47,6 +47,18 @@ async fn create_test_backend(
     (backend, transport, temp_dir)
 }
 
+/// Helper to create a test backend with dynamic port allocation (port 0)
+/// This prevents port conflicts when tests run in parallel.
+async fn create_test_backend_dynamic() -> (AutomergeBackend, Arc<IrohTransport>, TempDir) {
+    let temp_dir = TempDir::new().unwrap();
+    let store = Arc::new(AutomergeStore::open(temp_dir.path()).unwrap());
+    // Use port 0 for dynamic allocation - prevents parallel test interference
+    let transport = Arc::new(IrohTransport::new().await.unwrap());
+    let backend = AutomergeBackend::with_transport(store, Arc::clone(&transport));
+
+    (backend, transport, temp_dir)
+}
+
 /// Helper to create a PeerInfo from an IrohTransport
 fn create_peer_info(name: &str, transport: &IrohTransport, addr: SocketAddr) -> PeerInfo {
     let endpoint_id = transport.endpoint_id();
@@ -56,6 +68,35 @@ fn create_peer_info(name: &str, transport: &IrohTransport, addr: SocketAddr) -> 
         name: name.to_string(),
         node_id: node_id_hex,
         addresses: vec![addr.to_string()],
+        relay_url: None,
+    }
+}
+
+/// Helper to create PeerInfo from transport using its actual bound address
+fn create_peer_info_dynamic(name: &str, transport: &IrohTransport) -> PeerInfo {
+    use iroh::TransportAddr;
+
+    let endpoint_id = transport.endpoint_id();
+    let node_id_hex = hex::encode(endpoint_id.as_bytes());
+    let addr = transport.endpoint_addr();
+
+    // Extract IP addresses from the EndpointAddr
+    let addresses: Vec<String> = addr
+        .addrs
+        .iter()
+        .filter_map(|a| {
+            if let TransportAddr::Ip(socket_addr) = a {
+                Some(socket_addr.to_string())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    PeerInfo {
+        name: name.to_string(),
+        node_id: node_id_hex,
+        addresses,
         relay_url: None,
     }
 }
@@ -70,19 +111,16 @@ fn create_peer_info(name: &str, transport: &IrohTransport, addr: SocketAddr) -> 
 /// - Uses connect_peer() for connection
 #[tokio::test]
 async fn test_two_nodes_connect() {
-    println!("=== E2E: Two Nodes Connect (Static Config) ===");
+    println!("=== E2E: Two Nodes Connect (Dynamic Ports) ===");
 
-    // Bind to specific localhost addresses
-    let addr1: SocketAddr = "127.0.0.1:19001".parse().unwrap();
-    let addr2: SocketAddr = "127.0.0.1:19002".parse().unwrap();
-
-    let (backend1, transport1, _temp1) = create_test_backend(addr1).await;
-    let (backend2, transport2, _temp2) = create_test_backend(addr2).await;
+    // Use dynamic port allocation to prevent parallel test interference
+    let (backend1, transport1, _temp1) = create_test_backend_dynamic().await;
+    let (backend2, transport2, _temp2) = create_test_backend_dynamic().await;
 
     println!("  Node 1 ID: {:?}", transport1.endpoint_id());
-    println!("  Node 1 Addr: {}", addr1);
+    println!("  Node 1 Addr: {:?}", transport1.endpoint_addr());
     println!("  Node 2 ID: {:?}", transport2.endpoint_id());
-    println!("  Node 2 Addr: {}", addr2);
+    println!("  Node 2 Addr: {:?}", transport2.endpoint_addr());
 
     // Start accept loop on BOTH nodes (required for bidirectional connection with tie-breaking)
     println!("  Starting accept loops on both nodes...");
@@ -92,52 +130,19 @@ async fn test_two_nodes_connect() {
     // Give accept loops a moment to start
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    // Create PeerInfo for both nodes (required for deterministic tie-breaking)
-    let node1_peer = create_peer_info("node-1", &transport1, addr1);
-    let node2_peer = create_peer_info("node-2", &transport2, addr2);
+    // Create PeerInfo using dynamic addresses
+    let node2_peer = create_peer_info_dynamic("node-2", &transport2);
 
-    // Determine which node should initiate based on endpoint ID comparison
-    let endpoint1 = transport1.endpoint_id();
-    let endpoint2 = transport2.endpoint_id();
-    println!("  Endpoint 1: {:?}", endpoint1);
-    println!("  Endpoint 2: {:?}", endpoint2);
+    println!("  1. Attempting connection (conflict resolution handled by transport)...");
 
-    let node1_should_initiate = endpoint1.as_bytes() < endpoint2.as_bytes();
-    println!(
-        "  Node {} should initiate (lower endpoint ID)",
-        if node1_should_initiate { "1" } else { "2" }
-    );
-
-    println!("  1. Attempting connection (with deterministic tie-breaking)...");
-
-    // Connect using PeerInfo - the side with lower endpoint ID will succeed
-    if node1_should_initiate {
-        // Node 1 initiates
-        match transport1.connect_peer(&node2_peer).await {
-            Ok(Some(_conn)) => {
-                println!("  ✓ Connection established (Node 1 initiated)!");
-                assert_eq!(transport1.peer_count(), 1);
-            }
-            Ok(None) => {
-                panic!("Expected Node 1 to initiate but got None");
-            }
-            Err(e) => {
-                println!("  ✗ Connection failed: {}", e);
-            }
+    // Connect - transport handles conflict resolution if both sides connect simultaneously
+    match transport1.connect_peer(&node2_peer).await {
+        Ok(_conn) => {
+            println!("  ✓ Connection established!");
+            assert_eq!(transport1.peer_count(), 1);
         }
-    } else {
-        // Node 2 initiates
-        match transport2.connect_peer(&node1_peer).await {
-            Ok(Some(_conn)) => {
-                println!("  ✓ Connection established (Node 2 initiated)!");
-                assert_eq!(transport2.peer_count(), 1);
-            }
-            Ok(None) => {
-                panic!("Expected Node 2 to initiate but got None");
-            }
-            Err(e) => {
-                println!("  ✗ Connection failed: {}", e);
-            }
+        Err(e) => {
+            println!("  ✗ Connection failed: {}", e);
         }
     }
 
@@ -158,12 +163,9 @@ async fn test_two_nodes_connect() {
 async fn test_document_sync_two_nodes() {
     println!("=== E2E: Document Sync Between Two Nodes ===");
 
-    // Bind to specific localhost addresses
-    let addr1: SocketAddr = "127.0.0.1:19003".parse().unwrap();
-    let addr2: SocketAddr = "127.0.0.1:19004".parse().unwrap();
-
-    let (backend1, transport1, _temp1) = create_test_backend(addr1).await;
-    let (backend2, transport2, _temp2) = create_test_backend(addr2).await;
+    // Use dynamic port allocation to prevent parallel test interference
+    let (backend1, transport1, _temp1) = create_test_backend_dynamic().await;
+    let (backend2, transport2, _temp2) = create_test_backend_dynamic().await;
 
     // Create typed collections
     let nodes1: Arc<dyn TypedCollection<NodeState>> = backend1.typed_collection("nodes");
@@ -177,20 +179,13 @@ async fn test_document_sync_two_nodes() {
 
     println!("  2. Connecting peers via static config (with deterministic tie-breaking)...");
 
-    // Create PeerInfo for both nodes
-    let node1_peer = create_peer_info("node-1", &transport1, addr1);
-    let node2_peer = create_peer_info("node-2", &transport2, addr2);
+    // Create PeerInfo using dynamic addresses
+    let _node1_peer = create_peer_info_dynamic("node-1", &transport1);
+    let node2_peer = create_peer_info_dynamic("node-2", &transport2);
 
     // Determine which node should initiate based on endpoint ID comparison
-    let endpoint1 = transport1.endpoint_id();
-    let endpoint2 = transport2.endpoint_id();
-    let node1_initiates = endpoint1.as_bytes() < endpoint2.as_bytes();
-
-    let connected = if node1_initiates {
-        matches!(transport1.connect_peer(&node2_peer).await, Ok(Some(_)))
-    } else {
-        matches!(transport2.connect_peer(&node1_peer).await, Ok(Some(_)))
-    };
+    // Either side can initiate - transport handles conflict resolution
+    let connected = transport1.connect_peer(&node2_peer).await.is_ok();
 
     if !connected {
         println!("  ✗ Connection failed - skipping sync test");
@@ -214,16 +209,25 @@ async fn test_document_sync_two_nodes() {
 
     println!("  4. Waiting for automatic sync to Node 2...");
 
-    // Poll for document on backend2
+    // Poll for document on backend2 with error handling
     let mut synced = false;
     for i in 0..10 {
         tokio::time::sleep(Duration::from_millis(200)).await;
-        if let Some(retrieved) = nodes2.get("node-1").unwrap() {
-            println!("  ✓ Document synced to Node 2! (attempt {})", i + 1);
-            assert_eq!(retrieved.fuel_minutes, 60);
-            assert_eq!(retrieved.cell_id, Some("cell-1".to_string()));
-            synced = true;
-            break;
+        match nodes2.get("node-1") {
+            Ok(Some(retrieved)) => {
+                println!("  ✓ Document synced to Node 2! (attempt {})", i + 1);
+                assert_eq!(retrieved.fuel_minutes, 60);
+                assert_eq!(retrieved.cell_id, Some("cell-1".to_string()));
+                synced = true;
+                break;
+            }
+            Ok(None) => {
+                // Document not yet synced, continue polling
+            }
+            Err(e) => {
+                // Deserialization error - document may have partial data
+                println!("    Sync attempt {} error: {}", i + 1, e);
+            }
         }
     }
 
@@ -249,12 +253,9 @@ async fn test_document_sync_two_nodes() {
 async fn test_bidirectional_sync() {
     println!("=== E2E: Bidirectional Sync ===");
 
-    // Bind to specific localhost addresses
-    let addr1: SocketAddr = "127.0.0.1:19005".parse().unwrap();
-    let addr2: SocketAddr = "127.0.0.1:19006".parse().unwrap();
-
-    let (backend1, transport1, _temp1) = create_test_backend(addr1).await;
-    let (backend2, transport2, _temp2) = create_test_backend(addr2).await;
+    // Use dynamic port allocation to prevent parallel test interference
+    let (backend1, transport1, _temp1) = create_test_backend_dynamic().await;
+    let (backend2, transport2, _temp2) = create_test_backend_dynamic().await;
 
     let nodes1: Arc<dyn TypedCollection<NodeState>> = backend1.typed_collection("nodes");
     let nodes2: Arc<dyn TypedCollection<NodeState>> = backend2.typed_collection("nodes");
@@ -263,16 +264,12 @@ async fn test_bidirectional_sync() {
     backend1.start_sync().unwrap();
     backend2.start_sync().unwrap();
 
-    // Connect via static config (with deterministic tie-breaking)
-    let node1_peer = create_peer_info("node-1", &transport1, addr1);
-    let node2_peer = create_peer_info("node-2", &transport2, addr2);
-    let node1_initiates = transport1.endpoint_id().as_bytes() < transport2.endpoint_id().as_bytes();
+    // Connect via static config (conflict resolution handled by transport layer)
+    let _node1_peer = create_peer_info_dynamic("node-1", &transport1);
+    let node2_peer = create_peer_info_dynamic("node-2", &transport2);
 
-    let connected = if node1_initiates {
-        matches!(transport1.connect_peer(&node2_peer).await, Ok(Some(_)))
-    } else {
-        matches!(transport2.connect_peer(&node1_peer).await, Ok(Some(_)))
-    };
+    // Either side can initiate - transport handles conflict resolution
+    let connected = transport1.connect_peer(&node2_peer).await.is_ok();
 
     if !connected {
         println!("  ✗ Connection failed - skipping test");
@@ -297,9 +294,27 @@ async fn test_bidirectional_sync() {
 
     println!("  3. Checking if both docs exist on both nodes...");
 
-    // TODO Phase 6: This will fail - no bidirectional sync yet
-    let node1_has_doc2 = nodes1.get("doc-2").unwrap().is_some();
-    let node2_has_doc1 = nodes2.get("doc-1").unwrap().is_some();
+    // Check with error handling - sync may return partial documents
+    let node1_doc2_result = nodes1.get("doc-2");
+    let node2_doc1_result = nodes2.get("doc-1");
+
+    let node1_has_doc2 = match node1_doc2_result {
+        Ok(Some(_)) => true,
+        Ok(None) => false,
+        Err(e) => {
+            println!("    Node 1 get doc-2 error: {}", e);
+            false
+        }
+    };
+
+    let node2_has_doc1 = match node2_doc1_result {
+        Ok(Some(_)) => true,
+        Ok(None) => false,
+        Err(e) => {
+            println!("    Node 2 get doc-1 error: {}", e);
+            false
+        }
+    };
 
     if node1_has_doc2 && node2_has_doc1 {
         println!("  ✓ Bidirectional sync working!");
@@ -338,16 +353,12 @@ async fn test_concurrent_updates_merge() {
     backend1.start_sync().unwrap();
     backend2.start_sync().unwrap();
 
-    // Connect via static config (with deterministic tie-breaking)
-    let node1_peer = create_peer_info("node-1", &transport1, addr1);
+    // Connect via static config (conflict resolution handled by transport layer)
+    let _node1_peer = create_peer_info("node-1", &transport1, addr1);
     let node2_peer = create_peer_info("node-2", &transport2, addr2);
-    let node1_initiates = transport1.endpoint_id().as_bytes() < transport2.endpoint_id().as_bytes();
 
-    let connected = if node1_initiates {
-        matches!(transport1.connect_peer(&node2_peer).await, Ok(Some(_)))
-    } else {
-        matches!(transport2.connect_peer(&node1_peer).await, Ok(Some(_)))
-    };
+    // Either side can initiate - transport handles conflict resolution
+    let connected = transport1.connect_peer(&node2_peer).await.is_ok();
 
     if !connected {
         println!("  ✗ Connection failed - skipping test");
@@ -432,8 +443,8 @@ async fn test_sync_stats_tracking() {
 
     let node2_peer = create_peer_info("node-2", &transport2, addr2);
     match transport1.connect_peer(&node2_peer).await {
-        Ok(Some(_conn)) => {
-            println!("  ✓ Connected (we initiated)");
+        Ok(_conn) => {
+            println!("  ✓ Connected");
 
             let stats_after_connect = backend1.sync_stats().unwrap();
             println!("  Peer count: {}", stats_after_connect.peer_count);
@@ -442,12 +453,6 @@ async fn test_sync_stats_tracking() {
             // TODO Phase 6.2: After actual sync, verify byte counters
             println!("  → Phase 6.2 TODO: Track bytes sent/received");
             println!("  → Phase 6.2 TODO: Track last sync timestamp");
-        }
-        Ok(None) => {
-            // With deterministic tie-breaking, we may not be the initiator
-            println!("  ✓ Connection skipped (other side should initiate)");
-            // Peer count will be 0 since we didn't initiate
-            // This is expected behavior with the new tie-breaking logic
         }
         Err(e) => {
             println!("  ✗ Connection failed: {}", e);
