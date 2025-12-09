@@ -27,6 +27,7 @@ topology:
         COMPANY_ID: company-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12345"
+        TCP_CONNECT: "company-1-platoon-1-leader|clab-am96n-company-1-platoon-1-leader:12346,company-1-platoon-2-leader|clab-am96n-company-1-platoon-2-leader:12371,company-1-platoon-3-leader|clab-am96n-company-1-platoon-3-leader:12396,company-1-platoon-4-leader|clab-am96n-company-1-platoon-4-leader:12421"
         DITTO_APP_ID: test-formation
         HIVE_SECRET_KEY: aGl2ZS10ZXN0LWZvcm1hdGlvbi1zZWNyZXQta2V5LTA=
         CIRCUIT_FAILURE_THRESHOLD: "3"
@@ -47,9 +48,10 @@ topology:
         MODE: hierarchical
         BACKEND: automerge
         PLATOON_ID: company-1-platoon-1
+        SQUAD_IDS: "company-1-platoon-1-squad-1,company-1-platoon-1-squad-2,company-1-platoon-1-squad-3"
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12346"
-        TCP_CONNECT: "company-1-commander|clab-am96n-company-1-commander:12345"
+        TCP_CONNECT: "company-1-commander|clab-am96n-company-1-commander:12345,company-1-platoon-1-squad-1-leader|clab-am96n-company-1-platoon-1-squad-1-leader:12347,company-1-platoon-1-squad-2-leader|clab-am96n-company-1-platoon-1-squad-2-leader:12355,company-1-platoon-1-squad-3-leader|clab-am96n-company-1-platoon-1-squad-3-leader:12363"
         DITTO_APP_ID: test-formation
         HIVE_SECRET_KEY: aGl2ZS10ZXN0LWZvcm1hdGlvbi1zZWNyZXQta2V5LTA=
         CIRCUIT_FAILURE_THRESHOLD: "3"
@@ -577,9 +579,10 @@ topology:
         MODE: hierarchical
         BACKEND: automerge
         PLATOON_ID: company-1-platoon-2
+        SQUAD_IDS: "company-1-platoon-2-squad-1,company-1-platoon-2-squad-2,company-1-platoon-2-squad-3"
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12371"
-        TCP_CONNECT: "company-1-commander|clab-am96n-company-1-commander:12345"
+        TCP_CONNECT: "company-1-commander|clab-am96n-company-1-commander:12345,company-1-platoon-2-squad-1-leader|clab-am96n-company-1-platoon-2-squad-1-leader:12372,company-1-platoon-2-squad-2-leader|clab-am96n-company-1-platoon-2-squad-2-leader:12380,company-1-platoon-2-squad-3-leader|clab-am96n-company-1-platoon-2-squad-3-leader:12388"
         DITTO_APP_ID: test-formation
         HIVE_SECRET_KEY: aGl2ZS10ZXN0LWZvcm1hdGlvbi1zZWNyZXQta2V5LTA=
         CIRCUIT_FAILURE_THRESHOLD: "3"
@@ -1107,9 +1110,10 @@ topology:
         MODE: hierarchical
         BACKEND: automerge
         PLATOON_ID: company-1-platoon-3
+        SQUAD_IDS: "company-1-platoon-3-squad-1,company-1-platoon-3-squad-2,company-1-platoon-3-squad-3"
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12396"
-        TCP_CONNECT: "company-1-commander|clab-am96n-company-1-commander:12345"
+        TCP_CONNECT: "company-1-commander|clab-am96n-company-1-commander:12345,company-1-platoon-3-squad-1-leader|clab-am96n-company-1-platoon-3-squad-1-leader:12397,company-1-platoon-3-squad-2-leader|clab-am96n-company-1-platoon-3-squad-2-leader:12405,company-1-platoon-3-squad-3-leader|clab-am96n-company-1-platoon-3-squad-3-leader:12413"
         DITTO_APP_ID: test-formation
         HIVE_SECRET_KEY: aGl2ZS10ZXN0LWZvcm1hdGlvbi1zZWNyZXQta2V5LTA=
         CIRCUIT_FAILURE_THRESHOLD: "3"
@@ -1637,9 +1641,10 @@ topology:
         MODE: hierarchical
         BACKEND: automerge
         PLATOON_ID: company-1-platoon-4
+        SQUAD_IDS: "company-1-platoon-4-squad-1,company-1-platoon-4-squad-2,company-1-platoon-4-squad-3"
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12421"
-        TCP_CONNECT: "company-1-commander|clab-am96n-company-1-commander:12345"
+        TCP_CONNECT: "company-1-commander|clab-am96n-company-1-commander:12345,company-1-platoon-4-squad-1-leader|clab-am96n-company-1-platoon-4-squad-1-leader:12422,company-1-platoon-4-squad-2-leader|clab-am96n-company-1-platoon-4-squad-2-leader:12430,company-1-platoon-4-squad-3-leader|clab-am96n-company-1-platoon-4-squad-3-leader:12438"
         DITTO_APP_ID: test-formation
         HIVE_SECRET_KEY: aGl2ZS10ZXN0LWZvcm1hdGlvbi1zZWNyZXQta2V5LTA=
         CIRCUIT_FAILURE_THRESHOLD: "3"
