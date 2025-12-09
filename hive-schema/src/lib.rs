@@ -28,6 +28,7 @@
 //! - **`model.v1`**: AI model deployment and distribution
 //! - **`sensor.v1`**: Sensor specifications (mount types, orientation, FOV, gimbal state)
 //! - **`actuator.v1`**: Actuator specifications (linear, rotary, gripper, barrier, winch)
+//! - **`effector.v1`**: Effector specifications (weapons, countermeasures, safety, authorization)
 //!
 //! ## Three-Tier Hierarchy
 //!
@@ -145,6 +146,13 @@ pub mod cap {
     pub mod actuator {
         pub mod v1 {
             include!(concat!(env!("OUT_DIR"), "/cap.actuator.v1.rs"));
+        }
+    }
+
+    #[allow(clippy::enum_variant_names)]
+    pub mod effector {
+        pub mod v1 {
+            include!(concat!(env!("OUT_DIR"), "/cap.effector.v1.rs"));
         }
     }
 }
