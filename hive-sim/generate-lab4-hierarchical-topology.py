@@ -87,8 +87,32 @@ def calculate_hierarchy(total_nodes):
         return (8, 4, 4, 6)
 
 
+def get_tcp_connect_list(peers, topology_name, backend):
+    """Generate TCP_CONNECT env var for automerge backend with multiple peers.
+
+    Docker's embedded DNS resolves container names on user-defined networks.
+    Containerlab container names are: clab-{topology-name}-{node-name}
+    Format for automerge: "peer_name|hostname:port,peer_name2|hostname2:port2,..."
+
+    Args:
+        peers: List of (peer_name, port) tuples
+        topology_name: Name of the containerlab topology
+        backend: Backend type ("automerge" or "ditto")
+    """
+    if backend != "automerge" or not peers:
+        return []
+
+    # Build connection string for all peers
+    connections = []
+    for peer_name, port in peers:
+        container_name = f"clab-{topology_name}-{peer_name}"
+        connections.append(f"{peer_name}|{container_name}:{port}")
+
+    return [f"        TCP_CONNECT: \"{','.join(connections)}\""]
+
+
 def get_tcp_connect(node_name, parent_name, parent_port, name, backend):
-    """Generate TCP_CONNECT env var for automerge backend.
+    """Generate TCP_CONNECT env var for automerge backend (single peer - legacy).
 
     Docker's embedded DNS resolves container names on user-defined networks.
     Containerlab container names are: clab-{topology-name}-{node-name}
@@ -130,14 +154,12 @@ def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
     # /24 = 254 hosts, /20 = 4094 hosts, /16 = 65534 hosts
     if actual_total > 4000:
         subnet = "172.30.0.0/16"
-        ipv6_subnet = "3fff:172:30::/48"
     elif actual_total > 250:
         subnet = "172.30.0.0/20"
-        ipv6_subnet = "3fff:172:30::/52"
     else:
         subnet = "172.20.20.0/24"
-        ipv6_subnet = "3fff:172:20:20::/64"
 
+    # Note: IPv6 disabled to avoid containerlab startup issues
     lines = [
         f"# Lab 4: Hierarchical HIVE CRDT - {name}",
         f"# Target nodes: {total_nodes}, Actual: {actual_total}",
@@ -149,7 +171,6 @@ def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
         "mgmt:",
         f"  network: {name}",
         f"  ipv4-subnet: {subnet}",
-        f"  ipv6-subnet: {ipv6_subnet}",
         "",
         "topology:",
         "  nodes:",
@@ -186,6 +207,28 @@ def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
     # Reset counter for second pass
     node_counter = 0
 
+    # For automerge: Pre-collect child nodes for bidirectional connections
+    # platoon_leader_id -> [(squad_leader_id, port), ...]
+    platoon_squad_leaders = {}
+    # commander_id -> [(platoon_leader_id, port), ...]
+    commander_platoon_leaders = {}
+
+    for company_idx in range(1, num_companies + 1):
+        company_id = f"company-{company_idx}"
+        commander_id = f"{company_id}-commander"
+        commander_platoon_leaders[commander_id] = []
+
+        for platoon_idx in range(1, platoons_per_company + 1):
+            platoon_id = f"{company_id}-platoon-{platoon_idx}"
+            leader_id = f"{platoon_id}-leader"
+            commander_platoon_leaders[commander_id].append((leader_id, node_ports[leader_id]))
+            platoon_squad_leaders[leader_id] = []
+
+            for squad_idx in range(1, squads_per_platoon + 1):
+                squad_id = f"{platoon_id}-squad-{squad_idx}"
+                squad_leader_id = f"{squad_id}-leader"
+                platoon_squad_leaders[leader_id].append((squad_leader_id, node_ports[squad_leader_id]))
+
     # Generate hierarchy - second pass: generate YAML with TCP_CONNECT
     for company_idx in range(1, num_companies + 1):
         company_id = f"company-{company_idx}"
@@ -194,10 +237,10 @@ def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
         lines.append(f"    # ===== COMPANY {company_idx} =====")
         lines.append("")
 
-        # Company commander (no parent to connect to)
+        # Company commander connects to all platoon leaders (bidirectional for automerge)
         cred_vars = get_credential_env_vars(backend)
         circuit_vars = get_circuit_breaker_env_vars()  # Lab defaults: aggressive (2s windows)
-        tcp_connect = get_tcp_connect(commander_id, None, None, name, backend)
+        tcp_connect = get_tcp_connect_list(commander_platoon_leaders[commander_id], name, backend)
         lines.extend([
             f"    {commander_id}:",
             "      kind: linux",
@@ -221,8 +264,17 @@ def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
             lines.append(f"    # ----- Platoon {company_idx}-{platoon_idx} -----")
             lines.append("")
 
-            # Platoon leader connects to company commander
-            tcp_connect = get_tcp_connect(leader_id, commander_id, node_ports[commander_id], name, backend)
+            # Platoon leader connects to:
+            # 1. Company commander (upstream)
+            # 2. All squad leaders (downstream, for bidirectional sync)
+            platoon_peers = [(commander_id, node_ports[commander_id])]
+            platoon_peers.extend(platoon_squad_leaders[leader_id])
+
+            # Also collect squad IDs for SQUAD_IDS env var
+            squad_ids = [f"{platoon_id}-squad-{i}" for i in range(1, squads_per_platoon + 1)]
+
+            tcp_connect = get_tcp_connect_list(platoon_peers, name, backend)
+            squad_ids_env = [f"        SQUAD_IDS: \"{','.join(squad_ids)}\""] if backend == "automerge" else []
             lines.extend([
                 f"    {leader_id}:",
                 "      kind: linux",
@@ -235,6 +287,7 @@ def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
                 f"        MODE: {mode}",
                 f"        BACKEND: {backend_env}",
                 f"        PLATOON_ID: {platoon_id}",
+            ] + squad_ids_env + [
                 "        UPDATE_RATE_MS: \"5000\"",
                 f"        TCP_LISTEN: \"{node_ports[leader_id]}\"",
             ] + tcp_connect + cred_vars + circuit_vars + [""])
