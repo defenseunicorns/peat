@@ -27,6 +27,7 @@
 //! - **`composition.v1`**: Capability composition rules (additive, emergent, redundant, constraint)
 //! - **`model.v1`**: AI model deployment and distribution
 //! - **`sensor.v1`**: Sensor specifications (mount types, orientation, FOV, gimbal state)
+//! - **`actuator.v1`**: Actuator specifications (linear, rotary, gripper, barrier, winch)
 //!
 //! ## Three-Tier Hierarchy
 //!
@@ -137,6 +138,13 @@ pub mod cap {
     pub mod sensor {
         pub mod v1 {
             include!(concat!(env!("OUT_DIR"), "/cap.sensor.v1.rs"));
+        }
+    }
+
+    #[allow(clippy::enum_variant_names)]
+    pub mod actuator {
+        pub mod v1 {
+            include!(concat!(env!("OUT_DIR"), "/cap.actuator.v1.rs"));
         }
     }
 }
