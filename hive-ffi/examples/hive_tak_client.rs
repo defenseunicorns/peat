@@ -175,8 +175,9 @@ fn main() {
         let peers = node.peer_count();
         let connected = node.connected_peers();
 
-        // Update track positions
+        // Update track positions and platform positions/heartbeats
         publish_flight_patterns(&node, &patterns, time_offset);
+        update_platform_positions(&node, &patterns, time_offset);
 
         // Check for received platforms (ATAK PLI)
         let platforms = match node.get_platforms() {
@@ -440,6 +441,39 @@ fn publish_cells_and_platforms(node: &hive_ffi::HiveNode) {
         match node.put_document("platforms", &platform_id, &json) {
             Ok(()) => println!("  Published platform: {}", platform_id),
             Err(e) => eprintln!("  Error publishing platform {}: {:?}", platform_id, e),
+        }
+    }
+}
+
+/// Update platform positions and heartbeats (called every refresh cycle)
+fn update_platform_positions(node: &hive_ffi::HiveNode, patterns: &[FlightPattern], time_secs: u64) {
+    let now = current_timestamp();
+
+    for pattern in patterns {
+        let (lat, lon, alt) = calculate_position(pattern, time_secs);
+        let heading = calculate_heading(pattern, time_secs);
+
+        let platform_id = format!("platform-{}", pattern.name.to_lowercase().replace('-', "_"));
+
+        let platform = serde_json::json!({
+            "id": platform_id,
+            "name": pattern.name,
+            "platform_type": "UAV",
+            "lat": lat,
+            "lon": lon,
+            "hae": alt,
+            "heading": heading,
+            "speed": 25.0,
+            "readiness": 0.95,
+            "cell_id": "cell-atlanta-001",
+            "capabilities": ["ISR", "EO/IR"],
+            "status": "active",
+            "last_heartbeat": now
+        });
+
+        let json = platform.to_string();
+        if let Err(e) = node.put_document("platforms", &platform_id, &json) {
+            eprintln!("Error updating platform {}: {:?}", platform_id, e);
         }
     }
 }
