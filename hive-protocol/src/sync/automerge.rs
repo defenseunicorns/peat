@@ -1169,10 +1169,40 @@ impl DocumentStore for IrohDocumentStore {
                         }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        // Issue #346: When lagged, re-emit all documents in the collection
+                        // to ensure observers don't miss updates. This is critical for
+                        // metrics tracking and hierarchical aggregation callbacks.
                         tracing::warn!(
-                            "Observer change notification lagged, skipped {} messages",
+                            "Observer change notification lagged, skipped {} messages - re-emitting all documents",
                             n
                         );
+
+                        // Re-scan collection and emit Updated for all matching documents
+                        let coll = backend.collection(collection_prefix.trim_end_matches(':'));
+                        if let Ok(all_items) = coll.scan() {
+                            for (doc_id, bytes) in all_items {
+                                if let Ok(mut doc) = serde_json::from_slice::<Document>(&bytes) {
+                                    if doc.id.is_none() {
+                                        doc.id = Some(doc_id);
+                                    }
+
+                                    // Send event if document matches query
+                                    #[allow(clippy::collapsible_if)]
+                                    if matches_query(&doc, &query_clone) {
+                                        if tx_clone
+                                            .send(ChangeEvent::Updated {
+                                                collection: collection_name.clone(),
+                                                document: doc,
+                                            })
+                                            .is_err()
+                                        {
+                                            // Receiver dropped, stop listening
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => {
                         // Channel closed, stop listening

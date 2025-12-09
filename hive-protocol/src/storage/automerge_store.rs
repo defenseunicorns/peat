@@ -91,8 +91,10 @@ impl AutomergeStore {
         let cache = LruCache::new(NonZeroUsize::new(1000).unwrap());
 
         // Create broadcast channel for change notifications
-        // Capacity of 1024 should be sufficient for most workloads
-        let (change_tx, _) = broadcast::channel(1024);
+        // Issue #346: Increased from 1024 to 8192 to reduce lagging under high load.
+        // When this channel lags, the auto_sync_task must do a full resync which is expensive.
+        // A larger buffer trades memory (8KB per doc_key) for reduced resync frequency.
+        let (change_tx, _) = broadcast::channel(8192);
 
         Ok(Self {
             db: Arc::new(db),

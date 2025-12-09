@@ -690,9 +690,16 @@ impl SyncCapable for AutomergeBackend {
         let mut change_rx = self.store.subscribe_to_changes();
         let coordinator = self.sync_coordinator.clone().unwrap();
         let sync_active = Arc::clone(&self.sync_active);
+        let store_for_resync = Arc::clone(&self.store);
 
         let auto_task = tokio::spawn(async move {
+            use std::time::{Duration, Instant};
+
             tracing::debug!("Automatic sync task started");
+
+            // Issue #346: Track last resync time to prevent thundering herd
+            let mut last_resync: Option<Instant> = None;
+            const RESYNC_COOLDOWN: Duration = Duration::from_secs(5);
 
             while sync_active.load(Ordering::Relaxed) {
                 // Wait for change notification
@@ -710,8 +717,56 @@ impl SyncCapable for AutomergeBackend {
                         }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        // Some messages were skipped due to slow receiver
+                        // Issue #346: When lagged, we MUST resync all documents to ensure
+                        // none are permanently lost. This is critical for hierarchical topologies
+                        // where documents must flow up the hierarchy.
                         tracing::warn!("Change notification lagged, skipped {} messages", n);
+
+                        // Back-pressure: Check if we recently resynced to avoid thundering herd
+                        let should_resync = match last_resync {
+                            Some(last) if last.elapsed() < RESYNC_COOLDOWN => {
+                                tracing::debug!(
+                                    "Skipping resync - cooldown active ({:?} remaining)",
+                                    RESYNC_COOLDOWN - last.elapsed()
+                                );
+                                false
+                            }
+                            _ => true,
+                        };
+
+                        if should_resync {
+                            // Add jitter (0-500ms) to spread load across nodes
+                            let jitter_ms = rand::random::<u64>() % 500;
+                            tokio::time::sleep(Duration::from_millis(jitter_ms)).await;
+
+                            last_resync = Some(Instant::now());
+
+                            // Spawn resync in background so we don't block new notifications
+                            let store_clone = Arc::clone(&store_for_resync);
+                            let coordinator_clone = coordinator.clone();
+                            tokio::spawn(async move {
+                                if let Ok(all_docs) = store_clone.scan_prefix("") {
+                                    tracing::info!(
+                                        "Resyncing {} documents after lag recovery",
+                                        all_docs.len()
+                                    );
+                                    for (doc_key, _doc) in all_docs {
+                                        if let Err(e) = coordinator_clone
+                                            .sync_document_with_all_peers(&doc_key)
+                                            .await
+                                        {
+                                            tracing::debug!(
+                                                "Resync failed for document {}: {}",
+                                                doc_key,
+                                                e
+                                            );
+                                        }
+                                        // Yield to prevent starving other tasks
+                                        tokio::task::yield_now().await;
+                                    }
+                                }
+                            });
+                        }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => {
                         // Channel closed
