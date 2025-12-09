@@ -95,19 +95,32 @@ pub const CAP_AUTOMERGE_ALPN: &[u8] = b"cap/automerge/1";
 // QUIC Timeout Configuration (Issue #315)
 // =============================================================================
 
-/// Maximum idle timeout for QUIC connections (Issue #315)
+/// Maximum idle timeout for QUIC connections (Issue #315, #346)
 ///
 /// When a peer disconnects unexpectedly (crash, kill, network loss), QUIC detects
-/// "dead" connections via idle timeout. The default of ~30 seconds is too slow
-/// for tactical radio networks where connections can drop at any time.
+/// "dead" connections via idle timeout.
 ///
-/// Setting this to 5 seconds provides fast disconnect detection suitable for
-/// tactical environments while still allowing for brief network jitter.
+/// ## History
 ///
-/// Note: In radio networks, a 5-second silence typically indicates a genuine
-/// connection loss, not just temporary congestion.
+/// - Issue #315: Set to 5 seconds for fast tactical disconnect detection
+/// - Issue #346: Increased to 30 seconds for hierarchical sync stability
+///
+/// ## Rationale (Issue #346)
+///
+/// In hierarchical deployments (96+ nodes), sync at upper levels is sparse:
+/// - Squad members → Squad leaders: every few seconds (works with short timeout)
+/// - Squad leaders → Platoon leaders: every 10-30 seconds
+/// - Platoon leaders → Company: every 30-60+ seconds
+///
+/// The 5-second timeout caused connections to drop before upper-level sync happened.
+/// Ditto uses 60 seconds as their default. We compromise at 30 seconds to balance:
+/// - Fast enough disconnect detection for tactical awareness (~30s vs ~40s default)
+/// - Long enough for hierarchical sync patterns
+///
+/// The keep-alive interval (1 second) maintains active connections; this timeout
+/// only affects truly idle or dead connections.
 #[cfg(feature = "automerge-backend")]
-pub const QUIC_MAX_IDLE_TIMEOUT_SECS: u64 = 5;
+pub const QUIC_MAX_IDLE_TIMEOUT_SECS: u64 = 30;
 
 /// Keep-alive interval for QUIC connections (Issue #315)
 ///
@@ -121,21 +134,22 @@ pub const QUIC_MAX_IDLE_TIMEOUT_SECS: u64 = 5;
 #[cfg(feature = "automerge-backend")]
 pub const QUIC_KEEP_ALIVE_INTERVAL_SECS: u64 = 1;
 
-/// Create a TransportConfig with optimized timeout settings for tactical applications (Issue #315)
+/// Create a TransportConfig with optimized timeout settings (Issue #315, #346)
 ///
 /// Key settings:
-/// - `max_idle_timeout`: 5 seconds (reduced from default ~30s)
+/// - `max_idle_timeout`: 30 seconds (balanced for hierarchical sync)
 /// - `keep_alive_interval`: 1 second (aggressive connection health monitoring)
 ///
 /// This configuration provides:
-/// - Fast disconnect detection (~5 seconds vs ~40 seconds default)
-/// - Immediate awareness of connection state changes
-/// - Designed for tactical radio networks where connections can drop unexpectedly
+/// - Disconnect detection within ~30 seconds (faster than default ~40s)
+/// - Stable connections for hierarchical sync patterns (Issue #346)
+/// - Immediate awareness of connection state changes via keep-alives
+/// - Designed for tactical/hierarchical deployments with varying sync frequencies
 #[cfg(feature = "automerge-backend")]
 fn create_tactical_transport_config() -> TransportConfig {
     let mut config = TransportConfig::default();
 
-    // Set maximum idle timeout to 10 seconds for faster disconnect detection
+    // Set maximum idle timeout (Issue #346: increased from 5s to 30s for hierarchical sync)
     // The IdleTimeout type requires conversion from Duration
     config.max_idle_timeout(Some(
         Duration::from_secs(QUIC_MAX_IDLE_TIMEOUT_SECS)
@@ -143,7 +157,7 @@ fn create_tactical_transport_config() -> TransportConfig {
             .unwrap(),
     ));
 
-    // Enable keep-alive packets every 3 seconds to prevent healthy connections
+    // Enable keep-alive packets every 1 second to prevent healthy connections
     // from timing out and to detect dead connections faster
     config.keep_alive_interval(Some(Duration::from_secs(QUIC_KEEP_ALIVE_INTERVAL_SECS)));
 
@@ -1430,7 +1444,7 @@ mod tests {
         transport.close().await.unwrap();
     }
 
-    /// Test that the tactical transport config is applied with correct timeout values (Issue #315)
+    /// Test that the tactical transport config is applied with correct timeout values (Issue #315, #346)
     ///
     /// This test verifies that the config can be created without panicking.
     /// The actual timeout values are private in quinn, but this ensures:
@@ -1442,13 +1456,13 @@ mod tests {
         let _config = create_tactical_transport_config();
 
         // If we get here, the config was created successfully
-        // The timeout values are: max_idle_timeout=5s, keep_alive_interval=1s
+        // The timeout values are: max_idle_timeout=30s (Issue #346), keep_alive_interval=1s
     }
 
-    /// Test that disconnect is detected within the expected timeout (Issue #315)
+    /// Test that disconnect is detected within the expected timeout (Issue #315, #346)
     ///
-    /// This test verifies that with the reduced idle timeout (10s) and keep-alive (3s),
-    /// disconnects are detected much faster than the default ~30-40 seconds.
+    /// This test verifies that with the idle timeout (30s) and keep-alive (1s),
+    /// disconnects are detected faster than the default ~40 seconds.
     #[tokio::test]
     async fn test_fast_disconnect_detection_issue_315() {
         use std::sync::Arc;
