@@ -29,9 +29,11 @@
 //! ```
 
 use crate::messages::{OperationalStatus, Position, TrackUpdate, Velocity};
-use crate::platform::SensorCapability;
 use chrono::{DateTime, Utc};
 use hive_protocol::models::{Capability, CapabilityExt, CapabilityType};
+use hive_schema::sensor::v1::{
+    FieldOfView, SensorModality, SensorMountType, SensorOrientation, SensorSpec,
+};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -146,7 +148,7 @@ pub enum PatrolPattern {
 // ============================================================================
 
 /// Configuration for UGV client
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct UgvConfig {
     /// Platform identifier
     pub platform_id: String,
@@ -164,24 +166,57 @@ pub struct UgvConfig {
     pub geofence: Option<Vec<(f64, f64)>>,
     /// Waypoints for patrol
     pub waypoints: Vec<(f64, f64)>,
-    /// Camera sensor spec
-    pub camera: Option<SensorCapability>,
+    /// Sensor specification (using hive-schema proto)
+    pub sensor: Option<SensorSpec>,
 }
 
 impl UgvConfig {
-    /// Create a new UGV configuration
+    /// Create a new UGV configuration with default fixed forward camera
     pub fn new(platform_id: impl Into<String>) -> Self {
         let id = platform_id.into();
         Self {
             platform_id: id.clone(),
-            name: id,
+            name: id.clone(),
             initial_position: (0.0, 0.0),
             base_position: (0.0, 0.0),
             max_speed_mps: 5.0, // 5 m/s typical UGV speed
             update_interval: Duration::from_millis(500),
             geofence: None,
             waypoints: Vec::new(),
-            camera: Some(SensorCapability::camera("1920x1080", 60.0, 30.0)),
+            sensor: Some(Self::default_ugv_camera(&id)),
+        }
+    }
+
+    /// Create default fixed forward-facing camera sensor for UGV
+    ///
+    /// Creates a SensorSpec for a typical UGV camera:
+    /// - Fixed mount (no pan/tilt), pointing forward
+    /// - 1920x1080 resolution @ 30fps
+    /// - 62° horizontal FOV (typical webcam)
+    /// - EO (visible light) modality
+    fn default_ugv_camera(platform_id: &str) -> SensorSpec {
+        SensorSpec {
+            sensor_id: format!("{}-eo-main", platform_id.to_lowercase()),
+            name: "Main EO Camera".to_string(),
+            mount_type: SensorMountType::Fixed as i32,
+            base_orientation: Some(SensorOrientation {
+                bearing_offset_deg: 0.0,   // Forward
+                elevation_offset_deg: 0.0, // Level
+                roll_offset_deg: 0.0,      // Upright
+            }),
+            field_of_view: Some(FieldOfView {
+                horizontal_deg: 62.0, // Typical webcam FOV
+                vertical_deg: 48.0,   // 4:3 aspect derived
+                diagonal_deg: 78.0,   // Diagonal FOV
+                max_range_m: 500.0,   // Effective detection range
+            }),
+            modality: SensorModality::Eo as i32,
+            resolution_width: 1920,
+            resolution_height: 1080,
+            frame_rate_fps: 30.0,
+            gimbal_limits: None, // Fixed mount - no gimbal
+            current_state: None, // Fixed mount - no state
+            updated_at: None,
         }
     }
 
@@ -213,6 +248,18 @@ impl UgvConfig {
     /// Set geofence boundary
     pub fn with_geofence(mut self, boundary: Vec<(f64, f64)>) -> Self {
         self.geofence = Some(boundary);
+        self
+    }
+
+    /// Set custom sensor specification
+    pub fn with_sensor(mut self, sensor: SensorSpec) -> Self {
+        self.sensor = Some(sensor);
+        self
+    }
+
+    /// Remove sensor (sensorless UGV)
+    pub fn without_sensor(mut self) -> Self {
+        self.sensor = None;
         self
     }
 }
@@ -578,24 +625,51 @@ impl UgvClient {
         );
         caps.push(nav_cap);
 
-        // Camera if present
-        if let Some(camera) = &self.config.camera {
+        // Sensor if present (using new hive-schema SensorSpec)
+        if let Some(sensor) = &self.config.sensor {
+            let mount_type = match sensor.mount_type {
+                x if x == SensorMountType::Fixed as i32 => "fixed",
+                x if x == SensorMountType::Ptz as i32 => "ptz",
+                x if x == SensorMountType::Gimbal as i32 => "gimbal",
+                x if x == SensorMountType::Turret as i32 => "turret",
+                _ => "unknown",
+            };
+            let modality = match sensor.modality {
+                x if x == SensorModality::Eo as i32 => "EO",
+                x if x == SensorModality::Ir as i32 => "IR",
+                x if x == SensorModality::Mwir as i32 => "MWIR",
+                x if x == SensorModality::Lwir as i32 => "LWIR",
+                x if x == SensorModality::Radar as i32 => "Radar",
+                x if x == SensorModality::Lidar as i32 => "LiDAR",
+                _ => "unknown",
+            };
             let mut cam_cap = Capability::new(
-                format!("{}-camera", self.config.platform_id),
-                "PTZ Camera".to_string(),
+                sensor.sensor_id.clone(),
+                sensor.name.clone(),
                 CapabilityType::Sensor,
                 0.95,
             );
             cam_cap.metadata_json = serde_json::json!({
-                "resolution": camera.resolution,
-                "fov_degrees": camera.fov_degrees,
-                "frame_rate": camera.frame_rate
+                "mount_type": mount_type,
+                "modality": modality,
+                "resolution": format!("{}x{}", sensor.resolution_width, sensor.resolution_height),
+                "fov_horizontal_deg": sensor.field_of_view.as_ref().map(|f| f.horizontal_deg),
+                "fov_vertical_deg": sensor.field_of_view.as_ref().map(|f| f.vertical_deg),
+                "max_range_m": sensor.field_of_view.as_ref().map(|f| f.max_range_m),
+                "frame_rate_fps": sensor.frame_rate_fps,
+                "bearing_offset_deg": sensor.base_orientation.as_ref().map(|o| o.bearing_offset_deg),
+                "elevation_offset_deg": sensor.base_orientation.as_ref().map(|o| o.elevation_offset_deg),
             })
             .to_string();
             caps.push(cam_cap);
         }
 
         caps
+    }
+
+    /// Get the sensor specification
+    pub fn sensor(&self) -> Option<&SensorSpec> {
+        self.config.sensor.as_ref()
     }
 }
 
