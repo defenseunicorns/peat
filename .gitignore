@@ -43,4 +43,24 @@ shadow.data/
 # ContainerLab
 cap-sim/topologies/clab-*/
 cap-sim/test-results-*/
+hive-sim/topologies/clab-*/
+hive-sim-results/
 docs/CAP_Branding_Package.zip
+
+# TAK Server
+tak-server/
+takserver-docker-*.zip
+
+# Test artifacts
+hive-sim/automerge-flat-mesh-*/
+hive-sim/hive-hierarchical-*/
+hive-sim/topologies/*.test.yaml
+hive-sim/topologies/am*.yaml
+hive-sim/topologies/hq-*.yaml
+hive-sim/topologies/hive-demo.clab.yml
+hive-sim/topologies/ditto-vars.yaml
+
+# Generated lab topologies (keep only the canonical ones in git)
+hive-sim/topologies/lab4-automerge-24n-*.yaml
+hive-sim/topologies/lab4-automerge-192n-*.yaml
+hive-sim/topologies/lab4-ditto-*.yaml
