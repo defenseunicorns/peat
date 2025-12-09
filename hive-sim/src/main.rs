@@ -1947,16 +1947,39 @@ async fn connect_to_automerge_peers(
         );
 
         // Resolve hostname to IP addresses (containerlab uses Docker DNS)
-        let resolved_addrs: Vec<String> = match tokio::net::lookup_host(peer_addr).await {
-            Ok(addrs) => addrs.map(|a| a.to_string()).collect(),
-            Err(e) => {
-                eprintln!("[{}] ✗ Failed to resolve '{}': {}", node_id, peer_addr, e);
-                continue;
+        // Retry DNS resolution with backoff since containers start in parallel
+        // Use 30 attempts with 2-second intervals to handle slow container startup
+        let mut resolved_addrs: Vec<String> = Vec::new();
+        for attempt in 1..=30 {
+            match tokio::net::lookup_host(peer_addr).await {
+                Ok(addrs) => {
+                    resolved_addrs = addrs.map(|a| a.to_string()).collect();
+                    if !resolved_addrs.is_empty() {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    if attempt == 30 {
+                        eprintln!(
+                            "[{}] ✗ Failed to resolve '{}' after 30 attempts: {}",
+                            node_id, peer_addr, e
+                        );
+                    } else if attempt % 5 == 0 {
+                        eprintln!(
+                            "[{}] DNS attempt {}/30 for '{}' still failing, retrying...",
+                            node_id, attempt, peer_addr
+                        );
+                    }
+                    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                }
             }
-        };
+        }
 
         if resolved_addrs.is_empty() {
-            eprintln!("[{}] ✗ No addresses resolved for '{}'", node_id, peer_addr);
+            eprintln!(
+                "[{}] ✗ No addresses resolved for '{}' after retries",
+                node_id, peer_addr
+            );
             continue;
         }
 
@@ -1965,22 +1988,43 @@ async fn connect_to_automerge_peers(
             node_id, peer_addr, resolved_addrs
         );
 
-        // Connect using the SyncEngine trait method
+        // Connect using the SyncEngine trait method with retry logic
         // Note: connect_to_peer uses connect_force() which bypasses tie-breaking,
         // so it will always attempt to connect for static configurations
-        match sync_engine
-            .connect_to_peer(&peer_endpoint_hex, &resolved_addrs)
-            .await
-        {
-            Ok(_) => {
-                eprintln!("[{}] ✓ Connected to peer '{}'", node_id, peer_name);
+        // Retry connection up to 10 times with 3-second intervals to handle
+        // timing issues where the peer's listener isn't ready yet
+        let mut connected = false;
+        for conn_attempt in 1..=10 {
+            match sync_engine
+                .connect_to_peer(&peer_endpoint_hex, &resolved_addrs)
+                .await
+            {
+                Ok(_) => {
+                    eprintln!("[{}] ✓ Connected to peer '{}'", node_id, peer_name);
+                    connected = true;
+                    break;
+                }
+                Err(e) => {
+                    if conn_attempt == 10 {
+                        eprintln!(
+                            "[{}] ✗ Failed to connect to peer '{}' after 10 attempts: {}",
+                            node_id, peer_name, e
+                        );
+                    } else if conn_attempt % 3 == 0 {
+                        eprintln!(
+                            "[{}] Connection attempt {}/10 for '{}' failed, retrying...",
+                            node_id, conn_attempt, peer_name
+                        );
+                    }
+                    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+                }
             }
-            Err(e) => {
-                eprintln!(
-                    "[{}] ✗ Failed to connect to peer '{}': {}",
-                    node_id, peer_name, e
-                );
-            }
+        }
+        if !connected {
+            eprintln!(
+                "[{}] ⚠ Continuing without connection to '{}' - sync may still work via other peers",
+                node_id, peer_name
+            );
         }
     }
 
