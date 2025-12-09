@@ -115,6 +115,13 @@ object HiveJni {
     external fun freeNodeJni(handle: Long)
 
     /**
+     * Get the global node handle that survives APK replacement.
+     * @return Handle (pointer) to the HiveNode, or 0 if no node exists
+     */
+    @JvmStatic
+    external fun getGlobalNodeHandleJni(): Long
+
+    /**
      * Get all cells as JSON array string.
      * @param handle Node handle from createNodeJni
      * @return JSON array of cell objects, or "[]" on error
@@ -165,25 +172,57 @@ object HiveJni {
 /**
  * Wrapper class for a HIVE node using JNI.
  * Provides a more idiomatic Kotlin API over the raw JNI functions.
+ *
+ * Uses a global singleton handle that survives APK replacement to avoid
+ * losing the native node connection when the plugin is hot-swapped.
  */
 class HiveNodeJni private constructor(private val handle: Long) : AutoCloseable {
 
     companion object {
         private const val TAG = "HiveNodeJni"
 
+        // Global handle that survives APK replacement
+        // The native node lives in native memory which persists across plugin reloads
+        @Volatile
+        private var globalHandle: Long = 0L
+
+        @Volatile
+        private var globalInstance: HiveNodeJni? = null
+
         /**
-         * Create a new HIVE node.
+         * Create a new HIVE node, or return existing one if handle is still valid.
          * @param appId Formation/app identifier
          * @param sharedKey Base64-encoded shared key
          * @param storagePath Path for persistent storage
          * @return HiveNodeJni instance, or null on failure
          */
         fun create(appId: String, sharedKey: String, storagePath: String): HiveNodeJni? {
+            // Check if we have an existing valid handle
+            if (globalHandle != 0L) {
+                try {
+                    // Verify handle is still valid by calling peerCount
+                    val peerCount = HiveJni.peerCountJni(globalHandle)
+                    if (peerCount >= 0) {
+                        Log.i(TAG, "Reusing existing HIVE node handle: $globalHandle (peers: $peerCount)")
+                        if (globalInstance == null) {
+                            globalInstance = HiveNodeJni(globalHandle)
+                        }
+                        return globalInstance
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Existing handle invalid, will create new node: ${e.message}")
+                    globalHandle = 0L
+                    globalInstance = null
+                }
+            }
+
             return try {
                 val handle = HiveJni.createNodeJni(appId, sharedKey, storagePath)
                 if (handle != 0L) {
                     Log.i(TAG, "Created HIVE node with handle: $handle")
-                    HiveNodeJni(handle)
+                    globalHandle = handle
+                    globalInstance = HiveNodeJni(handle)
+                    globalInstance
                 } else {
                     Log.e(TAG, "Failed to create HIVE node (handle=0)")
                     null
@@ -192,6 +231,36 @@ class HiveNodeJni private constructor(private val handle: Long) : AutoCloseable 
                 Log.e(TAG, "Exception creating HIVE node: ${e.message}", e)
                 null
             }
+        }
+
+        /**
+         * Get the existing instance without creating a new one.
+         * Recovers from native global handle if Kotlin state was lost (APK replacement).
+         */
+        fun getInstance(): HiveNodeJni? {
+            // First check if we have a local instance
+            if (globalInstance != null) {
+                return globalInstance
+            }
+
+            // Try to recover from native global handle (survives APK replacement)
+            try {
+                val nativeHandle = HiveJni.getGlobalNodeHandleJni()
+                if (nativeHandle != 0L) {
+                    // Verify handle is still valid
+                    val peerCount = HiveJni.peerCountJni(nativeHandle)
+                    if (peerCount >= 0) {
+                        Log.i(TAG, "Recovered HIVE node from native global handle: $nativeHandle (peers: $peerCount)")
+                        globalHandle = nativeHandle
+                        globalInstance = HiveNodeJni(nativeHandle)
+                        return globalInstance
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to recover from native handle: ${e.message}")
+            }
+
+            return null
         }
     }
 

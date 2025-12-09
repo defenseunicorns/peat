@@ -129,15 +129,17 @@ class HiveMapComponent : DropDownMapComponent() {
     }
 
     /**
-     * Update connection status based on HIVE node availability
+     * Update connection status based on HIVE node availability and peer count
      */
     private fun updateConnectionStatus() {
-        _connectionStatus = if (HivePluginLifecycle.getInstance()?.getHiveNodeJni() != null) {
-            ConnectionStatus.CONNECTED
-        } else {
-            ConnectionStatus.DISCONNECTED
+        val node = HivePluginLifecycle.getInstance()?.getHiveNodeJni()
+        val currentPeerCount = peerCount  // Use the property which gets live peer count
+        _connectionStatus = when {
+            node == null -> ConnectionStatus.DISCONNECTED
+            currentPeerCount > 0 -> ConnectionStatus.CONNECTED
+            else -> ConnectionStatus.CONNECTING  // Node exists but no peers
         }
-        Log.d(TAG, "Connection status: $_connectionStatus")
+        Log.d(TAG, "Connection status: $_connectionStatus (peers: $currentPeerCount)")
     }
 
     /**
@@ -147,9 +149,10 @@ class HiveMapComponent : DropDownMapComponent() {
         Log.d(TAG, "Refreshing HIVE data")
         updateConnectionStatus()
 
-        val node = HivePluginLifecycle.getInstance()?.getHiveNodeJni()
+        val lifecycle = HivePluginLifecycle.getInstance()
+        val node = lifecycle?.getHiveNodeJni()
         if (node == null) {
-            Log.w(TAG, "No HIVE node available - clearing data")
+            Log.w(TAG, "No HIVE node available - lifecycle=$lifecycle, node=$node")
             _cells.clear()
             _platforms.clear()
             _tracks.clear()
