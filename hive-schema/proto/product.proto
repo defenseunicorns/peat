@@ -1,0 +1,450 @@
+// AI/ML Product definitions for CAP Protocol
+// Version: 1.0.0
+//
+// Products represent outputs from AI/ML models and sensor processing.
+// This is the generic primitive for any AI-generated content flowing
+// upward through the hierarchy: images, classifications, summaries,
+// chat responses, embeddings, alerts, etc.
+
+syntax = "proto3";
+
+package cap.product.v1;
+
+import "common.proto";
+
+// ============================================================================
+// Product (AI/ML Output Primitive)
+// ============================================================================
+
+// Product represents any AI/ML model output
+//
+// This is the generic container for AI-generated products that flow upward
+// from edge platforms to C2. Each product has a type-specific content payload.
+message Product {
+  // Unique product identifier (e.g., "PROD-{platform}-{timestamp}")
+  string product_id = 1;
+
+  // Type of product
+  ProductType product_type = 2;
+
+  // Source platform that generated this product
+  string source_platform = 3;
+
+  // Timestamp when product was generated
+  common.v1.Timestamp timestamp = 4;
+
+  // Model provenance (which model produced this)
+  ModelSource model_source = 5;
+
+  // Overall confidence/quality score (0.0 - 1.0)
+  float confidence = 6;
+
+  // Optional: Associated track ID (if product relates to a tracked entity)
+  string track_id = 7;
+
+  // Optional: Geographic location relevant to this product
+  common.v1.Position position = 8;
+
+  // Product content (type-specific payload)
+  oneof content {
+    ImageProduct image = 10;
+    ClassificationProduct classification = 11;
+    DetectionProduct detection = 12;
+    SummaryProduct summary = 13;
+    ChatProduct chat = 14;
+    AlertProduct alert = 15;
+    EmbeddingProduct embedding = 16;
+    SegmentationProduct segmentation = 17;
+    TranscriptionProduct transcription = 18;
+  }
+
+  // Additional attributes (JSON-encoded for extensibility)
+  string attributes_json = 20;
+}
+
+// Type of AI/ML product
+enum ProductType {
+  PRODUCT_TYPE_UNSPECIFIED = 0;
+  PRODUCT_TYPE_IMAGE = 1;           // Image extract, chipout, thumbnail
+  PRODUCT_TYPE_CLASSIFICATION = 2;  // Class label with confidence
+  PRODUCT_TYPE_DETECTION = 3;       // Raw detection (pre-track)
+  PRODUCT_TYPE_SUMMARY = 4;         // Text summary, report
+  PRODUCT_TYPE_CHAT = 5;            // LLM response, Q&A
+  PRODUCT_TYPE_ALERT = 6;           // Threshold trigger, anomaly
+  PRODUCT_TYPE_EMBEDDING = 7;       // Vector embedding
+  PRODUCT_TYPE_SEGMENTATION = 8;    // Mask, region
+  PRODUCT_TYPE_TRANSCRIPTION = 9;   // Speech-to-text
+}
+
+// Model provenance information
+message ModelSource {
+  // Model identifier (e.g., "yolov8n", "llama3-8b")
+  string model_id = 1;
+
+  // Model version
+  string model_version = 2;
+
+  // Model type/family (e.g., "detector", "llm", "embedding")
+  string model_type = 3;
+
+  // Inference latency in milliseconds
+  float inference_latency_ms = 4;
+}
+
+// ============================================================================
+// Image Product (Chipouts, Thumbnails, Annotated Frames)
+// ============================================================================
+
+// Image product - extracted image regions or annotated frames
+message ImageProduct {
+  // Image format
+  ImageFormat format = 1;
+
+  // Image dimensions
+  uint32 width = 2;
+  uint32 height = 3;
+
+  // Image data (one of these should be set)
+  oneof image_data {
+    bytes data = 4;              // Raw image bytes
+    string data_base64 = 5;      // Base64-encoded image
+    string url = 6;              // External URL reference
+    string blob_hash = 7;        // Content-addressed blob reference (Iroh)
+  }
+
+  // Size in bytes
+  uint32 size_bytes = 8;
+
+  // Bounding box in source frame [x, y, width, height] in pixels
+  repeated uint32 source_bbox = 9;
+
+  // Source frame dimensions [width, height]
+  repeated uint32 source_frame_size = 10;
+
+  // Trigger reason for extraction
+  ImageTrigger trigger = 11;
+
+  // JPEG quality (if applicable, 0-100)
+  uint32 jpeg_quality = 12;
+}
+
+// Image format
+enum ImageFormat {
+  IMAGE_FORMAT_UNSPECIFIED = 0;
+  IMAGE_FORMAT_JPEG = 1;
+  IMAGE_FORMAT_PNG = 2;
+  IMAGE_FORMAT_WEBP = 3;
+  IMAGE_FORMAT_RAW = 4;
+}
+
+// Trigger reason for image extraction
+enum ImageTrigger {
+  IMAGE_TRIGGER_UNSPECIFIED = 0;
+  IMAGE_TRIGGER_NEW_TRACK = 1;       // First detection of new track
+  IMAGE_TRIGGER_REACQUIRE = 2;       // Track lost and found again
+  IMAGE_TRIGGER_CLASS_CHANGE = 3;    // Classification changed
+  IMAGE_TRIGGER_HIGH_CONFIDENCE = 4; // Confidence crossed threshold
+  IMAGE_TRIGGER_PERIODIC = 5;        // Periodic capture
+  IMAGE_TRIGGER_MANUAL = 6;          // On-demand/manual request
+  IMAGE_TRIGGER_ALERT = 7;           // Alert condition triggered
+}
+
+// ============================================================================
+// Classification Product
+// ============================================================================
+
+// Classification result with confidence scores
+message ClassificationProduct {
+  // Primary classification label
+  string label = 1;
+
+  // Confidence for primary label (0.0 - 1.0)
+  float confidence = 2;
+
+  // Top-K classification results
+  repeated ClassScore top_k = 3;
+
+  // Classification taxonomy/ontology (e.g., "coco", "imagenet", "custom")
+  string taxonomy = 4;
+}
+
+// Classification score for a single class
+message ClassScore {
+  string label = 1;
+  float score = 2;
+}
+
+// ============================================================================
+// Detection Product (Raw Detection, Pre-Track)
+// ============================================================================
+
+// Raw detection before tracking association
+message DetectionProduct {
+  // Classification label
+  string label = 1;
+
+  // Detection confidence (0.0 - 1.0)
+  float confidence = 2;
+
+  // Bounding box [x, y, width, height] in pixels
+  repeated uint32 bbox = 3;
+
+  // Frame dimensions [width, height]
+  repeated uint32 frame_size = 4;
+
+  // Frame number/index
+  uint64 frame_number = 5;
+
+  // Detection index within frame (if multiple detections)
+  uint32 detection_index = 6;
+}
+
+// ============================================================================
+// Summary Product (Text Summaries, Reports)
+// ============================================================================
+
+// Text summary or report
+message SummaryProduct {
+  // Summary text content
+  string text = 1;
+
+  // Type of summary
+  SummaryType summary_type = 2;
+
+  // Source IDs that were summarized
+  repeated string source_ids = 3;
+
+  // Time range covered by summary
+  common.v1.Timestamp start_time = 4;
+  common.v1.Timestamp end_time = 5;
+
+  // Word/token count
+  uint32 word_count = 6;
+}
+
+// Type of summary
+enum SummaryType {
+  SUMMARY_TYPE_UNSPECIFIED = 0;
+  SUMMARY_TYPE_SITUATION = 1;    // Situation report
+  SUMMARY_TYPE_ACTIVITY = 2;     // Activity summary
+  SUMMARY_TYPE_THREAT = 3;       // Threat assessment
+  SUMMARY_TYPE_INTEL = 4;        // Intelligence summary
+  SUMMARY_TYPE_MISSION = 5;      // Mission summary
+}
+
+// ============================================================================
+// Chat Product (LLM Responses)
+// ============================================================================
+
+// LLM chat/completion response
+message ChatProduct {
+  // Original prompt/query
+  string prompt = 1;
+
+  // Model response
+  string response = 2;
+
+  // Model name (e.g., "llama3-8b", "gpt-4", "Codex-3")
+  string model_name = 3;
+
+  // Tokens used
+  uint32 prompt_tokens = 4;
+  uint32 completion_tokens = 5;
+  uint32 total_tokens = 6;
+
+  // Generation parameters
+  float temperature = 7;
+  float top_p = 8;
+
+  // Conversation context (if multi-turn)
+  string conversation_id = 9;
+  uint32 turn_number = 10;
+
+  // Finish reason
+  string finish_reason = 11;
+}
+
+// ============================================================================
+// Alert Product (Threshold Triggers, Anomalies)
+// ============================================================================
+
+// Alert or anomaly detection
+message AlertProduct {
+  // Alert type
+  AlertType alert_type = 1;
+
+  // Severity level
+  AlertSeverity severity = 2;
+
+  // Alert message/description
+  string message = 3;
+
+  // Threshold that was crossed (if applicable)
+  float threshold = 4;
+  float actual_value = 5;
+
+  // Related entity IDs
+  repeated string related_ids = 6;
+
+  // Is this alert acknowledged?
+  bool acknowledged = 7;
+}
+
+// Type of alert
+enum AlertType {
+  ALERT_TYPE_UNSPECIFIED = 0;
+  ALERT_TYPE_THRESHOLD = 1;      // Value crossed threshold
+  ALERT_TYPE_ANOMALY = 2;        // Anomaly detected
+  ALERT_TYPE_INTRUSION = 3;      // Intrusion/breach detected
+  ALERT_TYPE_LOITER = 4;         // Loitering behavior
+  ALERT_TYPE_SPEED = 5;          // Speed violation
+  ALERT_TYPE_GEOFENCE = 6;       // Geofence violation
+  ALERT_TYPE_PATTERN = 7;        // Pattern match
+}
+
+// Alert severity
+enum AlertSeverity {
+  ALERT_SEVERITY_UNSPECIFIED = 0;
+  ALERT_SEVERITY_INFO = 1;
+  ALERT_SEVERITY_WARNING = 2;
+  ALERT_SEVERITY_CRITICAL = 3;
+  ALERT_SEVERITY_EMERGENCY = 4;
+}
+
+// ============================================================================
+// Embedding Product (Vector Embeddings)
+// ============================================================================
+
+// Vector embedding for similarity search
+message EmbeddingProduct {
+  // Embedding vector (float array)
+  repeated float vector = 1;
+
+  // Embedding dimensions
+  uint32 dimensions = 2;
+
+  // Embedding model/space identifier
+  string embedding_model = 3;
+
+  // What was embedded (text, image hash, etc.)
+  string source_hash = 4;
+
+  // Normalized? (L2 norm = 1)
+  bool normalized = 5;
+}
+
+// ============================================================================
+// Segmentation Product (Masks, Regions)
+// ============================================================================
+
+// Segmentation mask or region
+message SegmentationProduct {
+  // Mask format
+  MaskFormat mask_format = 1;
+
+  // Mask data (RLE encoded or raw)
+  bytes mask_data = 2;
+
+  // Mask dimensions
+  uint32 width = 3;
+  uint32 height = 4;
+
+  // Segmented class labels
+  repeated string labels = 5;
+
+  // Per-pixel class IDs (if semantic segmentation)
+  repeated uint32 class_ids = 6;
+
+  // Instance count (for instance segmentation)
+  uint32 instance_count = 7;
+}
+
+// Mask encoding format
+enum MaskFormat {
+  MASK_FORMAT_UNSPECIFIED = 0;
+  MASK_FORMAT_RLE = 1;           // Run-length encoded
+  MASK_FORMAT_POLYGON = 2;       // Polygon vertices
+  MASK_FORMAT_RAW = 3;           // Raw bitmap
+}
+
+// ============================================================================
+// Transcription Product (Speech-to-Text)
+// ============================================================================
+
+// Speech-to-text transcription
+message TranscriptionProduct {
+  // Transcribed text
+  string text = 1;
+
+  // Language code (e.g., "en-US", "es-ES")
+  string language = 2;
+
+  // Confidence in transcription
+  float confidence = 3;
+
+  // Audio duration in seconds
+  float duration_seconds = 4;
+
+  // Word-level timestamps (optional)
+  repeated WordTimestamp words = 5;
+
+  // Speaker diarization (optional)
+  repeated SpeakerSegment speakers = 6;
+}
+
+// Word with timestamp
+message WordTimestamp {
+  string word = 1;
+  float start_seconds = 2;
+  float end_seconds = 3;
+  float confidence = 4;
+}
+
+// Speaker segment for diarization
+message SpeakerSegment {
+  string speaker_id = 1;
+  float start_seconds = 2;
+  float end_seconds = 3;
+  string text = 4;
+}
+
+// ============================================================================
+// Product Query
+// ============================================================================
+
+// Query for products
+message ProductQuery {
+  // Filter by product types
+  repeated ProductType product_types = 1;
+
+  // Filter by source platform
+  repeated string source_platforms = 2;
+
+  // Filter by model ID
+  string model_id = 3;
+
+  // Filter by track ID
+  string track_id = 4;
+
+  // Filter by minimum confidence
+  float min_confidence = 5;
+
+  // Filter by time range
+  common.v1.Timestamp start_time = 6;
+  common.v1.Timestamp end_time = 7;
+
+  // Maximum results
+  uint32 limit = 8;
+}
+
+// Product query response
+message ProductResponse {
+  // Matching products
+  repeated Product products = 1;
+
+  // Total count
+  uint32 total_count = 2;
+
+  // Query timestamp
+  common.v1.Timestamp as_of = 3;
+}

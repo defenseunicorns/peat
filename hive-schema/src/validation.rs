@@ -27,6 +27,11 @@ use crate::model::v1::{
     ModelType,
 };
 use crate::node::v1::{NodeConfig, NodeState};
+use crate::product::v1::{
+    AlertProduct, AlertSeverity, AlertType, ChatProduct, ClassificationProduct, DetectionProduct,
+    EmbeddingProduct, ImageFormat, ImageProduct, Product, ProductType, SegmentationProduct,
+    SummaryProduct, SummaryType, TranscriptionProduct,
+};
 use crate::sensor::v1::{
     FieldOfView, GimbalLimits, GimbalState, SensorMountType, SensorOrientation, SensorSpec,
     SensorStateUpdate, SensorStatus,
@@ -1746,6 +1751,329 @@ pub fn validate_effector_command(cmd: &EffectorCommand) -> ValidationResult<()> 
         if let Some(ref target) = cmd.target {
             validate_target_designation(target)?;
         }
+    }
+
+    Ok(())
+}
+
+// ============================================================================
+// Product Validators (AI/ML Products)
+// ============================================================================
+
+/// Validate a Product message
+///
+/// Validates:
+/// - product_id is present
+/// - product_type is specified (not unspecified)
+/// - source_platform is present
+/// - timestamp is present
+/// - confidence is in valid range (0.0 - 1.0)
+/// - content is present and valid for the product type
+pub fn validate_product(product: &Product) -> ValidationResult<()> {
+    // Check required fields
+    if product.product_id.is_empty() {
+        return Err(ValidationError::MissingField("product_id".to_string()));
+    }
+
+    // Product type must be specified
+    if product.product_type == ProductType::Unspecified as i32 {
+        return Err(ValidationError::InvalidValue(
+            "product_type must be specified".to_string(),
+        ));
+    }
+
+    if product.source_platform.is_empty() {
+        return Err(ValidationError::MissingField("source_platform".to_string()));
+    }
+
+    // Timestamp is required
+    if product.timestamp.is_none() {
+        return Err(ValidationError::MissingField("timestamp".to_string()));
+    }
+
+    // Confidence must be in valid range
+    if product.confidence < 0.0 || product.confidence > 1.0 {
+        return Err(ValidationError::InvalidConfidence(product.confidence));
+    }
+
+    // Validate model_source if present
+    if let Some(ref source) = product.model_source {
+        if source.model_id.is_empty() {
+            return Err(ValidationError::MissingField(
+                "model_source.model_id".to_string(),
+            ));
+        }
+    }
+
+    // Validate content based on type
+    use crate::product::v1::product::Content;
+    match &product.content {
+        Some(Content::Image(img)) => validate_image_product(img)?,
+        Some(Content::Classification(cls)) => validate_classification_product(cls)?,
+        Some(Content::Detection(det)) => validate_detection_product(det)?,
+        Some(Content::Summary(sum)) => validate_summary_product(sum)?,
+        Some(Content::Chat(chat)) => validate_chat_product(chat)?,
+        Some(Content::Alert(alert)) => validate_alert_product(alert)?,
+        Some(Content::Embedding(emb)) => validate_embedding_product(emb)?,
+        Some(Content::Segmentation(seg)) => validate_segmentation_product(seg)?,
+        Some(Content::Transcription(trans)) => validate_transcription_product(trans)?,
+        None => {
+            return Err(ValidationError::MissingField("content".to_string()));
+        }
+    }
+
+    Ok(())
+}
+
+/// Validate an ImageProduct (chipout, thumbnail, etc.)
+pub fn validate_image_product(image: &ImageProduct) -> ValidationResult<()> {
+    // Format must be specified
+    if image.format == ImageFormat::Unspecified as i32 {
+        return Err(ValidationError::InvalidValue(
+            "image format must be specified".to_string(),
+        ));
+    }
+
+    // Dimensions must be positive
+    if image.width == 0 {
+        return Err(ValidationError::InvalidValue(
+            "image width must be positive".to_string(),
+        ));
+    }
+
+    if image.height == 0 {
+        return Err(ValidationError::InvalidValue(
+            "image height must be positive".to_string(),
+        ));
+    }
+
+    // Must have image data (one of data, data_base64, url, or blob_hash)
+    use crate::product::v1::image_product::ImageData;
+    match &image.image_data {
+        Some(ImageData::Data(bytes)) => {
+            if bytes.is_empty() {
+                return Err(ValidationError::InvalidValue(
+                    "image data must not be empty".to_string(),
+                ));
+            }
+        }
+        Some(ImageData::DataBase64(b64)) => {
+            if b64.is_empty() {
+                return Err(ValidationError::InvalidValue(
+                    "image data_base64 must not be empty".to_string(),
+                ));
+            }
+        }
+        Some(ImageData::Url(url)) => {
+            if url.is_empty() {
+                return Err(ValidationError::InvalidValue(
+                    "image url must not be empty".to_string(),
+                ));
+            }
+            if !url.contains("://") {
+                return Err(ValidationError::InvalidValue(
+                    "image url must be a valid URL with scheme".to_string(),
+                ));
+            }
+        }
+        Some(ImageData::BlobHash(hash)) => {
+            if hash.is_empty() {
+                return Err(ValidationError::InvalidValue(
+                    "image blob_hash must not be empty".to_string(),
+                ));
+            }
+        }
+        None => {
+            return Err(ValidationError::MissingField("image_data".to_string()));
+        }
+    }
+
+    Ok(())
+}
+
+/// Validate a ClassificationProduct
+pub fn validate_classification_product(cls: &ClassificationProduct) -> ValidationResult<()> {
+    if cls.label.is_empty() {
+        return Err(ValidationError::MissingField("label".to_string()));
+    }
+
+    if cls.confidence < 0.0 || cls.confidence > 1.0 {
+        return Err(ValidationError::InvalidConfidence(cls.confidence));
+    }
+
+    // Validate top_k scores
+    for score in &cls.top_k {
+        if score.score < 0.0 || score.score > 1.0 {
+            return Err(ValidationError::InvalidConfidence(score.score));
+        }
+    }
+
+    Ok(())
+}
+
+/// Validate a DetectionProduct
+pub fn validate_detection_product(det: &DetectionProduct) -> ValidationResult<()> {
+    if det.label.is_empty() {
+        return Err(ValidationError::MissingField("label".to_string()));
+    }
+
+    if det.confidence < 0.0 || det.confidence > 1.0 {
+        return Err(ValidationError::InvalidConfidence(det.confidence));
+    }
+
+    // Bounding box should have 4 elements [x, y, width, height]
+    if det.bbox.len() != 4 {
+        return Err(ValidationError::InvalidValue(format!(
+            "bbox must have 4 elements, got {}",
+            det.bbox.len()
+        )));
+    }
+
+    // Frame size should have 2 elements [width, height]
+    if det.frame_size.len() != 2 {
+        return Err(ValidationError::InvalidValue(format!(
+            "frame_size must have 2 elements, got {}",
+            det.frame_size.len()
+        )));
+    }
+
+    Ok(())
+}
+
+/// Validate a SummaryProduct
+pub fn validate_summary_product(summary: &SummaryProduct) -> ValidationResult<()> {
+    if summary.text.is_empty() {
+        return Err(ValidationError::MissingField("text".to_string()));
+    }
+
+    // Summary type must be specified
+    if summary.summary_type == SummaryType::Unspecified as i32 {
+        return Err(ValidationError::InvalidValue(
+            "summary_type must be specified".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+/// Validate a ChatProduct
+pub fn validate_chat_product(chat: &ChatProduct) -> ValidationResult<()> {
+    if chat.response.is_empty() {
+        return Err(ValidationError::MissingField("response".to_string()));
+    }
+
+    if chat.model_name.is_empty() {
+        return Err(ValidationError::MissingField("model_name".to_string()));
+    }
+
+    // Temperature should be non-negative
+    if chat.temperature < 0.0 {
+        return Err(ValidationError::InvalidValue(
+            "temperature must be non-negative".to_string(),
+        ));
+    }
+
+    // top_p should be in [0, 1]
+    if chat.top_p < 0.0 || chat.top_p > 1.0 {
+        return Err(ValidationError::InvalidValue(format!(
+            "top_p {} must be between 0.0 and 1.0",
+            chat.top_p
+        )));
+    }
+
+    Ok(())
+}
+
+/// Validate an AlertProduct
+pub fn validate_alert_product(alert: &AlertProduct) -> ValidationResult<()> {
+    // Alert type must be specified
+    if alert.alert_type == AlertType::Unspecified as i32 {
+        return Err(ValidationError::InvalidValue(
+            "alert_type must be specified".to_string(),
+        ));
+    }
+
+    // Severity must be specified
+    if alert.severity == AlertSeverity::Unspecified as i32 {
+        return Err(ValidationError::InvalidValue(
+            "severity must be specified".to_string(),
+        ));
+    }
+
+    if alert.message.is_empty() {
+        return Err(ValidationError::MissingField("message".to_string()));
+    }
+
+    Ok(())
+}
+
+/// Validate an EmbeddingProduct
+pub fn validate_embedding_product(emb: &EmbeddingProduct) -> ValidationResult<()> {
+    if emb.vector.is_empty() {
+        return Err(ValidationError::MissingField("vector".to_string()));
+    }
+
+    if emb.dimensions == 0 {
+        return Err(ValidationError::InvalidValue(
+            "dimensions must be positive".to_string(),
+        ));
+    }
+
+    // Vector length should match dimensions
+    if emb.vector.len() != emb.dimensions as usize {
+        return Err(ValidationError::ConstraintViolation(format!(
+            "vector length {} does not match dimensions {}",
+            emb.vector.len(),
+            emb.dimensions
+        )));
+    }
+
+    if emb.embedding_model.is_empty() {
+        return Err(ValidationError::MissingField("embedding_model".to_string()));
+    }
+
+    Ok(())
+}
+
+/// Validate a SegmentationProduct
+pub fn validate_segmentation_product(seg: &SegmentationProduct) -> ValidationResult<()> {
+    if seg.mask_data.is_empty() {
+        return Err(ValidationError::MissingField("mask_data".to_string()));
+    }
+
+    if seg.width == 0 {
+        return Err(ValidationError::InvalidValue(
+            "width must be positive".to_string(),
+        ));
+    }
+
+    if seg.height == 0 {
+        return Err(ValidationError::InvalidValue(
+            "height must be positive".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+/// Validate a TranscriptionProduct
+pub fn validate_transcription_product(trans: &TranscriptionProduct) -> ValidationResult<()> {
+    if trans.text.is_empty() {
+        return Err(ValidationError::MissingField("text".to_string()));
+    }
+
+    if trans.language.is_empty() {
+        return Err(ValidationError::MissingField("language".to_string()));
+    }
+
+    if trans.confidence < 0.0 || trans.confidence > 1.0 {
+        return Err(ValidationError::InvalidConfidence(trans.confidence));
+    }
+
+    if trans.duration_seconds < 0.0 {
+        return Err(ValidationError::InvalidValue(
+            "duration_seconds must be non-negative".to_string(),
+        ));
     }
 
     Ok(())
