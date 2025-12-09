@@ -30,6 +30,7 @@
 //! - **`actuator.v1`**: Actuator specifications (linear, rotary, gripper, barrier, winch)
 //! - **`effector.v1`**: Effector specifications (weapons, countermeasures, safety, authorization)
 //! - **`product.v1`**: AI/ML products (images, classifications, summaries, chat, embeddings)
+//! - **`tasking.v1`**: AI/ML tasking (detection tasks, filters, product delivery configuration)
 //!
 //! ## Three-Tier Hierarchy
 //!
@@ -160,6 +161,13 @@ pub mod cap {
     pub mod product {
         pub mod v1 {
             include!(concat!(env!("OUT_DIR"), "/cap.product.v1.rs"));
+        }
+    }
+
+    #[allow(clippy::enum_variant_names)]
+    pub mod tasking {
+        pub mod v1 {
+            include!(concat!(env!("OUT_DIR"), "/cap.tasking.v1.rs"));
         }
     }
 }
