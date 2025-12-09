@@ -30,7 +30,7 @@ use std::sync::Arc;
 
 // JNI support for Android
 use jni::objects::{GlobalRef, JClass, JString, JValue};
-use jni::sys::{jint, jstring, JavaVM, JNI_VERSION_1_6};
+use jni::sys::{jboolean, jint, jstring, JavaVM, JNI_VERSION_1_6};
 use jni::JNIEnv;
 use std::os::raw::c_void;
 use std::sync::{LazyLock, Mutex};
@@ -973,7 +973,7 @@ impl PlatformStatus {
         }
     }
 
-    fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             Self::Ready => "READY",
             Self::Active => "ACTIVE",
@@ -1959,6 +1959,126 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_getPlatformsJni(
         .into_raw()
 }
 
+/// JNI: Publish a platform (self-position/PLI) to the HIVE network
+///
+/// Kotlin signature: external fun publishPlatformJni(handle: Long, platformJson: String): Boolean
+/// Stores the platform in the "platforms" collection for sync to peers.
+///
+/// Expected JSON format:
+/// ```json
+/// {
+///   "id": "atak-device-uid",
+///   "name": "CALLSIGN",
+///   "platform_type": "SOLDIER",
+///   "lat": 33.7490,
+///   "lon": -84.3880,
+///   "hae": 320.0,
+///   "heading": 45.0,
+///   "speed": 1.5,
+///   "status": "ACTIVE",
+///   "capabilities": ["PLI"],
+///   "cell_id": null,
+///   "readiness": 1.0
+/// }
+/// ```
+#[cfg(feature = "sync")]
+#[no_mangle]
+pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_publishPlatformJni(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: i64,
+    platform_json: JString,
+) -> jboolean {
+    if handle == 0 {
+        #[cfg(target_os = "android")]
+        android_log("publishPlatformJni: Invalid handle (0)");
+        return 0; // JNI_FALSE
+    }
+
+    // Get platform JSON string from Java
+    let json_str: String = match env.get_string(&platform_json) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            #[cfg(target_os = "android")]
+            android_log(&format!(
+                "publishPlatformJni: Failed to get JSON string: {:?}",
+                e
+            ));
+            return 0; // JNI_FALSE
+        }
+    };
+
+    #[cfg(target_os = "android")]
+    android_log(&format!("publishPlatformJni: Received JSON: {}", json_str));
+
+    // Parse JSON to validate and extract platform info
+    let platform: PlatformInfo = match serde_json::from_str::<serde_json::Value>(&json_str) {
+        Ok(v) => {
+            // Extract platform ID - required field
+            let id = match v["id"].as_str() {
+                Some(id) if !id.is_empty() => id.to_string(),
+                _ => {
+                    #[cfg(target_os = "android")]
+                    android_log("publishPlatformJni: Missing or empty 'id' field");
+                    return 0; // JNI_FALSE
+                }
+            };
+
+            PlatformInfo {
+                id,
+                platform_type: v["platform_type"].as_str().unwrap_or("SOLDIER").to_string(),
+                name: v["name"].as_str().unwrap_or("Unknown").to_string(),
+                status: PlatformStatus::from_str(v["status"].as_str().unwrap_or("ACTIVE")),
+                lat: v["lat"].as_f64().unwrap_or(0.0),
+                lon: v["lon"].as_f64().unwrap_or(0.0),
+                hae: v["hae"].as_f64(),
+                readiness: v["readiness"].as_f64().unwrap_or(1.0),
+                capabilities: v["capabilities"]
+                    .as_array()
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
+                    .unwrap_or_else(|| vec!["PLI".to_string()]),
+                cell_id: v["cell_id"].as_str().map(|s| s.to_string()),
+                last_heartbeat: chrono::Utc::now().timestamp_millis(),
+            }
+        }
+        Err(e) => {
+            #[cfg(target_os = "android")]
+            android_log(&format!("publishPlatformJni: Invalid JSON: {:?}", e));
+            return 0; // JNI_FALSE
+        }
+    };
+
+    #[cfg(target_os = "android")]
+    android_log(&format!(
+        "publishPlatformJni: Publishing platform id={}, name={}, lat={}, lon={}",
+        platform.id, platform.name, platform.lat, platform.lon
+    ));
+
+    // Get node from handle and store platform
+    let node = unsafe { Arc::from_raw(handle as *const HiveNode) };
+    let result = match node.put_platform(platform) {
+        Ok(_) => {
+            #[cfg(target_os = "android")]
+            android_log("publishPlatformJni: Platform published successfully");
+            1 // JNI_TRUE
+        }
+        Err(e) => {
+            #[cfg(target_os = "android")]
+            android_log(&format!("publishPlatformJni: Failed to publish: {:?}", e));
+            0 // JNI_FALSE
+        }
+    };
+
+    // Don't drop the Arc - we're just borrowing
+    std::mem::forget(node);
+
+    result
+}
+
 // =============================================================================
 // JNI Native Method Registration
 // =============================================================================
@@ -2008,6 +2128,12 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_nativeInit(
         },
         #[cfg(feature = "sync")]
         NativeMethod {
+            name: "getGlobalNodeHandleJni".into(),
+            sig: "()J".into(),
+            fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_getGlobalNodeHandleJni as *mut c_void,
+        },
+        #[cfg(feature = "sync")]
+        NativeMethod {
             name: "nodeIdJni".into(),
             sig: "(J)Ljava/lang/String;".into(),
             fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_nodeIdJni as *mut c_void,
@@ -2053,6 +2179,12 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_nativeInit(
             name: "getPlatformsJni".into(),
             sig: "(J)Ljava/lang/String;".into(),
             fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_getPlatformsJni as *mut c_void,
+        },
+        #[cfg(feature = "sync")]
+        NativeMethod {
+            name: "publishPlatformJni".into(),
+            sig: "(JLjava/lang/String;)Z".into(),
+            fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_publishPlatformJni as *mut c_void,
         },
     ];
 
@@ -2172,6 +2304,13 @@ pub extern "C" fn JNI_OnLoad(vm: *mut JavaVM, _reserved: *mut c_void) -> jint {
                 },
                 #[cfg(feature = "sync")]
                 NativeMethod {
+                    name: "getGlobalNodeHandleJni".into(),
+                    sig: "()J".into(),
+                    fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_getGlobalNodeHandleJni
+                        as *mut c_void,
+                },
+                #[cfg(feature = "sync")]
+                NativeMethod {
                     name: "nodeIdJni".into(),
                     sig: "(J)Ljava/lang/String;".into(),
                     fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_nodeIdJni as *mut c_void,
@@ -2217,6 +2356,13 @@ pub extern "C" fn JNI_OnLoad(vm: *mut JavaVM, _reserved: *mut c_void) -> jint {
                     name: "getPlatformsJni".into(),
                     sig: "(J)Ljava/lang/String;".into(),
                     fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_getPlatformsJni as *mut c_void,
+                },
+                #[cfg(feature = "sync")]
+                NativeMethod {
+                    name: "publishPlatformJni".into(),
+                    sig: "(JLjava/lang/String;)Z".into(),
+                    fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_publishPlatformJni
+                        as *mut c_void,
                 },
             ];
 
