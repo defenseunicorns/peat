@@ -404,6 +404,9 @@ fn query_to_dql(query: &Query) -> String {
                 lat_key, min.lat, lat_key, max.lat, lon_key, min.lon, lon_key, max.lon
             )
         }
+
+        // === Negation query (Issue #357) ===
+        Query::Not(inner) => format!("NOT ({})", query_to_dql(inner)),
     }
 }
 
