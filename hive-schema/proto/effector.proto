@@ -1,0 +1,591 @@
+// Effector definitions for CAP Protocol
+// Version: 1.0.0
+//
+// This module defines effector specifications for weapon systems and
+// countermeasures. Effectors represent systems that produce effects on
+// targets, including kinetic weapons, directed energy, electronic warfare,
+// and countermeasures. Effectors contain safety states, authorization
+// chains, ammunition tracking, and ROE compliance.
+//
+// IMPORTANT: This schema is for capability modeling and C2 coordination.
+// Actual weapon control systems require additional safety interlocks
+// and hardened implementations beyond this schema.
+
+syntax = "proto3";
+
+package cap.effector.v1;
+
+import "common.proto";
+
+// ============================================================================
+// Effector Types
+// ============================================================================
+
+// Primary classification of effector system
+enum EffectorType {
+  EFFECTOR_TYPE_UNSPECIFIED = 0;
+
+  // Kinetic weapons - projectile-based
+  // Examples: machine guns, cannons, missiles, rockets
+  EFFECTOR_TYPE_KINETIC = 1;
+
+  // Directed energy weapons
+  // Examples: lasers, high-power microwave (HPM)
+  EFFECTOR_TYPE_DIRECTED_ENERGY = 2;
+
+  // Electronic warfare - jamming/spoofing
+  // Examples: GPS jammers, comm jammers, radar jammers
+  EFFECTOR_TYPE_ELECTRONIC = 3;
+
+  // Obscurants and decoys
+  // Examples: smoke grenades, chaff, flares, decoys
+  EFFECTOR_TYPE_OBSCURANT = 4;
+
+  // Acoustic devices
+  // Examples: LRAD, warning sirens, acoustic hailing
+  EFFECTOR_TYPE_ACOUSTIC = 5;
+
+  // Non-lethal systems
+  // Examples: tasers, flashbang, rubber rounds, dazzlers
+  EFFECTOR_TYPE_NON_LETHAL = 6;
+
+  // Chemical/biological defense (dispensers, not agents)
+  // Examples: riot control dispensers, marker dye
+  EFFECTOR_TYPE_DISPENSER = 7;
+}
+
+// Effector category for ROE and authorization purposes
+enum EffectorCategory {
+  EFFECTOR_CATEGORY_UNSPECIFIED = 0;
+  EFFECTOR_CATEGORY_LETHAL = 1;           // Designed to cause casualties
+  EFFECTOR_CATEGORY_NON_LETHAL = 2;       // Designed to incapacitate
+  EFFECTOR_CATEGORY_DEFENSIVE = 3;        // Countermeasures, self-defense
+  EFFECTOR_CATEGORY_WARNING = 4;          // Warning/deterrent only
+  EFFECTOR_CATEGORY_OBSCURANT = 5;        // Concealment only
+}
+
+// ============================================================================
+// Safety and Arming States
+// ============================================================================
+
+// Weapon safety state - strict state machine
+enum SafetyState {
+  SAFETY_STATE_UNSPECIFIED = 0;
+
+  // Safe - cannot fire, all interlocks engaged
+  // Transition: SAFE -> ARMED requires authorization
+  SAFETY_STATE_SAFE = 1;
+
+  // Armed - ready to engage, safety interlocks disengaged
+  // Transition: ARMED -> READY when firing solution valid
+  SAFETY_STATE_ARMED = 2;
+
+  // Ready - firing solution valid, authorized to engage
+  // Transition: READY -> FIRING on trigger
+  SAFETY_STATE_READY = 3;
+
+  // Firing - currently engaging target
+  // Transition: FIRING -> READY or COOLDOWN after engagement
+  SAFETY_STATE_FIRING = 4;
+
+  // Cooldown - post-firing cooldown period
+  // Transition: COOLDOWN -> ARMED after cooldown complete
+  SAFETY_STATE_COOLDOWN = 5;
+
+  // Fault - safety interlock tripped, requires manual reset
+  // Transition: FAULT -> SAFE requires maintenance action
+  SAFETY_STATE_FAULT = 6;
+
+  // Maintenance - system under maintenance, cannot arm
+  SAFETY_STATE_MAINTENANCE = 7;
+}
+
+// Interlock status for safety systems
+message SafetyInterlocks {
+  // Master arm switch status
+  bool master_arm_enabled = 1;
+
+  // Firing circuit continuity
+  bool firing_circuit_ready = 2;
+
+  // Barrel/muzzle clear
+  bool muzzle_clear = 3;
+
+  // Ammunition feed ready
+  bool feed_ready = 4;
+
+  // Thermal limits OK (for DEW)
+  bool thermal_ok = 5;
+
+  // Authorization received
+  bool authorization_valid = 6;
+
+  // ROE compliance verified
+  bool roe_compliant = 7;
+
+  // Target in valid engagement zone
+  bool engagement_zone_valid = 8;
+
+  // No friendly fire risk detected
+  bool friendly_clear = 9;
+
+  // Human-in-the-loop confirmation received (if required)
+  bool human_confirmed = 10;
+}
+
+// ============================================================================
+// Ammunition and Capacity
+// ============================================================================
+
+// Ammunition/capacity status for kinetic weapons
+message AmmunitionStatus {
+  // Current rounds in ready magazine
+  uint32 rounds_ready = 1;
+
+  // Total rounds available (all magazines)
+  uint32 rounds_total = 2;
+
+  // Magazine capacity
+  uint32 magazine_capacity = 3;
+
+  // Number of full magazines available
+  uint32 magazines_available = 4;
+
+  // Ammunition type loaded (e.g., "7.62 NATO", "APFSDS")
+  string ammunition_type = 5;
+
+  // Reload in progress
+  bool reloading = 6;
+
+  // Estimated time to reload complete (seconds)
+  float reload_time_remaining_s = 7;
+
+  // Jam/malfunction detected
+  bool malfunction = 8;
+
+  // Malfunction description
+  string malfunction_detail = 9;
+}
+
+// Capacity status for directed energy weapons
+message EnergyCapacity {
+  // Current charge level (0.0 - 1.0)
+  float charge_level = 1;
+
+  // Maximum capacity (joules or application-specific)
+  float max_capacity = 2;
+
+  // Current power output capability
+  float power_available_kw = 3;
+
+  // Thermal state (0.0 = cool, 1.0 = thermal limit)
+  float thermal_level = 4;
+
+  // Charging in progress
+  bool charging = 5;
+
+  // Time to full charge (seconds)
+  float charge_time_remaining_s = 6;
+
+  // Shots remaining at current power setting
+  uint32 shots_remaining = 7;
+}
+
+// Capacity status for dispensers (smoke, chaff, flares)
+message DispenserCapacity {
+  // Canisters/units remaining
+  uint32 units_remaining = 1;
+
+  // Total capacity
+  uint32 total_capacity = 2;
+
+  // Unit type (e.g., "M18 Smoke", "MJU-7 Flare")
+  string unit_type = 3;
+
+  // Dispenser ready
+  bool ready = 4;
+}
+
+// ============================================================================
+// Engagement and Targeting
+// ============================================================================
+
+// Current engagement state
+enum EngagementState {
+  ENGAGEMENT_STATE_UNSPECIFIED = 0;
+  ENGAGEMENT_STATE_IDLE = 1;              // No engagement
+  ENGAGEMENT_STATE_TRACKING = 2;          // Tracking target
+  ENGAGEMENT_STATE_SOLUTION_VALID = 3;    // Firing solution computed
+  ENGAGEMENT_STATE_ENGAGING = 4;          // Actively engaging
+  ENGAGEMENT_STATE_ASSESSING = 5;         // Battle damage assessment
+  ENGAGEMENT_STATE_COMPLETE = 6;          // Engagement complete
+}
+
+// Target designation for engagement
+message TargetDesignation {
+  // Target track ID (from track.proto)
+  string target_track_id = 1;
+
+  // Target classification
+  string target_classification = 2;
+
+  // Target position
+  common.v1.Position target_position = 3;
+
+  // Target velocity (if tracking)
+  float target_velocity_mps = 4;
+
+  // Target bearing from effector (degrees)
+  float bearing_deg = 5;
+
+  // Target range (meters)
+  float range_m = 6;
+
+  // Designation source (e.g., "SENSOR-01", "OPERATOR", "C2")
+  string designation_source = 7;
+
+  // Designation timestamp
+  common.v1.Timestamp designated_at = 8;
+}
+
+// Firing solution status
+message FiringSolution {
+  // Solution valid
+  bool valid = 1;
+
+  // Solution quality (0.0 - 1.0)
+  float quality = 2;
+
+  // Predicted hit probability (0.0 - 1.0)
+  float hit_probability = 3;
+
+  // Lead angle computed (degrees)
+  float lead_angle_deg = 4;
+
+  // Elevation adjustment (degrees)
+  float elevation_deg = 5;
+
+  // Time to impact (seconds)
+  float time_to_impact_s = 6;
+
+  // Solution computed at
+  common.v1.Timestamp computed_at = 7;
+
+  // Solution stale after (requires recompute)
+  common.v1.Timestamp valid_until = 8;
+}
+
+// ============================================================================
+// Authorization and ROE
+// ============================================================================
+
+// Authorization level required for engagement
+enum AuthorizationLevel {
+  AUTHORIZATION_LEVEL_UNSPECIFIED = 0;
+
+  // Autonomous - system can engage without human approval
+  // Typically for defensive countermeasures only
+  AUTHORIZATION_LEVEL_AUTONOMOUS = 1;
+
+  // Operator - requires operator confirmation
+  AUTHORIZATION_LEVEL_OPERATOR = 2;
+
+  // Commander - requires cell/squad commander approval
+  AUTHORIZATION_LEVEL_COMMANDER = 3;
+
+  // Higher authority - requires zone/theater approval
+  AUTHORIZATION_LEVEL_HIGHER = 4;
+
+  // Weapons hold - no engagement authorized
+  AUTHORIZATION_LEVEL_HOLD = 5;
+}
+
+// Authorization chain record
+message Authorization {
+  // Authorization ID
+  string authorization_id = 1;
+
+  // Who authorized (operator/commander ID)
+  string authorized_by = 2;
+
+  // Authorization level granted
+  AuthorizationLevel level = 3;
+
+  // When authorized
+  common.v1.Timestamp authorized_at = 4;
+
+  // Authorization expires at
+  common.v1.Timestamp expires_at = 5;
+
+  // Target class authorized (e.g., "hostile_vehicle", "all_hostile")
+  repeated string authorized_target_classes = 6;
+
+  // Geographic constraints (if any)
+  string engagement_zone_id = 7;
+
+  // ROE reference (e.g., "ROE-ALPHA-3")
+  string roe_reference = 8;
+
+  // Special instructions
+  string special_instructions = 9;
+}
+
+// Rules of Engagement status
+message RoeStatus {
+  // Current ROE in effect
+  string roe_id = 1;
+
+  // ROE description
+  string roe_description = 2;
+
+  // Weapons status (FREE, TIGHT, HOLD)
+  string weapons_status = 3;
+
+  // Current engagement authorized
+  bool engagement_authorized = 4;
+
+  // Reason if not authorized
+  string denial_reason = 5;
+
+  // ROE last updated
+  common.v1.Timestamp updated_at = 6;
+}
+
+// ============================================================================
+// Complete Effector Specification
+// ============================================================================
+
+// Complete effector specification
+message EffectorSpec {
+  // Unique effector identifier within the platform
+  // Format: lowercase alphanumeric with hyphens, e.g., "m240-coax", "smoke-l"
+  string effector_id = 1;
+
+  // Human-readable name
+  // e.g., "M240 Coaxial Machine Gun", "Left Smoke Dispenser"
+  string name = 2;
+
+  // Effector type
+  EffectorType effector_type = 3;
+
+  // Effector category for ROE
+  EffectorCategory category = 4;
+
+  // Caliber/type for kinetic (e.g., "7.62x51mm NATO")
+  // Wavelength for DEW (e.g., "1064nm")
+  // Frequency for EW (e.g., "GPS L1")
+  string effector_class = 5;
+
+  // Maximum effective range (meters)
+  float max_range_m = 6;
+
+  // Minimum safe range (meters)
+  float min_range_m = 7;
+
+  // Rate of fire (rounds/min for kinetic, shots/min for DEW)
+  float rate_of_fire = 8;
+
+  // Current safety state
+  SafetyState safety_state = 9;
+
+  // Safety interlock status
+  SafetyInterlocks interlocks = 10;
+
+  // Ammunition/capacity (one of)
+  oneof capacity {
+    AmmunitionStatus ammunition = 15;
+    EnergyCapacity energy = 16;
+    DispenserCapacity dispenser = 17;
+  }
+
+  // Current engagement state
+  EngagementState engagement_state = 20;
+
+  // Current target (if tracking/engaging)
+  TargetDesignation current_target = 21;
+
+  // Current firing solution (if computed)
+  FiringSolution firing_solution = 22;
+
+  // Authorization level required
+  AuthorizationLevel required_authorization = 25;
+
+  // Current authorization (if any)
+  Authorization current_authorization = 26;
+
+  // Current ROE status
+  RoeStatus roe_status = 27;
+
+  // Mount/actuator reference (links to actuator.proto)
+  // e.g., "turret-main" for the turret actuator controlling this effector
+  string mount_actuator_id = 30;
+
+  // Timestamp of last state update
+  common.v1.Timestamp updated_at = 31;
+
+  // Additional metadata (JSON)
+  string metadata_json = 32;
+}
+
+// ============================================================================
+// Effector Status and Events
+// ============================================================================
+
+// Operational status of effector
+enum EffectorStatus {
+  EFFECTOR_STATUS_UNSPECIFIED = 0;
+  EFFECTOR_STATUS_OPERATIONAL = 1;     // Fully operational
+  EFFECTOR_STATUS_DEGRADED = 2;        // Reduced capability
+  EFFECTOR_STATUS_MALFUNCTION = 3;     // Malfunction detected
+  EFFECTOR_STATUS_DEPLETED = 4;        // Out of ammunition/capacity
+  EFFECTOR_STATUS_OFFLINE = 5;         // Not available
+  EFFECTOR_STATUS_MAINTENANCE = 6;     // Under maintenance
+}
+
+// Effector state update message (flows upward with capability advertisements)
+message EffectorStateUpdate {
+  // Platform this effector belongs to
+  string platform_id = 1;
+
+  // Effector specification with current state
+  EffectorSpec effector = 2;
+
+  // Current operational status
+  EffectorStatus status = 3;
+
+  // Timestamp of this update
+  common.v1.Timestamp timestamp = 4;
+}
+
+// ============================================================================
+// Effector Commands (C2 → Platform)
+// ============================================================================
+
+// Command type for effector control
+enum EffectorCommandType {
+  EFFECTOR_COMMAND_UNSPECIFIED = 0;
+
+  // Set to safe (cannot fire)
+  EFFECTOR_COMMAND_SAFE = 1;
+
+  // Arm weapon (enable firing)
+  EFFECTOR_COMMAND_ARM = 2;
+
+  // Designate target
+  EFFECTOR_COMMAND_DESIGNATE = 3;
+
+  // Clear target designation
+  EFFECTOR_COMMAND_CLEAR_TARGET = 4;
+
+  // Engage designated target
+  EFFECTOR_COMMAND_ENGAGE = 5;
+
+  // Cease fire
+  EFFECTOR_COMMAND_CEASE_FIRE = 6;
+
+  // Reload/recharge
+  EFFECTOR_COMMAND_RELOAD = 7;
+
+  // Fire warning (for non-lethal/acoustic)
+  EFFECTOR_COMMAND_WARNING = 8;
+
+  // Deploy countermeasure
+  EFFECTOR_COMMAND_DEPLOY = 9;
+}
+
+// Command message for effector control (flows downward from C2)
+message EffectorCommand {
+  // Command identifier
+  string command_id = 1;
+
+  // Target platform
+  string platform_id = 2;
+
+  // Target effector
+  string effector_id = 3;
+
+  // Command type
+  EffectorCommandType command_type = 4;
+
+  // Target designation (for DESIGNATE/ENGAGE commands)
+  TargetDesignation target = 5;
+
+  // Authorization record (required for ARM/ENGAGE)
+  Authorization authorization = 6;
+
+  // Number of rounds/shots (for ENGAGE)
+  uint32 rounds_authorized = 7;
+
+  // Command originator
+  string issued_by = 8;
+
+  // Priority level
+  int32 priority = 9;
+
+  // Timestamp when command was issued
+  common.v1.Timestamp issued_at = 10;
+
+  // Optional expiry time
+  common.v1.Timestamp expires_at = 11;
+}
+
+// Command acknowledgment
+message EffectorCommandAck {
+  // Original command ID
+  string command_id = 1;
+
+  // Whether command was accepted
+  bool accepted = 2;
+
+  // Reason if rejected
+  string rejection_reason = 3;
+
+  // Current safety state after command
+  SafetyState resulting_state = 4;
+
+  // Timestamp of acknowledgment
+  common.v1.Timestamp acknowledged_at = 5;
+}
+
+// ============================================================================
+// Engagement Record (for audit/logging)
+// ============================================================================
+
+// Record of an engagement (for logging/audit)
+message EngagementRecord {
+  // Unique engagement ID
+  string engagement_id = 1;
+
+  // Platform that engaged
+  string platform_id = 2;
+
+  // Effector used
+  string effector_id = 3;
+
+  // Target information
+  TargetDesignation target = 4;
+
+  // Authorization for this engagement
+  Authorization authorization = 5;
+
+  // Rounds/shots expended
+  uint32 rounds_expended = 6;
+
+  // Engagement start time
+  common.v1.Timestamp started_at = 7;
+
+  // Engagement end time
+  common.v1.Timestamp ended_at = 8;
+
+  // Outcome assessment
+  string outcome = 9;
+
+  // Battle damage assessment
+  string bda = 10;
+
+  // Position at time of engagement
+  common.v1.Position engagement_position = 11;
+
+  // Recording reference (if recorded)
+  string recording_id = 12;
+}
