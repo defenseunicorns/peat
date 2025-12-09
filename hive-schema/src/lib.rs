@@ -29,6 +29,7 @@
 //! - **`sensor.v1`**: Sensor specifications (mount types, orientation, FOV, gimbal state)
 //! - **`actuator.v1`**: Actuator specifications (linear, rotary, gripper, barrier, winch)
 //! - **`effector.v1`**: Effector specifications (weapons, countermeasures, safety, authorization)
+//! - **`product.v1`**: AI/ML products (images, classifications, summaries, chat, embeddings)
 //!
 //! ## Three-Tier Hierarchy
 //!
@@ -153,6 +154,12 @@ pub mod cap {
     pub mod effector {
         pub mod v1 {
             include!(concat!(env!("OUT_DIR"), "/cap.effector.v1.rs"));
+        }
+    }
+
+    pub mod product {
+        pub mod v1 {
+            include!(concat!(env!("OUT_DIR"), "/cap.product.v1.rs"));
         }
     }
 }
