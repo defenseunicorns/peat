@@ -11,6 +11,8 @@ import com.atakmap.coremap.log.Log
 import com.revolveteam.atak.hive.model.HiveCell
 import com.revolveteam.atak.hive.model.HivePlatform
 import com.revolveteam.atak.hive.model.HiveTrack
+import com.revolveteam.atak.hive.overlay.HiveCellOverlay
+import com.revolveteam.atak.hive.overlay.HivePlatformOverlay
 import com.revolveteam.atak.hive.overlay.HiveTrackOverlay
 import org.json.JSONArray
 import org.json.JSONObject
@@ -35,6 +37,8 @@ class HiveMapComponent : DropDownMapComponent() {
     private lateinit var mapView: MapView
     private var dropDownReceiver: HiveDropDownReceiver? = null
     private var trackOverlay: HiveTrackOverlay? = null
+    private var cellOverlay: HiveCellOverlay? = null
+    private var platformOverlay: HivePlatformOverlay? = null
     private val refreshHandler = Handler(Looper.getMainLooper())
     private var isRefreshing = false
 
@@ -72,6 +76,14 @@ class HiveMapComponent : DropDownMapComponent() {
         trackOverlay = HiveTrackOverlay(view)
         Log.d(TAG, "Track overlay created")
 
+        // Create cell overlay for cell boundaries (kept for cell metadata, but cell markers are secondary to platforms)
+        cellOverlay = HiveCellOverlay(view)
+        Log.d(TAG, "Cell overlay created")
+
+        // Create platform overlay for individual platform markers
+        platformOverlay = HivePlatformOverlay(view)
+        Log.d(TAG, "Platform overlay created")
+
         // Create self-position broadcaster for PLI
         selfPositionBroadcaster = SelfPositionBroadcaster(view)
         selfPositionBroadcaster?.onBroadcastCallback = { success, message ->
@@ -104,6 +116,10 @@ class HiveMapComponent : DropDownMapComponent() {
         selfPositionBroadcaster = null
         trackOverlay?.dispose()
         trackOverlay = null
+        cellOverlay?.dispose()
+        cellOverlay = null
+        platformOverlay?.dispose()
+        platformOverlay = null
         super.onDestroyImpl(context, view)
     }
 
@@ -132,8 +148,11 @@ class HiveMapComponent : DropDownMapComponent() {
 
             try {
                 refreshData()
-                // Update map markers
+                // Update map overlays
                 trackOverlay?.updateTracks(_tracks)
+                // Update cell bounding circles based on platform positions
+                cellOverlay?.updateCellBounds(_cells, _platforms)
+                platformOverlay?.updatePlatforms(_platforms, _cells)
             } catch (e: Exception) {
                 Log.e(TAG, "Error in periodic refresh: ${e.message}", e)
             }
@@ -405,10 +424,22 @@ class HiveMapComponent : DropDownMapComponent() {
     fun getMapMarkerCount(): Int = trackOverlay?.getMarkerCount() ?: 0
 
     /**
+     * Get the number of cell visualizations currently on the map
+     */
+    fun getCellMarkerCount(): Int = cellOverlay?.getCellCount() ?: 0
+
+    /**
+     * Get the number of platform markers currently on the map
+     */
+    fun getPlatformMarkerCount(): Int = platformOverlay?.getMarkerCount() ?: 0
+
+    /**
      * Force update of track markers on the map
      */
     fun updateMapMarkers() {
         trackOverlay?.updateTracks(_tracks)
+        cellOverlay?.updateCellBounds(_cells, _platforms)
+        platformOverlay?.updatePlatforms(_platforms, _cells)
     }
 
     /**
