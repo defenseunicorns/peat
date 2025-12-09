@@ -336,7 +336,10 @@ impl AutomergeSyncCoordinator {
             doc_len_after
         );
 
-        // Save updated document
+        // Save updated document - this triggers change notification
+        // The flow control cooldown (per peer+doc) will correctly prevent
+        // syncing back to the peer that just sent us this document,
+        // while still allowing sync to other peers and notifying observers.
         self.store.put(doc_key, &doc)?;
 
         // Generate response message

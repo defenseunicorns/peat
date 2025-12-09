@@ -619,121 +619,56 @@ impl IrohTransport {
     ///
     /// # Returns
     ///
-    /// `Ok(Some(conn))` - New connection that needs handshake
-    /// `Ok(None)` - We should not initiate (they have lower ID and will connect to us)
+    /// `Ok(conn)` - Connection (new or existing)
     /// `Err(e)` - Connection failed
     ///
-    /// # Note (Issue #229)
+    /// # Connection Conflict Resolution (Issue #346)
     ///
-    /// Uses deterministic tie-breaking to prevent simultaneous connection race conditions.
-    /// Only the side with the LOWER endpoint ID initiates connections. The side with
-    /// higher ID should wait to accept incoming connections instead.
+    /// This method ALWAYS attempts to connect. When both peers try to connect to each
+    /// other simultaneously (common with mDNS discovery), a conflict occurs.
     ///
-    /// This ensures exactly one QUIC connection is established between any pair of peers,
-    /// avoiding the race where both sides establish connections and then close the "wrong" one.
+    /// **Conflict Resolution Algorithm:**
+    /// - When conflict detected (we have outgoing + accept loop has incoming)
+    /// - Keep the connection initiated by the peer with LOWER endpoint ID
+    /// - Close the other connection
     ///
-    /// Callers MUST check for `None` and skip connection in that case.
+    /// This approach is **event-driven** (not preemptive):
+    /// - We don't guess who should initiate based on ID
+    /// - We resolve conflicts when they actually occur
+    /// - Works correctly for both static configs AND mDNS discovery
+    ///
+    /// Previous approach (preemptive tie-breaking) failed for static configs where
+    /// only one side has the peer in their config.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(Some(conn))` - New connection, caller should do initiator handshake
+    /// - `Ok(None)` - Connection handled by accept path, caller should do nothing
+    /// - `Err` - Actual connection error
     pub async fn connect(&self, addr: EndpointAddr) -> Result<Option<Connection>> {
         let remote_id = addr.id;
         let our_id = self.endpoint_id();
 
-        // Deterministic tie-breaking (Issue #229): only lower ID initiates
-        let we_are_lower = our_id.as_bytes() < remote_id.as_bytes();
-
-        if !we_are_lower {
-            // We have higher ID - we should NOT initiate
-            // The peer with lower ID will connect to us, and we'll accept
-            tracing::debug!(
-                "Skipping connect to {:?}: they have lower ID and will initiate",
-                remote_id
-            );
-            return Ok(None);
-        }
-
-        // Check if we already have a connection to this peer
+        // Check if we already have a live connection to this peer
         {
             let connections = self.connections.read().unwrap();
             if let Some(existing) = connections.get(&remote_id) {
-                tracing::debug!("Already have connection to {:?}, reusing", remote_id);
-                return Ok(Some(existing.clone()));
-            }
-        }
-
-        let conn = self
-            .endpoint
-            .connect(addr, CAP_AUTOMERGE_ALPN)
-            .await
-            .context("Failed to connect to peer")?;
-
-        // Store connection (check again in case of race with accept loop)
-        let mut connections = self.connections.write().unwrap();
-        if let Some(_existing) = connections.get(&remote_id) {
-            // Race: accept loop stored an incoming connection while we were connecting
-            // Since we're the lower ID, we're the initiator - close theirs, use ours
-            // Wait, this shouldn't happen since only lower ID connects...
-            // But if it does, keep our outgoing connection
-            tracing::debug!(
-                "Race detected with accept loop for {:?}, keeping our connection",
-                remote_id
-            );
-            // Close the existing (incoming) and use our new one
-            if let Some(old) = connections.remove(&remote_id) {
-                old.close(0u32.into(), b"replaced by our initiated connection");
-            }
-        }
-
-        connections.insert(remote_id, conn.clone());
-        drop(connections); // Release lock before emitting event
-
-        // Emit connect event (Issue #275)
-        self.emit_event(TransportPeerEvent::Connected {
-            endpoint_id: remote_id,
-            connected_at: std::time::Instant::now(),
-        });
-
-        // Spawn connection close monitor for instant disconnect detection (Issue #275)
-        self.spawn_connection_monitor(remote_id, conn.clone());
-
-        Ok(Some(conn))
-    }
-
-    /// Connect to a peer, bypassing tie-breaking (Issue #346)
-    ///
-    /// This method ALWAYS attempts the connection regardless of endpoint ID ordering.
-    /// Use this for static configurations (TCP_CONNECT) where only one side has the
-    /// peer in their config.
-    ///
-    /// # Arguments
-    ///
-    /// * `addr` - Peer's EndpointAddr
-    ///
-    /// # Returns
-    ///
-    /// `Ok(conn)` - Connection (new or existing)
-    /// `Err(e)` - Connection failed
-    ///
-    /// # When to use
-    ///
-    /// - Static peer configuration (containerlab, etc.)
-    /// - Unidirectional topology configs where only child knows about parent
-    ///
-    /// For mDNS/dynamic discovery where both peers might try to connect, use
-    /// `connect()` instead which applies tie-breaking.
-    pub async fn connect_force(&self, addr: EndpointAddr) -> Result<Connection> {
-        let remote_id = addr.id;
-
-        // Check if we already have a connection to this peer
-        {
-            let connections = self.connections.read().unwrap();
-            if let Some(existing) = connections.get(&remote_id) {
-                tracing::debug!("Already have connection to {:?}, reusing", remote_id);
-                return Ok(existing.clone());
+                if existing.close_reason().is_none() {
+                    tracing::debug!(
+                        "Already have live connection to {:?}, accept path handling",
+                        remote_id
+                    );
+                    // Connection is being handled by accept path - don't duplicate handshake
+                    return Ok(None);
+                }
+                // Connection exists but is dead - we'll replace it below
             }
         }
 
         tracing::debug!(
+            our_id = %our_id,
             remote_id = %remote_id,
-            "Force connecting to peer (bypassing tie-breaking for static config)"
+            "Connecting to peer (conflict resolution on detection)"
         );
 
         let conn = self
@@ -742,27 +677,66 @@ impl IrohTransport {
             .await
             .context("Failed to connect to peer")?;
 
-        // Store connection
+        // Store connection, handling potential conflict with accept loop
+        // Issue #346: We always store and return our connection. Conflict resolution
+        // happens in accept() if there's a simultaneous connection from the peer.
+        // This supports both symmetric (both initiate) and asymmetric (one initiates) cases.
         let mut connections = self.connections.write().unwrap();
-        if let Some(old) = connections.remove(&remote_id) {
-            // Replace existing connection (could be from accept loop racing)
-            tracing::debug!("Replacing existing connection to {:?}", remote_id);
-            old.close(0u32.into(), b"replaced by force connect");
+        if let Some(existing) = connections.get(&remote_id) {
+            if existing.close_reason().is_none() {
+                // Accept loop already stored a connection from this peer.
+                // Resolve conflict: keep connection initiated by LOWER endpoint ID.
+                let we_are_lower = our_id.as_bytes() < remote_id.as_bytes();
+                if we_are_lower {
+                    // We have lower ID - keep OUR outgoing connection, close theirs
+                    tracing::info!(
+                        remote_id = %remote_id,
+                        "Conflict resolved: we have lower ID, keeping our outgoing connection"
+                    );
+                    if let Some(old) = connections.remove(&remote_id) {
+                        old.close(0u32.into(), b"conflict_resolution_lower_wins");
+                    }
+                } else {
+                    // They have lower ID - keep THEIR connection, don't store ours
+                    // Return None to indicate accept path is handling
+                    tracing::info!(
+                        remote_id = %remote_id,
+                        "Conflict resolved: they have lower ID, accept path handling"
+                    );
+                    conn.close(0u32.into(), b"conflict_resolution_lower_wins");
+                    return Ok(None);
+                }
+            }
         }
 
         connections.insert(remote_id, conn.clone());
-        drop(connections);
+        drop(connections); // Release lock before emitting event
 
-        // Emit connect event (Issue #275)
-        self.emit_event(TransportPeerEvent::Connected {
-            endpoint_id: remote_id,
-            connected_at: std::time::Instant::now(),
-        });
+        // NOTE: Connected event is NOT emitted here (Issue #346).
+        // The caller must call emit_peer_connected() AFTER successful handshake
+        // to prevent sync handlers from racing with the handshake protocol.
 
-        // Spawn connection monitor
+        // Spawn connection close monitor for instant disconnect detection (Issue #275)
         self.spawn_connection_monitor(remote_id, conn.clone());
 
-        Ok(conn)
+        Ok(Some(conn))
+    }
+
+    /// Emit the Connected event for a peer after successful handshake.
+    ///
+    /// This must be called after the formation handshake succeeds to notify
+    /// sync handlers that the connection is ready for use.
+    ///
+    /// # Issue #346 Fix
+    ///
+    /// Previously, Connected was emitted immediately when the connection was stored,
+    /// which caused sync handlers to race with the handshake. This led to sync
+    /// streams being opened before authentication completed, causing handshake failures.
+    pub fn emit_peer_connected(&self, endpoint_id: EndpointId) {
+        self.emit_event(TransportPeerEvent::Connected {
+            endpoint_id,
+            connected_at: std::time::Instant::now(),
+        });
     }
 
     /// Connect to a peer using PeerInfo from static configuration
@@ -773,48 +747,25 @@ impl IrohTransport {
     ///
     /// # Returns
     ///
-    /// `Ok(Some(conn))` - New connection that needs handshake
-    /// `Ok(None)` - Already connected, no handshake needed (they are the initiator)
-    /// `Err(e)` - Connection failed
+    /// - `Ok(Some(conn))` - New connection, caller should do initiator handshake
+    /// - `Ok(None)` - Connection handled by accept path, caller should do nothing
+    /// - `Err(e)` - Connection failed
     ///
     /// # Example
     ///
     /// ```ignore
     /// let peer = config.get_peer("node-1").unwrap();
     /// if let Some(conn) = transport.connect_peer(peer).await? {
-    ///     // Do initiator handshake
+    ///     // Do initiator handshake on new connection
+    ///     perform_initiator_handshake(&conn, &key).await?;
     /// }
+    /// // If None, accept path is handling the handshake
     /// ```
-    /// Connect to a peer using PeerInfo, bypassing tie-breaking (Issue #346)
-    ///
-    /// Use this for static configurations where the config is unidirectional.
-    ///
-    /// # Arguments
-    ///
-    /// * `peer` - PeerInfo with node_id and direct addresses
-    ///
-    /// # Returns
-    ///
-    /// `Ok(conn)` - Connection (new or existing)
-    /// `Err(e)` - Connection failed
-    pub async fn connect_peer_force(&self, peer: &PeerInfo) -> Result<Connection> {
-        let endpoint_id = peer.endpoint_id()?;
-        let socket_addrs = peer.socket_addrs()?;
-
-        let mut addr = EndpointAddr::new(endpoint_id);
-        for socket_addr in socket_addrs {
-            addr = addr.with_ip_addr(socket_addr);
-        }
-
-        self.connect_force(addr).await
-    }
-
     pub async fn connect_peer(&self, peer: &PeerInfo) -> Result<Option<Connection>> {
         let endpoint_id = peer.endpoint_id()?;
         let socket_addrs = peer.socket_addrs()?;
 
         // Create EndpointAddr with direct addresses
-        // Note: with_ip_addr adds direct addresses one at a time
         let mut addr = EndpointAddr::new(endpoint_id);
         for socket_addr in socket_addrs {
             addr = addr.with_ip_addr(socket_addr);
@@ -835,7 +786,9 @@ impl IrohTransport {
     ///
     /// # Returns
     ///
-    /// Connection to the peer
+    /// - `Ok(Some(conn))` - New connection, caller should do initiator handshake
+    /// - `Ok(None)` - Connection handled by accept path, caller should do nothing
+    /// - `Err(e)` - Connection failed
     ///
     /// # Example
     ///
@@ -847,7 +800,9 @@ impl IrohTransport {
     /// tokio::time::sleep(Duration::from_secs(2)).await;
     ///
     /// // Connect to a discovered peer by their EndpointId
-    /// let conn = transport.connect_by_id(peer_endpoint_id).await?;
+    /// if let Some(conn) = transport.connect_by_id(peer_endpoint_id).await? {
+    ///     // Do initiator handshake
+    /// }
     /// ```
     pub async fn connect_by_id(&self, endpoint_id: EndpointId) -> Result<Option<Connection>> {
         // Create EndpointAddr with just the ID - discovery should have provided addresses
@@ -858,7 +813,6 @@ impl IrohTransport {
             "Connecting to peer by ID (using discovery-resolved addresses)"
         );
 
-        // Use connect() which handles tie-breaking (Issue #229)
         self.connect(addr).await
     }
 
@@ -906,21 +860,26 @@ impl IrohTransport {
     /// # Returns
     ///
     /// `Ok(Some(conn))` - A new connection that needs authentication
-    /// `Ok(None)` - A duplicate connection was received and closed (already have one to this peer)
-    /// `Err(e)` - An error occurred
+    /// `Ok(None)` - Connection was rejected due to conflict resolution or transient error
+    /// `Err(e)` - An error occurred (endpoint closed)
     ///
-    /// # Note (Issue #229)
+    /// # Connection Conflict Resolution (Issue #346)
     ///
-    /// Since only the side with LOWER endpoint ID initiates connections, incoming
-    /// connections always come from peers with lower IDs. If we already have a
-    /// connection to this peer, it means they're reconnecting - we close the old
-    /// connection and accept the new one.
+    /// When accepting a connection, there may be a conflict with an outgoing connection
+    /// attempt (race condition when both peers try to connect simultaneously).
     ///
-    /// Callers MUST check for `None` and skip authentication in that case.
+    /// **Conflict Resolution Algorithm:**
+    /// - If existing connection to this peer: conflict detected
+    /// - Keep connection initiated by peer with LOWER endpoint ID
+    /// - Close the other connection
+    ///
+    /// Example scenarios:
+    /// - We (ID=HIGH) accept from peer (ID=LOW): Peer's incoming wins (they're lower)
+    /// - We (ID=LOW) accept from peer (ID=HIGH): Our outgoing wins (we're lower)
     ///
     /// # Error Handling (Issue #346)
     ///
-    /// - Returns `Ok(None)` for transient errors (failed QUIC handshake, connection timeout)
+    /// - Returns `Ok(None)` for transient errors (failed QUIC handshake, conflict rejection)
     /// - Returns `Err` only when the endpoint is closed (accept loop should stop)
     ///
     /// This ensures the accept loop survives transient network issues.
@@ -932,7 +891,6 @@ impl IrohTransport {
             .context("Endpoint closed - no more incoming connections")?;
 
         // Issue #346: Handle transient errors gracefully
-        // If the QUIC handshake fails (e.g., timeout, client abort), don't kill the accept loop
         let conn = match incoming.await {
             Ok(conn) => conn,
             Err(e) => {
@@ -940,33 +898,55 @@ impl IrohTransport {
                     error = %e,
                     "Incoming connection failed during QUIC handshake (transient, continuing)"
                 );
-                return Ok(None); // Transient error - accept loop should continue
+                return Ok(None);
             }
         };
+
         let remote_id = conn.remote_id();
+        let our_id = self.endpoint_id();
 
         let mut connections = self.connections.write().unwrap();
 
-        // Check if we already have a connection to this peer (Issue #229)
-        // Since only lower ID initiates, if we have an existing connection to them,
-        // it's from a previous connection attempt. Accept the new one.
-        if let Some(old_conn) = connections.remove(&remote_id) {
-            tracing::debug!(
-                "Replacing existing connection from {:?} with new incoming connection",
-                remote_id
-            );
-            old_conn.close(0u32.into(), b"replaced by new connection");
+        // Check for existing connection (conflict detection)
+        if let Some(existing) = connections.get(&remote_id) {
+            if existing.close_reason().is_none() {
+                // Conflict: we have an outgoing connection AND incoming
+                // Resolve: keep connection initiated by LOWER endpoint ID
+                let they_are_lower = remote_id.as_bytes() < our_id.as_bytes();
+
+                if they_are_lower {
+                    // They have lower ID - they should be initiator
+                    // This incoming connection IS from them initiating - keep it
+                    tracing::debug!(
+                        ?our_id,
+                        ?remote_id,
+                        "Conflict resolution: keeping incoming (they have lower ID)"
+                    );
+                    if let Some(old) = connections.remove(&remote_id) {
+                        old.close(0u32.into(), b"conflict_resolution_lower_wins");
+                    }
+                } else {
+                    // We have lower ID - our outgoing connection should be kept
+                    // Reject this incoming connection
+                    tracing::debug!(
+                        ?our_id,
+                        ?remote_id,
+                        "Conflict resolution: keeping existing (we have lower ID)"
+                    );
+                    conn.close(0u32.into(), b"conflict_resolution_lower_wins");
+                    drop(connections);
+                    return Ok(None);
+                }
+            }
         }
 
         // Store and return the new connection
         connections.insert(remote_id, conn.clone());
-        drop(connections); // Release lock before emitting event
+        drop(connections);
 
-        // Emit connect event (Issue #275)
-        self.emit_event(TransportPeerEvent::Connected {
-            endpoint_id: remote_id,
-            connected_at: std::time::Instant::now(),
-        });
+        // NOTE: Connected event is NOT emitted here (Issue #346).
+        // The caller must call emit_peer_connected() AFTER successful handshake
+        // to prevent sync handlers from racing with the handshake protocol.
 
         // Spawn connection close monitor for instant disconnect detection (Issue #275)
         self.spawn_connection_monitor(remote_id, conn.clone());
@@ -1049,6 +1029,8 @@ impl IrohTransport {
     fn spawn_connection_monitor(&self, endpoint_id: EndpointId, conn: Connection) {
         let connections = Arc::clone(&self.connections);
         let event_senders = Arc::clone(&self.event_senders);
+        // Store the stable_id to verify we're removing the right connection
+        let monitored_stable_id = conn.stable_id();
 
         self.runtime_handle.spawn(async move {
             // Wait for the connection to close (this completes immediately when closed)
@@ -1060,21 +1042,46 @@ impl IrohTransport {
                 "Connection closed, emitting disconnect event"
             );
 
-            // Remove from connections map
+            // Remove from connections map ONLY if it's the same connection we were monitoring.
+            // This prevents a race where conflict resolution replaces a connection:
+            // 1. connect() stores conn A and spawns monitor for A
+            // 2. accept() removes A, closes it, inserts conn B
+            // 3. Monitor for A wakes up - must NOT remove B!
+            let should_emit_disconnect;
             {
                 let mut conns = connections.write().unwrap();
-                conns.remove(&endpoint_id);
+                if let Some(current_conn) = conns.get(&endpoint_id) {
+                    if current_conn.stable_id() == monitored_stable_id {
+                        // Same connection - safe to remove
+                        conns.remove(&endpoint_id);
+                        should_emit_disconnect = true;
+                    } else {
+                        // Different connection replaced ours - don't remove!
+                        tracing::debug!(
+                            ?endpoint_id,
+                            monitored_id = monitored_stable_id,
+                            current_id = current_conn.stable_id(),
+                            "Connection was replaced, not removing"
+                        );
+                        should_emit_disconnect = false;
+                    }
+                } else {
+                    // Already removed - someone else cleaned it up
+                    should_emit_disconnect = false;
+                }
             }
 
-            // Emit disconnect event
-            let reason = format!("{:?}", close_reason);
-            let event = TransportPeerEvent::Disconnected {
-                endpoint_id,
-                reason,
-            };
-            let senders = event_senders.read().unwrap();
-            for sender in senders.iter() {
-                let _ = sender.try_send(event.clone());
+            // Only emit disconnect if we actually removed this connection
+            if should_emit_disconnect {
+                let reason = format!("{:?}", close_reason);
+                let event = TransportPeerEvent::Disconnected {
+                    endpoint_id,
+                    reason,
+                };
+                let senders = event_senders.read().unwrap();
+                for sender in senders.iter() {
+                    let _ = sender.try_send(event.clone());
+                }
             }
         });
     }
@@ -1110,7 +1117,10 @@ impl IrohTransport {
 
             connections.retain(|endpoint_id, conn| {
                 if let Some(reason) = conn.close_reason() {
-                    tracing::debug!(?endpoint_id, "Removing closed connection from map");
+                    eprintln!(
+                        "[CLEANUP] Removing closed connection to {:?}, reason: {:?}",
+                        endpoint_id, reason
+                    );
                     let reason_str = format!("{:?}", reason);
                     closed.push((*endpoint_id, reason_str));
                     false
@@ -1396,70 +1406,52 @@ mod tests {
     async fn test_stale_peer_cleanup_issue_244() {
         use std::sync::Arc;
 
-        // Use deterministic keys so we know which direction to connect
-        // Lower ID initiates connection (Issue #229 tie-breaking)
+        // Use deterministic keys
         let transport_a = Arc::new(IrohTransport::from_seed("test/node-a").await.unwrap());
         let transport_b = Arc::new(IrohTransport::from_seed("test/node-b").await.unwrap());
 
-        let id_a = transport_a.endpoint_id();
-        let id_b = transport_b.endpoint_id();
-
-        // Determine which should initiate (lower ID initiates)
-        let (initiator, acceptor, acceptor_addr) = if id_a.as_bytes() < id_b.as_bytes() {
-            (
-                Arc::clone(&transport_a),
-                Arc::clone(&transport_b),
-                transport_b.endpoint_addr(),
-            )
-        } else {
-            (
-                Arc::clone(&transport_b),
-                Arc::clone(&transport_a),
-                transport_a.endpoint_addr(),
-            )
-        };
+        // Either side can initiate now (conflict resolution handles races)
+        let acceptor_addr = transport_b.endpoint_addr();
 
         // Initially no connections
-        assert_eq!(initiator.peer_count(), 0);
-        assert_eq!(acceptor.peer_count(), 0);
+        assert_eq!(transport_a.peer_count(), 0);
+        assert_eq!(transport_b.peer_count(), 0);
 
-        // Start accept loop on acceptor
-        acceptor.start_accept_loop().unwrap();
+        // Start accept loop on transport_b
+        transport_b.start_accept_loop().unwrap();
 
-        // Connect from initiator to acceptor
-        let conn = initiator.connect(acceptor_addr).await.unwrap();
-        assert!(conn.is_some(), "Connection should be established");
+        // Connect from transport_a to transport_b
+        let _conn = transport_a.connect(acceptor_addr).await.unwrap();
 
         // Give the connection time to establish fully
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
-        // Initiator should have 1 connected peer
-        assert_eq!(initiator.peer_count(), 1);
+        // transport_a should have 1 connected peer
+        assert_eq!(transport_a.peer_count(), 1);
 
-        // Now close acceptor, simulating a peer disconnect
-        let _ = acceptor.stop_accept_loop();
+        // Now close transport_b, simulating a peer disconnect
+        let _ = transport_b.stop_accept_loop();
 
-        // Close the acceptor connections - this will close the QUIC connection
-        for (_id, conn) in acceptor.connections.write().unwrap().drain() {
+        // Close the transport_b connections - this will close the QUIC connection
+        for (_id, conn) in transport_b.connections.write().unwrap().drain() {
             conn.close(0u32.into(), b"test_close");
         }
 
         // Give time for the connection close to propagate
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;
 
-        // Now initiator should report 0 peers (Issue #244 fix)
-        // Before the fix, this would still return 1 because closed connections weren't removed
+        // Now transport_a should report 0 peers (Issue #244 fix)
         assert_eq!(
-            initiator.peer_count(),
+            transport_a.peer_count(),
             0,
             "Closed connections should be removed from the map"
         );
         assert!(
-            initiator.connected_peers().is_empty(),
+            transport_a.connected_peers().is_empty(),
             "connected_peers() should not include closed connections"
         );
 
-        // Cleanup - drop the Arcs (connections will close automatically)
+        // Cleanup
         drop(transport_a);
         drop(transport_b);
     }
@@ -1481,7 +1473,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_peer_event_on_connect() {
-        // Test that connect emits an event (Issue #275)
+        // Test that emit_peer_connected emits an event (Issue #275, #346)
+        // Note: Since Issue #346, Connected events are only emitted AFTER handshake
+        // by calling emit_peer_connected(). This test simulates that flow.
         use std::sync::Arc;
 
         // Use deterministic keys for reliable testing
@@ -1497,26 +1491,30 @@ mod tests {
         transport2.start_accept_loop().unwrap();
 
         // Connect transport1 to transport2
-        if let Some(_conn) = transport.connect(transport2_addr).await.unwrap() {
-            // Give time for event to be emitted
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        let conn = transport.connect(transport2_addr).await.unwrap();
+        assert!(conn.is_some(), "Should get connection in asymmetric case");
 
-            // Should have received a Connected event
-            let event =
-                tokio::time::timeout(std::time::Duration::from_millis(500), rx.recv()).await;
-            assert!(event.is_ok(), "Should receive connect event");
+        // Issue #346: Connected event is only emitted after handshake.
+        // For this test, we simulate handshake success by calling it manually.
+        transport.emit_peer_connected(transport2_id);
 
-            if let Ok(Some(TransportPeerEvent::Connected { endpoint_id, .. })) = event {
-                assert_eq!(
-                    endpoint_id, transport2_id,
-                    "Event should be for connected peer"
-                );
-            } else {
-                panic!("Expected Connected event");
-            }
+        // Give time for event to be emitted
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        // Should have received a Connected event
+        let event = tokio::time::timeout(std::time::Duration::from_millis(500), rx.recv()).await;
+        assert!(event.is_ok(), "Should receive connect event");
+
+        if let Ok(Some(TransportPeerEvent::Connected { endpoint_id, .. })) = event {
+            assert_eq!(
+                endpoint_id, transport2_id,
+                "Event should be for connected peer"
+            );
+        } else {
+            panic!("Expected Connected event");
         }
 
-        // Cleanup - just drop the Arcs (connections will close)
+        // Cleanup
         drop(transport);
         drop(transport2);
     }
@@ -1566,34 +1564,23 @@ mod tests {
         // Use deterministic keys for reliable testing
         let transport_a = Arc::new(IrohTransport::from_seed("test-315/node-a").await.unwrap());
         let transport_b = Arc::new(IrohTransport::from_seed("test-315/node-b").await.unwrap());
+        let transport_b_id = transport_b.endpoint_id();
 
-        let id_a = transport_a.endpoint_id();
-        let id_b = transport_b.endpoint_id();
-
-        // Determine which should initiate (lower ID initiates)
-        let (initiator, acceptor, acceptor_addr) = if id_a.as_bytes() < id_b.as_bytes() {
-            (
-                Arc::clone(&transport_a),
-                Arc::clone(&transport_b),
-                transport_b.endpoint_addr(),
-            )
-        } else {
-            (
-                Arc::clone(&transport_b),
-                Arc::clone(&transport_a),
-                transport_a.endpoint_addr(),
-            )
-        };
+        let acceptor_addr = transport_b.endpoint_addr();
 
         // Subscribe to events BEFORE connecting
-        let mut events = initiator.subscribe_peer_events();
+        let mut events = transport_a.subscribe_peer_events();
 
-        // Start accept loop on acceptor
-        acceptor.start_accept_loop().unwrap();
+        // Start accept loop on transport_b
+        transport_b.start_accept_loop().unwrap();
 
-        // Connect from initiator to acceptor
-        let conn = initiator.connect(acceptor_addr).await.unwrap();
-        assert!(conn.is_some(), "Connection should be established");
+        // Connect from transport_a to transport_b
+        let conn = transport_a.connect(acceptor_addr).await.unwrap();
+        assert!(conn.is_some(), "Should get connection in asymmetric case");
+
+        // Issue #346: Connected event is only emitted after handshake.
+        // For this test, we simulate handshake success by calling it manually.
+        transport_a.emit_peer_connected(transport_b_id);
 
         // Wait for connection event
         let event = tokio::time::timeout(std::time::Duration::from_secs(1), events.recv()).await;
@@ -1603,26 +1590,24 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
         assert_eq!(
-            initiator.peer_count(),
+            transport_a.peer_count(),
             1,
             "Should have 1 peer before disconnect"
         );
 
-        // Now close the acceptor abruptly (simulating crash/kill)
-        let _ = acceptor.stop_accept_loop();
+        // Now close transport_b abruptly (simulating crash/kill)
+        let _ = transport_b.stop_accept_loop();
         // Close all connections without clean shutdown
-        for (_id, conn) in acceptor.connections.write().unwrap().drain() {
+        for (_id, conn) in transport_b.connections.write().unwrap().drain() {
             conn.close(0u32.into(), b"crash");
         }
         // Force close the endpoint
-        drop(acceptor);
+        drop(transport_b);
 
         // Start timing - disconnect should be detected within QUIC_MAX_IDLE_TIMEOUT_SECS
         let start = std::time::Instant::now();
 
         // Wait for disconnect event - should be MUCH faster than the old ~40s
-        // With connection.closed() monitor, this should be almost instant when peer closes cleanly
-        // Even with abrupt close, it should be within idle timeout (10s)
         let disconnect_timeout = std::time::Duration::from_secs(QUIC_MAX_IDLE_TIMEOUT_SECS + 2);
         let event = tokio::time::timeout(disconnect_timeout, events.recv()).await;
 
@@ -1640,9 +1625,6 @@ mod tests {
                 "Disconnect detected (Issue #315)"
             );
 
-            // Verify the timing is reasonable
-            // With clean close (via connection.close()), it should be nearly instant
-            // This test documents the expected behavior with new config
             assert!(
                 elapsed.as_secs() <= QUIC_MAX_IDLE_TIMEOUT_SECS + 2,
                 "Disconnect should be detected within {} seconds, took {:.1}s (Issue #315)",
@@ -1653,12 +1635,11 @@ mod tests {
 
         // Verify peer is removed
         assert_eq!(
-            initiator.peer_count(),
+            transport_a.peer_count(),
             0,
             "Peer count should be 0 after disconnect"
         );
 
         drop(transport_a);
-        drop(transport_b);
     }
 }
