@@ -18,6 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "proto/sensor.proto",
         "proto/actuator.proto",
         "proto/effector.proto",
+        "proto/product.proto",
     ];
 
     // Configure prost to generate Rust code from .proto files
