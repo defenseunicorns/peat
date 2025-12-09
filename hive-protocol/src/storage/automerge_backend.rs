@@ -271,9 +271,23 @@ impl AutomergeBackend {
             active_handlers.write().unwrap().insert(peer_id);
 
             // Trigger sync of all existing documents with new peer (Issue #235)
+            // Issue #346: Brief delay to allow conflict resolution to settle before syncing.
             let coord_for_initial_sync = Arc::clone(coordinator);
             let initial_sync_peer_id = peer_id;
+            let conn_for_initial_check = conn.clone();
             tokio::spawn(async move {
+                // Wait for conflict resolution to settle
+                tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+                // Check if connection was closed by conflict resolution
+                if conn_for_initial_check.close_reason().is_some() {
+                    tracing::debug!(
+                        "Skipping initial sync for {:?}: connection was superseded",
+                        initial_sync_peer_id
+                    );
+                    return;
+                }
+
                 if let Err(e) = coord_for_initial_sync
                     .sync_all_documents_with_peer(initial_sync_peer_id)
                     .await
@@ -291,12 +305,37 @@ impl AutomergeBackend {
             let active_handlers_clone = Arc::clone(active_handlers);
             let handler_peer_id = peer_id;
 
+            // Store the connection's stable_id to detect if it gets replaced by conflict resolution
+            let conn_stable_id = conn.stable_id();
+
             // Spawn continuous handler that loops accepting streams
             tokio::spawn(async move {
                 tracing::debug!(
-                    "Started continuous sync handler for peer {:?}",
-                    handler_peer_id
+                    "Started continuous sync handler for peer {:?} (conn_id={})",
+                    handler_peer_id,
+                    conn_stable_id
                 );
+
+                // Issue #346: Brief delay to allow conflict resolution to settle.
+                // If both nodes connect simultaneously, one connection will be closed.
+                // Give time for that to happen before we start using the connection.
+                tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+                // Check if connection was closed by conflict resolution
+                if conn.close_reason().is_some() {
+                    tracing::debug!(
+                        "Sync handler for {:?} exiting: connection was superseded by conflict resolution (conn_id={})",
+                        handler_peer_id,
+                        conn_stable_id
+                    );
+                    // Don't remove from active_handlers - a new handler will be spawned
+                    // when the correct connection's Connected event fires
+                    active_handlers_clone
+                        .write()
+                        .unwrap()
+                        .remove(&handler_peer_id);
+                    return;
+                }
 
                 // Loop accepting streams until connection closes or sync stops
                 while sync_active_clone.load(Ordering::Relaxed) {
@@ -317,9 +356,10 @@ impl AutomergeBackend {
                         Err(e) => {
                             // Connection closed or error - exit handler
                             tracing::debug!(
-                                "Sync handler for {:?} exiting: {}",
+                                "Sync handler for {:?} exiting: {} (conn_id={})",
                                 handler_peer_id,
-                                e
+                                e,
+                                conn_stable_id
                             );
                             break;
                         }
