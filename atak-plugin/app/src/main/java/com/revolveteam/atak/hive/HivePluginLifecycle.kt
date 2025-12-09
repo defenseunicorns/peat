@@ -136,11 +136,23 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
 
     fun isHiveFfiAvailable(): Boolean = hiveFfiInitialized
 
-    fun getHiveNodeJni(): HiveNodeJni? = hiveNodeJni
+    fun getHiveNodeJni(): HiveNodeJni? {
+        // First check our instance
+        if (hiveNodeJni != null) {
+            return hiveNodeJni
+        }
+        // Try to recover from global singleton (survives APK replacement)
+        val recovered = HiveNodeJni.getInstance()
+        if (recovered != null) {
+            Log.i(TAG, "Recovered HIVE node from global singleton")
+            hiveNodeJni = recovered
+        }
+        return hiveNodeJni
+    }
 
-    fun getPeerCount(): Int = hiveNodeJni?.peerCount() ?: 0
+    fun getPeerCount(): Int = getHiveNodeJni()?.peerCount() ?: 0
 
-    fun getNodeId(): String? = hiveNodeJni?.nodeId()
+    fun getNodeId(): String? = getHiveNodeJni()?.nodeId()
 
-    fun getConnectedPeers(): String = hiveNodeJni?.connectedPeers() ?: "[]"
+    fun getConnectedPeers(): String = getHiveNodeJni()?.connectedPeers() ?: "[]"
 }
