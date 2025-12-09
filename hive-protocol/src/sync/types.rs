@@ -151,6 +151,11 @@ pub enum Query {
     /// Multiple conditions combined with OR
     Or(Vec<Query>),
 
+    /// Negation of a query (Issue #357)
+    ///
+    /// Matches documents that do NOT match the inner query.
+    Not(Box<Query>),
+
     /// All documents in collection (no filter)
     All,
 
@@ -478,6 +483,49 @@ impl Subscription {
         self.qos.sync_mode = sync_mode;
         self
     }
+
+    // === Dynamic subscription updates (Issue #357) ===
+
+    /// Update the query for this subscription
+    ///
+    /// Allows modifying the subscription filter without recreating it.
+    /// Useful for dynamic spatial queries that follow user position.
+    pub fn update_query(&mut self, query: Query) {
+        self.query = query;
+    }
+
+    /// Update the QoS settings for this subscription
+    ///
+    /// Allows adjusting sync behavior based on runtime conditions
+    /// (e.g., switching to LatestOnly when bandwidth is constrained).
+    pub fn update_qos(&mut self, qos: SubscriptionQoS) {
+        self.qos = qos;
+    }
+
+    /// Update just the sync mode
+    pub fn update_sync_mode(&mut self, sync_mode: crate::qos::SyncMode) {
+        self.qos.sync_mode = sync_mode;
+    }
+
+    /// Update the spatial center point (for radius queries)
+    ///
+    /// If the current query is a `WithinRadius`, updates the center point.
+    /// Otherwise, this is a no-op.
+    pub fn update_center(&mut self, new_center: GeoPoint) {
+        if let Query::WithinRadius { center, .. } = &mut self.query {
+            *center = new_center;
+        }
+    }
+
+    /// Update the spatial radius (for radius queries)
+    ///
+    /// If the current query is a `WithinRadius`, updates the radius.
+    /// Otherwise, this is a no-op.
+    pub fn update_radius(&mut self, new_radius: f64) {
+        if let Query::WithinRadius { radius_meters, .. } = &mut self.query {
+            *radius_meters = new_radius;
+        }
+    }
 }
 
 /// QoS settings for a subscription (Issue #356)
@@ -549,6 +597,122 @@ pub enum Priority {
 
     /// Low priority (e.g., capability additions, metadata)
     Low = 3,
+}
+
+// === Sync Mode Metrics (Issue #357) ===
+
+/// Metrics for sync mode performance tracking
+///
+/// Provides statistics on sync operations by mode, enabling analysis
+/// of the ~300× reconnection improvement from LatestOnly mode.
+///
+/// # Example
+///
+/// ```
+/// use hive_protocol::sync::types::SyncModeMetrics;
+///
+/// let mut metrics = SyncModeMetrics::new();
+/// metrics.record_sync("beacons", crate::qos::SyncMode::LatestOnly, 1024, std::time::Duration::from_millis(5));
+/// assert_eq!(metrics.total_syncs, 1);
+/// assert_eq!(metrics.latest_only_syncs, 1);
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct SyncModeMetrics {
+    /// Total number of sync operations
+    pub total_syncs: u64,
+    /// Number of syncs using FullHistory mode
+    pub full_history_syncs: u64,
+    /// Number of syncs using LatestOnly mode
+    pub latest_only_syncs: u64,
+    /// Number of syncs using WindowedHistory mode
+    pub windowed_syncs: u64,
+    /// Total bytes synced with FullHistory mode
+    pub full_history_bytes: u64,
+    /// Total bytes synced with LatestOnly mode
+    pub latest_only_bytes: u64,
+    /// Total bytes synced with WindowedHistory mode
+    pub windowed_bytes: u64,
+    /// Total sync duration (in milliseconds) for FullHistory
+    pub full_history_duration_ms: u64,
+    /// Total sync duration (in milliseconds) for LatestOnly
+    pub latest_only_duration_ms: u64,
+    /// Total sync duration (in milliseconds) for WindowedHistory
+    pub windowed_duration_ms: u64,
+}
+
+impl SyncModeMetrics {
+    /// Create new empty metrics
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record a sync operation
+    pub fn record_sync(
+        &mut self,
+        _collection: &str,
+        mode: crate::qos::SyncMode,
+        bytes: u64,
+        duration: std::time::Duration,
+    ) {
+        self.total_syncs += 1;
+        let duration_ms = duration.as_millis() as u64;
+
+        match mode {
+            crate::qos::SyncMode::FullHistory => {
+                self.full_history_syncs += 1;
+                self.full_history_bytes += bytes;
+                self.full_history_duration_ms += duration_ms;
+            }
+            crate::qos::SyncMode::LatestOnly => {
+                self.latest_only_syncs += 1;
+                self.latest_only_bytes += bytes;
+                self.latest_only_duration_ms += duration_ms;
+            }
+            crate::qos::SyncMode::WindowedHistory { .. } => {
+                self.windowed_syncs += 1;
+                self.windowed_bytes += bytes;
+                self.windowed_duration_ms += duration_ms;
+            }
+        }
+    }
+
+    /// Average bytes per sync for FullHistory mode
+    pub fn avg_full_history_bytes(&self) -> f64 {
+        if self.full_history_syncs == 0 {
+            0.0
+        } else {
+            self.full_history_bytes as f64 / self.full_history_syncs as f64
+        }
+    }
+
+    /// Average bytes per sync for LatestOnly mode
+    pub fn avg_latest_only_bytes(&self) -> f64 {
+        if self.latest_only_syncs == 0 {
+            0.0
+        } else {
+            self.latest_only_bytes as f64 / self.latest_only_syncs as f64
+        }
+    }
+
+    /// Bandwidth savings ratio (LatestOnly vs FullHistory)
+    ///
+    /// Returns the ratio of FullHistory bytes to LatestOnly bytes.
+    /// A ratio of 300.0 means LatestOnly uses 300× less bandwidth.
+    pub fn bandwidth_savings_ratio(&self) -> Option<f64> {
+        let fh_avg = self.avg_full_history_bytes();
+        let lo_avg = self.avg_latest_only_bytes();
+
+        if lo_avg == 0.0 || fh_avg == 0.0 {
+            None
+        } else {
+            Some(fh_avg / lo_avg)
+        }
+    }
+
+    /// Reset all metrics
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
 }
 
 #[cfg(test)]
@@ -809,5 +973,242 @@ mod tests {
             .with_rate_limit(1000);
         assert_eq!(qos.max_documents, Some(100));
         assert_eq!(qos.update_rate_ms, Some(1000));
+    }
+
+    // === Compound query tests (Issue #357) ===
+
+    #[test]
+    fn test_query_not() {
+        // Create a NOT query
+        let inner = Query::Eq {
+            field: "type".to_string(),
+            value: Value::String("hidden".to_string()),
+        };
+        let not_query = Query::Not(Box::new(inner));
+
+        match not_query {
+            Query::Not(inner) => match inner.as_ref() {
+                Query::Eq { field, value } => {
+                    assert_eq!(field, "type");
+                    assert_eq!(value, &Value::String("hidden".to_string()));
+                }
+                _ => panic!("Expected Eq query inside Not"),
+            },
+            _ => panic!("Expected Not query"),
+        }
+    }
+
+    #[test]
+    fn test_compound_query_not_and() {
+        // NOT (type == "hidden" AND status == "deleted")
+        let and_query = Query::And(vec![
+            Query::Eq {
+                field: "type".to_string(),
+                value: Value::String("hidden".to_string()),
+            },
+            Query::Eq {
+                field: "status".to_string(),
+                value: Value::String("deleted".to_string()),
+            },
+        ]);
+        let not_and = Query::Not(Box::new(and_query));
+
+        match not_and {
+            Query::Not(inner) => match inner.as_ref() {
+                Query::And(queries) => {
+                    assert_eq!(queries.len(), 2);
+                }
+                _ => panic!("Expected And query inside Not"),
+            },
+            _ => panic!("Expected Not query"),
+        }
+    }
+
+    // === Dynamic subscription update tests (Issue #357) ===
+
+    #[test]
+    fn test_subscription_update_query() {
+        let mut sub = Subscription::all("beacons");
+
+        // Update to a spatial query
+        sub.update_query(Query::WithinRadius {
+            center: GeoPoint::new(37.7749, -122.4194),
+            radius_meters: 5000.0,
+            lat_field: None,
+            lon_field: None,
+        });
+
+        match &sub.query {
+            Query::WithinRadius { radius_meters, .. } => {
+                assert_eq!(*radius_meters, 5000.0);
+            }
+            _ => panic!("Expected WithinRadius query"),
+        }
+    }
+
+    #[test]
+    fn test_subscription_update_qos() {
+        let mut sub = Subscription::all("beacons");
+        assert!(sub.qos.sync_mode.is_full_history());
+
+        // Update QoS
+        sub.update_qos(SubscriptionQoS::latest_only().with_max_documents(50));
+        assert!(sub.qos.sync_mode.is_latest_only());
+        assert_eq!(sub.qos.max_documents, Some(50));
+    }
+
+    #[test]
+    fn test_subscription_update_sync_mode() {
+        let mut sub = Subscription::all("beacons");
+        sub.update_sync_mode(crate::qos::SyncMode::LatestOnly);
+        assert!(sub.qos.sync_mode.is_latest_only());
+    }
+
+    #[test]
+    fn test_subscription_update_center() {
+        let mut sub =
+            Subscription::within_radius("beacons", GeoPoint::new(37.7749, -122.4194), 5000.0);
+
+        // Move center to new location
+        sub.update_center(GeoPoint::new(34.0522, -118.2437)); // LA
+
+        match &sub.query {
+            Query::WithinRadius { center, .. } => {
+                assert_eq!(center.lat, 34.0522);
+                assert_eq!(center.lon, -118.2437);
+            }
+            _ => panic!("Expected WithinRadius query"),
+        }
+    }
+
+    #[test]
+    fn test_subscription_update_radius() {
+        let mut sub =
+            Subscription::within_radius("beacons", GeoPoint::new(37.7749, -122.4194), 5000.0);
+
+        // Expand radius
+        sub.update_radius(10000.0);
+
+        match &sub.query {
+            Query::WithinRadius { radius_meters, .. } => {
+                assert_eq!(*radius_meters, 10000.0);
+            }
+            _ => panic!("Expected WithinRadius query"),
+        }
+    }
+
+    #[test]
+    fn test_subscription_update_center_noop_on_non_radius() {
+        let mut sub = Subscription::all("beacons");
+
+        // Should be a no-op since this isn't a radius query
+        sub.update_center(GeoPoint::new(34.0522, -118.2437));
+
+        assert!(matches!(sub.query, Query::All));
+    }
+
+    // === SyncModeMetrics tests (Issue #357) ===
+
+    #[test]
+    fn test_sync_mode_metrics_new() {
+        let metrics = SyncModeMetrics::new();
+        assert_eq!(metrics.total_syncs, 0);
+        assert_eq!(metrics.full_history_syncs, 0);
+        assert_eq!(metrics.latest_only_syncs, 0);
+    }
+
+    #[test]
+    fn test_sync_mode_metrics_record_full_history() {
+        let mut metrics = SyncModeMetrics::new();
+        metrics.record_sync(
+            "beacons",
+            crate::qos::SyncMode::FullHistory,
+            10000,
+            std::time::Duration::from_millis(50),
+        );
+
+        assert_eq!(metrics.total_syncs, 1);
+        assert_eq!(metrics.full_history_syncs, 1);
+        assert_eq!(metrics.full_history_bytes, 10000);
+        assert_eq!(metrics.full_history_duration_ms, 50);
+    }
+
+    #[test]
+    fn test_sync_mode_metrics_record_latest_only() {
+        let mut metrics = SyncModeMetrics::new();
+        metrics.record_sync(
+            "beacons",
+            crate::qos::SyncMode::LatestOnly,
+            500,
+            std::time::Duration::from_millis(5),
+        );
+
+        assert_eq!(metrics.total_syncs, 1);
+        assert_eq!(metrics.latest_only_syncs, 1);
+        assert_eq!(metrics.latest_only_bytes, 500);
+        assert_eq!(metrics.latest_only_duration_ms, 5);
+    }
+
+    #[test]
+    fn test_sync_mode_metrics_bandwidth_savings() {
+        let mut metrics = SyncModeMetrics::new();
+
+        // Simulate full history sync: 30,000 bytes
+        metrics.record_sync(
+            "beacons",
+            crate::qos::SyncMode::FullHistory,
+            30000,
+            std::time::Duration::from_millis(100),
+        );
+
+        // Simulate latest only sync: 100 bytes
+        metrics.record_sync(
+            "beacons",
+            crate::qos::SyncMode::LatestOnly,
+            100,
+            std::time::Duration::from_millis(2),
+        );
+
+        assert_eq!(metrics.avg_full_history_bytes(), 30000.0);
+        assert_eq!(metrics.avg_latest_only_bytes(), 100.0);
+
+        // Bandwidth savings ratio should be 300x
+        let ratio = metrics.bandwidth_savings_ratio().unwrap();
+        assert_eq!(ratio, 300.0);
+    }
+
+    #[test]
+    fn test_sync_mode_metrics_reset() {
+        let mut metrics = SyncModeMetrics::new();
+        metrics.record_sync(
+            "beacons",
+            crate::qos::SyncMode::LatestOnly,
+            500,
+            std::time::Duration::from_millis(5),
+        );
+
+        assert_eq!(metrics.total_syncs, 1);
+
+        metrics.reset();
+
+        assert_eq!(metrics.total_syncs, 0);
+        assert_eq!(metrics.latest_only_syncs, 0);
+    }
+
+    #[test]
+    fn test_sync_mode_metrics_windowed() {
+        let mut metrics = SyncModeMetrics::new();
+        metrics.record_sync(
+            "track_history",
+            crate::qos::SyncMode::WindowedHistory {
+                window_seconds: 300,
+            },
+            5000,
+            std::time::Duration::from_millis(20),
+        );
+
+        assert_eq!(metrics.total_syncs, 1);
+        assert_eq!(metrics.windowed_syncs, 1);
+        assert_eq!(metrics.windowed_bytes, 5000);
     }
 }
