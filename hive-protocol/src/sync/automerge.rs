@@ -1760,26 +1760,27 @@ impl SyncEngine for IrohSyncEngine {
             )));
         }
 
-        // Tie-breaking: only the peer with the lower EndpointId initiates the connection
-        // This prevents duplicate connections where both peers try to connect to each other
+        // Issue #346: Removed tie-breaking from sync layer
+        //
+        // Tie-breaking is handled by the transport layer (IrohTransport::connect).
+        // For static configurations (TCP_CONNECT), we should always attempt to connect
+        // when explicitly configured. The transport will return Ok(None) if we should
+        // wait for the peer to connect to us, which we handle below.
+        //
+        // Having tie-breaking at BOTH layers caused connections to fail when:
+        // - Child node (soldier) has higher EndpointId than parent (squad leader)
+        // - Child's TCP_CONNECT says "connect to parent"
+        // - Sync layer tie-breaking blocked the connection
+        // - Parent doesn't have child in config, so never connects
+        // - Result: no connection!
         let our_endpoint_id = self.transport.endpoint_id();
         let our_endpoint_hex = hex::encode(our_endpoint_id.as_bytes());
-
-        if our_endpoint_hex.as_str() > endpoint_id_hex {
-            // We have the higher EndpointId, so we should wait for them to connect to us
-            tracing::debug!(
-                our_endpoint = %our_endpoint_hex,
-                peer_endpoint = %endpoint_id_hex,
-                "Tie-breaking: peer has lower EndpointId, waiting for them to connect"
-            );
-            return Ok(false);
-        }
 
         tracing::debug!(
             our_endpoint = %our_endpoint_hex,
             peer_endpoint = %endpoint_id_hex,
             addresses = ?addresses,
-            "Tie-breaking: we have lower EndpointId, initiating connection"
+            "Connecting to peer via static configuration"
         );
 
         // Create PeerInfo for the transport
@@ -1790,10 +1791,10 @@ impl SyncEngine for IrohSyncEngine {
             relay_url: None,
         };
 
-        // Attempt to connect via transport
-        // Returns Some(conn) if new connection, None if already connected
-        match self.transport.connect_peer(&peer_info).await {
-            Ok(Some(conn)) => {
+        // Issue #346: Use connect_peer_force for static configurations
+        // This bypasses tie-breaking since we're explicitly told to connect
+        match self.transport.connect_peer_force(&peer_info).await {
+            Ok(conn) => {
                 // New connection - perform formation handshake
                 if let Some(ref formation_key) = self.formation_key {
                     use crate::network::formation_handshake::perform_initiator_handshake;
@@ -1831,14 +1832,6 @@ impl SyncEngine for IrohSyncEngine {
                     );
                     Ok(true)
                 }
-            }
-            Ok(None) => {
-                // Already connected (they initiated)
-                tracing::debug!(
-                    peer_endpoint = %endpoint_id_hex,
-                    "Already connected to peer (they initiated)"
-                );
-                Ok(true)
             }
             Err(e) => {
                 tracing::warn!(
