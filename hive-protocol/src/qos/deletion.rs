@@ -41,9 +41,10 @@ use std::time::{Duration, SystemTime};
 /// - UpOnly: Only to parent cells (e.g., contact_reports)
 /// - DownOnly: Only to child cells (e.g., commands)
 /// - SystemWide: Propagate to ALL peers (eventually consistent)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum PropagationDirection {
     /// Sync bidirectionally (both up and down hierarchy)
+    #[default]
     Bidirectional,
     /// Sync only upward to parent cells
     UpOnly,
@@ -92,12 +93,6 @@ impl PropagationDirection {
     #[inline]
     pub fn is_system_wide(&self) -> bool {
         matches!(self, Self::SystemWide)
-    }
-}
-
-impl Default for PropagationDirection {
-    fn default() -> Self {
-        Self::Bidirectional
     }
 }
 

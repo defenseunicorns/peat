@@ -48,9 +48,14 @@ use iroh::endpoint::Connection;
 #[cfg(feature = "automerge-backend")]
 pub const FORMATION_HANDSHAKE_ALPN: &[u8] = b"hive/formation-auth/1";
 
-/// Timeout for handshake operations (5 seconds)
+/// Timeout for handshake operations (30 seconds)
+///
+/// Issue #373: Increased from 5 to 30 seconds to handle large hierarchical
+/// deployments (96+ nodes) where multiple nodes may be connecting simultaneously.
+/// Under heavy load, the responder may take longer to process handshakes,
+/// causing "Challenge receive timeout" errors with shorter timeouts.
 #[cfg(feature = "automerge-backend")]
-const HANDSHAKE_TIMEOUT_SECS: u64 = 5;
+const HANDSHAKE_TIMEOUT_SECS: u64 = 30;
 
 /// Perform the initiator side of the formation handshake
 ///
