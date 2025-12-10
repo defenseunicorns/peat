@@ -1,10 +1,16 @@
 # HIVE Protocol Proof-of-Concept Vignette
 ## Object Tracking Across Distributed Human-Machine-AI Teams
 
-**Document Version**: 2.0  
-**Date**: 2025-11-26  
-**Author**: (r)evolve Inc. — https://revolveteam.com  
+**Document Version**: 3.0
+**Date**: 2025-12-10
+**Author**: (r)evolve Inc. — https://revolveteam.com
 **Status**: Draft
+
+**Revision History**:
+| Version | Date | Changes |
+|---------|------|---------|
+| 2.0 | 2025-11-26 | Initial vignette with flat team structure |
+| 3.0 | 2025-12-10 | Added sub-tier architecture (HIVE-Lite), M5Stack Core2 wearables, Waveshare UGV Beast platforms, ADR-035 reference |
 
 ---
 
@@ -49,23 +55,61 @@ Traditional approaches require each sensor to stream raw video/imagery to a cent
 
 ### 2.1 Team Alpha (Network A)
 
-| Role | Platform | Description |
-|------|----------|-------------|
-| **Alpha-1 (Operator)** | ATAK on Android | Human operator with smartphone running ATAK |
-| **Alpha-2 (UGV)** | Small ground robot | Camera-equipped UGV with edge compute |
-| **Alpha-3 (AI Model)** | Edge GPU (Jetson) | Object tracking model (YOLOv8 + DeepSORT) |
+Team Alpha demonstrates the **hierarchical sub-tier architecture** where both human operators and autonomous platforms aggregate multiple HIVE nodes:
 
-**Team Composition**: 1 Human + 1 Machine + 1 AI = Human-Machine-AI cell
+| Entity | HIVE Node(s) | Description |
+|--------|--------------|-------------|
+| **Alpha-1 (Operator)** | Squad Member (aggregation tier) | Human operator identity |
+| ↳ Alpha-1a | ATAK on Android (HIVE-Full) | SA, comms, mapping, tasking |
+| ↳ Alpha-1b | M5Stack Core2 (HIVE-Lite) | Biometrics, activity, panic button |
+| **Alpha-2 (UGV)** | UGV (aggregation tier) | Waveshare UGV Beast platform |
+| ↳ Alpha-2a | Jetson Orin Nano (HIVE-Full) | AI vision, navigation, ROS2 |
+| ↳ Alpha-2b | ESP32 (HIVE-Lite) | Motor control, proximity, IMU |
+
+**Hardware Details:**
+
+| Component | Model | Capabilities |
+|-----------|-------|--------------|
+| Operator Phone | Android + ATAK | GPS, camera, mesh radio, full HIVE |
+| Wearable Sensor | M5Stack Core2 | 6-axis IMU (MPU6886), microphone (SPM1423), touch, RTC, battery monitoring |
+| UGV Platform | Waveshare UGV Beast | Tracked chassis, 360° pan-tilt, 5MP 160° camera, LiDAR |
+| UGV Compute | Jetson Orin Nano | YOLOv8 + DeepSORT, ROS2, full HIVE |
+| UGV Controller | ESP32 | Motor PID, sensor fusion, HIVE-Lite |
+
+**Sub-Tier Data Flow:**
+```
+Alpha Squad (HIVE aggregation)
+├── Alpha-1 (Operator) ──────────────────────────────┐
+│   ├── ATAK Phone (Full) ◄──────────────────────────┤ Operator
+│   │   └── Position, SA, tasking, comms             │ Document
+│   └── Core2 (Lite) ◄───────────────────────────────┤
+│       └── Activity, posture, battery, panic button │
+│                                                    ▼
+├── Alpha-2 (UGV) ───────────────────────────────────┐
+│   ├── Jetson Orin (Full) ◄─────────────────────────┤ UGV
+│   │   └── Tracks, vision, navigation               │ Document
+│   └── ESP32 (Lite) ◄───────────────────────────────┤
+│       └── Motor state, IMU, proximity, battery     │
+│                                                    ▼
+└── Squad-level aggregation ─────────────────────────► Coordinator
+```
+
+**Team Composition**: 1 Human (2 nodes) + 1 UGV (2 nodes) = 4 HIVE nodes forming 2 logical entities
 
 ### 2.2 Team Bravo (Network B)
 
-| Role | Platform | Description |
-|------|----------|-------------|
-| **Bravo-1 (Operator)** | ATAK on Android | Human operator with smartphone running ATAK |
-| **Bravo-2 (UAV)** | Small quadcopter | Camera-equipped drone with edge compute |
-| **Bravo-3 (AI Model)** | Edge GPU (Jetson) | Object tracking model (YOLOv8 + DeepSORT) |
+| Entity | HIVE Node(s) | Description |
+|--------|--------------|-------------|
+| **Bravo-1 (Operator)** | Squad Member (aggregation tier) | Human operator identity |
+| ↳ Bravo-1a | ATAK on Android (HIVE-Full) | SA, comms, mapping, tasking |
+| ↳ Bravo-1b | M5Stack Core2 (HIVE-Lite) | Biometrics, activity, panic button |
+| **Bravo-2 (UGV)** | UGV (aggregation tier) | Waveshare UGV Beast platform |
+| ↳ Bravo-2a | Jetson Orin Nano (HIVE-Full) | AI vision, navigation, ROS2 |
+| ↳ Bravo-2b | ESP32 (HIVE-Lite) | Motor control, proximity, IMU |
 
-**Team Composition**: 1 Human + 1 Machine + 1 AI = Human-Machine-AI cell
+**Team Composition**: 1 Human (2 nodes) + 1 UGV (2 nodes) = 4 HIVE nodes forming 2 logical entities
+
+> **Note**: Original vignette specified Bravo-2 as UAV. Updated to UGV for hardware consistency with available Waveshare platforms. UAV variant remains a valid extension scenario.
 
 ### 2.3 Coordinator Node (Network Bridge)
 
@@ -124,29 +168,89 @@ Traditional approaches require each sensor to stream raw video/imagery to a cent
               │ (Mesh Sync)                │ (Mesh Sync)
               │                            │
               ▼                            ▼
-┌─────────────────────────────┐  ┌─────────────────────────────┐
-│      TEAM ALPHA             │  │      TEAM BRAVO             │
-│      (Network A)            │  │      (Network B)            │
-│                             │  │                             │
-│  ┌─────────┐                │  │  ┌─────────┐                │
-│  │ Alpha-1 │ Operator       │  │  │ Bravo-1 │ Operator       │
-│  │ (ATAK)  │ w/ authority   │  │  │ (ATAK)  │ w/ authority   │
-│  └────┬────┘                │  │  └────┬────┘                │
-│       │                     │  │       │                     │
-│       ▼                     │  │       ▼                     │
-│  ┌─────────┐                │  │  ┌─────────┐                │
-│  │ Alpha-2 │ UGV + Camera   │  │  │ Bravo-2 │ UAV + Camera   │
-│  │ (Robot) │                │  │  │ (Drone) │                │
-│  └────┬────┘                │  │  └────┬────┘                │
-│       │                     │  │       │                     │
-│       ▼                     │  │       ▼                     │
-│  ┌─────────┐                │  │  ┌─────────┐                │
-│  │ Alpha-3 │ Object Tracker │  │  │ Bravo-3 │ Object Tracker │
-│  │  (AI)   │ YOLOv8+DeepSORT│  │  │  (AI)   │ YOLOv8+DeepSORT│
-│  └─────────┘                │  │  └─────────┘                │
-│                             │  │                             │
-└─────────────────────────────┘  └─────────────────────────────┘
+┌──────────────────────────────────┐  ┌──────────────────────────────────┐
+│      TEAM ALPHA (Network A)      │  │      TEAM BRAVO (Network B)      │
+│                                  │  │                                  │
+│  ┌────────────────────────────┐  │  │  ┌────────────────────────────┐  │
+│  │ Alpha-1 (Operator)         │  │  │  │ Bravo-1 (Operator)         │  │
+│  │ Squad Member aggregation   │  │  │  │ Squad Member aggregation   │  │
+│  │  ┌──────────┐ ┌──────────┐ │  │  │  │  ┌──────────┐ ┌──────────┐ │  │
+│  │  │ ATAK     │ │ Core2    │ │  │  │  │  │ ATAK     │ │ Core2    │ │  │
+│  │  │ Phone    │ │ Wearable │ │  │  │  │  │ Phone    │ │ Wearable │ │  │
+│  │  │ (Full)   │ │ (Lite)   │ │  │  │  │  │ (Full)   │ │ (Lite)   │ │  │
+│  │  │ SA,comms │ │ IMU,mic  │ │  │  │  │  │ SA,comms │ │ IMU,mic  │ │  │
+│  │  └──────────┘ └──────────┘ │  │  │  │  └──────────┘ └──────────┘ │  │
+│  └────────────────────────────┘  │  │  └────────────────────────────┘  │
+│                                  │  │                                  │
+│  ┌────────────────────────────┐  │  │  ┌────────────────────────────┐  │
+│  │ Alpha-2 (UGV Beast)        │  │  │  │ Bravo-2 (UGV Beast)        │  │
+│  │ Platform aggregation       │  │  │  │ Platform aggregation       │  │
+│  │  ┌──────────┐ ┌──────────┐ │  │  │  │  ┌──────────┐ ┌──────────┐ │  │
+│  │  │ Jetson   │ │ ESP32    │ │  │  │  │  │ Jetson   │ │ ESP32    │ │  │
+│  │  │ Orin     │ │ Lower    │ │  │  │  │  │ Orin     │ │ Lower    │ │  │
+│  │  │ (Full)   │ │ (Lite)   │ │  │  │  │  │ (Full)   │ │ (Lite)   │ │  │
+│  │  │ AI,nav   │ │ motors   │ │  │  │  │  │ AI,nav   │ │ motors   │ │  │
+│  │  └──────────┘ └──────────┘ │  │  │  │  └──────────┘ └──────────┘ │  │
+│  └────────────────────────────┘  │  │  └────────────────────────────┘  │
+│                                  │  │                                  │
+│  4 HIVE nodes → 2 entities       │  │  4 HIVE nodes → 2 entities       │
+└──────────────────────────────────┘  └──────────────────────────────────┘
+
+Legend:
+  (Full) = HIVE-Full node: persistent storage, full CRDTs, relay capable
+  (Lite) = HIVE-Lite node: ephemeral, primitive CRDTs, first-class mesh participant
 ```
+
+### 3.1 Sub-Tier Architecture Detail
+
+The vignette demonstrates HIVE's **hierarchical sub-tier architecture** where complex entities (humans with wearables, robots with multiple computers) aggregate multiple HIVE nodes into unified logical identities:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│              Sub-Tier Aggregation Pattern                            │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Human Operator                      UGV Beast                       │
+│  ┌─────────────────┐                 ┌─────────────────┐            │
+│  │ Squad Member    │                 │ Platform        │            │
+│  │ (logical ID)    │                 │ (logical ID)    │            │
+│  └────────┬────────┘                 └────────┬────────┘            │
+│           │                                   │                      │
+│     ┌─────┴─────┐                       ┌─────┴─────┐               │
+│     ▼           ▼                       ▼           ▼               │
+│  ┌──────┐   ┌──────┐                ┌───────┐   ┌───────┐          │
+│  │ ATAK │   │Core2 │                │Jetson │   │ ESP32 │          │
+│  │Phone │   │      │                │Orin   │   │       │          │
+│  │(Full)│   │(Lite)│                │(Full) │   │(Lite) │          │
+│  └──────┘   └──────┘                └───────┘   └───────┘          │
+│                                                                      │
+│  Produces:                           Produces:                       │
+│  • Position, heading                 • POI tracks                    │
+│  • Activity level (IMU)              • Camera imagery                │
+│  • Ambient noise (mic)               • LiDAR scans                   │
+│  • Battery status                    • Motor telemetry               │
+│  • Panic button events               • Obstacle detection            │
+│  • Status acknowledgments            • Battery/power status          │
+│                                                                      │
+│  Aggregated Operator Doc:            Aggregated Platform Doc:        │
+│  {                                   {                               │
+│    "callsign": "Alpha-1",              "platform_id": "Alpha-2",    │
+│    "position": {...},                  "tracks": [...],             │
+│    "activity": "moving",               "position": {...},           │
+│    "battery": 84,                      "heading": 45,               │
+│    "alerts": [],                       "battery": 72,               │
+│    "last_ack": "14:32:00Z"             "obstacles": [...]           │
+│  }                                   }                               │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Insight**: HIVE-Lite nodes (Core2, ESP32) are **first-class mesh participants**, not bridged peripherals. They speak the same protocol as Full nodes but with capability negotiation:
+
+- Full nodes: persistent storage, document CRDTs, relay capable
+- Lite nodes: ephemeral, primitive CRDTs (LWW-Register, G-Counter), direct mesh participation
+
+See [ADR-035: HIVE-Lite Embedded Sensor Nodes](../../docs/adr/035-hive-lite-embedded-nodes.md) for detailed architecture.
 
 ---
 
@@ -515,12 +619,34 @@ Team View:
 
 ### 7.1 Team Equipment (per team)
 
-| Component | Specification | Est. Cost |
-|-----------|---------------|-----------|
-| Operator device | Android phone/tablet with ATAK | $300-500 |
-| Ground robot (UGV) or UAV | Camera-equipped, WiFi-enabled | $500-2000 |
-| Edge compute | NVIDIA Jetson Nano/Xavier | $150-500 |
-| Local network | WiFi router or mesh radio | $50-200 |
+| Component | Model | Specification | Est. Cost |
+|-----------|-------|---------------|-----------|
+| Operator Phone | Android + ATAK | HIVE-Full node, SA/comms | $300-500 |
+| Operator Wearable | M5Stack Core2 | HIVE-Lite node, ESP32, 6-axis IMU, mic, touch, RTC | $50 |
+| UGV Platform | Waveshare UGV Beast | Tracked chassis, 360° pan-tilt, 5MP camera | $400 |
+| UGV Compute | Jetson Orin Nano | HIVE-Full node, AI/vision, ROS2, 4GB+ RAM | $200-500 |
+| UGV Controller | ESP32 (included) | HIVE-Lite node, motor PID, sensor fusion | (included) |
+| Local network | WiFi router or mesh radio | Team connectivity | $50-200 |
+
+**Per-Team Total**: ~$1,000-1,700
+
+**M5Stack Core2 Sensor Capabilities (HIVE-Lite):**
+| Sensor | Chip | CRDT Mapping | Data |
+|--------|------|--------------|------|
+| 6-axis IMU | MPU6886 | LWW-Register | Orientation, activity, fall detection |
+| Microphone | SPM1423 | LWW-Register | Ambient noise, acoustic events |
+| Touch | FT6336U | G-Counter | Panic button, acknowledgments |
+| RTC | BM8563 | (clock sync) | Accurate timestamps |
+| Battery | AXP192 | LWW-Register | Device health |
+
+**Waveshare UGV Beast Capabilities:**
+| Component | Specification | Data |
+|-----------|---------------|------|
+| Camera | 5MP, 160° wide-angle | Video frames for AI |
+| Pan-Tilt | 360° horizontal, servo-driven | Camera positioning |
+| LiDAR | (optional addon) | Obstacle detection, mapping |
+| Chassis | Tracked, all-terrain | Mobility |
+| ESP32 | Dual-core 240MHz | Motor PID, IMU, proximity |
 
 ### 7.2 Coordinator Equipment
 
@@ -684,13 +810,32 @@ Team View:
 |------|------------|
 | ATAK | Android Tactical Assault Kit - Mobile situational awareness app |
 | CoT | Cursor on Target - XML message format for SA data |
+| CRDT | Conflict-free Replicated Data Type - Data structures that merge without conflicts |
+| G-Counter | Grow-only Counter - CRDT that only increments (used for event counts) |
 | HIVE | Hierarchical Information and Value Exchange Protocol |
+| HIVE-Full | Full-capability HIVE node with persistent storage, document CRDTs, relay capability |
+| HIVE-Lite | Resource-constrained HIVE node with ephemeral storage, primitive CRDTs, first-class mesh participation |
+| LWW-Register | Last-Writer-Wins Register - CRDT where latest timestamp wins (used for sensor readings) |
+| M5Stack Core2 | ESP32-based development board with IMU, microphone, touch, RTC, display |
 | MLOps | Machine Learning Operations - Model lifecycle management |
 | POI | Person of Interest - Target being tracked |
+| ROS2 | Robot Operating System 2 - Middleware for robot software development |
+| Squad Member | Logical aggregation tier for human operator (aggregates ATAK + wearables) |
+| Sub-tier | Hierarchical level below Squad where multiple devices aggregate into single entity |
 | TAK | Team Awareness Kit - SA ecosystem |
 | UGV | Unmanned Ground Vehicle |
+| UGV Beast | Waveshare tracked robot platform with Jetson compute and ESP32 controller |
 | UAV | Unmanned Aerial Vehicle |
 | WebTAK | Browser-based TAK client |
+
+---
+
+## Appendix C: References
+
+- [ADR-035: HIVE-Lite Embedded Sensor Nodes](../../docs/adr/035-hive-lite-embedded-nodes.md)
+- [M5Stack Core2 Specifications](https://docs.m5stack.com/en/core/core2)
+- [Waveshare UGV Beast](https://www.waveshare.com/ugv-beast.htm)
+- [NVIDIA Jetson Orin Nano](https://developer.nvidia.com/embedded/jetson-orin-nano-developer-kit)
 
 ---
 
