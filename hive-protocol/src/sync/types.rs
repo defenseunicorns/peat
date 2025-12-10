@@ -163,6 +163,35 @@ pub enum Query {
     /// Use sparingly - limits backend portability
     Custom(String),
 
+    // === Deletion-aware queries (ADR-034, Issue #369) ===
+    /// Include soft-deleted documents in query results
+    ///
+    /// By default, queries exclude documents with `_deleted=true` (soft-deleted).
+    /// This modifier includes those documents in the results.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Default: excludes deleted documents
+    /// let query = Query::All;
+    ///
+    /// // Include deleted documents
+    /// let query_with_deleted = Query::IncludeDeleted(Box::new(Query::All));
+    ///
+    /// // With a filter
+    /// let filtered_with_deleted = Query::IncludeDeleted(Box::new(Query::Eq {
+    ///     field: "type".to_string(),
+    ///     value: Value::String("contact_report".to_string()),
+    /// }));
+    /// ```
+    IncludeDeleted(Box<Query>),
+
+    /// Only return soft-deleted documents
+    ///
+    /// Matches only documents where `_deleted=true`.
+    /// Useful for auditing or restoring deleted records.
+    DeletedOnly,
+
     // === Spatial queries (Issue #356) ===
     /// Documents within a radius of a center point
     ///
@@ -193,6 +222,58 @@ pub enum Query {
         /// Field name for longitude (default: "lon")
         lon_field: Option<String>,
     },
+}
+
+impl Query {
+    /// Check if this query includes deleted documents
+    ///
+    /// Returns true if the query is `IncludeDeleted` or `DeletedOnly`.
+    pub fn includes_deleted(&self) -> bool {
+        matches!(self, Query::IncludeDeleted(_) | Query::DeletedOnly)
+    }
+
+    /// Check if this query only matches deleted documents
+    pub fn is_deleted_only(&self) -> bool {
+        matches!(self, Query::DeletedOnly)
+    }
+
+    /// Wrap this query to include deleted documents
+    ///
+    /// If already `IncludeDeleted` or `DeletedOnly`, returns self unchanged.
+    pub fn with_deleted(self) -> Self {
+        if self.includes_deleted() {
+            self
+        } else {
+            Query::IncludeDeleted(Box::new(self))
+        }
+    }
+
+    /// Get the inner query if this is an IncludeDeleted wrapper
+    pub fn inner_query(&self) -> &Query {
+        match self {
+            Query::IncludeDeleted(inner) => inner.as_ref(),
+            other => other,
+        }
+    }
+
+    /// Check if a document matches the soft-delete filter
+    ///
+    /// - For normal queries: document must NOT have `_deleted=true`
+    /// - For `IncludeDeleted`: document can have any `_deleted` value
+    /// - For `DeletedOnly`: document MUST have `_deleted=true`
+    pub fn matches_deletion_state(&self, doc: &Document) -> bool {
+        let is_deleted = doc
+            .fields
+            .get("_deleted")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+        match self {
+            Query::DeletedOnly => is_deleted,
+            Query::IncludeDeleted(_) => true, // Include all
+            _ => !is_deleted,                 // Exclude deleted
+        }
+    }
 }
 
 /// Stream of document changes for live queries
@@ -1211,5 +1292,147 @@ mod tests {
         assert_eq!(metrics.total_syncs, 1);
         assert_eq!(metrics.windowed_syncs, 1);
         assert_eq!(metrics.windowed_bytes, 5000);
+    }
+
+    // === Deletion-aware query tests (ADR-034, Issue #369) ===
+
+    #[test]
+    fn test_query_include_deleted() {
+        let inner = Query::All;
+        let query = Query::IncludeDeleted(Box::new(inner));
+
+        assert!(query.includes_deleted());
+        assert!(!query.is_deleted_only());
+
+        match query.inner_query() {
+            Query::All => {}
+            _ => panic!("Expected All query inside IncludeDeleted"),
+        }
+    }
+
+    #[test]
+    fn test_query_deleted_only() {
+        let query = Query::DeletedOnly;
+
+        assert!(query.includes_deleted());
+        assert!(query.is_deleted_only());
+    }
+
+    #[test]
+    fn test_query_with_deleted() {
+        // Normal query should be wrapped
+        let query = Query::All;
+        let wrapped = query.with_deleted();
+        assert!(matches!(wrapped, Query::IncludeDeleted(_)));
+
+        // Already wrapped should stay the same
+        let already_wrapped = Query::IncludeDeleted(Box::new(Query::All));
+        let still_wrapped = already_wrapped.with_deleted();
+        assert!(matches!(still_wrapped, Query::IncludeDeleted(_)));
+
+        // DeletedOnly should stay the same
+        let deleted_only = Query::DeletedOnly;
+        let still_deleted_only = deleted_only.with_deleted();
+        assert!(matches!(still_deleted_only, Query::DeletedOnly));
+    }
+
+    #[test]
+    fn test_query_matches_deletion_state_normal() {
+        let query = Query::All;
+
+        // Non-deleted document should match
+        let mut non_deleted = Document::new(HashMap::new());
+        non_deleted.set("name", Value::String("test".to_string()));
+        assert!(query.matches_deletion_state(&non_deleted));
+
+        // Deleted document should NOT match
+        let mut deleted = Document::new(HashMap::new());
+        deleted.set("name", Value::String("test".to_string()));
+        deleted.set("_deleted", Value::Bool(true));
+        assert!(!query.matches_deletion_state(&deleted));
+
+        // _deleted=false should match
+        let mut not_deleted = Document::new(HashMap::new());
+        not_deleted.set("_deleted", Value::Bool(false));
+        assert!(query.matches_deletion_state(&not_deleted));
+    }
+
+    #[test]
+    fn test_query_matches_deletion_state_include_deleted() {
+        let query = Query::IncludeDeleted(Box::new(Query::All));
+
+        // Non-deleted document should match
+        let non_deleted = Document::new(HashMap::new());
+        assert!(query.matches_deletion_state(&non_deleted));
+
+        // Deleted document should also match
+        let mut deleted = Document::new(HashMap::new());
+        deleted.set("_deleted", Value::Bool(true));
+        assert!(query.matches_deletion_state(&deleted));
+    }
+
+    #[test]
+    fn test_query_matches_deletion_state_deleted_only() {
+        let query = Query::DeletedOnly;
+
+        // Non-deleted document should NOT match
+        let non_deleted = Document::new(HashMap::new());
+        assert!(!query.matches_deletion_state(&non_deleted));
+
+        // Deleted document should match
+        let mut deleted = Document::new(HashMap::new());
+        deleted.set("_deleted", Value::Bool(true));
+        assert!(query.matches_deletion_state(&deleted));
+
+        // _deleted=false should NOT match
+        let mut not_deleted = Document::new(HashMap::new());
+        not_deleted.set("_deleted", Value::Bool(false));
+        assert!(!query.matches_deletion_state(&not_deleted));
+    }
+
+    #[test]
+    fn test_query_include_deleted_with_filter() {
+        // IncludeDeleted wrapping a more complex query
+        let inner = Query::Eq {
+            field: "type".to_string(),
+            value: Value::String("contact_report".to_string()),
+        };
+        let query = Query::IncludeDeleted(Box::new(inner));
+
+        assert!(query.includes_deleted());
+
+        match query.inner_query() {
+            Query::Eq { field, value } => {
+                assert_eq!(field, "type");
+                assert_eq!(value, &Value::String("contact_report".to_string()));
+            }
+            _ => panic!("Expected Eq query inside IncludeDeleted"),
+        }
+    }
+
+    #[test]
+    fn test_query_normal_excludes_deleted() {
+        // All query variants (except IncludeDeleted/DeletedOnly) should exclude deleted docs
+        let queries = vec![
+            Query::All,
+            Query::Eq {
+                field: "x".to_string(),
+                value: Value::Null,
+            },
+            Query::And(vec![Query::All]),
+            Query::Or(vec![Query::All]),
+            Query::Not(Box::new(Query::All)),
+        ];
+
+        let mut deleted_doc = Document::new(HashMap::new());
+        deleted_doc.set("_deleted", Value::Bool(true));
+
+        for query in queries {
+            assert!(
+                !query.matches_deletion_state(&deleted_doc),
+                "Query {:?} should exclude deleted docs",
+                query
+            );
+        }
     }
 }
