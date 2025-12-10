@@ -593,6 +593,25 @@ impl SyncCapable for AutomergeBackend {
                         &sync_active_for_events,
                         &active_handlers_for_events,
                     );
+
+                    // ADR-034 Phase 2: Exchange tombstones with new peer
+                    // This ensures deletions are synchronized when peers connect
+                    let coordinator_for_tombstones = Arc::clone(&coordinator_for_events);
+                    let peer_id_for_tombstones = endpoint_id;
+                    tokio::spawn(async move {
+                        // Small delay to let connection fully establish
+                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                        if let Err(e) = coordinator_for_tombstones
+                            .sync_tombstones_with_peer(peer_id_for_tombstones)
+                            .await
+                        {
+                            tracing::debug!(
+                                "Tombstone exchange with peer {:?} failed: {}",
+                                peer_id_for_tombstones,
+                                e
+                            );
+                        }
+                    });
                 }
             }
             tracing::debug!("Event-based sync handler spawner stopped");
