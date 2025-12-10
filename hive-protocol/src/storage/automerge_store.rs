@@ -11,7 +11,7 @@ use automerge::{transaction::Transactable, Automerge, ReadDoc};
 #[cfg(feature = "automerge-backend")]
 use lru::LruCache;
 #[cfg(feature = "automerge-backend")]
-use redb::{Database, ReadableTableMetadata, TableDefinition};
+use redb::{Database, ReadableTable, ReadableTableMetadata, TableDefinition};
 #[cfg(feature = "automerge-backend")]
 use std::num::NonZeroUsize;
 #[cfg(feature = "automerge-backend")]
@@ -29,6 +29,12 @@ use anyhow::{Context, Result};
 /// Value: serialized Automerge document bytes
 #[cfg(feature = "automerge-backend")]
 const DOCUMENTS_TABLE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("documents");
+
+/// Table definition for tombstone storage (ADR-034 Phase 2)
+/// Key: "collection:document_id" as string bytes
+/// Value: serialized Tombstone bytes (JSON)
+#[cfg(feature = "automerge-backend")]
+const TOMBSTONES_TABLE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("tombstones");
 
 /// Storage layer for Automerge documents with redb persistence
 ///
@@ -76,13 +82,14 @@ impl AutomergeStore {
 
         let db = Database::create(&db_path).context("Failed to open redb database")?;
 
-        // Initialize the table (redb requires this on first use)
+        // Initialize the tables (redb requires this on first use)
         {
             let write_txn = db
                 .begin_write()
                 .context("Failed to begin write transaction")?;
-            // Creating the table if it doesn't exist
+            // Creating the tables if they don't exist
             let _ = write_txn.open_table(DOCUMENTS_TABLE);
+            let _ = write_txn.open_table(TOMBSTONES_TABLE); // ADR-034 Phase 2
             write_txn
                 .commit()
                 .context("Failed to commit table creation")?;
@@ -275,6 +282,154 @@ impl AutomergeStore {
             store: Arc::clone(self),
             prefix: format!("{}:", name),
         })
+    }
+
+    // === Tombstone storage methods (ADR-034 Phase 2) ===
+
+    /// Store a tombstone
+    ///
+    /// Tombstones are stored with key format "collection:document_id"
+    pub fn put_tombstone(&self, tombstone: &crate::qos::Tombstone) -> Result<()> {
+        let key = format!("{}:{}", tombstone.collection, tombstone.document_id);
+        let bytes = serde_json::to_vec(tombstone).context("Failed to serialize tombstone")?;
+
+        let write_txn = self
+            .db
+            .begin_write()
+            .context("Failed to begin write transaction")?;
+        {
+            let mut table = write_txn
+                .open_table(TOMBSTONES_TABLE)
+                .context("Failed to open tombstones table")?;
+            table
+                .insert(key.as_bytes(), bytes.as_slice())
+                .context("Failed to insert tombstone")?;
+        }
+        write_txn
+            .commit()
+            .context("Failed to commit tombstone write")?;
+
+        tracing::debug!(
+            "Stored tombstone for document {} in collection {}",
+            tombstone.document_id,
+            tombstone.collection
+        );
+
+        Ok(())
+    }
+
+    /// Get a tombstone by collection and document ID
+    pub fn get_tombstone(
+        &self,
+        collection: &str,
+        document_id: &str,
+    ) -> Result<Option<crate::qos::Tombstone>> {
+        let key = format!("{}:{}", collection, document_id);
+
+        let read_txn = self
+            .db
+            .begin_read()
+            .context("Failed to begin read transaction")?;
+        let table = read_txn
+            .open_table(TOMBSTONES_TABLE)
+            .context("Failed to open tombstones table")?;
+
+        match table.get(key.as_bytes())? {
+            Some(value) => {
+                let bytes = value.value();
+                let tombstone: crate::qos::Tombstone =
+                    serde_json::from_slice(bytes).context("Failed to deserialize tombstone")?;
+                Ok(Some(tombstone))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Get all tombstones for a collection
+    pub fn get_tombstones_for_collection(
+        &self,
+        collection: &str,
+    ) -> Result<Vec<crate::qos::Tombstone>> {
+        let prefix = format!("{}:", collection);
+        let mut tombstones = Vec::new();
+
+        let read_txn = self
+            .db
+            .begin_read()
+            .context("Failed to begin read transaction")?;
+        let table = read_txn
+            .open_table(TOMBSTONES_TABLE)
+            .context("Failed to open tombstones table")?;
+
+        // Iterate all entries and filter by prefix
+        for entry in table.iter()? {
+            let (key, value) = entry?;
+            let key_str = String::from_utf8_lossy(key.value());
+            if key_str.starts_with(&prefix) {
+                let tombstone: crate::qos::Tombstone = serde_json::from_slice(value.value())
+                    .context("Failed to deserialize tombstone")?;
+                tombstones.push(tombstone);
+            }
+        }
+
+        Ok(tombstones)
+    }
+
+    /// Get all tombstones across all collections
+    pub fn get_all_tombstones(&self) -> Result<Vec<crate::qos::Tombstone>> {
+        let mut tombstones = Vec::new();
+
+        let read_txn = self
+            .db
+            .begin_read()
+            .context("Failed to begin read transaction")?;
+        let table = read_txn
+            .open_table(TOMBSTONES_TABLE)
+            .context("Failed to open tombstones table")?;
+
+        for entry in table.iter()? {
+            let (_key, value) = entry?;
+            let tombstone: crate::qos::Tombstone =
+                serde_json::from_slice(value.value()).context("Failed to deserialize tombstone")?;
+            tombstones.push(tombstone);
+        }
+
+        Ok(tombstones)
+    }
+
+    /// Remove a tombstone
+    pub fn remove_tombstone(&self, collection: &str, document_id: &str) -> Result<bool> {
+        let key = format!("{}:{}", collection, document_id);
+
+        let write_txn = self
+            .db
+            .begin_write()
+            .context("Failed to begin write transaction")?;
+        let existed = {
+            let mut table = write_txn
+                .open_table(TOMBSTONES_TABLE)
+                .context("Failed to open tombstones table")?;
+            let result = table.remove(key.as_bytes())?;
+            result.is_some()
+        };
+        write_txn
+            .commit()
+            .context("Failed to commit tombstone removal")?;
+
+        if existed {
+            tracing::debug!(
+                "Removed tombstone for document {} in collection {}",
+                document_id,
+                collection
+            );
+        }
+
+        Ok(existed)
+    }
+
+    /// Check if a tombstone exists
+    pub fn has_tombstone(&self, collection: &str, document_id: &str) -> Result<bool> {
+        Ok(self.get_tombstone(collection, document_id)?.is_some())
     }
 }
 
