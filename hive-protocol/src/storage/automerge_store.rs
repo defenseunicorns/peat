@@ -431,6 +431,120 @@ impl AutomergeStore {
     pub fn has_tombstone(&self, collection: &str, document_id: &str) -> Result<bool> {
         Ok(self.get_tombstone(collection, document_id)?.is_some())
     }
+
+    // === Garbage Collection support methods (ADR-034 Phase 3) ===
+
+    /// Get list of all collections (by scanning document key prefixes)
+    pub fn list_collections(&self) -> Result<Vec<String>> {
+        let read_txn = self
+            .db
+            .begin_read()
+            .context("Failed to begin read transaction")?;
+        let table = read_txn
+            .open_table(DOCUMENTS_TABLE)
+            .context("Failed to open documents table")?;
+
+        let mut collections = std::collections::HashSet::new();
+
+        for result in table.iter().context("Failed to iterate documents")? {
+            let (key, _) = result.context("Failed to read document entry")?;
+            let key_str =
+                std::str::from_utf8(key.value()).context("Invalid UTF-8 in document key")?;
+
+            // Keys are formatted as "collection:document_id"
+            if let Some(colon_pos) = key_str.find(':') {
+                let collection = &key_str[..colon_pos];
+                collections.insert(collection.to_string());
+            }
+        }
+
+        Ok(collections.into_iter().collect())
+    }
+
+    /// Get documents in a collection that were created before the cutoff time
+    ///
+    /// This checks the _created_at field stored in the Automerge document.
+    /// Used for ImplicitTTL garbage collection.
+    pub fn get_expired_documents(
+        &self,
+        collection: &str,
+        cutoff: std::time::SystemTime,
+    ) -> Result<Vec<String>> {
+        let prefix = format!("{}:", collection);
+        let docs = self.scan_prefix(&prefix)?;
+        let mut expired = Vec::new();
+
+        let cutoff_ms = cutoff
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+
+        for (key, doc) in docs {
+            // Extract _created_at timestamp if present
+            if let Ok(Some((automerge::Value::Scalar(scalar), _))) =
+                doc.get(automerge::ROOT, "_created_at")
+            {
+                if let automerge::ScalarValue::Uint(created_at) = scalar.as_ref() {
+                    if *created_at < cutoff_ms {
+                        // Document is older than cutoff
+                        if let Some(doc_id) = key.strip_prefix(&prefix) {
+                            expired.push(doc_id.to_string());
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(expired)
+    }
+
+    /// Hard delete a document (permanent removal, no tombstone created)
+    ///
+    /// Used by garbage collection for ImplicitTTL collections where
+    /// tombstones are not needed.
+    pub fn hard_delete(&self, collection: &str, document_id: &str) -> Result<()> {
+        let key = format!("{}:{}", collection, document_id);
+        self.delete(&key)?;
+        tracing::debug!(
+            "Hard deleted document {} from collection {}",
+            document_id,
+            collection
+        );
+        Ok(())
+    }
+}
+
+// === GcStore trait implementation for AutomergeStore (ADR-034 Phase 3) ===
+
+#[cfg(feature = "automerge-backend")]
+impl crate::qos::GcStore for AutomergeStore {
+    fn get_all_tombstones(&self) -> anyhow::Result<Vec<crate::qos::Tombstone>> {
+        self.get_all_tombstones()
+    }
+
+    fn remove_tombstone(&self, collection: &str, document_id: &str) -> anyhow::Result<bool> {
+        self.remove_tombstone(collection, document_id)
+    }
+
+    fn has_tombstone(&self, collection: &str, document_id: &str) -> anyhow::Result<bool> {
+        self.has_tombstone(collection, document_id)
+    }
+
+    fn get_expired_documents(
+        &self,
+        collection: &str,
+        cutoff: std::time::SystemTime,
+    ) -> anyhow::Result<Vec<String>> {
+        self.get_expired_documents(collection, cutoff)
+    }
+
+    fn hard_delete(&self, collection: &str, document_id: &str) -> anyhow::Result<()> {
+        self.hard_delete(collection, document_id)
+    }
+
+    fn list_collections(&self) -> anyhow::Result<Vec<String>> {
+        self.list_collections()
+    }
 }
 
 /// Collection implementation for AutomergeStore
