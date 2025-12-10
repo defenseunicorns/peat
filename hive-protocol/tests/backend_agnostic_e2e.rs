@@ -357,10 +357,14 @@ async fn test_automerge_three_node_mesh() {
         .await
         .unwrap();
 
-    // Connect the peers in a mesh (1-2, 1-3, 2-3)
+    // Connect the peers in a mesh (1-2, 1-3, 2-3) with proper formation handshakes
     println!("  Connecting Automerge peers in mesh...");
     let transport1 = backend1.transport();
     let transport2 = backend2.transport();
+
+    // Get formation keys for authentication (Issue #373)
+    let formation_key1 = backend1.formation_key().expect("Should have formation key");
+    let formation_key2 = backend2.formation_key().expect("Should have formation key");
 
     let node2_id_hex = hex::encode(backend2.endpoint_id().as_bytes());
     let node3_id_hex = hex::encode(backend3.endpoint_id().as_bytes());
@@ -379,27 +383,45 @@ async fn test_automerge_three_node_mesh() {
         relay_url: None,
     };
 
-    transport1
+    // Connect with formation handshakes (matches multi_node_mesh_e2e pattern)
+    use hive_protocol::network::formation_handshake::perform_initiator_handshake;
+
+    if let Some(conn) = transport1
         .connect_peer(&peer_info_2)
         .await
-        .expect("Should connect backend1 to backend2");
+        .expect("Should connect backend1 to backend2")
+    {
+        perform_initiator_handshake(&conn, &formation_key1)
+            .await
+            .expect("Should authenticate backend1 to backend2");
+    }
 
     // Allow connection to stabilize before next connection attempt
     // This prevents race conditions in CI environments with limited resources
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-    transport1
+    if let Some(conn) = transport1
         .connect_peer(&peer_info_3)
         .await
-        .expect("Should connect backend1 to backend3");
+        .expect("Should connect backend1 to backend3")
+    {
+        perform_initiator_handshake(&conn, &formation_key1)
+            .await
+            .expect("Should authenticate backend1 to backend3");
+    }
 
     // Allow connection to stabilize
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-    transport2
+    if let Some(conn) = transport2
         .connect_peer(&peer_info_3)
         .await
-        .expect("Should connect backend2 to backend3");
+        .expect("Should connect backend2 to backend3")
+    {
+        perform_initiator_handshake(&conn, &formation_key2)
+            .await
+            .expect("Should authenticate backend2 to backend3");
+    }
     println!("  ✓ Mesh connected");
 
     run_three_node_mesh_test(backend1, backend2, backend3, "Automerge+Iroh").await;
