@@ -59,13 +59,13 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "ditto-backend")]
 use serde_json::json;
 use std::collections::HashMap;
-#[cfg(feature = "ditto-backend")]
+#[cfg(any(feature = "ditto-backend", feature = "automerge-backend"))]
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::broadcast;
-#[cfg(feature = "ditto-backend")]
+#[cfg(any(feature = "ditto-backend", feature = "automerge-backend"))]
 use tokio::sync::RwLock;
-#[cfg(feature = "ditto-backend")]
+#[cfg(any(feature = "ditto-backend", feature = "automerge-backend"))]
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
@@ -765,6 +765,337 @@ impl<B: BlobStore + 'static> FileDistribution for DittoFileDistribution<B> {
 /// Type alias for Arc-wrapped BlobStore
 #[cfg(feature = "ditto-backend")]
 pub type SharedBlobStore = Arc<dyn BlobStore>;
+
+// ============================================================================
+// IrohFileDistribution Implementation (Issue #379, ADR-025)
+// ============================================================================
+
+#[cfg(feature = "automerge-backend")]
+use super::automerge_store::AutomergeStore;
+#[cfg(feature = "automerge-backend")]
+use super::iroh_blob_store::NetworkedIrohBlobStore;
+
+/// Distribution collection for Iroh backend
+#[cfg(feature = "automerge-backend")]
+const IROH_DISTRIBUTION_COLLECTION: &str = "file_distributions";
+
+/// Iroh-based file distribution service
+///
+/// Distributes files/models using NetworkedIrohBlobStore with:
+/// - Blob tokens stored in Automerge documents for discovery
+/// - Direct P2P transfer via iroh-blobs protocol
+/// - Status tracking via distribution documents
+///
+/// # Architecture
+///
+/// ```text
+/// IrohFileDistribution
+///     ├─ NetworkedIrohBlobStore (P2P blob transfer)
+///     └─ AutomergeStore (distribution metadata sync)
+///
+/// Distribution Flow:
+/// 1. Commander calls distribute(token, scope)
+/// 2. Distribution document created in Automerge with blob token
+/// 3. Document syncs to target nodes via CRDT sync
+/// 4. Target nodes see distribution doc, fetch blob via iroh-blobs
+/// 5. Target nodes update their status in distribution doc
+/// ```
+#[cfg(feature = "automerge-backend")]
+pub struct IrohFileDistribution {
+    /// Blob store for P2P file transfer
+    blob_store: Arc<NetworkedIrohBlobStore>,
+    /// Document store for distribution metadata
+    document_store: Arc<AutomergeStore>,
+    /// Active distributions (distribution_id -> status)
+    distributions: RwLock<HashMap<String, DistributionStatus>>,
+    /// Progress broadcast channels per distribution
+    progress_channels: RwLock<HashMap<String, broadcast::Sender<DistributionStatus>>>,
+}
+
+#[cfg(feature = "automerge-backend")]
+impl IrohFileDistribution {
+    /// Create a new Iroh file distribution service
+    pub fn new(
+        blob_store: Arc<NetworkedIrohBlobStore>,
+        document_store: Arc<AutomergeStore>,
+    ) -> Self {
+        Self {
+            blob_store,
+            document_store,
+            distributions: RwLock::new(HashMap::new()),
+            progress_channels: RwLock::new(HashMap::new()),
+        }
+    }
+
+    /// Get the blob store reference
+    pub fn blob_store(&self) -> &Arc<NetworkedIrohBlobStore> {
+        &self.blob_store
+    }
+
+    /// Get the document store reference
+    pub fn document_store(&self) -> &Arc<AutomergeStore> {
+        &self.document_store
+    }
+
+    /// Resolve target nodes from scope
+    ///
+    /// For now, returns known peers from the blob store.
+    /// In the future, could query node capabilities from Automerge documents.
+    async fn resolve_targets(&self, scope: &DistributionScope) -> Vec<String> {
+        match scope {
+            DistributionScope::AllNodes => {
+                // Return all known peers
+                self.blob_store
+                    .known_peers()
+                    .await
+                    .iter()
+                    .map(|p| p.fmt_short().to_string())
+                    .collect()
+            }
+            DistributionScope::Nodes { node_ids } => {
+                // Return specified nodes (if they're known peers)
+                let known_peers: Vec<String> = self
+                    .blob_store
+                    .known_peers()
+                    .await
+                    .iter()
+                    .map(|p| p.fmt_short().to_string())
+                    .collect();
+
+                node_ids
+                    .iter()
+                    .filter(|id| known_peers.contains(id))
+                    .cloned()
+                    .collect()
+            }
+            DistributionScope::Formation { formation_id } => {
+                // TODO: Query formation membership from Automerge documents
+                // For now, return all known peers (formation filtering not yet implemented)
+                warn!(
+                    formation_id = %formation_id,
+                    "Formation-based distribution not yet implemented, distributing to all peers"
+                );
+                self.blob_store
+                    .known_peers()
+                    .await
+                    .iter()
+                    .map(|p| p.fmt_short().to_string())
+                    .collect()
+            }
+            DistributionScope::Capable { .. } => {
+                // TODO: Query node capabilities from Automerge documents
+                // For now, return all known peers (capability filtering not yet implemented)
+                warn!(
+                    "Capability-based distribution not yet implemented, distributing to all peers"
+                );
+                self.blob_store
+                    .known_peers()
+                    .await
+                    .iter()
+                    .map(|p| p.fmt_short().to_string())
+                    .collect()
+            }
+        }
+    }
+
+    /// Store distribution metadata as Automerge document
+    #[allow(unused_imports)]
+    async fn store_distribution_document(
+        &self,
+        handle: &DistributionHandle,
+        blob_token: &BlobToken,
+        target_nodes: &[String],
+    ) -> Result<()> {
+        use super::traits::Collection;
+
+        let doc_id = &handle.distribution_id;
+
+        // Create distribution document
+        let distribution_doc = serde_json::json!({
+            "distribution_id": handle.distribution_id,
+            "blob_hash": blob_token.hash.as_hex(),
+            "blob_size": blob_token.size_bytes,
+            "blob_metadata": blob_token.metadata,
+            "scope": handle.scope,
+            "priority": handle.priority,
+            "target_nodes": target_nodes,
+            "started_at": handle.started_at.to_rfc3339(),
+            "status": "distributing"
+        });
+
+        // Serialize to bytes for storage
+        let bytes = serde_json::to_vec(&distribution_doc)
+            .map_err(|e| anyhow::anyhow!("Failed to serialize distribution doc: {}", e))?;
+
+        // Store in Automerge via Collection trait - this will sync to peers via CRDT
+        let collection = self.document_store.collection(IROH_DISTRIBUTION_COLLECTION);
+        collection.upsert(doc_id, bytes)?;
+
+        debug!(
+            distribution_id = %handle.distribution_id,
+            blob_hash = %blob_token.hash,
+            target_count = target_nodes.len(),
+            "Stored distribution document in Automerge"
+        );
+
+        Ok(())
+    }
+
+    /// Broadcast progress update to subscribers
+    #[allow(dead_code)]
+    async fn broadcast_progress(&self, distribution_id: &str, status: &DistributionStatus) {
+        let channels = self.progress_channels.read().await;
+        if let Some(sender) = channels.get(distribution_id) {
+            // Ignore send errors (no subscribers)
+            let _ = sender.send(status.clone());
+        }
+    }
+}
+
+#[cfg(feature = "automerge-backend")]
+#[async_trait::async_trait]
+impl FileDistribution for IrohFileDistribution {
+    async fn distribute(
+        &self,
+        blob_token: &BlobToken,
+        scope: DistributionScope,
+        priority: TransferPriority,
+    ) -> Result<DistributionHandle> {
+        info!(
+            blob_hash = %blob_token.hash,
+            blob_size = blob_token.size_bytes,
+            scope = ?scope,
+            priority = ?priority,
+            "Starting file distribution"
+        );
+
+        // Create distribution handle
+        let handle = DistributionHandle::new(blob_token.hash.clone(), scope.clone(), priority);
+
+        // Resolve target nodes
+        let target_nodes = self.resolve_targets(&scope).await;
+
+        if target_nodes.is_empty() {
+            warn!("No target nodes found for distribution scope");
+        }
+
+        // Create initial status
+        let status =
+            DistributionStatus::new(handle.clone(), target_nodes.clone(), blob_token.size_bytes);
+
+        // Store distribution document (syncs to peers via Automerge)
+        self.store_distribution_document(&handle, blob_token, &target_nodes)
+            .await?;
+
+        // Store status locally
+        {
+            let mut distributions = self.distributions.write().await;
+            distributions.insert(handle.distribution_id.clone(), status.clone());
+        }
+
+        // Create progress channel
+        {
+            let (tx, _rx) = broadcast::channel(16);
+            let mut channels = self.progress_channels.write().await;
+            channels.insert(handle.distribution_id.clone(), tx);
+        }
+
+        info!(
+            distribution_id = %handle.distribution_id,
+            target_count = target_nodes.len(),
+            "Distribution initiated - document synced to peers"
+        );
+
+        // Note: Actual blob transfer happens when target nodes:
+        // 1. Receive the distribution document via Automerge sync
+        // 2. See they are a target node
+        // 3. Fetch the blob via NetworkedIrohBlobStore::fetch_blob()
+        // 4. Update their status (not yet implemented - would require observer pattern)
+
+        Ok(handle)
+    }
+
+    async fn status(&self, handle: &DistributionHandle) -> Result<DistributionStatus> {
+        let distributions = self.distributions.read().await;
+        distributions
+            .get(&handle.distribution_id)
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("Distribution not found: {}", handle.distribution_id))
+    }
+
+    async fn cancel(&self, handle: &DistributionHandle) -> Result<()> {
+        info!(
+            distribution_id = %handle.distribution_id,
+            "Cancelling distribution"
+        );
+
+        // Update status to cancelled
+        {
+            let mut distributions = self.distributions.write().await;
+            if let Some(status) = distributions.get_mut(&handle.distribution_id) {
+                // Mark all pending/in-progress as failed
+                for node_status in status.node_statuses.values_mut() {
+                    if node_status.status != TransferState::Completed {
+                        node_status.status = TransferState::Failed;
+                        node_status.error = Some("Distribution cancelled".to_string());
+                    }
+                }
+                status.recalculate_counts();
+            }
+        }
+
+        // Update distribution document
+        #[allow(unused_imports)]
+        use super::traits::Collection;
+
+        let cancel_update = serde_json::json!({
+            "status": "cancelled",
+            "cancelled_at": Utc::now().to_rfc3339()
+        });
+
+        let bytes = serde_json::to_vec(&cancel_update)
+            .map_err(|e| anyhow::anyhow!("Failed to serialize cancel update: {}", e))?;
+
+        let collection = self.document_store.collection(IROH_DISTRIBUTION_COLLECTION);
+        collection.upsert(&handle.distribution_id, bytes)?;
+
+        Ok(())
+    }
+
+    async fn wait_for_completion(
+        &self,
+        handle: &DistributionHandle,
+        timeout: Duration,
+    ) -> Result<DistributionStatus> {
+        let start = std::time::Instant::now();
+        let poll_interval = Duration::from_millis(500);
+
+        loop {
+            let status = self.status(handle).await?;
+
+            if status.is_complete() {
+                return Ok(status);
+            }
+
+            if start.elapsed() >= timeout {
+                return Err(anyhow::anyhow!("Distribution timeout after {:?}", timeout));
+            }
+
+            tokio::time::sleep(poll_interval).await;
+        }
+    }
+
+    async fn subscribe_progress(
+        &self,
+        handle: &DistributionHandle,
+    ) -> Result<broadcast::Receiver<DistributionStatus>> {
+        let channels = self.progress_channels.read().await;
+        channels
+            .get(&handle.distribution_id)
+            .map(|sender| sender.subscribe())
+            .ok_or_else(|| anyhow::anyhow!("Distribution not found: {}", handle.distribution_id))
+    }
+}
 
 // ============================================================================
 // Tests

@@ -952,6 +952,14 @@ pub struct AutomergeIrohBackend {
     /// Peer discovery manager (ADR-011 Phase 3)
     #[cfg(feature = "automerge-backend")]
     discovery_manager: Arc<tokio::sync::RwLock<crate::discovery::peer::DiscoveryManager>>,
+
+    /// Optional blob store for file/model transfer (Issue #379, ADR-025)
+    ///
+    /// When enabled, provides content-addressed blob storage with P2P transfer
+    /// capability via iroh-blobs. Peers connected for document sync are automatically
+    /// registered for blob transfer as well.
+    #[cfg(feature = "automerge-backend")]
+    blob_store: Option<Arc<crate::storage::NetworkedIrohBlobStore>>,
 }
 
 impl AutomergeIrohBackend {
@@ -970,6 +978,8 @@ impl AutomergeIrohBackend {
             discovery_manager: Arc::new(tokio::sync::RwLock::new(
                 crate::discovery::peer::DiscoveryManager::default(),
             )),
+            #[cfg(feature = "automerge-backend")]
+            blob_store: None,
         }
     }
 
@@ -1030,6 +1040,156 @@ impl AutomergeIrohBackend {
     /// Get this node's endpoint ID
     pub fn endpoint_id(&self) -> iroh::EndpointId {
         self.transport.endpoint_id()
+    }
+
+    // =========================================================================
+    // Blob Store Methods (Issue #379, ADR-025)
+    // =========================================================================
+
+    /// Enable blob storage with P2P transfer capability
+    ///
+    /// Creates a `NetworkedIrohBlobStore` for content-addressed file transfer.
+    /// The blob store uses a separate iroh endpoint for the iroh-blobs protocol,
+    /// but peers are automatically synchronized when document sync connections
+    /// are established.
+    ///
+    /// # Arguments
+    ///
+    /// * `blob_dir` - Directory for blob storage and metadata sidecars
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use hive_protocol::sync::automerge::AutomergeIrohBackend;
+    /// use std::path::PathBuf;
+    ///
+    /// let backend = AutomergeIrohBackend::from_parts(store, transport);
+    /// backend.enable_blob_store(PathBuf::from("/tmp/hive-blobs")).await?;
+    ///
+    /// // Now you can use the blob store
+    /// let blob_store = backend.blob_store().unwrap();
+    /// let token = blob_store.create_blob_from_bytes(data, metadata).await?;
+    /// ```
+    #[cfg(feature = "automerge-backend")]
+    pub async fn enable_blob_store(
+        &mut self,
+        blob_dir: std::path::PathBuf,
+    ) -> std::result::Result<(), anyhow::Error> {
+        use crate::storage::NetworkedIrohBlobStore;
+
+        let blob_store = NetworkedIrohBlobStore::new(blob_dir).await?;
+
+        // Register currently connected peers with the blob store
+        let connected_peers = self.transport.connected_peers();
+        for peer_id in connected_peers {
+            blob_store.add_peer(peer_id).await;
+        }
+
+        self.blob_store = Some(blob_store);
+
+        tracing::info!(
+            endpoint_id = %self.transport.endpoint_id(),
+            "Blob store enabled for AutomergeIrohBackend"
+        );
+
+        Ok(())
+    }
+
+    /// Get reference to the blob store (if enabled)
+    ///
+    /// Returns `None` if `enable_blob_store()` has not been called.
+    #[cfg(feature = "automerge-backend")]
+    pub fn blob_store(&self) -> Option<Arc<crate::storage::NetworkedIrohBlobStore>> {
+        self.blob_store.clone()
+    }
+
+    /// Check if blob storage is enabled
+    #[cfg(feature = "automerge-backend")]
+    pub fn has_blob_store(&self) -> bool {
+        self.blob_store.is_some()
+    }
+
+    /// Register a peer with the blob store for file transfer
+    ///
+    /// This is called automatically when document sync connections are established,
+    /// but can also be called manually if needed.
+    #[cfg(feature = "automerge-backend")]
+    pub async fn register_blob_peer(&self, peer_id: iroh::EndpointId) {
+        if let Some(ref blob_store) = self.blob_store {
+            blob_store.add_peer(peer_id).await;
+            tracing::debug!(
+                peer_id = %peer_id.fmt_short(),
+                "Registered peer for blob transfer"
+            );
+        }
+    }
+
+    /// Unregister a peer from the blob store
+    #[cfg(feature = "automerge-backend")]
+    pub async fn unregister_blob_peer(&self, peer_id: &iroh::EndpointId) {
+        if let Some(ref blob_store) = self.blob_store {
+            blob_store.remove_peer(peer_id).await;
+            tracing::debug!(
+                peer_id = %peer_id.fmt_short(),
+                "Unregistered peer from blob transfer"
+            );
+        }
+    }
+
+    /// Start automatic peer synchronization for blob transfers
+    ///
+    /// Spawns a background task that listens to transport peer events and
+    /// automatically registers/unregisters peers with the blob store when
+    /// document sync connections are established or closed.
+    ///
+    /// This should be called after `enable_blob_store()` and before starting
+    /// peer connections.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// backend.enable_blob_store(blob_dir).await?;
+    /// backend.start_blob_peer_sync();
+    /// backend.initialize(config).await?; // Now peer connections auto-register
+    /// ```
+    #[cfg(feature = "automerge-backend")]
+    pub fn start_blob_peer_sync(&self) {
+        use crate::network::iroh_transport::TransportPeerEvent;
+
+        let blob_store = match &self.blob_store {
+            Some(store) => Arc::clone(store),
+            None => {
+                tracing::warn!("start_blob_peer_sync called but blob store not enabled");
+                return;
+            }
+        };
+
+        let mut events = self.transport.subscribe_peer_events();
+
+        tokio::spawn(async move {
+            tracing::debug!("Blob peer sync task started");
+
+            while let Some(event) = events.recv().await {
+                match event {
+                    TransportPeerEvent::Connected { endpoint_id, .. } => {
+                        blob_store.add_peer(endpoint_id).await;
+                        tracing::debug!(
+                            peer_id = %endpoint_id.fmt_short(),
+                            "Auto-registered peer for blob transfer on connect"
+                        );
+                    }
+                    TransportPeerEvent::Disconnected { endpoint_id, .. } => {
+                        blob_store.remove_peer(&endpoint_id).await;
+                        tracing::debug!(
+                            peer_id = %endpoint_id.fmt_short(),
+                            "Auto-unregistered peer from blob transfer on disconnect"
+                        );
+                    }
+                }
+            }
+
+            tracing::debug!("Blob peer sync task stopped");
+        });
     }
 
     /// Manually trigger sync for a specific document with all connected peers

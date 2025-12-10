@@ -129,6 +129,8 @@ pub use blob_traits::{
 pub use ditto_blob_store::DittoBlobStore;
 #[cfg(feature = "ditto-backend")]
 pub use file_distribution::DittoFileDistribution;
+#[cfg(feature = "automerge-backend")]
+pub use file_distribution::IrohFileDistribution;
 pub use file_distribution::{
     DistributionHandle, DistributionScope, DistributionStatus, FileDistribution,
     NodeTransferStatus, TransferPriority, TransferState,
