@@ -70,6 +70,82 @@ pub trait DocumentStore: Send + Sync {
         let docs = self.query(collection, query).await?;
         Ok(docs.len())
     }
+
+    // === Deletion methods (ADR-034) ===
+
+    /// Delete a document according to collection policy (ADR-034)
+    ///
+    /// Behavior depends on the collection's DeletionPolicy:
+    /// - ImplicitTTL: No-op (documents expire automatically)
+    /// - Tombstone: Creates a tombstone record
+    /// - SoftDelete: Marks document with _deleted=true
+    /// - Immutable: Returns error
+    ///
+    /// Returns DeleteResult with details about what action was taken.
+    async fn delete(
+        &self,
+        collection: &str,
+        doc_id: &DocumentId,
+        reason: Option<&str>,
+    ) -> Result<crate::qos::DeleteResult> {
+        // Default implementation: fall back to remove() with SoftDelete semantics
+        let policy = self.deletion_policy(collection);
+
+        if policy.is_immutable() {
+            return Ok(crate::qos::DeleteResult::immutable());
+        }
+
+        // For non-tombstone policies, just use remove
+        self.remove(collection, doc_id).await?;
+        let _ = reason; // Unused in default impl
+
+        Ok(crate::qos::DeleteResult::soft_deleted(policy))
+    }
+
+    /// Check if a document is deleted (tombstoned or soft-deleted)
+    ///
+    /// Returns true if:
+    /// - Document has a tombstone record, OR
+    /// - Document has _deleted=true field (soft delete)
+    ///
+    /// Returns false if document exists and is not deleted,
+    /// or if document doesn't exist.
+    async fn is_deleted(&self, collection: &str, doc_id: &DocumentId) -> Result<bool> {
+        // Default: check if document exists with _deleted field
+        if let Some(doc) = self.get(collection, doc_id).await? {
+            if let Some(deleted) = doc.fields.get("_deleted") {
+                return Ok(deleted.as_bool().unwrap_or(false));
+            }
+        }
+        Ok(false)
+    }
+
+    /// Get the deletion policy for a collection
+    ///
+    /// Returns the configured DeletionPolicy for this collection.
+    /// Default implementation returns SoftDelete for all collections.
+    fn deletion_policy(&self, _collection: &str) -> crate::qos::DeletionPolicy {
+        crate::qos::DeletionPolicy::default()
+    }
+
+    /// Get all tombstones for a collection
+    ///
+    /// Returns tombstones that haven't expired yet.
+    /// Used for sync protocol to exchange deletion markers.
+    async fn get_tombstones(&self, collection: &str) -> Result<Vec<crate::qos::Tombstone>> {
+        // Default: no tombstones (backends override)
+        let _ = collection;
+        Ok(vec![])
+    }
+
+    /// Apply a tombstone received from sync
+    ///
+    /// Used by sync protocol to apply remote deletions.
+    async fn apply_tombstone(&self, tombstone: &crate::qos::Tombstone) -> Result<()> {
+        // Default: just remove the document
+        self.remove(&tombstone.collection, &tombstone.document_id)
+            .await
+    }
 }
 
 /// Trait 2: Peer Discovery and Connection Management
