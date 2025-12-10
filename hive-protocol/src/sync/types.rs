@@ -610,9 +610,10 @@ pub enum Priority {
 ///
 /// ```
 /// use hive_protocol::sync::types::SyncModeMetrics;
+/// use hive_protocol::qos::SyncMode;
 ///
 /// let mut metrics = SyncModeMetrics::new();
-/// metrics.record_sync("beacons", crate::qos::SyncMode::LatestOnly, 1024, std::time::Duration::from_millis(5));
+/// metrics.record_sync("beacons", SyncMode::LatestOnly, 1024, std::time::Duration::from_millis(5));
 /// assert_eq!(metrics.total_syncs, 1);
 /// assert_eq!(metrics.latest_only_syncs, 1);
 /// ```
