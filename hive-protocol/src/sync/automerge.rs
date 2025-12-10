@@ -1347,9 +1347,14 @@ impl DocumentStore for IrohDocumentStore {
             documents: initial_docs,
         });
 
-        // Subscribe to change notifications from the store (Issue #221)
-        // This enables emitting ChangeEvent::Updated when documents sync from peers
-        let mut change_rx = self.backend.automerge_store().subscribe_to_changes();
+        // Subscribe to observer notifications from the store (Issue #221, Issue #377)
+        // This enables emitting ChangeEvent::Updated when documents sync from peers.
+        // Using subscribe_to_observer_changes() instead of subscribe_to_changes() ensures
+        // we get notifications for ALL document changes, including remotely synced docs.
+        let mut change_rx = self
+            .backend
+            .automerge_store()
+            .subscribe_to_observer_changes();
         let collection_name = collection.to_string();
         let collection_prefix = format!("{}:", collection);
         let query_clone = query.clone();
@@ -2151,6 +2156,10 @@ impl SyncEngine for IrohSyncEngine {
                                 peer_endpoint = %endpoint_id_hex,
                                 "Successfully connected to peer and authenticated"
                             );
+                            // Issue #378: Emit peer connected event to notify sync handlers
+                            if let Ok(peer_id) = peer_info.endpoint_id() {
+                                self.transport.emit_peer_connected(peer_id);
+                            }
                             Ok(true)
                         }
                         Err(e) => {
@@ -2177,6 +2186,10 @@ impl SyncEngine for IrohSyncEngine {
                         peer_endpoint = %endpoint_id_hex,
                         "Successfully connected to peer (no authentication)"
                     );
+                    // Issue #378: Emit peer connected event to notify sync handlers
+                    if let Ok(peer_id) = peer_info.endpoint_id() {
+                        self.transport.emit_peer_connected(peer_id);
+                    }
                     Ok(true)
                 }
             }
