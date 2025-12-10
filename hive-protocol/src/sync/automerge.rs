@@ -34,6 +34,7 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 
 use crate::error::{Error, Result};
+use crate::qos::{DeletionPolicy, DeletionPolicyRegistry, Tombstone};
 use crate::sync::traits::*;
 use crate::sync::types::*;
 
@@ -57,6 +58,12 @@ pub struct AutomergeBackend {
 
     /// Change notification channels for observers
     observers: Arc<Mutex<Vec<mpsc::UnboundedSender<ChangeEvent>>>>,
+
+    /// Tombstone storage indexed by collection:doc_id (ADR-034)
+    tombstones: Arc<Mutex<HashMap<String, Tombstone>>>,
+
+    /// Deletion policy registry (ADR-034)
+    deletion_policy_registry: Arc<DeletionPolicyRegistry>,
 }
 
 impl AutomergeBackend {
@@ -76,6 +83,8 @@ impl AutomergeBackend {
             config: Arc::new(Mutex::new(None)),
             initialized: Arc::new(Mutex::new(false)),
             observers: Arc::new(Mutex::new(Vec::new())),
+            tombstones: Arc::new(Mutex::new(HashMap::new())),
+            deletion_policy_registry: Arc::new(DeletionPolicyRegistry::new()),
         }
     }
 
@@ -601,6 +610,151 @@ impl DocumentStore for AutomergeBackend {
         self.observers.lock().unwrap().push(tx.clone());
 
         Ok(ChangeStream { receiver: rx })
+    }
+
+    // === Deletion methods (ADR-034) ===
+
+    async fn delete(
+        &self,
+        collection: &str,
+        doc_id: &DocumentId,
+        reason: Option<&str>,
+    ) -> Result<crate::qos::DeleteResult> {
+        let policy = self.deletion_policy(collection);
+
+        match policy {
+            DeletionPolicy::Immutable => {
+                // Cannot delete immutable documents
+                Ok(crate::qos::DeleteResult::immutable())
+            }
+            DeletionPolicy::ImplicitTTL { .. } => {
+                // Implicit TTL: no-op, documents expire automatically
+                Ok(crate::qos::DeleteResult {
+                    deleted: false,
+                    tombstone_id: None,
+                    expires_at: None,
+                    policy: policy.clone(),
+                })
+            }
+            DeletionPolicy::Tombstone {
+                tombstone_ttl,
+                delete_wins: _,
+            } => {
+                // Create tombstone
+                let tombstone = if let Some(reason_str) = reason {
+                    Tombstone::with_reason(
+                        doc_id.clone(),
+                        collection.to_string(),
+                        "local".to_string(), // TODO: Use actual node ID
+                        0,                   // TODO: Use actual Lamport timestamp
+                        reason_str,
+                    )
+                } else {
+                    Tombstone::new(
+                        doc_id.clone(),
+                        collection.to_string(),
+                        "local".to_string(), // TODO: Use actual node ID
+                        0,                   // TODO: Use actual Lamport timestamp
+                    )
+                };
+                let tombstone_id = format!("{}:{}", collection, doc_id);
+
+                // Store tombstone
+                self.tombstones
+                    .lock()
+                    .unwrap()
+                    .insert(tombstone_id.clone(), tombstone.clone());
+
+                // Remove the actual document
+                self.remove(collection, doc_id).await.ok(); // Ignore if not found
+
+                Ok(crate::qos::DeleteResult {
+                    deleted: true,
+                    tombstone_id: Some(tombstone_id),
+                    expires_at: Some(std::time::SystemTime::now() + tombstone_ttl),
+                    policy: policy.clone(),
+                })
+            }
+            DeletionPolicy::SoftDelete {
+                include_deleted_default: _,
+            } => {
+                // Soft delete: mark document with _deleted=true
+                if let Some(mut doc) = self.get(collection, doc_id).await? {
+                    doc.fields.insert("_deleted".to_string(), Value::Bool(true));
+                    doc.fields.insert(
+                        "_deleted_at".to_string(),
+                        Value::String(chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+                    );
+                    if let Some(reason) = reason {
+                        doc.fields.insert(
+                            "_deleted_reason".to_string(),
+                            Value::String(reason.to_string()),
+                        );
+                    }
+                    self.upsert(collection, doc).await?;
+
+                    Ok(crate::qos::DeleteResult::soft_deleted(policy.clone()))
+                } else {
+                    // Document not found - still report as deleted
+                    Ok(crate::qos::DeleteResult {
+                        deleted: false,
+                        tombstone_id: None,
+                        expires_at: None,
+                        policy: policy.clone(),
+                    })
+                }
+            }
+        }
+    }
+
+    async fn is_deleted(&self, collection: &str, doc_id: &DocumentId) -> Result<bool> {
+        let key = format!("{}:{}", collection, doc_id);
+
+        // Check if there's a tombstone
+        if self.tombstones.lock().unwrap().contains_key(&key) {
+            return Ok(true);
+        }
+
+        // Check for soft-delete (_deleted field)
+        if let Some(doc) = self.get(collection, doc_id).await? {
+            if let Some(deleted) = doc.fields.get("_deleted") {
+                return Ok(deleted.as_bool().unwrap_or(false));
+            }
+        }
+
+        Ok(false)
+    }
+
+    fn deletion_policy(&self, collection: &str) -> crate::qos::DeletionPolicy {
+        self.deletion_policy_registry.get(collection)
+    }
+
+    async fn get_tombstones(&self, collection: &str) -> Result<Vec<crate::qos::Tombstone>> {
+        let tombstones = self.tombstones.lock().unwrap();
+        let prefix = format!("{}:", collection);
+
+        Ok(tombstones
+            .iter()
+            .filter(|(key, _)| key.starts_with(&prefix))
+            .map(|(_, tombstone)| tombstone.clone())
+            .collect())
+    }
+
+    async fn apply_tombstone(&self, tombstone: &crate::qos::Tombstone) -> Result<()> {
+        let key = format!("{}:{}", tombstone.collection, tombstone.document_id);
+
+        // Store the tombstone
+        self.tombstones
+            .lock()
+            .unwrap()
+            .insert(key, tombstone.clone());
+
+        // Remove the document if it exists
+        self.remove(&tombstone.collection, &tombstone.document_id)
+            .await
+            .ok();
+
+        Ok(())
     }
 }
 
@@ -2630,5 +2784,215 @@ mod issue_271_clone_tests {
             cloned_before.is_ready().await,
             "Clone (created before init) should also be ready, proving Arc is shared"
         );
+    }
+
+    // === Deletion Tests (ADR-034) ===
+
+    fn deletion_test_config() -> BackendConfig {
+        let test_secret = crate::security::FormationKey::generate_secret();
+        BackendConfig {
+            app_id: "deletion_test".to_string(),
+            persistence_dir: std::path::PathBuf::from("/tmp/deletion_test"),
+            shared_key: Some(test_secret),
+            transport: TransportConfig::default(),
+            extra: HashMap::new(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_soft_delete() {
+        let backend = AutomergeBackend::new();
+        backend.initialize(deletion_test_config()).await.unwrap();
+
+        // Insert document
+        let mut fields = HashMap::new();
+        fields.insert("data".to_string(), serde_json::json!("test_value"));
+        let doc = Document::new(fields);
+        let doc_id = backend
+            .document_store()
+            .upsert("test_collection", doc)
+            .await
+            .unwrap();
+
+        // Verify document exists
+        let retrieved = backend
+            .document_store()
+            .get("test_collection", &doc_id)
+            .await
+            .unwrap();
+        assert!(retrieved.is_some());
+        assert!(!backend
+            .document_store()
+            .is_deleted("test_collection", &doc_id)
+            .await
+            .unwrap());
+
+        // Delete (default policy is SoftDelete)
+        let result = backend
+            .document_store()
+            .delete("test_collection", &doc_id, Some("test deletion"))
+            .await
+            .unwrap();
+        assert!(result.deleted);
+
+        // Document should now be marked as deleted
+        assert!(backend
+            .document_store()
+            .is_deleted("test_collection", &doc_id)
+            .await
+            .unwrap());
+
+        // Document should still exist (soft delete preserves it)
+        let deleted_doc = backend
+            .document_store()
+            .get("test_collection", &doc_id)
+            .await
+            .unwrap();
+        assert!(deleted_doc.is_some());
+        let deleted_doc = deleted_doc.unwrap();
+        assert_eq!(
+            deleted_doc.fields.get("_deleted"),
+            Some(&serde_json::json!(true))
+        );
+        assert!(deleted_doc.fields.contains_key("_deleted_at"));
+        assert_eq!(
+            deleted_doc.fields.get("_deleted_reason"),
+            Some(&serde_json::json!("test deletion"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_tombstone_delete() {
+        let backend = AutomergeBackend::new();
+        backend.initialize(deletion_test_config()).await.unwrap();
+
+        // Configure tombstone policy for this collection
+        backend.deletion_policy_registry.set(
+            "tombstone_collection",
+            crate::qos::DeletionPolicy::Tombstone {
+                tombstone_ttl: std::time::Duration::from_secs(3600),
+                delete_wins: true,
+            },
+        );
+
+        // Insert document
+        let mut fields = HashMap::new();
+        fields.insert("data".to_string(), serde_json::json!("tombstone_test"));
+        let doc = Document::new(fields);
+        let doc_id = backend
+            .document_store()
+            .upsert("tombstone_collection", doc)
+            .await
+            .unwrap();
+
+        // Delete with tombstone policy
+        let result = backend
+            .document_store()
+            .delete("tombstone_collection", &doc_id, Some("removed"))
+            .await
+            .unwrap();
+        assert!(result.deleted);
+        assert!(result.tombstone_id.is_some());
+        assert!(result.expires_at.is_some());
+
+        // Document should be deleted
+        assert!(backend
+            .document_store()
+            .is_deleted("tombstone_collection", &doc_id)
+            .await
+            .unwrap());
+
+        // Document should be removed (not just marked)
+        let removed_doc = backend
+            .document_store()
+            .get("tombstone_collection", &doc_id)
+            .await
+            .unwrap();
+        assert!(removed_doc.is_none());
+
+        // Tombstone should exist
+        let tombstones = backend
+            .document_store()
+            .get_tombstones("tombstone_collection")
+            .await
+            .unwrap();
+        assert_eq!(tombstones.len(), 1);
+        assert_eq!(tombstones[0].document_id, doc_id);
+        assert_eq!(tombstones[0].reason, Some("removed".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_deletion_policy() {
+        let backend = AutomergeBackend::new();
+
+        // Default policy is SoftDelete
+        let policy = backend
+            .document_store()
+            .deletion_policy("unknown_collection");
+        assert!(matches!(
+            policy,
+            crate::qos::DeletionPolicy::SoftDelete { .. }
+        ));
+
+        // Verify default policies for known collections
+        assert!(matches!(
+            backend.document_store().deletion_policy("beacons"),
+            crate::qos::DeletionPolicy::ImplicitTTL { .. }
+        ));
+        assert!(matches!(
+            backend.document_store().deletion_policy("nodes"),
+            crate::qos::DeletionPolicy::Tombstone { .. }
+        ));
+        assert!(matches!(
+            backend.document_store().deletion_policy("contact_reports"),
+            crate::qos::DeletionPolicy::SoftDelete { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_apply_tombstone() {
+        let backend = AutomergeBackend::new();
+        backend.initialize(deletion_test_config()).await.unwrap();
+
+        // Insert document
+        let mut fields = HashMap::new();
+        fields.insert("data".to_string(), serde_json::json!("to_be_deleted"));
+        let doc = Document::new(fields);
+        let doc_id = backend
+            .document_store()
+            .upsert("sync_test", doc)
+            .await
+            .unwrap();
+
+        // Create a tombstone (simulating receiving from sync)
+        let tombstone = crate::qos::Tombstone::with_reason(
+            doc_id.clone(),
+            "sync_test".to_string(),
+            "remote_node".to_string(),
+            1, // Lamport timestamp
+            "synced deletion",
+        );
+
+        // Apply tombstone
+        backend
+            .document_store()
+            .apply_tombstone(&tombstone)
+            .await
+            .unwrap();
+
+        // Document should be deleted
+        assert!(backend
+            .document_store()
+            .is_deleted("sync_test", &doc_id)
+            .await
+            .unwrap());
+
+        // Document should be removed
+        let removed_doc = backend
+            .document_store()
+            .get("sync_test", &doc_id)
+            .await
+            .unwrap();
+        assert!(removed_doc.is_none());
     }
 }
