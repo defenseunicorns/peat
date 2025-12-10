@@ -361,6 +361,23 @@ impl AutomergeBackend {
                     Ok(false)
                 }
             }
+
+            // === Deletion-aware queries (ADR-034, Issue #369) ===
+            Query::IncludeDeleted(inner) => {
+                // IncludeDeleted wraps another query - run the inner query
+                // The soft-delete filter bypass is handled at the query() method level
+                self.matches_query(document, inner)
+            }
+
+            Query::DeletedOnly => {
+                // Only match documents with _deleted=true
+                let is_deleted = document
+                    .fields
+                    .get("_deleted")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                Ok(is_deleted)
+            }
         }
     }
 
@@ -529,6 +546,13 @@ impl DocumentStore for AutomergeBackend {
 
             // Convert to our Document type
             let document = Self::automerge_to_document(automerge_doc, doc_id)?;
+
+            // Apply soft-delete filter (ADR-034, Issue #369)
+            // By default, queries exclude documents with _deleted=true
+            // IncludeDeleted and DeletedOnly queries override this behavior
+            if !query.matches_deletion_state(&document) {
+                continue;
+            }
 
             // Apply query filter
             if self.matches_query(&document, query)? {
@@ -1260,6 +1284,13 @@ impl DocumentStore for IrohDocumentStore {
                 // Set the ID from the key if not already set
                 if doc.id.is_none() {
                     doc.id = Some(doc_id);
+                }
+
+                // Apply soft-delete filter (ADR-034, Issue #369)
+                // By default, queries exclude documents with _deleted=true
+                // IncludeDeleted and DeletedOnly queries override this behavior
+                if !query.matches_deletion_state(&doc) {
+                    continue;
                 }
 
                 if matches_query(&doc, query) {
@@ -2350,6 +2381,21 @@ fn matches_query(doc: &Document, query: &Query) -> bool {
 
         // === Negation query (Issue #357) ===
         Query::Not(inner) => !matches_query(doc, inner),
+
+        // === Deletion-aware queries (ADR-034, Issue #369) ===
+        Query::IncludeDeleted(inner) => {
+            // IncludeDeleted wraps another query - run the inner query
+            // The soft-delete filter bypass is handled at the query() method level
+            matches_query(doc, inner)
+        }
+
+        Query::DeletedOnly => {
+            // Only match documents with _deleted=true
+            doc.fields
+                .get("_deleted")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+        }
     }
 }
 

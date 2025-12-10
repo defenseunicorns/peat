@@ -407,6 +407,17 @@ fn query_to_dql(query: &Query) -> String {
 
         // === Negation query (Issue #357) ===
         Query::Not(inner) => format!("NOT ({})", query_to_dql(inner)),
+
+        // === Deletion-aware queries (ADR-034, Issue #369) ===
+        // For Ditto, these translate to DQL conditions on the _deleted field
+        Query::IncludeDeleted(inner) => {
+            // Include deleted: just process the inner query without soft-delete filter
+            query_to_dql(inner)
+        }
+        Query::DeletedOnly => {
+            // Only deleted documents
+            "_deleted == true".to_string()
+        }
     }
 }
 
