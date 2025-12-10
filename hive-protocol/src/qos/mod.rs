@@ -71,6 +71,7 @@ pub mod context;
 pub mod context_manager;
 pub mod deletion;
 pub mod eviction;
+pub mod garbage_collection;
 pub mod lifecycle;
 pub mod preemption;
 pub mod recovery;
@@ -91,8 +92,14 @@ pub use bandwidth::{
 pub use classification::DataType;
 pub use context::{ContextProfile, MissionContext, QoSClassAdjustment};
 pub use context_manager::{ContextChangeListener, ContextChangeLog, ContextManager};
-pub use deletion::{DeleteResult, DeletionPolicy, DeletionPolicyRegistry, Tombstone};
+pub use deletion::{
+    DeleteResult, DeletionPolicy, DeletionPolicyRegistry, PropagationDirection, Tombstone,
+    TombstoneBatch, TombstoneDecodeError, TombstoneSyncMessage,
+};
 pub use eviction::{EvictionConfig, EvictionController, EvictionResult};
+pub use garbage_collection::{
+    start_periodic_gc, GarbageCollector, GcConfig, GcResult, GcStats, GcStore, ResurrectionPolicy,
+};
 pub use lifecycle::{
     make_lifecycle_decision, LifecycleDecision, LifecyclePolicies, LifecyclePolicy,
 };

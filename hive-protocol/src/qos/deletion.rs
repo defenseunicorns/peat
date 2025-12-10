@@ -32,6 +32,422 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 use std::time::{Duration, SystemTime};
 
+// === Tombstone Sync Protocol Types (ADR-034 Phase 2, Issue #367) ===
+
+/// Propagation direction for tombstones (ADR-034)
+///
+/// Controls which direction tombstones flow in the hierarchy:
+/// - Bidirectional: Both up to parents and down to children
+/// - UpOnly: Only to parent cells (e.g., contact_reports)
+/// - DownOnly: Only to child cells (e.g., commands)
+/// - SystemWide: Propagate to ALL peers (eventually consistent)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub enum PropagationDirection {
+    /// Sync bidirectionally (both up and down hierarchy)
+    #[default]
+    Bidirectional,
+    /// Sync only upward to parent cells
+    UpOnly,
+    /// Sync only downward to child cells
+    DownOnly,
+    /// Sync to all peers regardless of hierarchy (eventually consistent)
+    ///
+    /// Use for security-critical deletions that must reach all nodes:
+    /// - PII removal (GDPR/privacy compliance)
+    /// - Malicious content removal
+    /// - Security-revoked credentials
+    SystemWide,
+}
+
+impl PropagationDirection {
+    /// Default propagation direction for a collection
+    ///
+    /// Per ADR-034 strategy matrix:
+    /// - nodes/tracks/alerts: Bidirectional
+    /// - cells/contact_reports: Up only
+    /// - commands: Down only
+    pub fn default_for_collection(collection: &str) -> Self {
+        match collection {
+            "cells" | "contact_reports" => Self::UpOnly,
+            "commands" => Self::DownOnly,
+            _ => Self::Bidirectional,
+        }
+    }
+
+    /// Check if this direction allows syncing to parent
+    #[inline]
+    pub fn allows_up(&self) -> bool {
+        matches!(self, Self::Bidirectional | Self::UpOnly | Self::SystemWide)
+    }
+
+    /// Check if this direction allows syncing to children
+    #[inline]
+    pub fn allows_down(&self) -> bool {
+        matches!(
+            self,
+            Self::Bidirectional | Self::DownOnly | Self::SystemWide
+        )
+    }
+
+    /// Check if this is a system-wide propagation
+    #[inline]
+    pub fn is_system_wide(&self) -> bool {
+        matches!(self, Self::SystemWide)
+    }
+}
+
+/// Wire format message for tombstone sync (ADR-034 Phase 2)
+///
+/// Compact binary format for exchanging tombstones:
+/// ```text
+/// ┌────────────────┬──────────────┬──────────────┬─────────────┬─────────┬───────────┐
+/// │ Collection Len │ Collection   │ Doc ID Len   │ Document ID │ Deleted │ Lamport   │
+/// │ (2 bytes)      │ (var)        │ (2 bytes)    │ (var)       │ At (8)  │ (8 bytes) │
+/// └────────────────┴──────────────┴──────────────┴─────────────┴─────────┴───────────┘
+/// Optionally followed by:
+/// ┌────────────────┬──────────────┬────────────────┬─────────────┐
+/// │ Deleted By Len │ Deleted By   │ Reason Len     │ Reason      │
+/// │ (2 bytes)      │ (var)        │ (2 bytes, 0=N) │ (var, opt)  │
+/// └────────────────┴──────────────┴────────────────┴─────────────┘
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TombstoneSyncMessage {
+    /// The tombstone being synced
+    pub tombstone: Tombstone,
+    /// Propagation direction (controls hierarchy flow)
+    pub direction: PropagationDirection,
+}
+
+impl TombstoneSyncMessage {
+    /// Create a new tombstone sync message
+    pub fn new(tombstone: Tombstone, direction: PropagationDirection) -> Self {
+        Self {
+            tombstone,
+            direction,
+        }
+    }
+
+    /// Create from a tombstone with default direction for its collection
+    pub fn from_tombstone(tombstone: Tombstone) -> Self {
+        let direction = PropagationDirection::default_for_collection(&tombstone.collection);
+        Self {
+            tombstone,
+            direction,
+        }
+    }
+
+    /// Encode to wire format bytes
+    ///
+    /// Wire format:
+    /// - collection_len (2 bytes, big-endian)
+    /// - collection (var bytes)
+    /// - doc_id_len (2 bytes, big-endian)
+    /// - doc_id (var bytes)
+    /// - deleted_at (8 bytes, big-endian, millis since epoch)
+    /// - lamport (8 bytes, big-endian)
+    /// - deleted_by_len (2 bytes, big-endian)
+    /// - deleted_by (var bytes)
+    /// - reason_len (2 bytes, big-endian, 0 if None)
+    /// - reason (var bytes, optional)
+    /// - direction (1 byte)
+    pub fn encode(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(128);
+
+        // Collection
+        let collection_bytes = self.tombstone.collection.as_bytes();
+        buf.extend_from_slice(&(collection_bytes.len() as u16).to_be_bytes());
+        buf.extend_from_slice(collection_bytes);
+
+        // Document ID
+        let doc_id_bytes = self.tombstone.document_id.as_bytes();
+        buf.extend_from_slice(&(doc_id_bytes.len() as u16).to_be_bytes());
+        buf.extend_from_slice(doc_id_bytes);
+
+        // Deleted at (millis since epoch)
+        let deleted_at_millis = self
+            .tombstone
+            .deleted_at
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+        buf.extend_from_slice(&deleted_at_millis.to_be_bytes());
+
+        // Lamport timestamp
+        buf.extend_from_slice(&self.tombstone.lamport.to_be_bytes());
+
+        // Deleted by
+        let deleted_by_bytes = self.tombstone.deleted_by.as_bytes();
+        buf.extend_from_slice(&(deleted_by_bytes.len() as u16).to_be_bytes());
+        buf.extend_from_slice(deleted_by_bytes);
+
+        // Reason (optional)
+        if let Some(reason) = &self.tombstone.reason {
+            let reason_bytes = reason.as_bytes();
+            buf.extend_from_slice(&(reason_bytes.len() as u16).to_be_bytes());
+            buf.extend_from_slice(reason_bytes);
+        } else {
+            buf.extend_from_slice(&0u16.to_be_bytes());
+        }
+
+        // Direction
+        buf.push(match self.direction {
+            PropagationDirection::Bidirectional => 0x00,
+            PropagationDirection::UpOnly => 0x01,
+            PropagationDirection::DownOnly => 0x02,
+            PropagationDirection::SystemWide => 0x03,
+        });
+
+        buf
+    }
+
+    /// Decode from wire format bytes
+    pub fn decode(bytes: &[u8]) -> Result<Self, TombstoneDecodeError> {
+        let mut pos = 0;
+
+        // Collection
+        if bytes.len() < pos + 2 {
+            return Err(TombstoneDecodeError::TooShort);
+        }
+        let collection_len = u16::from_be_bytes([bytes[pos], bytes[pos + 1]]) as usize;
+        pos += 2;
+
+        if bytes.len() < pos + collection_len {
+            return Err(TombstoneDecodeError::TooShort);
+        }
+        let collection = String::from_utf8(bytes[pos..pos + collection_len].to_vec())
+            .map_err(|_| TombstoneDecodeError::InvalidUtf8)?;
+        pos += collection_len;
+
+        // Document ID
+        if bytes.len() < pos + 2 {
+            return Err(TombstoneDecodeError::TooShort);
+        }
+        let doc_id_len = u16::from_be_bytes([bytes[pos], bytes[pos + 1]]) as usize;
+        pos += 2;
+
+        if bytes.len() < pos + doc_id_len {
+            return Err(TombstoneDecodeError::TooShort);
+        }
+        let document_id = String::from_utf8(bytes[pos..pos + doc_id_len].to_vec())
+            .map_err(|_| TombstoneDecodeError::InvalidUtf8)?;
+        pos += doc_id_len;
+
+        // Deleted at
+        if bytes.len() < pos + 8 {
+            return Err(TombstoneDecodeError::TooShort);
+        }
+        let deleted_at_millis = u64::from_be_bytes([
+            bytes[pos],
+            bytes[pos + 1],
+            bytes[pos + 2],
+            bytes[pos + 3],
+            bytes[pos + 4],
+            bytes[pos + 5],
+            bytes[pos + 6],
+            bytes[pos + 7],
+        ]);
+        let deleted_at =
+            SystemTime::UNIX_EPOCH + std::time::Duration::from_millis(deleted_at_millis);
+        pos += 8;
+
+        // Lamport
+        if bytes.len() < pos + 8 {
+            return Err(TombstoneDecodeError::TooShort);
+        }
+        let lamport = u64::from_be_bytes([
+            bytes[pos],
+            bytes[pos + 1],
+            bytes[pos + 2],
+            bytes[pos + 3],
+            bytes[pos + 4],
+            bytes[pos + 5],
+            bytes[pos + 6],
+            bytes[pos + 7],
+        ]);
+        pos += 8;
+
+        // Deleted by
+        if bytes.len() < pos + 2 {
+            return Err(TombstoneDecodeError::TooShort);
+        }
+        let deleted_by_len = u16::from_be_bytes([bytes[pos], bytes[pos + 1]]) as usize;
+        pos += 2;
+
+        if bytes.len() < pos + deleted_by_len {
+            return Err(TombstoneDecodeError::TooShort);
+        }
+        let deleted_by = String::from_utf8(bytes[pos..pos + deleted_by_len].to_vec())
+            .map_err(|_| TombstoneDecodeError::InvalidUtf8)?;
+        pos += deleted_by_len;
+
+        // Reason (optional)
+        if bytes.len() < pos + 2 {
+            return Err(TombstoneDecodeError::TooShort);
+        }
+        let reason_len = u16::from_be_bytes([bytes[pos], bytes[pos + 1]]) as usize;
+        pos += 2;
+
+        let reason = if reason_len > 0 {
+            if bytes.len() < pos + reason_len {
+                return Err(TombstoneDecodeError::TooShort);
+            }
+            let reason_str = String::from_utf8(bytes[pos..pos + reason_len].to_vec())
+                .map_err(|_| TombstoneDecodeError::InvalidUtf8)?;
+            pos += reason_len;
+            Some(reason_str)
+        } else {
+            None
+        };
+
+        // Direction
+        if bytes.len() < pos + 1 {
+            return Err(TombstoneDecodeError::TooShort);
+        }
+        let direction = match bytes[pos] {
+            0x00 => PropagationDirection::Bidirectional,
+            0x01 => PropagationDirection::UpOnly,
+            0x02 => PropagationDirection::DownOnly,
+            0x03 => PropagationDirection::SystemWide,
+            _ => return Err(TombstoneDecodeError::InvalidDirection),
+        };
+
+        Ok(Self {
+            tombstone: Tombstone {
+                document_id,
+                collection,
+                deleted_at,
+                deleted_by,
+                lamport,
+                reason,
+            },
+            direction,
+        })
+    }
+}
+
+/// Error decoding a tombstone message
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TombstoneDecodeError {
+    /// Message too short
+    TooShort,
+    /// Invalid UTF-8 string
+    InvalidUtf8,
+    /// Invalid propagation direction byte
+    InvalidDirection,
+}
+
+impl std::fmt::Display for TombstoneDecodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::TooShort => write!(f, "Tombstone message too short"),
+            Self::InvalidUtf8 => write!(f, "Invalid UTF-8 in tombstone message"),
+            Self::InvalidDirection => write!(f, "Invalid propagation direction byte"),
+        }
+    }
+}
+
+impl std::error::Error for TombstoneDecodeError {}
+
+/// Batch of tombstones for sync exchange
+///
+/// Sent during peer connect to exchange all known tombstones.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TombstoneBatch {
+    /// Tombstones in this batch
+    pub tombstones: Vec<TombstoneSyncMessage>,
+}
+
+impl TombstoneBatch {
+    /// Create a new empty batch
+    pub fn new() -> Self {
+        Self {
+            tombstones: Vec::new(),
+        }
+    }
+
+    /// Create a batch from tombstones
+    pub fn from_tombstones(tombstones: Vec<Tombstone>) -> Self {
+        Self {
+            tombstones: tombstones
+                .into_iter()
+                .map(TombstoneSyncMessage::from_tombstone)
+                .collect(),
+        }
+    }
+
+    /// Create a batch from TombstoneSyncMessages directly
+    pub fn with_messages(messages: Vec<TombstoneSyncMessage>) -> Self {
+        Self {
+            tombstones: messages,
+        }
+    }
+
+    /// Add a tombstone to the batch
+    pub fn push(&mut self, tombstone: TombstoneSyncMessage) {
+        self.tombstones.push(tombstone);
+    }
+
+    /// Get the number of tombstones in the batch
+    pub fn len(&self) -> usize {
+        self.tombstones.len()
+    }
+
+    /// Check if the batch is empty
+    pub fn is_empty(&self) -> bool {
+        self.tombstones.is_empty()
+    }
+
+    /// Encode batch to wire format
+    ///
+    /// Format: [count (4 bytes)][tombstone 1][tombstone 2]...
+    /// Each tombstone is: [len (4 bytes)][encoded tombstone bytes]
+    pub fn encode(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(self.tombstones.len() * 64 + 4);
+
+        // Count
+        buf.extend_from_slice(&(self.tombstones.len() as u32).to_be_bytes());
+
+        // Each tombstone with length prefix
+        for tombstone in &self.tombstones {
+            let encoded = tombstone.encode();
+            buf.extend_from_slice(&(encoded.len() as u32).to_be_bytes());
+            buf.extend_from_slice(&encoded);
+        }
+
+        buf
+    }
+
+    /// Decode batch from wire format
+    pub fn decode(bytes: &[u8]) -> Result<Self, TombstoneDecodeError> {
+        if bytes.len() < 4 {
+            return Err(TombstoneDecodeError::TooShort);
+        }
+
+        let count = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize;
+        let mut pos = 4;
+        let mut tombstones = Vec::with_capacity(count);
+
+        for _ in 0..count {
+            if bytes.len() < pos + 4 {
+                return Err(TombstoneDecodeError::TooShort);
+            }
+            let len =
+                u32::from_be_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]])
+                    as usize;
+            pos += 4;
+
+            if bytes.len() < pos + len {
+                return Err(TombstoneDecodeError::TooShort);
+            }
+            let tombstone = TombstoneSyncMessage::decode(&bytes[pos..pos + len])?;
+            tombstones.push(tombstone);
+            pos += len;
+        }
+
+        Ok(Self { tombstones })
+    }
+}
+
 /// Deletion policy for a collection (ADR-034)
 ///
 /// Determines how documents are deleted and whether tombstones are used.
@@ -644,5 +1060,156 @@ mod tests {
         assert_eq!(tombstone.collection, deserialized.collection);
         assert_eq!(tombstone.lamport, deserialized.lamport);
         assert_eq!(tombstone.reason, deserialized.reason);
+    }
+
+    // === Phase 2 Tests (Issue #367) ===
+
+    #[test]
+    fn test_propagation_direction_defaults() {
+        // Bidirectional by default
+        assert_eq!(
+            PropagationDirection::default_for_collection("tracks"),
+            PropagationDirection::Bidirectional
+        );
+        assert_eq!(
+            PropagationDirection::default_for_collection("nodes"),
+            PropagationDirection::Bidirectional
+        );
+
+        // Up-only for contact reports and cells
+        assert_eq!(
+            PropagationDirection::default_for_collection("contact_reports"),
+            PropagationDirection::UpOnly
+        );
+        assert_eq!(
+            PropagationDirection::default_for_collection("cells"),
+            PropagationDirection::UpOnly
+        );
+
+        // Down-only for commands
+        assert_eq!(
+            PropagationDirection::default_for_collection("commands"),
+            PropagationDirection::DownOnly
+        );
+    }
+
+    #[test]
+    fn test_propagation_direction_allows() {
+        assert!(PropagationDirection::Bidirectional.allows_up());
+        assert!(PropagationDirection::Bidirectional.allows_down());
+
+        assert!(PropagationDirection::UpOnly.allows_up());
+        assert!(!PropagationDirection::UpOnly.allows_down());
+
+        assert!(!PropagationDirection::DownOnly.allows_up());
+        assert!(PropagationDirection::DownOnly.allows_down());
+
+        // SystemWide allows both
+        assert!(PropagationDirection::SystemWide.allows_up());
+        assert!(PropagationDirection::SystemWide.allows_down());
+        assert!(PropagationDirection::SystemWide.is_system_wide());
+    }
+
+    #[test]
+    fn test_tombstone_sync_message_encode_decode() {
+        let tombstone = Tombstone::with_reason("doc-456", "alerts", "node-beta", 100, "Dismissed");
+        let msg = TombstoneSyncMessage::new(tombstone, PropagationDirection::Bidirectional);
+
+        let encoded = msg.encode();
+        let decoded = TombstoneSyncMessage::decode(&encoded).unwrap();
+
+        assert_eq!(msg.tombstone.document_id, decoded.tombstone.document_id);
+        assert_eq!(msg.tombstone.collection, decoded.tombstone.collection);
+        assert_eq!(msg.tombstone.deleted_by, decoded.tombstone.deleted_by);
+        assert_eq!(msg.tombstone.lamport, decoded.tombstone.lamport);
+        assert_eq!(msg.tombstone.reason, decoded.tombstone.reason);
+        assert_eq!(msg.direction, decoded.direction);
+    }
+
+    #[test]
+    fn test_tombstone_sync_message_no_reason() {
+        let tombstone = Tombstone::new("doc-789", "tracks", "node-gamma", 50);
+        let msg = TombstoneSyncMessage::new(tombstone, PropagationDirection::UpOnly);
+
+        let encoded = msg.encode();
+        let decoded = TombstoneSyncMessage::decode(&encoded).unwrap();
+
+        assert!(decoded.tombstone.reason.is_none());
+        assert_eq!(decoded.direction, PropagationDirection::UpOnly);
+    }
+
+    #[test]
+    fn test_tombstone_sync_message_system_wide() {
+        let tombstone = Tombstone::with_reason("pii-doc", "users", "admin", 999, "GDPR deletion");
+        let msg = TombstoneSyncMessage::new(tombstone, PropagationDirection::SystemWide);
+
+        let encoded = msg.encode();
+        let decoded = TombstoneSyncMessage::decode(&encoded).unwrap();
+
+        assert_eq!(decoded.direction, PropagationDirection::SystemWide);
+        assert!(decoded.direction.is_system_wide());
+    }
+
+    #[test]
+    fn test_tombstone_sync_message_from_tombstone() {
+        // from_tombstone uses default direction for collection
+        let tombstone = Tombstone::new("doc-123", "commands", "node-delta", 75);
+        let msg = TombstoneSyncMessage::from_tombstone(tombstone);
+
+        // commands should default to DownOnly
+        assert_eq!(msg.direction, PropagationDirection::DownOnly);
+    }
+
+    #[test]
+    fn test_tombstone_batch_encode_decode() {
+        let tombstones = vec![
+            Tombstone::new("doc-1", "tracks", "node-a", 10),
+            Tombstone::with_reason("doc-2", "alerts", "node-b", 20, "Expired"),
+            Tombstone::new("doc-3", "nodes", "node-c", 30),
+        ];
+
+        let batch = TombstoneBatch::from_tombstones(tombstones);
+        assert_eq!(batch.len(), 3);
+        assert!(!batch.is_empty());
+
+        let encoded = batch.encode();
+        let decoded = TombstoneBatch::decode(&encoded).unwrap();
+
+        assert_eq!(decoded.len(), 3);
+        assert_eq!(decoded.tombstones[0].tombstone.document_id, "doc-1");
+        assert_eq!(decoded.tombstones[1].tombstone.document_id, "doc-2");
+        assert_eq!(decoded.tombstones[2].tombstone.document_id, "doc-3");
+    }
+
+    #[test]
+    fn test_tombstone_batch_empty() {
+        let batch = TombstoneBatch::new();
+        assert!(batch.is_empty());
+        assert_eq!(batch.len(), 0);
+
+        let encoded = batch.encode();
+        let decoded = TombstoneBatch::decode(&encoded).unwrap();
+        assert!(decoded.is_empty());
+    }
+
+    #[test]
+    fn test_tombstone_decode_error_too_short() {
+        let result = TombstoneSyncMessage::decode(&[0x00]);
+        assert_eq!(result.unwrap_err(), TombstoneDecodeError::TooShort);
+    }
+
+    #[test]
+    fn test_tombstone_decode_error_invalid_direction() {
+        // Create a valid tombstone, then corrupt the direction byte
+        let tombstone = Tombstone::new("doc", "col", "node", 1);
+        let msg = TombstoneSyncMessage::new(tombstone, PropagationDirection::Bidirectional);
+        let mut encoded = msg.encode();
+
+        // Corrupt the last byte (direction) to invalid value
+        let len = encoded.len();
+        encoded[len - 1] = 0xFF;
+
+        let result = TombstoneSyncMessage::decode(&encoded);
+        assert_eq!(result.unwrap_err(), TombstoneDecodeError::InvalidDirection);
     }
 }
