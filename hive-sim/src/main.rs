@@ -100,6 +100,8 @@ use hive_schema::common::v1::Timestamp;
 // Lab 3b: Flat mesh coordination with CRDT
 use hive_mesh::beacon::{NodeMobility, NodeProfile, NodeResources};
 use hive_mesh::FlatMeshCoordinator;
+#[cfg(feature = "automerge-backend")]
+use rand::Rng;
 
 /// Test document structure
 #[allow(dead_code)]
@@ -1997,6 +1999,13 @@ async fn connect_to_automerge_peers(
             "[{}] Resolved '{}' to {:?}",
             node_id, peer_addr, resolved_addrs
         );
+
+        // Issue #373: Add staggered connection timing to prevent thundering herd
+        // When many nodes start simultaneously, they all try to connect at once,
+        // overwhelming responders and causing handshake timeouts.
+        // Add a random delay of 0-2 seconds to spread out connection attempts.
+        let stagger_delay_ms = rand::thread_rng().gen_range(0..2000);
+        tokio::time::sleep(tokio::time::Duration::from_millis(stagger_delay_ms)).await;
 
         // Connect using the SyncEngine trait method with retry logic
         // Issue #346: connect_peer now always attempts connection
