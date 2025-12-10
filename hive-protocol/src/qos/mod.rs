@@ -69,6 +69,7 @@ pub mod bandwidth;
 pub mod classification;
 pub mod context;
 pub mod context_manager;
+pub mod deletion;
 pub mod eviction;
 pub mod lifecycle;
 pub mod preemption;
@@ -90,6 +91,7 @@ pub use bandwidth::{
 pub use classification::DataType;
 pub use context::{ContextProfile, MissionContext, QoSClassAdjustment};
 pub use context_manager::{ContextChangeListener, ContextChangeLog, ContextManager};
+pub use deletion::{DeleteResult, DeletionPolicy, DeletionPolicyRegistry, Tombstone};
 pub use eviction::{EvictionConfig, EvictionController, EvictionResult};
 pub use lifecycle::{
     make_lifecycle_decision, LifecycleDecision, LifecyclePolicies, LifecyclePolicy,
