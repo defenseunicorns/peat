@@ -2621,6 +2621,7 @@ dependencies = [
  "hmac",
  "iroh",
  "iroh-blobs",
+ "log",
  "lru 0.12.5",
  "mdns-sd",
  "proptest",

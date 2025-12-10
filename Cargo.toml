@@ -13,6 +13,8 @@ members = [
     "hive-inference",
     "hive-tak-bridge",
 ]
+# hive-lite is excluded because it requires ESP32 toolchain (no_std)
+exclude = ["hive-lite"]
 
 [workspace.package]
 version = "0.1.0"

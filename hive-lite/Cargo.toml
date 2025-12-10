@@ -1,0 +1,100 @@
+[package]
+name = "hive-lite"
+version = "0.1.0"
+edition = "2021"
+authors = ["(r)evolve Inc."]
+description = "HIVE-Lite: Resource-constrained mesh protocol for embedded sensors"
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/kitplummer/hive"
+
+[lib]
+name = "hive_lite"
+path = "src/lib.rs"
+
+[[bin]]
+name = "hive-lite-esp32"
+path = "src/main.rs"
+required-features = ["esp32"]
+
+[[bin]]
+name = "hive-lite-wifi"
+path = "src/wifi_main.rs"
+required-features = ["wifi"]
+
+[dependencies]
+# Core dependencies (no_std compatible)
+heapless = "0.8"
+log = { version = "0.4", default-features = false }
+
+# ESP32 dependencies (optional, for actual hardware)
+esp-hal = { version = "1.0.0", features = ["esp32", "unstable"], optional = true }
+esp-backtrace = { version = "0.15", features = ["esp32", "panic-handler", "println"], optional = true }
+esp-println = { version = "0.13", features = ["esp32", "log"], optional = true }
+critical-section = { version = "1.2", optional = true }
+esp-bootloader-esp-idf = { version = "0.4", features = ["esp32"], optional = true }
+
+# WiFi and networking
+esp-radio = { version = "0.17", features = ["esp32", "wifi", "esp-alloc", "smoltcp", "unstable"], optional = true }
+esp-alloc = { version = "0.9", features = ["esp32"], optional = true }
+esp-rtos = { version = "0.2", features = ["esp32", "esp-radio", "esp-alloc"], optional = true }
+smoltcp = { version = "0.12", default-features = false, features = ["medium-ethernet", "proto-ipv4", "socket-udp", "socket-dhcpv4"], optional = true }
+blocking-network-stack = { git = "https://github.com/bjoernQ/blocking-network-stack.git", optional = true }
+
+# Display support for M5Stack Core2 (ILI9342C)
+mipidsi = { version = "0.8", optional = true }
+display-interface-spi = { version = "0.5", optional = true }
+embedded-graphics = { version = "0.8", optional = true }
+embedded-hal-bus = { version = "0.3", optional = true }
+embedded-hal = { version = "1.0", optional = true }
+
+# WiFi and networking - TODO: configure features correctly for esp-wifi
+# esp-wifi = { version = "0.13", default-features = false, features = ["esp32", "wifi"], optional = true }
+# smoltcp = { version = "0.12", default-features = false, features = ["medium-ethernet", "proto-ipv4", "socket-udp", "socket-dhcpv4"], optional = true }
+# esp-alloc = { version = "0.7", optional = true }
+
+[dev-dependencies]
+# For running tests on host (uses std)
+
+[features]
+default = []
+# Enable for M5Stack Core2 / ESP32 builds (no WiFi)
+esp32 = [
+    "dep:esp-hal",
+    "dep:esp-backtrace",
+    "dep:esp-println",
+    "dep:critical-section",
+    "dep:esp-bootloader-esp-idf",
+]
+# Enable WiFi networking
+wifi = [
+    "esp32",
+    "dep:esp-radio",
+    "dep:esp-alloc",
+    "dep:esp-rtos",
+    "dep:smoltcp",
+    "dep:blocking-network-stack",
+]
+# Enable M5Stack Core2 specific drivers (display, etc.)
+m5stack-core2 = [
+    "esp32",
+    "dep:mipidsi",
+    "dep:display-interface-spi",
+    "dep:embedded-graphics",
+    "dep:embedded-hal-bus",
+    "dep:embedded-hal",
+]
+# Full M5Stack Core2 with WiFi
+m5stack-core2-wifi = [
+    "m5stack-core2",
+    "wifi",
+]
+
+[profile.release]
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
+
+[profile.dev]
+opt-level = 1
+debug = true
