@@ -46,9 +46,12 @@ const TOMBSTONES_TABLE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("to
 pub struct AutomergeStore {
     db: Arc<Database>,
     cache: Arc<RwLock<LruCache<String, Automerge>>>,
-    /// Broadcast channel for notifying of document changes (Phase 6.3)
-    /// Multiple subscribers can receive notifications (sync coordinator + observers)
+    /// Broadcast channel for sync coordinator - used to trigger P2P sync
+    /// Only notified for local puts (not synced documents)
     change_tx: broadcast::Sender<String>,
+    /// Broadcast channel for observers - used for hierarchical aggregation (Issue #377)
+    /// Notified for ALL document changes (local and synced) so observers can react
+    observer_tx: broadcast::Sender<String>,
 }
 
 #[cfg(feature = "automerge-backend")]
@@ -97,16 +100,22 @@ impl AutomergeStore {
 
         let cache = LruCache::new(NonZeroUsize::new(1000).unwrap());
 
-        // Create broadcast channel for change notifications
+        // Create broadcast channel for sync coordinator notifications
         // Issue #346: Increased from 1024 to 8192 to reduce lagging under high load.
         // When this channel lags, the auto_sync_task must do a full resync which is expensive.
         // A larger buffer trades memory (8KB per doc_key) for reduced resync frequency.
         let (change_tx, _) = broadcast::channel(8192);
 
+        // Create broadcast channel for observer notifications (Issue #377)
+        // This channel notifies ALL document changes including synced documents
+        // so hierarchical aggregation can react to remotely synced platoon summaries
+        let (observer_tx, _) = broadcast::channel(8192);
+
         Ok(Self {
             db: Arc::new(db),
             cache: Arc::new(RwLock::new(cache)),
             change_tx,
+            observer_tx,
         })
     }
 
@@ -152,8 +161,12 @@ impl AutomergeStore {
             .unwrap()
             .put(key.to_string(), doc.clone());
 
-        // Notify subscribers of the change (Phase 6.3)
-        // Skip notification for documents received via sync (Issue #346)
+        // Always notify observers for ALL document changes (Issue #377)
+        // This enables hierarchical aggregation to react to remotely synced docs
+        let _ = self.observer_tx.send(key.to_string());
+
+        // Notify sync coordinator only for local changes (Phase 6.3, Issue #346)
+        // Skip notification for documents received via sync to avoid sync-back loops
         if notify {
             // Ignore send errors - if no one is listening, that's fine
             let _ = self.change_tx.send(key.to_string());
@@ -274,6 +287,19 @@ impl AutomergeStore {
     /// ```
     pub fn subscribe_to_changes(&self) -> broadcast::Receiver<String> {
         self.change_tx.subscribe()
+    }
+
+    /// Subscribe to observer notifications (Issue #377)
+    ///
+    /// Returns a receiver that receives document keys for ALL changes, including
+    /// documents received via sync. Use this for hierarchical aggregation where
+    /// you need to react to remotely synced documents (e.g., company commander
+    /// reacting to platoon summaries synced from platoon leaders).
+    ///
+    /// Unlike `subscribe_to_changes()` which only fires for local puts,
+    /// this fires for ALL document changes.
+    pub fn subscribe_to_observer_changes(&self) -> broadcast::Receiver<String> {
+        self.observer_tx.subscribe()
     }
 
     /// Get a collection handle for a specific namespace
