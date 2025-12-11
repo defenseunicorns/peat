@@ -1,0 +1,59 @@
+# Whitepaper Metadata
+# Used by pandoc for document generation
+
+title: "HIVE Protocol: Breaking the 20-Platform Wall"
+subtitle: "Open Coordination Architecture for Human-Machine Teams at Scale"
+author:
+  - name: Kit Plummer
+    affiliation: "(r)evolve — Revolve Team LLC"
+    email: kit@revolveteam.com
+date: December 2025
+version: "Draft 0.1"
+
+# Document metadata
+abstract: |
+  Military autonomous systems programs consistently plateau at approximately
+  20 platforms—not due to technology gaps, but architectural constraints rooted
+  in O(n²) scaling mathematics. HIVE Protocol breaks this barrier through
+  hierarchical CRDT-based coordination that achieves O(n log n) scaling,
+  enabling 1,000+ platform operations on bandwidth-constrained tactical networks.
+  Laboratory validation confirms 95-99% bandwidth reduction. This whitepaper
+  presents the scaling crisis, the hierarchy insight, technical architecture,
+  and the case for open standards.
+
+keywords:
+  - autonomous systems
+  - human-machine teaming
+  - distributed coordination
+  - CRDT
+  - military hierarchy
+  - swarm coordination
+  - edge computing
+  - tactical networks
+
+# Classification
+classification: UNCLASSIFIED
+distribution: Public Release
+
+# Publisher info
+publisher: "(r)evolve — Revolve Team LLC"
+website: https://revolveteam.com
+
+# PDF-specific settings
+documentclass: article
+fontsize: 11pt
+geometry: margin=1in
+linestretch: 1.15
+colorlinks: true
+# Colors now defined in template using (r)evolve palette
+# linkcolor, urlcolor, toccolor handled by template
+
+# HTML-specific settings
+lang: en-US
+# Design: (r)evolve color scheme + Space Grotesk font
+# Dark theme default, respects prefers-color-scheme
+
+# Citation
+citation: |
+  Plummer, K. (2025). "HIVE Protocol: Breaking the 20-Platform Wall."
+  (r)evolve - Revolve Team LLC.
