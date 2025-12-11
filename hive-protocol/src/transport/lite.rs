@@ -65,6 +65,9 @@ use super::{
     PEER_EVENT_CHANNEL_CAPACITY,
 };
 
+/// Type alias for CRDT callback to avoid clippy::type_complexity
+type CrdtCallback = Arc<StdMutex<Option<Box<dyn Fn(&str, &str, CrdtType, &[u8]) + Send + Sync>>>>;
+
 // =============================================================================
 // Wire Protocol Constants (ADR-035)
 // =============================================================================
@@ -419,7 +422,7 @@ pub struct LiteMeshTransport {
 
     /// Callback for received CRDT data
     /// (collection, doc_id, crdt_type, crdt_data)
-    crdt_callback: Arc<StdMutex<Option<Box<dyn Fn(&str, &str, CrdtType, &[u8]) + Send + Sync>>>>,
+    crdt_callback: CrdtCallback,
 }
 
 impl LiteMeshTransport {
