@@ -59,6 +59,9 @@ pub mod iroh;
 #[cfg(feature = "ditto-backend")]
 pub mod ditto;
 
+#[cfg(feature = "lite-transport")]
+pub mod lite;
+
 pub mod capabilities;
 pub mod health;
 pub mod manager;

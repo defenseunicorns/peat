@@ -549,6 +549,81 @@ Simple pub/sub without CRDT guarantees.
 - Can't meaningfully merge conflicting data
 - Defeats purpose of HIVE integration
 
+## Appendix C: AXP192 Power Management (CRITICAL)
+
+**⚠️ WARNING: Improper AXP192 configuration can permanently brick M5Stack Core2 devices.**
+
+The M5Stack Core2 uses an AXP192 Power Management IC that controls all power rails including the ESP32 itself. The AXP192's registers can latch into states that prevent the ESP32 from booting, making recovery impossible without hardware intervention.
+
+### What Happened
+
+On 2024-12-10, an attempt to configure the AXP192 for proper power button behavior resulted in a bricked Core2 that could not be recovered via:
+- Factory reset button
+- M5Burner recovery
+- espflash with boot mode entry
+- Complete power drain (overnight, battery removed)
+
+### Root Cause
+
+The AXP192 initialization code modified voltage rail registers (DCDC1, DCDC3, LDO2/3, etc.) in addition to the power button (PEK) register. One or more of these settings caused the ESP32 to lose power before it could complete booting.
+
+### SAFE AXP192 Configuration
+
+**DO NOT** modify these registers from firmware:
+- `0x12` (DCDC13_LDO23) - Power rail enables - **NEVER TOUCH**
+- `0x23` (DCDC2_VOLTAGE) - **NEVER TOUCH**
+- `0x26` (DCDC1_VOLTAGE) - ESP32 power - **NEVER TOUCH**
+- `0x27` (DCDC3_VOLTAGE) - LCD power - **NEVER TOUCH**
+- `0x28` (LDO23_VOLTAGE) - **NEVER TOUCH**
+
+**SAFE** to modify (read-only or non-critical):
+- `0x00` (POWER_STATUS) - Read only
+- `0x01` (CHARGE_STATUS) - Read only
+- `0x36` (PEK_SETTING) - Power button behavior - **SAFE**
+- `0x78-0x79` (BAT_VOLTAGE) - Read only
+- `0x82` (ADC_ENABLE1) - Probably safe, enables ADC readings
+
+### Recommended Safe Init
+
+```rust
+/// SAFE AXP192 init - ONLY configures power button, nothing else
+/// This will NOT brick the device
+fn axp192_init_safe<I2C>(i2c: &mut I2C) -> bool
+where
+    I2C: embedded_hal::i2c::I2c,
+{
+    const AXP192_ADDR: u8 = 0x34;
+    const PEK_SETTING: u8 = 0x36;
+
+    // ONLY set power button behavior:
+    // - Boot time: 512ms
+    // - Long press: 1s
+    // - Long press shutdown: enabled
+    // - PWROK delay: 64ms
+    // - Shutdown delay: 4s
+    i2c.write(AXP192_ADDR, &[PEK_SETTING, 0x4C]).is_ok()
+}
+```
+
+### If Power Button Doesn't Work
+
+If the power button on/off doesn't work after flashing custom firmware:
+1. **DO NOT** try to "fix" it by writing to AXP192 voltage registers
+2. Use M5Burner to restore factory firmware - this will reset AXP192 properly
+3. The factory firmware configures AXP192 correctly during its boot sequence
+
+### Recovery Options (If Bricked)
+
+If the device becomes unresponsive:
+1. Remove battery, unplug USB, wait 30 seconds
+2. Try M5Burner recovery (may not work if AXP192 is misconfigured)
+3. If recovery fails: **device may be permanently bricked**
+4. Hardware option: Replace the AXP192 chip (requires SMD rework)
+
+### Lesson Learned
+
+The AXP192 is not a peripheral to experiment with. Its registers directly control whether the CPU receives power. Always trust the factory configuration for voltage rails, and only modify the PEK register for power button customization.
+
 ## References
 
 - [M5Stack Core2 Specifications](https://docs.m5stack.com/en/core/core2)
