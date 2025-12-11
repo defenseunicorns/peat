@@ -1,0 +1,13 @@
+[target.xtensa-esp32-none-elf]
+runner = "espflash flash --ignore_app_descriptor --monitor"
+
+[build]
+rustflags = ["-C", "link-arg=-nostartfiles"]
+target = "xtensa-esp32-none-elf"
+
+[unstable]
+build-std = ["core", "alloc"]
+
+[env]
+ESP_LOG = "info"
+RUST_LOG = "info"
