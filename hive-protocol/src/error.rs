@@ -118,6 +118,15 @@ pub enum Error {
     /// Security/Authentication errors
     #[error("Security error: {0}")]
     Security(String),
+
+    /// Event operation errors (ADR-027)
+    #[error("Event operation error: {message}")]
+    EventOp {
+        message: String,
+        operation: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
 }
 
 impl Error {

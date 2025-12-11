@@ -170,6 +170,13 @@ pub mod cap {
             include!(concat!(env!("OUT_DIR"), "/cap.tasking.v1.rs"));
         }
     }
+
+    #[allow(clippy::enum_variant_names)]
+    pub mod event {
+        pub mod v1 {
+            include!(concat!(env!("OUT_DIR"), "/cap.event.v1.rs"));
+        }
+    }
 }
 
 // Re-export for convenience
@@ -231,6 +238,63 @@ mod tests {
         };
 
         assert_eq!(OperationalStatus::Ready as i32, 1);
+    }
+
+    #[test]
+    fn test_event_types_accessible() {
+        // Verify Event types are accessible from event.v1
+        use event::v1::{
+            AggregationPolicy, EventClass, EventPriority, EventQuery, EventSummary, HiveEvent,
+            PropagationMode,
+        };
+
+        let policy = AggregationPolicy {
+            propagation: PropagationMode::PropagationSummary as i32,
+            priority: EventPriority::PriorityNormal as i32,
+            ttl_seconds: 300,
+            aggregation_window_ms: 1000,
+        };
+
+        let _event = HiveEvent {
+            event_id: "evt-001".to_string(),
+            timestamp: None,
+            source_node_id: "node-1".to_string(),
+            source_formation_id: "squad-1".to_string(),
+            source_instance_id: Some("model-v1".to_string()),
+            event_class: EventClass::Product as i32,
+            event_type: "detection".to_string(),
+            routing: Some(policy),
+            payload_type_url: "type.googleapis.com/example.Detection".to_string(),
+            payload_value: vec![],
+        };
+
+        let _summary = EventSummary {
+            formation_id: "squad-1".to_string(),
+            window_start: None,
+            window_end: None,
+            event_class: EventClass::Product as i32,
+            event_type: "detection".to_string(),
+            event_count: 10,
+            source_node_ids: vec!["node-1".to_string(), "node-2".to_string()],
+            summary_type_url: String::new(),
+            summary_value: vec![],
+        };
+
+        let _query = EventQuery {
+            query_id: "q-001".to_string(),
+            requester_id: "platoon-leader".to_string(),
+            scope: None,
+            filters: None,
+            limit: 100,
+        };
+
+        assert_eq!(EventClass::Product as i32, 1);
+        assert_eq!(EventClass::Anomaly as i32, 2);
+        assert_eq!(EventClass::Telemetry as i32, 3);
+        assert_eq!(PropagationMode::PropagationFull as i32, 0);
+        assert_eq!(PropagationMode::PropagationSummary as i32, 1);
+        assert_eq!(EventPriority::PriorityCritical as i32, 0);
+        assert_eq!(EventPriority::PriorityNormal as i32, 2);
     }
 
     #[test]
