@@ -65,8 +65,6 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 #[cfg(feature = "sync")]
 use std::sync::atomic::{AtomicBool, Ordering};
-#[cfg(feature = "sync")]
-use tokio::sync::RwLock;
 
 // Setup UniFFI scaffolding
 uniffi::setup_scaffolding!();
@@ -325,8 +323,10 @@ impl Drop for SubscriptionHandle {
 pub struct HiveNode {
     /// The sync backend with FormationKey authentication
     sync_backend: Arc<AutomergeIrohBackend>,
-    /// Storage backend for document operations
-    storage_backend: Arc<RwLock<AutomergeBackend>>,
+    /// Storage backend for document operations (shared with sync_backend)
+    /// Note: This is the SAME backend instance used by sync_backend to ensure
+    /// sync coordinator state is shared. Do NOT create a separate backend.
+    storage_backend: Arc<AutomergeBackend>,
     transport: Arc<IrohTransport>,
     /// Store reference for subscriptions
     store: Arc<AutomergeStore>,
@@ -367,20 +367,50 @@ impl HiveNode {
     }
 
     /// Start sync operations
+    ///
+    /// This starts the sync coordination - peer discovery and accept loop are already
+    /// running from node creation. We just need to ensure the sync engine is started.
     pub fn start_sync(&self) -> Result<(), HiveError> {
-        self.runtime.block_on(async {
-            let backend = self.storage_backend.read().await;
-            backend
+        #[cfg(target_os = "android")]
+        android_log("start_sync: called");
+
+        // IMPORTANT: Use runtime.enter() to ensure tokio::spawn() inside start_sync()
+        // can find the runtime context. block_on() alone doesn't guarantee this on
+        // all platforms (especially Android where the JNI thread may not have proper
+        // thread-local storage for the Tokio runtime handle).
+        let _guard = self.runtime.enter();
+
+        #[cfg(target_os = "android")]
+        android_log("start_sync: runtime entered");
+
+        // Must run inside Tokio runtime because start_sync() calls tokio::spawn()
+        let result = self.runtime.block_on(async {
+            #[cfg(target_os = "android")]
+            android_log("start_sync: inside block_on");
+
+            // CRITICAL: Call start_sync() on the ACTUAL storage_backend instance,
+            // NOT on sync_backend.sync_engine() which returns a CLONED instance
+            // that doesn't have the transport event subscriptions set up!
+            self.storage_backend
                 .start_sync()
                 .map_err(|e| HiveError::SyncError { msg: e.to_string() })
-        })
+        });
+
+        #[cfg(target_os = "android")]
+        match &result {
+            Ok(_) => android_log("start_sync: SUCCESS - sync handlers spawned"),
+            Err(e) => android_log(&format!("start_sync: FAILED - {}", e)),
+        }
+
+        result
     }
 
     /// Stop sync operations
     pub fn stop_sync(&self) -> Result<(), HiveError> {
+        // Must run inside Tokio runtime for consistency with start_sync()
         self.runtime.block_on(async {
-            let backend = self.storage_backend.read().await;
-            backend
+            // Call stop_sync() on the ACTUAL storage_backend instance
+            self.storage_backend
                 .stop_sync()
                 .map_err(|e| HiveError::SyncError { msg: e.to_string() })
         })
@@ -388,18 +418,16 @@ impl HiveNode {
 
     /// Get sync statistics
     pub fn sync_stats(&self) -> Result<SyncStats, HiveError> {
-        self.runtime.block_on(async {
-            let backend = self.storage_backend.read().await;
-            let stats = backend
-                .sync_stats()
-                .map_err(|e| HiveError::SyncError { msg: e.to_string() })?;
+        let stats = self
+            .storage_backend
+            .sync_stats()
+            .map_err(|e| HiveError::SyncError { msg: e.to_string() })?;
 
-            Ok(SyncStats {
-                sync_active: stats.peer_count > 0, // Infer from peer count
-                connected_peers: self.transport.peer_count() as u32,
-                bytes_sent: stats.bytes_sent,
-                bytes_received: stats.bytes_received,
-            })
+        Ok(SyncStats {
+            sync_active: stats.peer_count > 0, // Infer from peer count
+            connected_peers: self.transport.peer_count() as u32,
+            bytes_sent: stats.bytes_sent,
+            bytes_received: stats.bytes_received,
         })
     }
 
@@ -456,7 +484,7 @@ impl HiveNode {
             })?;
 
         self.runtime.block_on(async {
-            let backend = self.storage_backend.read().await;
+            let backend = &self.storage_backend;
             let coll = backend.collection(collection);
 
             coll.upsert(doc_id, json_data.as_bytes().to_vec())
@@ -471,7 +499,7 @@ impl HiveNode {
         doc_id: &str,
     ) -> Result<Option<String>, HiveError> {
         self.runtime.block_on(async {
-            let backend = self.storage_backend.read().await;
+            let backend = &self.storage_backend;
             let coll = backend.collection(collection);
 
             match coll.get(doc_id) {
@@ -490,7 +518,7 @@ impl HiveNode {
     /// Delete a document from a collection
     pub fn delete_document(&self, collection: &str, doc_id: &str) -> Result<(), HiveError> {
         self.runtime.block_on(async {
-            let backend = self.storage_backend.read().await;
+            let backend = &self.storage_backend;
             let coll = backend.collection(collection);
 
             coll.delete(doc_id)
@@ -501,7 +529,7 @@ impl HiveNode {
     /// List all document IDs in a collection
     pub fn list_documents(&self, collection: &str) -> Result<Vec<String>, HiveError> {
         self.runtime.block_on(async {
-            let backend = self.storage_backend.read().await;
+            let backend = &self.storage_backend;
             let coll = backend.collection(collection);
 
             let docs = coll
@@ -517,7 +545,7 @@ impl HiveNode {
         let doc_key = format!("{}:{}", collection, doc_id);
 
         self.runtime.block_on(async {
-            let backend = self.storage_backend.read().await;
+            let backend = &self.storage_backend;
 
             backend
                 .sync_document(&doc_key)
@@ -774,12 +802,14 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
         android_log("Peer event listener task exiting");
     });
 
+    // IMPORTANT (Issue #378): Use the storage_backend from sync_backend, NOT a new one!
+    // Creating a separate AutomergeBackend would cause sync coordinator state to be split,
+    // resulting in data not being received from peers.
+    let storage_backend = sync_backend.storage_backend();
+
     Ok(Arc::new(HiveNode {
         sync_backend,
-        storage_backend: Arc::new(RwLock::new(AutomergeBackend::with_transport(
-            Arc::clone(&store),
-            Arc::clone(&transport),
-        ))),
+        storage_backend,
         transport,
         store,
         storage_path,
@@ -1086,7 +1116,7 @@ impl HiveNode {
     /// Get all cells from the sync document
     pub fn get_cells(&self) -> Result<Vec<CellInfo>, HiveError> {
         self.runtime.block_on(async {
-            let backend = self.storage_backend.read().await;
+            let backend = &self.storage_backend;
             let coll = backend.collection(collections::CELLS);
 
             let docs = coll
@@ -1108,7 +1138,7 @@ impl HiveNode {
     /// Get a specific cell by ID
     pub fn get_cell(&self, cell_id: &str) -> Result<Option<CellInfo>, HiveError> {
         self.runtime.block_on(async {
-            let backend = self.storage_backend.read().await;
+            let backend = &self.storage_backend;
             let coll = backend.collection(collections::CELLS);
 
             match coll.get(cell_id) {
@@ -1129,7 +1159,7 @@ impl HiveNode {
     pub fn put_cell(&self, cell: CellInfo) -> Result<(), HiveError> {
         let json = serialize_cell_json(&cell)?;
         self.runtime.block_on(async {
-            let backend = self.storage_backend.read().await;
+            let backend = &self.storage_backend;
             let coll = backend.collection(collections::CELLS);
             coll.upsert(&cell.id, json.into_bytes())
                 .map_err(|e| HiveError::StorageError { msg: e.to_string() })
@@ -1143,7 +1173,7 @@ impl HiveNode {
     /// Get all tracks from the sync document
     pub fn get_tracks(&self) -> Result<Vec<TrackInfo>, HiveError> {
         self.runtime.block_on(async {
-            let backend = self.storage_backend.read().await;
+            let backend = &self.storage_backend;
             let coll = backend.collection(collections::TRACKS);
 
             let docs = coll
@@ -1165,7 +1195,7 @@ impl HiveNode {
     /// Get a specific track by ID
     pub fn get_track(&self, track_id: &str) -> Result<Option<TrackInfo>, HiveError> {
         self.runtime.block_on(async {
-            let backend = self.storage_backend.read().await;
+            let backend = &self.storage_backend;
             let coll = backend.collection(collections::TRACKS);
 
             match coll.get(track_id) {
@@ -1186,7 +1216,7 @@ impl HiveNode {
     pub fn put_track(&self, track: TrackInfo) -> Result<(), HiveError> {
         let json = serialize_track_json(&track)?;
         self.runtime.block_on(async {
-            let backend = self.storage_backend.read().await;
+            let backend = &self.storage_backend;
             let coll = backend.collection(collections::TRACKS);
             coll.upsert(&track.id, json.into_bytes())
                 .map_err(|e| HiveError::StorageError { msg: e.to_string() })
@@ -1200,7 +1230,7 @@ impl HiveNode {
     /// Get all platforms from the sync document
     pub fn get_platforms(&self) -> Result<Vec<PlatformInfo>, HiveError> {
         self.runtime.block_on(async {
-            let backend = self.storage_backend.read().await;
+            let backend = &self.storage_backend;
             let coll = backend.collection(collections::PLATFORMS);
 
             let docs = coll
@@ -1223,7 +1253,7 @@ impl HiveNode {
     pub fn put_platform(&self, platform: PlatformInfo) -> Result<(), HiveError> {
         let json = serialize_platform_json(&platform)?;
         self.runtime.block_on(async {
-            let backend = self.storage_backend.read().await;
+            let backend = &self.storage_backend;
             let coll = backend.collection(collections::PLATFORMS);
             coll.upsert(&platform.id, json.into_bytes())
                 .map_err(|e| HiveError::StorageError { msg: e.to_string() })
@@ -1237,7 +1267,7 @@ impl HiveNode {
     /// Get all pending commands
     pub fn get_commands(&self) -> Result<Vec<CommandInfo>, HiveError> {
         self.runtime.block_on(async {
-            let backend = self.storage_backend.read().await;
+            let backend = &self.storage_backend;
             let coll = backend.collection(collections::COMMANDS);
 
             let docs = coll
@@ -1260,7 +1290,7 @@ impl HiveNode {
     pub fn put_command(&self, command: CommandInfo) -> Result<(), HiveError> {
         let json = serialize_command_json(&command)?;
         self.runtime.block_on(async {
-            let backend = self.storage_backend.read().await;
+            let backend = &self.storage_backend;
             let coll = backend.collection(collections::COMMANDS);
             coll.upsert(&command.id, json.into_bytes())
                 .map_err(|e| HiveError::StorageError { msg: e.to_string() })
@@ -1753,12 +1783,34 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_startSyncJni(
     _class: JClass,
     handle: i64,
 ) -> bool {
+    // CRITICAL DEBUG: Log unconditionally to verify this function is called
+    eprintln!("startSyncJni: CALLED with handle={}", handle);
+    #[cfg(target_os = "android")]
+    android_log(&format!("startSyncJni: ENTERED with handle={}", handle));
+
     if handle == 0 {
+        #[cfg(target_os = "android")]
+        android_log("startSyncJni: handle is 0, returning false");
         return false;
     }
 
     let node = unsafe { Arc::from_raw(handle as *const HiveNode) };
-    let result = node.start_sync().is_ok();
+
+    #[cfg(target_os = "android")]
+    android_log("startSyncJni: calling node.start_sync()");
+
+    let result = match node.start_sync() {
+        Ok(()) => {
+            #[cfg(target_os = "android")]
+            android_log("startSyncJni: start_sync succeeded");
+            true
+        }
+        Err(e) => {
+            #[cfg(target_os = "android")]
+            android_log(&format!("startSyncJni: start_sync failed: {}", e));
+            false
+        }
+    };
 
     // Don't drop the Arc - we're just borrowing
     std::mem::forget(node);
@@ -2206,9 +2258,12 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_nativeInit(
 pub extern "C" fn JNI_OnLoad(vm: *mut JavaVM, _reserved: *mut c_void) -> jint {
     // Log that we're being called
     #[cfg(target_os = "android")]
-    {
-        android_log("JNI_OnLoad called for hive_ffi");
-    }
+    android_log("JNI_OnLoad called for hive_ffi");
+
+    // NOTE: Tracing initialization disabled - was causing issues and blocking debugging.
+    // The android_log() function works directly and is used for critical logging.
+    // Tracing from protocol crate won't show in logcat, but we can add android_log
+    // callbacks if needed for debugging specific paths.
 
     // Store JavaVM globally for callbacks from any thread
     let java_vm = unsafe {
