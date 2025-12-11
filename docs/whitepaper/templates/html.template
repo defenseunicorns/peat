@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="$lang$">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="generator" content="pandoc">
+$for(author)$
+  <meta name="author" content="$author.name$">
+$endfor$
+$if(date)$
+  <meta name="dcterms.date" content="$date$">
+$endif$
+$if(keywords)$
+  <meta name="keywords" content="$for(keywords)$$keywords$$sep$, $endfor$">
+$endif$
+$if(description)$
+  <meta name="description" content="$description$">
+$endif$
+  <title>$if(title)$$title$$endif$</title>
+$if(css)$
+  <style>
+$css$
+  </style>
+$endif$
+$for(header-includes)$
+  $header-includes$
+$endfor$
+</head>
+<body>
+<header id="title-block-header">
+$if(title)$
+<h1 class="title">$title$</h1>
+$endif$
+$if(subtitle)$
+<p class="subtitle">$subtitle$</p>
+$endif$
+$for(author)$
+<p class="author">$author.name$$if(author.affiliation)$ — $author.affiliation$$endif$</p>
+$endfor$
+$if(date)$
+<p class="date">$date$$if(version)$ | $version$$endif$</p>
+$endif$
+$if(classification)$
+<p class="classification"><strong>$classification$</strong>$if(distribution)$ — $distribution$$endif$</p>
+$endif$
+</header>
+$if(abstract)$
+<section id="abstract">
+<h2>Abstract</h2>
+$abstract$
+</section>
+$endif$
+$if(toc)$
+<nav id="$idprefix$TOC" role="doc-toc">
+<h2>Contents</h2>
+$table-of-contents$
+</nav>
+$endif$
+$body$
+$for(include-after)$
+$include-after$
+$endfor$
+</body>
+</html>

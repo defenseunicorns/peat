@@ -1,0 +1,16 @@
+# Build output
+build/
+
+# LaTeX auxiliary files (if building locally)
+*.aux
+*.log
+*.out
+*.toc
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+
+# Editor files
+*.swp
+*~
+.DS_Store
