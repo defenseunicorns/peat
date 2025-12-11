@@ -27,6 +27,7 @@ pub mod credentials; // Backend-agnostic credential management
 pub mod discovery;
 pub mod distribution; // AI model distribution (manifests, updates, requirements)
 pub mod error;
+pub mod event; // Event routing and aggregation (ADR-027)
 pub mod ffi; // FFI bindings for ATAK and other native consumers (Issue #258)
 pub mod hierarchy;
 pub mod models;
