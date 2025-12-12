@@ -1014,6 +1014,15 @@ impl AutomergeIrohBackend {
         Arc::clone(&self.transport)
     }
 
+    /// Get the storage backend (Issue #378: shared with sync coordinator)
+    ///
+    /// Returns the underlying `AutomergeBackend` used by this sync backend.
+    /// This ensures callers use the same backend instance that the sync
+    /// coordinator uses, preventing state from being split across instances.
+    pub fn storage_backend(&self) -> Arc<crate::storage::AutomergeBackend> {
+        Arc::clone(&self.backend)
+    }
+
     /// Get the transport Arc pointer address (for debugging Issue #271)
     ///
     /// This returns the raw pointer address of the transport Arc, which can be used
