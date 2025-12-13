@@ -170,7 +170,7 @@ impl MeshManager {
 
     /// Get our parent's node ID
     pub fn parent(&self) -> Option<NodeId> {
-        self.topology.read().unwrap().parent.clone()
+        self.topology.read().unwrap().parent
     }
 
     /// Get list of children
@@ -205,7 +205,7 @@ impl MeshManager {
         // Only consider nodes at higher hierarchy levels as parent candidates
         if beacon.hierarchy_level > self.my_level {
             let candidate = ParentCandidate {
-                node_id: beacon.node_id.clone(),
+                node_id: beacon.node_id,
                 level: beacon.hierarchy_level,
                 rssi,
                 age_ms: 0,
@@ -256,23 +256,20 @@ impl MeshManager {
             return Err(BleError::InvalidState("Already have a parent".into()));
         }
 
-        if !topology.set_parent(node_id.clone()) {
+        if !topology.set_parent(node_id) {
             return Err(BleError::ConnectionFailed(
                 "Cannot accept connection".into(),
             ));
         }
 
         // Add peer info
-        let mut peer_info = PeerInfo::new(node_id.clone(), PeerRole::Parent, level);
+        let mut peer_info = PeerInfo::new(node_id, PeerRole::Parent, level);
         peer_info.state = ConnectionState::Connected;
         peer_info.rssi = Some(rssi);
         peer_info.connected_at = Some(self.time_ms());
         peer_info.last_seen_ms = self.time_ms();
 
-        self.peers
-            .write()
-            .unwrap()
-            .insert(node_id.clone(), peer_info);
+        self.peers.write().unwrap().insert(node_id, peer_info);
 
         // Emit event
         drop(topology); // Release lock before emitting
@@ -297,7 +294,7 @@ impl MeshManager {
             self.peers.write().unwrap().remove(parent_id);
 
             self.emit_event(TopologyEvent::ParentDisconnected {
-                node_id: parent_id.clone(),
+                node_id: *parent_id,
                 reason,
             });
             self.emit_topology_changed();
@@ -310,20 +307,17 @@ impl MeshManager {
     pub fn accept_child(&self, node_id: NodeId, level: HierarchyLevel) -> Result<()> {
         let mut topology = self.topology.write().unwrap();
 
-        if !topology.add_child(node_id.clone()) {
+        if !topology.add_child(node_id) {
             return Err(BleError::ConnectionFailed("Cannot accept child".into()));
         }
 
         // Add peer info
-        let mut peer_info = PeerInfo::new(node_id.clone(), PeerRole::Child, level);
+        let mut peer_info = PeerInfo::new(node_id, PeerRole::Child, level);
         peer_info.state = ConnectionState::Connected;
         peer_info.connected_at = Some(self.time_ms());
         peer_info.last_seen_ms = self.time_ms();
 
-        self.peers
-            .write()
-            .unwrap()
-            .insert(node_id.clone(), peer_info);
+        self.peers.write().unwrap().insert(node_id, peer_info);
 
         // Emit event
         drop(topology);
@@ -344,7 +338,7 @@ impl MeshManager {
             self.peers.write().unwrap().remove(node_id);
 
             self.emit_event(TopologyEvent::ChildDisconnected {
-                node_id: node_id.clone(),
+                node_id: *node_id,
                 reason,
             });
             self.emit_topology_changed();
@@ -385,12 +379,12 @@ impl MeshManager {
                 .read()
                 .unwrap()
                 .first()
-                .map(|c| c.node_id.clone())
+                .map(|c| c.node_id)
                 .unwrap_or_else(|| NodeId::new(0))
         };
 
         if let Some((node_id, level, rssi)) = new_parent {
-            self.connect_parent(node_id.clone(), level, rssi)?;
+            self.connect_parent(node_id, level, rssi)?;
 
             let mut state = self.state.write().unwrap();
             *state = ManagerState::Running;
@@ -424,7 +418,7 @@ impl MeshManager {
         drop(peers);
 
         self.emit_event(TopologyEvent::ConnectionQualityChanged {
-            node_id: node_id.clone(),
+            node_id: *node_id,
             rssi,
         });
     }
@@ -457,7 +451,7 @@ impl MeshManager {
     /// Check if we should switch parents (better option available)
     pub fn should_switch_parent(&self) -> Option<ParentCandidate> {
         let topology = self.topology.read().unwrap();
-        let current_parent = topology.parent.clone()?;
+        let current_parent = topology.parent?;
         drop(topology);
 
         let peers = self.peers.read().unwrap();
@@ -524,11 +518,11 @@ mod tests {
 
         let parent_id = NodeId::new(0x5678);
         assert!(manager
-            .connect_parent(parent_id.clone(), HierarchyLevel::Squad, -50)
+            .connect_parent(parent_id, HierarchyLevel::Squad, -50)
             .is_ok());
 
         assert!(manager.has_parent());
-        assert_eq!(manager.parent(), Some(parent_id.clone()));
+        assert_eq!(manager.parent(), Some(parent_id));
 
         // Can't connect another parent
         assert!(manager
@@ -543,7 +537,7 @@ mod tests {
 
         let parent_id = NodeId::new(0x5678);
         manager
-            .connect_parent(parent_id.clone(), HierarchyLevel::Squad, -50)
+            .connect_parent(parent_id, HierarchyLevel::Squad, -50)
             .unwrap();
 
         let old = manager.disconnect_parent(DisconnectReason::Requested);
@@ -562,7 +556,7 @@ mod tests {
 
         let child_id = NodeId::new(0x0001);
         assert!(manager
-            .accept_child(child_id.clone(), HierarchyLevel::Platform)
+            .accept_child(child_id, HierarchyLevel::Platform)
             .is_ok());
 
         assert_eq!(manager.child_count(), 1);
@@ -652,7 +646,7 @@ mod tests {
 
         let parent_id = NodeId::new(0x5678);
         manager
-            .connect_parent(parent_id.clone(), HierarchyLevel::Squad, -50)
+            .connect_parent(parent_id, HierarchyLevel::Squad, -50)
             .unwrap();
 
         // Start failover
@@ -696,7 +690,7 @@ mod tests {
 
         let parent_id = NodeId::new(0x5678);
         manager
-            .connect_parent(parent_id.clone(), HierarchyLevel::Squad, -50)
+            .connect_parent(parent_id, HierarchyLevel::Squad, -50)
             .unwrap();
 
         manager.update_rssi(&parent_id, -60);

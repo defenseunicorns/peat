@@ -344,7 +344,7 @@ impl GattSyncProtocol {
     /// Create a new sync protocol instance
     pub fn new(node_id: NodeId, config: SyncConfig) -> Self {
         Self {
-            node_id: node_id.clone(),
+            node_id,
             batch: BatchAccumulator::new(config.batch.clone()),
             delta: DeltaEncoder::new(node_id),
             vector_clock: VectorClock::new(),
@@ -682,7 +682,7 @@ mod tests {
         let node1 = NodeId::new(1);
         let node2 = NodeId::new(2);
 
-        let mut proto1 = GattSyncProtocol::with_defaults(node1.clone());
+        let mut proto1 = GattSyncProtocol::with_defaults(node1);
         proto1.add_peer(&node2);
         proto1.set_mtu(100);
 
@@ -703,8 +703,8 @@ mod tests {
         let node1 = NodeId::new(1);
         let node2 = NodeId::new(2);
 
-        let mut proto1 = GattSyncProtocol::with_defaults(node1.clone());
-        let mut proto2 = GattSyncProtocol::with_defaults(node2.clone());
+        let mut proto1 = GattSyncProtocol::with_defaults(node1);
+        let mut proto2 = GattSyncProtocol::with_defaults(node2);
 
         proto1.add_peer(&node2);
         proto2.add_peer(&node1);

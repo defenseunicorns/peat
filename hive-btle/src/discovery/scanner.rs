@@ -268,7 +268,7 @@ impl Scanner {
 
         // Extract beacon and node ID
         let (beacon, node_id) = match adv.beacon {
-            Some(ref b) => (b.clone(), b.node_id.clone()),
+            Some(ref b) => (b.clone(), b.node_id),
             None => return false, // No beacon = not a HIVE device
         };
 
@@ -278,7 +278,7 @@ impl Scanner {
                 return false;
             }
         }
-        self.last_processed.insert(node_id.clone(), Instant::now());
+        self.last_processed.insert(node_id, Instant::now());
 
         // Update or create tracked device
         let is_new = !self.devices.contains_key(&node_id);
@@ -289,7 +289,7 @@ impl Scanner {
         } else {
             // New device
             let device = TrackedDevice::new(beacon, adv.address.clone(), adv.rssi, adv.connectable);
-            self.devices.insert(node_id.clone(), device);
+            self.devices.insert(node_id, device);
             self.address_map.insert(adv.address, node_id);
         }
 
@@ -339,7 +339,7 @@ impl Scanner {
             .devices
             .iter()
             .filter(|(_, d)| d.is_stale(timeout))
-            .map(|(id, _)| id.clone())
+            .map(|(id, _)| *id)
             .collect();
 
         let count = stale.len();
