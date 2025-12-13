@@ -12,6 +12,7 @@ members = [
     "hive-commander",
     "hive-inference",
     "hive-tak-bridge",
+    "hive-btle",
 ]
 # hive-lite is excluded because it requires ESP32 toolchain (no_std)
 exclude = ["hive-lite"]
