@@ -1863,8 +1863,11 @@ fn create_backend_config(
             // Try HIVE_SECRET_KEY first, fall back to DITTO_SHARED_KEY for compatibility
             let shared_key =
                 std::env::var("HIVE_SECRET_KEY").or_else(|_| std::env::var("DITTO_SHARED_KEY"))?;
+            // Use shared formation ID for all nodes (Issue #399)
+            // This ensures formation handshake succeeds in hierarchical topologies
+            // where nodes at different levels need to connect (soldiers → squad leaders → etc.)
             let app_id =
-                std::env::var("DITTO_APP_ID").unwrap_or_else(|_| format!("automerge-{}", node_id));
+                std::env::var("DITTO_APP_ID").unwrap_or_else(|_| "default-formation".to_string());
 
             BackendConfig {
                 app_id,
