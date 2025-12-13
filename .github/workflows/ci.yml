@@ -56,8 +56,8 @@ jobs:
       - run: cargo clippy --all-targets --all-features --workspace --exclude hive-ffi --exclude hive-inference --exclude hive-btle -- -D warnings
       # Run clippy on hive-inference without optional features (no GStreamer/CUDA deps)
       - run: cargo clippy -p hive-inference --all-targets -- -D warnings
-      # Run clippy on hive-btle with linux feature (not macos/ios which need Apple)
-      - run: cargo clippy -p hive-btle --all-targets --features linux -- -D warnings
+      # Run clippy on hive-btle with default features (platform features need OS-specific deps)
+      - run: cargo clippy -p hive-btle --all-targets -- -D warnings
 
   # ============================================
   # Tests (single compile, nextest for speed)
@@ -97,7 +97,7 @@ jobs:
         run: |
           cargo nextest run --all-features --workspace --exclude hive-ffi --exclude hive-inference --exclude hive-btle -E 'not test(e2e)'
           cargo nextest run -p hive-inference -E 'not test(e2e)'
-          cargo nextest run -p hive-btle --features linux -E 'not test(e2e)'
+          cargo nextest run -p hive-btle -E 'not test(e2e)'
 
       - name: Run all tests (including E2E for main)
         if: github.event_name != 'pull_request'
@@ -108,4 +108,4 @@ jobs:
         run: |
           cargo nextest run --all-features --workspace --exclude hive-ffi --exclude hive-inference --exclude hive-btle
           cargo nextest run -p hive-inference
-          cargo nextest run -p hive-btle --features linux
+          cargo nextest run -p hive-btle
