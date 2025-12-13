@@ -98,6 +98,7 @@ pub mod error;
 pub mod gatt;
 pub mod mesh;
 pub mod platform;
+pub mod sync;
 pub mod transport;
 
 // Re-exports for convenience
@@ -107,6 +108,7 @@ pub use error::{BleError, Result};
 pub use gatt::{HiveGattService, SyncProtocol};
 pub use mesh::{MeshManager, MeshRouter, MeshTopology, TopologyConfig, TopologyEvent};
 pub use platform::{BleAdapter, ConnectionEvent, DisconnectReason, DiscoveredDevice, StubAdapter};
+pub use sync::{GattSyncProtocol, SyncConfig, SyncState};
 pub use transport::{BleConnection, BluetoothLETransport, MeshTransport, TransportCapabilities};
 
 /// HIVE BLE Service UUID (128-bit)
