@@ -96,6 +96,7 @@ pub mod config;
 pub mod discovery;
 pub mod error;
 pub mod gatt;
+pub mod mesh;
 pub mod platform;
 pub mod transport;
 
@@ -104,6 +105,7 @@ pub use config::{BleConfig, BlePhy, DiscoveryConfig, GattConfig, MeshConfig, Pow
 pub use discovery::{Advertiser, HiveBeacon, ScanFilter, Scanner};
 pub use error::{BleError, Result};
 pub use gatt::{HiveGattService, SyncProtocol};
+pub use mesh::{MeshManager, MeshRouter, MeshTopology, TopologyConfig, TopologyEvent};
 pub use platform::{BleAdapter, ConnectionEvent, DisconnectReason, DiscoveredDevice, StubAdapter};
 pub use transport::{BleConnection, BluetoothLETransport, MeshTransport, TransportCapabilities};
 
