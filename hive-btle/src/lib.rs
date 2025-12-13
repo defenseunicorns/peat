@@ -95,6 +95,7 @@ use alloc::vec::Vec;
 pub mod config;
 pub mod discovery;
 pub mod error;
+pub mod gatt;
 pub mod platform;
 pub mod transport;
 
@@ -102,6 +103,7 @@ pub mod transport;
 pub use config::{BleConfig, BlePhy, DiscoveryConfig, GattConfig, MeshConfig, PowerProfile};
 pub use discovery::{Advertiser, HiveBeacon, ScanFilter, Scanner};
 pub use error::{BleError, Result};
+pub use gatt::{HiveGattService, SyncProtocol};
 pub use platform::{BleAdapter, ConnectionEvent, DisconnectReason, DiscoveredDevice, StubAdapter};
 pub use transport::{BleConnection, BluetoothLETransport, MeshTransport, TransportCapabilities};
 
