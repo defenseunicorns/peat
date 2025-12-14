@@ -51,6 +51,13 @@ pub struct StorageConfig {
     /// Required for redb, optional for others.
     /// Example: `/var/cap/data`, `./data`, `/tmp/cap-test`
     pub data_path: Option<PathBuf>,
+
+    /// Run in pure in-memory mode (no disk persistence)
+    ///
+    /// When true, the automerge backend will skip all disk writes and store
+    /// documents only in the LRU cache. Useful for high-throughput testing
+    /// where persistence is not needed.
+    pub in_memory: bool,
 }
 
 impl Default for StorageConfig {
@@ -65,6 +72,7 @@ impl Default for StorageConfig {
         Self {
             backend: "ditto".to_string(),
             data_path: None,
+            in_memory: false,
         }
     }
 }
@@ -97,7 +105,16 @@ impl StorageConfig {
 
         let data_path = std::env::var("CAP_DATA_PATH").ok().map(PathBuf::from);
 
-        Ok(Self { backend, data_path })
+        // CAP_IN_MEMORY=true enables pure in-memory mode (no disk persistence)
+        let in_memory = std::env::var("CAP_IN_MEMORY")
+            .map(|v| v == "1" || v.to_lowercase() == "true")
+            .unwrap_or(false);
+
+        Ok(Self {
+            backend,
+            data_path,
+            in_memory,
+        })
     }
 
     /// Validate configuration
@@ -193,14 +210,17 @@ pub fn create_storage_backend(config: &StorageConfig) -> Result<Arc<dyn StorageB
                 use crate::storage::automerge_backend::AutomergeBackend;
                 use crate::storage::automerge_store::AutomergeStore;
 
-                // Determine storage path (use data_path if provided, otherwise temp)
-                let path = config.data_path.as_deref().ok_or_else(|| {
-                    anyhow!("Automerge backend requires CAP_DATA_PATH to be set for persistence")
-                })?;
-
-                // Create AutomergeStore with persistence
-                let automerge_store =
-                    AutomergeStore::open(path).context("Failed to create Automerge backend")?;
+                // Create AutomergeStore - in-memory or with persistence
+                let automerge_store = if config.in_memory {
+                    tracing::info!("Creating AutomergeStore in MEMORY-ONLY mode");
+                    AutomergeStore::in_memory()
+                } else {
+                    // Determine storage path (use data_path if provided, otherwise temp)
+                    let path = config.data_path.as_deref().ok_or_else(|| {
+                        anyhow!("Automerge backend requires CAP_DATA_PATH to be set for persistence (or use CAP_IN_MEMORY=true)")
+                    })?;
+                    AutomergeStore::open(path).context("Failed to create Automerge backend")?
+                };
 
                 // Wrap in AutomergeBackend trait adapter (without transport for now)
                 let backend = AutomergeBackend::new(Arc::new(automerge_store));
@@ -249,6 +269,7 @@ mod tests {
         let config = StorageConfig {
             backend: "ditto".to_string(),
             data_path: None,
+            in_memory: false,
         };
         assert!(config.validate().is_ok());
     }
@@ -258,6 +279,7 @@ mod tests {
         let config = StorageConfig {
             backend: "automerge-memory".to_string(),
             data_path: None,
+            in_memory: false,
         };
         assert!(config.validate().is_ok());
     }
@@ -267,12 +289,14 @@ mod tests {
         let config = StorageConfig {
             backend: "redb".to_string(),
             data_path: None,
+            in_memory: false,
         };
         assert!(config.validate().is_err());
 
         let config_with_path = StorageConfig {
             backend: "redb".to_string(),
             data_path: Some(PathBuf::from("/var/cap/data")),
+            in_memory: false,
         };
         assert!(config_with_path.validate().is_ok());
     }
@@ -282,6 +306,7 @@ mod tests {
         let config = StorageConfig {
             backend: "unknown".to_string(),
             data_path: None,
+            in_memory: false,
         };
         assert!(config.validate().is_err());
     }
@@ -300,6 +325,7 @@ mod tests {
         let config = StorageConfig {
             backend: "automerge-memory".to_string(),
             data_path: None,
+            in_memory: false, // Not in-memory, so needs data_path
         };
         let result = create_storage_backend(&config);
         assert!(result.is_err());
@@ -317,6 +343,7 @@ mod tests {
         let config = StorageConfig {
             backend: "redb".to_string(),
             data_path: Some(PathBuf::from("/tmp/test")),
+            in_memory: false,
         };
         let result = create_storage_backend(&config);
         assert!(result.is_err());
@@ -331,6 +358,7 @@ mod tests {
         let config = StorageConfig {
             backend: "unknown".to_string(),
             data_path: None,
+            in_memory: false,
         };
         let result = create_storage_backend(&config);
         assert!(result.is_err());
