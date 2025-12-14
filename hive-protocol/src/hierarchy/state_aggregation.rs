@@ -43,7 +43,7 @@ use crate::cell::capability_aggregation::CapabilityAggregator;
 use crate::models::{NodeConfig, NodeState, NodeStateExt};
 use crate::{Error, Result};
 use hive_schema::common::v1::{Position, Timestamp};
-use hive_schema::hierarchy::v1::{BoundingBox, PlatoonSummary, SquadSummary};
+use hive_schema::hierarchy::v1::{BoundingBox, CompanySummary, PlatoonSummary, SquadSummary};
 use hive_schema::node::v1::HealthStatus;
 use std::time::SystemTime;
 
@@ -221,6 +221,84 @@ impl StateAggregator {
             leader_id: leader_id.to_string(),
             squad_ids,
             squad_count,
+            total_member_count,
+            position_centroid: Some(position_centroid),
+            avg_fuel_minutes,
+            worst_health: worst_health as i32,
+            operational_count,
+            aggregated_capabilities,
+            readiness_score,
+            bounding_box,
+            aggregated_at,
+        })
+    }
+
+    /// Aggregate company-level state from platoon summaries
+    ///
+    /// # Arguments
+    ///
+    /// * `company_id` - Unique company identifier
+    /// * `leader_id` - Company commander node ID
+    /// * `platoons` - Vector of PlatoonSummary from constituent platoons
+    ///
+    /// # Returns
+    ///
+    /// `CompanySummary` with aggregated position, health, fuel, and capabilities
+    pub fn aggregate_company(
+        company_id: &str,
+        leader_id: &str,
+        platoons: Vec<PlatoonSummary>,
+    ) -> Result<CompanySummary> {
+        if platoons.is_empty() {
+            return Err(Error::HierarchicalOp {
+                message: "Company has no platoons".to_string(),
+                operation: "aggregate_company".to_string(),
+                source: None,
+            });
+        }
+
+        // Extract platoon IDs
+        let platoon_ids: Vec<String> = platoons.iter().map(|p| p.platoon_id.clone()).collect();
+        let platoon_count = platoons.len() as u32;
+
+        // Sum total member count
+        let total_member_count: u32 = platoons.iter().map(|p| p.total_member_count).sum();
+
+        // Calculate position centroid from platoon centroids
+        let position_centroid = Self::calculate_position_centroid_from_positions(
+            &platoons
+                .iter()
+                .filter_map(|p| p.position_centroid.as_ref())
+                .cloned()
+                .collect::<Vec<_>>(),
+        )?;
+
+        // Calculate average fuel across platoons (weighted by member count)
+        let avg_fuel_minutes = Self::calculate_weighted_avg_fuel_from_platoons(&platoons);
+
+        // Find worst health across platoons
+        let worst_health = Self::find_worst_health_from_platoons(&platoons);
+
+        // Sum operational counts
+        let operational_count: u32 = platoons.iter().map(|p| p.operational_count).sum();
+
+        // Aggregate capabilities across platoons (union of capabilities)
+        let aggregated_capabilities = Self::aggregate_capabilities_from_platoons(&platoons);
+
+        // Calculate company readiness (weighted average of platoon readiness)
+        let readiness_score = Self::calculate_weighted_readiness_from_platoons(&platoons);
+
+        // Calculate company bounding box from platoon bounding boxes
+        let bounding_box = Some(Self::aggregate_bounding_boxes_from_platoons(&platoons)?);
+
+        // Create timestamp
+        let aggregated_at = Some(Self::current_timestamp());
+
+        Ok(CompanySummary {
+            company_id: company_id.to_string(),
+            leader_id: leader_id.to_string(),
+            platoon_ids,
+            platoon_count,
             total_member_count,
             position_centroid: Some(position_centroid),
             avg_fuel_minutes,
@@ -509,6 +587,147 @@ impl StateAggregator {
         }
 
         total_readiness / total_members as f32
+    }
+
+    // ========================================================================
+    // Company-level helper functions (aggregate from PlatoonSummary)
+    // ========================================================================
+
+    /// Calculate weighted average fuel from platoon summaries
+    fn calculate_weighted_avg_fuel_from_platoons(platoons: &[PlatoonSummary]) -> f32 {
+        if platoons.is_empty() {
+            return 0.0;
+        }
+
+        let total_fuel: f32 = platoons
+            .iter()
+            .map(|p| p.avg_fuel_minutes * p.total_member_count as f32)
+            .sum();
+        let total_members: u32 = platoons.iter().map(|p| p.total_member_count).sum();
+
+        if total_members == 0 {
+            return 0.0;
+        }
+
+        total_fuel / total_members as f32
+    }
+
+    /// Find worst health status from platoon summaries
+    fn find_worst_health_from_platoons(platoons: &[PlatoonSummary]) -> HealthStatus {
+        platoons
+            .iter()
+            .map(|p| HealthStatus::try_from(p.worst_health).unwrap_or(HealthStatus::Failed))
+            .max_by_key(|h| *h as i32)
+            .unwrap_or(HealthStatus::Nominal)
+    }
+
+    /// Aggregate capabilities from platoon summaries (union of capabilities)
+    fn aggregate_capabilities_from_platoons(
+        platoons: &[PlatoonSummary],
+    ) -> Vec<hive_schema::capability::v1::Capability> {
+        use std::collections::HashMap;
+
+        let mut capability_map: HashMap<i32, hive_schema::capability::v1::Capability> =
+            HashMap::new();
+
+        for platoon in platoons {
+            for cap in &platoon.aggregated_capabilities {
+                capability_map
+                    .entry(cap.capability_type)
+                    .and_modify(|existing| {
+                        // Take the higher confidence score
+                        if cap.confidence > existing.confidence {
+                            existing.confidence = cap.confidence;
+                        }
+                    })
+                    .or_insert_with(|| cap.clone());
+            }
+        }
+
+        capability_map.into_values().collect()
+    }
+
+    /// Calculate weighted average readiness score from platoon summaries
+    fn calculate_weighted_readiness_from_platoons(platoons: &[PlatoonSummary]) -> f32 {
+        if platoons.is_empty() {
+            return 0.0;
+        }
+
+        let total_readiness: f32 = platoons
+            .iter()
+            .map(|p| p.readiness_score * p.total_member_count as f32)
+            .sum();
+        let total_members: u32 = platoons.iter().map(|p| p.total_member_count).sum();
+
+        if total_members == 0 {
+            return 0.0;
+        }
+
+        total_readiness / total_members as f32
+    }
+
+    /// Aggregate bounding boxes from platoon summaries
+    fn aggregate_bounding_boxes_from_platoons(platoons: &[PlatoonSummary]) -> Result<BoundingBox> {
+        let boxes: Vec<&BoundingBox> = platoons
+            .iter()
+            .filter_map(|p| p.bounding_box.as_ref())
+            .collect();
+
+        if boxes.is_empty() {
+            return Err(Error::HierarchicalOp {
+                message: "No valid bounding boxes to aggregate".to_string(),
+                operation: "aggregate_bounding_boxes_from_platoons".to_string(),
+                source: None,
+            });
+        }
+
+        let min_lat = boxes
+            .iter()
+            .filter_map(|b| b.southwest.as_ref())
+            .map(|p| p.latitude)
+            .fold(f64::INFINITY, f64::min);
+        let max_lat = boxes
+            .iter()
+            .filter_map(|b| b.northeast.as_ref())
+            .map(|p| p.latitude)
+            .fold(f64::NEG_INFINITY, f64::max);
+        let min_lon = boxes
+            .iter()
+            .filter_map(|b| b.southwest.as_ref())
+            .map(|p| p.longitude)
+            .fold(f64::INFINITY, f64::min);
+        let max_lon = boxes
+            .iter()
+            .filter_map(|b| b.northeast.as_ref())
+            .map(|p| p.longitude)
+            .fold(f64::NEG_INFINITY, f64::max);
+        let min_alt = boxes
+            .iter()
+            .map(|b| b.min_altitude)
+            .fold(f32::INFINITY, f32::min);
+        let max_alt = boxes
+            .iter()
+            .map(|b| b.max_altitude)
+            .fold(f32::NEG_INFINITY, f32::max);
+
+        // Calculate radius from max of constituent platoon radii
+        let radius_m = boxes.iter().map(|b| b.radius_m).fold(0.0, f32::max);
+
+        Ok(BoundingBox {
+            southwest: Some(Position {
+                latitude: min_lat,
+                longitude: min_lon,
+                altitude: min_alt as f64,
+            }),
+            northeast: Some(Position {
+                latitude: max_lat,
+                longitude: max_lon,
+                altitude: max_alt as f64,
+            }),
+            max_altitude: max_alt,
+            min_altitude: min_alt,
+            radius_m,
+        })
     }
 
     /// Haversine distance calculation (approximate)

@@ -42,9 +42,16 @@ const TOMBSTONES_TABLE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("to
 ///
 /// The store emits change notifications when documents are modified via `put()`.
 /// Subscribers can listen for these notifications to trigger automatic sync.
+///
+/// # In-Memory Mode
+///
+/// For high-throughput testing, the store can operate in pure in-memory mode
+/// where all documents are stored only in the LRU cache (no disk persistence).
+/// Enable via `AutomergeStore::in_memory()` constructor.
 #[cfg(feature = "automerge-backend")]
 pub struct AutomergeStore {
-    db: Arc<Database>,
+    /// Database handle - None when running in memory-only mode
+    db: Option<Arc<Database>>,
     cache: Arc<RwLock<LruCache<String, Automerge>>>,
     /// Broadcast channel for sync coordinator - used to trigger P2P sync
     /// Only notified for local puts (not synced documents)
@@ -112,11 +119,39 @@ impl AutomergeStore {
         let (observer_tx, _) = broadcast::channel(8192);
 
         Ok(Self {
-            db: Arc::new(db),
+            db: Some(Arc::new(db)),
             cache: Arc::new(RwLock::new(cache)),
             change_tx,
             observer_tx,
         })
+    }
+
+    /// Create an in-memory store (no disk persistence)
+    ///
+    /// Documents are stored only in the LRU cache. This mode is useful for
+    /// high-throughput testing where persistence is not required.
+    ///
+    /// Note: Cache size is 10,000 documents in memory mode (vs 1,000 for disk mode)
+    /// to accommodate larger working sets.
+    pub fn in_memory() -> Self {
+        // Larger cache for in-memory mode since we have no disk backing
+        let cache = LruCache::new(NonZeroUsize::new(10000).unwrap());
+        let (change_tx, _) = broadcast::channel(8192);
+        let (observer_tx, _) = broadcast::channel(8192);
+
+        tracing::info!("AutomergeStore: Running in MEMORY-ONLY mode (no disk persistence)");
+
+        Self {
+            db: None,
+            cache: Arc::new(RwLock::new(cache)),
+            change_tx,
+            observer_tx,
+        }
+    }
+
+    /// Check if the store is running in memory-only mode
+    pub fn is_in_memory(&self) -> bool {
+        self.db.is_none()
     }
 
     /// Save an Automerge document
@@ -140,21 +175,23 @@ impl AutomergeStore {
 
     /// Internal put implementation
     fn put_inner(&self, key: &str, doc: &Automerge, notify: bool) -> Result<()> {
-        let bytes = doc.save();
+        // Only persist to disk if we have a database (not in-memory mode)
+        if let Some(ref db) = self.db {
+            let bytes = doc.save();
 
-        let write_txn = self
-            .db
-            .begin_write()
-            .context("Failed to begin write transaction")?;
-        {
-            let mut table = write_txn
-                .open_table(DOCUMENTS_TABLE)
-                .context("Failed to open documents table")?;
-            table
-                .insert(key.as_bytes(), bytes.as_slice())
-                .context("Failed to insert document")?;
+            let write_txn = db
+                .begin_write()
+                .context("Failed to begin write transaction")?;
+            {
+                let mut table = write_txn
+                    .open_table(DOCUMENTS_TABLE)
+                    .context("Failed to open documents table")?;
+                table
+                    .insert(key.as_bytes(), bytes.as_slice())
+                    .context("Failed to insert document")?;
+            }
+            write_txn.commit().context("Failed to commit write")?;
         }
-        write_txn.commit().context("Failed to commit write")?;
 
         self.cache
             .write()
@@ -177,6 +214,7 @@ impl AutomergeStore {
 
     /// Load an Automerge document
     pub fn get(&self, key: &str) -> Result<Option<Automerge>> {
+        // Always check cache first
         {
             let mut cache = self.cache.write().unwrap();
             if let Some(doc) = cache.get(key) {
@@ -184,8 +222,12 @@ impl AutomergeStore {
             }
         }
 
-        let read_txn = self
-            .db
+        // In memory-only mode, cache miss means document doesn't exist
+        let Some(ref db) = self.db else {
+            return Ok(None);
+        };
+
+        let read_txn = db
             .begin_read()
             .context("Failed to begin read transaction")?;
         let table = read_txn
@@ -210,17 +252,19 @@ impl AutomergeStore {
 
     /// Delete a document
     pub fn delete(&self, key: &str) -> Result<()> {
-        let write_txn = self
-            .db
-            .begin_write()
-            .context("Failed to begin write transaction")?;
-        {
-            let mut table = write_txn
-                .open_table(DOCUMENTS_TABLE)
-                .context("Failed to open documents table")?;
-            table.remove(key.as_bytes())?;
+        // Only delete from disk if we have a database
+        if let Some(ref db) = self.db {
+            let write_txn = db
+                .begin_write()
+                .context("Failed to begin write transaction")?;
+            {
+                let mut table = write_txn
+                    .open_table(DOCUMENTS_TABLE)
+                    .context("Failed to open documents table")?;
+                table.remove(key.as_bytes())?;
+            }
+            write_txn.commit().context("Failed to commit delete")?;
         }
-        write_txn.commit().context("Failed to commit delete")?;
 
         self.cache.write().unwrap().pop(key);
         Ok(())
@@ -228,10 +272,23 @@ impl AutomergeStore {
 
     /// Scan documents with prefix
     pub fn scan_prefix(&self, prefix: &str) -> Result<Vec<(String, Automerge)>> {
+        // In memory-only mode, scan the cache
+        if self.db.is_none() {
+            let cache = self.cache.read().unwrap();
+            let results: Vec<(String, Automerge)> = cache
+                .iter()
+                .filter(|(k, _)| k.starts_with(prefix))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+            return Ok(results);
+        }
+
         let mut results = Vec::new();
 
         let read_txn = self
             .db
+            .as_ref()
+            .unwrap()
             .begin_read()
             .context("Failed to begin read transaction")?;
         let table = read_txn
@@ -259,7 +316,12 @@ impl AutomergeStore {
 
     /// Count total documents
     pub fn count(&self) -> usize {
-        let read_txn = match self.db.begin_read() {
+        // In memory-only mode, count cache entries
+        let Some(ref db) = self.db else {
+            return self.cache.read().unwrap().len();
+        };
+
+        let read_txn = match db.begin_read() {
             Ok(txn) => txn,
             Err(_) => return 0,
         };
@@ -315,12 +377,16 @@ impl AutomergeStore {
     /// Store a tombstone
     ///
     /// Tombstones are stored with key format "collection:document_id"
+    /// In memory-only mode, this is a no-op (tombstones aren't needed without persistence)
     pub fn put_tombstone(&self, tombstone: &crate::qos::Tombstone) -> Result<()> {
+        let Some(ref db) = self.db else {
+            return Ok(()); // No-op in memory mode
+        };
+
         let key = format!("{}:{}", tombstone.collection, tombstone.document_id);
         let bytes = serde_json::to_vec(tombstone).context("Failed to serialize tombstone")?;
 
-        let write_txn = self
-            .db
+        let write_txn = db
             .begin_write()
             .context("Failed to begin write transaction")?;
         {
@@ -350,10 +416,13 @@ impl AutomergeStore {
         collection: &str,
         document_id: &str,
     ) -> Result<Option<crate::qos::Tombstone>> {
+        let Some(ref db) = self.db else {
+            return Ok(None); // No tombstones in memory mode
+        };
+
         let key = format!("{}:{}", collection, document_id);
 
-        let read_txn = self
-            .db
+        let read_txn = db
             .begin_read()
             .context("Failed to begin read transaction")?;
         let table = read_txn
@@ -376,11 +445,14 @@ impl AutomergeStore {
         &self,
         collection: &str,
     ) -> Result<Vec<crate::qos::Tombstone>> {
+        let Some(ref db) = self.db else {
+            return Ok(Vec::new()); // No tombstones in memory mode
+        };
+
         let prefix = format!("{}:", collection);
         let mut tombstones = Vec::new();
 
-        let read_txn = self
-            .db
+        let read_txn = db
             .begin_read()
             .context("Failed to begin read transaction")?;
         let table = read_txn
@@ -403,10 +475,13 @@ impl AutomergeStore {
 
     /// Get all tombstones across all collections
     pub fn get_all_tombstones(&self) -> Result<Vec<crate::qos::Tombstone>> {
+        let Some(ref db) = self.db else {
+            return Ok(Vec::new()); // No tombstones in memory mode
+        };
+
         let mut tombstones = Vec::new();
 
-        let read_txn = self
-            .db
+        let read_txn = db
             .begin_read()
             .context("Failed to begin read transaction")?;
         let table = read_txn
@@ -425,10 +500,13 @@ impl AutomergeStore {
 
     /// Remove a tombstone
     pub fn remove_tombstone(&self, collection: &str, document_id: &str) -> Result<bool> {
+        let Some(ref db) = self.db else {
+            return Ok(false); // No tombstones in memory mode
+        };
+
         let key = format!("{}:{}", collection, document_id);
 
-        let write_txn = self
-            .db
+        let write_txn = db
             .begin_write()
             .context("Failed to begin write transaction")?;
         let existed = {
@@ -462,15 +540,29 @@ impl AutomergeStore {
 
     /// Get list of all collections (by scanning document key prefixes)
     pub fn list_collections(&self) -> Result<Vec<String>> {
+        let mut collections = std::collections::HashSet::new();
+
+        // In memory-only mode, scan the cache
+        if self.db.is_none() {
+            let cache = self.cache.read().unwrap();
+            for key in cache.iter().map(|(k, _)| k) {
+                if let Some(colon_pos) = key.find(':') {
+                    let collection = &key[..colon_pos];
+                    collections.insert(collection.to_string());
+                }
+            }
+            return Ok(collections.into_iter().collect());
+        }
+
         let read_txn = self
             .db
+            .as_ref()
+            .unwrap()
             .begin_read()
             .context("Failed to begin read transaction")?;
         let table = read_txn
             .open_table(DOCUMENTS_TABLE)
             .context("Failed to open documents table")?;
-
-        let mut collections = std::collections::HashSet::new();
 
         for result in table.iter().context("Failed to iterate documents")? {
             let (key, _) = result.context("Failed to read document entry")?;
@@ -537,6 +629,199 @@ impl AutomergeStore {
             collection
         );
         Ok(())
+    }
+
+    // === Document Compaction (Issue #401 - Memory Blowout Fix) ===
+
+    /// Compact a document by discarding CRDT history
+    ///
+    /// Automerge documents accumulate operation history with every change.
+    /// This method replaces the document with a forked copy that contains
+    /// only the current state, freeing memory used by historical operations.
+    ///
+    /// # When to use
+    ///
+    /// - After many updates to high-frequency documents (beacons, node_states)
+    /// - When memory pressure is detected
+    /// - Periodically for long-running simulations
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(Some(old_size, new_size))` - Document was compacted, returns sizes before/after
+    /// - `Ok(None)` - Document not found
+    /// - `Err(_)` - Compaction failed
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let store = AutomergeStore::open("./data")?;
+    /// if let Some((old, new)) = store.compact("node_states:soldier-1")? {
+    ///     tracing::info!("Compacted {} -> {} bytes ({}% reduction)", old, new, 100 - (new * 100 / old));
+    /// }
+    /// ```
+    pub fn compact(&self, key: &str) -> Result<Option<(usize, usize)>> {
+        let doc = match self.get(key)? {
+            Some(d) => d,
+            None => return Ok(None),
+        };
+
+        let old_size = doc.save().len();
+
+        // Fork creates a new document with current state but no history
+        let compacted = doc.fork();
+        let new_size = compacted.save().len();
+
+        // Save the compacted document (without triggering sync notification)
+        self.put_without_notify(key, &compacted)?;
+
+        tracing::debug!(
+            "Compacted document {}: {} -> {} bytes ({:.1}% reduction)",
+            key,
+            old_size,
+            new_size,
+            if old_size > 0 {
+                100.0 - (new_size as f64 * 100.0 / old_size as f64)
+            } else {
+                0.0
+            }
+        );
+
+        Ok(Some((old_size, new_size)))
+    }
+
+    /// Compact all documents with a given prefix
+    ///
+    /// Useful for batch-compacting all documents in a collection.
+    ///
+    /// # Returns
+    ///
+    /// `(documents_compacted, total_bytes_before, total_bytes_after)`
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let store = AutomergeStore::open("./data")?;
+    /// let (count, before, after) = store.compact_prefix("node_states:")?;
+    /// tracing::info!("Compacted {} documents: {} -> {} bytes", count, before, after);
+    /// ```
+    pub fn compact_prefix(&self, prefix: &str) -> Result<(usize, usize, usize)> {
+        let docs = self.scan_prefix(prefix)?;
+        let mut count = 0;
+        let mut total_before = 0;
+        let mut total_after = 0;
+
+        for (key, _) in docs {
+            if let Some((before, after)) = self.compact(&key)? {
+                count += 1;
+                total_before += before;
+                total_after += after;
+            }
+        }
+
+        if count > 0 {
+            tracing::info!(
+                "Compacted {} documents with prefix '{}': {} -> {} bytes ({:.1}% reduction)",
+                count,
+                prefix,
+                total_before,
+                total_after,
+                if total_before > 0 {
+                    100.0 - (total_after as f64 * 100.0 / total_before as f64)
+                } else {
+                    0.0
+                }
+            );
+        }
+
+        Ok((count, total_before, total_after))
+    }
+
+    /// Compact all documents in the store
+    ///
+    /// # Returns
+    ///
+    /// `(documents_compacted, total_bytes_before, total_bytes_after)`
+    pub fn compact_all(&self) -> Result<(usize, usize, usize)> {
+        // In memory-only mode, iterate cache
+        if self.db.is_none() {
+            let keys: Vec<String> = {
+                let cache = self.cache.read().unwrap();
+                cache.iter().map(|(k, _)| k.clone()).collect()
+            };
+
+            let mut count = 0;
+            let mut total_before = 0;
+            let mut total_after = 0;
+
+            for key in keys {
+                if let Some((before, after)) = self.compact(&key)? {
+                    count += 1;
+                    total_before += before;
+                    total_after += after;
+                }
+            }
+
+            return Ok((count, total_before, total_after));
+        }
+
+        // With disk persistence, scan all documents
+        let read_txn = self
+            .db
+            .as_ref()
+            .unwrap()
+            .begin_read()
+            .context("Failed to begin read transaction")?;
+        let table = read_txn
+            .open_table(DOCUMENTS_TABLE)
+            .context("Failed to open documents table")?;
+
+        let keys: Vec<String> = table
+            .iter()?
+            .filter_map(|entry| {
+                entry
+                    .ok()
+                    .map(|(k, _)| String::from_utf8_lossy(k.value()).to_string())
+            })
+            .collect();
+
+        drop(table);
+        drop(read_txn);
+
+        let mut count = 0;
+        let mut total_before = 0;
+        let mut total_after = 0;
+
+        for key in keys {
+            if let Some((before, after)) = self.compact(&key)? {
+                count += 1;
+                total_before += before;
+                total_after += after;
+            }
+        }
+
+        if count > 0 {
+            tracing::info!(
+                "Compacted {} documents: {} -> {} bytes ({:.1}% reduction)",
+                count,
+                total_before,
+                total_after,
+                if total_before > 0 {
+                    100.0 - (total_after as f64 * 100.0 / total_before as f64)
+                } else {
+                    0.0
+                }
+            );
+        }
+
+        Ok((count, total_before, total_after))
+    }
+
+    /// Get the serialized size of a document (for monitoring)
+    pub fn document_size(&self, key: &str) -> Result<Option<usize>> {
+        match self.get(key)? {
+            Some(doc) => Ok(Some(doc.save().len())),
+            None => Ok(None),
+        }
     }
 }
 
@@ -879,5 +1164,136 @@ mod tests {
 
         let results = store.scan_prefix("prefix:").unwrap();
         assert_eq!(results.len(), 2);
+    }
+
+    // === Compaction Tests (Issue #401 - Memory Blowout Fix) ===
+
+    #[test]
+    fn test_compact_document() {
+        let (store, _temp) = create_test_store();
+
+        // Create a document and update it many times to build up history
+        let mut doc = Automerge::new();
+        for i in 0..100 {
+            doc.transact::<_, _, automerge::AutomergeError>(|tx| {
+                tx.put(automerge::ROOT, "counter", i as i64)?;
+                Ok(())
+            })
+            .unwrap();
+        }
+
+        store.put("test-doc", &doc).unwrap();
+        let size_before = store.document_size("test-doc").unwrap().unwrap();
+
+        // Compact the document
+        let result = store.compact("test-doc").unwrap();
+        assert!(result.is_some());
+        let (old_size, new_size) = result.unwrap();
+
+        assert_eq!(old_size, size_before);
+        assert!(
+            new_size <= old_size,
+            "Compaction should reduce or maintain size"
+        );
+
+        // Verify the document still has the correct value
+        let loaded = store.get("test-doc").unwrap().unwrap();
+        let value = loaded.get(automerge::ROOT, "counter").unwrap().unwrap();
+        assert_eq!(value.0.to_i64(), Some(99));
+    }
+
+    #[test]
+    fn test_compact_nonexistent_document() {
+        let (store, _temp) = create_test_store();
+        let result = store.compact("nonexistent").unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_compact_prefix() {
+        let (store, _temp) = create_test_store();
+
+        // Create multiple documents with history
+        for doc_num in 0..5 {
+            let mut doc = Automerge::new();
+            for i in 0..50 {
+                doc.transact::<_, _, automerge::AutomergeError>(|tx| {
+                    tx.put(automerge::ROOT, "counter", i as i64)?;
+                    Ok(())
+                })
+                .unwrap();
+            }
+            store.put(&format!("test:{}", doc_num), &doc).unwrap();
+        }
+
+        // Add a document with different prefix
+        let mut other_doc = Automerge::new();
+        other_doc
+            .transact::<_, _, automerge::AutomergeError>(|tx| {
+                tx.put(automerge::ROOT, "other", "value")?;
+                Ok(())
+            })
+            .unwrap();
+        store.put("other:1", &other_doc).unwrap();
+
+        // Compact only "test:" prefix
+        let (count, before, after) = store.compact_prefix("test:").unwrap();
+        assert_eq!(count, 5);
+        assert!(before > 0);
+        assert!(after <= before);
+
+        // Verify other document was not affected
+        let other = store.get("other:1").unwrap().unwrap();
+        let value = other.get(automerge::ROOT, "other").unwrap().unwrap();
+        assert!(value.0.to_str().unwrap().contains("value"));
+    }
+
+    #[test]
+    fn test_compact_all() {
+        let (store, _temp) = create_test_store();
+
+        // Create documents with history
+        for prefix in &["a", "b", "c"] {
+            let mut doc = Automerge::new();
+            for i in 0..30 {
+                doc.transact::<_, _, automerge::AutomergeError>(|tx| {
+                    tx.put(automerge::ROOT, "counter", i as i64)?;
+                    Ok(())
+                })
+                .unwrap();
+            }
+            store.put(&format!("{}:doc", prefix), &doc).unwrap();
+        }
+
+        let (count, before, after) = store.compact_all().unwrap();
+        assert_eq!(count, 3);
+        assert!(before > 0);
+        assert!(after <= before);
+    }
+
+    #[test]
+    fn test_compact_in_memory_store() {
+        let store = Arc::new(AutomergeStore::in_memory());
+
+        // Create a document and update it many times
+        let mut doc = Automerge::new();
+        for i in 0..100 {
+            doc.transact::<_, _, automerge::AutomergeError>(|tx| {
+                tx.put(automerge::ROOT, "counter", i as i64)?;
+                Ok(())
+            })
+            .unwrap();
+        }
+
+        store.put("test-doc", &doc).unwrap();
+
+        // Compact should work in memory mode too
+        let result = store.compact("test-doc").unwrap();
+        assert!(result.is_some());
+
+        // Verify value is preserved
+        let loaded = store.get("test-doc").unwrap().unwrap();
+        let value = loaded.get(automerge::ROOT, "counter").unwrap().unwrap();
+        assert_eq!(value.0.to_i64(), Some(99));
     }
 }
