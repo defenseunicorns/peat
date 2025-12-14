@@ -1,24 +1,12 @@
-//! HIVE-Lite Counter Demo for M5Stack Core2
+//! HIVE-Lite CRDT Demo for M5Stack Core2
 //!
-//! Demonstrates CRDT document sync between two nodes:
-//! - Tap screen to increment your counter
-//! - Counter persists to NVS (survives power off)
-//! - When peer connects, full state exchange and merge
-//! - Eventually consistent: both nodes converge to same state
+//! Simple demonstration of CRDT persistence on ESP32:
+//! - Tap screen to increment counter
+//! - State persists to NVS (survives power off)
+//! - Counter displays on serial output
 //!
-//! ## Automerge-style Semantics
-//!
-//! Each node maintains a GCounter CRDT document:
-//! - Node tracks its own taps independently
-//! - Merge = take max of each node's count
-//! - Offline changes are preserved and sync later
-//!
-//! Example:
-//! ```text
-//! Node A: {A: 5, B: 3} = 8 total
-//! Node B offline, taps 4 times: {A: 2, B: 7}
-//! After sync: both have {A: 5, B: 7} = 12 total
-//! ```
+//! BLE sync will be added in a future iteration once we have
+//! proper NimBLE bindings working.
 //!
 //! ## Building
 //!
@@ -34,36 +22,27 @@ use esp_idf_hal::peripherals::Peripherals;
 use esp_idf_hal::prelude::*;
 use esp_idf_svc::eventloop::EspSystemEventLoop;
 use esp_idf_svc::nvs::{EspDefaultNvsPartition, EspNvs, NvsDefault};
-use log::{info, warn, error, debug};
+use log::{info, warn, error};
 
-use hive_btle::discovery::HiveBeacon;
 use hive_btle::sync::GCounter;
-use hive_btle::{HierarchyLevel, NodeId};
+use hive_btle::NodeId;
 
-// NVS namespace for storing CRDT state
+// NVS storage
 const NVS_NAMESPACE: &str = "hive";
 const NVS_KEY_COUNTER: &str = "counter";
 
-// FT6336U Touch controller
+// FT6336U Touch controller on M5Stack Core2
 const FT6336U_ADDR: u8 = 0x38;
 const FT6336U_REG_STATUS: u8 = 0x02;
-const FT6336U_REG_TOUCH1_XH: u8 = 0x03;
 
-/// CRDT Document - holds all synced state
-///
-/// This is our "Automerge document" - a collection of CRDTs
-/// that can be synced as a unit.
+/// CRDT Document with persistence
 struct HiveDocument {
-    /// The tap counter (G-Counter CRDT)
     pub counter: GCounter,
-    /// Our node ID
     node_id: NodeId,
-    /// Document version (increments on any local change)
-    version: u64,
+    version: u32,
 }
 
 impl HiveDocument {
-    /// Create new empty document
     fn new(node_id: NodeId) -> Self {
         Self {
             counter: GCounter::new(),
@@ -72,163 +51,113 @@ impl HiveDocument {
         }
     }
 
-    /// Increment our tap counter
     fn tap(&mut self) {
         self.counter.increment(&self.node_id, 1);
         self.version += 1;
     }
 
-    /// Get our tap count
     fn our_taps(&self) -> u64 {
         self.counter.node_count(&self.node_id)
     }
 
-    /// Get peer tap count (everyone else)
-    fn peer_taps(&self) -> u64 {
-        self.counter.value() - self.our_taps()
-    }
-
-    /// Get total taps
     fn total_taps(&self) -> u64 {
         self.counter.value()
     }
 
-    /// Merge with another document (Automerge-style)
-    ///
-    /// After merge, both documents will have the same state
-    /// (max of each node's contribution).
-    fn merge(&mut self, other: &HiveDocument) {
-        self.counter.merge(&other.counter);
-        self.version += 1;
-    }
-
-    /// Encode document for sync/storage
     fn encode(&self) -> Vec<u8> {
-        // Format: [version: 8 bytes] [counter_data]
         let mut buf = Vec::new();
         buf.extend_from_slice(&self.version.to_le_bytes());
         buf.extend_from_slice(&self.counter.encode());
         buf
     }
 
-    /// Decode document from sync/storage
     fn decode(data: &[u8], node_id: NodeId) -> Option<Self> {
-        if data.len() < 8 {
+        if data.len() < 4 {
             return None;
         }
-        let version = u64::from_le_bytes([
-            data[0], data[1], data[2], data[3],
-            data[4], data[5], data[6], data[7],
-        ]);
-        let counter = GCounter::decode(&data[8..])?;
-        Some(Self {
-            counter,
-            node_id,
-            version,
-        })
+        let version = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+        let counter = GCounter::decode(&data[4..])?;
+        Some(Self { counter, node_id, version })
     }
 }
 
-/// Persistent storage for CRDT document
-struct DocumentStore<'a> {
+/// Document store with NVS persistence
+struct DocumentStore {
     nvs: EspNvs<NvsDefault>,
     node_id: NodeId,
-    _phantom: std::marker::PhantomData<&'a ()>,
 }
 
-impl<'a> DocumentStore<'a> {
-    /// Open or create the document store
+impl DocumentStore {
     fn new(nvs_partition: EspDefaultNvsPartition, node_id: NodeId) -> anyhow::Result<Self> {
         let nvs = EspNvs::new(nvs_partition, NVS_NAMESPACE, true)?;
-        Ok(Self {
-            nvs,
-            node_id,
-            _phantom: std::marker::PhantomData,
-        })
+        Ok(Self { nvs, node_id })
     }
 
-    /// Load document from NVS (or create new if not found)
     fn load(&self) -> HiveDocument {
         let mut buf = [0u8; 256];
         match self.nvs.get_raw(NVS_KEY_COUNTER, &mut buf) {
             Ok(Some(data)) => {
                 if let Some(doc) = HiveDocument::decode(data, self.node_id) {
-                    info!("Loaded document from NVS: {} taps, version {}",
-                          doc.total_taps(), doc.version);
+                    info!("Loaded: {} taps, v{}", doc.total_taps(), doc.version);
                     return doc;
                 }
             }
-            Ok(None) => {
-                info!("No saved document, starting fresh");
-            }
-            Err(e) => {
-                warn!("Failed to load from NVS: {:?}, starting fresh", e);
-            }
+            Ok(None) => info!("No saved document, starting fresh"),
+            Err(e) => warn!("NVS load error: {:?}", e),
         }
         HiveDocument::new(self.node_id)
     }
 
-    /// Save document to NVS
     fn save(&mut self, doc: &HiveDocument) -> anyhow::Result<()> {
         let data = doc.encode();
         self.nvs.set_raw(NVS_KEY_COUNTER, &data)?;
-        debug!("Saved document to NVS: {} bytes", data.len());
+        info!("Saved: {} taps, v{}", doc.total_taps(), doc.version);
         Ok(())
     }
 }
 
-/// Touch detection
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum TouchState {
+/// Touch state
+#[derive(PartialEq, Clone, Copy)]
+enum Touch {
     None,
     Touched,
 }
 
-fn read_touch(i2c: &mut I2cDriver) -> TouchState {
+fn read_touch(i2c: &mut I2cDriver) -> Touch {
     let mut buf = [0u8; 1];
-    if i2c.write_read(FT6336U_ADDR, &[FT6336U_REG_STATUS], &mut buf).is_err() {
-        return TouchState::None;
+    if i2c.write_read(FT6336U_ADDR, &[FT6336U_REG_STATUS], &mut buf, 100).is_ok() {
+        if buf[0] & 0x0F > 0 {
+            return Touch::Touched;
+        }
     }
-    let num_touches = buf[0] & 0x0F;
-    if num_touches > 0 {
-        TouchState::Touched
-    } else {
-        TouchState::None
-    }
+    Touch::None
 }
 
-/// Get unique Node ID from ESP32 MAC address
 fn get_node_id_from_mac() -> NodeId {
     let mut mac = [0u8; 6];
     unsafe {
         esp_idf_svc::sys::esp_efuse_mac_get_default(mac.as_mut_ptr());
     }
-    info!("MAC: {:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
-          mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    info!(
+        "MAC: {:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]
+    );
+    // Use last 4 bytes of MAC as node ID
     NodeId::new(u32::from_be_bytes([mac[2], mac[3], mac[4], mac[5]]))
 }
 
-/// Display state to serial (LCD driver to come)
-fn update_display(doc: &HiveDocument, peer_id: Option<NodeId>, connected: bool, status: &str) {
-    info!("┌────────────────────────────────┐");
-    info!("│  HIVE-Lite Document Sync       │");
-    info!("├────────────────────────────────┤");
-    info!("│  My ID: {:08X}  v{}          │", doc.node_id.as_u32(), doc.version);
-    if let Some(peer) = peer_id {
-        info!("│  Peer:  {:08X} {}           │", peer.as_u32(),
-              if connected { "●" } else { "○" });
-    } else {
-        info!("│  Peer:  (scanning...)          │");
-    }
-    info!("├────────────────────────────────┤");
-    info!("│  My taps:   {:>4}               │", doc.our_taps());
-    info!("│  Peer taps: {:>4}               │", doc.peer_taps());
-    info!("│  ──────────────                │");
-    info!("│  TOTAL:     {:>4}               │", doc.total_taps());
-    info!("├────────────────────────────────┤");
-    info!("│  TAP SCREEN = +1 (persisted)   │");
-    info!("│  Status: {:<20} │", status);
-    info!("└────────────────────────────────┘");
+fn print_status(doc: &HiveDocument, status: &str) {
+    info!("========================================");
+    info!("  HIVE-Lite CRDT Demo");
+    info!("----------------------------------------");
+    info!("  Node ID: {:08X}", doc.node_id.as_u32());
+    info!("  Version: {}", doc.version);
+    info!("----------------------------------------");
+    info!("  My taps:    {:>6}", doc.our_taps());
+    info!("  Total taps: {:>6}", doc.total_taps());
+    info!("----------------------------------------");
+    info!("  {}", status);
+    info!("========================================");
 }
 
 fn main() -> anyhow::Result<()> {
@@ -236,92 +165,67 @@ fn main() -> anyhow::Result<()> {
     esp_idf_svc::sys::link_patches();
     esp_idf_svc::log::EspLogger::initialize_default();
 
+    info!("");
     info!("=========================================");
-    info!("  HIVE-Lite Document Sync Demo");
+    info!("  HIVE-Lite CRDT Demo - M5Stack Core2");
     info!("=========================================");
+    info!("");
 
     // Take peripherals
     let peripherals = Peripherals::take()?;
     let _sys_loop = EspSystemEventLoop::take()?;
     let nvs_partition = EspDefaultNvsPartition::take()?;
 
-    // Get unique Node ID from MAC
+    // Get node ID from MAC address
     let node_id = get_node_id_from_mac();
     info!("Node ID: {:08X}", node_id.as_u32());
 
-    // Initialize persistent document store
+    // Initialize document store and load state
     let mut store = DocumentStore::new(nvs_partition, node_id)?;
-
-    // Load document from NVS (or create new)
     let mut doc = store.load();
-    info!("Document loaded: {} total taps", doc.total_taps());
+    info!("Loaded document: {} total taps", doc.total_taps());
 
     // Initialize I2C for touch controller
     let i2c_config = I2cConfig::new().baudrate(400.kHz().into());
     let mut i2c = I2cDriver::new(
         peripherals.i2c0,
-        peripherals.pins.gpio21,
-        peripherals.pins.gpio22,
+        peripherals.pins.gpio21, // SDA
+        peripherals.pins.gpio22, // SCL
         &i2c_config,
     )?;
     info!("Touch controller initialized");
 
-    // Create HIVE beacon
-    let mut beacon = HiveBeacon::new(node_id);
-    beacon.set_hierarchy_level(HierarchyLevel::Leaf);
-    beacon.set_battery_level(100);
-    info!("HIVE beacon ready: {} bytes", beacon.encode_compact().len());
-
-    // TODO: Initialize NimBLE
-    // - Advertise with beacon + document hash in service data
-    // - Scan for peer HIVE beacons
-    // - On connect: exchange full document, merge, save
-
-    // Initial display
-    let mut status = "Tap screen!";
-    update_display(&doc, None, false, status);
+    // Print initial status
+    print_status(&doc, "Tap screen to increment!");
 
     // Main loop
-    let mut last_touch = TouchState::None;
+    let mut last_touch = Touch::None;
     let mut loop_count: u32 = 0;
 
     loop {
-        // Check for touch
         let touch = read_touch(&mut i2c);
 
-        // Detect rising edge (new touch)
-        if touch == TouchState::Touched && last_touch == TouchState::None {
-            info!(">>> TAP! Incrementing and saving...");
-
-            // Increment counter
+        // Handle tap (rising edge only)
+        if touch == Touch::Touched && last_touch == Touch::None {
+            info!("");
+            info!(">>> TAP DETECTED!");
             doc.tap();
 
-            // Persist to NVS immediately
+            // Save to NVS
             if let Err(e) = store.save(&doc) {
                 error!("Failed to save: {:?}", e);
-                status = "Save failed!";
-            } else {
-                status = "Saved!";
             }
 
-            update_display(&doc, None, false, status);
-
-            // TODO: If connected to peer, trigger sync
+            print_status(&doc, "Tap saved to NVS!");
         }
         last_touch = touch;
 
         // Periodic status update
-        if loop_count % 50 == 0 {
-            status = "Tap screen!";
-            update_display(&doc, None, false, status);
+        if loop_count % 100 == 0 {
+            print_status(&doc, "Waiting for tap...");
         }
 
-        // TODO: BLE sync loop
-        // - Check for new peer connections
-        // - Exchange document state
-        // - Merge and save
-
-        FreeRtos::delay_ms(100);
-        loop_count += 1;
+        FreeRtos::delay_ms(50);
+        loop_count = loop_count.wrapping_add(1);
     }
 }

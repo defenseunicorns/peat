@@ -12,6 +12,8 @@ ESP_IDF_VERSION = "v5.3"
 MCU = "esp32"
 # Enable native build
 ESP_IDF_TOOLS_INSTALL_DIR = "global"
+# Use Python 3.12 for IDF (system Python 3.9 has importlib.metadata issues)
+IDF_PYTHON_ENV_PATH = "/Users/kit/.espressif/python_env/idf5.3_py3.12_env"
 
 [unstable]
 build-std = ["std", "panic_abort"]

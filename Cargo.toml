@@ -14,8 +14,8 @@ members = [
     "hive-tak-bridge",
     "hive-btle",
 ]
-# hive-lite is excluded because it requires ESP32 toolchain (no_std)
-exclude = ["hive-lite"]
+# hive-lite and ESP32 examples are excluded because they require ESP32 toolchain
+exclude = ["hive-lite", "examples/m5stack-core2-hive"]
 
 [workspace.package]
 version = "0.1.0"

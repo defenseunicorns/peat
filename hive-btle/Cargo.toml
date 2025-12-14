@@ -70,6 +70,9 @@ windows = { version = "0.58", features = [
 esp-idf-svc = { version = "0.50", optional = true }
 esp-idf-hal = { version = "0.45", optional = true }
 
+# Portable atomics for platforms without native AtomicU64 (like ESP32)
+portable-atomic = { version = "1.10", features = ["fallback"] }
+
 [dev-dependencies]
 tokio-test = "0.4"
 env_logger = "0.11"

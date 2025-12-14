@@ -7,7 +7,7 @@ use alloc::{boxed::Box, collections::BTreeMap, vec::Vec};
 #[cfg(feature = "std")]
 use std::collections::HashMap;
 
-use core::sync::atomic::{AtomicU64, Ordering};
+use portable_atomic::{AtomicU64, Ordering};
 
 #[cfg(feature = "std")]
 use std::sync::RwLock;

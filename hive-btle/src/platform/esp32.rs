@@ -41,12 +41,9 @@ use crate::platform::{
 use crate::transport::BleConnection;
 use crate::NodeId;
 
-// ESP-IDF imports - only used when actually building for ESP32
-#[cfg(target_os = "espidf")]
-use esp_idf_svc::bt::{
-    ble::{gap::BleGapEvent, gatt::server::GattsEvent},
-    BtDriver,
-};
+// NOTE: esp_idf_svc::bt module only supports Bluedroid, not NimBLE.
+// For NimBLE support, we would need to use raw FFI bindings to esp-idf-sys.
+// This module provides a stub implementation until proper NimBLE bindings are added.
 
 /// ESP32 BLE connection handle
 pub struct Esp32Connection {
