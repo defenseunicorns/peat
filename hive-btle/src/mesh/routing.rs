@@ -119,7 +119,7 @@ impl MeshRouter {
     /// Route upward to parent
     fn route_upward(&self, topology: &MeshTopology) -> RouteDecision {
         match &topology.parent {
-            Some(parent_id) => RouteDecision::success(vec![parent_id.clone()], true),
+            Some(parent_id) => RouteDecision::success(vec![*parent_id], true),
             None => RouteDecision::failed(RouteFailure::NoParent),
         }
     }
@@ -147,7 +147,7 @@ impl MeshRouter {
     fn route_targeted(&self, target: &NodeId, topology: &MeshTopology) -> RouteDecision {
         // Check if target is directly connected
         if topology.is_connected(target) {
-            return RouteDecision::success(vec![target.clone()], false);
+            return RouteDecision::success(vec![*target], false);
         }
 
         // Not directly connected - need to route through topology
@@ -157,7 +157,7 @@ impl MeshRouter {
 
         if let Some(ref parent) = topology.parent {
             // Route to parent, it will figure out where to send
-            RouteDecision::success(vec![parent.clone()], false)
+            RouteDecision::success(vec![*parent], false)
         } else if !topology.children.is_empty() {
             // Flood to all children
             RouteDecision::success(topology.children.clone(), false)
@@ -223,7 +223,7 @@ impl MeshRouter {
     ///
     /// For HIVE-Lite nodes, this is always the parent.
     pub fn aggregation_route(&self, topology: &MeshTopology) -> Option<NodeId> {
-        topology.parent.clone()
+        topology.parent
     }
 
     /// Get routes for dissemination (data flowing downward)

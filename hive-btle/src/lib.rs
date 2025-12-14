@@ -98,6 +98,7 @@ pub mod error;
 pub mod gatt;
 pub mod mesh;
 pub mod platform;
+pub mod power;
 pub mod sync;
 pub mod transport;
 
@@ -108,6 +109,7 @@ pub use error::{BleError, Result};
 pub use gatt::{HiveGattService, SyncProtocol};
 pub use mesh::{MeshManager, MeshRouter, MeshTopology, TopologyConfig, TopologyEvent};
 pub use platform::{BleAdapter, ConnectionEvent, DisconnectReason, DiscoveredDevice, StubAdapter};
+pub use power::{BatteryState, RadioScheduler, SyncPriority};
 pub use sync::{GattSyncProtocol, SyncConfig, SyncState};
 pub use transport::{BleConnection, BluetoothLETransport, MeshTransport, TransportCapabilities};
 
@@ -144,7 +146,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 ///
 /// Represents a unique node in the HIVE mesh. For BLE, this is typically
 /// derived from the Bluetooth MAC address or a configured value.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct NodeId {
     /// 32-bit node identifier
     id: u32,

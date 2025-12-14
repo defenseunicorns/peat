@@ -338,7 +338,7 @@ mod tests {
     fn test_advertiser_new() {
         let config = DiscoveryConfig::default();
         let node_id = NodeId::new(0x12345678);
-        let advertiser = Advertiser::new(config, node_id.clone());
+        let advertiser = Advertiser::new(config, node_id);
 
         assert_eq!(advertiser.state(), AdvertiserState::Idle);
         assert_eq!(advertiser.beacon().node_id, node_id);
