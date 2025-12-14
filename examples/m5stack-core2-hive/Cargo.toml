@@ -22,6 +22,11 @@ log = "0.4"
 # Error handling
 anyhow = "1.0"
 
+# Display
+display-interface-spi = "0.5"
+mipidsi = "0.8"
+embedded-graphics = "0.8"
+
 # HIVE libraries (local)
 hive-btle = { path = "../../hive-btle", default-features = false, features = ["esp32"] }
 
