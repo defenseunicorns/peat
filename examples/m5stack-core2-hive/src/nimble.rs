@@ -27,15 +27,39 @@ pub const DOC_CHAR_UUID: u16 = 0xF47B;
 /// Maximum document size
 const MAX_DOC_SIZE: usize = 256;
 
-/// BLE connection state
+/// Maximum simultaneous connections (for mesh gossip)
+const MAX_CONNECTIONS: usize = 4;
+
+/// Connection info for each peer
+#[derive(Clone, Copy, Default)]
+struct PeerConnection {
+    handle: u16,
+    peer_doc_handle: u16,  // Their document characteristic (for writing)
+    active: bool,
+}
+
+/// Multi-connection state
+static CONNECTIONS: Mutex<[PeerConnection; MAX_CONNECTIONS]> = Mutex::new([PeerConnection { handle: 0xFFFF, peer_doc_handle: 0, active: false }; MAX_CONNECTIONS]);
+static NUM_CONNECTIONS: AtomicU16 = AtomicU16::new(0);
+
+/// Legacy single-connection state (for compatibility)
 static CONNECTED: AtomicBool = AtomicBool::new(false);
 static CONN_HANDLE: AtomicU16 = AtomicU16::new(0xFFFF);
+
+/// Track when we connected (for rotation timeout)
+static CONNECT_TIME: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+/// Sync completed flag
+static SYNC_COMPLETE: AtomicBool = AtomicBool::new(false);
 
 /// Document characteristic value handle (set during registration)
 static DOC_CHAR_HANDLE: AtomicU16 = AtomicU16::new(0);
 
-/// Peer's document characteristic handle (discovered via GATT)
+/// Peer's document characteristic handle (discovered via GATT) - for current discovery
 static PEER_DOC_HANDLE: AtomicU16 = AtomicU16::new(0);
+
+/// Connection currently being discovered
+static DISCOVERING_CONN: AtomicU16 = AtomicU16::new(0xFFFF);
 
 /// Shared document buffer for GATT access
 static DOC_BUFFER: Mutex<[u8; MAX_DOC_SIZE]> = Mutex::new([0u8; MAX_DOC_SIZE]);
@@ -49,6 +73,54 @@ static CONNECTION_CHANGED: AtomicBool = AtomicBool::new(false);
 
 /// Flag to track if we're currently connecting (to avoid multiple connection attempts)
 static CONNECTING: AtomicBool = AtomicBool::new(false);
+
+/// Our MAC address (for connection arbitration - only connect to higher MACs)
+static OUR_MAC: Mutex<[u8; 6]> = Mutex::new([0u8; 6]);
+
+/// Peer sync tracking - MAC address -> last sync timestamp
+/// Max 8 peers tracked
+const MAX_TRACKED_PEERS: usize = 8;
+static PEER_SYNC_TIMES: Mutex<[([u8; 6], u32); MAX_TRACKED_PEERS]> = Mutex::new([([0u8; 6], 0); MAX_TRACKED_PEERS]);
+
+/// Current peer MAC (the one we're connected/connecting to)
+static CURRENT_PEER_MAC: Mutex<[u8; 6]> = Mutex::new([0u8; 6]);
+
+/// Our document version when we last sent (to avoid redundant sends)
+static LAST_SENT_VERSION: AtomicU16 = AtomicU16::new(0);
+
+/// Record when we synced with a peer
+fn record_peer_sync(mac: &[u8; 6], timestamp: u32) {
+    if let Ok(mut peers) = PEER_SYNC_TIMES.lock() {
+        // Find existing entry or oldest slot
+        let mut oldest_idx = 0;
+        let mut oldest_time = u32::MAX;
+        for (i, (peer_mac, sync_time)) in peers.iter().enumerate() {
+            if peer_mac == mac {
+                // Update existing
+                peers[i].1 = timestamp;
+                return;
+            }
+            if *sync_time < oldest_time {
+                oldest_time = *sync_time;
+                oldest_idx = i;
+            }
+        }
+        // Use oldest slot for new peer
+        peers[oldest_idx] = (*mac, timestamp);
+    }
+}
+
+/// Get last sync time for a peer (0 if never synced)
+fn get_peer_last_sync(mac: &[u8; 6]) -> u32 {
+    if let Ok(peers) = PEER_SYNC_TIMES.lock() {
+        for (peer_mac, sync_time) in peers.iter() {
+            if peer_mac == mac {
+                return *sync_time;
+            }
+        }
+    }
+    0
+}
 
 /// Check if advertising data contains HIVE service UUID
 unsafe fn has_hive_service(data: *const u8, len: u8) -> bool {
@@ -91,32 +163,75 @@ unsafe extern "C" fn gap_event_handler(event: *mut ble_gap_event, _arg: *mut c_v
             CONNECTING.store(false, Ordering::SeqCst);
             if connect.status == 0 {
                 info!("BLE: Connected, handle={}", connect.conn_handle);
+
+                // Add to multi-connection list
+                if let Ok(mut conns) = CONNECTIONS.lock() {
+                    for conn in conns.iter_mut() {
+                        if !conn.active {
+                            conn.handle = connect.conn_handle;
+                            conn.peer_doc_handle = 0;
+                            conn.active = true;
+                            NUM_CONNECTIONS.fetch_add(1, Ordering::SeqCst);
+                            break;
+                        }
+                    }
+                }
+
+                // Legacy single-connection tracking
                 CONNECTED.store(true, Ordering::SeqCst);
                 CONN_HANDLE.store(connect.conn_handle, Ordering::SeqCst);
                 CONNECTION_CHANGED.store(true, Ordering::SeqCst);
+                SYNC_COMPLETE.store(false, Ordering::SeqCst);
+                CONNECT_TIME.store(esp_idf_svc::sys::esp_timer_get_time() as u32 / 1_000_000, Ordering::SeqCst);
 
-                // Request MTU exchange for larger payloads (default is 23, need at least 27 for our docs)
+                // Track which connection we're discovering
+                DISCOVERING_CONN.store(connect.conn_handle, Ordering::SeqCst);
+
+                // Request MTU exchange for larger payloads
                 let ret = ble_gattc_exchange_mtu(connect.conn_handle, Some(mtu_exchange_cb), ptr::null_mut());
                 if ret != 0 {
                     warn!("BLE: MTU exchange failed to start: {}", ret);
-                    // Fall back to service discovery anyway
                     let ret = ble_gattc_disc_all_svcs(connect.conn_handle, Some(gatt_disc_svc_cb), ptr::null_mut());
                     if ret != 0 {
                         warn!("BLE: Failed to start service discovery: {}", ret);
                     }
                 }
+
+                // Keep scanning for more peers (mesh!)
+                let _ = start_scanning();
             } else {
                 warn!("BLE: Connection failed, status={}", connect.status);
-                // Restart scanning
                 let _ = start_scanning();
             }
         }
         BLE_GAP_EVENT_DISCONNECT => {
-            info!("BLE: Disconnected");
-            CONNECTED.store(false, Ordering::SeqCst);
-            CONN_HANDLE.store(0xFFFF, Ordering::SeqCst);
+            let disconnect = &event.__bindgen_anon_1.disconnect;
+            let disc_handle = disconnect.conn.conn_handle;
+            info!("BLE: Disconnected, handle={}", disc_handle);
+
+            // Remove from multi-connection list
+            if let Ok(mut conns) = CONNECTIONS.lock() {
+                for conn in conns.iter_mut() {
+                    if conn.active && conn.handle == disc_handle {
+                        conn.active = false;
+                        conn.handle = 0xFFFF;
+                        conn.peer_doc_handle = 0;
+                        NUM_CONNECTIONS.fetch_sub(1, Ordering::SeqCst);
+                        break;
+                    }
+                }
+            }
+
+            // Update legacy tracking
+            let remaining = NUM_CONNECTIONS.load(Ordering::SeqCst);
+            CONNECTED.store(remaining > 0, Ordering::SeqCst);
+            if remaining == 0 {
+                CONN_HANDLE.store(0xFFFF, Ordering::SeqCst);
+            }
             CONNECTION_CHANGED.store(true, Ordering::SeqCst);
-            // Restart advertising and scanning
+            LAST_SENT_VERSION.store(0, Ordering::SeqCst);
+
+            // Keep advertising and scanning
             let _ = start_advertising();
             let _ = start_scanning();
         }
@@ -132,29 +247,45 @@ unsafe extern "C" fn gap_event_handler(event: *mut ble_gap_event, _arg: *mut c_v
 
             // Check if this device advertises HIVE service
             if has_hive_service(disc.data, disc.length_data) {
-                info!("BLE: Found HIVE peer!");
+                // Get peer MAC address
+                let peer_mac = disc.addr.val;
 
-                // Only connect if not already connected/connecting
-                if !CONNECTED.load(Ordering::SeqCst) && !CONNECTING.load(Ordering::SeqCst) {
+                // Check cooldown - prefer peers we haven't synced with recently
+                let now = esp_idf_svc::sys::esp_timer_get_time() as u32 / 1_000_000;
+                let last_sync = get_peer_last_sync(&peer_mac);
+                let since_sync = now.saturating_sub(last_sync);
+
+                // 30 second cooldown per peer - prevents thrashing
+                let in_cooldown = last_sync > 0 && since_sync < 30;
+
+                if in_cooldown {
+                    debug!("BLE: Peer in cooldown (synced {}s ago)", since_sync);
+                } else if !CONNECTED.load(Ordering::SeqCst) && !CONNECTING.load(Ordering::SeqCst) {
+                    info!("BLE: Found HIVE peer (last sync {}s ago), connecting...", since_sync);
                     CONNECTING.store(true, Ordering::SeqCst);
+
+                    // Store current peer MAC
+                    if let Ok(mut current) = CURRENT_PEER_MAC.lock() {
+                        *current = peer_mac;
+                    }
 
                     // Stop scanning before connecting
                     ble_gap_disc_cancel();
 
-                    // Connect to this peer
-                    info!("BLE: Connecting to peer...");
                     let ret = ble_gap_connect(
                         BLE_OWN_ADDR_PUBLIC as u8,
                         &disc.addr,
-                        30000, // 30 second timeout
+                        10000, // 10 second timeout
                         ptr::null(),
                         Some(gap_event_handler),
                         ptr::null_mut(),
                     );
                     if ret != 0 {
-                        error!("BLE: ble_gap_connect failed: {}", ret);
+                        // Error 14 = BLE_HS_EBUSY (already connecting/connected) - not critical
+                        if ret != 14 {
+                            warn!("BLE: ble_gap_connect failed: {}", ret);
+                        }
                         CONNECTING.store(false, Ordering::SeqCst);
-                        // Restart scanning
                         let _ = start_scanning();
                     }
                 }
@@ -287,6 +418,18 @@ unsafe extern "C" fn gatt_disc_chr_cb(
             if uuid16.value == DOC_CHAR_UUID {
                 info!("BLE: Found HIVE document characteristic, handle={}", c.val_handle);
                 PEER_DOC_HANDLE.store(c.val_handle, Ordering::SeqCst);
+
+                // Store in the connection struct
+                let disc_conn = DISCOVERING_CONN.load(Ordering::SeqCst);
+                if let Ok(mut conns) = CONNECTIONS.lock() {
+                    for conn in conns.iter_mut() {
+                        if conn.active && conn.handle == disc_conn {
+                            conn.peer_doc_handle = c.val_handle;
+                            info!("BLE: Stored peer doc handle {} for conn {}", c.val_handle, disc_conn);
+                            break;
+                        }
+                    }
+                }
             }
         }
     }
@@ -371,20 +514,44 @@ unsafe extern "C" fn gatt_read_cb(
         }
     }
 
-    // After reading peer's document, write our document to peer
+    // After reading peer's document, write our document to peer (only if we have newer data)
     let peer_handle = PEER_DOC_HANDLE.load(Ordering::SeqCst);
     if peer_handle != 0 {
         if let Ok(doc) = DOC_BUFFER.lock() {
             let len = DOC_LEN.load(Ordering::SeqCst) as usize;
-            if len > 0 {
+            // Get version from our doc (first 4 bytes are version)
+            let our_version = if len >= 4 {
+                u32::from_le_bytes([doc[0], doc[1], doc[2], doc[3]])
+            } else {
+                0
+            };
+            let last_sent = LAST_SENT_VERSION.load(Ordering::SeqCst) as u32;
+
+            if len > 0 && our_version > last_sent {
                 let om = ble_hs_mbuf_from_flat(doc.as_ptr() as *const c_void, len as u16);
                 if !om.is_null() {
-                    info!("BLE: Writing our document to peer, {} bytes", len);
+                    info!("BLE: Sending doc v{} to peer ({} bytes)", our_version, len);
                     let ret = ble_gattc_write_no_rsp(conn_handle, peer_handle, om);
                     if ret != 0 {
                         warn!("BLE: Write failed: {}", ret);
                         os_mbuf_free_chain(om);
+                    } else {
+                        LAST_SENT_VERSION.store(our_version as u16, Ordering::SeqCst);
+                        info!("BLE: Sync complete");
+                        SYNC_COMPLETE.store(true, Ordering::SeqCst);
+                        if let Ok(current) = CURRENT_PEER_MAC.lock() {
+                            let now = esp_idf_svc::sys::esp_timer_get_time() as u32 / 1_000_000;
+                            record_peer_sync(&*current, now);
+                        }
                     }
+                }
+            } else {
+                // Nothing new to send, but still mark sync complete
+                debug!("BLE: No new data to send (v{} <= last sent v{})", our_version, last_sent);
+                SYNC_COMPLETE.store(true, Ordering::SeqCst);
+                if let Ok(current) = CURRENT_PEER_MAC.lock() {
+                    let now = esp_idf_svc::sys::esp_timer_get_time() as u32 / 1_000_000;
+                    record_peer_sync(&*current, now);
                 }
             }
         }
@@ -454,6 +621,15 @@ static mut CHR_UUID: ble_uuid16_t = unsafe { core::mem::zeroed() };
 pub fn init(_node_id: NodeId) -> Result<(), i32> {
     unsafe {
         info!("BLE: Initializing NimBLE");
+
+        // Store our MAC for connection arbitration
+        let mut mac = [0u8; 6];
+        esp_idf_svc::sys::esp_efuse_mac_get_default(mac.as_mut_ptr());
+        if let Ok(mut our_mac) = OUR_MAC.lock() {
+            *our_mac = mac;
+        }
+        info!("BLE: Our MAC: {:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+              mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
         // Initialize NimBLE
         let ret = nimble_port_init();
@@ -603,7 +779,8 @@ pub fn start_scanning() -> Result<(), i32> {
             Some(gap_event_handler),
             ptr::null_mut(),
         );
-        if ret != 0 {
+        if ret != 0 && ret != 2 {
+            // Ignore error 2 (BLE_HS_EALREADY - already scanning)
             error!("BLE: ble_gap_disc failed: {}", ret);
             return Err(ret);
         }
@@ -627,32 +804,38 @@ pub fn set_document(data: &[u8]) {
 pub fn notify_document(data: &[u8]) -> Result<(), i32> {
     let conn = CONN_HANDLE.load(Ordering::SeqCst);
     if conn == 0xFFFF {
+        info!("BLE: notify_document - not connected");
         return Err(-1); // Not connected
     }
 
     // Update local buffer first
     set_document(data);
 
-    // Try to notify (works if we're the peripheral)
     let our_handle = DOC_CHAR_HANDLE.load(Ordering::SeqCst);
+    let peer_handle = PEER_DOC_HANDLE.load(Ordering::SeqCst);
+    info!("BLE: notify_document - conn={}, our_handle={}, peer_handle={}, len={}",
+          conn, our_handle, peer_handle, data.len());
+
+    // Try to notify (works if we're the peripheral)
     if our_handle != 0 {
         unsafe {
             let ret = ble_gatts_notify(conn, our_handle);
             if ret == 0 {
-                info!("BLE: Notified document, {} bytes", data.len());
+                info!("BLE: Notified via GATT");
+            } else {
+                warn!("BLE: Notify failed: {}", ret);
             }
         }
     }
 
     // Also write to peer (works if we're the central and discovered their characteristic)
-    let peer_handle = PEER_DOC_HANDLE.load(Ordering::SeqCst);
     if peer_handle != 0 {
         unsafe {
             let om = ble_hs_mbuf_from_flat(data.as_ptr() as *const c_void, data.len() as u16);
             if !om.is_null() {
                 let ret = ble_gattc_write_no_rsp(conn, peer_handle, om);
                 if ret == 0 {
-                    info!("BLE: Wrote document to peer, {} bytes", data.len());
+                    info!("BLE: Wrote to peer via GATT");
                 } else {
                     warn!("BLE: Write to peer failed: {}", ret);
                     os_mbuf_free_chain(om);
@@ -681,4 +864,63 @@ pub fn take_connection_changed() -> bool {
 /// Check if connected to a peer
 pub fn is_connected() -> bool {
     CONNECTED.load(Ordering::SeqCst)
+}
+
+/// Check if we should rotate to find other peers (call this periodically)
+pub fn check_rotation() -> bool {
+    false // No rotation needed - using multi-connection gossip instead
+}
+
+/// Gossip document to ALL connected peers (multi-hop mesh sync)
+pub fn gossip_document(data: &[u8]) -> usize {
+    let mut sent_count = 0;
+
+    // Update local buffer
+    set_document(data);
+
+    // Send via notification to all peers (we're peripheral)
+    let our_handle = DOC_CHAR_HANDLE.load(Ordering::SeqCst);
+    if our_handle != 0 {
+        if let Ok(conns) = CONNECTIONS.lock() {
+            for conn in conns.iter() {
+                if conn.active {
+                    unsafe {
+                        let ret = ble_gatts_notify(conn.handle, our_handle);
+                        if ret == 0 {
+                            info!("BLE: Gossiped via notify to conn {}", conn.handle);
+                            sent_count += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Also write to peers where we're the central
+    if let Ok(conns) = CONNECTIONS.lock() {
+        for conn in conns.iter() {
+            if conn.active && conn.peer_doc_handle != 0 {
+                unsafe {
+                    let om = ble_hs_mbuf_from_flat(data.as_ptr() as *const c_void, data.len() as u16);
+                    if !om.is_null() {
+                        let ret = ble_gattc_write_no_rsp(conn.handle, conn.peer_doc_handle, om);
+                        if ret == 0 {
+                            info!("BLE: Gossiped via write to conn {} handle {}", conn.handle, conn.peer_doc_handle);
+                            sent_count += 1;
+                        } else {
+                            os_mbuf_free_chain(om);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    info!("BLE: Gossiped to {} peers", sent_count);
+    sent_count
+}
+
+/// Get number of active connections
+pub fn connection_count() -> usize {
+    NUM_CONNECTIONS.load(Ordering::SeqCst) as usize
 }

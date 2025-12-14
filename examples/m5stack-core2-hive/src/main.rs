@@ -65,30 +65,59 @@ impl HiveDocument {
     }
 
     fn tap(&mut self) {
+        info!(">>> TAP: incrementing node {:08X}", self.node_id.as_u32());
+        self.debug_dump("BEFORE TAP");
         self.counter.increment(&self.node_id, 1);
         self.version += 1;
-    }
-
-    fn our_taps(&self) -> u64 {
-        self.counter.node_count(&self.node_id)
-    }
-
-    fn peer_taps(&self) -> u64 {
-        self.counter.value().saturating_sub(self.our_taps())
+        self.debug_dump("AFTER TAP");
     }
 
     fn total_taps(&self) -> u64 {
         self.counter.value()
     }
 
+    fn num_nodes(&self) -> usize {
+        self.counter.node_count_total()
+    }
+
+    /// Debug dump the GCounter state
+    fn debug_dump(&self, prefix: &str) {
+        let encoded = self.counter.encode();
+        if encoded.len() >= 4 {
+            let num_entries = u32::from_le_bytes([encoded[0], encoded[1], encoded[2], encoded[3]]);
+            info!("{}: {} entries, total={}, v{}", prefix, num_entries, self.total_taps(), self.version);
+            let mut offset = 4;
+            for i in 0..num_entries as usize {
+                if offset + 12 <= encoded.len() {
+                    let node = u32::from_le_bytes([
+                        encoded[offset], encoded[offset+1], encoded[offset+2], encoded[offset+3]
+                    ]);
+                    let count = u64::from_le_bytes([
+                        encoded[offset+4], encoded[offset+5], encoded[offset+6], encoded[offset+7],
+                        encoded[offset+8], encoded[offset+9], encoded[offset+10], encoded[offset+11]
+                    ]);
+                    info!("{}:   [{}] node={:08X} count={}", prefix, i, node, count);
+                    offset += 12;
+                }
+            }
+        }
+    }
+
     /// Merge another document into this one
     fn merge(&mut self, other: &HiveDocument) -> bool {
+        info!("=== MERGE START ===");
+        self.debug_dump("OURS BEFORE");
+        other.debug_dump("THEIRS");
+
         let old_value = self.counter.value();
         self.counter.merge(&other.counter);
         let changed = self.counter.value() != old_value;
         if changed {
             self.version += 1;
         }
+
+        self.debug_dump("OURS AFTER");
+        info!("=== MERGE END (changed={}) ===", changed);
         changed
     }
 
@@ -130,16 +159,21 @@ impl DocumentStore {
         let mut buf = [0u8; 256];
         match self.nvs.get_raw(NVS_KEY_COUNTER, &mut buf) {
             Ok(Some(data)) => {
+                info!("NVS: loaded {} raw bytes", data.len());
                 if let Some(mut doc) = HiveDocument::decode(data) {
                     // Update node_id to our own (in case it was from a merge)
                     doc.node_id = node_id;
-                    info!("Loaded: {} taps, v{}", doc.total_taps(), doc.version);
+                    info!("Loaded document:");
+                    doc.debug_dump("  LOADED");
                     return doc;
+                } else {
+                    warn!("Failed to decode NVS data!");
                 }
             }
             Ok(None) => info!("No saved document, starting fresh"),
             Err(e) => warn!("NVS load error: {:?}", e),
         }
+        info!("Creating fresh document for node {:08X}", node_id.as_u32());
         HiveDocument::new(node_id)
     }
 
@@ -205,52 +239,192 @@ fn print_status(doc: &HiveDocument, connected: bool, status: &str) {
 const AXP192_ADDR: u8 = 0x34;
 
 fn axp192_init(i2c: &mut I2cDriver) -> anyhow::Result<()> {
-    // Don't modify AXP192 - factory bootloader configures it correctly
-    // Modifying registers breaks the display
     let mut buf = [0u8; 1];
-    if i2c.write_read(AXP192_ADDR, &[0x03], &mut buf, 100).is_ok() {
-        info!("AXP192: OK (status=0x{:02X})", buf[0]);
+
+    // Read current ADC config
+    if i2c.write_read(AXP192_ADDR, &[0x82], &mut buf, 100).is_ok() {
+        info!("AXP192: ADC config=0x{:02X} (need bit7 set for battery)", buf[0]);
+
+        // Enable battery voltage ADC (bit 7) if not already set
+        if (buf[0] & 0x80) == 0 {
+            let new_val = buf[0] | 0x80; // Set only bit 7, preserve others
+            info!("AXP192: Enabling battery ADC: 0x{:02X} -> 0x{:02X}", buf[0], new_val);
+            // Write register address and value
+            let write_result = i2c.write(AXP192_ADDR, &[0x82, new_val], 1000);
+            match write_result {
+                Ok(_) => {
+                    info!("AXP192: Write succeeded");
+                    FreeRtos::delay_ms(10); // Small delay after write
+                }
+                Err(e) => {
+                    warn!("AXP192: Write failed: {:?}", e);
+                }
+            }
+            // Wait for ADC to stabilize
+            FreeRtos::delay_ms(100);
+            // Verify it took effect
+            if i2c.write_read(AXP192_ADDR, &[0x82], &mut buf, 100).is_ok() {
+                info!("AXP192: ADC config after enable=0x{:02X}", buf[0]);
+                if (buf[0] & 0x80) == 0 {
+                    warn!("AXP192: Battery ADC enable did NOT take effect!");
+                }
+            }
+        }
+    }
+
+    if i2c.write_read(AXP192_ADDR, &[0x00], &mut buf, 100).is_ok() {
+        info!("AXP192: Power status=0x{:02X}", buf[0]);
     }
     Ok(())
 }
 
-fn draw_display<D>(display: &mut D, doc: &HiveDocument, connected: bool, status: &str)
+/// Read battery voltage from AXP192 (returns millivolts)
+fn axp192_read_battery_voltage(i2c: &mut I2cDriver) -> Option<u16> {
+    let mut buf = [0u8; 2];
+    // Register 0x78-0x79: Battery voltage ADC (12-bit, 1.1mV/step)
+    // High 8 bits in 0x78, low 4 bits in upper nibble of 0x79
+    if i2c.write_read(AXP192_ADDR, &[0x78], &mut buf, 100).is_ok() {
+        let raw = ((buf[0] as u16) << 4) | ((buf[1] as u16) >> 4);
+        let mv = (raw as u32 * 1100 / 1000) as u16; // 1.1mV per step
+        info!("Battery ADC: raw=0x{:03X} ({}) => {}mV [0x78=0x{:02X}, 0x79=0x{:02X}]",
+              raw, raw, mv, buf[0], buf[1]);
+        Some(mv)
+    } else {
+        None
+    }
+}
+
+/// Estimate battery percentage from voltage (rough approximation)
+fn battery_percent_from_voltage(mv: u16) -> u8 {
+    // M5Stack Core2 battery: 3.7V nominal, ~4.2V full, ~3.0V empty
+    if mv >= 4150 {
+        100
+    } else if mv <= 3000 {
+        0
+    } else {
+        // Linear interpolation between 3.0V and 4.15V
+        ((mv - 3000) as u32 * 100 / 1150) as u8
+    }
+}
+
+/// Check if running on battery (no USB power)
+fn axp192_on_battery(i2c: &mut I2cDriver) -> bool {
+    let mut buf = [0u8; 1];
+    if i2c.write_read(AXP192_ADDR, &[0x00], &mut buf, 100).is_ok() {
+        // Bit 7: ACIN exists, Bit 5: VBUS exists
+        let acin = (buf[0] & 0x80) != 0;
+        let vbus = (buf[0] & 0x20) != 0;
+        !acin && !vbus
+    } else {
+        false
+    }
+}
+
+/// Build number for tracking firmware versions
+const BUILD_NUM: u32 = 11;
+
+/// Draw initial static UI elements (call once at startup)
+fn draw_static_ui<D>(display: &mut D, node_id: u32)
 where
     D: DrawTarget<Color = Rgb565>,
 {
-    let _ = display.clear(Rgb565::new(0, 0, 8)); // Dark blue background
+    let _ = display.clear(Rgb565::BLACK);
 
     let white = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
     let cyan = MonoTextStyle::new(&FONT_10X20, Rgb565::CYAN);
 
-    // Title
-    let _ = Text::new("HIVE-Lite BLE Sync", Point::new(50, 25), white).draw(display);
+    // Title with build number
+    let title = format!("HIVE-Lite BLE Sync  b{}", BUILD_NUM);
+    let _ = Text::new(&title, Point::new(30, 25), white).draw(display);
 
-    // Connection indicator
-    let conn_color = if connected { Rgb565::GREEN } else { Rgb565::RED };
-    let _ = Circle::new(Point::new(280, 10), 20)
-        .into_styled(PrimitiveStyle::with_fill(conn_color))
-        .draw(display);
-
-    // Node ID
-    let node_str = format!("Node: {:08X}", doc.node_id.as_u32());
+    // Node ID (static)
+    let node_str = format!("Node: {:08X}", node_id);
     let _ = Text::new(&node_str, Point::new(20, 60), cyan).draw(display);
 
-    // Separator
+    // Separators
     let _ = Rectangle::new(Point::new(10, 75), Size::new(300, 2))
         .into_styled(PrimitiveStyle::with_fill(Rgb565::CSS_GRAY))
         .draw(display);
-
-    // Total taps (large, centered)
-    let total_str = format!("{}", doc.total_taps());
-    let _ = Text::new(&total_str, Point::new(120, 145), white).draw(display);
-    let _ = Text::new("taps", Point::new(115, 175), cyan).draw(display);
-
-    // Status
     let _ = Rectangle::new(Point::new(10, 200), Size::new(300, 2))
         .into_styled(PrimitiveStyle::with_fill(Rgb565::CSS_GRAY))
         .draw(display);
-    let _ = Text::new(status, Point::new(20, 230), cyan).draw(display);
+
+    // Static label
+    let _ = Text::new("taps", Point::new(115, 175), cyan).draw(display);
+}
+
+/// Compute a simple hash for visual state comparison
+fn state_hash(doc: &HiveDocument) -> u16 {
+    let encoded = doc.encode();
+    let mut hash: u16 = 0;
+    for byte in &encoded {
+        hash = hash.wrapping_add(*byte as u16);
+        hash = hash.wrapping_mul(31);
+    }
+    hash
+}
+
+/// Update only the dynamic parts of the display (no flicker)
+fn update_display<D>(
+    display: &mut D,
+    doc: &HiveDocument,
+    connected: bool,
+    battery_pct: Option<u8>,
+    status: &str,
+) where
+    D: DrawTarget<Color = Rgb565>,
+{
+    let black = PrimitiveStyle::with_fill(Rgb565::BLACK);
+    let white = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
+    let green = MonoTextStyle::new(&FONT_10X20, Rgb565::GREEN);
+    let yellow = MonoTextStyle::new(&FONT_10X20, Rgb565::YELLOW);
+
+    // Connection indicator (top right) - show number of connections
+    let num_conns = nimble::connection_count();
+    let conn_color = if num_conns > 0 { Rgb565::GREEN } else { Rgb565::RED };
+    let _ = Circle::new(Point::new(280, 10), 20)
+        .into_styled(PrimitiveStyle::with_fill(conn_color))
+        .draw(display);
+    // Show connection count inside circle
+    if num_conns > 0 {
+        let conn_str = format!("{}", num_conns);
+        let black_text = MonoTextStyle::new(&FONT_10X20, Rgb565::BLACK);
+        let _ = Text::new(&conn_str, Point::new(285, 25), black_text).draw(display);
+    }
+
+    // Battery indicator (top left) - clear area then draw
+    // Hide if 0% (ADC not enabled on some modules)
+    let _ = Rectangle::new(Point::new(5, 5), Size::new(45, 25))
+        .into_styled(black)
+        .draw(display);
+    if let Some(pct) = battery_pct {
+        if pct > 0 {
+            let batt_color = if pct > 20 { Rgb565::GREEN } else { Rgb565::RED };
+            let batt_style = MonoTextStyle::new(&FONT_10X20, batt_color);
+            let batt_str = format!("{}%", pct);
+            let _ = Text::new(&batt_str, Point::new(10, 25), batt_style).draw(display);
+        }
+    }
+
+    // Tap count - clear area then draw large total
+    let _ = Rectangle::new(Point::new(30, 90), Size::new(260, 100))
+        .into_styled(black)
+        .draw(display);
+
+    // Large total count - this should be identical on all devices after sync!
+    let total_str = format!("{}", doc.total_taps());
+    let _ = Text::new(&total_str, Point::new(130, 140), green).draw(display);
+
+    // Show state hash and node count for visual convergence check
+    let hash = state_hash(doc);
+    let hash_str = format!("{:04X} v{} n{}", hash, doc.version, doc.num_nodes());
+    let _ = Text::new(&hash_str, Point::new(80, 180), white).draw(display);
+
+    // Status - clear area then draw
+    let _ = Rectangle::new(Point::new(10, 210), Size::new(300, 25))
+        .into_styled(black)
+        .draw(display);
+    let _ = Text::new(status, Point::new(20, 230), yellow).draw(display);
 }
 
 fn main() -> anyhow::Result<()> {
@@ -276,7 +450,11 @@ fn main() -> anyhow::Result<()> {
 
     // Get node ID from MAC address
     let node_id = get_node_id_from_mac();
-    info!("Node ID: {:08X}", node_id.as_u32());
+    info!("");
+    info!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    info!("!!! THIS DEVICE NODE ID: {:08X} !!!", node_id.as_u32());
+    info!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    info!("");
 
     // Initialize I2C for touch controller and AXP192
     info!("Initializing I2C...");
@@ -326,7 +504,7 @@ fn main() -> anyhow::Result<()> {
     // Initialize display (ILI9341 compatible, 320x240)
     info!("Initializing display...");
     let mut display = Builder::new(ILI9342CRgb565, spi_iface)
-        .orientation(Orientation::new().rotate(mipidsi::options::Rotation::Deg180))
+        .orientation(Orientation::new())
         .color_order(mipidsi::options::ColorOrder::Bgr)
         .invert_colors(mipidsi::options::ColorInversion::Inverted)
         .init(&mut FreeRtos)
@@ -357,14 +535,24 @@ fn main() -> anyhow::Result<()> {
 
     info!("All initialization complete!");
 
-    // Draw initial status
-    draw_display(&mut display, &doc, false, "Tap screen to increment!");
+    // Read initial battery status
+    let battery_mv = axp192_read_battery_voltage(&mut i2c);
+    let mut battery_pct = battery_mv.map(battery_percent_from_voltage);
+    if let Some(mv) = battery_mv {
+        info!("Battery: {}mV ({}%)", mv, battery_pct.unwrap_or(0));
+    }
+
+    // Draw static UI once, then update dynamic parts
+    draw_static_ui(&mut display, node_id.as_u32());
+    update_display(&mut display, &doc, false, battery_pct, "Tap screen to increment!");
     print_status(&doc, false, "Tap screen to increment!");
 
     // Main loop
     let mut last_touch = Touch::None;
     let mut loop_count: u32 = 0;
     let mut needs_redraw = false;
+    let mut touch_start_time: u32 = 0;  // For long-press detection
+    const LONG_PRESS_MS: u32 = 3000;  // 3 seconds to reset
 
     loop {
         let touch = read_touch(&mut i2c);
@@ -380,53 +568,76 @@ fn main() -> anyhow::Result<()> {
             needs_redraw = true;
         }
 
-        // Handle tap (rising edge only)
+        // Handle touch - detect tap vs long-press
+        let now_ms = unsafe { esp_idf_svc::sys::esp_timer_get_time() as u32 / 1000 };
+
         if touch == Touch::Touched && last_touch == Touch::None {
-            info!("");
-            info!(">>> TAP DETECTED!");
-
-            doc.tap();
-
-            // Save to NVS
-            if let Err(e) = store.save(&doc) {
-                error!("Failed to save: {:?}", e);
-            }
-
-            // Update BLE document
-            let encoded = doc.encode();
-            nimble::set_document(&encoded);
-
-            // Notify peer if connected
-            if connected {
-                if let Err(e) = nimble::notify_document(&encoded) {
-                    warn!("Failed to notify peer: {}", e);
+            // Touch started
+            touch_start_time = now_ms;
+        } else if touch == Touch::Touched && last_touch == Touch::Touched {
+            // Still touching - check for long press
+            let held_ms = now_ms.saturating_sub(touch_start_time);
+            if held_ms >= LONG_PRESS_MS && touch_start_time != 0 {
+                // Long press detected - RESET counter
+                info!(">>> LONG PRESS - RESETTING COUNTER!");
+                doc = HiveDocument::new(node_id);
+                if let Err(e) = store.save(&doc) {
+                    error!("Failed to save reset: {:?}", e);
                 }
+                let encoded = doc.encode();
+                nimble::set_document(&encoded);
+                touch_start_time = 0; // Prevent repeated resets
+                needs_redraw = true;
+                update_display(&mut display, &doc, connected, battery_pct, "RESET!");
             }
+        } else if touch == Touch::None && last_touch == Touch::Touched {
+            // Touch released - check if it was a tap (short press)
+            let held_ms = now_ms.saturating_sub(touch_start_time);
+            if held_ms < LONG_PRESS_MS && touch_start_time != 0 {
+                // Short tap - increment
+                doc.tap();
 
-            needs_redraw = true;
-            print_status(&doc, connected, "Tap saved!");
+                // Save to NVS
+                if let Err(e) = store.save(&doc) {
+                    error!("Failed to save: {:?}", e);
+                }
+
+                // Gossip to ALL connected peers (multi-hop mesh)
+                let encoded = doc.encode();
+                let sent = nimble::gossip_document(&encoded);
+                info!(">>> Gossiped tap to {} peers", sent);
+
+                needs_redraw = true;
+                print_status(&doc, connected, "Tap saved!");
+            }
         }
         last_touch = touch;
 
         // Handle pending document from BLE
         if let Some(data) = nimble::take_pending_document() {
-            info!(">>> Received {} bytes from peer", data.len());
+            info!("");
+            info!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            info!("!!! RECEIVED {} BYTES FROM BLE !!!", data.len());
+            info!("!!! Raw: {:02X?}", &data[..data.len().min(32)]);
+            info!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
             if let Some(peer_doc) = HiveDocument::decode(&data) {
-                info!("Decoded peer document: {} taps from node {:08X}", peer_doc.total_taps(), peer_doc.node_id.as_u32());
+                info!("Decoded peer doc from node {:08X}:", peer_doc.node_id.as_u32());
+                peer_doc.debug_dump("  PEER");
                 if doc.merge(&peer_doc) {
-                    info!("Merged! New total: {}", doc.total_taps());
+                    info!(">>> MERGED! New total: {}", doc.total_taps());
 
                     // Save merged state
                     if let Err(e) = store.save(&doc) {
                         error!("Failed to save merged doc: {:?}", e);
                     }
 
-                    // Update BLE document
+                    // GOSSIP: Forward merged state to ALL other peers (multi-hop!)
                     let encoded = doc.encode();
-                    nimble::set_document(&encoded);
+                    let sent = nimble::gossip_document(&encoded);
+                    info!(">>> Forwarded merged doc to {} peers (multi-hop)", sent);
 
                     needs_redraw = true;
-                    print_status(&doc, connected, "Merged from peer!");
+                    print_status(&doc, connected, "Merged & forwarded!");
                 } else {
                     info!("No changes from merge (peer had same or less data)");
                 }
@@ -438,18 +649,26 @@ fn main() -> anyhow::Result<()> {
         // Redraw display when needed
         if needs_redraw {
             let status = if connected { "Connected!" } else { "Advertising..." };
-            draw_display(&mut display, &doc, connected, status);
+            update_display(&mut display, &doc, connected, battery_pct, status);
             needs_redraw = false;
         }
 
-        // Periodic status update (every 5 seconds)
+        // Check if we should rotate to find other peers (mesh behavior)
+        nimble::check_rotation();
+
+        // Periodic status update (every 5 seconds = 100 * 50ms)
         if loop_count % 100 == 0 {
+            // Update battery reading
+            if let Some(mv) = axp192_read_battery_voltage(&mut i2c) {
+                battery_pct = Some(battery_percent_from_voltage(mv));
+            }
+
             let status = if connected {
                 "Connected - tap to sync!"
             } else {
                 "Advertising..."
             };
-            draw_display(&mut display, &doc, connected, status);
+            update_display(&mut display, &doc, connected, battery_pct, status);
             print_status(&doc, connected, status);
         }
 
