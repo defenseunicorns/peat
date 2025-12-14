@@ -41,12 +41,10 @@ use crate::platform::{
 use crate::transport::BleConnection;
 use crate::NodeId;
 
-// ESP-IDF imports - only used when actually building for ESP32
-#[cfg(target_os = "espidf")]
-use esp_idf_svc::bt::{
-    ble::{gap::BleGapEvent, gatt::server::GattsEvent},
-    BtDriver,
-};
+// Note: esp_idf_svc::bt requires Bluedroid feature which conflicts with NimBLE.
+// The actual BLE implementation is in the nimble.rs module in the example code.
+// This module provides the BleAdapter trait implementation but uses mock/stub
+// types when Bluedroid is not available.
 
 /// ESP32 BLE connection handle
 pub struct Esp32Connection {
