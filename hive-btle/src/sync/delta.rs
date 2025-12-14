@@ -5,7 +5,7 @@
 //! reduces bandwidth over BLE.
 
 #[cfg(not(feature = "std"))]
-use alloc::{collections::BTreeMap, string::String, vec::Vec};
+use alloc::{collections::BTreeMap, format, string::String, string::ToString, vec::Vec};
 #[cfg(feature = "std")]
 use std::collections::HashMap;
 

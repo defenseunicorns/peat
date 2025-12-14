@@ -33,6 +33,9 @@
 //!
 //! Total: 3 + 18 = 21 bytes (fits!)
 
+#[cfg(not(feature = "std"))]
+use alloc::string::String;
+
 use crate::{capabilities, HierarchyLevel, NodeId};
 
 /// HIVE beacon protocol version
@@ -312,6 +315,9 @@ impl ParsedAdvertisement {
     /// Uses the log-distance path loss model:
     /// distance = 10 ^ ((tx_power - rssi) / (10 * n))
     /// where n is the path loss exponent (typically 2-4)
+    ///
+    /// Note: Requires std feature for floating point math.
+    #[cfg(feature = "std")]
     pub fn estimated_distance_meters(&self) -> Option<f32> {
         let tx_power = self.tx_power.unwrap_or(0) as f32;
         let rssi = self.rssi as f32;
@@ -323,6 +329,12 @@ impl ParsedAdvertisement {
 
         let distance = 10.0_f32.powf((tx_power - rssi) / (10.0 * n));
         Some(distance)
+    }
+
+    /// Stub for no_std - always returns None
+    #[cfg(not(feature = "std"))]
+    pub fn estimated_distance_meters(&self) -> Option<f32> {
+        None
     }
 }
 

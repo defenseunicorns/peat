@@ -87,11 +87,6 @@
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
-#[cfg(not(feature = "std"))]
-use alloc::string::String;
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
-
 pub mod config;
 pub mod discovery;
 pub mod error;
@@ -105,10 +100,16 @@ pub mod transport;
 
 // Re-exports for convenience
 pub use config::{BleConfig, BlePhy, DiscoveryConfig, GattConfig, MeshConfig, PowerProfile};
-pub use discovery::{Advertiser, HiveBeacon, ScanFilter, Scanner};
+#[cfg(feature = "std")]
+pub use discovery::Scanner;
+pub use discovery::{Advertiser, HiveBeacon, ScanFilter};
 pub use error::{BleError, Result};
-pub use gatt::{HiveGattService, SyncProtocol};
-pub use mesh::{MeshManager, MeshRouter, MeshTopology, TopologyConfig, TopologyEvent};
+#[cfg(feature = "std")]
+pub use gatt::HiveGattService;
+pub use gatt::SyncProtocol;
+#[cfg(feature = "std")]
+pub use mesh::MeshManager;
+pub use mesh::{MeshRouter, MeshTopology, TopologyConfig, TopologyEvent};
 pub use phy::{PhyCapabilities, PhyController, PhyStrategy};
 pub use platform::{BleAdapter, ConnectionEvent, DisconnectReason, DiscoveredDevice, StubAdapter};
 pub use power::{BatteryState, RadioScheduler, SyncPriority};

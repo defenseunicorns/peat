@@ -6,7 +6,7 @@
 //! - Broadcast to all connected peers
 
 #[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 
 use crate::{HierarchyLevel, NodeId};
 

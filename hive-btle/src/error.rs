@@ -4,6 +4,8 @@
 //! adapter initialization, discovery, GATT operations, and connectivity.
 
 #[cfg(not(feature = "std"))]
+use alloc::string::String;
+#[cfg(not(feature = "std"))]
 use core::fmt;
 
 /// Result type alias for BLE operations

@@ -33,6 +33,9 @@
 //! Large documents are fragmented across multiple GATT writes.
 //! The `SyncDataHeader` contains fragment count and index.
 
+#[cfg(not(feature = "std"))]
+use alloc::{collections::VecDeque, vec, vec::Vec};
+#[cfg(feature = "std")]
 use std::collections::VecDeque;
 
 use super::characteristics::{SyncDataHeader, SyncDataOp};

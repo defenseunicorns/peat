@@ -25,6 +25,10 @@ windows = ["dep:windows"]
 # Embedded/no_std support
 embedded = []
 
+# ESP32 support (requires esp-idf toolchain)
+# Build with: cargo build --target xtensa-esp32-espidf --features esp32
+esp32 = ["embedded", "std", "dep:esp-idf-svc", "dep:esp-idf-hal"]
+
 # BLE 5.0 features
 coded-phy = []
 extended-adv = []
@@ -61,6 +65,10 @@ windows = { version = "0.58", features = [
     "Foundation",
     "Foundation_Collections",
 ], optional = true }
+
+# ESP32/ESP-IDF (optional)
+esp-idf-svc = { version = "0.50", optional = true }
+esp-idf-hal = { version = "0.45", optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"
