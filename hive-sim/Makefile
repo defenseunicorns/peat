@@ -1,7 +1,7 @@
 # Hive-Sim Makefile
 # Simple interface for running network simulations and tests
 
-.PHONY: help build clean deploy destroy
+.PHONY: help build clean deploy destroy lab4-48 lab4-96 lab4-384 lab4-status lab4-watch lab4-destroy
 
 # Default target
 .DEFAULT_GOAL := help
@@ -191,3 +191,75 @@ example-tactical: ## Example: Full tactical radio scenario
 	@echo "  - Backhaul: 10 Mbps, 500ms latency (satellite)"
 	@echo ""
 	@echo "View profiles: make hierarchical-list-profiles"
+
+##@ Lab 4: Backend Comparison (Ditto vs Automerge)
+
+lab4-48: ## Deploy Lab 4 with 48 nodes (BACKEND=automerge by default)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 4: 48 nodes (BACKEND=$${BACKEND:-automerge})           ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@if [ ! -f ../.env ]; then \
+		echo "ERROR: ../.env file required with HIVE_APP_ID, HIVE_SECRET_KEY"; \
+		exit 1; \
+	fi
+	@set -a && . ../.env && set +a && \
+		BACKEND=$${BACKEND:-automerge} \
+		CAP_IN_MEMORY=$${CAP_IN_MEMORY:-true} \
+		containerlab deploy -t topologies/lab4-48n-1gbps.yaml --reconfigure --timeout 5m
+	@echo ""
+	@echo "✓ Lab 4 (48 nodes) deployed. Monitor with: make lab4-status"
+
+lab4-96: ## Deploy Lab 4 with 96 nodes (BACKEND=automerge by default)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 4: 96 nodes (BACKEND=$${BACKEND:-automerge})           ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@if [ ! -f ../.env ]; then \
+		echo "ERROR: ../.env file required with HIVE_APP_ID, HIVE_SECRET_KEY"; \
+		exit 1; \
+	fi
+	@set -a && . ../.env && set +a && \
+		BACKEND=$${BACKEND:-automerge} \
+		CAP_IN_MEMORY=$${CAP_IN_MEMORY:-true} \
+		containerlab deploy -t topologies/lab4-96n-1gbps.yaml --reconfigure --timeout 5m
+	@echo ""
+	@echo "✓ Lab 4 (96 nodes) deployed. Monitor with: make lab4-status"
+
+lab4-384: ## Deploy Lab 4 with 384 nodes (BACKEND=automerge by default)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 4: 384 nodes (BACKEND=$${BACKEND:-automerge})          ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@if [ ! -f ../.env ]; then \
+		echo "ERROR: ../.env file required with HIVE_APP_ID, HIVE_SECRET_KEY"; \
+		exit 1; \
+	fi
+	@set -a && . ../.env && set +a && \
+		BACKEND=$${BACKEND:-automerge} \
+		CAP_IN_MEMORY=$${CAP_IN_MEMORY:-true} \
+		containerlab deploy -t topologies/lab4-384n-1gbps.yaml --reconfigure --timeout 10m
+	@echo ""
+	@echo "✓ Lab 4 (384 nodes) deployed. Monitor with: make lab4-status"
+
+lab4-status: ## Show Lab 4 deployment status
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 4: Status                                             ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@TOTAL=$$(docker ps --filter "name=clab-lab4" -q | wc -l); \
+	RUNNING=$$(docker ps --filter "name=clab-lab4" --filter "status=running" -q | wc -l); \
+	echo "Containers: $$RUNNING running / $$TOTAL total"
+	@echo ""
+	@echo "Memory usage (leaders):"
+	@docker stats --no-stream --format "table {{.Name}}\t{{.MemUsage}}" | grep -E "squad.*leader|platoon.*leader|commander" | head -10
+	@echo ""
+	@echo "Errors (if any):"
+	@docker ps --filter "name=clab-lab4" -q | head -10 | xargs -I{} docker logs {} 2>&1 | grep -iE "error|panic|fatal" | grep -v "No error" | head -5 || echo "  None found"
+
+lab4-watch: ## Continuously monitor Lab 4 (Ctrl+C to stop)
+	@watch -n 5 'docker stats --no-stream --format "table {{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}" | grep -E "squad.*leader|platoon.*leader|commander" | head -20'
+
+lab4-destroy: ## Destroy Lab 4 deployment
+	@echo "Destroying Lab 4 deployment..."
+	-containerlab destroy -t topologies/lab4-48n-1gbps.yaml --cleanup 2>/dev/null || true
+	-containerlab destroy -t topologies/lab4-96n-1gbps.yaml --cleanup 2>/dev/null || true
+	-containerlab destroy -t topologies/lab4-384n-1gbps.yaml --cleanup 2>/dev/null || true
+	-docker network prune -f 2>/dev/null || true
+	@echo "✓ Lab 4 destroyed"
