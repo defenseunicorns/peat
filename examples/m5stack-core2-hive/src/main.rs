@@ -26,17 +26,16 @@
 //! espflash flash --monitor target/xtensa-esp32-espidf/release/m5stack-core2-hive
 //! ```
 
-use std::collections::HashMap;
-
 use esp_idf_hal::delay::FreeRtos;
 use esp_idf_hal::i2c::{I2cConfig, I2cDriver};
 use esp_idf_hal::peripherals::Peripherals;
 use esp_idf_hal::prelude::*;
 use esp_idf_svc::eventloop::EspSystemEventLoop;
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
-use log::{info, warn, error, debug};
+use log::{info, debug};
 
 use hive_btle::discovery::HiveBeacon;
+use hive_btle::sync::GCounter;  // Use HIVE-Lite's CRDT!
 use hive_btle::{HierarchyLevel, NodeId};
 
 // FT6336U Touch controller I2C address
@@ -70,103 +69,36 @@ enum TouchButton {
     Screen(u16, u16), // Touch on main screen area
 }
 
-/// G-Counter CRDT
-///
-/// Each node has its own counter. Merge takes max per node.
-/// Total is sum of all counters.
-#[derive(Debug, Clone)]
-struct GCounter {
-    counts: HashMap<u32, u32>,
-    our_id: u32,
-}
-
-impl GCounter {
-    fn new(our_id: u32) -> Self {
-        let mut counts = HashMap::new();
-        counts.insert(our_id, 0);
-        Self { counts, our_id }
-    }
-
-    fn increment(&mut self) {
-        let count = self.counts.entry(self.our_id).or_insert(0);
-        *count += 1;
-    }
-
-    fn our_count(&self) -> u32 {
-        *self.counts.get(&self.our_id).unwrap_or(&0)
-    }
-
-    fn peer_count(&self) -> u32 {
-        self.counts
-            .iter()
-            .filter(|(&id, _)| id != self.our_id)
-            .map(|(_, &count)| count)
-            .sum()
-    }
-
-    fn total(&self) -> u32 {
-        self.counts.values().sum()
-    }
-
-    fn merge(&mut self, other: &GCounter) {
-        for (&node_id, &count) in &other.counts {
-            let our_count = self.counts.entry(node_id).or_insert(0);
-            *our_count = (*our_count).max(count);
-        }
-    }
-
-    /// Encode for BLE: [num_entries: u8] [node_id: u32, count: u32]...
-    fn encode(&self) -> Vec<u8> {
-        let mut data = Vec::with_capacity(1 + self.counts.len() * 8);
-        data.push(self.counts.len() as u8);
-        for (&node_id, &count) in &self.counts {
-            data.extend_from_slice(&node_id.to_le_bytes());
-            data.extend_from_slice(&count.to_le_bytes());
-        }
-        data
-    }
-
-    fn decode(data: &[u8], our_id: u32) -> Option<Self> {
-        if data.is_empty() {
-            return None;
-        }
-        let num_entries = data[0] as usize;
-        if data.len() < 1 + num_entries * 8 {
-            return None;
-        }
-        let mut counts = HashMap::new();
-        for i in 0..num_entries {
-            let offset = 1 + i * 8;
-            let node_id = u32::from_le_bytes([
-                data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
-            ]);
-            let count = u32::from_le_bytes([
-                data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
-            ]);
-            counts.insert(node_id, count);
-        }
-        Some(Self { counts, our_id })
-    }
-}
+// Using hive_btle::sync::GCounter - the real HIVE-Lite CRDT!
 
 /// Display state
 struct DisplayState {
-    our_id: u32,
-    peer_id: Option<u32>,
+    our_node_id: NodeId,
+    peer_id: Option<NodeId>,
     counter: GCounter,
     status: &'static str,
     ble_connected: bool,
 }
 
 impl DisplayState {
-    fn new(our_id: u32) -> Self {
+    fn new(node_id: NodeId) -> Self {
         Self {
-            our_id,
+            our_node_id: node_id,
             peer_id: None,
-            counter: GCounter::new(our_id),
+            counter: GCounter::new(),  // HIVE-Lite GCounter
             status: "Starting...",
             ble_connected: false,
         }
+    }
+
+    /// Get our tap count
+    fn our_count(&self) -> u64 {
+        self.counter.node_count(&self.our_node_id)
+    }
+
+    /// Get peer tap count (total - ours)
+    fn peer_count(&self) -> u64 {
+        self.counter.value() - self.our_count()
     }
 }
 
@@ -231,20 +163,20 @@ fn read_touch(i2c: &mut I2cDriver) -> TouchButton {
 /// Update display (serial output for now, LCD driver to come)
 fn update_display(state: &DisplayState) {
     info!("┌────────────────────────────────┐");
-    info!("│  HIVE Counter Demo             │");
+    info!("│  HIVE-Lite Counter Demo        │");
     info!("├────────────────────────────────┤");
-    info!("│  My ID: {:08X}              │", state.our_id);
-    if let Some(peer) = state.peer_id {
-        info!("│  Peer:  {:08X} {}           │", peer,
+    info!("│  My ID: {:08X}              │", state.our_node_id.as_u32());
+    if let Some(ref peer) = state.peer_id {
+        info!("│  Peer:  {:08X} {}           │", peer.as_u32(),
             if state.ble_connected { "●" } else { "○" });
     } else {
         info!("│  Peer:  (scanning...)          │");
     }
     info!("├────────────────────────────────┤");
-    info!("│  My taps:   {:>4}               │", state.counter.our_count());
-    info!("│  Peer taps: {:>4}               │", state.counter.peer_count());
+    info!("│  My taps:   {:>4}               │", state.our_count());
+    info!("│  Peer taps: {:>4}               │", state.peer_count());
     info!("│  ──────────────                │");
-    info!("│  TOTAL:     {:>4}               │", state.counter.total());
+    info!("│  TOTAL:     {:>4}               │", state.counter.value());
     info!("├────────────────────────────────┤");
     info!("│  TAP SCREEN = +1               │");
     info!("│  Status: {:<20} │", state.status);
@@ -266,8 +198,9 @@ fn main() -> anyhow::Result<()> {
     let _nvs = EspDefaultNvsPartition::take()?;
 
     // Get unique Node ID from MAC
-    let node_id = get_node_id_from_mac();
-    info!("Node ID: {:08X}", node_id);
+    let node_id_value = get_node_id_from_mac();
+    let node_id = NodeId::new(node_id_value);
+    info!("Node ID: {:08X}", node_id.as_u32());
 
     // Initialize I2C for touch controller
     let i2c_config = I2cConfig::new().baudrate(400.kHz().into());
@@ -280,13 +213,12 @@ fn main() -> anyhow::Result<()> {
 
     info!("I2C initialized for touch controller");
 
-    // Initialize display state
+    // Initialize display state with HIVE-Lite GCounter
     let mut state = DisplayState::new(node_id);
     state.status = "Tap screen!";
 
     // Create HIVE beacon
-    let node_id_obj = NodeId::new(node_id);
-    let mut beacon = HiveBeacon::new(node_id_obj);
+    let mut beacon = HiveBeacon::new(node_id);
     beacon.set_hierarchy_level(HierarchyLevel::Leaf);
     beacon.set_battery_level(100);
 
@@ -313,9 +245,9 @@ fn main() -> anyhow::Result<()> {
         let was_touching = last_button != TouchButton::None;
 
         if is_touching && !was_touching {
-            // Any touch increments counter
+            // Any touch increments counter using HIVE-Lite GCounter
             info!(">>> TOUCH! Incrementing counter...");
-            state.counter.increment();
+            state.counter.increment(&state.our_node_id, 1);
             state.status = "Tapped! +1";
             update_display(&state);
             // TODO: Trigger BLE sync to peer
@@ -338,47 +270,4 @@ fn main() -> anyhow::Result<()> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_gcounter_increment() {
-        let mut counter = GCounter::new(0x1234);
-        assert_eq!(counter.our_count(), 0);
-        counter.increment();
-        assert_eq!(counter.our_count(), 1);
-        counter.increment();
-        assert_eq!(counter.our_count(), 2);
-    }
-
-    #[test]
-    fn test_gcounter_merge() {
-        let mut counter_a = GCounter::new(0x1111);
-        let mut counter_b = GCounter::new(0x2222);
-
-        counter_a.increment();
-        counter_a.increment();
-        counter_b.increment();
-
-        assert_eq!(counter_a.total(), 2);
-        assert_eq!(counter_b.total(), 1);
-
-        counter_a.merge(&counter_b);
-        assert_eq!(counter_a.total(), 3);
-        assert_eq!(counter_a.our_count(), 2);
-        assert_eq!(counter_a.peer_count(), 1);
-    }
-
-    #[test]
-    fn test_gcounter_encode_decode() {
-        let mut counter = GCounter::new(0x12345678);
-        counter.increment();
-        counter.increment();
-
-        let encoded = counter.encode();
-        let decoded = GCounter::decode(&encoded, 0x12345678).unwrap();
-
-        assert_eq!(decoded.our_count(), 2);
-    }
-}
+// Note: GCounter tests are in hive_btle::sync::crdt - no need to duplicate here
