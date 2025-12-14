@@ -1,22 +1,24 @@
-//! HIVE Protocol Demo for M5Stack Core2
+//! HIVE-Lite Counter Demo for M5Stack Core2
 //!
-//! Simple CRDT counter sync demo:
-//! - Touch Button A to increment your counter
-//! - Counter syncs to peer via BLE
-//! - Both devices show same total
+//! Demonstrates CRDT document sync between two nodes:
+//! - Tap screen to increment your counter
+//! - Counter persists to NVS (survives power off)
+//! - When peer connects, full state exchange and merge
+//! - Eventually consistent: both nodes converge to same state
 //!
-//! ## Hardware
+//! ## Automerge-style Semantics
 //!
-//! - M5Stack Core2 (ESP32-D0WDQ6-V3)
-//! - FT6336U capacitive touch controller (I2C 0x38)
-//! - 320x240 ILI9342C LCD display
-//! - Touch buttons A/B/C at bottom of screen
+//! Each node maintains a GCounter CRDT document:
+//! - Node tracks its own taps independently
+//! - Merge = take max of each node's count
+//! - Offline changes are preserved and sync later
 //!
-//! ## CRDT Design
-//!
-//! Uses a G-Counter (grow-only counter) where each node tracks its own count.
-//! Merge operation takes max of each node's count.
-//! Total is sum of all node counts.
+//! Example:
+//! ```text
+//! Node A: {A: 5, B: 3} = 8 total
+//! Node B offline, taps 4 times: {A: 2, B: 7}
+//! After sync: both have {A: 5, B: 7} = 12 total
+//! ```
 //!
 //! ## Building
 //!
@@ -31,155 +33,201 @@ use esp_idf_hal::i2c::{I2cConfig, I2cDriver};
 use esp_idf_hal::peripherals::Peripherals;
 use esp_idf_hal::prelude::*;
 use esp_idf_svc::eventloop::EspSystemEventLoop;
-use esp_idf_svc::nvs::EspDefaultNvsPartition;
-use log::{info, debug};
+use esp_idf_svc::nvs::{EspDefaultNvsPartition, EspNvs, NvsDefault};
+use log::{info, warn, error, debug};
 
 use hive_btle::discovery::HiveBeacon;
-use hive_btle::sync::GCounter;  // Use HIVE-Lite's CRDT!
+use hive_btle::sync::GCounter;
 use hive_btle::{HierarchyLevel, NodeId};
 
-// FT6336U Touch controller I2C address
+// NVS namespace for storing CRDT state
+const NVS_NAMESPACE: &str = "hive";
+const NVS_KEY_COUNTER: &str = "counter";
+
+// FT6336U Touch controller
 const FT6336U_ADDR: u8 = 0x38;
+const FT6336U_REG_STATUS: u8 = 0x02;
+const FT6336U_REG_TOUCH1_XH: u8 = 0x03;
 
-// FT6336U registers
-const FT6336U_REG_STATUS: u8 = 0x02;    // Number of touch points
-const FT6336U_REG_TOUCH1_XH: u8 = 0x03; // Touch 1 X high byte + event
-const FT6336U_REG_TOUCH1_XL: u8 = 0x04; // Touch 1 X low byte
-const FT6336U_REG_TOUCH1_YH: u8 = 0x05; // Touch 1 Y high byte
-const FT6336U_REG_TOUCH1_YL: u8 = 0x06; // Touch 1 Y low byte
-
-// Touch button regions (M5Stack Core2 button bar at bottom)
-// The touch panel extends below the visible LCD area
-const BUTTON_Y_MIN: u16 = 240;  // Below visible screen
-const BUTTON_Y_MAX: u16 = 320;
-const BUTTON_A_X_MIN: u16 = 0;
-const BUTTON_A_X_MAX: u16 = 109;
-const BUTTON_B_X_MIN: u16 = 110;
-const BUTTON_B_X_MAX: u16 = 219;
-const BUTTON_C_X_MIN: u16 = 220;
-const BUTTON_C_X_MAX: u16 = 320;
-
-/// Touch event
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum TouchButton {
-    None,
-    A,
-    B,
-    C,
-    Screen(u16, u16), // Touch on main screen area
+/// CRDT Document - holds all synced state
+///
+/// This is our "Automerge document" - a collection of CRDTs
+/// that can be synced as a unit.
+struct HiveDocument {
+    /// The tap counter (G-Counter CRDT)
+    pub counter: GCounter,
+    /// Our node ID
+    node_id: NodeId,
+    /// Document version (increments on any local change)
+    version: u64,
 }
 
-// Using hive_btle::sync::GCounter - the real HIVE-Lite CRDT!
-
-/// Display state
-struct DisplayState {
-    our_node_id: NodeId,
-    peer_id: Option<NodeId>,
-    counter: GCounter,
-    status: &'static str,
-    ble_connected: bool,
-}
-
-impl DisplayState {
+impl HiveDocument {
+    /// Create new empty document
     fn new(node_id: NodeId) -> Self {
         Self {
-            our_node_id: node_id,
-            peer_id: None,
-            counter: GCounter::new(),  // HIVE-Lite GCounter
-            status: "Starting...",
-            ble_connected: false,
+            counter: GCounter::new(),
+            node_id,
+            version: 0,
         }
     }
 
-    /// Get our tap count
-    fn our_count(&self) -> u64 {
-        self.counter.node_count(&self.our_node_id)
+    /// Increment our tap counter
+    fn tap(&mut self) {
+        self.counter.increment(&self.node_id, 1);
+        self.version += 1;
     }
 
-    /// Get peer tap count (total - ours)
-    fn peer_count(&self) -> u64 {
-        self.counter.value() - self.our_count()
+    /// Get our tap count
+    fn our_taps(&self) -> u64 {
+        self.counter.node_count(&self.node_id)
+    }
+
+    /// Get peer tap count (everyone else)
+    fn peer_taps(&self) -> u64 {
+        self.counter.value() - self.our_taps()
+    }
+
+    /// Get total taps
+    fn total_taps(&self) -> u64 {
+        self.counter.value()
+    }
+
+    /// Merge with another document (Automerge-style)
+    ///
+    /// After merge, both documents will have the same state
+    /// (max of each node's contribution).
+    fn merge(&mut self, other: &HiveDocument) {
+        self.counter.merge(&other.counter);
+        self.version += 1;
+    }
+
+    /// Encode document for sync/storage
+    fn encode(&self) -> Vec<u8> {
+        // Format: [version: 8 bytes] [counter_data]
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&self.version.to_le_bytes());
+        buf.extend_from_slice(&self.counter.encode());
+        buf
+    }
+
+    /// Decode document from sync/storage
+    fn decode(data: &[u8], node_id: NodeId) -> Option<Self> {
+        if data.len() < 8 {
+            return None;
+        }
+        let version = u64::from_le_bytes([
+            data[0], data[1], data[2], data[3],
+            data[4], data[5], data[6], data[7],
+        ]);
+        let counter = GCounter::decode(&data[8..])?;
+        Some(Self {
+            counter,
+            node_id,
+            version,
+        })
+    }
+}
+
+/// Persistent storage for CRDT document
+struct DocumentStore<'a> {
+    nvs: EspNvs<NvsDefault>,
+    node_id: NodeId,
+    _phantom: std::marker::PhantomData<&'a ()>,
+}
+
+impl<'a> DocumentStore<'a> {
+    /// Open or create the document store
+    fn new(nvs_partition: EspDefaultNvsPartition, node_id: NodeId) -> anyhow::Result<Self> {
+        let nvs = EspNvs::new(nvs_partition, NVS_NAMESPACE, true)?;
+        Ok(Self {
+            nvs,
+            node_id,
+            _phantom: std::marker::PhantomData,
+        })
+    }
+
+    /// Load document from NVS (or create new if not found)
+    fn load(&self) -> HiveDocument {
+        let mut buf = [0u8; 256];
+        match self.nvs.get_raw(NVS_KEY_COUNTER, &mut buf) {
+            Ok(Some(data)) => {
+                if let Some(doc) = HiveDocument::decode(data, self.node_id) {
+                    info!("Loaded document from NVS: {} taps, version {}",
+                          doc.total_taps(), doc.version);
+                    return doc;
+                }
+            }
+            Ok(None) => {
+                info!("No saved document, starting fresh");
+            }
+            Err(e) => {
+                warn!("Failed to load from NVS: {:?}, starting fresh", e);
+            }
+        }
+        HiveDocument::new(self.node_id)
+    }
+
+    /// Save document to NVS
+    fn save(&mut self, doc: &HiveDocument) -> anyhow::Result<()> {
+        let data = doc.encode();
+        self.nvs.set_raw(NVS_KEY_COUNTER, &data)?;
+        debug!("Saved document to NVS: {} bytes", data.len());
+        Ok(())
+    }
+}
+
+/// Touch detection
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum TouchState {
+    None,
+    Touched,
+}
+
+fn read_touch(i2c: &mut I2cDriver) -> TouchState {
+    let mut buf = [0u8; 1];
+    if i2c.write_read(FT6336U_ADDR, &[FT6336U_REG_STATUS], &mut buf).is_err() {
+        return TouchState::None;
+    }
+    let num_touches = buf[0] & 0x0F;
+    if num_touches > 0 {
+        TouchState::Touched
+    } else {
+        TouchState::None
     }
 }
 
 /// Get unique Node ID from ESP32 MAC address
-fn get_node_id_from_mac() -> u32 {
+fn get_node_id_from_mac() -> NodeId {
     let mut mac = [0u8; 6];
     unsafe {
         esp_idf_svc::sys::esp_efuse_mac_get_default(mac.as_mut_ptr());
     }
-    info!(
-        "MAC: {:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
-        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]
-    );
-    u32::from_be_bytes([mac[2], mac[3], mac[4], mac[5]])
+    info!("MAC: {:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+          mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    NodeId::new(u32::from_be_bytes([mac[2], mac[3], mac[4], mac[5]]))
 }
 
-/// Read touch input from FT6336U
-fn read_touch(i2c: &mut I2cDriver) -> TouchButton {
-    let mut buf = [0u8; 5];
-
-    // Read touch status and first touch point
-    if i2c.write_read(FT6336U_ADDR, &[FT6336U_REG_STATUS], &mut buf).is_err() {
-        return TouchButton::None;
-    }
-
-    let num_touches = buf[0] & 0x0F;
-    if num_touches == 0 {
-        return TouchButton::None;
-    }
-
-    // Read touch coordinates
-    let mut coord_buf = [0u8; 4];
-    if i2c.write_read(FT6336U_ADDR, &[FT6336U_REG_TOUCH1_XH], &mut coord_buf).is_err() {
-        return TouchButton::None;
-    }
-
-    // Extract X and Y (12-bit values)
-    let x = (((coord_buf[0] & 0x0F) as u16) << 8) | (coord_buf[1] as u16);
-    let y = (((coord_buf[2] & 0x0F) as u16) << 8) | (coord_buf[3] as u16);
-
-    debug!("Touch at ({}, {})", x, y);
-
-    // Determine which button (if any)
-    if y >= BUTTON_Y_MIN && y <= BUTTON_Y_MAX {
-        if x >= BUTTON_A_X_MIN && x <= BUTTON_A_X_MAX {
-            return TouchButton::A;
-        } else if x >= BUTTON_B_X_MIN && x <= BUTTON_B_X_MAX {
-            return TouchButton::B;
-        } else if x >= BUTTON_C_X_MIN && x <= BUTTON_C_X_MAX {
-            return TouchButton::C;
-        }
-    }
-
-    // Touch on main screen area
-    if y < BUTTON_Y_MIN {
-        return TouchButton::Screen(x, y);
-    }
-
-    TouchButton::None
-}
-
-/// Update display (serial output for now, LCD driver to come)
-fn update_display(state: &DisplayState) {
+/// Display state to serial (LCD driver to come)
+fn update_display(doc: &HiveDocument, peer_id: Option<NodeId>, connected: bool, status: &str) {
     info!("┌────────────────────────────────┐");
-    info!("│  HIVE-Lite Counter Demo        │");
+    info!("│  HIVE-Lite Document Sync       │");
     info!("├────────────────────────────────┤");
-    info!("│  My ID: {:08X}              │", state.our_node_id.as_u32());
-    if let Some(ref peer) = state.peer_id {
+    info!("│  My ID: {:08X}  v{}          │", doc.node_id.as_u32(), doc.version);
+    if let Some(peer) = peer_id {
         info!("│  Peer:  {:08X} {}           │", peer.as_u32(),
-            if state.ble_connected { "●" } else { "○" });
+              if connected { "●" } else { "○" });
     } else {
         info!("│  Peer:  (scanning...)          │");
     }
     info!("├────────────────────────────────┤");
-    info!("│  My taps:   {:>4}               │", state.our_count());
-    info!("│  Peer taps: {:>4}               │", state.peer_count());
+    info!("│  My taps:   {:>4}               │", doc.our_taps());
+    info!("│  Peer taps: {:>4}               │", doc.peer_taps());
     info!("│  ──────────────                │");
-    info!("│  TOTAL:     {:>4}               │", state.counter.value());
+    info!("│  TOTAL:     {:>4}               │", doc.total_taps());
     info!("├────────────────────────────────┤");
-    info!("│  TAP SCREEN = +1               │");
-    info!("│  Status: {:<20} │", state.status);
+    info!("│  TAP SCREEN = +1 (persisted)   │");
+    info!("│  Status: {:<20} │", status);
     info!("└────────────────────────────────┘");
 }
 
@@ -189,85 +237,91 @@ fn main() -> anyhow::Result<()> {
     esp_idf_svc::log::EspLogger::initialize_default();
 
     info!("=========================================");
-    info!("  HIVE Counter Demo - M5Stack Core2");
+    info!("  HIVE-Lite Document Sync Demo");
     info!("=========================================");
 
     // Take peripherals
     let peripherals = Peripherals::take()?;
     let _sys_loop = EspSystemEventLoop::take()?;
-    let _nvs = EspDefaultNvsPartition::take()?;
+    let nvs_partition = EspDefaultNvsPartition::take()?;
 
     // Get unique Node ID from MAC
-    let node_id_value = get_node_id_from_mac();
-    let node_id = NodeId::new(node_id_value);
+    let node_id = get_node_id_from_mac();
     info!("Node ID: {:08X}", node_id.as_u32());
+
+    // Initialize persistent document store
+    let mut store = DocumentStore::new(nvs_partition, node_id)?;
+
+    // Load document from NVS (or create new)
+    let mut doc = store.load();
+    info!("Document loaded: {} total taps", doc.total_taps());
 
     // Initialize I2C for touch controller
     let i2c_config = I2cConfig::new().baudrate(400.kHz().into());
     let mut i2c = I2cDriver::new(
         peripherals.i2c0,
-        peripherals.pins.gpio21, // SDA
-        peripherals.pins.gpio22, // SCL
+        peripherals.pins.gpio21,
+        peripherals.pins.gpio22,
         &i2c_config,
     )?;
-
-    info!("I2C initialized for touch controller");
-
-    // Initialize display state with HIVE-Lite GCounter
-    let mut state = DisplayState::new(node_id);
-    state.status = "Tap screen!";
+    info!("Touch controller initialized");
 
     // Create HIVE beacon
     let mut beacon = HiveBeacon::new(node_id);
     beacon.set_hierarchy_level(HierarchyLevel::Leaf);
     beacon.set_battery_level(100);
+    info!("HIVE beacon ready: {} bytes", beacon.encode_compact().len());
 
-    info!("Beacon configured, {} bytes", beacon.encode_compact().len());
+    // TODO: Initialize NimBLE
+    // - Advertise with beacon + document hash in service data
+    // - Scan for peer HIVE beacons
+    // - On connect: exchange full document, merge, save
 
     // Initial display
-    update_display(&state);
+    let mut status = "Tap screen!";
+    update_display(&doc, None, false, status);
 
-    // TODO: Initialize BLE advertising with counter state in service data
-    // TODO: Start BLE scan for peer HIVE nodes
-    // TODO: On peer discovery, connect and sync counter state
-
-    // Track button state for edge detection
-    let mut last_button = TouchButton::None;
+    // Main loop
+    let mut last_touch = TouchState::None;
     let mut loop_count: u32 = 0;
-    let mut last_display_update = 0u32;
 
     loop {
-        // Read touch input
-        let button = read_touch(&mut i2c);
+        // Check for touch
+        let touch = read_touch(&mut i2c);
 
-        // Detect touch (rising edge - only trigger on new touch)
-        let is_touching = button != TouchButton::None;
-        let was_touching = last_button != TouchButton::None;
+        // Detect rising edge (new touch)
+        if touch == TouchState::Touched && last_touch == TouchState::None {
+            info!(">>> TAP! Incrementing and saving...");
 
-        if is_touching && !was_touching {
-            // Any touch increments counter using HIVE-Lite GCounter
-            info!(">>> TOUCH! Incrementing counter...");
-            state.counter.increment(&state.our_node_id, 1);
-            state.status = "Tapped! +1";
-            update_display(&state);
-            // TODO: Trigger BLE sync to peer
+            // Increment counter
+            doc.tap();
+
+            // Persist to NVS immediately
+            if let Err(e) = store.save(&doc) {
+                error!("Failed to save: {:?}", e);
+                status = "Save failed!";
+            } else {
+                status = "Saved!";
+            }
+
+            update_display(&doc, None, false, status);
+
+            // TODO: If connected to peer, trigger sync
+        }
+        last_touch = touch;
+
+        // Periodic status update
+        if loop_count % 50 == 0 {
+            status = "Tap screen!";
+            update_display(&doc, None, false, status);
         }
 
-        last_button = button;
+        // TODO: BLE sync loop
+        // - Check for new peer connections
+        // - Exchange document state
+        // - Merge and save
 
-        // Update display periodically (every ~5 seconds)
-        if loop_count - last_display_update >= 50 {
-            update_display(&state);
-            last_display_update = loop_count;
-        }
-
-        // TODO: Check for incoming BLE sync data
-        // - If peer counter received, merge with ours
-        // - Update display
-
-        FreeRtos::delay_ms(100); // 10Hz loop for responsive touch
+        FreeRtos::delay_ms(100);
         loop_count += 1;
     }
 }
-
-// Note: GCounter tests are in hive_btle::sync::crdt - no need to duplicate here
