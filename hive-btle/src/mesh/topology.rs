@@ -212,7 +212,7 @@ impl MeshTopology {
     pub fn all_connected(&self) -> Vec<NodeId> {
         let mut nodes = Vec::with_capacity(self.connection_count());
         if let Some(ref parent) = self.parent {
-            nodes.push(parent.clone());
+            nodes.push(*parent);
         }
         nodes.extend(self.children.iter().cloned());
         nodes.extend(self.peers.iter().cloned());
@@ -455,8 +455,8 @@ mod tests {
         let mut topology = MeshTopology::new(HierarchyLevel::Platform, 3, 7);
         let parent_id = NodeId::new(0x1234);
 
-        assert!(topology.set_parent(parent_id.clone()));
-        assert_eq!(topology.parent, Some(parent_id.clone()));
+        assert!(topology.set_parent(parent_id));
+        assert_eq!(topology.parent, Some(parent_id));
         assert_eq!(topology.connection_count(), 1);
 
         // Can't set another parent
@@ -494,7 +494,7 @@ mod tests {
         let mut topology = MeshTopology::new(HierarchyLevel::Squad, 3, 7);
         let child_id = NodeId::new(0x1111);
 
-        topology.add_child(child_id.clone());
+        topology.add_child(child_id);
         assert!(topology.remove_child(&child_id));
         assert!(!topology.remove_child(&child_id)); // Already removed
         assert!(topology.children.is_empty());
@@ -508,9 +508,9 @@ mod tests {
         let peer_id = NodeId::new(0x0003);
         let unknown_id = NodeId::new(0x9999);
 
-        topology.set_parent(parent_id.clone());
-        topology.add_child(child_id.clone());
-        topology.add_peer(peer_id.clone());
+        topology.set_parent(parent_id);
+        topology.add_child(child_id);
+        topology.add_peer(peer_id);
 
         assert_eq!(topology.get_role(&parent_id), Some(PeerRole::Parent));
         assert_eq!(topology.get_role(&child_id), Some(PeerRole::Child));
