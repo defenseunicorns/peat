@@ -17,132 +17,112 @@
 //! use hive_btle::{BleConfig, BluetoothLETransport, NodeId};
 //!
 //! // Create adapter
-//! let adapter = Esp32Adapter::new()?;
+//! let adapter = Esp32Adapter::new(NodeId::new(0x12345678), "HIVE-Device")?;
 //!
-//! // Create transport
-//! let config = BleConfig::hive_lite(NodeId::new(0x12345678));
-//! let transport = BluetoothLETransport::new(config, adapter);
+//! // Initialize
+//! adapter.init(&BleConfig::hive_lite(NodeId::new(0x12345678))).await?;
 //!
-//! // Start BLE operations
-//! transport.start().await?;
+//! // Start operations
+//! adapter.start().await?;
 //! ```
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use esp_idf_hal::peripheral::Peripheral;
-use esp_idf_svc::bt::{
-    ble::{
-        gap::{BleGapEvent, EspBleGap},
-        gatt::{
-            server::{EspGatts, GattsEvent},
-            GattCharacteristic, GattDescriptor, GattService,
-        },
-    },
-    BtDriver,
-};
-use log::{debug, error, info, warn};
+use log::{debug, info};
 
-use crate::config::{BleConfig, BlePhy, DiscoveryConfig};
-use crate::discovery::{Advertiser, HiveBeacon};
+use crate::config::{BleConfig, DiscoveryConfig};
+use crate::discovery::HiveBeacon;
 use crate::error::{BleError, Result};
 use crate::platform::{
-    BleAdapter, ConnectionCallback, ConnectionEvent, DisconnectReason, DiscoveredDevice,
-    DiscoveryCallback,
+    BleAdapter, ConnectionCallback, ConnectionEvent, DisconnectReason, DiscoveryCallback,
 };
 use crate::transport::BleConnection;
 use crate::NodeId;
-use crate::{
-    CHAR_COMMAND_UUID, CHAR_NODE_INFO_UUID, CHAR_STATUS_UUID, CHAR_SYNC_DATA_UUID,
-    CHAR_SYNC_STATE_UUID, HIVE_SERVICE_UUID,
+
+// ESP-IDF imports - only used when actually building for ESP32
+#[cfg(target_os = "espidf")]
+use esp_idf_svc::bt::{
+    ble::{gap::BleGapEvent, gatt::server::GattsEvent},
+    BtDriver,
 };
 
 /// ESP32 BLE connection handle
 pub struct Esp32Connection {
+    /// Peer node ID
+    peer_id: NodeId,
     /// Connection handle from NimBLE
     conn_handle: u16,
     /// Peer address
     address: String,
-    /// Node ID (if known)
-    node_id: Option<NodeId>,
     /// Connection MTU
     mtu: u16,
-    /// Whether this is a GATT client (central) or server (peripheral)
-    is_client: bool,
+    /// Connection start time (monotonic ms)
+    connected_at_ms: u64,
+    /// Current time (monotonic ms)
+    current_time_ms: u64,
+    /// Whether connection is still alive
+    alive: bool,
 }
 
 impl Esp32Connection {
     /// Create new connection
-    pub fn new(conn_handle: u16, address: String, is_client: bool) -> Self {
+    pub fn new(peer_id: NodeId, conn_handle: u16, address: String) -> Self {
         Self {
+            peer_id,
             conn_handle,
             address,
-            node_id: None,
             mtu: 23, // BLE default
-            is_client,
+            connected_at_ms: 0,
+            current_time_ms: 0,
+            alive: true,
         }
+    }
+
+    /// Set the connection time
+    pub fn set_time_ms(&mut self, time_ms: u64) {
+        if self.connected_at_ms == 0 {
+            self.connected_at_ms = time_ms;
+        }
+        self.current_time_ms = time_ms;
     }
 }
 
-#[async_trait]
 impl BleConnection for Esp32Connection {
-    async fn read_characteristic(&self, uuid: u16) -> Result<Vec<u8>> {
-        // TODO: Implement GATT read via NimBLE
-        Err(BleError::NotSupported(
-            "ESP32 GATT read not yet implemented".into(),
-        ))
+    fn peer_id(&self) -> &NodeId {
+        &self.peer_id
     }
 
-    async fn write_characteristic(&self, uuid: u16, data: &[u8]) -> Result<()> {
-        // TODO: Implement GATT write via NimBLE
-        Err(BleError::NotSupported(
-            "ESP32 GATT write not yet implemented".into(),
-        ))
-    }
-
-    async fn subscribe(&self, uuid: u16) -> Result<()> {
-        // TODO: Implement GATT subscribe via NimBLE
-        Err(BleError::NotSupported(
-            "ESP32 GATT subscribe not yet implemented".into(),
-        ))
-    }
-
-    async fn unsubscribe(&self, uuid: u16) -> Result<()> {
-        // TODO: Implement GATT unsubscribe via NimBLE
-        Err(BleError::NotSupported(
-            "ESP32 GATT unsubscribe not yet implemented".into(),
-        ))
-    }
-
-    async fn disconnect(&self) -> Result<()> {
-        // TODO: Implement disconnect via NimBLE
-        info!("ESP32: Disconnecting from {}", self.address);
-        Ok(())
+    fn is_alive(&self) -> bool {
+        self.alive
     }
 
     fn mtu(&self) -> u16 {
         self.mtu
     }
 
-    fn address(&self) -> &str {
-        &self.address
-    }
-
-    fn node_id(&self) -> Option<NodeId> {
-        self.node_id
+    fn phy(&self) -> crate::config::BlePhy {
+        crate::config::BlePhy::Le1M // ESP32 classic only supports 1M
     }
 
     fn rssi(&self) -> Option<i8> {
         // TODO: Read RSSI from NimBLE connection
         None
     }
+
+    fn connected_duration(&self) -> core::time::Duration {
+        let ms = self.current_time_ms.saturating_sub(self.connected_at_ms);
+        core::time::Duration::from_millis(ms)
+    }
 }
 
 /// ESP32 BLE adapter state
 struct Esp32AdapterState {
-    /// Active connections by handle
-    connections: HashMap<u16, Esp32Connection>,
+    /// Active connections by node ID
+    connections: HashMap<NodeId, Esp32Connection>,
+    /// Node ID to connection handle mapping
+    handle_map: HashMap<u16, NodeId>,
     /// Discovery callback
     discovery_callback: Option<DiscoveryCallback>,
     /// Connection callback
@@ -151,16 +131,20 @@ struct Esp32AdapterState {
     advertising: bool,
     /// Current scanning state
     scanning: bool,
+    /// Powered on
+    powered: bool,
 }
 
 impl Default for Esp32AdapterState {
     fn default() -> Self {
         Self {
             connections: HashMap::new(),
+            handle_map: HashMap::new(),
             discovery_callback: None,
             connection_callback: None,
             advertising: false,
             scanning: false,
+            powered: false,
         }
     }
 }
@@ -176,6 +160,8 @@ pub struct Esp32Adapter {
     node_id: NodeId,
     /// Device name
     device_name: String,
+    /// Current beacon for advertising
+    beacon: Option<HiveBeacon>,
 }
 
 impl Esp32Adapter {
@@ -205,112 +191,13 @@ impl Esp32Adapter {
             state: Arc::new(Mutex::new(Esp32AdapterState::default())),
             node_id,
             device_name: device_name.to_string(),
+            beacon: None,
         })
     }
 
     /// Create adapter with HIVE-Lite defaults
     pub fn hive_lite(node_id: NodeId) -> Result<Self> {
         Self::new(node_id, &format!("HIVE-{:08X}", node_id.as_u32()))
-    }
-
-    /// Get the number of active connections
-    pub fn connection_count(&self) -> usize {
-        self.state.lock().unwrap().connections.len()
-    }
-
-    /// Handle GAP events from NimBLE
-    fn handle_gap_event(&self, event: &BleGapEvent) {
-        match event {
-            BleGapEvent::AdvComplete { .. } => {
-                debug!("ESP32: Advertising complete");
-            }
-            BleGapEvent::Connect {
-                conn_handle, addr, ..
-            } => {
-                info!("ESP32: Connected to {:?}", addr);
-                // TODO: Create connection and notify callback
-            }
-            BleGapEvent::Disconnect {
-                conn_handle,
-                reason,
-                ..
-            } => {
-                info!(
-                    "ESP32: Disconnected handle={}, reason={:?}",
-                    conn_handle, reason
-                );
-                let mut state = self.state.lock().unwrap();
-                if let Some(conn) = state.connections.remove(conn_handle) {
-                    if let Some(ref callback) = state.connection_callback {
-                        if let Some(node_id) = conn.node_id {
-                            callback(
-                                node_id,
-                                ConnectionEvent::Disconnected(DisconnectReason::LinkLoss),
-                            );
-                        }
-                    }
-                }
-            }
-            BleGapEvent::DiscComplete { .. } => {
-                debug!("ESP32: Discovery complete");
-            }
-            _ => {
-                debug!("ESP32: Unhandled GAP event");
-            }
-        }
-    }
-
-    /// Handle GATT server events
-    fn handle_gatts_event(&self, event: &GattsEvent) {
-        match event {
-            GattsEvent::Connect { conn_handle } => {
-                info!("ESP32: GATT server connection handle={}", conn_handle);
-            }
-            GattsEvent::Disconnect { conn_handle } => {
-                info!("ESP32: GATT server disconnection handle={}", conn_handle);
-            }
-            GattsEvent::Write {
-                conn_handle,
-                handle,
-                data,
-                ..
-            } => {
-                debug!(
-                    "ESP32: GATT write to handle {} ({} bytes)",
-                    handle,
-                    data.len()
-                );
-                // TODO: Dispatch to HIVE sync protocol
-            }
-            GattsEvent::Read {
-                conn_handle,
-                handle,
-                ..
-            } => {
-                debug!("ESP32: GATT read from handle {}", handle);
-                // TODO: Return characteristic value
-            }
-            _ => {
-                debug!("ESP32: Unhandled GATTS event");
-            }
-        }
-    }
-
-    /// Register the HIVE GATT service
-    fn register_hive_service(&self) -> Result<()> {
-        info!("ESP32: Registering HIVE GATT service");
-
-        // Service definition would go here
-        // UUID: f47ac10b-58cc-4372-a567-0e02b2c3d479
-        //
-        // Characteristics:
-        // - Node Info (read)
-        // - Sync State (read/notify)
-        // - Sync Data (write/indicate)
-        // - Command (write)
-        // - Status (read/notify)
-
-        Ok(())
     }
 
     /// Build advertising data for HIVE beacon
@@ -338,115 +225,180 @@ impl Esp32Adapter {
 
         data
     }
+
+    /// Handle disconnect event
+    fn handle_disconnect(&self, conn_handle: u16, _reason: u8) {
+        let mut state = self.state.lock().unwrap();
+        if let Some(node_id) = state.handle_map.remove(&conn_handle) {
+            state.connections.remove(&node_id);
+            if let Some(ref callback) = state.connection_callback {
+                callback(
+                    node_id,
+                    ConnectionEvent::Disconnected {
+                        reason: DisconnectReason::LinkLoss,
+                    },
+                );
+            }
+        }
+    }
 }
 
 #[async_trait]
 impl BleAdapter for Esp32Adapter {
-    fn name(&self) -> &str {
-        "ESP32 NimBLE"
-    }
-
-    async fn initialize(&mut self, config: &BleConfig) -> Result<()> {
+    async fn init(&mut self, config: &BleConfig) -> Result<()> {
         info!("ESP32: Initializing with config {:?}", config);
 
-        // Register HIVE GATT service
-        self.register_hive_service()?;
+        // Create beacon from config
+        self.beacon = Some(HiveBeacon::new(config.node_id));
+
+        let mut state = self.state.lock().unwrap();
+        state.powered = true;
+
+        // TODO: Initialize NimBLE stack
+        // TODO: Register GATT service
 
         Ok(())
     }
 
-    async fn start_discovery(&mut self, config: &DiscoveryConfig) -> Result<()> {
-        info!("ESP32: Starting discovery");
+    async fn start(&self) -> Result<()> {
+        info!("ESP32: Starting adapter");
+        // Start advertising and scanning based on configuration
+        Ok(())
+    }
 
+    async fn stop(&self) -> Result<()> {
+        info!("ESP32: Stopping adapter");
+        let mut state = self.state.lock().unwrap();
+        state.advertising = false;
+        state.scanning = false;
+        Ok(())
+    }
+
+    fn is_powered(&self) -> bool {
+        self.state.lock().unwrap().powered
+    }
+
+    fn address(&self) -> Option<String> {
+        // TODO: Read MAC address from ESP32
+        None
+    }
+
+    async fn start_scan(&self, config: &DiscoveryConfig) -> Result<()> {
+        info!("ESP32: Starting scan");
         let mut state = self.state.lock().unwrap();
         state.scanning = true;
-
         // TODO: Start NimBLE scan with filter for HIVE service UUID
-
         Ok(())
     }
 
-    async fn stop_discovery(&mut self) -> Result<()> {
-        info!("ESP32: Stopping discovery");
-
+    async fn stop_scan(&self) -> Result<()> {
+        info!("ESP32: Stopping scan");
         let mut state = self.state.lock().unwrap();
         state.scanning = false;
-
         // TODO: Stop NimBLE scan
-
         Ok(())
     }
 
-    async fn start_advertising(&mut self, beacon: &HiveBeacon) -> Result<()> {
-        info!(
-            "ESP32: Starting advertising for node {:08X}",
-            beacon.node_id.as_u32()
-        );
+    async fn start_advertising(&self, config: &DiscoveryConfig) -> Result<()> {
+        info!("ESP32: Starting advertising");
 
-        let adv_data = self.build_adv_data(beacon);
-        debug!(
-            "ESP32: Advertising data ({} bytes): {:02X?}",
-            adv_data.len(),
-            adv_data
-        );
+        if let Some(ref beacon) = self.beacon {
+            let adv_data = self.build_adv_data(beacon);
+            debug!(
+                "ESP32: Advertising data ({} bytes): {:02X?}",
+                adv_data.len(),
+                adv_data
+            );
+        }
 
         let mut state = self.state.lock().unwrap();
         state.advertising = true;
-
         // TODO: Configure and start NimBLE advertising
-
         Ok(())
     }
 
-    async fn stop_advertising(&mut self) -> Result<()> {
+    async fn stop_advertising(&self) -> Result<()> {
         info!("ESP32: Stopping advertising");
-
         let mut state = self.state.lock().unwrap();
         state.advertising = false;
-
         // TODO: Stop NimBLE advertising
-
         Ok(())
     }
 
-    async fn connect(&mut self, address: &str) -> Result<Box<dyn BleConnection>> {
-        info!("ESP32: Connecting to {}", address);
+    fn set_discovery_callback(&mut self, callback: Option<DiscoveryCallback>) {
+        let mut state = self.state.lock().unwrap();
+        state.discovery_callback = callback;
+    }
 
-        // TODO: Parse address and initiate NimBLE connection
-
+    async fn connect(&self, peer_id: &NodeId) -> Result<Box<dyn BleConnection>> {
+        info!("ESP32: Connecting to {:08X}", peer_id.as_u32());
+        // TODO: Lookup address from discovery and initiate NimBLE connection
         Err(BleError::NotSupported(
             "ESP32 connection not yet implemented".into(),
         ))
     }
 
-    async fn disconnect(&mut self, address: &str) -> Result<()> {
-        info!("ESP32: Disconnecting from {}", address);
-
-        // TODO: Find connection by address and disconnect
-
+    async fn disconnect(&self, peer_id: &NodeId) -> Result<()> {
+        info!("ESP32: Disconnecting from {:08X}", peer_id.as_u32());
+        let mut state = self.state.lock().unwrap();
+        if let Some(conn) = state.connections.remove(peer_id) {
+            state.handle_map.remove(&conn.conn_handle);
+            // TODO: Disconnect via NimBLE
+        }
         Ok(())
     }
 
-    fn set_discovery_callback(&mut self, callback: DiscoveryCallback) {
-        let mut state = self.state.lock().unwrap();
-        state.discovery_callback = Some(callback);
+    fn get_connection(&self, peer_id: &NodeId) -> Option<Box<dyn BleConnection>> {
+        let state = self.state.lock().unwrap();
+        state.connections.get(peer_id).map(|conn| {
+            Box::new(Esp32Connection::new(
+                conn.peer_id,
+                conn.conn_handle,
+                conn.address.clone(),
+            )) as Box<dyn BleConnection>
+        })
     }
 
-    fn set_connection_callback(&mut self, callback: ConnectionCallback) {
-        let mut state = self.state.lock().unwrap();
-        state.connection_callback = Some(callback);
+    fn peer_count(&self) -> usize {
+        self.state.lock().unwrap().connections.len()
     }
 
-    fn supports_phy(&self, phy: BlePhy) -> bool {
-        // ESP32 with BLE 5.0 support
-        // Original ESP32 only supports LE 1M
-        // ESP32-S3 and ESP32-C3 support LE 2M and Coded PHY
-        match phy {
-            BlePhy::Le1M => true,
-            BlePhy::Le2M => false, // Depends on ESP32 variant
-            BlePhy::LeCodedS2 => false,
-            BlePhy::LeCodedS8 => false,
-        }
+    fn connected_peers(&self) -> Vec<NodeId> {
+        self.state
+            .lock()
+            .unwrap()
+            .connections
+            .keys()
+            .copied()
+            .collect()
+    }
+
+    fn set_connection_callback(&mut self, callback: Option<ConnectionCallback>) {
+        let mut state = self.state.lock().unwrap();
+        state.connection_callback = callback;
+    }
+
+    async fn register_gatt_service(&self) -> Result<()> {
+        info!("ESP32: Registering HIVE GATT service");
+        // TODO: Register service with NimBLE
+        Ok(())
+    }
+
+    async fn unregister_gatt_service(&self) -> Result<()> {
+        info!("ESP32: Unregistering HIVE GATT service");
+        // TODO: Unregister service from NimBLE
+        Ok(())
+    }
+
+    fn supports_coded_phy(&self) -> bool {
+        // Original ESP32 does not support Coded PHY
+        // ESP32-S3 and ESP32-C3 do
+        false
+    }
+
+    fn supports_extended_advertising(&self) -> bool {
+        // Original ESP32 does not support extended advertising
+        false
     }
 
     fn max_mtu(&self) -> u16 {
@@ -454,30 +406,15 @@ impl BleAdapter for Esp32Adapter {
         512
     }
 
-    fn max_connections(&self) -> usize {
+    fn max_connections(&self) -> u8 {
         // ESP32 NimBLE default
         9
-    }
-
-    fn address(&self) -> Option<String> {
-        // TODO: Read MAC address from ESP32
-        None
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // Note: These tests require actual ESP32 hardware
-    // They are marked as ignored and can be run manually
-
-    #[test]
-    #[ignore]
-    fn test_adapter_creation() {
-        let adapter = Esp32Adapter::hive_lite(NodeId::new(0x12345678));
-        assert!(adapter.is_ok());
-    }
 
     #[test]
     fn test_adv_data_size() {

@@ -1,0 +1,21 @@
+[build]
+target = "xtensa-esp32-espidf"
+
+[target.xtensa-esp32-espidf]
+linker = "ldproxy"
+runner = "espflash flash --monitor"
+
+[env]
+# ESP-IDF version
+ESP_IDF_VERSION = "v5.3"
+# M5Stack Core2 ESP32 variant
+MCU = "esp32"
+# Enable native build
+ESP_IDF_TOOLS_INSTALL_DIR = "global"
+
+[unstable]
+build-std = ["std", "panic_abort"]
+
+[profile.release]
+opt-level = "s"
+lto = true
