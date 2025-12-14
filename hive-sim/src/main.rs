@@ -1657,10 +1657,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     )
                                     .await
                                     {
-                                        eprintln!(
-                                            "[{}] Command issuance error: {}",
-                                            cmd_node_id, e
-                                        );
+                                        let err_str = e.to_string();
+                                        if !err_str.contains("conflict resolution") {
+                                            // Only log unexpected errors, not conflict rejections
+                                            eprintln!(
+                                                "[{}] Command issuance error: {}",
+                                                cmd_node_id, e
+                                            );
+                                        }
                                     }
                                     sleep(Duration::from_secs(30)).await;
                                 }
@@ -1786,10 +1790,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     )
                                     .await
                                     {
-                                        eprintln!(
-                                            "[{}] Command issuance error: {}",
-                                            cmd_node_id, e
-                                        );
+                                        let err_str = e.to_string();
+                                        if !err_str.contains("conflict resolution") {
+                                            // Only log unexpected errors, not conflict rejections
+                                            eprintln!(
+                                                "[{}] Command issuance error: {}",
+                                                cmd_node_id, e
+                                            );
+                                        }
                                     }
                                     sleep(Duration::from_secs(30)).await;
                                 }
