@@ -96,10 +96,12 @@
 //! }
 //! ```
 
+#[cfg(feature = "std")]
 mod manager;
 mod routing;
 mod topology;
 
+#[cfg(feature = "std")]
 pub use manager::{ManagerState, MeshManager, TopologyCallback};
 pub use routing::{HopTracker, MeshRouter, RouteDecision, RouteDirection, RouteFailure};
 pub use topology::{

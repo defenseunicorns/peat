@@ -2,6 +2,9 @@
 //!
 //! Defines the characteristics exposed by the HIVE GATT service.
 
+#[cfg(not(feature = "std"))]
+use alloc::{borrow::ToOwned, vec::Vec};
+
 use uuid::Uuid;
 
 use crate::{

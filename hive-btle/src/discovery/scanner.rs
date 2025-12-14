@@ -2,19 +2,26 @@
 //!
 //! Provides filtering, deduplication, and tracking of discovered HIVE beacons.
 
+#[cfg(not(feature = "std"))]
+use alloc::{string::String, vec::Vec};
+#[cfg(feature = "std")]
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
 
+#[cfg(feature = "std")]
 use crate::config::DiscoveryConfig;
-use crate::{HierarchyLevel, NodeId};
+use crate::HierarchyLevel;
+#[cfg(feature = "std")]
+use crate::NodeId;
 
 use super::beacon::{HiveBeacon, ParsedAdvertisement};
 
-/// Default timeout for considering a device "stale"
-const DEFAULT_DEVICE_TIMEOUT: Duration = Duration::from_secs(30);
+/// Default timeout for considering a device "stale" (ms)
+#[cfg(feature = "std")]
+const DEFAULT_DEVICE_TIMEOUT_MS: u64 = 30_000;
 
-/// Minimum interval between processing duplicate beacons from same node
-const DEDUP_INTERVAL: Duration = Duration::from_millis(500);
+/// Minimum interval between processing duplicate beacons from same node (ms)
+#[cfg(feature = "std")]
+const DEDUP_INTERVAL_MS: u64 = 500;
 
 /// Tracked device state
 #[derive(Debug, Clone)]
@@ -27,10 +34,10 @@ pub struct TrackedDevice {
     pub rssi: i8,
     /// RSSI history for averaging (last N readings)
     pub rssi_history: Vec<i8>,
-    /// When first discovered
-    pub first_seen: Instant,
-    /// When last beacon received
-    pub last_seen: Instant,
+    /// When first discovered (monotonic ms timestamp)
+    pub first_seen_ms: u64,
+    /// When last beacon received (monotonic ms timestamp)
+    pub last_seen_ms: u64,
     /// Estimated distance in meters
     pub estimated_distance: Option<f32>,
     /// Whether this device is currently connectable
@@ -39,25 +46,32 @@ pub struct TrackedDevice {
 
 impl TrackedDevice {
     /// Create a new tracked device
-    fn new(beacon: HiveBeacon, address: String, rssi: i8, connectable: bool) -> Self {
-        let now = Instant::now();
+    #[cfg(feature = "std")]
+    fn new(
+        beacon: HiveBeacon,
+        address: String,
+        rssi: i8,
+        connectable: bool,
+        current_time_ms: u64,
+    ) -> Self {
         Self {
             beacon,
             address,
             rssi,
             rssi_history: vec![rssi],
-            first_seen: now,
-            last_seen: now,
+            first_seen_ms: current_time_ms,
+            last_seen_ms: current_time_ms,
             estimated_distance: None,
             connectable,
         }
     }
 
     /// Update with new beacon data
-    fn update(&mut self, beacon: HiveBeacon, rssi: i8, connectable: bool) {
+    #[cfg(feature = "std")]
+    fn update(&mut self, beacon: HiveBeacon, rssi: i8, connectable: bool, current_time_ms: u64) {
         self.beacon = beacon;
         self.rssi = rssi;
-        self.last_seen = Instant::now();
+        self.last_seen_ms = current_time_ms;
         self.connectable = connectable;
 
         // Keep last 10 RSSI readings for averaging
@@ -77,13 +91,13 @@ impl TrackedDevice {
     }
 
     /// Check if this device is stale (not seen recently)
-    pub fn is_stale(&self, timeout: Duration) -> bool {
-        self.last_seen.elapsed() > timeout
+    pub fn is_stale(&self, timeout_ms: u64, current_time_ms: u64) -> bool {
+        current_time_ms.saturating_sub(self.last_seen_ms) > timeout_ms
     }
 
-    /// Get time since first discovery
-    pub fn time_tracked(&self) -> Duration {
-        self.first_seen.elapsed()
+    /// Get time since first discovery in milliseconds
+    pub fn time_tracked_ms(&self, current_time_ms: u64) -> u64 {
+        current_time_ms.saturating_sub(self.first_seen_ms)
     }
 }
 
@@ -195,6 +209,9 @@ pub enum ScannerState {
 /// BLE Scanner for discovering HIVE nodes
 ///
 /// Handles beacon reception, filtering, deduplication, and device tracking.
+///
+/// Note: This type requires the `std` feature for full functionality.
+#[cfg(feature = "std")]
 pub struct Scanner {
     /// Scanner configuration (will be used for PHY/power management)
     #[allow(dead_code)]
@@ -207,12 +224,15 @@ pub struct Scanner {
     address_map: HashMap<String, NodeId>,
     /// Filter criteria
     filter: ScanFilter,
-    /// Device timeout
-    device_timeout: Duration,
-    /// Last dedup timestamps per node
-    last_processed: HashMap<NodeId, Instant>,
+    /// Device timeout (ms)
+    device_timeout_ms: u64,
+    /// Last dedup timestamps per node (ms)
+    last_processed: HashMap<NodeId, u64>,
+    /// Current time (monotonic ms, set externally)
+    current_time_ms: u64,
 }
 
+#[cfg(feature = "std")]
 impl Scanner {
     /// Create a new scanner with default settings
     pub fn new(config: DiscoveryConfig) -> Self {
@@ -222,9 +242,15 @@ impl Scanner {
             devices: HashMap::new(),
             address_map: HashMap::new(),
             filter: ScanFilter::default(),
-            device_timeout: DEFAULT_DEVICE_TIMEOUT,
+            device_timeout_ms: DEFAULT_DEVICE_TIMEOUT_MS,
             last_processed: HashMap::new(),
+            current_time_ms: 0,
         }
+    }
+
+    /// Set the current time (call periodically from platform)
+    pub fn set_time_ms(&mut self, time_ms: u64) {
+        self.current_time_ms = time_ms;
     }
 
     /// Set the scan filter
@@ -232,9 +258,9 @@ impl Scanner {
         self.filter = filter;
     }
 
-    /// Set device timeout
-    pub fn set_device_timeout(&mut self, timeout: Duration) {
-        self.device_timeout = timeout;
+    /// Set device timeout in milliseconds
+    pub fn set_device_timeout_ms(&mut self, timeout_ms: u64) {
+        self.device_timeout_ms = timeout_ms;
     }
 
     /// Get current state
@@ -273,22 +299,28 @@ impl Scanner {
         };
 
         // Check deduplication
-        if let Some(last) = self.last_processed.get(&node_id) {
-            if last.elapsed() < DEDUP_INTERVAL {
+        if let Some(&last) = self.last_processed.get(&node_id) {
+            if self.current_time_ms.saturating_sub(last) < DEDUP_INTERVAL_MS {
                 return false;
             }
         }
-        self.last_processed.insert(node_id, Instant::now());
+        self.last_processed.insert(node_id, self.current_time_ms);
 
         // Update or create tracked device
         let is_new = !self.devices.contains_key(&node_id);
 
         if let Some(device) = self.devices.get_mut(&node_id) {
             // Update existing device
-            device.update(beacon, adv.rssi, adv.connectable);
+            device.update(beacon, adv.rssi, adv.connectable, self.current_time_ms);
         } else {
             // New device
-            let device = TrackedDevice::new(beacon, adv.address.clone(), adv.rssi, adv.connectable);
+            let device = TrackedDevice::new(
+                beacon,
+                adv.address.clone(),
+                adv.rssi,
+                adv.connectable,
+                self.current_time_ms,
+            );
             self.devices.insert(node_id, device);
             self.address_map.insert(adv.address, node_id);
         }
@@ -334,11 +366,12 @@ impl Scanner {
     ///
     /// Returns the number of devices removed.
     pub fn remove_stale(&mut self) -> usize {
-        let timeout = self.device_timeout;
+        let timeout = self.device_timeout_ms;
+        let current_time = self.current_time_ms;
         let stale: Vec<NodeId> = self
             .devices
             .iter()
-            .filter(|(_, d)| d.is_stale(timeout))
+            .filter(|(_, d)| d.is_stale(timeout, current_time))
             .map(|(id, _)| *id)
             .collect();
 
@@ -372,7 +405,7 @@ impl Scanner {
             .max_by(|a, b| {
                 // First compare hierarchy level
                 match a.beacon.hierarchy_level.cmp(&b.beacon.hierarchy_level) {
-                    std::cmp::Ordering::Equal => {
+                    core::cmp::Ordering::Equal => {
                         // Then compare RSSI
                         a.average_rssi().cmp(&b.average_rssi())
                     }
@@ -405,12 +438,14 @@ mod tests {
     fn test_scanner_process_advertisement() {
         let config = DiscoveryConfig::default();
         let mut scanner = Scanner::new(config);
+        scanner.set_time_ms(1000);
 
         let adv = make_adv(0x12345678, -60, HierarchyLevel::Platform);
         assert!(scanner.process_advertisement(adv));
         assert_eq!(scanner.device_count(), 1);
 
         // Duplicate within dedup interval should be ignored
+        scanner.set_time_ms(1100);
         let adv2 = make_adv(0x12345678, -65, HierarchyLevel::Platform);
         assert!(!scanner.process_advertisement(adv2));
         assert_eq!(scanner.device_count(), 1);
@@ -453,13 +488,14 @@ mod tests {
     fn test_find_best_parent() {
         let config = DiscoveryConfig::default();
         let mut scanner = Scanner::new(config);
+        scanner.set_time_ms(0);
 
         // Add a squad leader
         let squad = make_adv(0x11111111, -60, HierarchyLevel::Squad);
         scanner.process_advertisement(squad);
 
         // Add a platoon leader (higher hierarchy)
-        std::thread::sleep(std::time::Duration::from_millis(501)); // Avoid dedup
+        scanner.set_time_ms(501); // Avoid dedup
         let platoon = make_adv(0x22222222, -70, HierarchyLevel::Platoon);
         scanner.process_advertisement(platoon);
 
@@ -477,11 +513,12 @@ mod tests {
     fn test_devices_by_rssi() {
         let config = DiscoveryConfig::default();
         let mut scanner = Scanner::new(config);
+        scanner.set_time_ms(0);
 
         scanner.process_advertisement(make_adv(0x11111111, -80, HierarchyLevel::Platform));
-        std::thread::sleep(std::time::Duration::from_millis(501));
+        scanner.set_time_ms(501);
         scanner.process_advertisement(make_adv(0x22222222, -50, HierarchyLevel::Platform));
-        std::thread::sleep(std::time::Duration::from_millis(501));
+        scanner.set_time_ms(1002);
         scanner.process_advertisement(make_adv(0x33333333, -70, HierarchyLevel::Platform));
 
         let sorted = scanner.devices_by_rssi();
@@ -489,5 +526,21 @@ mod tests {
         assert_eq!(sorted[0].rssi, -50); // Strongest first
         assert_eq!(sorted[1].rssi, -70);
         assert_eq!(sorted[2].rssi, -80);
+    }
+
+    #[test]
+    fn test_remove_stale() {
+        let config = DiscoveryConfig::default();
+        let mut scanner = Scanner::new(config);
+        scanner.set_time_ms(0);
+
+        scanner.process_advertisement(make_adv(0x11111111, -60, HierarchyLevel::Platform));
+        assert_eq!(scanner.device_count(), 1);
+
+        // Fast forward past timeout
+        scanner.set_time_ms(35_000);
+        let removed = scanner.remove_stale();
+        assert_eq!(removed, 1);
+        assert_eq!(scanner.device_count(), 0);
     }
 }

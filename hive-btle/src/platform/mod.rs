@@ -19,6 +19,9 @@
 //! - GATT server and client operations
 //! - Connection management
 
+#[cfg(not(feature = "std"))]
+use alloc::{boxed::Box, format, string::String, string::ToString, vec::Vec};
+
 use async_trait::async_trait;
 
 use crate::config::{BleConfig, BlePhy, DiscoveryConfig};
@@ -41,6 +44,9 @@ pub mod windows;
 
 #[cfg(feature = "embedded")]
 pub mod embedded;
+
+#[cfg(feature = "esp32")]
+pub mod esp32;
 
 /// Discovered BLE device
 #[derive(Debug, Clone)]
