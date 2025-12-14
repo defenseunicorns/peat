@@ -105,7 +105,10 @@ pub mod delta;
 pub mod protocol;
 
 pub use batch::{BatchAccumulator, BatchConfig, OperationBatch};
-pub use crdt::{CrdtOperation, GCounter, HealthStatus, LwwRegister, Position, Timestamp};
+pub use crdt::{
+    CrdtOperation, EventType, GCounter, HealthStatus, LwwRegister, Peripheral, PeripheralEvent,
+    PeripheralType, Position, Timestamp,
+};
 pub use delta::{DeltaEncoder, DeltaStats, PeerSyncState, VectorClock};
 pub use protocol::{
     chunk_data, ChunkHeader, ChunkReassembler, GattSyncProtocol, SyncChunk, SyncConfig, SyncState,
