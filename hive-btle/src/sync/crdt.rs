@@ -389,6 +389,267 @@ impl HealthStatus {
     }
 }
 
+// ============================================================================
+// Peripheral (Sub-node) Types - for soldier-attached devices like M5Stack Core2
+// ============================================================================
+
+/// Type of peripheral device
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[repr(u8)]
+pub enum PeripheralType {
+    /// Unknown/unspecified
+    #[default]
+    Unknown = 0,
+    /// Soldier-worn sensor (e.g., M5Stack Core2)
+    SoldierSensor = 1,
+    /// Fixed/stationary sensor
+    FixedSensor = 2,
+    /// Mesh relay only (no sensors)
+    Relay = 3,
+}
+
+impl PeripheralType {
+    /// Convert from u8 value
+    pub fn from_u8(v: u8) -> Self {
+        match v {
+            1 => Self::SoldierSensor,
+            2 => Self::FixedSensor,
+            3 => Self::Relay,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+/// Event types that a peripheral can emit (e.g., from tap input)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[repr(u8)]
+pub enum EventType {
+    /// No event / cleared
+    #[default]
+    None = 0,
+    /// "I'm OK" ping
+    Ping = 1,
+    /// Request assistance
+    NeedAssist = 2,
+    /// Emergency / SOS
+    Emergency = 3,
+    /// Moving / in transit
+    Moving = 4,
+    /// In position / stationary
+    InPosition = 5,
+    /// Acknowledged / copy
+    Ack = 6,
+}
+
+impl EventType {
+    /// Convert from u8 value
+    pub fn from_u8(v: u8) -> Self {
+        match v {
+            1 => Self::Ping,
+            2 => Self::NeedAssist,
+            3 => Self::Emergency,
+            4 => Self::Moving,
+            5 => Self::InPosition,
+            6 => Self::Ack,
+            _ => Self::None,
+        }
+    }
+
+    /// Human-readable label for display
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::None => "",
+            Self::Ping => "PING",
+            Self::NeedAssist => "NEED ASSIST",
+            Self::Emergency => "EMERGENCY",
+            Self::Moving => "MOVING",
+            Self::InPosition => "IN POSITION",
+            Self::Ack => "ACK",
+        }
+    }
+}
+
+/// An event emitted by a peripheral (e.g., tap on Core2)
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PeripheralEvent {
+    /// Type of event
+    pub event_type: EventType,
+    /// Timestamp when event occurred (ms since epoch or boot)
+    pub timestamp: u64,
+}
+
+impl PeripheralEvent {
+    /// Create a new peripheral event
+    pub fn new(event_type: EventType, timestamp: u64) -> Self {
+        Self {
+            event_type,
+            timestamp,
+        }
+    }
+
+    /// Encode to bytes (9 bytes)
+    pub fn encode(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(9);
+        buf.push(self.event_type as u8);
+        buf.extend_from_slice(&self.timestamp.to_le_bytes());
+        buf
+    }
+
+    /// Decode from bytes
+    pub fn decode(data: &[u8]) -> Option<Self> {
+        if data.len() < 9 {
+            return None;
+        }
+        Some(Self {
+            event_type: EventType::from_u8(data[0]),
+            timestamp: u64::from_le_bytes([
+                data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8],
+            ]),
+        })
+    }
+}
+
+/// A peripheral device attached to a Node (soldier)
+///
+/// Peripherals are sub-tier devices that augment a soldier's capabilities
+/// with sensors and input (e.g., M5Stack Core2 wearable).
+#[derive(Debug, Clone, Default)]
+pub struct Peripheral {
+    /// Unique peripheral ID (derived from device MAC or similar)
+    pub id: u32,
+    /// Parent Node ID this peripheral is attached to (0 if not paired)
+    pub parent_node: u32,
+    /// Type of peripheral
+    pub peripheral_type: PeripheralType,
+    /// Callsign/name (inherited from parent or configured)
+    pub callsign: [u8; 12],
+    /// Current health status
+    pub health: HealthStatus,
+    /// Most recent event (if any)
+    pub last_event: Option<PeripheralEvent>,
+    /// Last update timestamp
+    pub timestamp: u64,
+}
+
+impl Peripheral {
+    /// Create a new peripheral
+    pub fn new(id: u32, peripheral_type: PeripheralType) -> Self {
+        Self {
+            id,
+            parent_node: 0,
+            peripheral_type,
+            callsign: [0u8; 12],
+            health: HealthStatus::default(),
+            last_event: None,
+            timestamp: 0,
+        }
+    }
+
+    /// Set the callsign (truncated to 12 bytes)
+    pub fn with_callsign(mut self, callsign: &str) -> Self {
+        let bytes = callsign.as_bytes();
+        let len = bytes.len().min(12);
+        self.callsign[..len].copy_from_slice(&bytes[..len]);
+        self
+    }
+
+    /// Get callsign as string
+    pub fn callsign_str(&self) -> &str {
+        let len = self.callsign.iter().position(|&b| b == 0).unwrap_or(12);
+        core::str::from_utf8(&self.callsign[..len]).unwrap_or("")
+    }
+
+    /// Set parent node
+    pub fn with_parent(mut self, parent_node: u32) -> Self {
+        self.parent_node = parent_node;
+        self
+    }
+
+    /// Record an event
+    pub fn set_event(&mut self, event_type: EventType, timestamp: u64) {
+        self.last_event = Some(PeripheralEvent::new(event_type, timestamp));
+        self.timestamp = timestamp;
+    }
+
+    /// Clear the last event
+    pub fn clear_event(&mut self) {
+        self.last_event = None;
+    }
+
+    /// Encode to bytes for BLE transmission
+    /// Format: [id:4][parent:4][type:1][callsign:12][health:4][has_event:1][event:9?][timestamp:8]
+    /// Size: 34 bytes without event, 43 bytes with event
+    pub fn encode(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(43);
+        buf.extend_from_slice(&self.id.to_le_bytes());
+        buf.extend_from_slice(&self.parent_node.to_le_bytes());
+        buf.push(self.peripheral_type as u8);
+        buf.extend_from_slice(&self.callsign);
+        buf.extend_from_slice(&self.health.encode());
+
+        if let Some(ref event) = self.last_event {
+            buf.push(1); // has event
+            buf.extend_from_slice(&event.encode());
+        } else {
+            buf.push(0); // no event
+        }
+
+        buf.extend_from_slice(&self.timestamp.to_le_bytes());
+        buf
+    }
+
+    /// Decode from bytes
+    pub fn decode(data: &[u8]) -> Option<Self> {
+        if data.len() < 34 {
+            return None;
+        }
+
+        let id = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+        let parent_node = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
+        let peripheral_type = PeripheralType::from_u8(data[8]);
+
+        let mut callsign = [0u8; 12];
+        callsign.copy_from_slice(&data[9..21]);
+
+        let health = HealthStatus::decode(&data[21..25])?;
+
+        let has_event = data[25] != 0;
+        let (last_event, timestamp_offset) = if has_event {
+            if data.len() < 43 {
+                return None;
+            }
+            (PeripheralEvent::decode(&data[26..35]), 35)
+        } else {
+            (None, 26)
+        };
+
+        if data.len() < timestamp_offset + 8 {
+            return None;
+        }
+
+        let timestamp = u64::from_le_bytes([
+            data[timestamp_offset],
+            data[timestamp_offset + 1],
+            data[timestamp_offset + 2],
+            data[timestamp_offset + 3],
+            data[timestamp_offset + 4],
+            data[timestamp_offset + 5],
+            data[timestamp_offset + 6],
+            data[timestamp_offset + 7],
+        ]);
+
+        Some(Self {
+            id,
+            parent_node,
+            peripheral_type,
+            callsign,
+            health,
+            last_event,
+            timestamp,
+        })
+    }
+}
+
 /// CRDT operation types for sync
 #[derive(Debug, Clone)]
 pub enum CrdtOperation {
@@ -781,5 +1042,137 @@ mod tests {
             amount: 1,
         };
         assert_eq!(counter_op.size(), 13);
+    }
+
+    // ============================================================================
+    // Peripheral Tests
+    // ============================================================================
+
+    #[test]
+    fn test_peripheral_type_from_u8() {
+        assert_eq!(PeripheralType::from_u8(0), PeripheralType::Unknown);
+        assert_eq!(PeripheralType::from_u8(1), PeripheralType::SoldierSensor);
+        assert_eq!(PeripheralType::from_u8(2), PeripheralType::FixedSensor);
+        assert_eq!(PeripheralType::from_u8(3), PeripheralType::Relay);
+        assert_eq!(PeripheralType::from_u8(99), PeripheralType::Unknown);
+    }
+
+    #[test]
+    fn test_event_type_from_u8() {
+        assert_eq!(EventType::from_u8(0), EventType::None);
+        assert_eq!(EventType::from_u8(1), EventType::Ping);
+        assert_eq!(EventType::from_u8(2), EventType::NeedAssist);
+        assert_eq!(EventType::from_u8(3), EventType::Emergency);
+        assert_eq!(EventType::from_u8(4), EventType::Moving);
+        assert_eq!(EventType::from_u8(5), EventType::InPosition);
+        assert_eq!(EventType::from_u8(6), EventType::Ack);
+        assert_eq!(EventType::from_u8(99), EventType::None);
+    }
+
+    #[test]
+    fn test_event_type_labels() {
+        assert_eq!(EventType::None.label(), "");
+        assert_eq!(EventType::Emergency.label(), "EMERGENCY");
+        assert_eq!(EventType::Ping.label(), "PING");
+    }
+
+    #[test]
+    fn test_peripheral_event_encode_decode() {
+        let event = PeripheralEvent::new(EventType::Emergency, 1234567890);
+        let encoded = event.encode();
+        assert_eq!(encoded.len(), 9);
+
+        let decoded = PeripheralEvent::decode(&encoded).unwrap();
+        assert_eq!(decoded.event_type, EventType::Emergency);
+        assert_eq!(decoded.timestamp, 1234567890);
+    }
+
+    #[test]
+    fn test_peripheral_new() {
+        let peripheral = Peripheral::new(0x12345678, PeripheralType::SoldierSensor);
+        assert_eq!(peripheral.id, 0x12345678);
+        assert_eq!(peripheral.peripheral_type, PeripheralType::SoldierSensor);
+        assert_eq!(peripheral.parent_node, 0);
+        assert!(peripheral.last_event.is_none());
+    }
+
+    #[test]
+    fn test_peripheral_with_callsign() {
+        let peripheral = Peripheral::new(1, PeripheralType::SoldierSensor).with_callsign("ALPHA-1");
+        assert_eq!(peripheral.callsign_str(), "ALPHA-1");
+
+        // Test truncation
+        let peripheral2 = Peripheral::new(2, PeripheralType::SoldierSensor)
+            .with_callsign("THIS_IS_A_VERY_LONG_CALLSIGN");
+        assert_eq!(peripheral2.callsign_str(), "THIS_IS_A_VE");
+    }
+
+    #[test]
+    fn test_peripheral_set_event() {
+        let mut peripheral = Peripheral::new(1, PeripheralType::SoldierSensor);
+        peripheral.set_event(EventType::Emergency, 1000);
+
+        assert!(peripheral.last_event.is_some());
+        let event = peripheral.last_event.as_ref().unwrap();
+        assert_eq!(event.event_type, EventType::Emergency);
+        assert_eq!(event.timestamp, 1000);
+        assert_eq!(peripheral.timestamp, 1000);
+
+        peripheral.clear_event();
+        assert!(peripheral.last_event.is_none());
+    }
+
+    #[test]
+    fn test_peripheral_encode_decode_without_event() {
+        let peripheral = Peripheral::new(0xAABBCCDD, PeripheralType::SoldierSensor)
+            .with_callsign("BRAVO-2")
+            .with_parent(0x11223344);
+
+        let encoded = peripheral.encode();
+        assert_eq!(encoded.len(), 34); // No event
+
+        let decoded = Peripheral::decode(&encoded).unwrap();
+        assert_eq!(decoded.id, 0xAABBCCDD);
+        assert_eq!(decoded.parent_node, 0x11223344);
+        assert_eq!(decoded.peripheral_type, PeripheralType::SoldierSensor);
+        assert_eq!(decoded.callsign_str(), "BRAVO-2");
+        assert!(decoded.last_event.is_none());
+    }
+
+    #[test]
+    fn test_peripheral_encode_decode_with_event() {
+        let mut peripheral = Peripheral::new(0x12345678, PeripheralType::SoldierSensor)
+            .with_callsign("CHARLIE")
+            .with_parent(0x87654321);
+        peripheral.health = HealthStatus::new(85);
+        peripheral.set_event(EventType::NeedAssist, 9999);
+
+        let encoded = peripheral.encode();
+        assert_eq!(encoded.len(), 43); // With event
+
+        let decoded = Peripheral::decode(&encoded).unwrap();
+        assert_eq!(decoded.id, 0x12345678);
+        assert_eq!(decoded.parent_node, 0x87654321);
+        assert_eq!(decoded.callsign_str(), "CHARLIE");
+        assert_eq!(decoded.health.battery_percent, 85);
+        assert!(decoded.last_event.is_some());
+        let event = decoded.last_event.as_ref().unwrap();
+        assert_eq!(event.event_type, EventType::NeedAssist);
+        assert_eq!(event.timestamp, 9999);
+    }
+
+    #[test]
+    fn test_peripheral_decode_invalid_data() {
+        // Too short
+        assert!(Peripheral::decode(&[0u8; 10]).is_none());
+
+        // Valid length but no event
+        let mut data = vec![0u8; 34];
+        data[25] = 0; // no event flag
+        assert!(Peripheral::decode(&data).is_some());
+
+        // Claims to have event but too short
+        data[25] = 1; // has event flag
+        assert!(Peripheral::decode(&data).is_none());
     }
 }

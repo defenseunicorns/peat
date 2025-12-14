@@ -7,7 +7,7 @@ use alloc::{boxed::Box, collections::BTreeMap, vec::Vec};
 #[cfg(feature = "std")]
 use std::collections::HashMap;
 
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 #[cfg(feature = "std")]
 use std::sync::RwLock;
@@ -66,7 +66,8 @@ pub struct MeshManager {
     /// Event callbacks
     callbacks: RwLock<Vec<TopologyCallback>>,
     /// Monotonic time in milliseconds (for testing without system time)
-    current_time_ms: AtomicU64,
+    /// Using AtomicUsize for 32-bit platform compatibility (ESP32)
+    current_time_ms: AtomicUsize,
 }
 
 #[cfg(feature = "std")]
@@ -84,7 +85,7 @@ impl MeshManager {
             candidates: RwLock::new(Vec::new()),
             state: RwLock::new(ManagerState::Stopped),
             callbacks: RwLock::new(Vec::new()),
-            current_time_ms: AtomicU64::new(0),
+            current_time_ms: AtomicUsize::new(0),
         }
     }
 
@@ -149,13 +150,16 @@ impl MeshManager {
     }
 
     /// Set the current time (for testing or embedded without RTC)
+    /// Note: Uses usize internally for 32-bit platform compatibility
     pub fn set_time_ms(&self, time_ms: u64) {
-        self.current_time_ms.store(time_ms, Ordering::SeqCst);
+        self.current_time_ms
+            .store(time_ms as usize, Ordering::SeqCst);
     }
 
     /// Get the current time
+    /// Note: Returns u64 but internally stored as usize for 32-bit compatibility
     pub fn time_ms(&self) -> u64 {
-        self.current_time_ms.load(Ordering::SeqCst)
+        self.current_time_ms.load(Ordering::SeqCst) as u64
     }
 
     /// Get a snapshot of the current topology

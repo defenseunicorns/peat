@@ -37,7 +37,7 @@ use mipidsi::models::ILI9342CRgb565;
 use mipidsi::options::Orientation;
 use mipidsi::Builder;
 
-use hive_btle::sync::GCounter;
+use hive_btle::sync::{EventType, GCounter, HealthStatus, Peripheral, PeripheralType};
 use hive_btle::NodeId;
 
 // NVS storage
@@ -48,19 +48,36 @@ const NVS_KEY_COUNTER: &str = "counter";
 const FT6336U_ADDR: u8 = 0x38;
 const FT6336U_REG_STATUS: u8 = 0x02;
 
-/// CRDT Document with persistence
+/// Event types in order for cycling through with taps
+const EVENT_CYCLE: [EventType; 7] = [
+    EventType::None,
+    EventType::Ping,
+    EventType::Moving,
+    EventType::InPosition,
+    EventType::Ack,
+    EventType::NeedAssist,
+    EventType::Emergency,
+];
+
+/// CRDT Document with persistence and Peripheral state
 struct HiveDocument {
     pub counter: GCounter,
+    pub peripheral: Peripheral,
     node_id: NodeId,
     version: u32,
+    event_index: usize,
 }
 
 impl HiveDocument {
     fn new(node_id: NodeId) -> Self {
+        let mut peripheral = Peripheral::new(node_id.as_u32(), PeripheralType::SoldierSensor);
+        peripheral.health = HealthStatus::new(100); // Will be updated with real battery
         Self {
             counter: GCounter::new(),
+            peripheral,
             node_id,
             version: 0,
+            event_index: 0,
         }
     }
 
@@ -69,7 +86,37 @@ impl HiveDocument {
         self.debug_dump("BEFORE TAP");
         self.counter.increment(&self.node_id, 1);
         self.version += 1;
+
+        // Cycle to next event type
+        self.event_index = (self.event_index + 1) % EVENT_CYCLE.len();
+        let event_type = EVENT_CYCLE[self.event_index];
+        let timestamp = unsafe { esp_idf_svc::sys::esp_timer_get_time() as u64 / 1000 };
+
+        if event_type == EventType::None {
+            self.peripheral.clear_event();
+            info!(">>> Event: CLEARED");
+        } else {
+            self.peripheral.set_event(event_type, timestamp);
+            info!(">>> Event: {}", event_type.label());
+        }
+        self.peripheral.timestamp = timestamp;
+
         self.debug_dump("AFTER TAP");
+    }
+
+    fn current_event(&self) -> EventType {
+        self.peripheral.last_event.as_ref()
+            .map(|e| e.event_type)
+            .unwrap_or(EventType::None)
+    }
+
+    fn update_health(&mut self, battery_pct: u8) {
+        self.peripheral.health.battery_percent = battery_pct;
+        if battery_pct < 20 {
+            self.peripheral.health.set_alert(HealthStatus::ALERT_LOW_BATTERY);
+        } else {
+            self.peripheral.health.clear_alert(HealthStatus::ALERT_LOW_BATTERY);
+        }
     }
 
     fn total_taps(&self) -> u64 {
@@ -123,9 +170,22 @@ impl HiveDocument {
 
     fn encode(&self) -> Vec<u8> {
         let mut buf = Vec::new();
+        // Header: version (4) + node_id (4) = 8 bytes (same as Build 11)
         buf.extend_from_slice(&self.version.to_le_bytes());
         buf.extend_from_slice(&self.node_id.as_u32().to_le_bytes());
-        buf.extend_from_slice(&self.counter.encode());
+
+        // Counter data FIRST (for backwards compatibility with Build 11)
+        let counter_data = self.counter.encode();
+        buf.extend_from_slice(&counter_data);
+
+        // NEW: Peripheral data after counter (Build 12+)
+        // Marker byte 0xAB to indicate extended format
+        buf.push(0xAB);
+        buf.push(self.event_index as u8);
+        let peripheral_data = self.peripheral.encode();
+        buf.extend_from_slice(&(peripheral_data.len() as u16).to_le_bytes());
+        buf.extend_from_slice(&peripheral_data);
+
         buf
     }
 
@@ -135,11 +195,42 @@ impl HiveDocument {
         }
         let version = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
         let node_id = NodeId::new(u32::from_le_bytes([data[4], data[5], data[6], data[7]]));
+
+        // Counter data starts at offset 8 (same as Build 11)
         let counter = GCounter::decode(&data[8..])?;
+
+        // Calculate where counter data ends
+        let num_entries = u32::from_le_bytes([data[8], data[9], data[10], data[11]]) as usize;
+        let counter_end = 8 + 4 + num_entries * 12;
+
+        // Check for extended format (Build 12+)
+        let (event_index, peripheral) = if data.len() > counter_end && data[counter_end] == 0xAB {
+            let event_index = data[counter_end + 1] as usize % EVENT_CYCLE.len();
+            let peripheral_len =
+                u16::from_le_bytes([data[counter_end + 2], data[counter_end + 3]]) as usize;
+            let peripheral_start = counter_end + 4;
+            if data.len() >= peripheral_start + peripheral_len {
+                let peripheral = Peripheral::decode(&data[peripheral_start..peripheral_start + peripheral_len]);
+                (event_index, peripheral)
+            } else {
+                (0, None)
+            }
+        } else {
+            // Old format (Build 11) - no peripheral data
+            (0, None)
+        };
+
+        // Create peripheral if not decoded from message
+        let peripheral = peripheral.unwrap_or_else(|| {
+            Peripheral::new(node_id.as_u32(), PeripheralType::SoldierSensor)
+        });
+
         Some(Self {
             counter,
+            peripheral,
             node_id,
             version,
+            event_index,
         })
     }
 }
@@ -321,7 +412,7 @@ fn axp192_on_battery(i2c: &mut I2cDriver) -> bool {
 }
 
 /// Build number for tracking firmware versions
-const BUILD_NUM: u32 = 11;
+const BUILD_NUM: u32 = 13;
 
 /// Draw initial static UI elements (call once at startup)
 fn draw_static_ui<D>(display: &mut D, node_id: u32)
@@ -350,7 +441,7 @@ where
         .draw(display);
 
     // Static label
-    let _ = Text::new("taps", Point::new(115, 175), cyan).draw(display);
+    let _ = Text::new("taps / event", Point::new(95, 85), cyan).draw(display);
 }
 
 /// Compute a simple hash for visual state comparison
@@ -362,6 +453,19 @@ fn state_hash(doc: &HiveDocument) -> u16 {
         hash = hash.wrapping_mul(31);
     }
     hash
+}
+
+/// Get color for event type
+fn event_color(event: EventType) -> Rgb565 {
+    match event {
+        EventType::None => Rgb565::CSS_GRAY,
+        EventType::Ping => Rgb565::GREEN,
+        EventType::Moving => Rgb565::CYAN,
+        EventType::InPosition => Rgb565::BLUE,
+        EventType::Ack => Rgb565::WHITE,
+        EventType::NeedAssist => Rgb565::YELLOW,
+        EventType::Emergency => Rgb565::RED,
+    }
 }
 
 /// Update only the dynamic parts of the display (no flicker)
@@ -407,18 +511,37 @@ fn update_display<D>(
     }
 
     // Tap count - clear area then draw large total
-    let _ = Rectangle::new(Point::new(30, 90), Size::new(260, 100))
+    let _ = Rectangle::new(Point::new(30, 90), Size::new(260, 55))
         .into_styled(black)
         .draw(display);
 
     // Large total count - this should be identical on all devices after sync!
     let total_str = format!("{}", doc.total_taps());
-    let _ = Text::new(&total_str, Point::new(130, 140), green).draw(display);
+    let _ = Text::new(&total_str, Point::new(130, 130), green).draw(display);
+
+    // Event type indicator - show current event with appropriate color
+    let _ = Rectangle::new(Point::new(30, 145), Size::new(260, 30))
+        .into_styled(black)
+        .draw(display);
+
+    let current_event = doc.current_event();
+    let event_label = if current_event == EventType::None {
+        "tap to send".to_string()
+    } else {
+        current_event.label().to_string()
+    };
+    let event_style = MonoTextStyle::new(&FONT_10X20, event_color(current_event));
+    // Center the event label
+    let x_offset = 160 - (event_label.len() as i32 * 5);
+    let _ = Text::new(&event_label, Point::new(x_offset, 165), event_style).draw(display);
 
     // Show state hash and node count for visual convergence check
+    let _ = Rectangle::new(Point::new(60, 175), Size::new(200, 25))
+        .into_styled(black)
+        .draw(display);
     let hash = state_hash(doc);
     let hash_str = format!("{:04X} v{} n{}", hash, doc.version, doc.num_nodes());
-    let _ = Text::new(&hash_str, Point::new(80, 180), white).draw(display);
+    let _ = Text::new(&hash_str, Point::new(80, 190), white).draw(display);
 
     // Status - clear area then draw
     let _ = Rectangle::new(Point::new(10, 210), Size::new(300, 25))
@@ -658,9 +781,11 @@ fn main() -> anyhow::Result<()> {
 
         // Periodic status update (every 5 seconds = 100 * 50ms)
         if loop_count % 100 == 0 {
-            // Update battery reading
+            // Update battery reading and peripheral health
             if let Some(mv) = axp192_read_battery_voltage(&mut i2c) {
-                battery_pct = Some(battery_percent_from_voltage(mv));
+                let pct = battery_percent_from_voltage(mv);
+                battery_pct = Some(pct);
+                doc.update_health(pct);
             }
 
             let status = if connected {
