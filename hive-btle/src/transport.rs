@@ -4,6 +4,9 @@
 //! providing the `BluetoothLETransport` struct that can be registered with
 //! the `TransportManager`.
 
+#[cfg(not(feature = "std"))]
+use alloc::{boxed::Box, vec::Vec};
+
 use async_trait::async_trait;
 use core::time::Duration;
 

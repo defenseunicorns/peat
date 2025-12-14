@@ -8,7 +8,7 @@
 //! serialization over constrained BLE connections.
 
 #[cfg(not(feature = "std"))]
-use alloc::{collections::BTreeMap, string::String, vec::Vec};
+use alloc::{collections::BTreeMap, string::String, string::ToString, vec, vec::Vec};
 #[cfg(feature = "std")]
 use std::collections::BTreeMap;
 

@@ -62,6 +62,7 @@
 
 mod characteristics;
 mod protocol;
+#[cfg(feature = "std")]
 mod service;
 
 pub use characteristics::{
@@ -72,6 +73,7 @@ pub use protocol::{
     fragment_payload, max_payload_size, FragmentReassembler, SyncMessage, SyncMessageType,
     SyncProtocol, SyncProtocolState, DEFAULT_MAX_PAYLOAD,
 };
+#[cfg(feature = "std")]
 pub use service::{
     CharacteristicDescriptor, GattEvent, GattEventCallback, HiveCharacteristics, HiveGattService,
 };

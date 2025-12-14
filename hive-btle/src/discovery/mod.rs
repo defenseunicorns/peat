@@ -45,4 +45,6 @@ pub use advertiser::{Advertiser, AdvertiserState, AdvertisingPacket};
 pub use beacon::{
     HiveBeacon, ParsedAdvertisement, BEACON_COMPACT_SIZE, BEACON_SIZE, BEACON_VERSION,
 };
-pub use scanner::{ScanFilter, Scanner, ScannerState, TrackedDevice};
+#[cfg(feature = "std")]
+pub use scanner::Scanner;
+pub use scanner::{ScanFilter, ScannerState, TrackedDevice};
