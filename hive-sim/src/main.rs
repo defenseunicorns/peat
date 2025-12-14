@@ -74,10 +74,15 @@ use hive_protocol::sync::{
     Value,
 };
 use std::collections::{HashMap, HashSet};
+use std::fs::{File, OpenOptions};
+use std::io::Write;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::time::sleep;
+
+/// Global metrics file handle for persistent logging
+static METRICS_FILE: OnceLock<Mutex<Option<File>>> = OnceLock::new();
 
 // Mode 4: Hierarchical aggregation imports
 use hive_protocol::hierarchy::{HierarchicalAggregator, StateAggregator};
@@ -145,6 +150,7 @@ enum MetricsEvent {
         doc_id: String,
         timestamp_us: u128,
     },
+    #[allow(dead_code)] // Reserved for future ack tracking feature
     AllAcksReceived {
         node_id: String,
         doc_id: String,
@@ -166,6 +172,13 @@ enum MetricsEvent {
         platoon_id: String,
         squad_count: usize,
         total_member_count: usize,
+        timestamp_us: u128,
+    },
+    CompanySummaryCreated {
+        node_id: String,
+        company_id: String,
+        platoon_count: u32,
+        total_member_count: u32,
         timestamp_us: u128,
     },
     // Phase 3: Command dissemination events
@@ -478,9 +491,9 @@ async fn handle_acknowledgment_collection(
 
 /// Squad leader aggregation loop (Mode 4)
 ///
-/// Periodically aggregates member NodeStates into SquadSummary and publishes via coordinator.
-/// This is the core of hierarchical state aggregation - squad leaders collect member
-/// states and create summary documents that get replicated via P2P mesh.
+/// Event-driven aggregation triggered by member NodeState updates via P2P mesh.
+/// Squad leaders observe member states arriving from soldiers and aggregate them
+/// into SquadSummary documents. Uses debouncing to avoid excessive aggregation.
 async fn squad_leader_aggregation_loop(
     coordinator: Arc<HierarchicalAggregator>,
     backend: Arc<Box<dyn DataSyncBackend>>,
@@ -493,6 +506,9 @@ async fn squad_leader_aggregation_loop(
         node_id, squad_id
     );
     println!("[{}] Squad members: {:?}", node_id, member_ids);
+
+    // Channel for observer to signal member state updates (triggers aggregation)
+    let (update_tx, mut update_rx) = tokio::sync::mpsc::channel::<String>(100);
 
     // Spawn observer for soldier NodeState documents (Lab 4 upward propagation tracking)
     let observer_backend = backend.clone();
@@ -549,6 +565,9 @@ async fn squad_leader_aggregation_loop(
                                                 is_first_reception: false,
                                                 latency_type: "soldier_to_squad_leader".to_string(),
                                             });
+
+                                            // Signal aggregation loop that a member updated
+                                            let _ = update_tx.try_send(doc_id.clone());
                                         }
                                     }
                                 }
@@ -562,9 +581,13 @@ async fn squad_leader_aggregation_loop(
         }
     });
 
-    loop {
+    // Helper closure for aggregation
+    let do_aggregation = |coordinator: Arc<HierarchicalAggregator>,
+                          squad_id: String,
+                          node_id: String,
+                          member_ids: Vec<String>| async move {
         // Collect member states using synthetic NodeConfig/NodeState
-        // In production, this would query actual NodeState documents from Ditto
+        // In production, this would query actual NodeState documents from storage
         let mut member_states = Vec::new();
 
         for member_id in &member_ids {
@@ -597,124 +620,189 @@ async fn squad_leader_aggregation_loop(
             member_states.push((config, state));
         }
 
-        if !member_states.is_empty() {
-            // Log aggregation start
-            log_metrics(&MetricsEvent::AggregationStarted {
-                node_id: node_id.clone(),
-                tier: "squad".to_string(),
-                input_doc_type: "NodeState".to_string(),
-                input_count: member_states.len(),
-                timestamp_us: now_micros(),
-            });
-
-            let aggregation_start_time = now_micros();
-
-            // Aggregate into SquadSummary using StateAggregator
-            match StateAggregator::aggregate_squad(&squad_id, &node_id, member_states) {
-                Ok(squad_summary) => {
-                    let timestamp_us = now_micros();
-                    let processing_time_us = timestamp_us - aggregation_start_time;
-
-                    // Check if squad summary document exists (create-once pattern)
-                    match coordinator.get_squad_summary(&squad_id).await {
-                        Ok(None) => {
-                            // First time - create document with latency tracking
-                            let crdt_start = Instant::now();
-                            if let Err(e) = coordinator
-                                .create_squad_summary(&squad_id, &squad_summary)
-                                .await
-                            {
-                                eprintln!("[{}] Failed to create squad summary: {}", node_id, e);
-                            } else {
-                                let crdt_latency_ms = crdt_start.elapsed().as_secs_f64() * 1000.0;
-                                println!(
-                                    "[{}] ✓ Created squad {} ({} members, readiness: {:.2})",
-                                    node_id,
-                                    squad_id,
-                                    squad_summary.member_count,
-                                    squad_summary.readiness_score
-                                );
-                                // Log CRDT create latency for Lab 4 analysis
-                                println!(
-                                    "METRICS: {{\"event_type\":\"CRDTUpsert\",\"node_id\":\"{}\",\"tier\":\"squad_leader\",\"squad_id\":\"{}\",\"operation\":\"create\",\"members_aggregated\":{},\"latency_ms\":{:.3},\"timestamp_us\":{}}}",
-                                    node_id, squad_id, squad_summary.member_count, crdt_latency_ms, timestamp_us
-                                );
-                            }
-                        }
-                        Ok(Some(_existing)) => {
-                            // Document exists - send delta update with latency tracking
-                            use hive_protocol::hierarchy::deltas::SquadDelta;
-                            let delta =
-                                SquadDelta::from_summary(&squad_summary, timestamp_us as u64);
-
-                            let crdt_start = Instant::now();
-                            if let Err(e) = coordinator.update_squad_summary(&squad_id, delta).await
-                            {
-                                eprintln!("[{}] Failed to update squad summary: {}", node_id, e);
-                            } else {
-                                let crdt_latency_ms = crdt_start.elapsed().as_secs_f64() * 1000.0;
-                                println!(
-                                    "[{}] ✓ Updated squad {} ({} members, readiness: {:.2})",
-                                    node_id,
-                                    squad_id,
-                                    squad_summary.member_count,
-                                    squad_summary.readiness_score
-                                );
-                                // Log CRDT update latency for Lab 4 analysis
-                                println!(
-                                    "METRICS: {{\"event_type\":\"CRDTUpsert\",\"node_id\":\"{}\",\"tier\":\"squad_leader\",\"squad_id\":\"{}\",\"operation\":\"update\",\"members_aggregated\":{},\"latency_ms\":{:.3},\"timestamp_us\":{}}}",
-                                    node_id, squad_id, squad_summary.member_count, crdt_latency_ms, timestamp_us
-                                );
-                            }
-                        }
-                        Err(e) => {
-                            eprintln!("[{}] Failed to check squad summary: {}", node_id, e);
-                        }
-                    }
-
-                    // Log squad summary metrics
-                    log_metrics(&MetricsEvent::SquadSummaryCreated {
-                        node_id: node_id.clone(),
-                        squad_id: squad_id.clone(),
-                        member_count: squad_summary.member_count as usize,
-                        readiness_score: squad_summary.readiness_score as f64,
-                        timestamp_us,
-                    });
-
-                    // Log aggregation completion with processing time
-                    log_metrics(&MetricsEvent::AggregationCompleted {
-                        node_id: node_id.clone(),
-                        tier: "squad".to_string(),
-                        input_doc_type: "NodeState".to_string(),
-                        output_doc_type: "SquadSummary".to_string(),
-                        output_doc_id: format!("squad-summary-{}", squad_id),
-                        input_count: squad_summary.member_count as usize,
-                        processing_time_us,
-                        timestamp_us,
-                    });
-
-                    // Log aggregation efficiency for Lab 4 analysis
-                    let reduction_ratio = squad_summary.member_count as f64;
-                    println!(
-                        "METRICS: {{\"event_type\":\"AggregationEfficiency\",\"node_id\":\"{}\",\"tier\":\"squad\",\"input_docs\":{},\"output_docs\":1,\"reduction_ratio\":{:.1},\"timestamp_us\":{}}}",
-                        node_id, squad_summary.member_count, reduction_ratio, timestamp_us
-                    );
-                }
-                Err(e) => {
-                    eprintln!("[{}] Failed to aggregate squad: {}", node_id, e);
-                }
-            }
-        } else {
-            println!(
-                "[{}] [Squad Leader] No operational members to aggregate",
-                node_id
-            );
+        if member_states.is_empty() {
+            return;
         }
 
-        // NO POLLING - aggregate continuously with zero delay
-        // In production this would be event-driven via member state change stream
-        // For now, continuously check and aggregate immediately
+        // Log aggregation start
+        log_metrics(&MetricsEvent::AggregationStarted {
+            node_id: node_id.clone(),
+            tier: "squad".to_string(),
+            input_doc_type: "NodeState".to_string(),
+            input_count: member_states.len(),
+            timestamp_us: now_micros(),
+        });
+
+        let aggregation_start_time = now_micros();
+
+        // Aggregate into SquadSummary using StateAggregator
+        match StateAggregator::aggregate_squad(&squad_id, &node_id, member_states) {
+            Ok(squad_summary) => {
+                let timestamp_us = now_micros();
+                let processing_time_us = timestamp_us - aggregation_start_time;
+
+                // Check if squad summary document exists (create-once pattern)
+                match coordinator.get_squad_summary(&squad_id).await {
+                    Ok(None) => {
+                        // First time - create document with latency tracking
+                        let crdt_start = Instant::now();
+                        if let Err(e) = coordinator
+                            .create_squad_summary(&squad_id, &squad_summary)
+                            .await
+                        {
+                            eprintln!("[{}] Failed to create squad summary: {}", node_id, e);
+                        } else {
+                            let crdt_latency_ms = crdt_start.elapsed().as_secs_f64() * 1000.0;
+                            println!(
+                                "[{}] ✓ Created squad {} ({} members, readiness: {:.2})",
+                                node_id,
+                                squad_id,
+                                squad_summary.member_count,
+                                squad_summary.readiness_score
+                            );
+                            // Log CRDT create latency for Lab 4 analysis
+                            println!(
+                                "METRICS: {{\"event_type\":\"CRDTUpsert\",\"node_id\":\"{}\",\"tier\":\"squad_leader\",\"squad_id\":\"{}\",\"operation\":\"create\",\"members_aggregated\":{},\"latency_ms\":{:.3},\"timestamp_us\":{}}}",
+                                node_id, squad_id, squad_summary.member_count, crdt_latency_ms, timestamp_us
+                            );
+                        }
+                    }
+                    Ok(Some(_existing)) => {
+                        // Document exists - send delta update with latency tracking
+                        use hive_protocol::hierarchy::deltas::SquadDelta;
+                        let delta = SquadDelta::from_summary(&squad_summary, timestamp_us as u64);
+
+                        let crdt_start = Instant::now();
+                        if let Err(e) = coordinator.update_squad_summary(&squad_id, delta).await {
+                            eprintln!("[{}] Failed to update squad summary: {}", node_id, e);
+                        } else {
+                            let crdt_latency_ms = crdt_start.elapsed().as_secs_f64() * 1000.0;
+                            println!(
+                                "[{}] ✓ Updated squad {} ({} members, readiness: {:.2})",
+                                node_id,
+                                squad_id,
+                                squad_summary.member_count,
+                                squad_summary.readiness_score
+                            );
+                            // Log CRDT update latency for Lab 4 analysis
+                            println!(
+                                "METRICS: {{\"event_type\":\"CRDTUpsert\",\"node_id\":\"{}\",\"tier\":\"squad_leader\",\"squad_id\":\"{}\",\"operation\":\"update\",\"members_aggregated\":{},\"latency_ms\":{:.3},\"timestamp_us\":{}}}",
+                                node_id, squad_id, squad_summary.member_count, crdt_latency_ms, timestamp_us
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[{}] Failed to check squad summary: {}", node_id, e);
+                    }
+                }
+
+                // Log squad summary metrics
+                log_metrics(&MetricsEvent::SquadSummaryCreated {
+                    node_id: node_id.clone(),
+                    squad_id: squad_id.clone(),
+                    member_count: squad_summary.member_count as usize,
+                    readiness_score: squad_summary.readiness_score as f64,
+                    timestamp_us,
+                });
+
+                // Log aggregation completion with processing time
+                log_metrics(&MetricsEvent::AggregationCompleted {
+                    node_id: node_id.clone(),
+                    tier: "squad".to_string(),
+                    input_doc_type: "NodeState".to_string(),
+                    output_doc_type: "SquadSummary".to_string(),
+                    output_doc_id: format!("squad-summary-{}", squad_id),
+                    input_count: squad_summary.member_count as usize,
+                    processing_time_us,
+                    timestamp_us,
+                });
+
+                // Log aggregation efficiency for Lab 4 analysis
+                let reduction_ratio = squad_summary.member_count as f64;
+                println!(
+                    "METRICS: {{\"event_type\":\"AggregationEfficiency\",\"node_id\":\"{}\",\"tier\":\"squad\",\"input_docs\":{},\"output_docs\":1,\"reduction_ratio\":{:.1},\"timestamp_us\":{}}}",
+                    node_id, squad_summary.member_count, reduction_ratio, timestamp_us
+                );
+            }
+            Err(e) => {
+                eprintln!("[{}] Failed to aggregate squad: {}", node_id, e);
+            }
+        }
+    };
+
+    // Debounce interval: aggregate at most once per this duration
+    // This prevents excessive aggregation when multiple members update simultaneously
+    let debounce_interval = Duration::from_millis(100);
+    let mut pending_aggregation = false;
+
+    // Initial aggregation on startup
+    do_aggregation(
+        Arc::clone(&coordinator),
+        squad_id.clone(),
+        node_id.clone(),
+        member_ids.clone(),
+    )
+    .await;
+    let mut last_aggregation = Instant::now();
+
+    // EVENT-DRIVEN: Wait for member state updates and aggregate with debouncing
+    loop {
+        // Wait for update signal with timeout (for periodic aggregation fallback)
+        let timeout_duration = if pending_aggregation {
+            // If we have a pending aggregation, wait only until debounce interval expires
+            debounce_interval.saturating_sub(last_aggregation.elapsed())
+        } else {
+            // Otherwise wait up to 5 seconds for an update (matches soldier update rate)
+            Duration::from_secs(5)
+        };
+
+        match tokio::time::timeout(timeout_duration, update_rx.recv()).await {
+            Ok(Some(_member_id)) => {
+                // Member state updated - mark aggregation as pending
+                pending_aggregation = true;
+
+                // Check if we can aggregate now (debounce)
+                if last_aggregation.elapsed() >= debounce_interval {
+                    do_aggregation(
+                        Arc::clone(&coordinator),
+                        squad_id.clone(),
+                        node_id.clone(),
+                        member_ids.clone(),
+                    )
+                    .await;
+                    last_aggregation = Instant::now();
+                    pending_aggregation = false;
+
+                    // Drain any queued updates (they're now stale)
+                    while update_rx.try_recv().is_ok() {}
+                }
+            }
+            Ok(None) => {
+                // Channel closed, observer terminated
+                println!(
+                    "[{}] Observer channel closed, stopping aggregation",
+                    node_id
+                );
+                break;
+            }
+            Err(_) => {
+                // Timeout - perform pending aggregation if any, or periodic refresh
+                if pending_aggregation || last_aggregation.elapsed() >= Duration::from_secs(5) {
+                    do_aggregation(
+                        Arc::clone(&coordinator),
+                        squad_id.clone(),
+                        node_id.clone(),
+                        member_ids.clone(),
+                    )
+                    .await;
+                    last_aggregation = Instant::now();
+                    pending_aggregation = false;
+                }
+            }
+        }
     }
+
+    Ok(())
 }
 
 /// Platoon leader aggregation loop (Mode 4)
@@ -1107,8 +1195,317 @@ async fn platoon_leader_aggregation_loop(
     }
 }
 
+/// Company commander aggregation loop (Mode 4)
+///
+/// Event-driven aggregation triggered by platoon summary updates via P2P mesh.
+/// Company commanders observe platoon summaries arriving from platoon leaders and aggregate
+/// them into CompanySummary documents.
+async fn company_commander_aggregation_loop(
+    mut change_stream: ChangeStream,
+    coordinator: Arc<HierarchicalAggregator>,
+    company_id: String,
+    node_id: String,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!(
+        "[{}] Started company commander aggregation for {}",
+        node_id, company_id
+    );
+    println!(
+        "[{}] Observing platoon summary change stream for P2P latency measurement",
+        node_id
+    );
+
+    // Get platoon IDs from environment variable if available, or derive from company ID
+    // PLATOON_IDS format: comma-separated list of platoon IDs
+    let platoon_ids: Vec<String> = if let Ok(platoon_ids_str) = std::env::var("PLATOON_IDS") {
+        platoon_ids_str
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect()
+    } else if company_id.contains("-company-") || company_id.starts_with("company-") {
+        // Hierarchical naming: company-X → platoon IDs with same prefix
+        // Default to 4 platoons per company for hierarchical topology
+        let num_platoons = std::env::var("PLATOONS_PER_COMPANY")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(4);
+        (1..=num_platoons)
+            .map(|i| format!("{}-platoon-{}", company_id, i))
+            .collect()
+    } else {
+        // Fallback for test cases
+        vec!["platoon-1".to_string(), "platoon-2".to_string()]
+    };
+    println!(
+        "[{}] Using platoon IDs for aggregation: {:?}",
+        node_id, platoon_ids
+    );
+
+    // Track unique document receptions by (doc_id, last_modified_us) for metrics deduplication
+    let mut seen_doc_updates: HashSet<(String, u128)> = HashSet::new();
+
+    // Helper function to perform aggregation (called when platoon summaries change)
+    let do_aggregation = |coordinator: Arc<HierarchicalAggregator>,
+                          company_id: String,
+                          node_id: String,
+                          platoon_ids: Vec<String>| async move {
+        // Collect latest platoon summaries
+        let mut platoon_summaries = Vec::new();
+
+        for platoon_id in &platoon_ids {
+            if let Ok(Some(summary)) = coordinator.get_platoon_summary(platoon_id).await {
+                platoon_summaries.push(summary);
+            }
+        }
+
+        // Aggregate when we have at least one platoon summary
+        // Note: In distributed P2P systems, we may not always have all platoons synced
+        // Relaxed from: platoon_summaries.len() == platoon_ids.len()
+        if !platoon_summaries.is_empty() {
+            // Log aggregation start
+            log_metrics(&MetricsEvent::AggregationStarted {
+                node_id: node_id.to_string(),
+                tier: "company".to_string(),
+                input_doc_type: "PlatoonSummary".to_string(),
+                input_count: platoon_summaries.len(),
+                timestamp_us: now_micros(),
+            });
+
+            let aggregation_start_time = now_micros();
+            let timestamp_us = aggregation_start_time;
+
+            // Aggregate into CompanySummary
+            match StateAggregator::aggregate_company(&company_id, &node_id, platoon_summaries) {
+                Ok(company_summary) => {
+                    let processing_time_us = now_micros() - aggregation_start_time;
+                    // Check if company summary document exists (create-once pattern)
+                    match coordinator.get_company_summary(&company_id).await {
+                        Ok(None) => {
+                            // First time - create document with latency tracking
+                            let crdt_start = Instant::now();
+                            if let Err(e) = coordinator
+                                .create_company_summary(&company_id, &company_summary)
+                                .await
+                            {
+                                eprintln!("[{}] Failed to create company summary: {}", node_id, e);
+                            } else {
+                                let crdt_latency_ms = crdt_start.elapsed().as_secs_f64() * 1000.0;
+                                println!(
+                                    "[{}] ✓ Created company {} ({} platoons, {} total members)",
+                                    node_id,
+                                    company_id,
+                                    company_summary.platoon_count,
+                                    company_summary.total_member_count
+                                );
+                                // Log CRDT create latency for Lab 4 analysis
+                                println!(
+                                    "METRICS: {{\"event_type\":\"CRDTUpsert\",\"node_id\":\"{}\",\"tier\":\"company_commander\",\"company_id\":\"{}\",\"operation\":\"create\",\"platoons_aggregated\":{},\"total_members\":{},\"latency_ms\":{:.3},\"timestamp_us\":{}}}",
+                                    node_id, company_id, company_summary.platoon_count, company_summary.total_member_count, crdt_latency_ms, timestamp_us
+                                );
+
+                                // Log CompanySummaryCreated event for metrics tracking
+                                log_metrics(&MetricsEvent::CompanySummaryCreated {
+                                    node_id: node_id.to_string(),
+                                    company_id: company_id.clone(),
+                                    platoon_count: company_summary.platoon_count,
+                                    total_member_count: company_summary.total_member_count,
+                                    timestamp_us,
+                                });
+                            }
+                        }
+                        Ok(Some(_existing)) => {
+                            // Document exists - send delta update with latency tracking
+                            use hive_protocol::hierarchy::deltas::CompanyDelta;
+                            let delta =
+                                CompanyDelta::from_summary(&company_summary, timestamp_us as u64);
+
+                            let crdt_start = Instant::now();
+                            if let Err(e) =
+                                coordinator.update_company_summary(&company_id, delta).await
+                            {
+                                eprintln!("[{}] Failed to update company summary: {}", node_id, e);
+                            } else {
+                                let crdt_latency_ms = crdt_start.elapsed().as_secs_f64() * 1000.0;
+                                println!(
+                                    "[{}] ↑ Updated company {} ({} platoons, {} total members)",
+                                    node_id,
+                                    company_id,
+                                    company_summary.platoon_count,
+                                    company_summary.total_member_count
+                                );
+                                // Log CRDT update latency for Lab 4 analysis
+                                println!(
+                                    "METRICS: {{\"event_type\":\"CRDTUpsert\",\"node_id\":\"{}\",\"tier\":\"company_commander\",\"company_id\":\"{}\",\"operation\":\"delta_update\",\"platoons_aggregated\":{},\"total_members\":{},\"latency_ms\":{:.3},\"timestamp_us\":{}}}",
+                                    node_id, company_id, company_summary.platoon_count, company_summary.total_member_count, crdt_latency_ms, timestamp_us
+                                );
+
+                                // Log CompanySummaryCreated event for metrics tracking
+                                log_metrics(&MetricsEvent::CompanySummaryCreated {
+                                    node_id: node_id.to_string(),
+                                    company_id: company_id.clone(),
+                                    platoon_count: company_summary.platoon_count,
+                                    total_member_count: company_summary.total_member_count,
+                                    timestamp_us,
+                                });
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("[{}] Failed to check company summary: {}", node_id, e);
+                        }
+                    }
+
+                    // Log aggregation completed
+                    log_metrics(&MetricsEvent::AggregationCompleted {
+                        node_id: node_id.to_string(),
+                        tier: "company".to_string(),
+                        input_doc_type: "PlatoonSummary".to_string(),
+                        output_doc_type: "CompanySummary".to_string(),
+                        output_doc_id: format!("company-summary-{}", company_id),
+                        input_count: company_summary.platoon_count as usize,
+                        processing_time_us,
+                        timestamp_us: now_micros(),
+                    });
+
+                    // Log aggregation efficiency for Lab 4 analysis
+                    let reduction_ratio = company_summary.platoon_count as f64;
+                    println!(
+                        "METRICS: {{\"event_type\":\"AggregationEfficiency\",\"node_id\":\"{}\",\"tier\":\"company\",\"input_docs\":{},\"output_docs\":1,\"reduction_ratio\":{:.1},\"total_members\":{},\"timestamp_us\":{}}}",
+                        node_id, company_summary.platoon_count, reduction_ratio, company_summary.total_member_count, now_micros()
+                    );
+                }
+                Err(e) => {
+                    eprintln!("[{}] Failed to aggregate company: {}", node_id, e);
+                }
+            }
+        }
+    };
+
+    // EVENT-DRIVEN: Listen for platoon summary changes and aggregate IMMEDIATELY
+    loop {
+        // Wait for next change event with timeout
+        let event =
+            tokio::time::timeout(Duration::from_millis(500), change_stream.receiver.recv()).await;
+
+        match event {
+            Ok(Some(change_event)) => {
+                match change_event {
+                    ChangeEvent::Initial { documents } => {
+                        // Process initial snapshot
+                        for doc in documents {
+                            let received_at_us = now_micros();
+                            if let Some(doc_id) = &doc.id {
+                                // Match platoon summaries
+                                if doc_id.contains("platoon-") {
+                                    let created_at_us = if let Some(ts) = doc.get("created_at_us") {
+                                        ts.as_u64().unwrap_or(0) as u128
+                                    } else if let Some(ts) = doc.get("timestamp_us") {
+                                        ts.as_u64().unwrap_or(0) as u128
+                                    } else {
+                                        0
+                                    };
+
+                                    let last_modified_us =
+                                        if let Some(ts) = doc.get("last_update_us") {
+                                            ts.as_u64().unwrap_or(0) as u128
+                                        } else if let Some(ts) = doc.get("last_modified_us") {
+                                            ts.as_u64().unwrap_or(0) as u128
+                                        } else {
+                                            created_at_us
+                                        };
+
+                                    let update_key = (doc_id.clone(), last_modified_us);
+                                    if last_modified_us > 0
+                                        && !seen_doc_updates.contains(&update_key)
+                                    {
+                                        seen_doc_updates.insert(update_key);
+
+                                        let latency_us =
+                                            received_at_us.saturating_sub(last_modified_us);
+                                        let latency_ms = latency_us as f64 / 1000.0;
+
+                                        println!(
+                                            "[{}] ✓ Platoon summary received (initial): {} (latency: {:.3}ms)",
+                                            node_id, doc_id, latency_ms
+                                        );
+
+                                        // EVENT-DRIVEN: Aggregate immediately when platoon summary arrives
+                                        do_aggregation(
+                                            Arc::clone(&coordinator),
+                                            company_id.clone(),
+                                            node_id.clone(),
+                                            platoon_ids.clone(),
+                                        )
+                                        .await;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    ChangeEvent::Updated { document, .. } => {
+                        let received_at_us = now_micros();
+                        if let Some(doc_id) = &document.id {
+                            if doc_id.contains("platoon-") {
+                                let created_at_us = if let Some(ts) = document.get("created_at_us")
+                                {
+                                    ts.as_u64().unwrap_or(0) as u128
+                                } else if let Some(ts) = document.get("timestamp_us") {
+                                    ts.as_u64().unwrap_or(0) as u128
+                                } else {
+                                    0
+                                };
+
+                                let last_modified_us =
+                                    if let Some(ts) = document.get("last_update_us") {
+                                        ts.as_u64().unwrap_or(0) as u128
+                                    } else if let Some(ts) = document.get("last_modified_us") {
+                                        ts.as_u64().unwrap_or(0) as u128
+                                    } else {
+                                        created_at_us
+                                    };
+
+                                let update_key = (doc_id.clone(), last_modified_us);
+                                if last_modified_us > 0 && !seen_doc_updates.contains(&update_key) {
+                                    seen_doc_updates.insert(update_key);
+
+                                    let latency_us =
+                                        received_at_us.saturating_sub(last_modified_us);
+                                    let latency_ms = latency_us as f64 / 1000.0;
+
+                                    println!(
+                                        "[{}] ✓ Platoon summary received (update): {} (latency: {:.3}ms)",
+                                        node_id, doc_id, latency_ms
+                                    );
+
+                                    // EVENT-DRIVEN: Aggregate immediately
+                                    do_aggregation(
+                                        Arc::clone(&coordinator),
+                                        company_id.clone(),
+                                        node_id.clone(),
+                                        platoon_ids.clone(),
+                                    )
+                                    .await;
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Ok(None) => {
+                return Err("Change stream closed unexpectedly".into());
+            }
+            Err(_) => {
+                continue;
+            }
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize persistent metrics file logging (writes to /data/logs if mounted)
+    init_metrics_file();
+
     // Parse command line arguments
     let args: Vec<String> = std::env::args().collect();
 
@@ -1200,6 +1597,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("[{}] Backend: {}", node_id, backend_type);
     println!("[{}] Node Type: {}", node_id, node_type);
     println!("[{}] Update Rate: {}ms", node_id, update_rate_ms);
+
+    // Register with lab orchestrator (if configured)
+    let role = std::env::var("ROLE").unwrap_or_else(|_| node_type.clone());
+    orchestrator::register(&node_id, &backend_type, &role);
     println!(
         "[{}] HIVE Filtering: {}",
         node_id,
@@ -1285,6 +1686,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("[{}] Starting sync...", node_id);
     sync_engine.start_sync().await?;
     println!("[{}] ✓ Sync started", node_id);
+
+    // Report ready to orchestrator
+    orchestrator::ready(&node_id);
 
     // Connect to Automerge peers using static configuration (Issue #235)
     // This is needed because mDNS doesn't work across containerlab network namespaces
@@ -1686,6 +2090,154 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             }
+            "company_commander" => {
+                println!(
+                    "[{}] Spawning company commander aggregation task...",
+                    node_id
+                );
+
+                let company_id =
+                    std::env::var("COMPANY_ID").unwrap_or_else(|_| "company-1".to_string());
+
+                // Create observer for platoon summaries arriving via P2P mesh
+                let change_stream_result = backend.document_store().observe(
+                    "sim_poc",
+                    &Query::Custom("collection_name == 'platoon_summaries'".to_string()),
+                );
+
+                // Get DittoStore from backend
+                if let Some(ditto_backend) = backend.as_any().downcast_ref::<DittoBackend>() {
+                    match (ditto_backend.get_ditto_store(), change_stream_result) {
+                        (Ok(ditto_store), Ok(change_stream)) => {
+                            // Wrap DittoStore in DittoSummaryStorage for backend abstraction
+                            let storage =
+                                Arc::new(hive_protocol::storage::DittoSummaryStorage::new(
+                                    Arc::clone(&ditto_store),
+                                ));
+                            let coordinator = Arc::new(HierarchicalAggregator::new(storage));
+
+                            // Phase 3: Instantiate CommandCoordinator for command dissemination
+                            // Company commander can command platoons in the company
+                            let cmd_storage =
+                                Arc::new(DittoCommandStorage::new(Arc::clone(&ditto_store)));
+                            let _cmd_coordinator = Arc::new(CommandCoordinator::new(
+                                None, // Company commander is not in a squad
+                                node_id.clone(),
+                                vec![], // Platoon IDs will be determined dynamically
+                                cmd_storage,
+                            ));
+
+                            let node_id_clone = node_id.clone();
+
+                            println!("[{}] → Company: {}", node_id, company_id);
+
+                            tokio::spawn(async move {
+                                if let Err(e) = company_commander_aggregation_loop(
+                                    change_stream,
+                                    coordinator,
+                                    company_id,
+                                    node_id_clone.clone(),
+                                )
+                                .await
+                                {
+                                    eprintln!(
+                                        "[{}] Company commander aggregation error: {}",
+                                        node_id_clone, e
+                                    );
+                                }
+                            });
+
+                            println!("[{}] ✓ Company commander aggregation task spawned", node_id);
+                        }
+                        (Err(e), _) => {
+                            eprintln!("[{}] ✗ Failed to get DittoStore: {}", node_id, e);
+                        }
+                        (_, Err(e)) => {
+                            eprintln!("[{}] ✗ Failed to create change stream: {}", node_id, e);
+                        }
+                    }
+                } else {
+                    // Try AutomergeIroh backend for company commander
+                    #[cfg(feature = "automerge-backend")]
+                    {
+                        if let Some(automerge_backend) =
+                            backend.as_any().downcast_ref::<AutomergeIrohBackend>()
+                        {
+                            use hive_protocol::storage::HierarchicalStorageCapable;
+
+                            // Automerge uses different key format: platoon-summary:{platoon_id}
+                            // Create observer specifically for Automerge's key prefix
+                            let automerge_change_stream = backend.document_store().observe(
+                                "platoon-summary", // Match AutomergeSummaryStorage key prefix
+                                &Query::All,       // All platoon summaries
+                            );
+
+                            match automerge_change_stream {
+                                Ok(change_stream) => {
+                                    let storage = automerge_backend.summary_storage();
+                                    let coordinator =
+                                        Arc::new(HierarchicalAggregator::new(storage));
+
+                                    let cmd_storage = automerge_backend.command_storage();
+                                    let _cmd_coordinator = Arc::new(CommandCoordinator::new(
+                                        None,
+                                        node_id.clone(),
+                                        vec![],
+                                        cmd_storage,
+                                    ));
+
+                                    let node_id_clone = node_id.clone();
+
+                                    println!(
+                                        "[{}] → Company: {} (AutomergeIroh)",
+                                        node_id, company_id
+                                    );
+
+                                    tokio::spawn(async move {
+                                        if let Err(e) = company_commander_aggregation_loop(
+                                            change_stream,
+                                            coordinator,
+                                            company_id,
+                                            node_id_clone.clone(),
+                                        )
+                                        .await
+                                        {
+                                            eprintln!(
+                                                "[{}] Company commander aggregation error: {}",
+                                                node_id_clone, e
+                                            );
+                                        }
+                                    });
+
+                                    println!(
+                                        "[{}] ✓ Company commander aggregation task spawned (AutomergeIroh)",
+                                        node_id
+                                    );
+                                }
+                                Err(e) => {
+                                    eprintln!(
+                                        "[{}] ✗ Failed to create change stream: {}",
+                                        node_id, e
+                                    );
+                                }
+                            }
+                        } else {
+                            eprintln!(
+                                "[{}] ✗ Cannot spawn company commander task: unsupported backend type",
+                                node_id
+                            );
+                        }
+                    }
+
+                    #[cfg(not(feature = "automerge-backend"))]
+                    {
+                        eprintln!(
+                            "[{}] ✗ Cannot spawn company commander task: backend is not DittoBackend",
+                            node_id
+                        );
+                    }
+                }
+            }
             _ => {
                 println!(
                     "[{}] No aggregation task needed for role: {}",
@@ -1748,10 +2300,186 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-/// Log metrics event as JSON to stderr (for parsing)
+/// Lab Orchestrator client - reports node status to central orchestrator
+/// The orchestrator URL is read from ORCHESTRATOR_URL environment variable
+mod orchestrator {
+    use std::io::{Read, Write};
+    use std::net::TcpStream;
+    use std::time::Duration;
+
+    fn get_orchestrator_url() -> Option<String> {
+        std::env::var("ORCHESTRATOR_URL")
+            .ok()
+            .filter(|s| !s.is_empty())
+    }
+
+    fn parse_url(url: &str) -> Option<(String, u16, String)> {
+        // Parse http://host:port/path
+        let url = url.strip_prefix("http://").unwrap_or(url);
+        let (host_port, path) = if let Some(idx) = url.find('/') {
+            (&url[..idx], &url[idx..])
+        } else {
+            (url, "/")
+        };
+        let (host, port) = if let Some(idx) = host_port.find(':') {
+            (&host_port[..idx], host_port[idx + 1..].parse().ok()?)
+        } else {
+            (host_port, 80u16)
+        };
+        Some((host.to_string(), port, path.to_string()))
+    }
+
+    fn http_post_once(base_url: &str, endpoint: &str, json_body: &str) -> Result<(), String> {
+        use std::net::ToSocketAddrs;
+
+        let full_url = format!("{}{}", base_url.trim_end_matches('/'), endpoint);
+        let (host, port, path) = parse_url(&full_url).ok_or("Invalid URL")?;
+
+        // Resolve hostname to IP address (required for connect_timeout)
+        let addr = format!("{}:{}", host, port)
+            .to_socket_addrs()
+            .map_err(|e| format!("DNS resolution failed: {}", e))?
+            .next()
+            .ok_or("No addresses found")?;
+
+        let mut stream = TcpStream::connect_timeout(&addr, Duration::from_secs(5))
+            .map_err(|e| format!("Connect failed: {}", e))?;
+
+        stream.set_read_timeout(Some(Duration::from_secs(5))).ok();
+        stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
+
+        let request = format!(
+            "POST {} HTTP/1.1\r\nHost: {}:{}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            path, host, port, json_body.len(), json_body
+        );
+
+        stream
+            .write_all(request.as_bytes())
+            .map_err(|e| format!("Write failed: {}", e))?;
+
+        let mut response = [0u8; 256];
+        let _ = stream.read(&mut response); // Don't care about response
+
+        Ok(())
+    }
+
+    fn http_post_with_retry(
+        base_url: &str,
+        endpoint: &str,
+        json_body: &str,
+        retries: u32,
+    ) -> Result<(), String> {
+        let mut last_err = String::new();
+        for attempt in 0..retries {
+            match http_post_once(base_url, endpoint, json_body) {
+                Ok(()) => return Ok(()),
+                Err(e) => {
+                    last_err = e;
+                    if attempt < retries - 1 {
+                        // Exponential backoff with jitter: 500ms * 2^attempt + random(0-500ms)
+                        // With 10 retries: 500ms, 1s, 2s, 4s, 8s, 16s, 32s... (capped at 30s)
+                        let base_ms = 500u64 * (1 << attempt.min(6));
+                        let jitter_ms = std::process::id() as u64 % 500;
+                        let backoff_ms = base_ms.min(30000) + jitter_ms;
+                        std::thread::sleep(Duration::from_millis(backoff_ms));
+                    }
+                }
+            }
+        }
+        Err(last_err)
+    }
+
+    pub fn register(node_id: &str, backend: &str, role: &str) {
+        if let Some(url) = get_orchestrator_url() {
+            // Initial random delay to spread out registration storm (5-15s)
+            // Higher base delay gives orchestrator time to start and DNS to propagate
+            let initial_delay_ms = 5000 + (std::process::id() as u64 % 10000);
+            std::thread::sleep(Duration::from_millis(initial_delay_ms));
+
+            let body = format!(
+                r#"{{"node_id":"{}","backend":"{}","role":"{}"}}"#,
+                node_id, backend, role
+            );
+            // 15 retries with exponential backoff: should span ~2-3 minutes total
+            if let Err(e) = http_post_with_retry(&url, "/register", &body, 15) {
+                eprintln!("[{}] Orchestrator register failed: {}", node_id, e);
+            }
+        }
+    }
+
+    pub fn ready(node_id: &str) {
+        if let Some(url) = get_orchestrator_url() {
+            let body = format!(r#"{{"node_id":"{}"}}"#, node_id);
+            if let Err(e) = http_post_with_retry(&url, "/ready", &body, 10) {
+                eprintln!("[{}] Orchestrator ready failed: {}", node_id, e);
+            }
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn error(node_id: &str, error_msg: &str) {
+        if let Some(url) = get_orchestrator_url() {
+            let body = format!(
+                r#"{{"node_id":"{}","error":"{}"}}"#,
+                node_id,
+                error_msg.replace('"', "'")
+            );
+            let _ = http_post_once(&url, "/error", &body);
+        }
+    }
+}
+
+/// Initialize the metrics file for persistent logging
+/// Called once at startup to create/open the log file based on NODE_ID
+fn init_metrics_file() {
+    METRICS_FILE.get_or_init(|| {
+        let node_id = std::env::var("NODE_ID").unwrap_or_else(|_| "unknown".to_string());
+        let log_dir = PathBuf::from("/data/logs");
+
+        // Try to create the log directory (may fail if not mounted, that's ok)
+        if std::fs::create_dir_all(&log_dir).is_ok() {
+            let log_path = log_dir.join(format!("{}.metrics.log", node_id));
+            match OpenOptions::new().create(true).append(true).open(&log_path) {
+                Ok(file) => {
+                    eprintln!("[{}] Metrics logging to: {:?}", node_id, log_path);
+                    Mutex::new(Some(file))
+                }
+                Err(e) => {
+                    eprintln!(
+                        "[{}] Warning: Could not open metrics file {:?}: {}",
+                        node_id, log_path, e
+                    );
+                    Mutex::new(None)
+                }
+            }
+        } else {
+            eprintln!(
+                "[{}] Warning: /data/logs not available, using stderr only",
+                node_id
+            );
+            Mutex::new(None)
+        }
+    });
+}
+
+/// Log metrics event as JSON to stderr and persistent file (for parsing)
 fn log_metrics(event: &MetricsEvent) {
     if let Ok(json) = serde_json::to_string(event) {
-        eprintln!("METRICS: {}", json);
+        let line = format!("METRICS: {}", json);
+
+        // Always write to stderr for backward compatibility
+        eprintln!("{}", line);
+
+        // Also write to persistent file if available
+        if let Some(file_mutex) = METRICS_FILE.get() {
+            if let Ok(mut guard) = file_mutex.lock() {
+                if let Some(ref mut file) = *guard {
+                    // Write with newline and flush immediately
+                    let _ = writeln!(file, "{}", line);
+                    let _ = file.flush();
+                }
+            }
+        }
     }
 }
 
@@ -1767,13 +2495,24 @@ async fn create_backend(
         "automerge" => {
             // Create AutomergeIrohBackend with persistence and transport
             // This enables hierarchical mode support (HierarchicalStorageCapable trait)
-            let persistence_dir = PathBuf::from(format!("/tmp/hive_sim_{}", node_id));
-            std::fs::create_dir_all(&persistence_dir)?;
 
-            let store = Arc::new(
+            // Check for in-memory mode (CAP_IN_MEMORY=true skips all disk I/O)
+            let in_memory = std::env::var("CAP_IN_MEMORY")
+                .map(|v| v == "1" || v.to_lowercase() == "true")
+                .unwrap_or(false);
+
+            let store = Arc::new(if in_memory {
+                eprintln!(
+                    "[{}] AutomergeStore: MEMORY-ONLY mode (no disk persistence)",
+                    node_id
+                );
+                AutomergeStore::in_memory()
+            } else {
+                let persistence_dir = PathBuf::from(format!("/tmp/hive_sim_{}", node_id));
+                std::fs::create_dir_all(&persistence_dir)?;
                 AutomergeStore::open(&persistence_dir)
-                    .map_err(|e| format!("Failed to open AutomergeStore: {}", e))?,
-            );
+                    .map_err(|e| format!("Failed to open AutomergeStore: {}", e))?
+            });
 
             // Get formation ID from environment (used as seed prefix for deterministic keys)
             let formation_id =
@@ -1803,6 +2542,62 @@ async fn create_backend(
                 hex::encode(transport.endpoint_id().as_bytes())
             );
 
+            // Spawn background compaction task to prevent memory bloat (Issue #401)
+            // Automerge documents accumulate operation history - compaction discards history
+            // while preserving current state, significantly reducing memory usage.
+            let compaction_store = Arc::clone(&store);
+            let compaction_node_id = node_id.to_string();
+            tokio::spawn(async move {
+                // Wait for initial sync to settle before first compaction
+                tokio::time::sleep(Duration::from_secs(60)).await;
+
+                let compaction_interval = Duration::from_secs(300); // Every 5 minutes
+                loop {
+                    // Compact high-frequency document prefixes
+                    let prefixes = [
+                        "squad-summary:",   // Squad aggregation summaries
+                        "platoon-summary:", // Platoon aggregation summaries
+                        "company-summary:", // Company aggregation summaries
+                        "node_states:",     // Individual node states
+                        "sim_poc:",         // Simulation documents
+                    ];
+
+                    let mut total_docs = 0;
+                    let mut total_before = 0;
+                    let mut total_after = 0;
+
+                    for prefix in &prefixes {
+                        match compaction_store.compact_prefix(prefix) {
+                            Ok((count, before, after)) => {
+                                total_docs += count;
+                                total_before += before;
+                                total_after += after;
+                            }
+                            Err(e) => {
+                                eprintln!(
+                                    "[{}] Compaction error for prefix '{}': {}",
+                                    compaction_node_id, prefix, e
+                                );
+                            }
+                        }
+                    }
+
+                    if total_docs > 0 {
+                        let reduction_pct = if total_before > 0 {
+                            100.0 - (total_after as f64 * 100.0 / total_before as f64)
+                        } else {
+                            0.0
+                        };
+                        println!(
+                            "METRICS: {{\"event_type\":\"Compaction\",\"node_id\":\"{}\",\"documents\":{},\"bytes_before\":{},\"bytes_after\":{},\"reduction_pct\":{:.1},\"timestamp_us\":{}}}",
+                            compaction_node_id, total_docs, total_before, total_after, reduction_pct, now_micros()
+                        );
+                    }
+
+                    tokio::time::sleep(compaction_interval).await;
+                }
+            });
+
             Ok(Box::new(AutomergeIrohBackend::from_parts(store, transport)))
         }
         _ => Err(format!(
@@ -1818,6 +2613,37 @@ async fn create_backend(
     }
 }
 
+/// Normalize TCP_CONNECT address format for the specified backend.
+///
+/// TCP_CONNECT can be in two formats:
+/// - Automerge format: "peer_name|hostname:port,peer2|host2:port2,..."
+/// - Ditto format: "hostname:port,host2:port2,..."
+///
+/// This function normalizes the format based on the backend:
+/// - For Ditto: strips the "peer_name|" prefix if present
+/// - For Automerge: keeps as-is (needs peer name for EndpointId derivation)
+fn normalize_tcp_connect(tcp_connect: &str, backend_type: &str) -> String {
+    if backend_type == "ditto" {
+        // Strip peer name prefix for Ditto (it only needs host:port)
+        tcp_connect
+            .split(',')
+            .map(|peer_spec| {
+                let peer_spec = peer_spec.trim();
+                if let Some((_peer_name, host_port)) = peer_spec.split_once('|') {
+                    host_port.to_string()
+                } else {
+                    peer_spec.to_string()
+                }
+            })
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join(",")
+    } else {
+        // Automerge needs the full format with peer names
+        tcp_connect.to_string()
+    }
+}
+
 /// Create backend configuration from environment and CLI args
 fn create_backend_config(
     node_id: &str,
@@ -1828,10 +2654,15 @@ fn create_backend_config(
     let persistence_dir = PathBuf::from(format!("/tmp/hive_sim_{}", node_id));
     std::fs::create_dir_all(&persistence_dir)?;
 
-    let enable_mdns = tcp_listen_port.is_none() && tcp_connect_addr.is_none();
+    // Normalize TCP_CONNECT format for the backend
+    let normalized_tcp_connect = tcp_connect_addr
+        .as_ref()
+        .map(|addr| normalize_tcp_connect(addr, backend_type));
+
+    let enable_mdns = tcp_listen_port.is_none() && normalized_tcp_connect.is_none();
     let transport = TransportConfig {
         tcp_listen_port,
-        tcp_connect_address: tcp_connect_addr.clone(),
+        tcp_connect_address: normalized_tcp_connect.clone(),
         enable_mdns,
         enable_bluetooth: false,
         enable_websocket: false,
@@ -1840,7 +2671,7 @@ fn create_backend_config(
 
     eprintln!(
         "[{}] Transport config: listen={:?}, connect={:?}, mdns={}",
-        node_id, tcp_listen_port, tcp_connect_addr, enable_mdns
+        node_id, tcp_listen_port, normalized_tcp_connect, enable_mdns
     );
 
     let config = match backend_type {
@@ -2099,14 +2930,16 @@ async fn soldier_capability_mode(
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("[{}] Running as SOLDIER with capability reporting", node_id);
 
-    // Mission parameters
-    const TARGET_UPDATES: u64 = 10;
-    const SAFETY_TIMEOUT_SECS: u64 = 60;
+    // Mission parameters - run indefinitely unless MAX_UPDATES is set
+    let max_updates: u64 = std::env::var("MAX_UPDATES")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(u64::MAX); // Default: run forever
 
     let update_interval = Duration::from_millis(update_rate_ms);
     let mut message_number: u64 = 0;
     let doc_id = format!("sim_doc_{}", node_id);
-    let start_time = Instant::now();
+    let _start_time = Instant::now();
 
     // Generate soldier capabilities (simple test data for now)
     let capabilities = generate_soldier_capabilities(node_id);
@@ -2119,8 +2952,8 @@ async fn soldier_capability_mode(
         println!("[{}]   - {} (confidence: {:.2})", node_id, cap, 0.85);
     }
 
-    // Send TARGET_UPDATES status updates with capabilities
-    while message_number < TARGET_UPDATES {
+    // Send status updates with capabilities (runs until MAX_UPDATES or forever)
+    while message_number < max_updates {
         message_number += 1;
         let timestamp_us = now_micros();
 
@@ -2175,14 +3008,16 @@ async fn soldier_capability_mode(
             node_id, message_number, crdt_latency_ms, timestamp_us
         );
 
-        println!(
-            "[{}] ✓ Status update #{}/{} sent ({} bytes, {} capabilities)",
-            node_id,
-            message_number,
-            TARGET_UPDATES,
-            message_size_bytes,
-            capabilities.len()
-        );
+        // Log progress every 10 updates or if running limited test
+        if max_updates < 100 || message_number % 10 == 0 {
+            println!(
+                "[{}] ✓ Status update #{} sent ({} bytes, {} capabilities)",
+                node_id,
+                message_number,
+                message_size_bytes,
+                capabilities.len()
+            );
+        }
 
         log_metrics(&MetricsEvent::MessageSent {
             node_id: node_id.to_string(),
@@ -2192,16 +3027,13 @@ async fn soldier_capability_mode(
             timestamp_us,
         });
 
-        // Check for safety timeout
-        if start_time.elapsed().as_secs() > SAFETY_TIMEOUT_SECS {
-            println!("[{}] ⚠ Safety timeout reached, exiting", node_id);
-            return Ok(());
-        }
-
         sleep(update_interval).await;
     }
 
-    println!("[{}] ✓ All {} status updates sent", node_id, TARGET_UPDATES);
+    println!(
+        "[{}] ✓ Completed {} status updates",
+        node_id, message_number
+    );
 
     // Spawn observer for document reception tracking (Lab 4 comprehensive latency)
     let observer_backend: Arc<Box<dyn DataSyncBackend>> =
@@ -2348,20 +3180,13 @@ async fn leader_status_mode(
         role.to_uppercase()
     );
 
-    // Leaders run for longer as they aggregate
-    let test_duration = match role {
-        "squad_leader" => Duration::from_secs(90),
-        "platoon_leader" => Duration::from_secs(120),
-        "company_commander" => Duration::from_secs(150),
-        _ => Duration::from_secs(90),
-    };
-
+    // Leaders run indefinitely until lab is destroyed
     let update_interval = Duration::from_millis(update_rate_ms);
     let mut message_number: u64 = 0;
     let doc_id = format!("sim_doc_{}", node_id);
-    let start_time = Instant::now();
+    let _start_time = Instant::now();
 
-    while start_time.elapsed() < test_duration {
+    loop {
         message_number += 1;
         let timestamp_us = now_micros();
 
@@ -2394,14 +3219,6 @@ async fn leader_status_mode(
 
         sleep(update_interval).await;
     }
-
-    println!(
-        "[{}] {} simulation complete after {:?}",
-        node_id,
-        role,
-        start_time.elapsed()
-    );
-    Ok(())
 }
 
 /// Generate simple test capabilities for a soldier node
@@ -2491,9 +3308,12 @@ async fn flat_mesh_mode(
     // Create or update this node's state document
     let update_interval = Duration::from_millis(update_rate_ms);
     let mut sequence = 0u64;
-    const TARGET_UPDATES: u64 = 20;
+    let max_updates: u64 = std::env::var("MAX_UPDATES")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(u64::MAX);
 
-    for _ in 0..TARGET_UPDATES {
+    while sequence < max_updates {
         sequence += 1;
 
         // Create state update document
@@ -2536,10 +3356,12 @@ async fn flat_mesh_mode(
             timestamp_us: now_micros(),
         });
 
-        println!(
-            "[{}] Published state update {}/{} to flat mesh, CRDT_latency: {:.3}ms",
-            node_id, sequence, TARGET_UPDATES, upsert_latency_ms
-        );
+        if max_updates < 100 || sequence % 10 == 0 {
+            println!(
+                "[{}] Published state update {} to flat mesh, CRDT_latency: {:.3}ms",
+                node_id, sequence, upsert_latency_ms
+            );
+        }
 
         // Check current role
         let role = coordinator.current_role().await;
@@ -2557,7 +3379,7 @@ async fn flat_mesh_mode(
 
     println!(
         "[{}] Completed {} updates, keeping process alive for CRDT sync monitoring...",
-        node_id, TARGET_UPDATES
+        node_id, sequence
     );
 
     // Keep running to allow CRDT synchronization to continue
@@ -2596,11 +3418,8 @@ async fn writer_mode(
     let mut message_number: u64 = 0;
     let doc_id = format!("sim_doc_{}", node_id);
 
-    // Send periodic updates for 15 seconds (test duration)
-    let test_duration = Duration::from_secs(15);
-    let start_time = Instant::now();
-
-    while start_time.elapsed() < test_duration {
+    // Send periodic updates indefinitely until lab is destroyed
+    loop {
         message_number += 1;
         let timestamp_us = now_micros();
 
@@ -2664,134 +3483,6 @@ async fn writer_mode(
         // Wait for next update interval
         sleep(update_interval).await;
     }
-
-    println!(
-        "[{}] Writer complete: sent {} updates over {:?}",
-        node_id,
-        message_number,
-        start_time.elapsed()
-    );
-
-    // Create test document with acknowledgment pattern
-    println!("[{}] Creating test document with ack pattern...", node_id);
-    let test_timestamp_us = now_micros();
-    let expected_acks = 11; // Number of reader nodes in 12-node topology
-
-    let mut test_fields = HashMap::new();
-    test_fields.insert(
-        "message".to_string(),
-        Value::String("Hello from HIVE Simulation!".to_string()),
-    );
-    test_fields.insert(
-        "timestamp_us".to_string(),
-        serde_json::json!(test_timestamp_us),
-    );
-    test_fields.insert("ack_required".to_string(), Value::Bool(true));
-    test_fields.insert(
-        "acked_by".to_string(),
-        serde_json::json!(Vec::<String>::new()),
-    );
-    test_fields.insert(
-        "expected_acks".to_string(),
-        serde_json::json!(expected_acks),
-    );
-    test_fields.insert("public".to_string(), Value::Bool(true));
-
-    let test_doc = Document::with_id("sim_test_001".to_string(), test_fields);
-    backend.document_store().upsert("sim_poc", test_doc).await?;
-
-    // Log metrics for the test document
-    log_metrics(&MetricsEvent::DocumentInserted {
-        node_id: node_id.to_string(),
-        doc_id: "sim_test_001".to_string(),
-        timestamp_us: test_timestamp_us,
-    });
-
-    println!(
-        "[{}] ✓ Test document created, waiting for {} acknowledgments...",
-        node_id, expected_acks
-    );
-
-    // Create observer for the test document to watch for acks
-    let ack_query = Query::Eq {
-        field: "_id".to_string(),
-        value: Value::String("sim_test_001".to_string()),
-    };
-    let mut ack_stream = backend.document_store().observe("sim_poc", &ack_query)?;
-
-    // Wait for all acknowledgments with timeout
-    let ack_timeout = Duration::from_secs(30);
-    let ack_start = Instant::now();
-
-    loop {
-        if ack_start.elapsed() > ack_timeout {
-            eprintln!("[{}] ✗ Timeout waiting for acknowledgments", node_id);
-            return Err("Timeout: Not all acknowledgments received".into());
-        }
-
-        // Wait for next change event
-        let event =
-            tokio::time::timeout(Duration::from_millis(100), ack_stream.receiver.recv()).await;
-
-        match event {
-            Ok(Some(change_event)) => {
-                let doc = match &change_event {
-                    ChangeEvent::Updated { document, .. } => document,
-                    ChangeEvent::Initial { documents } => {
-                        if let Some(d) = documents.first() {
-                            d
-                        } else {
-                            continue;
-                        }
-                    }
-                    _ => continue,
-                };
-
-                // Check acked_by array
-                if let Some(acked_by_value) = doc.get("acked_by") {
-                    if let Some(acked_by) = acked_by_value.as_array() {
-                        let ack_count = acked_by.len();
-
-                        if ack_count > 0 {
-                            println!(
-                                "[{}] Received {} acknowledgments so far...",
-                                node_id, ack_count
-                            );
-                        }
-
-                        if ack_count >= expected_acks {
-                            let all_acked_at_us = now_micros();
-                            let round_trip_latency_us = all_acked_at_us - test_timestamp_us;
-                            let round_trip_latency_ms = round_trip_latency_us as f64 / 1000.0;
-
-                            println!("[{}] ✓ All {} acknowledgments received! Round-trip latency: {:.3}ms",
-                                     node_id, ack_count, round_trip_latency_ms);
-
-                            // Log round-trip metrics
-                            log_metrics(&MetricsEvent::AllAcksReceived {
-                                node_id: node_id.to_string(),
-                                doc_id: "sim_test_001".to_string(),
-                                inserted_at_us: test_timestamp_us,
-                                all_acked_at_us,
-                                round_trip_latency_us,
-                                round_trip_latency_ms,
-                                ack_count,
-                            });
-
-                            return Ok(());
-                        }
-                    }
-                }
-            }
-            Ok(None) => {
-                return Err("Change stream closed unexpectedly".into());
-            }
-            Err(_) => {
-                // Timeout - continue checking
-                continue;
-            }
-        }
-    }
 }
 
 /// Reader mode: Use event-driven observer to monitor updates
@@ -2810,19 +3501,8 @@ async fn reader_mode(
     // Track unique test document insertions by timestamp
     let mut test_doc_timestamps = HashSet::new();
 
-    let timeout = Duration::from_secs(20);
-    let start = Instant::now();
-
-    // Listen for document changes via observer
+    // Listen for document changes indefinitely until lab is destroyed
     loop {
-        // Check timeout
-        if start.elapsed() > timeout {
-            if test_doc_timestamps.is_empty() {
-                return Err("Timeout: Test document not received".into());
-            }
-            break;
-        }
-
         // Wait for next change event with timeout
         let event =
             tokio::time::timeout(Duration::from_millis(100), change_stream.receiver.recv()).await;
@@ -2869,8 +3549,6 @@ async fn reader_mode(
             }
         }
     }
-
-    Ok(())
 }
 
 /// Process a document and log latency metrics

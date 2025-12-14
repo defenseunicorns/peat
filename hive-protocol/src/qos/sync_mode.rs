@@ -105,12 +105,19 @@ impl SyncMode {
     ///
     /// Returns appropriate defaults based on collection semantics:
     /// - beacons, platforms, tracks → LatestOnly (position data)
+    /// - node_states, squad_summaries, platoon_summaries → LatestOnly (hierarchical aggregation)
     /// - contact_reports, commands, audit_logs → FullHistory (critical data)
     /// - track_history → WindowedHistory(300) (5 minutes)
     pub fn default_for_collection(collection: &str) -> Self {
         match collection {
             // Position/state data - only current matters
             "beacons" | "platforms" | "tracks" | "nodes" | "cells" => Self::LatestOnly,
+
+            // Hierarchical aggregation data - only current summaries matter
+            // These collections update frequently and history accumulates unbounded without this
+            "node_states" | "squad_summaries" | "platoon_summaries" | "company_summaries" => {
+                Self::LatestOnly
+            }
 
             // Critical data - full history required
             "contact_reports" | "commands" | "audit_logs" | "alerts" => Self::FullHistory,
@@ -180,6 +187,12 @@ impl SyncModeRegistry {
             ("tracks", SyncMode::LatestOnly),
             ("nodes", SyncMode::LatestOnly),
             ("cells", SyncMode::LatestOnly),
+            // Hierarchical aggregation collections - only current summaries matter
+            ("node_states", SyncMode::LatestOnly),
+            ("squad_summaries", SyncMode::LatestOnly),
+            ("platoon_summaries", SyncMode::LatestOnly),
+            ("company_summaries", SyncMode::LatestOnly),
+            // Critical data - full history required
             ("contact_reports", SyncMode::FullHistory),
             ("commands", SyncMode::FullHistory),
             ("audit_logs", SyncMode::FullHistory),
@@ -278,6 +291,24 @@ mod tests {
         );
         assert_eq!(
             SyncMode::default_for_collection("tracks"),
+            SyncMode::LatestOnly
+        );
+
+        // Hierarchical aggregation should be LatestOnly (Issue #401 - memory blowout fix)
+        assert_eq!(
+            SyncMode::default_for_collection("node_states"),
+            SyncMode::LatestOnly
+        );
+        assert_eq!(
+            SyncMode::default_for_collection("squad_summaries"),
+            SyncMode::LatestOnly
+        );
+        assert_eq!(
+            SyncMode::default_for_collection("platoon_summaries"),
+            SyncMode::LatestOnly
+        );
+        assert_eq!(
+            SyncMode::default_for_collection("company_summaries"),
             SyncMode::LatestOnly
         );
 
