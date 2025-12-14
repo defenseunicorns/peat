@@ -87,7 +87,7 @@ impl<T: Clone> LwwRegister<T> {
         if self.should_update(other.timestamp, &other.node_id) {
             self.value = other.value.clone();
             self.timestamp = other.timestamp;
-            self.node_id = other.node_id.clone();
+            self.node_id = other.node_id;
             true
         } else {
             false
