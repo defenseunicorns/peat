@@ -1,6 +1,8 @@
 //! HIVE GATT Service Implementation
 //!
 //! Provides the GATT service structure and handlers for HIVE Protocol BLE communication.
+//!
+//! Note: This module requires the `std` feature for full functionality.
 
 use std::sync::{Arc, RwLock};
 

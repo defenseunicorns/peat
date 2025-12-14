@@ -2,7 +2,8 @@
 //!
 //! Builds and manages BLE advertising packets containing HIVE beacons.
 
-use std::time::{Duration, Instant};
+#[cfg(not(feature = "std"))]
+use alloc::{string::String, vec::Vec};
 
 use crate::config::DiscoveryConfig;
 use crate::{HierarchyLevel, NodeId, HIVE_SERVICE_UUID_16BIT};
@@ -86,8 +87,10 @@ pub struct Advertiser {
     beacon: HiveBeacon,
     /// Current state
     state: AdvertiserState,
-    /// When advertising started
-    started_at: Option<Instant>,
+    /// When advertising started (monotonic ms timestamp)
+    started_at_ms: Option<u64>,
+    /// Current time (monotonic ms, set externally)
+    current_time_ms: u64,
     /// TX power level to advertise
     tx_power: Option<i8>,
     /// Device name to include
@@ -108,7 +111,8 @@ impl Advertiser {
             config,
             beacon,
             state: AdvertiserState::Idle,
-            started_at: None,
+            started_at_ms: None,
+            current_time_ms: 0,
             tx_power: None,
             device_name: None,
             use_extended: false,
@@ -124,13 +128,19 @@ impl Advertiser {
             config,
             beacon,
             state: AdvertiserState::Idle,
-            started_at: None,
+            started_at_ms: None,
+            current_time_ms: 0,
             tx_power: None,
             device_name: None,
             use_extended: false,
             cached_packet: None,
             cache_dirty: true,
         }
+    }
+
+    /// Set the current time (call periodically from platform)
+    pub fn set_time_ms(&mut self, time_ms: u64) {
+        self.current_time_ms = time_ms;
     }
 
     /// Set TX power level
@@ -197,7 +207,7 @@ impl Advertiser {
     /// Start advertising
     pub fn start(&mut self) {
         self.state = AdvertiserState::Advertising;
-        self.started_at = Some(Instant::now());
+        self.started_at_ms = Some(self.current_time_ms);
     }
 
     /// Pause advertising
@@ -215,12 +225,13 @@ impl Advertiser {
     /// Stop advertising
     pub fn stop(&mut self) {
         self.state = AdvertiserState::Idle;
-        self.started_at = None;
+        self.started_at_ms = None;
     }
 
-    /// Get duration of current advertising session
-    pub fn advertising_duration(&self) -> Option<Duration> {
-        self.started_at.map(|t| t.elapsed())
+    /// Get duration of current advertising session in milliseconds
+    pub fn advertising_duration_ms(&self) -> Option<u64> {
+        self.started_at_ms
+            .map(|t| self.current_time_ms.saturating_sub(t))
     }
 
     /// Increment sequence number and invalidate cache
@@ -360,9 +371,11 @@ mod tests {
 
         assert_eq!(advertiser.state(), AdvertiserState::Idle);
 
+        advertiser.set_time_ms(1000);
         advertiser.start();
         assert_eq!(advertiser.state(), AdvertiserState::Advertising);
-        assert!(advertiser.advertising_duration().is_some());
+        advertiser.set_time_ms(2000);
+        assert_eq!(advertiser.advertising_duration_ms(), Some(1000));
 
         advertiser.pause();
         assert_eq!(advertiser.state(), AdvertiserState::Paused);
@@ -372,7 +385,7 @@ mod tests {
 
         advertiser.stop();
         assert_eq!(advertiser.state(), AdvertiserState::Idle);
-        assert!(advertiser.advertising_duration().is_none());
+        assert!(advertiser.advertising_duration_ms().is_none());
     }
 
     #[test]
