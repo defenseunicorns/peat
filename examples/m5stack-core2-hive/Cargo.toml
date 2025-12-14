@@ -19,6 +19,9 @@ esp-idf-hal = "0.45"
 # Logging
 log = "0.4"
 
+# Error handling
+anyhow = "1.0"
+
 # HIVE libraries (local)
 hive-btle = { path = "../../hive-btle", default-features = false, features = ["esp32"] }
 
