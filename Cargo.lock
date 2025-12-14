@@ -2968,6 +2968,7 @@ dependencies = [
  "log",
  "ndk",
  "objc2",
+ "portable-atomic",
  "thiserror 2.0.17",
  "tokio",
  "tokio-test",
