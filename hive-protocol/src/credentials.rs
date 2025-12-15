@@ -77,7 +77,12 @@ impl HiveCredentials {
             return Err(CredentialsError::EmptyAppId);
         }
 
-        let secret_key = Self::get_env_with_fallback("HIVE_SECRET_KEY", "DITTO_SHARED_KEY");
+        // Check HIVE_SECRET_KEY first, then HIVE_SHARED_KEY, then DITTO_SHARED_KEY
+        let secret_key = env::var("HIVE_SECRET_KEY")
+            .ok()
+            .filter(|v| !v.is_empty())
+            .or_else(|| env::var("HIVE_SHARED_KEY").ok().filter(|v| !v.is_empty()))
+            .or_else(|| env::var("DITTO_SHARED_KEY").ok().filter(|v| !v.is_empty()));
         let offline_token =
             Self::get_env_with_fallback("HIVE_OFFLINE_TOKEN", "DITTO_OFFLINE_TOKEN");
 

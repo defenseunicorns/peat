@@ -196,9 +196,12 @@ mod tests {
                 )
             })?;
 
-        let app_id = std::env::var("DITTO_APP_ID").unwrap_or_else(|_| "test_app_id".to_string());
-        let shared_key =
-            std::env::var("DITTO_SHARED_KEY").unwrap_or_else(|_| "test_shared_key".to_string());
+        let app_id = std::env::var("HIVE_APP_ID")
+            .or_else(|_| std::env::var("DITTO_APP_ID"))
+            .unwrap_or_else(|_| "test_app_id".to_string());
+        let shared_key = std::env::var("HIVE_SECRET_KEY")
+            .or_else(|_| std::env::var("DITTO_SHARED_KEY"))
+            .unwrap_or_else(|_| "test_shared_key".to_string());
 
         let persistence_path = temp_dir.path().to_path_buf();
         std::mem::forget(temp_dir); // Keep directory alive

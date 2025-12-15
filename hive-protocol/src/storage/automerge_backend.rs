@@ -140,6 +140,8 @@ pub struct AutomergeBackend {
     active_sync_handlers: Arc<RwLock<HashSet<EndpointId>>>,
     /// Active heartbeat handlers per connection
     active_heartbeat_handlers: Arc<RwLock<HashSet<EndpointId>>>,
+    /// Sync channel manager for persistent channels (Issue #438 Phase 2)
+    channel_manager: Arc<RwLock<Option<Arc<super::sync_channel::SyncChannelManager>>>>,
 }
 
 #[cfg(feature = "automerge-backend")]
@@ -177,6 +179,7 @@ impl AutomergeBackend {
             heartbeat_receiver_task: Arc::new(RwLock::new(None)),
             active_sync_handlers: Arc::new(RwLock::new(HashSet::new())),
             active_heartbeat_handlers: Arc::new(RwLock::new(HashSet::new())),
+            channel_manager: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -218,6 +221,7 @@ impl AutomergeBackend {
             heartbeat_receiver_task: Arc::new(RwLock::new(None)),
             active_sync_handlers: Arc::new(RwLock::new(HashSet::new())),
             active_heartbeat_handlers: Arc::new(RwLock::new(HashSet::new())),
+            channel_manager: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -549,6 +553,15 @@ impl SyncCapable for AutomergeBackend {
             }
         }
 
+        // Issue #438 Phase 2: Initialize sync channel manager for persistent channels
+        {
+            let transport = self.transport.clone().unwrap();
+            let coordinator = self.sync_coordinator.clone().unwrap();
+            let manager = super::sync_channel::SyncChannelManager::new(transport, coordinator);
+            *self.channel_manager.write().unwrap() = Some(Arc::new(manager));
+            tracing::debug!("SyncChannelManager initialized for persistent channels");
+        }
+
         // Phase 6.2: Spawn incoming sync handler task
         //
         // Note: For Phase 6.2, we rely on manual sync triggering via sync_document().
@@ -750,38 +763,86 @@ impl SyncCapable for AutomergeBackend {
         let coordinator = self.sync_coordinator.clone().unwrap();
         let sync_active = Arc::clone(&self.sync_active);
         let store_for_resync = Arc::clone(&self.store);
+        // Issue #438 Phase 2: Use persistent channels for batch sync
+        let channel_manager = self.channel_manager.read().unwrap().clone().unwrap();
 
         let auto_task = tokio::spawn(async move {
             use std::time::{Duration, Instant};
 
-            tracing::debug!("Automatic sync task started");
+            tracing::debug!("Automatic sync task started (batch mode with persistent channels)");
 
             // Issue #346: Track last resync time to prevent thundering herd
             let mut last_resync: Option<Instant> = None;
             const RESYNC_COOLDOWN: Duration = Duration::from_secs(5);
 
-            while sync_active.load(Ordering::Relaxed) {
-                // Wait for change notification
-                match change_rx.recv().await {
-                    Ok(doc_key) => {
-                        tracing::debug!("Document changed: {}, triggering sync", doc_key);
+            // Issue #438: Batch sync parameters
+            const BATCH_WINDOW: Duration = Duration::from_millis(50);
+            const MAX_BATCH_SIZE: usize = 20;
 
-                        // Sync with all connected peers
-                        if let Err(e) = coordinator.sync_document_with_all_peers(&doc_key).await {
-                            tracing::warn!(
-                                "Failed to sync document {} after change: {}",
-                                doc_key,
-                                e
+            // Pending documents for batch sync
+            let mut pending_docs: Vec<String> = Vec::new();
+            let mut window_start = Instant::now();
+
+            while sync_active.load(Ordering::Relaxed) {
+                // Use timeout to implement batch window
+                let timeout = if pending_docs.is_empty() {
+                    // No pending docs, wait indefinitely for next change
+                    Duration::from_secs(3600) // 1 hour (effectively infinite)
+                } else {
+                    // Have pending docs, wait for remaining window time
+                    BATCH_WINDOW.saturating_sub(window_start.elapsed())
+                };
+
+                match tokio::time::timeout(timeout, change_rx.recv()).await {
+                    Ok(Ok(doc_key)) => {
+                        // Document changed, add to pending batch
+                        if pending_docs.is_empty() {
+                            window_start = Instant::now();
+                        }
+
+                        // Avoid duplicates in the same batch
+                        if !pending_docs.contains(&doc_key) {
+                            pending_docs.push(doc_key);
+                        }
+
+                        // Flush if batch is full
+                        if pending_docs.len() >= MAX_BATCH_SIZE {
+                            tracing::debug!(
+                                "Batch full ({} docs), flushing via persistent channels",
+                                pending_docs.len()
                             );
+                            let doc_refs: Vec<&str> =
+                                pending_docs.iter().map(|s| s.as_str()).collect();
+                            // Issue #438 Phase 2: Use persistent channels
+                            match coordinator.create_batch_for_documents(&doc_refs) {
+                                Ok(batch) => {
+                                    if let Err(e) = channel_manager.broadcast(&batch).await {
+                                        tracing::warn!("Batch broadcast failed: {}", e);
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::warn!("Batch creation failed: {}", e);
+                                }
+                            }
+                            pending_docs.clear();
                         }
                     }
-                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        // Issue #346: When lagged, we MUST resync all documents to ensure
-                        // none are permanently lost. This is critical for hierarchical topologies
-                        // where documents must flow up the hierarchy.
+                    Ok(Err(tokio::sync::broadcast::error::RecvError::Lagged(n))) => {
+                        // Issue #346: When lagged, we MUST resync all documents
                         tracing::warn!("Change notification lagged, skipped {} messages", n);
 
-                        // Back-pressure: Check if we recently resynced to avoid thundering herd
+                        // Flush any pending docs first
+                        if !pending_docs.is_empty() {
+                            let doc_refs: Vec<&str> =
+                                pending_docs.iter().map(|s| s.as_str()).collect();
+                            // Issue #438 Phase 2: Use persistent channels
+                            if let Ok(batch) = coordinator.create_batch_for_documents(&doc_refs) {
+                                let _ = channel_manager.broadcast(&batch).await;
+                            }
+                            pending_docs.clear();
+                        }
+
+                        // Back-pressure: Check if we recently resynced
                         let should_resync = match last_resync {
                             Some(last) if last.elapsed() < RESYNC_COOLDOWN => {
                                 tracing::debug!(
@@ -800,25 +861,35 @@ impl SyncCapable for AutomergeBackend {
 
                             last_resync = Some(Instant::now());
 
-                            // Spawn resync in background so we don't block new notifications
+                            // Issue #438 Phase 2: Use persistent channels for resync
                             let store_clone = Arc::clone(&store_for_resync);
                             let coordinator_clone = coordinator.clone();
+                            let channel_manager_clone = Arc::clone(&channel_manager);
                             tokio::spawn(async move {
                                 if let Ok(all_docs) = store_clone.scan_prefix("") {
                                     tracing::info!(
-                                        "Resyncing {} documents after lag recovery",
+                                        "Batch resyncing {} documents via persistent channels",
                                         all_docs.len()
                                     );
-                                    for (doc_key, _doc) in all_docs {
-                                        if let Err(e) = coordinator_clone
-                                            .sync_document_with_all_peers(&doc_key)
-                                            .await
+                                    // Collect all doc keys
+                                    let doc_keys: Vec<String> =
+                                        all_docs.into_iter().map(|(k, _)| k).collect();
+                                    let doc_refs: Vec<&str> =
+                                        doc_keys.iter().map(|s| s.as_str()).collect();
+
+                                    // Send as batch(es) via persistent channels
+                                    for chunk in doc_refs.chunks(MAX_BATCH_SIZE) {
+                                        if let Ok(batch) =
+                                            coordinator_clone.create_batch_for_documents(chunk)
                                         {
-                                            tracing::debug!(
-                                                "Resync failed for document {}: {}",
-                                                doc_key,
-                                                e
-                                            );
+                                            if let Err(e) =
+                                                channel_manager_clone.broadcast(&batch).await
+                                            {
+                                                tracing::debug!(
+                                                    "Batch resync broadcast failed: {}",
+                                                    e
+                                                );
+                                            }
                                         }
                                         // Yield to prevent starving other tasks
                                         tokio::task::yield_now().await;
@@ -827,15 +898,51 @@ impl SyncCapable for AutomergeBackend {
                             });
                         }
                     }
-                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                    Ok(Err(tokio::sync::broadcast::error::RecvError::Closed)) => {
                         // Channel closed
                         tracing::debug!("Change notification channel closed");
                         break;
                     }
+                    Err(_elapsed) => {
+                        // Batch window expired, flush pending docs
+                        if !pending_docs.is_empty() {
+                            tracing::debug!(
+                                "Batch window expired ({} docs), flushing via persistent channels",
+                                pending_docs.len()
+                            );
+                            let doc_refs: Vec<&str> =
+                                pending_docs.iter().map(|s| s.as_str()).collect();
+                            // Issue #438 Phase 2: Use persistent channels
+                            match coordinator.create_batch_for_documents(&doc_refs) {
+                                Ok(batch) => {
+                                    if let Err(e) = channel_manager.broadcast(&batch).await {
+                                        tracing::warn!("Batch broadcast failed: {}", e);
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::warn!("Batch creation failed: {}", e);
+                                }
+                            }
+                            pending_docs.clear();
+                        }
+                    }
                 }
             }
 
-            tracing::debug!("Automatic sync task stopped");
+            // Flush any remaining docs on shutdown
+            if !pending_docs.is_empty() {
+                tracing::debug!(
+                    "Flushing {} pending docs on shutdown via persistent channels",
+                    pending_docs.len()
+                );
+                let doc_refs: Vec<&str> = pending_docs.iter().map(|s| s.as_str()).collect();
+                // Issue #438 Phase 2: Use persistent channels
+                if let Ok(batch) = coordinator.create_batch_for_documents(&doc_refs) {
+                    let _ = channel_manager.broadcast(&batch).await;
+                }
+            }
+
+            tracing::debug!("Automatic sync task stopped (persistent channels)");
         });
 
         *self.auto_sync_task.write().unwrap() = Some(auto_task);
@@ -930,6 +1037,14 @@ impl SyncCapable for AutomergeBackend {
         if let Some(transport) = &self.transport {
             // Ignore error if accept loop already stopped
             let _ = transport.stop_accept_loop();
+        }
+
+        // Issue #438 Phase 2: Clear channel manager (channels close when Arc drops)
+        if let Some(manager) = self.channel_manager.write().unwrap().take() {
+            // Spawn async cleanup task
+            tokio::spawn(async move {
+                manager.shutdown().await;
+            });
         }
 
         // TODO Phase 6.2: Signal background sync task to stop and wait for completion

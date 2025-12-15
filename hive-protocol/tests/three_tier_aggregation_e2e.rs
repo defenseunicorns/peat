@@ -23,11 +23,10 @@ use std::sync::Arc;
 /// Test: Complete 3-tier aggregation flow with protocol APIs
 #[tokio::test]
 async fn test_three_tier_hierarchical_aggregation() {
-    let ditto_app_id = std::env::var("DITTO_APP_ID").unwrap_or_else(|_| "test-app-id".to_string());
-    if ditto_app_id == "test-app-id" {
-        println!("⚠ Skipping E2E test - DITTO_APP_ID not set");
-        return;
-    }
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("e2e_three_tier_aggregation");
     let ditto_store = Arc::new(harness.create_ditto_store().await.unwrap());
@@ -171,11 +170,10 @@ async fn test_three_tier_hierarchical_aggregation() {
 /// Test: Dynamic squad count validation (not hardcoded)
 #[tokio::test]
 async fn test_dynamic_squad_count_validation() {
-    let ditto_app_id = std::env::var("DITTO_APP_ID").unwrap_or_else(|_| "test-app-id".to_string());
-    if ditto_app_id == "test-app-id" {
-        println!("⚠ Skipping E2E test - DITTO_APP_ID not set");
-        return;
-    }
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("e2e_dynamic_squad_count");
     let ditto_store = Arc::new(harness.create_ditto_store().await.unwrap());

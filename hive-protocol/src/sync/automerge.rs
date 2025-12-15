@@ -927,6 +927,33 @@ impl DataSyncBackend for AutomergeBackend {
 /// Type alias for peer event callback list
 type PeerCallbacks = Arc<Mutex<Vec<Box<dyn Fn(PeerEvent) + Send + Sync>>>>;
 
+/// Topology-driven connection events
+///
+/// These events allow external topology managers (e.g., hive-mesh TopologyManager)
+/// to control which peers the backend connects to, avoiding N² mesh formation.
+/// When a topology event receiver is configured, the backend delegates connection
+/// decisions to the topology manager instead of connecting to all discovered peers.
+#[derive(Debug, Clone)]
+pub enum TopologyConnectionEvent {
+    /// Connect to a peer selected by topology manager
+    ConnectPeer {
+        /// Peer identifier (node_id)
+        peer_id: String,
+        /// Network addresses for the peer
+        addresses: Vec<String>,
+        /// Optional relay URL
+        relay_url: Option<String>,
+    },
+    /// Disconnect from a peer (topology decision)
+    DisconnectPeer {
+        /// Peer identifier to disconnect
+        peer_id: String,
+    },
+}
+
+/// Default maximum connections when topology manager is not configured
+pub const DEFAULT_MAX_CONNECTIONS: usize = 7;
+
 /// DataSyncBackend adapter for storage::AutomergeBackend
 ///
 /// This adapter wraps the storage::AutomergeBackend (RocksDB + Iroh + Automerge)
@@ -960,6 +987,22 @@ pub struct AutomergeIrohBackend {
     /// registered for blob transfer as well.
     #[cfg(feature = "automerge-backend")]
     blob_store: Option<Arc<crate::storage::NetworkedIrohBlobStore>>,
+
+    /// Optional topology event receiver for topology-driven connections
+    ///
+    /// When provided, the backend delegates connection decisions to the topology
+    /// manager instead of connecting to all discovered peers. This prevents N²
+    /// mesh formation and enables multi-hop routing.
+    #[cfg(feature = "automerge-backend")]
+    topology_event_rx:
+        Arc<tokio::sync::Mutex<Option<mpsc::UnboundedReceiver<TopologyConnectionEvent>>>>,
+
+    /// Maximum peer connections when topology manager is not configured
+    ///
+    /// Defaults to DEFAULT_MAX_CONNECTIONS (7). When topology events are
+    /// provided, this limit is ignored (topology manager controls connections).
+    #[cfg(feature = "automerge-backend")]
+    max_connections: usize,
 }
 
 impl AutomergeIrohBackend {
@@ -980,7 +1023,55 @@ impl AutomergeIrohBackend {
             )),
             #[cfg(feature = "automerge-backend")]
             blob_store: None,
+            #[cfg(feature = "automerge-backend")]
+            topology_event_rx: Arc::new(tokio::sync::Mutex::new(None)),
+            #[cfg(feature = "automerge-backend")]
+            max_connections: DEFAULT_MAX_CONNECTIONS,
         }
+    }
+
+    /// Configure topology-driven connection management
+    ///
+    /// When topology events are provided, the backend delegates all connection
+    /// decisions to the external topology manager (e.g., hive-mesh TopologyManager).
+    /// This prevents N² mesh formation and enables multi-hop routing.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let (tx, rx) = mpsc::unbounded_channel();
+    /// let backend = AutomergeIrohBackend::new(storage, transport)
+    ///     .with_topology_events(rx);
+    ///
+    /// // TopologyManager sends events via tx
+    /// tx.send(TopologyConnectionEvent::ConnectPeer { ... });
+    /// ```
+    #[cfg(feature = "automerge-backend")]
+    pub fn with_topology_events(
+        mut self,
+        rx: mpsc::UnboundedReceiver<TopologyConnectionEvent>,
+    ) -> Self {
+        self.topology_event_rx = Arc::new(tokio::sync::Mutex::new(Some(rx)));
+        self
+    }
+
+    /// Set maximum peer connections for fallback mode
+    ///
+    /// When topology events are not configured, the backend limits connections
+    /// to this many peers discovered via mDNS/static config. Defaults to 7.
+    #[cfg(feature = "automerge-backend")]
+    pub fn with_max_connections(mut self, max: usize) -> Self {
+        self.max_connections = max;
+        self
+    }
+
+    /// Check if topology-driven connection management is enabled
+    #[cfg(feature = "automerge-backend")]
+    pub fn has_topology_events(&self) -> bool {
+        // Check if the receiver exists (non-blocking)
+        self.topology_event_rx
+            .try_lock()
+            .is_ok_and(|guard| guard.is_some())
     }
 
     /// Get the formation key (if initialized with credentials)
@@ -1630,6 +1721,13 @@ struct IrohPeerDiscovery {
     formation_key: Arc<std::sync::RwLock<Option<crate::security::FormationKey>>>,
     /// Whether the event forwarder task is running (Issue #275)
     event_forwarder_running: Arc<std::sync::atomic::AtomicBool>,
+    /// Optional topology event receiver for topology-driven connections
+    #[cfg(feature = "automerge-backend")]
+    topology_event_rx:
+        Arc<tokio::sync::Mutex<Option<mpsc::UnboundedReceiver<TopologyConnectionEvent>>>>,
+    /// Maximum peer connections when topology manager is not configured
+    #[cfg(feature = "automerge-backend")]
+    max_connections: usize,
 }
 
 #[async_trait]
@@ -1839,16 +1937,160 @@ impl PeerDiscovery for IrohPeerDiscovery {
             });
         }
 
-        // Spawn background task to connect to discovered peers (with authentication)
+        // Check if topology-driven connection management is configured
         #[cfg(feature = "automerge-backend")]
-        {
-            let discovery_manager = Arc::clone(&self.discovery_manager);
+        let has_topology_events = {
+            let guard = self.topology_event_rx.lock().await;
+            guard.is_some()
+        };
+
+        // Spawn topology event handler if configured (prevents N² mesh)
+        #[cfg(feature = "automerge-backend")]
+        if has_topology_events {
+            let topology_rx = self.topology_event_rx.clone();
             let transport = Arc::clone(&self.transport);
-            let formation_key_connect = formation_key;
+            let formation_key_topology = formation_key.clone();
 
             tokio::spawn(async move {
                 use crate::network::formation_handshake::perform_initiator_handshake;
                 use crate::network::PeerInfo as NetworkPeerInfo;
+
+                // Take the receiver from the mutex
+                let mut rx = {
+                    let mut guard = topology_rx.lock().await;
+                    guard.take()
+                };
+
+                if let Some(ref mut receiver) = rx {
+                    tracing::info!("Topology-driven connection management enabled");
+
+                    while let Some(event) = receiver.recv().await {
+                        match event {
+                            TopologyConnectionEvent::ConnectPeer {
+                                peer_id,
+                                addresses,
+                                relay_url,
+                            } => {
+                                tracing::debug!(
+                                    peer_id = %peer_id,
+                                    "Topology event: connecting to peer"
+                                );
+
+                                let network_peer_info = NetworkPeerInfo {
+                                    name: peer_id.clone(),
+                                    node_id: peer_id.clone(),
+                                    addresses,
+                                    relay_url,
+                                };
+
+                                match transport.connect_peer(&network_peer_info).await {
+                                    Ok(Some(conn)) => {
+                                        // Give accept loop time for conflict resolution
+                                        tokio::task::yield_now().await;
+                                        tokio::time::sleep(tokio::time::Duration::from_millis(10))
+                                            .await;
+
+                                        if conn.close_reason().is_some() {
+                                            tracing::debug!(
+                                                "Topology peer {} superseded by accept path",
+                                                peer_id
+                                            );
+                                            continue;
+                                        }
+
+                                        // Perform formation handshake
+                                        match perform_initiator_handshake(
+                                            &conn,
+                                            &formation_key_topology,
+                                        )
+                                        .await
+                                        {
+                                            Ok(()) => {
+                                                // Convert peer_id hex string to EndpointId
+                                                if let Ok(bytes) = hex::decode(&peer_id) {
+                                                    if bytes.len() == 32 {
+                                                        let mut array = [0u8; 32];
+                                                        array.copy_from_slice(&bytes);
+                                                        if let Ok(endpoint_id) =
+                                                            iroh::EndpointId::from_bytes(&array)
+                                                        {
+                                                            transport
+                                                                .emit_peer_connected(endpoint_id);
+                                                            tracing::info!(
+                                                                "Topology: connected and authenticated with peer: {}",
+                                                                peer_id
+                                                            );
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            Err(e) => {
+                                                tracing::warn!(
+                                                    "Topology peer {} failed authentication: {}",
+                                                    peer_id,
+                                                    e
+                                                );
+                                                conn.close(1u32.into(), b"authentication failed");
+                                            }
+                                        }
+                                    }
+                                    Ok(None) => {
+                                        tracing::debug!(
+                                            "Topology peer {} handled by accept path",
+                                            peer_id
+                                        );
+                                    }
+                                    Err(e) => {
+                                        tracing::debug!(
+                                            "Failed to connect to topology peer {}: {}",
+                                            peer_id,
+                                            e
+                                        );
+                                    }
+                                }
+                            }
+                            TopologyConnectionEvent::DisconnectPeer { peer_id } => {
+                                tracing::debug!(
+                                    peer_id = %peer_id,
+                                    "Topology event: disconnecting from peer"
+                                );
+                                // Convert peer_id hex string to EndpointId
+                                if let Ok(bytes) = hex::decode(&peer_id) {
+                                    if bytes.len() == 32 {
+                                        let mut array = [0u8; 32];
+                                        array.copy_from_slice(&bytes);
+                                        if let Ok(endpoint_id) =
+                                            iroh::EndpointId::from_bytes(&array)
+                                        {
+                                            let _ = transport.disconnect(&endpoint_id);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                tracing::debug!("Topology event handler stopped");
+            });
+        }
+
+        // Spawn background task to connect to discovered peers (with authentication)
+        // Only runs if topology events are NOT configured (fallback to limited discovery)
+        #[cfg(feature = "automerge-backend")]
+        if !has_topology_events {
+            let discovery_manager = Arc::clone(&self.discovery_manager);
+            let transport = Arc::clone(&self.transport);
+            let formation_key_connect = formation_key;
+            let max_connections = self.max_connections;
+
+            tokio::spawn(async move {
+                use crate::network::formation_handshake::perform_initiator_handshake;
+                use crate::network::PeerInfo as NetworkPeerInfo;
+
+                tracing::info!(
+                    "Discovery-based connection management enabled (max {} connections)",
+                    max_connections
+                );
 
                 // Adaptive interval: start fast (1s), slow down once mesh is stable (up to 5s)
                 let mut interval_secs = 1u64;
@@ -1857,14 +2099,31 @@ impl PeerDiscovery for IrohPeerDiscovery {
                 loop {
                     tokio::time::sleep(std::time::Duration::from_secs(interval_secs)).await;
 
+                    // Check current connection count
+                    let current_connections = transport.connected_peers().len();
+                    if current_connections >= max_connections {
+                        tracing::debug!(
+                            "At max connections ({}/{}), skipping discovery connect cycle",
+                            current_connections,
+                            max_connections
+                        );
+                        consecutive_no_new_connections += 1;
+                        if consecutive_no_new_connections >= 3 && interval_secs < 5 {
+                            interval_secs = (interval_secs * 2).min(5);
+                        }
+                        continue;
+                    }
+
                     // Get discovered peers
                     let manager = discovery_manager.read().await;
                     let discovered_peers = manager.get_peers().await;
                     drop(manager);
 
-                    // Try to connect to each discovered peer
+                    // Try to connect to discovered peers (up to max_connections limit)
                     let mut made_new_connection = false;
-                    for peer in discovered_peers {
+                    let slots_available = max_connections.saturating_sub(current_connections);
+
+                    for peer in discovered_peers.into_iter().take(slots_available) {
                         // Convert discovery::peer::PeerInfo to network::PeerInfo
                         let network_peer_info = NetworkPeerInfo {
                             name: peer.name.clone(),
@@ -1905,8 +2164,10 @@ impl PeerDiscovery for IrohPeerDiscovery {
                                     {
                                         Ok(()) => {
                                             tracing::info!(
-                                                "Connected and authenticated with peer: {}",
-                                                peer.name
+                                                "Connected and authenticated with peer: {} ({}/{})",
+                                                peer.name,
+                                                transport.connected_peers().len(),
+                                                max_connections
                                             );
                                             // Issue #346: Emit Connected AFTER successful handshake
                                             transport.emit_peer_connected(endpoint_id);
@@ -2444,6 +2705,10 @@ impl DataSyncBackend for AutomergeIrohBackend {
             #[cfg(feature = "automerge-backend")]
             formation_key: Arc::clone(&self.formation_key),
             event_forwarder_running: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            #[cfg(feature = "automerge-backend")]
+            topology_event_rx: Arc::clone(&self.topology_event_rx),
+            #[cfg(feature = "automerge-backend")]
+            max_connections: self.max_connections,
         })
     }
 

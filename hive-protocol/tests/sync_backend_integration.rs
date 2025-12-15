@@ -14,8 +14,9 @@ use std::collections::HashMap;
 async fn setup_backend() -> DittoBackend {
     dotenvy::dotenv().ok();
 
-    // Fail explicitly if Ditto credentials not available
-    let app_id = std::env::var("DITTO_APP_ID")
+    // Fail explicitly if credentials not available (prefer HIVE_*, fallback to DITTO_*)
+    let app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
         .ok()
         .and_then(|v| {
             let trimmed = v.trim();
@@ -25,9 +26,11 @@ async fn setup_backend() -> DittoBackend {
                 Some(trimmed.to_string())
             }
         })
-        .expect("DITTO_APP_ID environment variable is required for sync backend integration tests. Set it in .env file or environment.");
+        .expect("HIVE_APP_ID environment variable is required for sync backend integration tests. Set it in .env file or environment.");
 
-    let shared_key = std::env::var("DITTO_SHARED_KEY")
+    let shared_key = std::env::var("HIVE_SECRET_KEY")
+        .or_else(|_| std::env::var("HIVE_SHARED_KEY"))
+        .or_else(|_| std::env::var("DITTO_SHARED_KEY"))
         .ok()
         .and_then(|v| {
             let trimmed = v.trim();
@@ -37,10 +40,14 @@ async fn setup_backend() -> DittoBackend {
                 Some(trimmed.to_string())
             }
         })
-        .expect("DITTO_SHARED_KEY environment variable is required for sync backend integration tests. Set it in .env file or environment.");
+        .expect("HIVE_SECRET_KEY environment variable is required for sync backend integration tests. Set it in .env file or environment.");
 
-    std::env::var("DITTO_OFFLINE_TOKEN")
-        .expect("DITTO_OFFLINE_TOKEN environment variable is required for sync backend integration tests. Set it in .env file or environment.");
+    let offline_token = std::env::var("HIVE_OFFLINE_TOKEN")
+        .or_else(|_| std::env::var("DITTO_OFFLINE_TOKEN"))
+        .expect("HIVE_OFFLINE_TOKEN environment variable is required for sync backend integration tests. Set it in .env file or environment.");
+
+    let mut extra = HashMap::new();
+    extra.insert("offline_token".to_string(), offline_token);
 
     let config = BackendConfig {
         app_id,
@@ -50,7 +57,7 @@ async fn setup_backend() -> DittoBackend {
             .to_path_buf(),
         shared_key: Some(shared_key),
         transport: TransportConfig::default(),
-        extra: HashMap::new(),
+        extra,
     };
 
     let backend = DittoBackend::new();

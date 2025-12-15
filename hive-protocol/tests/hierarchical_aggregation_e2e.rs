@@ -18,11 +18,11 @@ use std::sync::Arc;
 /// Test: Squad summary follows create-once, update-many pattern
 #[tokio::test]
 async fn test_squad_summary_delta_updates() {
-    let ditto_app_id = std::env::var("DITTO_APP_ID").unwrap_or_else(|_| "test-app-id".to_string());
-    if ditto_app_id == "test-app-id" {
-        println!("⚠ Skipping E2E test - DITTO_APP_ID not set");
-        return;
-    }
+    dotenvy::dotenv().ok();
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("e2e_squad_delta_updates");
     let ditto_store = Arc::new(harness.create_ditto_store().await.unwrap());
@@ -133,11 +133,11 @@ async fn test_squad_summary_delta_updates() {
 /// Test: End-to-end upward aggregation flow (Node → Squad → Platoon)
 #[tokio::test]
 async fn test_upward_aggregation_flow() {
-    let ditto_app_id = std::env::var("DITTO_APP_ID").unwrap_or_else(|_| "test-app-id".to_string());
-    if ditto_app_id == "test-app-id" {
-        println!("⚠ Skipping E2E test - DITTO_APP_ID not set");
-        return;
-    }
+    dotenvy::dotenv().ok();
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("e2e_upward_aggregation");
     let ditto_store = Arc::new(harness.create_ditto_store().await.unwrap());
@@ -248,11 +248,11 @@ async fn test_upward_aggregation_flow() {
 /// Test: Document lifecycle validation - create-once, update-many pattern
 #[tokio::test]
 async fn test_document_lifecycle_pattern() {
-    let ditto_app_id = std::env::var("DITTO_APP_ID").unwrap_or_else(|_| "test-app-id".to_string());
-    if ditto_app_id == "test-app-id" {
-        println!("⚠ Skipping E2E test - DITTO_APP_ID not set");
-        return;
-    }
+    dotenvy::dotenv().ok();
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("e2e_document_lifecycle");
     let ditto_store = Arc::new(harness.create_ditto_store().await.unwrap());
@@ -361,11 +361,11 @@ async fn test_document_lifecycle_pattern() {
 /// Test: Bandwidth efficiency measurement - delta updates vs full document replacement
 #[tokio::test]
 async fn test_bandwidth_efficiency() {
-    let ditto_app_id = std::env::var("DITTO_APP_ID").unwrap_or_else(|_| "test-app-id".to_string());
-    if ditto_app_id == "test-app-id" {
-        println!("⚠ Skipping E2E test - DITTO_APP_ID not set");
-        return;
-    }
+    dotenvy::dotenv().ok();
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("e2e_bandwidth_efficiency");
     let ditto_store = Arc::new(harness.create_ditto_store().await.unwrap());

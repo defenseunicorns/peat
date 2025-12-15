@@ -24,9 +24,16 @@ async fn create_test_backend(test_name: &str) -> Arc<DittoBackend> {
     // Load environment variables from .env
     dotenvy::dotenv().ok();
 
-    let app_id = std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set in .env file");
-    let shared_key =
-        std::env::var("DITTO_SHARED_KEY").expect("DITTO_SHARED_KEY must be set in .env file");
+    let app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set in .env file");
+    let shared_key = std::env::var("HIVE_SECRET_KEY")
+        .or_else(|_| std::env::var("HIVE_SHARED_KEY"))
+        .or_else(|_| std::env::var("DITTO_SHARED_KEY"))
+        .expect("HIVE_SECRET_KEY must be set in .env file");
+    let offline_token = std::env::var("HIVE_OFFLINE_TOKEN")
+        .or_else(|_| std::env::var("DITTO_OFFLINE_TOKEN"))
+        .ok();
 
     let backend = Arc::new(DittoBackend::new());
 
@@ -35,6 +42,11 @@ async fn create_test_backend(test_name: &str) -> Arc<DittoBackend> {
     // Clean up any leftover data from previous test runs
     if persistence_dir.exists() {
         let _ = std::fs::remove_dir_all(&persistence_dir);
+    }
+
+    let mut extra = HashMap::new();
+    if let Some(token) = offline_token {
+        extra.insert("offline_token".to_string(), token);
     }
 
     let config = BackendConfig {
@@ -49,7 +61,7 @@ async fn create_test_backend(test_name: &str) -> Arc<DittoBackend> {
             enable_websocket: false,
             custom: HashMap::new(),
         },
-        extra: HashMap::new(),
+        extra,
     };
 
     backend.initialize(config).await.unwrap();
