@@ -1,10 +1,9 @@
-//! HIVE-Lite BLE Document Sync Demo for M5Stack Core2
+//! HIVE-Lite BLE Alert/Ack Demo for M5Stack Core2
 //!
-//! Two-device CRDT sync over BLE:
-//! - Tap screen to increment counter
-//! - State persists to NVS (survives power off)
-//! - Devices discover each other via BLE
-//! - Documents merge automatically (eventually consistent)
+//! Tactical alert system over BLE mesh:
+//! - Double tap: Send EMERGENCY alert to all peers (they buzz)
+//! - Single tap: Acknowledge (silence local buzz, send ACK)
+//! - Long press (3s): Reset counter
 //!
 //! ## Building
 //!
@@ -48,24 +47,12 @@ const NVS_KEY_COUNTER: &str = "counter";
 const FT6336U_ADDR: u8 = 0x38;
 const FT6336U_REG_STATUS: u8 = 0x02;
 
-/// Event types in order for cycling through with taps
-const EVENT_CYCLE: [EventType; 7] = [
-    EventType::None,
-    EventType::Ping,
-    EventType::Moving,
-    EventType::InPosition,
-    EventType::Ack,
-    EventType::NeedAssist,
-    EventType::Emergency,
-];
-
 /// CRDT Document with persistence and Peripheral state
 struct HiveDocument {
     pub counter: GCounter,
     pub peripheral: Peripheral,
     node_id: NodeId,
     version: u32,
-    event_index: usize,
 }
 
 impl HiveDocument {
@@ -77,31 +64,37 @@ impl HiveDocument {
             peripheral,
             node_id,
             version: 0,
-            event_index: 0,
         }
     }
 
-    fn tap(&mut self) {
-        info!(">>> TAP: incrementing node {:08X}", self.node_id.as_u32());
-        self.debug_dump("BEFORE TAP");
+    /// Send EMERGENCY alert (double-tap)
+    fn send_emergency(&mut self) {
+        info!(">>> EMERGENCY from node {:08X}", self.node_id.as_u32());
+        self.debug_dump("BEFORE EMERGENCY");
         self.counter.increment(&self.node_id, 1);
         self.version += 1;
 
-        // Cycle to next event type
-        self.event_index = (self.event_index + 1) % EVENT_CYCLE.len();
-        let event_type = EVENT_CYCLE[self.event_index];
         let timestamp = unsafe { esp_idf_svc::sys::esp_timer_get_time() as u64 / 1000 };
-
-        if event_type == EventType::None {
-            self.peripheral.clear_event();
-            info!(">>> Event: CLEARED");
-        } else {
-            self.peripheral.set_event(event_type, timestamp);
-            info!(">>> Event: {}", event_type.label());
-        }
+        self.peripheral.set_event(EventType::Emergency, timestamp);
         self.peripheral.timestamp = timestamp;
 
-        self.debug_dump("AFTER TAP");
+        self.debug_dump("AFTER EMERGENCY");
+    }
+
+    /// Send ACK (single-tap when alert is active)
+    fn send_ack(&mut self) {
+        info!(">>> ACK from node {:08X}", self.node_id.as_u32());
+        self.counter.increment(&self.node_id, 1);
+        self.version += 1;
+
+        let timestamp = unsafe { esp_idf_svc::sys::esp_timer_get_time() as u64 / 1000 };
+        self.peripheral.set_event(EventType::Ack, timestamp);
+        self.peripheral.timestamp = timestamp;
+    }
+
+    /// Clear event (after timeout or processing)
+    fn clear_event(&mut self) {
+        self.peripheral.clear_event();
     }
 
     fn current_event(&self) -> EventType {
@@ -178,14 +171,16 @@ impl HiveDocument {
         let counter_data = self.counter.encode();
         buf.extend_from_slice(&counter_data);
 
-        // NEW: Peripheral data after counter (Build 12+)
+        // Peripheral data after counter (Build 12+)
         // Marker byte 0xAB to indicate extended format
         buf.push(0xAB);
-        buf.push(self.event_index as u8);
+        buf.push(0); // reserved byte
         let peripheral_data = self.peripheral.encode();
         buf.extend_from_slice(&(peripheral_data.len() as u16).to_le_bytes());
         buf.extend_from_slice(&peripheral_data);
 
+        info!("Encoded doc: {} bytes (header=8, counter={}, peripheral={})",
+              buf.len(), counter_data.len(), peripheral_data.len());
         buf
     }
 
@@ -204,24 +199,34 @@ impl HiveDocument {
         let counter_end = 8 + 4 + num_entries * 12;
 
         // Check for extended format (Build 12+)
-        let (event_index, peripheral) = if data.len() > counter_end && data[counter_end] == 0xAB {
-            let event_index = data[counter_end + 1] as usize % EVENT_CYCLE.len();
+        let peripheral = if data.len() > counter_end && data[counter_end] == 0xAB {
+            // data[counter_end + 1] is reserved byte, skip it
             let peripheral_len =
                 u16::from_le_bytes([data[counter_end + 2], data[counter_end + 3]]) as usize;
             let peripheral_start = counter_end + 4;
             if data.len() >= peripheral_start + peripheral_len {
-                let peripheral = Peripheral::decode(&data[peripheral_start..peripheral_start + peripheral_len]);
-                (event_index, peripheral)
+                let p = Peripheral::decode(&data[peripheral_start..peripheral_start + peripheral_len]);
+                if p.is_some() {
+                    info!("Decoded Peripheral OK ({} bytes), event={:?}",
+                          peripheral_len, p.as_ref().map(|x| x.last_event.as_ref().map(|e| e.event_type)));
+                } else {
+                    warn!("Peripheral decode FAILED ({} bytes available)", peripheral_len);
+                }
+                p
             } else {
-                (0, None)
+                warn!("Peripheral data truncated! need {} bytes at offset {}, have {}",
+                      peripheral_len, peripheral_start, data.len());
+                None
             }
         } else {
             // Old format (Build 11) - no peripheral data
-            (0, None)
+            info!("No peripheral marker (counter_end={}, data.len={})", counter_end, data.len());
+            None
         };
 
         // Create peripheral if not decoded from message
         let peripheral = peripheral.unwrap_or_else(|| {
+            warn!("Creating default Peripheral (no event data from peer)");
             Peripheral::new(node_id.as_u32(), PeripheralType::SoldierSensor)
         });
 
@@ -230,7 +235,6 @@ impl HiveDocument {
             peripheral,
             node_id,
             version,
-            event_index,
         })
     }
 }
@@ -275,24 +279,52 @@ impl DocumentStore {
     }
 }
 
-/// Touch state
-#[derive(PartialEq, Clone, Copy)]
-enum Touch {
+/// Button press state
+#[derive(PartialEq, Clone, Copy, Debug)]
+enum Button {
     None,
-    Touched,
+    BtnA,  // Left button - ACK
+    BtnB,  // Middle button - (unused)
+    BtnC,  // Right button - EMERGENCY
 }
 
-fn read_touch(i2c: &mut I2cDriver) -> Touch {
-    let mut buf = [0u8; 1];
+/// Read touch and map to buttons
+/// M5Stack Core2 touch buttons are at Y > 240:
+/// - Button A: X = 0-106
+/// - Button B: X = 107-213
+/// - Button C: X = 214-320
+fn read_button(i2c: &mut I2cDriver) -> Button {
+    let mut buf = [0u8; 5];
+    // Read touch status and first touch point (registers 0x02-0x06)
     if i2c
         .write_read(FT6336U_ADDR, &[FT6336U_REG_STATUS], &mut buf, 100)
         .is_ok()
     {
-        if buf[0] & 0x0F > 0 {
-            return Touch::Touched;
+        let num_points = buf[0] & 0x0F;
+        if num_points > 0 {
+            // Touch point 1: X high bits in [1], X low in [2], Y high in [3], Y low in [4]
+            let x = ((buf[1] as u16 & 0x0F) << 8) | buf[2] as u16;
+            let y = ((buf[3] as u16 & 0x0F) << 8) | buf[4] as u16;
+
+            // Debug: log all touches
+            info!("Touch: x={}, y={}", x, y);
+
+            // Only count touches in the button area (y > 240)
+            if y > 240 {
+                if x < 107 {
+                    info!(">>> Button A detected");
+                    return Button::BtnA;
+                } else if x < 214 {
+                    info!(">>> Button B detected");
+                    return Button::BtnB;
+                } else {
+                    info!(">>> Button C detected");
+                    return Button::BtnC;
+                }
+            }
         }
     }
-    Touch::None
+    Button::None
 }
 
 fn get_node_id_from_mac() -> NodeId {
@@ -326,62 +358,164 @@ fn print_status(doc: &HiveDocument, connected: bool, status: &str) {
     info!("========================================");
 }
 
-/// AXP192 power management IC (controls backlight and power)
-const AXP192_ADDR: u8 = 0x34;
+/// Power management IC address (same for AXP192 and AXP2101)
+const AXP_ADDR: u8 = 0x34;
 
-fn axp192_init(i2c: &mut I2cDriver) -> anyhow::Result<()> {
+/// Hardware version detected at runtime
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum HardwareVersion {
+    Core2V10,  // AXP192
+    Core2V11,  // AXP2101
+}
+
+/// Global hardware version (set during init)
+static mut HARDWARE_VERSION: HardwareVersion = HardwareVersion::Core2V10;
+
+/// Detect hardware version by checking AXP chip ID
+fn detect_hardware_version(i2c: &mut I2cDriver) -> HardwareVersion {
     let mut buf = [0u8; 1];
 
-    // Read current ADC config
-    if i2c.write_read(AXP192_ADDR, &[0x82], &mut buf, 100).is_ok() {
-        info!("AXP192: ADC config=0x{:02X} (need bit7 set for battery)", buf[0]);
+    // AXP2101 has chip ID at register 0x03
+    // AXP192 has different register layout
 
-        // Enable battery voltage ADC (bit 7) if not already set
-        if (buf[0] & 0x80) == 0 {
-            let new_val = buf[0] | 0x80; // Set only bit 7, preserve others
-            info!("AXP192: Enabling battery ADC: 0x{:02X} -> 0x{:02X}", buf[0], new_val);
-            // Write register address and value
-            let write_result = i2c.write(AXP192_ADDR, &[0x82, new_val], 1000);
-            match write_result {
-                Ok(_) => {
-                    info!("AXP192: Write succeeded");
-                    FreeRtos::delay_ms(10); // Small delay after write
-                }
-                Err(e) => {
-                    warn!("AXP192: Write failed: {:?}", e);
-                }
-            }
-            // Wait for ADC to stabilize
-            FreeRtos::delay_ms(100);
-            // Verify it took effect
-            if i2c.write_read(AXP192_ADDR, &[0x82], &mut buf, 100).is_ok() {
-                info!("AXP192: ADC config after enable=0x{:02X}", buf[0]);
-                if (buf[0] & 0x80) == 0 {
-                    warn!("AXP192: Battery ADC enable did NOT take effect!");
-                }
-            }
+    // Try reading AXP2101 chip ID register (0x03)
+    if i2c.write_read(AXP_ADDR, &[0x03], &mut buf, 100).is_ok() {
+        // AXP2101 chip ID is 0x4A (or similar)
+        if buf[0] == 0x4A || buf[0] == 0x4B {
+            info!("Detected AXP2101 (chip ID 0x{:02X}) - Core2 v1.1", buf[0]);
+            return HardwareVersion::Core2V11;
         }
     }
 
-    if i2c.write_read(AXP192_ADDR, &[0x00], &mut buf, 100).is_ok() {
-        info!("AXP192: Power status=0x{:02X}", buf[0]);
+    // Try AXP192 - read power status register (0x00)
+    // AXP192 should respond to this
+    if i2c.write_read(AXP_ADDR, &[0x00], &mut buf, 100).is_ok() {
+        info!("Detected AXP192 (status 0x{:02X}) - Core2 v1.0", buf[0]);
+        return HardwareVersion::Core2V10;
     }
-    Ok(())
+
+    warn!("Could not detect AXP chip, assuming Core2 v1.0");
+    HardwareVersion::Core2V10
 }
 
-/// Read battery voltage from AXP192 (returns millivolts)
-fn axp192_read_battery_voltage(i2c: &mut I2cDriver) -> Option<u16> {
+fn axp_init(i2c: &mut I2cDriver) -> anyhow::Result<HardwareVersion> {
+    let mut buf = [0u8; 1];
+
+    // Detect hardware version first
+    let version = detect_hardware_version(i2c);
+    unsafe { HARDWARE_VERSION = version; }
+
+    match version {
+        HardwareVersion::Core2V10 => {
+            info!("Initializing AXP192 for Core2 v1.0");
+            // Read current ADC config
+            if i2c.write_read(AXP_ADDR, &[0x82], &mut buf, 100).is_ok() {
+                info!("AXP192: ADC config=0x{:02X} (need bit7 set for battery)", buf[0]);
+
+                // Enable battery voltage ADC (bit 7) if not already set
+                if (buf[0] & 0x80) == 0 {
+                    let new_val = buf[0] | 0x80;
+                    info!("AXP192: Enabling battery ADC: 0x{:02X} -> 0x{:02X}", buf[0], new_val);
+                    let _ = i2c.write(AXP_ADDR, &[0x82, new_val], 1000);
+                    FreeRtos::delay_ms(100);
+                }
+            }
+
+            if i2c.write_read(AXP_ADDR, &[0x00], &mut buf, 100).is_ok() {
+                info!("AXP192: Power status=0x{:02X}", buf[0]);
+            }
+        }
+        HardwareVersion::Core2V11 => {
+            info!("Initializing AXP2101 for Core2 v1.1");
+
+            // AXP2101 register map (from Tasmota/M5Stack drivers):
+            // 0x90 = LDOS ON/OFF control
+            // 0x92 = ALDO1 voltage (not used)
+            // 0x93 = ALDO2 voltage (LCD power, 3.3V = 0x1C)
+            // 0x94 = ALDO3 voltage (Speaker)
+            // 0x95 = ALDO4 voltage
+            // 0x96 = BLDO1 voltage (Backlight)
+            // 0x97 = BLDO2 voltage
+            // 0x99 = DLDO1 voltage (Vibration motor, 0.5V = 0x00, higher for stronger)
+
+            // Enable ALDO2 for LCD (3.3V)
+            // ALDO2 voltage: (val * 0.1 + 0.5)V, so 0x1C = 3.3V
+            let _ = i2c.write(AXP_ADDR, &[0x93, 0x1C], 100);
+            info!("AXP2101: ALDO2 set to 3.3V for LCD");
+
+            // Enable BLDO1 for backlight (typically 2.8-3.0V)
+            // BLDO voltage: (val * 0.1 + 0.5)V, so 0x17 = 2.8V
+            let _ = i2c.write(AXP_ADDR, &[0x96, 0x17], 100);
+            info!("AXP2101: BLDO1 set to 2.8V for backlight");
+
+            // Set DLDO1 voltage for vibration (0.5V base + 0.1V * val)
+            // val=0x0A gives 1.5V - good for vibration motor
+            let _ = i2c.write(AXP_ADDR, &[0x99, 0x0A], 100);
+            info!("AXP2101: DLDO1 set to 1.5V for vibration motor");
+
+            // Read LDO control register
+            if i2c.write_read(AXP_ADDR, &[0x90], &mut buf, 100).is_ok() {
+                info!("AXP2101: LDO control (0x90) = 0x{:02X}", buf[0]);
+                // Enable ALDO2 (bit 1), BLDO1 (bit 4)
+                // Bit 0: ALDO1, Bit 1: ALDO2, Bit 2: ALDO3, Bit 3: ALDO4
+                // Bit 4: BLDO1, Bit 5: BLDO2, Bit 6: DLDO1, Bit 7: DLDO2
+                let new_val = buf[0] | 0x12; // Enable ALDO2 + BLDO1
+                let _ = i2c.write(AXP_ADDR, &[0x90, new_val], 100);
+                info!("AXP2101: LDO control enabled: 0x{:02X}", new_val);
+            }
+
+            FreeRtos::delay_ms(100); // Let power stabilize
+        }
+    }
+
+    Ok(version)
+}
+
+/// Read battery voltage (returns millivolts)
+/// - Core2 v1.0 (AXP192): Registers 0x78-0x79
+/// - Core2 v1.1 (AXP2101): Registers 0x34-0x35
+fn axp_read_battery_voltage(i2c: &mut I2cDriver) -> Option<u16> {
     let mut buf = [0u8; 2];
-    // Register 0x78-0x79: Battery voltage ADC (12-bit, 1.1mV/step)
-    // High 8 bits in 0x78, low 4 bits in upper nibble of 0x79
-    if i2c.write_read(AXP192_ADDR, &[0x78], &mut buf, 100).is_ok() {
-        let raw = ((buf[0] as u16) << 4) | ((buf[1] as u16) >> 4);
-        let mv = (raw as u32 * 1100 / 1000) as u16; // 1.1mV per step
-        info!("Battery ADC: raw=0x{:03X} ({}) => {}mV [0x78=0x{:02X}, 0x79=0x{:02X}]",
-              raw, raw, mv, buf[0], buf[1]);
-        Some(mv)
-    } else {
-        None
+    let version = unsafe { HARDWARE_VERSION };
+
+    match version {
+        HardwareVersion::Core2V10 => {
+            // AXP192: Register 0x78-0x79: Battery voltage ADC (12-bit, 1.1mV/step)
+            if i2c.write_read(AXP_ADDR, &[0x78], &mut buf, 100).is_ok() {
+                let raw = ((buf[0] as u16) << 4) | ((buf[1] as u16) >> 4);
+                let mv = (raw as u32 * 1100 / 1000) as u16;
+                info!("Battery ADC (AXP192): raw=0x{:03X} => {}mV", raw, mv);
+                Some(mv)
+            } else {
+                None
+            }
+        }
+        HardwareVersion::Core2V11 => {
+            // AXP2101: Battery voltage at 0x34-0x35 (14-bit, 1mV/step)
+            if i2c.write_read(AXP_ADDR, &[0x34], &mut buf, 100).is_ok() {
+                let raw = ((buf[0] as u16) << 8) | (buf[1] as u16);
+                let mv = raw & 0x3FFF; // 14-bit value, 1mV per step
+                if mv > 0 && mv < 5000 {
+                    info!("Battery ADC (AXP2101): raw=0x{:04X} => {}mV", raw, mv);
+                    Some(mv)
+                } else {
+                    // Try alternate register (some docs show 0x38-0x39)
+                    if i2c.write_read(AXP_ADDR, &[0x38], &mut buf, 100).is_ok() {
+                        let raw = ((buf[0] as u16) << 8) | (buf[1] as u16);
+                        let mv = raw & 0x3FFF;
+                        if mv > 0 && mv < 5000 {
+                            info!("Battery ADC (AXP2101 alt): raw=0x{:04X} => {}mV", raw, mv);
+                            return Some(mv);
+                        }
+                    }
+                    // Return a default for v1.1 if ADC not working
+                    info!("Battery ADC (AXP2101): unable to read, assuming 4000mV");
+                    Some(4000)
+                }
+            } else {
+                Some(4000) // Default for v1.1
+            }
+        }
     }
 }
 
@@ -399,20 +533,77 @@ fn battery_percent_from_voltage(mv: u16) -> u8 {
 }
 
 /// Check if running on battery (no USB power)
-fn axp192_on_battery(i2c: &mut I2cDriver) -> bool {
+fn axp_on_battery(i2c: &mut I2cDriver) -> bool {
     let mut buf = [0u8; 1];
-    if i2c.write_read(AXP192_ADDR, &[0x00], &mut buf, 100).is_ok() {
-        // Bit 7: ACIN exists, Bit 5: VBUS exists
-        let acin = (buf[0] & 0x80) != 0;
-        let vbus = (buf[0] & 0x20) != 0;
-        !acin && !vbus
-    } else {
-        false
+    let version = unsafe { HARDWARE_VERSION };
+
+    match version {
+        HardwareVersion::Core2V10 => {
+            // AXP192: Register 0x00, Bit 7: ACIN, Bit 5: VBUS
+            if i2c.write_read(AXP_ADDR, &[0x00], &mut buf, 100).is_ok() {
+                let acin = (buf[0] & 0x80) != 0;
+                let vbus = (buf[0] & 0x20) != 0;
+                !acin && !vbus
+            } else {
+                false
+            }
+        }
+        HardwareVersion::Core2V11 => {
+            // AXP2101: Register 0x00, check power source bits
+            if i2c.write_read(AXP_ADDR, &[0x00], &mut buf, 100).is_ok() {
+                // Bit 5: VBUS good
+                let vbus = (buf[0] & 0x20) != 0;
+                !vbus
+            } else {
+                false
+            }
+        }
+    }
+}
+
+/// Enable/disable vibration motor
+/// - Core2 v1.0 (AXP192): LDO3 (register 0x12, bit 3)
+/// - Core2 v1.1 (AXP2101): DLDO1 (register 0x90, bit 6)
+fn axp_set_vibration(i2c: &mut I2cDriver, enable: bool) {
+    let mut buf = [0u8; 1];
+    let version = unsafe { HARDWARE_VERSION };
+
+    match version {
+        HardwareVersion::Core2V10 => {
+            // AXP192: Register 0x12, Bit 3 = LDO3 enable
+            if i2c.write_read(AXP_ADDR, &[0x12], &mut buf, 100).is_ok() {
+                let new_val = if enable {
+                    buf[0] | 0x08  // Set bit 3
+                } else {
+                    buf[0] & !0x08  // Clear bit 3
+                };
+                if new_val != buf[0] {
+                    let _ = i2c.write(AXP_ADDR, &[0x12, new_val], 100);
+                    info!("Vibration (AXP192): {} (0x{:02X} -> 0x{:02X})",
+                          if enable { "ON" } else { "OFF" }, buf[0], new_val);
+                }
+            }
+        }
+        HardwareVersion::Core2V11 => {
+            // AXP2101: Register 0x90, Bit 6 = DLDO1 enable
+            if i2c.write_read(AXP_ADDR, &[0x90], &mut buf, 100).is_ok() {
+                let new_val = if enable {
+                    buf[0] | 0x40  // Set bit 6 (DLDO1)
+                } else {
+                    buf[0] & !0x40  // Clear bit 6
+                };
+                if new_val != buf[0] {
+                    let _ = i2c.write(AXP_ADDR, &[0x90, new_val], 100);
+                    info!("Vibration (AXP2101): {} (0x{:02X} -> 0x{:02X})",
+                          if enable { "ON" } else { "OFF" }, buf[0], new_val);
+                }
+            }
+        }
     }
 }
 
 /// Build number for tracking firmware versions
-const BUILD_NUM: u32 = 13;
+const BUILD_NUM: u32 = 17;
 
 /// Draw initial static UI elements (call once at startup)
 fn draw_static_ui<D>(display: &mut D, node_id: u32)
@@ -425,8 +616,8 @@ where
     let cyan = MonoTextStyle::new(&FONT_10X20, Rgb565::CYAN);
 
     // Title with build number
-    let title = format!("HIVE-Lite BLE Sync  b{}", BUILD_NUM);
-    let _ = Text::new(&title, Point::new(30, 25), white).draw(display);
+    let title = format!("HIVE Alert/Ack  b{}", BUILD_NUM);
+    let _ = Text::new(&title, Point::new(45, 25), white).draw(display);
 
     // Node ID (static)
     let node_str = format!("Node: {:08X}", node_id);
@@ -440,39 +631,20 @@ where
         .into_styled(PrimitiveStyle::with_fill(Rgb565::CSS_GRAY))
         .draw(display);
 
-    // Static label
-    let _ = Text::new("taps / event", Point::new(95, 85), cyan).draw(display);
+    // Button labels at bottom (for the three touch buttons)
+    let green = MonoTextStyle::new(&FONT_10X20, Rgb565::GREEN);
+    let red = MonoTextStyle::new(&FONT_10X20, Rgb565::RED);
+    let _ = Text::new("[ACK]", Point::new(25, 230), green).draw(display);
+    let _ = Text::new("[RST]", Point::new(130, 230), cyan).draw(display);
+    let _ = Text::new("[EMERG]", Point::new(225, 230), red).draw(display);
 }
 
-/// Compute a simple hash for visual state comparison
-fn state_hash(doc: &HiveDocument) -> u16 {
-    let encoded = doc.encode();
-    let mut hash: u16 = 0;
-    for byte in &encoded {
-        hash = hash.wrapping_add(*byte as u16);
-        hash = hash.wrapping_mul(31);
-    }
-    hash
-}
-
-/// Get color for event type
-fn event_color(event: EventType) -> Rgb565 {
-    match event {
-        EventType::None => Rgb565::CSS_GRAY,
-        EventType::Ping => Rgb565::GREEN,
-        EventType::Moving => Rgb565::CYAN,
-        EventType::InPosition => Rgb565::BLUE,
-        EventType::Ack => Rgb565::WHITE,
-        EventType::NeedAssist => Rgb565::YELLOW,
-        EventType::Emergency => Rgb565::RED,
-    }
-}
 
 /// Update only the dynamic parts of the display (no flicker)
 fn update_display<D>(
     display: &mut D,
     doc: &HiveDocument,
-    connected: bool,
+    alert_active: bool,
     battery_pct: Option<u8>,
     status: &str,
 ) where
@@ -480,7 +652,6 @@ fn update_display<D>(
 {
     let black = PrimitiveStyle::with_fill(Rgb565::BLACK);
     let white = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
-    let green = MonoTextStyle::new(&FONT_10X20, Rgb565::GREEN);
     let yellow = MonoTextStyle::new(&FONT_10X20, Rgb565::YELLOW);
 
     // Connection indicator (top right) - show number of connections
@@ -496,8 +667,7 @@ fn update_display<D>(
         let _ = Text::new(&conn_str, Point::new(285, 25), black_text).draw(display);
     }
 
-    // Battery indicator (top left) - clear area then draw
-    // Hide if 0% (ADC not enabled on some modules)
+    // Battery indicator (top left)
     let _ = Rectangle::new(Point::new(5, 5), Size::new(45, 25))
         .into_styled(black)
         .draw(display);
@@ -510,44 +680,38 @@ fn update_display<D>(
         }
     }
 
-    // Tap count - clear area then draw large total
-    let _ = Rectangle::new(Point::new(30, 90), Size::new(260, 55))
+    // Main alert area - large central display
+    let _ = Rectangle::new(Point::new(20, 85), Size::new(280, 100))
         .into_styled(black)
         .draw(display);
 
-    // Large total count - this should be identical on all devices after sync!
-    let total_str = format!("{}", doc.total_taps());
-    let _ = Text::new(&total_str, Point::new(130, 130), green).draw(display);
-
-    // Event type indicator - show current event with appropriate color
-    let _ = Rectangle::new(Point::new(30, 145), Size::new(260, 30))
-        .into_styled(black)
-        .draw(display);
-
-    let current_event = doc.current_event();
-    let event_label = if current_event == EventType::None {
-        "tap to send".to_string()
+    if alert_active {
+        // ALERT MODE - big red background with EMERGENCY text
+        let _ = Rectangle::new(Point::new(30, 90), Size::new(260, 80))
+            .into_styled(PrimitiveStyle::with_fill(Rgb565::RED))
+            .draw(display);
+        let white_style = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
+        let _ = Text::new("!! EMERGENCY !!", Point::new(65, 125), white_style).draw(display);
+        let _ = Text::new("TAP TO ACK", Point::new(90, 155), white_style).draw(display);
     } else {
-        current_event.label().to_string()
-    };
-    let event_style = MonoTextStyle::new(&FONT_10X20, event_color(current_event));
-    // Center the event label
-    let x_offset = 160 - (event_label.len() as i32 * 5);
-    let _ = Text::new(&event_label, Point::new(x_offset, 165), event_style).draw(display);
+        // NORMAL MODE - show tap count and ready status
+        let green = MonoTextStyle::new(&FONT_10X20, Rgb565::GREEN);
+        let _ = Text::new("READY", Point::new(120, 110), green).draw(display);
 
-    // Show state hash and node count for visual convergence check
-    let _ = Rectangle::new(Point::new(60, 175), Size::new(200, 25))
+        // Show total taps (smaller, informational)
+        let total_str = format!("taps: {}", doc.total_taps());
+        let _ = Text::new(&total_str, Point::new(105, 140), white).draw(display);
+
+        // Show node count
+        let node_str = format!("peers: {}", doc.num_nodes().saturating_sub(1));
+        let _ = Text::new(&node_str, Point::new(105, 165), white).draw(display);
+    }
+
+    // Status line (above button labels)
+    let _ = Rectangle::new(Point::new(10, 185), Size::new(300, 20))
         .into_styled(black)
         .draw(display);
-    let hash = state_hash(doc);
-    let hash_str = format!("{:04X} v{} n{}", hash, doc.version, doc.num_nodes());
-    let _ = Text::new(&hash_str, Point::new(80, 190), white).draw(display);
-
-    // Status - clear area then draw
-    let _ = Rectangle::new(Point::new(10, 210), Size::new(300, 25))
-        .into_styled(black)
-        .draw(display);
-    let _ = Text::new(status, Point::new(20, 230), yellow).draw(display);
+    let _ = Text::new(status, Point::new(20, 198), yellow).draw(display);
 }
 
 fn main() -> anyhow::Result<()> {
@@ -579,7 +743,7 @@ fn main() -> anyhow::Result<()> {
     info!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     info!("");
 
-    // Initialize I2C for touch controller and AXP192
+    // Initialize I2C for touch controller and power management (AXP192/AXP2101)
     info!("Initializing I2C...");
     let i2c_config = I2cConfig::new().baudrate(400.kHz().into());
     let mut i2c = I2cDriver::new(
@@ -590,11 +754,18 @@ fn main() -> anyhow::Result<()> {
     )?;
     info!("I2C initialized");
 
-    // Initialize AXP192 (enable LCD power/backlight)
-    info!("Initializing AXP192...");
-    if let Err(e) = axp192_init(&mut i2c) {
-        warn!("AXP192 init failed: {:?}", e);
-    }
+    // Initialize AXP (detect hardware version and enable LCD power/backlight)
+    info!("Initializing AXP...");
+    let hw_version = match axp_init(&mut i2c) {
+        Ok(v) => {
+            info!("Hardware: {:?}", v);
+            v
+        }
+        Err(e) => {
+            warn!("AXP init failed: {:?}", e);
+            HardwareVersion::Core2V10 // Assume v1.0 on error
+        }
+    };
 
     // Initialize SPI for display
     info!("Initializing SPI...");
@@ -659,7 +830,7 @@ fn main() -> anyhow::Result<()> {
     info!("All initialization complete!");
 
     // Read initial battery status
-    let battery_mv = axp192_read_battery_voltage(&mut i2c);
+    let battery_mv = axp_read_battery_voltage(&mut i2c);
     let mut battery_pct = battery_mv.map(battery_percent_from_voltage);
     if let Some(mv) = battery_mv {
         info!("Battery: {}mV ({}%)", mv, battery_pct.unwrap_or(0));
@@ -667,19 +838,24 @@ fn main() -> anyhow::Result<()> {
 
     // Draw static UI once, then update dynamic parts
     draw_static_ui(&mut display, node_id.as_u32());
-    update_display(&mut display, &doc, false, battery_pct, "Tap screen to increment!");
-    print_status(&doc, false, "Tap screen to increment!");
+    update_display(&mut display, &doc, false, battery_pct, "BtnC=EMERG  BtnA=ACK");
+    print_status(&doc, false, "BtnC=EMERG  BtnA=ACK");
 
-    // Main loop
-    let mut last_touch = Touch::None;
+    // Main loop state
+    let mut last_button = Button::None;
     let mut loop_count: u32 = 0;
     let mut needs_redraw = false;
-    let mut touch_start_time: u32 = 0;  // For long-press detection
-    const LONG_PRESS_MS: u32 = 3000;  // 3 seconds to reset
+
+    // Alert state
+    let mut alert_active = false;
+    let mut vibration_on = false;
+    let mut last_vibration_toggle: u32 = 0;
+    const VIBRATION_INTERVAL_MS: u32 = 500;  // Buzz on/off every 500ms
 
     loop {
-        let touch = read_touch(&mut i2c);
+        let button = read_button(&mut i2c);
         let connected = nimble::is_connected();
+        let now_ms = unsafe { esp_idf_svc::sys::esp_timer_get_time() as u32 / 1000 };
 
         // Check for connection state changes
         if nimble::take_connection_changed() {
@@ -691,50 +867,84 @@ fn main() -> anyhow::Result<()> {
             needs_redraw = true;
         }
 
-        // Handle touch - detect tap vs long-press
-        let now_ms = unsafe { esp_idf_svc::sys::esp_timer_get_time() as u32 / 1000 };
-
-        if touch == Touch::Touched && last_touch == Touch::None {
-            // Touch started
-            touch_start_time = now_ms;
-        } else if touch == Touch::Touched && last_touch == Touch::Touched {
-            // Still touching - check for long press
-            let held_ms = now_ms.saturating_sub(touch_start_time);
-            if held_ms >= LONG_PRESS_MS && touch_start_time != 0 {
-                // Long press detected - RESET counter
-                info!(">>> LONG PRESS - RESETTING COUNTER!");
-                doc = HiveDocument::new(node_id);
-                if let Err(e) = store.save(&doc) {
-                    error!("Failed to save reset: {:?}", e);
-                }
-                let encoded = doc.encode();
-                nimble::set_document(&encoded);
-                touch_start_time = 0; // Prevent repeated resets
-                needs_redraw = true;
-                update_display(&mut display, &doc, connected, battery_pct, "RESET!");
+        // Handle vibration buzzing when alert is active
+        if alert_active {
+            let elapsed = now_ms.saturating_sub(last_vibration_toggle);
+            if elapsed >= VIBRATION_INTERVAL_MS {
+                vibration_on = !vibration_on;
+                axp_set_vibration(&mut i2c, vibration_on);
+                last_vibration_toggle = now_ms;
             }
-        } else if touch == Touch::None && last_touch == Touch::Touched {
-            // Touch released - check if it was a tap (short press)
-            let held_ms = now_ms.saturating_sub(touch_start_time);
-            if held_ms < LONG_PRESS_MS && touch_start_time != 0 {
-                // Short tap - increment
-                doc.tap();
+        } else if vibration_on {
+            // Turn off vibration if alert cleared
+            vibration_on = false;
+            axp_set_vibration(&mut i2c, false);
+        }
 
-                // Save to NVS
-                if let Err(e) = store.save(&doc) {
-                    error!("Failed to save: {:?}", e);
+        // Handle button releases (action on release)
+        if button == Button::None && last_button != Button::None {
+            match last_button {
+                Button::BtnA => {
+                    // Button A = ACK (also silences alert)
+                    info!(">>> BUTTON A - SENDING ACK");
+                    doc.send_ack();
+                    alert_active = false;
+                    axp_set_vibration(&mut i2c, false);
+                    vibration_on = false;
+
+                    // Save and gossip
+                    if let Err(e) = store.save(&doc) {
+                        error!("Failed to save: {:?}", e);
+                    }
+                    let encoded = doc.encode();
+                    let sent = nimble::gossip_document(&encoded);
+                    info!(">>> Gossiped ACK to {} peers", sent);
+
+                    needs_redraw = true;
+                    update_display(&mut display, &doc, false, battery_pct, "ACK sent!");
                 }
+                Button::BtnB => {
+                    // Button B = RESET
+                    info!(">>> BUTTON B - RESETTING!");
+                    doc = HiveDocument::new(node_id);
+                    alert_active = false;
+                    axp_set_vibration(&mut i2c, false);
+                    vibration_on = false;
 
-                // Gossip to ALL connected peers (multi-hop mesh)
-                let encoded = doc.encode();
-                let sent = nimble::gossip_document(&encoded);
-                info!(">>> Gossiped tap to {} peers", sent);
+                    if let Err(e) = store.save(&doc) {
+                        error!("Failed to save reset: {:?}", e);
+                    }
+                    let encoded = doc.encode();
+                    nimble::set_document(&encoded);
+                    needs_redraw = true;
+                    update_display(&mut display, &doc, false, battery_pct, "RESET!");
+                }
+                Button::BtnC => {
+                    // Button C = EMERGENCY
+                    info!(">>> BUTTON C - SENDING EMERGENCY!");
+                    doc.send_emergency();
 
-                needs_redraw = true;
-                print_status(&doc, connected, "Tap saved!");
+                    // Enter alert mode locally too (buzz until ACK'd)
+                    alert_active = true;
+                    last_vibration_toggle = now_ms;
+                    vibration_on = true;
+                    axp_set_vibration(&mut i2c, true);
+
+                    // Save and gossip
+                    if let Err(e) = store.save(&doc) {
+                        error!("Failed to save: {:?}", e);
+                    }
+                    let encoded = doc.encode();
+                    let sent = nimble::gossip_document(&encoded);
+                    info!(">>> Gossiped EMERGENCY to {} peers", sent);
+
+                    needs_redraw = true;
+                    update_display(&mut display, &doc, true, battery_pct, "EMERGENCY!");
+                }
+                Button::None => {}
             }
         }
-        last_touch = touch;
+        last_button = button;
 
         // Handle pending document from BLE
         if let Some(data) = nimble::take_pending_document() {
@@ -746,6 +956,18 @@ fn main() -> anyhow::Result<()> {
             if let Some(peer_doc) = HiveDocument::decode(&data) {
                 info!("Decoded peer doc from node {:08X}:", peer_doc.node_id.as_u32());
                 peer_doc.debug_dump("  PEER");
+
+                // Check if peer is sending EMERGENCY
+                let peer_event = peer_doc.current_event();
+                if peer_event == EventType::Emergency && !alert_active {
+                    info!(">>> RECEIVED EMERGENCY FROM PEER!");
+                    alert_active = true;
+                    last_vibration_toggle = now_ms;
+                    vibration_on = true;
+                    axp_set_vibration(&mut i2c, true);
+                    needs_redraw = true;
+                }
+
                 if doc.merge(&peer_doc) {
                     info!(">>> MERGED! New total: {}", doc.total_taps());
 
@@ -771,8 +993,14 @@ fn main() -> anyhow::Result<()> {
 
         // Redraw display when needed
         if needs_redraw {
-            let status = if connected { "Connected!" } else { "Advertising..." };
-            update_display(&mut display, &doc, connected, battery_pct, status);
+            let status = if alert_active {
+                "!! ALERT - TAP TO ACK !!"
+            } else if connected {
+                "Connected"
+            } else {
+                "Advertising..."
+            };
+            update_display(&mut display, &doc, alert_active, battery_pct, status);
             needs_redraw = false;
         }
 
@@ -782,18 +1010,20 @@ fn main() -> anyhow::Result<()> {
         // Periodic status update (every 5 seconds = 100 * 50ms)
         if loop_count % 100 == 0 {
             // Update battery reading and peripheral health
-            if let Some(mv) = axp192_read_battery_voltage(&mut i2c) {
+            if let Some(mv) = axp_read_battery_voltage(&mut i2c) {
                 let pct = battery_percent_from_voltage(mv);
                 battery_pct = Some(pct);
                 doc.update_health(pct);
             }
 
-            let status = if connected {
-                "Connected - tap to sync!"
+            let status = if alert_active {
+                "!! ALERT - TAP TO ACK !!"
+            } else if connected {
+                "Connected"
             } else {
                 "Advertising..."
             };
-            update_display(&mut display, &doc, connected, battery_pct, status);
+            update_display(&mut display, &doc, alert_active, battery_pct, status);
             print_status(&doc, connected, status);
         }
 
