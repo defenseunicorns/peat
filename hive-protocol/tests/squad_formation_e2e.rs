@@ -84,12 +84,13 @@ async fn test_ditto_peer_sync_with_observers() {
     let mut harness = E2EHarness::new("e2e_peer_sync");
 
     // Create two Ditto stores with explicit TCP connections (mDNS unreliable in 4.11.5)
+    let port = E2EHarness::allocate_tcp_port().expect("Failed to allocate port");
     let store1 = harness
-        .create_ditto_store_with_tcp(Some(12345), None)
+        .create_ditto_store_with_tcp(Some(port), None)
         .await
         .unwrap();
     let store2 = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12345".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", port)))
         .await
         .unwrap();
 
@@ -146,12 +147,13 @@ async fn test_e2e_node_advertisement_sync() {
     println!("=== E2E: Node Advertisement Sync ===");
 
     // Create two Ditto stores with explicit TCP connections (mDNS unreliable in 4.11.5)
+    let port = E2EHarness::allocate_tcp_port().expect("Failed to allocate port");
     let store1 = harness
-        .create_ditto_store_with_tcp(Some(12346), None)
+        .create_ditto_store_with_tcp(Some(port), None)
         .await
         .unwrap();
     let store2 = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12346".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", port)))
         .await
         .unwrap();
 
@@ -246,16 +248,17 @@ async fn test_e2e_capability_multi_peer_propagation() {
     println!("=== E2E: Capability Multi-Peer Propagation ===");
 
     // Create three peers with explicit TCP (star topology: store1 is hub)
+    let port = E2EHarness::allocate_tcp_port().expect("Failed to allocate port");
     let store1 = harness
-        .create_ditto_store_with_tcp(Some(12347), None)
+        .create_ditto_store_with_tcp(Some(port), None)
         .await
         .unwrap();
     let store2 = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12347".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", port)))
         .await
         .unwrap();
     let store3 = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12347".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", port)))
         .await
         .unwrap();
 
@@ -403,13 +406,17 @@ async fn test_e2e_cell_formation_multi_peer() {
 
     println!("=== E2E: Cell Formation Multi-Peer ===");
 
+    // Allocate random TCP port to avoid conflicts with concurrent tests
+    let tcp_port = E2EHarness::allocate_tcp_port().expect("Failed to allocate TCP port");
+    println!("  Using TCP port: {}", tcp_port);
+
     // Create two peers with explicit TCP connections (mDNS unreliable in 4.11.5)
     let store1 = harness
-        .create_ditto_store_with_tcp(Some(12348), None)
+        .create_ditto_store_with_tcp(Some(tcp_port), None)
         .await
         .unwrap();
     let store2 = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12348".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
         .await
         .unwrap();
 
@@ -641,17 +648,21 @@ async fn test_e2e_leader_election_propagation() {
 
     println!("=== E2E: Leader Election Propagation ===");
 
+    // Allocate random TCP port to avoid conflicts with concurrent tests
+    let tcp_port = E2EHarness::allocate_tcp_port().expect("Failed to allocate TCP port");
+    println!("  Using TCP port: {}", tcp_port);
+
     // Create three peers with explicit TCP (star topology: store1 is hub)
     let store1 = harness
-        .create_ditto_store_with_tcp(Some(12350), None)
+        .create_ditto_store_with_tcp(Some(tcp_port), None)
         .await
         .unwrap();
     let store2 = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12350".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
         .await
         .unwrap();
     let store3 = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12350".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
         .await
         .unwrap();
 
@@ -833,14 +844,18 @@ async fn test_e2e_timestamped_state_updates() {
 
     println!("=== E2E: Timestamped State Updates ===");
 
+    // Allocate random TCP port to avoid conflicts with concurrent tests
+    let tcp_port = E2EHarness::allocate_tcp_port().expect("Failed to allocate TCP port");
+    println!("  Using TCP port: {}", tcp_port);
+
     // Create two DittoBackends (each wraps a DittoStore in Arc)
     let backend1: Arc<DittoBackend> = harness
-        .create_ditto_store_with_tcp(Some(12351), None)
+        .create_ditto_store_with_tcp(Some(tcp_port), None)
         .await
         .unwrap()
         .into();
     let backend2: Arc<DittoBackend> = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12351".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
         .await
         .unwrap()
         .into();
@@ -1356,9 +1371,14 @@ async fn test_e2e_automerge_node_advertisement_sync() {
 
     println!("=== E2E: Automerge Node Advertisement Sync ===");
 
+    // Allocate random TCP ports to avoid conflicts with concurrent tests
+    let port1 = E2EHarness::allocate_tcp_port().expect("Failed to allocate port1");
+    let port2 = E2EHarness::allocate_tcp_port().expect("Failed to allocate port2");
+    println!("  Using TCP ports: {}, {}", port1, port2);
+
     // Create two Automerge backends with explicit bind addresses
-    let addr1: std::net::SocketAddr = "127.0.0.1:19301".parse().unwrap();
-    let addr2: std::net::SocketAddr = "127.0.0.1:19302".parse().unwrap();
+    let addr1: std::net::SocketAddr = format!("127.0.0.1:{}", port1).parse().unwrap();
+    let addr2: std::net::SocketAddr = format!("127.0.0.1:{}", port2).parse().unwrap();
 
     let backend1 = harness
         .create_automerge_backend_with_bind(Some(addr1))

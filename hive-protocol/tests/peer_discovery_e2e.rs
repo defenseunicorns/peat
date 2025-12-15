@@ -279,9 +279,15 @@ async fn test_e2e_discovery_and_connection() {
     let temp_a = TempDir::new().expect("Failed to create temp dir");
     let temp_b = TempDir::new().expect("Failed to create temp dir");
 
+    // Allocate random TCP ports to avoid conflicts with concurrent tests
+    use hive_protocol::testing::E2EHarness;
+    let port_a = E2EHarness::allocate_tcp_port().expect("Failed to allocate port A");
+    let port_b = E2EHarness::allocate_tcp_port().expect("Failed to allocate port B");
+    println!("  Using TCP ports: {}, {}", port_a, port_b);
+
     // Use specific bind addresses for deterministic connection
-    let addr_a: std::net::SocketAddr = "127.0.0.1:19501".parse().unwrap();
-    let addr_b: std::net::SocketAddr = "127.0.0.1:19502".parse().unwrap();
+    let addr_a: std::net::SocketAddr = format!("127.0.0.1:{}", port_a).parse().unwrap();
+    let addr_b: std::net::SocketAddr = format!("127.0.0.1:{}", port_b).parse().unwrap();
 
     // Create Node A
     let transport_a = Arc::new(
