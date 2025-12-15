@@ -91,13 +91,9 @@ jobs:
       - name: Run tests (excluding E2E for PRs)
         if: github.event_name == 'pull_request'
         env:
-          # HIVE_* are preferred, DITTO_* kept for backwards compatibility
-          HIVE_APP_ID: ${{ secrets.DITTO_APP_ID }}
-          HIVE_SHARED_KEY: ${{ secrets.DITTO_SHARED_KEY }}
-          HIVE_OFFLINE_TOKEN: ${{ secrets.DITTO_OFFLINE_TOKEN }}
-          DITTO_APP_ID: ${{ secrets.DITTO_APP_ID }}
-          DITTO_OFFLINE_TOKEN: ${{ secrets.DITTO_OFFLINE_TOKEN }}
-          DITTO_SHARED_KEY: ${{ secrets.DITTO_SHARED_KEY }}
+          HIVE_APP_ID: ${{ secrets.HIVE_APP_ID }}
+          HIVE_SHARED_KEY: ${{ secrets.HIVE_SHARED_KEY }}
+          HIVE_OFFLINE_TOKEN: ${{ secrets.HIVE_OFFLINE_TOKEN }}
         run: |
           cargo nextest run --all-features --workspace --exclude hive-ffi --exclude hive-inference --exclude hive-btle -E 'not test(e2e)'
           cargo nextest run -p hive-inference -E 'not test(e2e)'
@@ -106,13 +102,9 @@ jobs:
       - name: Run all tests (including E2E for main)
         if: github.event_name != 'pull_request'
         env:
-          # HIVE_* are preferred, DITTO_* kept for backwards compatibility
-          HIVE_APP_ID: ${{ secrets.DITTO_APP_ID }}
-          HIVE_SHARED_KEY: ${{ secrets.DITTO_SHARED_KEY }}
-          HIVE_OFFLINE_TOKEN: ${{ secrets.DITTO_OFFLINE_TOKEN }}
-          DITTO_APP_ID: ${{ secrets.DITTO_APP_ID }}
-          DITTO_OFFLINE_TOKEN: ${{ secrets.DITTO_OFFLINE_TOKEN }}
-          DITTO_SHARED_KEY: ${{ secrets.DITTO_SHARED_KEY }}
+          HIVE_APP_ID: ${{ secrets.HIVE_APP_ID }}
+          HIVE_SHARED_KEY: ${{ secrets.HIVE_SHARED_KEY }}
+          HIVE_OFFLINE_TOKEN: ${{ secrets.HIVE_OFFLINE_TOKEN }}
         run: |
           cargo nextest run --all-features --workspace --exclude hive-ffi --exclude hive-inference --exclude hive-btle
           cargo nextest run -p hive-inference
