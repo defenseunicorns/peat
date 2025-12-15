@@ -91,6 +91,10 @@ jobs:
       - name: Run tests (excluding E2E for PRs)
         if: github.event_name == 'pull_request'
         env:
+          # HIVE_* are preferred, DITTO_* kept for backwards compatibility
+          HIVE_APP_ID: ${{ secrets.DITTO_APP_ID }}
+          HIVE_SHARED_KEY: ${{ secrets.DITTO_SHARED_KEY }}
+          HIVE_OFFLINE_TOKEN: ${{ secrets.DITTO_OFFLINE_TOKEN }}
           DITTO_APP_ID: ${{ secrets.DITTO_APP_ID }}
           DITTO_OFFLINE_TOKEN: ${{ secrets.DITTO_OFFLINE_TOKEN }}
           DITTO_SHARED_KEY: ${{ secrets.DITTO_SHARED_KEY }}
@@ -102,6 +106,10 @@ jobs:
       - name: Run all tests (including E2E for main)
         if: github.event_name != 'pull_request'
         env:
+          # HIVE_* are preferred, DITTO_* kept for backwards compatibility
+          HIVE_APP_ID: ${{ secrets.DITTO_APP_ID }}
+          HIVE_SHARED_KEY: ${{ secrets.DITTO_SHARED_KEY }}
+          HIVE_OFFLINE_TOKEN: ${{ secrets.DITTO_OFFLINE_TOKEN }}
           DITTO_APP_ID: ${{ secrets.DITTO_APP_ID }}
           DITTO_OFFLINE_TOKEN: ${{ secrets.DITTO_OFFLINE_TOKEN }}
           DITTO_SHARED_KEY: ${{ secrets.DITTO_SHARED_KEY }}
