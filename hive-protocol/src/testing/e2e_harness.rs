@@ -188,12 +188,23 @@ impl E2EHarness {
             )
         })?;
 
-        let app_id = std::env::var("DITTO_APP_ID")
+        let app_id = std::env::var("HIVE_APP_ID")
+            .or_else(|_| std::env::var("DITTO_APP_ID"))
             .unwrap_or_else(|_| "00000000-0000-0000-0000-000000000000".to_string());
-        let shared_key = std::env::var("DITTO_SHARED_KEY")
+        let shared_key = std::env::var("HIVE_SECRET_KEY")
+            .or_else(|_| std::env::var("HIVE_SHARED_KEY"))
+            .or_else(|_| std::env::var("DITTO_SHARED_KEY"))
             .unwrap_or_else(|_| "shared_key_for_testing".to_string());
+        let offline_token = std::env::var("HIVE_OFFLINE_TOKEN")
+            .or_else(|_| std::env::var("DITTO_OFFLINE_TOKEN"))
+            .ok();
 
         let persistence_path = temp_dir.path().to_path_buf();
+
+        let mut extra = HashMap::new();
+        if let Some(token) = offline_token {
+            extra.insert("offline_token".to_string(), token);
+        }
 
         let config = BackendConfig {
             app_id,
@@ -204,7 +215,7 @@ impl E2EHarness {
                 tcp_connect_address,
                 ..Default::default()
             },
-            extra: HashMap::new(),
+            extra,
         };
 
         let backend = DittoBackend::new();
@@ -743,9 +754,10 @@ mod tests {
     #[tokio::test]
     async fn test_ditto_store_creation() {
         // Fail if Ditto credentials not properly configured
-        let ditto_app_id =
-            std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-        assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+        let ditto_app_id = std::env::var("HIVE_APP_ID")
+            .or_else(|_| std::env::var("DITTO_APP_ID"))
+            .expect("HIVE_APP_ID must be set for E2E tests");
+        assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
         let mut harness = E2EHarness::new("test_store_creation");
         let store = harness.create_ditto_store().await;
@@ -758,9 +770,10 @@ mod tests {
     #[tokio::test]
     async fn test_multiple_isolated_stores() {
         // Fail if Ditto credentials not properly configured
-        let ditto_app_id =
-            std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-        assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+        let ditto_app_id = std::env::var("HIVE_APP_ID")
+            .or_else(|_| std::env::var("DITTO_APP_ID"))
+            .expect("HIVE_APP_ID must be set for E2E tests");
+        assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
         let mut harness = E2EHarness::new("test_isolated_stores");
         let store1 = harness.create_ditto_store().await;

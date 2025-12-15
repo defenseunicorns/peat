@@ -31,9 +31,10 @@ use std::time::Duration;
 async fn test_ditto_basic_document_operations() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     println!("=== Backend Agnostic E2E: Ditto Basic Operations ===");
 
@@ -48,9 +49,10 @@ async fn test_ditto_basic_document_operations() {
 async fn test_ditto_two_instance_sync() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     println!("=== Backend Agnostic E2E: Ditto Two-Instance Sync ===");
 
@@ -306,9 +308,10 @@ async fn run_two_instance_sync_test<B: DataSyncBackend>(
 async fn test_ditto_three_node_mesh() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     println!("=== Backend Agnostic E2E: Ditto Three-Node Mesh ===");
 
@@ -552,9 +555,10 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
 async fn test_ditto_concurrent_updates() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     println!("=== Backend Agnostic E2E: Ditto Concurrent Updates ===");
 

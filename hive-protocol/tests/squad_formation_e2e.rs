@@ -50,9 +50,10 @@ fn sync_timeout_attempts() -> usize {
 #[serial]
 async fn test_harness_creates_isolated_stores() {
     // Fail if Ditto credentials not properly configured
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("test_harness");
 
@@ -75,9 +76,10 @@ async fn test_harness_creates_isolated_stores() {
 #[serial]
 async fn test_ditto_peer_sync_with_observers() {
     // Fail if Ditto credentials not properly configured
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("e2e_peer_sync");
 
@@ -134,9 +136,10 @@ async fn test_ditto_peer_sync_with_observers() {
 #[tokio::test]
 #[serial]
 async fn test_e2e_node_advertisement_sync() {
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("node_advert_sync");
 
@@ -233,9 +236,10 @@ async fn test_e2e_node_advertisement_sync() {
 #[tokio::test]
 #[serial]
 async fn test_e2e_capability_multi_peer_propagation() {
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("capability_multi_peer");
 
@@ -390,9 +394,10 @@ async fn test_e2e_capability_multi_peer_propagation() {
 #[tokio::test]
 #[serial]
 async fn test_e2e_cell_formation_multi_peer() {
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("cell_formation_multi");
 
@@ -483,9 +488,10 @@ async fn test_e2e_cell_formation_multi_peer() {
 #[tokio::test]
 #[serial]
 async fn test_e2e_role_assignment_sync() {
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("role_assignment_sync");
 
@@ -626,9 +632,10 @@ async fn test_e2e_role_assignment_sync() {
 #[tokio::test]
 #[serial]
 async fn test_e2e_leader_election_propagation() {
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("leader_election_prop");
 
@@ -817,9 +824,10 @@ async fn test_e2e_leader_election_propagation() {
 async fn test_e2e_timestamped_state_updates() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("timestamped_updates");
 
@@ -1045,9 +1053,10 @@ async fn test_e2e_timestamped_state_updates() {
 #[tokio::test]
 #[serial]
 async fn test_e2e_complete_formation_convergence() {
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("complete_formation");
 

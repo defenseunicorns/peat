@@ -376,12 +376,15 @@ mod tests {
                 )
             })?;
 
-        let app_id = std::env::var("DITTO_APP_ID")
-            .map_err(|_| Error::storage_error("DITTO_APP_ID not set", "create_test_store", None))?;
+        let app_id = std::env::var("HIVE_APP_ID")
+            .or_else(|_| std::env::var("DITTO_APP_ID"))
+            .map_err(|_| Error::storage_error("HIVE_APP_ID not set", "create_test_store", None))?;
 
-        let shared_key = std::env::var("DITTO_SHARED_KEY").map_err(|_| {
-            Error::storage_error("DITTO_SHARED_KEY not set", "create_test_store", None)
-        })?;
+        let shared_key = std::env::var("HIVE_SECRET_KEY")
+            .or_else(|_| std::env::var("DITTO_SHARED_KEY"))
+            .map_err(|_| {
+                Error::storage_error("HIVE_SECRET_KEY not set", "create_test_store", None)
+            })?;
 
         // Get the path before dropping temp_dir
         let persistence_path = temp_dir.path().to_path_buf();

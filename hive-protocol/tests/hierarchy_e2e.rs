@@ -34,11 +34,11 @@ use hive_protocol::testing::E2EHarness;
 /// Test: Zone formation creates valid zone with multiple cells
 #[tokio::test]
 async fn test_e2e_zone_formation() {
-    let ditto_app_id = std::env::var("DITTO_APP_ID").unwrap_or_else(|_| "test-app-id".to_string());
-    if ditto_app_id == "test-app-id" {
-        println!("⚠ Skipping E2E test - DITTO_APP_ID not set");
-        return;
-    }
+    dotenvy::dotenv().ok();
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("e2e_zone_formation");
     let store = harness.create_ditto_store().await.unwrap();
