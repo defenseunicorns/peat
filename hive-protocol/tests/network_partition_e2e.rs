@@ -172,22 +172,26 @@ async fn test_e2e_multi_zone_partition_isolation() {
 
     println!("=== E2E: Multi-Zone Partition Isolation ===");
 
+    // Allocate random TCP port to avoid conflicts with concurrent tests
+    let tcp_port = E2EHarness::allocate_tcp_port().expect("Failed to allocate TCP port");
+    println!("  Using TCP port: {}", tcp_port);
+
     // Create 4 peers using explicit TCP topology to avoid mDNS file descriptor issues
-    // Star topology: alpha1 (hub on port 12345), others connect to it
+    // Star topology: alpha1 (hub), others connect to it
     let store_alpha1 = harness
-        .create_ditto_store_with_tcp(Some(12345), None)
+        .create_ditto_store_with_tcp(Some(tcp_port), None)
         .await
         .unwrap();
     let store_alpha2 = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12345".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
         .await
         .unwrap();
     let store_beta1 = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12345".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
         .await
         .unwrap();
     let store_beta2 = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12345".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
         .await
         .unwrap();
 
@@ -323,9 +327,14 @@ async fn test_e2e_automerge_partition_during_formation() {
 
     println!("=== E2E: Automerge Partition During Formation ===");
 
+    // Allocate random TCP ports to avoid conflicts with concurrent tests
+    let port1 = E2EHarness::allocate_tcp_port().expect("Failed to allocate port1");
+    let port2 = E2EHarness::allocate_tcp_port().expect("Failed to allocate port2");
+    println!("  Using TCP ports: {}, {}", port1, port2);
+
     // Create two Automerge backends with explicit bind addresses
-    let addr1: std::net::SocketAddr = "127.0.0.1:19401".parse().unwrap();
-    let addr2: std::net::SocketAddr = "127.0.0.1:19402".parse().unwrap();
+    let addr1: std::net::SocketAddr = format!("127.0.0.1:{}", port1).parse().unwrap();
+    let addr2: std::net::SocketAddr = format!("127.0.0.1:{}", port2).parse().unwrap();
 
     let backend1 = harness
         .create_automerge_backend_with_bind(Some(addr1))

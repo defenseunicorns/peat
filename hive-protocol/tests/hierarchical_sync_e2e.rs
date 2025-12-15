@@ -45,10 +45,21 @@ async fn test_hierarchical_sync_soldiers_to_leader() {
 
     let mut harness = E2EHarness::new("hierarchical_sync_e2e");
 
+    // Allocate random TCP ports to avoid conflicts with concurrent tests
+    let leader_port = E2EHarness::allocate_tcp_port().expect("Failed to allocate leader port");
+    let soldier_ports: Vec<u16> = (0..4)
+        .map(|_| E2EHarness::allocate_tcp_port().expect("Failed to allocate soldier port"))
+        .collect();
+    println!(
+        "  Using leader port: {}, soldier ports: {:?}",
+        leader_port, soldier_ports
+    );
+
     // Create addresses
-    let leader_addr: std::net::SocketAddr = "127.0.0.1:19501".parse().unwrap();
-    let soldier_addrs: Vec<std::net::SocketAddr> = (0..4)
-        .map(|i| format!("127.0.0.1:{}", 19502 + i).parse().unwrap())
+    let leader_addr: std::net::SocketAddr = format!("127.0.0.1:{}", leader_port).parse().unwrap();
+    let soldier_addrs: Vec<std::net::SocketAddr> = soldier_ports
+        .iter()
+        .map(|p| format!("127.0.0.1:{}", p).parse().unwrap())
         .collect();
 
     // Create leader backend
@@ -306,11 +317,20 @@ async fn test_hierarchical_sync_leader_to_soldiers() {
 
     let mut harness = E2EHarness::new("hierarchical_down_sync");
 
+    // Allocate random TCP ports to avoid conflicts with concurrent tests
+    let leader_port = E2EHarness::allocate_tcp_port().expect("Failed to allocate leader port");
+    let soldier_port1 = E2EHarness::allocate_tcp_port().expect("Failed to allocate soldier1 port");
+    let soldier_port2 = E2EHarness::allocate_tcp_port().expect("Failed to allocate soldier2 port");
+    println!(
+        "  Using leader port: {}, soldier ports: [{}, {}]",
+        leader_port, soldier_port1, soldier_port2
+    );
+
     // Create addresses
-    let leader_addr: std::net::SocketAddr = "127.0.0.1:19601".parse().unwrap();
+    let leader_addr: std::net::SocketAddr = format!("127.0.0.1:{}", leader_port).parse().unwrap();
     let soldier_addrs: Vec<std::net::SocketAddr> = vec![
-        "127.0.0.1:19602".parse().unwrap(),
-        "127.0.0.1:19603".parse().unwrap(),
+        format!("127.0.0.1:{}", soldier_port1).parse().unwrap(),
+        format!("127.0.0.1:{}", soldier_port2).parse().unwrap(),
     ];
 
     // Create leader
