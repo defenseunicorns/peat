@@ -156,6 +156,13 @@ fn create_tactical_transport_config() -> TransportConfig {
     config
 }
 
+/// Default interval for connection recycling (Issue #435 memory leak workaround)
+///
+/// Connections older than this are eligible for recycling to mitigate upstream
+/// iroh memory leak (iroh#3565). Set to 0 to disable recycling.
+#[cfg(feature = "automerge-backend")]
+pub const CONNECTION_RECYCLE_INTERVAL_SECS: u64 = 60;
+
 /// Iroh QUIC transport for P2P connections
 ///
 /// Wraps Iroh Endpoint to provide CAP-specific networking.
@@ -165,6 +172,9 @@ pub struct IrohTransport {
     endpoint: Endpoint,
     /// Active peer connections
     connections: Arc<RwLock<HashMap<EndpointId, Connection>>>,
+    /// Connection establishment timestamps (Issue #435 memory leak workaround)
+    /// Used to track connection age for periodic recycling
+    connection_timestamps: Arc<RwLock<HashMap<EndpointId, std::time::Instant>>>,
     /// Accept loop state
     accept_running: Arc<AtomicBool>,
     /// Accept loop task handle
@@ -214,6 +224,7 @@ impl IrohTransport {
         Ok(Self {
             endpoint,
             connections: Arc::new(RwLock::new(HashMap::new())),
+            connection_timestamps: Arc::new(RwLock::new(HashMap::new())),
             accept_running: Arc::new(AtomicBool::new(false)),
             accept_task: Arc::new(RwLock::new(None)),
             mdns_discovery: None,
@@ -278,6 +289,7 @@ impl IrohTransport {
         Ok(Self {
             endpoint,
             connections: Arc::new(RwLock::new(HashMap::new())),
+            connection_timestamps: Arc::new(RwLock::new(HashMap::new())),
             accept_running: Arc::new(AtomicBool::new(false)),
             accept_task: Arc::new(RwLock::new(None)),
             mdns_discovery: Some(discovery),
@@ -349,6 +361,7 @@ impl IrohTransport {
         Ok(Self {
             endpoint,
             connections: Arc::new(RwLock::new(HashMap::new())),
+            connection_timestamps: Arc::new(RwLock::new(HashMap::new())),
             accept_running: Arc::new(AtomicBool::new(false)),
             accept_task: Arc::new(RwLock::new(None)),
             mdns_discovery: None,
@@ -412,6 +425,7 @@ impl IrohTransport {
         Ok(Self {
             endpoint,
             connections: Arc::new(RwLock::new(HashMap::new())),
+            connection_timestamps: Arc::new(RwLock::new(HashMap::new())),
             accept_running: Arc::new(AtomicBool::new(false)),
             accept_task: Arc::new(RwLock::new(None)),
             mdns_discovery: Some(discovery),
@@ -491,6 +505,7 @@ impl IrohTransport {
         Ok(Self {
             endpoint,
             connections: Arc::new(RwLock::new(HashMap::new())),
+            connection_timestamps: Arc::new(RwLock::new(HashMap::new())),
             accept_running: Arc::new(AtomicBool::new(false)),
             accept_task: Arc::new(RwLock::new(None)),
             mdns_discovery: Some(discovery),
@@ -586,6 +601,7 @@ impl IrohTransport {
         Ok(Self {
             endpoint,
             connections: Arc::new(RwLock::new(HashMap::new())),
+            connection_timestamps: Arc::new(RwLock::new(HashMap::new())),
             accept_running: Arc::new(AtomicBool::new(false)),
             accept_task: Arc::new(RwLock::new(None)),
             mdns_discovery: None,
@@ -715,6 +731,12 @@ impl IrohTransport {
 
         connections.insert(remote_id, conn.clone());
         drop(connections); // Release lock before emitting event
+
+        // Track connection timestamp for recycling (Issue #435 workaround)
+        self.connection_timestamps
+            .write()
+            .unwrap()
+            .insert(remote_id, std::time::Instant::now());
 
         // NOTE: Connected event is NOT emitted here (Issue #346).
         // The caller must call emit_peer_connected() AFTER successful handshake
@@ -950,6 +972,12 @@ impl IrohTransport {
         connections.insert(remote_id, conn.clone());
         drop(connections);
 
+        // Track connection timestamp for recycling (Issue #435 workaround)
+        self.connection_timestamps
+            .write()
+            .unwrap()
+            .insert(remote_id, std::time::Instant::now());
+
         // NOTE: Connected event is NOT emitted here (Issue #346).
         // The caller must call emit_peer_connected() AFTER successful handshake
         // to prevent sync handlers from racing with the handshake protocol.
@@ -967,6 +995,12 @@ impl IrohTransport {
 
     /// Disconnect from a peer
     pub fn disconnect(&self, endpoint_id: &EndpointId) -> Result<()> {
+        // Remove timestamp tracking (Issue #435 workaround)
+        self.connection_timestamps
+            .write()
+            .unwrap()
+            .remove(endpoint_id);
+
         if let Some(conn) = self.connections.write().unwrap().remove(endpoint_id) {
             conn.close(0u32.into(), b"disconnecting");
             // Emit disconnect event (Issue #275)
@@ -976,6 +1010,69 @@ impl IrohTransport {
             });
         }
         Ok(())
+    }
+
+    /// Get connections older than the specified duration (Issue #435 workaround)
+    ///
+    /// Returns a list of EndpointIds for connections that have been established
+    /// longer than `max_age`. These connections are candidates for recycling
+    /// to mitigate the upstream iroh memory leak (iroh#3565).
+    ///
+    /// # Arguments
+    ///
+    /// * `max_age` - Maximum connection age before it becomes eligible for recycling
+    ///
+    /// # Returns
+    ///
+    /// Vector of EndpointIds for connections older than `max_age`
+    pub fn connections_older_than(&self, max_age: Duration) -> Vec<EndpointId> {
+        let now = std::time::Instant::now();
+        let timestamps = self.connection_timestamps.read().unwrap();
+        timestamps
+            .iter()
+            .filter_map(|(id, &connected_at)| {
+                if now.duration_since(connected_at) > max_age {
+                    Some(*id)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Recycle old connections to mitigate memory leak (Issue #435 workaround)
+    ///
+    /// Disconnects all connections older than `max_age`. The reconnection manager
+    /// will automatically re-establish connections to static-config peers.
+    ///
+    /// # Arguments
+    ///
+    /// * `max_age` - Maximum connection age before recycling
+    ///
+    /// # Returns
+    ///
+    /// Number of connections recycled
+    pub fn recycle_old_connections(&self, max_age: Duration) -> usize {
+        let old_connections = self.connections_older_than(max_age);
+        let count = old_connections.len();
+
+        for endpoint_id in old_connections {
+            tracing::info!(
+                peer_id = %endpoint_id,
+                "Recycling connection to mitigate memory leak (Issue #435)"
+            );
+            let _ = self.disconnect(&endpoint_id);
+        }
+
+        if count > 0 {
+            tracing::info!(
+                count = count,
+                max_age_secs = max_age.as_secs(),
+                "Recycled old connections (Issue #435 memory leak workaround)"
+            );
+        }
+
+        count
     }
 
     // =========================================================================
@@ -1167,6 +1264,14 @@ impl IrohTransport {
 
             closed
         };
+
+        // Clean up timestamps for removed connections (Issue #435 workaround)
+        if !closed_peers.is_empty() {
+            let mut timestamps = self.connection_timestamps.write().unwrap();
+            for (endpoint_id, _) in &closed_peers {
+                timestamps.remove(endpoint_id);
+            }
+        }
 
         // Emit disconnect events (Issue #275)
         for (endpoint_id, reason) in closed_peers {
