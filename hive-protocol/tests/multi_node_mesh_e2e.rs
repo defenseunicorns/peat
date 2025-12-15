@@ -35,20 +35,24 @@ async fn test_ditto_three_node_mesh() {
 
     let mut harness = E2EHarness::new("ditto_3node_mesh");
 
+    // Allocate random TCP port to avoid conflicts with concurrent tests
+    let tcp_port = E2EHarness::allocate_tcp_port().expect("Failed to allocate TCP port");
+    println!("  Using TCP port: {}", tcp_port);
+
     // Create 3 backends with explicit TCP configuration
     println!("  Creating 3 Ditto backends...");
     let backend1 = harness
-        .create_ditto_backend_with_tcp(Some(17001), None)
+        .create_ditto_backend_with_tcp(Some(tcp_port), None)
         .await
         .expect("Should create backend1");
 
     let backend2 = harness
-        .create_ditto_backend_with_tcp(None, Some("127.0.0.1:17001".to_string()))
+        .create_ditto_backend_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
         .await
         .expect("Should create backend2");
 
     let backend3 = harness
-        .create_ditto_backend_with_tcp(None, Some("127.0.0.1:17001".to_string()))
+        .create_ditto_backend_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
         .await
         .expect("Should create backend3");
 
@@ -70,11 +74,17 @@ async fn test_automerge_three_node_mesh() {
 
     let mut harness = E2EHarness::new("automerge_3node_mesh");
 
+    // Allocate random TCP ports to avoid conflicts with concurrent tests
+    let port1 = E2EHarness::allocate_tcp_port().expect("Failed to allocate port1");
+    let port2 = E2EHarness::allocate_tcp_port().expect("Failed to allocate port2");
+    let port3 = E2EHarness::allocate_tcp_port().expect("Failed to allocate port3");
+    println!("  Using TCP ports: {}, {}, {}", port1, port2, port3);
+
     // Create 3 backends with explicit bind addresses
     println!("  Creating 3 Automerge+Iroh backends...");
-    let addr1: std::net::SocketAddr = "127.0.0.1:19401".parse().unwrap();
-    let addr2: std::net::SocketAddr = "127.0.0.1:19402".parse().unwrap();
-    let addr3: std::net::SocketAddr = "127.0.0.1:19403".parse().unwrap();
+    let addr1: std::net::SocketAddr = format!("127.0.0.1:{}", port1).parse().unwrap();
+    let addr2: std::net::SocketAddr = format!("127.0.0.1:{}", port2).parse().unwrap();
+    let addr3: std::net::SocketAddr = format!("127.0.0.1:{}", port3).parse().unwrap();
 
     let backend1 = harness
         .create_automerge_backend_with_bind(Some(addr1))
