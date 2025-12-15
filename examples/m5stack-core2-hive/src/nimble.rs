@@ -642,12 +642,13 @@ pub fn init(_node_id: NodeId) -> Result<(), i32> {
         ble_hs_cfg.sync_cb = Some(on_sync);
         ble_hs_cfg.reset_cb = Some(on_reset);
 
-        // Set preferred ATT MTU to 64 bytes (enough for our 24-byte documents + overhead)
-        let ret = ble_att_set_preferred_mtu(64);
+        // Set preferred ATT MTU to 128 bytes
+        // Our documents can be ~70-100 bytes with Peripheral event data
+        let ret = ble_att_set_preferred_mtu(128);
         if ret != 0 {
             warn!("BLE: Failed to set preferred MTU: {}", ret);
         } else {
-            info!("BLE: Preferred MTU set to 64");
+            info!("BLE: Preferred MTU set to 128");
         }
 
         // Set up service UUID
