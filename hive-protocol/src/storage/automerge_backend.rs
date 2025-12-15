@@ -876,6 +876,47 @@ impl SyncCapable for AutomergeBackend {
 
         *self.heartbeat_task.write().unwrap() = Some(heartbeat_task);
 
+        // Issue #435: Connection recycling task to mitigate upstream iroh memory leak
+        //
+        // The iroh library has a memory leak (iroh#3565) where WeakConnectionHandle
+        // references accumulate in RttActor's MergeUnbounded stream. This causes
+        // ~0.875 MB/sec memory growth during active sync operations.
+        //
+        // Workaround: Periodically disconnect and reconnect peers to clear accumulated
+        // state. The reconnection manager handles automatic reconnection.
+        let recycle_interval = crate::network::iroh_transport::CONNECTION_RECYCLE_INTERVAL_SECS;
+        if recycle_interval > 0 {
+            let transport_for_recycle = self.transport.clone().unwrap();
+            let sync_active_recycle = Arc::clone(&self.sync_active);
+
+            tokio::spawn(async move {
+                tracing::info!(
+                    interval_secs = recycle_interval,
+                    "Starting connection recycling task (Issue #435 memory leak workaround)"
+                );
+
+                let recycle_duration = std::time::Duration::from_secs(recycle_interval);
+
+                // Initial delay - don't recycle immediately after startup
+                tokio::time::sleep(recycle_duration).await;
+
+                while sync_active_recycle.load(Ordering::Relaxed) {
+                    let recycled = transport_for_recycle.recycle_old_connections(recycle_duration);
+                    if recycled > 0 {
+                        tracing::debug!(
+                            recycled = recycled,
+                            "Connection recycling complete, reconnection will happen automatically"
+                        );
+                    }
+
+                    // Check every 10 seconds but only recycle connections older than recycle_interval
+                    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                }
+
+                tracing::debug!("Connection recycling task stopped");
+            });
+        }
+
         Ok(())
     }
 
