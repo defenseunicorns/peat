@@ -39,8 +39,10 @@ use std::time::Duration;
 /// 5. Validate Peer2 catches up
 #[tokio::test]
 async fn test_e2e_partition_during_formation() {
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
+    dotenvy::dotenv().ok();
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
     assert!(!ditto_app_id.is_empty());
 
     let mut harness = E2EHarness::new("partition_formation");
@@ -160,8 +162,10 @@ async fn test_e2e_partition_during_formation() {
 /// 5. Validate zone-level convergence
 #[tokio::test]
 async fn test_e2e_multi_zone_partition_isolation() {
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
+    dotenvy::dotenv().ok();
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
     assert!(!ditto_app_id.is_empty());
 
     let mut harness = E2EHarness::new("zone_partition");

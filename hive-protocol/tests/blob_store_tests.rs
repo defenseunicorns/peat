@@ -39,8 +39,9 @@ use tempfile::TempDir;
 async fn test_ditto_blob_store_basic_operations() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for Ditto tests");
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for Ditto tests");
 
     println!("=== BlobStore E2E: Ditto Basic Operations ===");
 
@@ -61,8 +62,9 @@ async fn test_ditto_blob_store_basic_operations() {
 async fn test_ditto_blob_store_metadata() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for Ditto tests");
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for Ditto tests");
 
     println!("=== BlobStore E2E: Ditto Metadata ===");
 
@@ -82,8 +84,9 @@ async fn test_ditto_blob_store_metadata() {
 async fn test_ditto_blob_store_from_file() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for Ditto tests");
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for Ditto tests");
 
     println!("=== BlobStore E2E: Ditto From File ===");
 
@@ -178,8 +181,9 @@ async fn test_both_backends_content_addressing() {
 
     println!("=== BlobStore E2E: Content Addressing Comparison ===");
 
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for Ditto tests");
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for Ditto tests");
 
     let test_data = b"Test content for both backends";
     let metadata = BlobMetadata::with_name("test.txt");

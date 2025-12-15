@@ -58,9 +58,11 @@ fn sync_timeout_attempts() -> usize {
 /// Test: Command propagates from leader to member via Ditto sync
 #[tokio::test]
 async fn test_e2e_command_propagation() {
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+    dotenvy::dotenv().ok();
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("command_propagation");
 
@@ -165,9 +167,11 @@ async fn test_e2e_command_propagation() {
 /// Test: Acknowledgments propagate from member back to leader
 #[tokio::test]
 async fn test_e2e_acknowledgment_propagation() {
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+    dotenvy::dotenv().ok();
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("ack_propagation");
 
@@ -277,9 +281,11 @@ async fn test_e2e_acknowledgment_propagation() {
 /// Test: Full-duplex bidirectional flow - command down + ack up
 #[tokio::test]
 async fn test_e2e_full_duplex_command_ack_flow() {
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+    dotenvy::dotenv().ok();
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("full_duplex");
 
@@ -497,9 +503,11 @@ async fn test_e2e_full_duplex_command_ack_flow() {
 /// Test: Multiple concurrent commands with independent acknowledgment tracking
 #[tokio::test]
 async fn test_e2e_concurrent_commands() {
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+    dotenvy::dotenv().ok();
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("concurrent_commands");
 

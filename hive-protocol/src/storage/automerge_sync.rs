@@ -264,7 +264,7 @@ impl SyncEntry {
 /// # Wire Format
 ///
 /// ```text
-/// [8 bytes: batch_id][8 bytes: created_at][4 bytes: entry_count][entries...]
+/// [8 bytes: batch_id][8 bytes: created_at][1 byte: ttl][4 bytes: entry_count][entries...]
 /// ```
 #[cfg(feature = "automerge-backend")]
 #[derive(Debug, Clone)]
@@ -273,9 +273,16 @@ pub struct SyncBatch {
     pub batch_id: u64,
     /// Timestamp when batch was created (millis since UNIX epoch)
     pub created_at: u64,
+    /// Time-to-live (hop count) for multi-hop forwarding
+    /// Decremented at each hop; batch is dropped when TTL reaches 0
+    pub ttl: u8,
     /// Entries in this batch
     pub entries: Vec<SyncEntry>,
 }
+
+/// Default TTL for sync batches (max 5 hops)
+#[cfg(feature = "automerge-backend")]
+pub const DEFAULT_SYNC_BATCH_TTL: u8 = 5;
 
 #[cfg(feature = "automerge-backend")]
 impl SyncBatch {
@@ -287,6 +294,7 @@ impl SyncBatch {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_millis() as u64,
+            ttl: DEFAULT_SYNC_BATCH_TTL,
             entries: Vec::new(),
         }
     }
@@ -299,6 +307,7 @@ impl SyncBatch {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_millis() as u64,
+            ttl: DEFAULT_SYNC_BATCH_TTL,
             entries: Vec::new(),
         }
     }
@@ -311,7 +320,24 @@ impl SyncBatch {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_millis() as u64,
+            ttl: DEFAULT_SYNC_BATCH_TTL,
             entries,
+        }
+    }
+
+    /// Set TTL for this batch
+    pub fn with_ttl(mut self, ttl: u8) -> Self {
+        self.ttl = ttl;
+        self
+    }
+
+    /// Decrement TTL and return true if batch should still be forwarded
+    pub fn decrement_ttl(&mut self) -> bool {
+        if self.ttl > 0 {
+            self.ttl -= 1;
+            true
+        } else {
+            false
         }
     }
 
@@ -362,10 +388,12 @@ impl SyncBatch {
     }
 
     /// Encode to wire format
+    /// Format: [8: batch_id][8: created_at][1: ttl][4: entry_count][entries...]
     pub fn encode(&self) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(20 + self.payload_size());
+        let mut buf = Vec::with_capacity(21 + self.payload_size());
         buf.extend_from_slice(&self.batch_id.to_be_bytes());
         buf.extend_from_slice(&self.created_at.to_be_bytes());
+        buf.push(self.ttl);
         buf.extend_from_slice(&(self.entries.len() as u32).to_be_bytes());
         for entry in &self.entries {
             buf.extend_from_slice(&entry.encode());
@@ -375,7 +403,7 @@ impl SyncBatch {
 
     /// Decode from wire format
     pub fn decode(bytes: &[u8]) -> anyhow::Result<Self> {
-        if bytes.len() < 20 {
+        if bytes.len() < 21 {
             anyhow::bail!("SyncBatch too short: {} bytes", bytes.len());
         }
 
@@ -385,9 +413,10 @@ impl SyncBatch {
         let created_at = u64::from_be_bytes([
             bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15],
         ]);
-        let entry_count = u32::from_be_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]) as usize;
+        let ttl = bytes[16];
+        let entry_count = u32::from_be_bytes([bytes[17], bytes[18], bytes[19], bytes[20]]) as usize;
 
-        let mut offset = 20;
+        let mut offset = 21;
         let mut entries = Vec::with_capacity(entry_count);
 
         for _ in 0..entry_count {
@@ -399,6 +428,7 @@ impl SyncBatch {
         Ok(Self {
             batch_id,
             created_at,
+            ttl,
             entries,
         })
     }
@@ -2727,9 +2757,10 @@ mod tests {
         let encoded = batch.encode();
 
         // Verify header
-        // [8 bytes: batch_id][8 bytes: created_at][4 bytes: entry_count][entries...]
+        // [8 bytes: batch_id][8 bytes: created_at][1 byte: ttl][4 bytes: entry_count][entries...]
         assert_eq!(u64::from_be_bytes(encoded[0..8].try_into().unwrap()), 12345);
-        assert_eq!(u32::from_be_bytes(encoded[16..20].try_into().unwrap()), 2); // 2 entries
+        assert_eq!(encoded[16], DEFAULT_SYNC_BATCH_TTL); // TTL byte
+        assert_eq!(u32::from_be_bytes(encoded[17..21].try_into().unwrap()), 2); // 2 entries
 
         // Decode and verify roundtrip
         let decoded = SyncBatch::decode(&encoded).unwrap();

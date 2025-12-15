@@ -41,9 +41,10 @@ use std::time::Duration;
 async fn test_e2e_blob_reference_sync() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("blob_reference_sync");
 
@@ -231,9 +232,10 @@ async fn test_e2e_blob_reference_sync() {
 async fn test_e2e_blob_content_transfer() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("blob_content_transfer");
 
@@ -425,9 +427,10 @@ async fn test_e2e_blob_content_transfer() {
 async fn test_e2e_multiple_blobs_sync() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id =
-        std::env::var("DITTO_APP_ID").expect("DITTO_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "DITTO_APP_ID cannot be empty");
+    let ditto_app_id = std::env::var("HIVE_APP_ID")
+        .or_else(|_| std::env::var("DITTO_APP_ID"))
+        .expect("HIVE_APP_ID must be set for E2E tests");
+    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
 
     let mut harness = E2EHarness::new("multiple_blobs_sync");
 

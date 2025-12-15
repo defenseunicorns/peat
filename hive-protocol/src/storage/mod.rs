@@ -56,6 +56,8 @@ pub mod sync_channel;
 #[cfg(feature = "automerge-backend")]
 pub mod sync_errors;
 #[cfg(feature = "automerge-backend")]
+pub mod sync_forwarding;
+#[cfg(feature = "automerge-backend")]
 pub mod sync_persistence;
 #[cfg(feature = "automerge-backend")]
 pub mod ttl_manager;
@@ -104,6 +106,8 @@ pub use flow_control::{
 };
 #[cfg(feature = "automerge-backend")]
 pub use sync_channel::{ChannelManagerStats, ChannelState, SyncChannel, SyncChannelManager};
+#[cfg(feature = "automerge-backend")]
+pub use sync_forwarding::{ForwardingStats, SyncForwarder};
 #[cfg(feature = "automerge-backend")]
 pub use sync_persistence::{
     Checkpoint, PersistedSyncState, PersistenceStats, SyncStatePersistence,
