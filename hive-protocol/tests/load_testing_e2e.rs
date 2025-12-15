@@ -40,6 +40,7 @@ fn get_test_node_count() -> usize {
 /// - All capabilities properly aggregated
 #[tokio::test]
 async fn test_load_large_formation_nodes() {
+    dotenvy::dotenv().ok();
     let node_count = get_test_node_count();
     let cell_count = node_count / 2; // 2 nodes per cell
     let mut harness = E2EHarness::new("large_formation_test");
@@ -282,6 +283,7 @@ async fn test_load_large_formation_nodes() {
 /// - Formation completes within reasonable time
 #[tokio::test]
 async fn test_load_multi_zone_hierarchy() {
+    dotenvy::dotenv().ok();
     let total_nodes = get_test_node_count();
     let mut harness = E2EHarness::new("multi_zone_hierarchy_test");
 

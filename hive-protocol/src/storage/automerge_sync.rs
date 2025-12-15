@@ -41,6 +41,8 @@ use super::partition_detection::PartitionDetector;
 #[cfg(feature = "automerge-backend")]
 use super::sync_errors::{SyncError, SyncErrorHandler};
 #[cfg(feature = "automerge-backend")]
+use crate::hierarchy::HierarchicalRouter;
+#[cfg(feature = "automerge-backend")]
 use crate::network::iroh_transport::IrohTransport;
 #[cfg(feature = "automerge-backend")]
 use crate::qos::{SyncMode, SyncModeRegistry};
@@ -98,11 +100,350 @@ pub enum SyncMessageType {
     TombstoneBatch = 0x05,
     /// Acknowledgement of received tombstones (ADR-034 Phase 2)
     TombstoneAck = 0x06,
+    /// Batch of sync messages for multiple documents (Issue #438)
+    SyncBatch = 0x07,
 }
 
-/// Received sync payload (Issue #355, ADR-034)
+/// Sync direction for hierarchical routing (Issue #438 Phase 3)
 ///
-/// Can be a delta-based sync message, state snapshot, or tombstone message.
+/// Determines how sync messages should be routed based on document type:
+/// - Upward: Sync to parent/leader only (nodes, beacons, platforms)
+/// - Downward: Sync from leader to members (commands)
+/// - Lateral: Sync to peers at same level (cells)
+/// - Broadcast: Sync to all connected peers (alerts, contact_reports)
+#[cfg(feature = "automerge-backend")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyncDirection {
+    /// Sync upward to parent/leader only
+    /// Used for: nodes, beacons, platforms
+    Upward,
+    /// Sync downward from leader to members
+    /// Used for: commands
+    Downward,
+    /// Sync laterally to peers at same hierarchy level
+    /// Used for: cells
+    Lateral,
+    /// Broadcast to all connected peers (existing behavior)
+    /// Used for: alerts, contact_reports, and unknown collections
+    Broadcast,
+}
+
+#[cfg(feature = "automerge-backend")]
+impl SyncDirection {
+    /// Determine sync direction from document key
+    ///
+    /// Parses the collection name from the document key (format: "collection:id")
+    /// and returns the appropriate sync direction.
+    pub fn from_doc_key(doc_key: &str) -> Self {
+        // Extract collection name from "collection:id" format
+        let collection = doc_key.split(':').next().unwrap_or(doc_key);
+
+        match collection {
+            // Upward: State aggregation data flows up the hierarchy
+            "nodes" | "beacons" | "platforms" | "summaries" => SyncDirection::Upward,
+            // Downward: Commands flow down from coordinators to executors
+            "commands" => SyncDirection::Downward,
+            // Lateral: Cell state syncs between peers in same cell
+            "cells" => SyncDirection::Lateral,
+            // Broadcast: Alerts and reports go everywhere
+            "alerts" | "contact_reports" | "events" => SyncDirection::Broadcast,
+            // Default to broadcast for unknown collections (safe fallback)
+            _ => SyncDirection::Broadcast,
+        }
+    }
+}
+
+/// A single document sync entry within a batch (Issue #438)
+///
+/// Represents one document's sync data within a `SyncBatch`. Can be a delta sync,
+/// state snapshot, or tombstone.
+#[cfg(feature = "automerge-backend")]
+#[derive(Debug, Clone)]
+pub struct SyncEntry {
+    /// Document key (e.g., "nodes:node-1")
+    pub doc_key: String,
+    /// Type of sync for this document
+    pub sync_type: SyncMessageType,
+    /// Payload bytes (encoded SyncMessage, state bytes, or tombstone)
+    pub payload: Vec<u8>,
+}
+
+#[cfg(feature = "automerge-backend")]
+impl SyncEntry {
+    /// Create a new sync entry
+    pub fn new(doc_key: String, sync_type: SyncMessageType, payload: Vec<u8>) -> Self {
+        Self {
+            doc_key,
+            sync_type,
+            payload,
+        }
+    }
+
+    /// Encode to wire format
+    ///
+    /// Wire format:
+    /// ```text
+    /// [2 bytes: doc_key_len][doc_key][1 byte: sync_type][4 bytes: payload_len][payload]
+    /// ```
+    pub fn encode(&self) -> Vec<u8> {
+        let doc_key_bytes = self.doc_key.as_bytes();
+        let doc_key_len = doc_key_bytes.len() as u16;
+
+        let mut buf = Vec::with_capacity(2 + doc_key_bytes.len() + 1 + 4 + self.payload.len());
+        buf.extend_from_slice(&doc_key_len.to_be_bytes());
+        buf.extend_from_slice(doc_key_bytes);
+        buf.push(self.sync_type as u8);
+        buf.extend_from_slice(&(self.payload.len() as u32).to_be_bytes());
+        buf.extend_from_slice(&self.payload);
+        buf
+    }
+
+    /// Decode from wire format, returns (entry, bytes_consumed)
+    pub fn decode(bytes: &[u8]) -> anyhow::Result<(Self, usize)> {
+        use anyhow::Context;
+
+        if bytes.len() < 7 {
+            anyhow::bail!("SyncEntry too short: {} bytes", bytes.len());
+        }
+
+        let doc_key_len = u16::from_be_bytes([bytes[0], bytes[1]]) as usize;
+        let mut offset = 2;
+
+        if bytes.len() < offset + doc_key_len + 1 + 4 {
+            anyhow::bail!("SyncEntry truncated at doc_key");
+        }
+
+        let doc_key = String::from_utf8(bytes[offset..offset + doc_key_len].to_vec())
+            .context("Invalid UTF-8 in doc_key")?;
+        offset += doc_key_len;
+
+        let sync_type = match bytes[offset] {
+            0x00 => SyncMessageType::DeltaSync,
+            0x01 => SyncMessageType::StateSnapshot,
+            0x02 => SyncMessageType::WindowedHistory,
+            0x04 => SyncMessageType::Tombstone,
+            0x05 => SyncMessageType::TombstoneBatch,
+            0x06 => SyncMessageType::TombstoneAck,
+            0x07 => SyncMessageType::SyncBatch,
+            other => anyhow::bail!("Unknown sync type: 0x{:02x}", other),
+        };
+        offset += 1;
+
+        let payload_len = u32::from_be_bytes([
+            bytes[offset],
+            bytes[offset + 1],
+            bytes[offset + 2],
+            bytes[offset + 3],
+        ]) as usize;
+        offset += 4;
+
+        if bytes.len() < offset + payload_len {
+            anyhow::bail!("SyncEntry truncated at payload");
+        }
+
+        let payload = bytes[offset..offset + payload_len].to_vec();
+        offset += payload_len;
+
+        Ok((
+            Self {
+                doc_key,
+                sync_type,
+                payload,
+            },
+            offset,
+        ))
+    }
+}
+
+/// Batch of sync messages for multiple documents (Issue #438)
+///
+/// Enables sending multiple document syncs in a single QUIC stream,
+/// reducing stream-per-message overhead from O(N×M) to O(N) where
+/// N = peers and M = documents.
+///
+/// # Wire Format
+///
+/// ```text
+/// [8 bytes: batch_id][8 bytes: created_at][1 byte: ttl][4 bytes: entry_count][entries...]
+/// ```
+#[cfg(feature = "automerge-backend")]
+#[derive(Debug, Clone)]
+pub struct SyncBatch {
+    /// Unique batch ID for tracking/acknowledgement
+    pub batch_id: u64,
+    /// Timestamp when batch was created (millis since UNIX epoch)
+    pub created_at: u64,
+    /// Time-to-live (hop count) for multi-hop forwarding
+    /// Decremented at each hop; batch is dropped when TTL reaches 0
+    pub ttl: u8,
+    /// Entries in this batch
+    pub entries: Vec<SyncEntry>,
+}
+
+/// Default TTL for sync batches (max 5 hops)
+#[cfg(feature = "automerge-backend")]
+pub const DEFAULT_SYNC_BATCH_TTL: u8 = 5;
+
+#[cfg(feature = "automerge-backend")]
+impl SyncBatch {
+    /// Create a new empty batch
+    pub fn new() -> Self {
+        Self {
+            batch_id: 0,
+            created_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+            ttl: DEFAULT_SYNC_BATCH_TTL,
+            entries: Vec::new(),
+        }
+    }
+
+    /// Create a batch with a specific ID
+    pub fn with_id(batch_id: u64) -> Self {
+        Self {
+            batch_id,
+            created_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+            ttl: DEFAULT_SYNC_BATCH_TTL,
+            entries: Vec::new(),
+        }
+    }
+
+    /// Create a batch with entries (Issue #438 Phase 3)
+    pub fn with_entries(entries: Vec<SyncEntry>) -> Self {
+        Self {
+            batch_id: 0, // Will be assigned when sent
+            created_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+            ttl: DEFAULT_SYNC_BATCH_TTL,
+            entries,
+        }
+    }
+
+    /// Set TTL for this batch
+    pub fn with_ttl(mut self, ttl: u8) -> Self {
+        self.ttl = ttl;
+        self
+    }
+
+    /// Decrement TTL and return true if batch should still be forwarded
+    pub fn decrement_ttl(&mut self) -> bool {
+        if self.ttl > 0 {
+            self.ttl -= 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Add a delta sync entry
+    pub fn add_delta(&mut self, doc_key: &str, message: &automerge::sync::Message) {
+        let payload = message.clone().encode();
+        self.entries.push(SyncEntry::new(
+            doc_key.to_string(),
+            SyncMessageType::DeltaSync,
+            payload,
+        ));
+    }
+
+    /// Add a state snapshot entry
+    pub fn add_snapshot(&mut self, doc_key: &str, state_bytes: Vec<u8>) {
+        self.entries.push(SyncEntry::new(
+            doc_key.to_string(),
+            SyncMessageType::StateSnapshot,
+            state_bytes,
+        ));
+    }
+
+    /// Add a tombstone entry
+    pub fn add_tombstone(&mut self, tombstone: &crate::qos::TombstoneSyncMessage) {
+        self.entries.push(SyncEntry::new(
+            format!(
+                "tombstones:{}:{}",
+                tombstone.tombstone.collection, tombstone.tombstone.document_id
+            ),
+            SyncMessageType::Tombstone,
+            tombstone.encode(),
+        ));
+    }
+
+    /// Check if batch is empty
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Get number of entries
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Get total payload size in bytes
+    pub fn payload_size(&self) -> usize {
+        self.entries.iter().map(|e| e.payload.len()).sum()
+    }
+
+    /// Encode to wire format
+    /// Format: [8: batch_id][8: created_at][1: ttl][4: entry_count][entries...]
+    pub fn encode(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(21 + self.payload_size());
+        buf.extend_from_slice(&self.batch_id.to_be_bytes());
+        buf.extend_from_slice(&self.created_at.to_be_bytes());
+        buf.push(self.ttl);
+        buf.extend_from_slice(&(self.entries.len() as u32).to_be_bytes());
+        for entry in &self.entries {
+            buf.extend_from_slice(&entry.encode());
+        }
+        buf
+    }
+
+    /// Decode from wire format
+    pub fn decode(bytes: &[u8]) -> anyhow::Result<Self> {
+        if bytes.len() < 21 {
+            anyhow::bail!("SyncBatch too short: {} bytes", bytes.len());
+        }
+
+        let batch_id = u64::from_be_bytes([
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+        ]);
+        let created_at = u64::from_be_bytes([
+            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15],
+        ]);
+        let ttl = bytes[16];
+        let entry_count = u32::from_be_bytes([bytes[17], bytes[18], bytes[19], bytes[20]]) as usize;
+
+        let mut offset = 21;
+        let mut entries = Vec::with_capacity(entry_count);
+
+        for _ in 0..entry_count {
+            let (entry, consumed) = SyncEntry::decode(&bytes[offset..])?;
+            entries.push(entry);
+            offset += consumed;
+        }
+
+        Ok(Self {
+            batch_id,
+            created_at,
+            ttl,
+            entries,
+        })
+    }
+}
+
+#[cfg(feature = "automerge-backend")]
+impl Default for SyncBatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Received sync payload (Issue #355, ADR-034, Issue #438)
+///
+/// Can be a delta-based sync message, state snapshot, tombstone, or batch of syncs.
 #[cfg(feature = "automerge-backend")]
 #[derive(Debug)]
 pub enum ReceivedSyncPayload {
@@ -114,6 +455,8 @@ pub enum ReceivedSyncPayload {
     Tombstone(crate::qos::TombstoneSyncMessage),
     /// Batch of tombstones for initial exchange (ADR-034 Phase 2)
     TombstoneBatch(crate::qos::TombstoneBatch),
+    /// Batch of sync messages for multiple documents (Issue #438)
+    Batch(SyncBatch),
 }
 
 /// Per-peer sync statistics
@@ -144,6 +487,7 @@ pub struct PeerSyncStats {
 /// - ✅ Partition detection with heartbeat mechanism (Phase 6.3)
 /// - ✅ Flow control and backpressure (Issue #97)
 /// - ✅ Sync modes: LatestOnly vs FullHistory (Issue #355)
+/// - ✅ Batch sync to reduce stream-per-message overhead (Issue #438)
 #[cfg(feature = "automerge-backend")]
 pub struct AutomergeSyncCoordinator {
     /// Reference to the AutomergeStore
@@ -168,6 +512,10 @@ pub struct AutomergeSyncCoordinator {
     flow_controller: Arc<FlowController>,
     /// Sync mode registry for per-collection sync mode configuration (Issue #355)
     sync_mode_registry: Arc<SyncModeRegistry>,
+    /// Next batch ID counter (Issue #438)
+    next_batch_id: Arc<AtomicU64>,
+    /// Optional hierarchical router for direction-based sync routing (Issue #438 Phase 3)
+    hierarchical_router: Option<Arc<HierarchicalRouter>>,
 }
 
 #[cfg(feature = "automerge-backend")]
@@ -205,6 +553,8 @@ impl AutomergeSyncCoordinator {
             partition_detector: Arc::new(PartitionDetector::new()),
             flow_controller: Arc::new(FlowController::with_config(flow_config)),
             sync_mode_registry: Arc::new(SyncModeRegistry::with_defaults()),
+            next_batch_id: Arc::new(AtomicU64::new(1)),
+            hierarchical_router: None,
         }
     }
 
@@ -231,6 +581,43 @@ impl AutomergeSyncCoordinator {
             partition_detector: Arc::new(PartitionDetector::new()),
             flow_controller: Arc::new(FlowController::with_config(FlowControlConfig::default())),
             sync_mode_registry,
+            next_batch_id: Arc::new(AtomicU64::new(1)),
+            hierarchical_router: None,
+        }
+    }
+
+    /// Create a new sync coordinator with hierarchical routing (Issue #438 Phase 3)
+    ///
+    /// When a hierarchical router is provided, sync operations will route messages
+    /// based on document type direction:
+    /// - Upward (nodes, beacons, platforms): Only sync to cell leader
+    /// - Downward (commands): Only sync from leader to cell members
+    /// - Lateral (cells): Sync to peers in same cell
+    /// - Broadcast (alerts, contact_reports): Sync to all (existing behavior)
+    ///
+    /// # Arguments
+    ///
+    /// * `store` - The AutomergeStore managing documents
+    /// * `transport` - The IrohTransport for P2P connections
+    /// * `router` - HierarchicalRouter for direction-based routing
+    pub fn with_hierarchical_router(
+        store: Arc<AutomergeStore>,
+        transport: Arc<IrohTransport>,
+        router: Arc<HierarchicalRouter>,
+    ) -> Self {
+        Self {
+            store,
+            transport,
+            peer_states: Arc::new(RwLock::new(HashMap::new())),
+            peer_stats: Arc::new(RwLock::new(HashMap::new())),
+            total_bytes_sent: Arc::new(AtomicU64::new(0)),
+            total_bytes_received: Arc::new(AtomicU64::new(0)),
+            error_handler: Arc::new(SyncErrorHandler::new()),
+            partition_detector: Arc::new(PartitionDetector::new()),
+            flow_controller: Arc::new(FlowController::with_config(FlowControlConfig::default())),
+            sync_mode_registry: Arc::new(SyncModeRegistry::with_defaults()),
+            next_batch_id: Arc::new(AtomicU64::new(1)),
+            hierarchical_router: Some(router),
         }
     }
 
@@ -770,6 +1157,13 @@ impl AutomergeSyncCoordinator {
                 // Return as a batch with no tombstones to indicate ack
                 ReceivedSyncPayload::TombstoneBatch(crate::qos::TombstoneBatch::new())
             }
+            0x07 => {
+                // SyncBatch - batch of sync messages for multiple documents (Issue #438)
+                tracing::debug!("Received sync batch: {} bytes", buffer.len());
+                let batch = SyncBatch::decode(&buffer)
+                    .map_err(|e| anyhow::anyhow!("Failed to decode sync batch: {}", e))?;
+                ReceivedSyncPayload::Batch(batch)
+            }
             other => {
                 return Err(anyhow::anyhow!(
                     "Unknown sync message type: 0x{:02x}",
@@ -803,6 +1197,10 @@ impl AutomergeSyncCoordinator {
                     doc_key
                 ))
             }
+            ReceivedSyncPayload::Batch(_) => Err(anyhow::anyhow!(
+                "Received sync batch but expected delta sync message for {}",
+                doc_key
+            )),
         }
     }
 
@@ -938,6 +1336,541 @@ impl AutomergeSyncCoordinator {
         }
 
         Ok(())
+    }
+
+    // === Batch sync methods (Issue #438) ===
+    //
+    // These methods enable sending multiple document syncs in a single QUIC stream,
+    // reducing stream-per-message overhead from O(N×M) to O(N).
+
+    /// Generate the next batch ID
+    fn next_batch_id(&self) -> u64 {
+        self.next_batch_id.fetch_add(1, Ordering::Relaxed)
+    }
+
+    /// Create a batch for multiple documents without sending
+    ///
+    /// This is useful for channel-based sync where the batch is queued.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_keys` - Document keys to include in the batch
+    pub fn create_batch_for_documents(&self, doc_keys: &[&str]) -> Result<SyncBatch> {
+        let mut batch = SyncBatch::with_id(self.next_batch_id());
+
+        for doc_key in doc_keys {
+            // Get the document
+            let doc = match self.store.get(doc_key)? {
+                Some(doc) => doc,
+                None => {
+                    tracing::debug!("Document {} not found, skipping in batch", doc_key);
+                    continue;
+                }
+            };
+
+            // Check sync mode for this collection
+            let sync_mode = self.sync_mode_for_doc(doc_key);
+
+            match sync_mode {
+                crate::qos::SyncMode::LatestOnly => {
+                    // State snapshot
+                    let state_bytes = doc.save();
+                    batch.add_snapshot(doc_key, state_bytes);
+                }
+                crate::qos::SyncMode::FullHistory
+                | crate::qos::SyncMode::WindowedHistory { .. } => {
+                    // Delta sync - need to generate message
+                    // Note: For batch sync we use a fresh sync state since we're
+                    // sending to potentially multiple peers
+                    let mut sync_state = SyncState::new();
+                    if let Some(message) =
+                        automerge::sync::SyncDoc::generate_sync_message(&doc, &mut sync_state)
+                    {
+                        batch.add_delta(doc_key, &message);
+                    }
+                }
+            }
+        }
+
+        Ok(batch)
+    }
+
+    /// Send a batch of sync messages to a peer (Issue #438)
+    ///
+    /// Opens a single QUIC stream and sends all entries in the batch.
+    ///
+    /// # Wire Format
+    ///
+    /// ```text
+    /// [2 bytes: doc_key_len="batch"][5 bytes: "batch"][1 byte: msg_type=0x07]
+    /// [4 bytes: batch_len][batch_bytes...]
+    /// ```
+    pub async fn send_batch_message(&self, peer_id: EndpointId, batch: &SyncBatch) -> Result<()> {
+        if batch.is_empty() {
+            tracing::debug!("Empty batch, nothing to send to {:?}", peer_id);
+            return Ok(());
+        }
+
+        // Get connection to peer
+        let conn = self
+            .transport
+            .get_connection(&peer_id)
+            .context("No connection to peer")?;
+
+        // Open a bidirectional stream
+        let (mut send, _recv) = conn
+            .open_bi()
+            .await
+            .context("Failed to open bidirectional stream for batch")?;
+
+        // Use "batch" as the doc_key for batch messages
+        let doc_key = "batch";
+        let doc_key_bytes = doc_key.as_bytes();
+        let doc_key_len = doc_key_bytes.len() as u16;
+
+        // Encode the batch
+        let batch_bytes = batch.encode();
+
+        // Write doc_key length prefix (2 bytes, big-endian)
+        send.write_all(&doc_key_len.to_be_bytes())
+            .await
+            .context("Failed to write doc_key length")?;
+
+        // Write doc_key
+        send.write_all(doc_key_bytes)
+            .await
+            .context("Failed to write doc_key")?;
+
+        // Write message type (1 byte) - SyncBatch = 0x07
+        send.write_all(&[SyncMessageType::SyncBatch as u8])
+            .await
+            .context("Failed to write message type")?;
+
+        // Write batch length prefix (4 bytes, big-endian)
+        let batch_len = batch_bytes.len() as u32;
+        send.write_all(&batch_len.to_be_bytes())
+            .await
+            .context("Failed to write batch length")?;
+
+        // Write the batch bytes
+        send.write_all(&batch_bytes)
+            .await
+            .context("Failed to write batch bytes")?;
+
+        // Finish the stream
+        send.finish().context("Failed to finish batch stream")?;
+
+        // Track statistics
+        let total_bytes = 2 + doc_key_bytes.len() + 1 + 4 + batch_bytes.len();
+        self.total_bytes_sent
+            .fetch_add(total_bytes as u64, Ordering::Relaxed);
+
+        // Update per-peer statistics
+        {
+            let mut stats = self.peer_stats.write().unwrap();
+            let peer_stat = stats.entry(peer_id).or_default();
+            peer_stat.bytes_sent += total_bytes as u64;
+            peer_stat.sync_count += batch.len() as u64;
+            peer_stat.last_sync = Some(SystemTime::now());
+        }
+
+        tracing::debug!(
+            "Sent batch {} with {} entries ({} bytes) to {:?}",
+            batch.batch_id,
+            batch.len(),
+            total_bytes,
+            peer_id
+        );
+
+        Ok(())
+    }
+
+    /// Receive and process a batch of sync messages (Issue #438)
+    ///
+    /// Processes each entry in the batch, applying changes to local documents.
+    pub async fn receive_batch_message(
+        &self,
+        peer_id: EndpointId,
+        batch: SyncBatch,
+        total_bytes: usize,
+    ) -> Result<()> {
+        // Track statistics first
+        self.total_bytes_received
+            .fetch_add(total_bytes as u64, Ordering::Relaxed);
+
+        {
+            let mut stats = self.peer_stats.write().unwrap();
+            let peer_stat = stats.entry(peer_id).or_default();
+            peer_stat.bytes_received += total_bytes as u64;
+            peer_stat.sync_count += batch.len() as u64;
+            peer_stat.last_sync = Some(SystemTime::now());
+        }
+
+        tracing::debug!(
+            "Received batch {} with {} entries ({} bytes) from {:?}",
+            batch.batch_id,
+            batch.len(),
+            total_bytes,
+            peer_id
+        );
+
+        // Process each entry in the batch
+        for entry in batch.entries {
+            match entry.sync_type {
+                SyncMessageType::DeltaSync => {
+                    // Decode and apply delta sync message
+                    match SyncMessage::decode(&entry.payload) {
+                        Ok(message) => {
+                            if let Err(e) = self
+                                .receive_sync_message(
+                                    &entry.doc_key,
+                                    peer_id,
+                                    message,
+                                    entry.payload.len(),
+                                )
+                                .await
+                            {
+                                tracing::warn!(
+                                    "Failed to apply delta sync for {} from batch: {}",
+                                    entry.doc_key,
+                                    e
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to decode delta sync message for {}: {}",
+                                entry.doc_key,
+                                e
+                            );
+                        }
+                    }
+                }
+                SyncMessageType::StateSnapshot => {
+                    // Apply state snapshot
+                    let payload_len = entry.payload.len();
+                    if let Err(e) = self
+                        .apply_state_snapshot(&entry.doc_key, peer_id, entry.payload, payload_len)
+                        .await
+                    {
+                        tracing::warn!(
+                            "Failed to apply state snapshot for {} from batch: {}",
+                            entry.doc_key,
+                            e
+                        );
+                    }
+                }
+                SyncMessageType::Tombstone => {
+                    // Handle tombstone
+                    match crate::qos::TombstoneSyncMessage::decode(&entry.payload) {
+                        Ok(tombstone_msg) => {
+                            if let Err(e) = self
+                                .handle_incoming_tombstone(
+                                    &entry.doc_key,
+                                    peer_id,
+                                    tombstone_msg,
+                                    entry.payload.len(),
+                                )
+                                .await
+                            {
+                                tracing::warn!(
+                                    "Failed to apply tombstone for {} from batch: {}",
+                                    entry.doc_key,
+                                    e
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to decode tombstone for {}: {}",
+                                entry.doc_key,
+                                e
+                            );
+                        }
+                    }
+                }
+                other => {
+                    tracing::warn!(
+                        "Unexpected sync type {:?} in batch entry for {}",
+                        other,
+                        entry.doc_key
+                    );
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Sync multiple documents with a single peer using batch (Issue #438)
+    ///
+    /// Creates a batch containing all specified documents and sends it in a single stream.
+    /// This reduces stream overhead from O(M) to O(1) for M documents.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_keys` - Document keys to sync
+    /// * `peer_id` - Target peer
+    pub async fn sync_documents_batch(&self, doc_keys: &[&str], peer_id: EndpointId) -> Result<()> {
+        // Check circuit breaker before attempting sync
+        if self.error_handler.is_circuit_open(&peer_id) {
+            tracing::warn!(
+                "Batch sync blocked by circuit breaker for peer {:?}",
+                peer_id
+            );
+            return Err(anyhow::anyhow!("Circuit breaker open"));
+        }
+
+        // Clear sync state for all documents in batch
+        for doc_key in doc_keys {
+            self.clear_sync_state_for_document(doc_key);
+        }
+
+        // Create the batch
+        let batch = self.create_batch_for_documents(doc_keys)?;
+
+        if batch.is_empty() {
+            tracing::debug!("No documents to sync in batch with {:?}", peer_id);
+            return Ok(());
+        }
+
+        // Send the batch
+        let result = self.send_batch_message(peer_id, &batch).await;
+
+        // Handle the result through error handler
+        match &result {
+            Ok(_) => {
+                self.error_handler.record_success(&peer_id);
+                // Record sync for each document's cooldown tracking
+                for doc_key in doc_keys {
+                    self.flow_controller.record_sync(&peer_id, doc_key);
+                }
+                tracing::debug!(
+                    "Batch sync of {} docs with peer {:?} succeeded",
+                    batch.len(),
+                    peer_id
+                );
+            }
+            Err(e) => {
+                let sync_error =
+                    if e.to_string().contains("connection") || e.to_string().contains("network") {
+                        SyncError::Network(e.to_string())
+                    } else {
+                        SyncError::Protocol(e.to_string())
+                    };
+
+                if let Err(SyncError::CircuitBreakerOpen) =
+                    self.error_handler.handle_error(&peer_id, sync_error)
+                {
+                    tracing::error!("Circuit breaker opened for peer {:?}", peer_id);
+                }
+            }
+        }
+
+        result
+    }
+
+    /// Sync multiple documents with all connected peers using batch (Issue #438)
+    ///
+    /// Sends a batch to each connected peer in parallel.
+    pub async fn sync_documents_batch_with_all_peers(&self, doc_keys: &[&str]) -> Result<()> {
+        let peer_ids = self.transport.connected_peers();
+
+        tracing::info!(
+            "Batch syncing {} documents with {} peers",
+            doc_keys.len(),
+            peer_ids.len()
+        );
+
+        // Clear sync state for all documents
+        for doc_key in doc_keys {
+            self.clear_sync_state_for_document(doc_key);
+        }
+
+        // Send to each peer (could be parallelized with futures::join_all)
+        for peer_id in peer_ids {
+            if let Err(e) = self.sync_documents_batch(doc_keys, peer_id).await {
+                tracing::warn!(
+                    "Failed to batch sync {} docs with peer {:?}: {}",
+                    doc_keys.len(),
+                    peer_id,
+                    e
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Get sync targets for a given sync direction (Issue #438 Phase 3)
+    ///
+    /// Returns the appropriate peer IDs to sync with based on the direction
+    /// and the hierarchical router configuration.
+    ///
+    /// If no hierarchical router is configured, returns all connected peers (broadcast).
+    pub async fn get_sync_targets(&self, direction: SyncDirection) -> Vec<EndpointId> {
+        // If no hierarchical router, fall back to broadcast
+        let router = match &self.hierarchical_router {
+            Some(r) => r,
+            None => return self.transport.connected_peers(),
+        };
+
+        let all_peers = self.transport.connected_peers();
+
+        match direction {
+            SyncDirection::Broadcast => {
+                // Broadcast to all connected peers
+                all_peers
+            }
+            SyncDirection::Lateral => {
+                // Sync to peers in same cell
+                let valid = router.valid_targets().await;
+                // Check if we have valid cell peers (non-zone targets)
+                let has_cell_peers = valid.iter().any(|t| !t.starts_with("zone:"));
+                if has_cell_peers {
+                    // Return all connected peers that are valid cell targets
+                    // TODO: Add peer_id -> node_id mapping to transport for precise filtering
+                    all_peers
+                } else {
+                    // No lateral peers configured, broadcast to all
+                    all_peers
+                }
+            }
+            SyncDirection::Upward => {
+                // Only sync to leader (if we're not the leader)
+                // If we are the leader, sync to zone coordinator
+                if router.is_leader().await {
+                    // We're the leader - sync to zone (represented as the first zone target)
+                    let valid = router.valid_targets().await;
+                    let has_zone_targets = valid.iter().any(|t| t.starts_with("zone:"));
+                    if has_zone_targets {
+                        // Return empty for now - zone sync requires zone transport mapping
+                        // TODO: Implement zone-level sync target resolution
+                        tracing::debug!("Upward sync from leader - zone sync not yet implemented");
+                        Vec::new()
+                    } else {
+                        // No zone targets, fallback to broadcast
+                        all_peers
+                    }
+                } else {
+                    // Not the leader - sync to cell peers (which includes leader)
+                    // The leader will aggregate and sync upward
+                    all_peers
+                }
+            }
+            SyncDirection::Downward => {
+                // Only leaders can send commands downward
+                if router.is_leader().await {
+                    // Sync to all cell members
+                    all_peers
+                } else {
+                    // Non-leaders don't send commands downward - they receive
+                    tracing::debug!(
+                        "Non-leader ignoring downward sync (commands flow from leader)"
+                    );
+                    Vec::new()
+                }
+            }
+        }
+    }
+
+    /// Sync batch with hierarchical routing (Issue #438 Phase 3)
+    ///
+    /// Splits the batch entries by their sync direction and routes each
+    /// sub-batch to the appropriate peers.
+    ///
+    /// This replaces `sync_documents_batch_with_all_peers` when hierarchical
+    /// routing is enabled.
+    pub async fn sync_batch_with_hierarchical_routing(&self, batch: &SyncBatch) -> Result<()> {
+        // If no hierarchical router, fall back to broadcast
+        if self.hierarchical_router.is_none() {
+            return self.broadcast_batch(batch).await;
+        }
+
+        // Group entries by direction
+        let mut upward_entries = Vec::new();
+        let mut downward_entries = Vec::new();
+        let mut lateral_entries = Vec::new();
+        let mut broadcast_entries = Vec::new();
+
+        for entry in &batch.entries {
+            let direction = SyncDirection::from_doc_key(&entry.doc_key);
+            match direction {
+                SyncDirection::Upward => upward_entries.push(entry.clone()),
+                SyncDirection::Downward => downward_entries.push(entry.clone()),
+                SyncDirection::Lateral => lateral_entries.push(entry.clone()),
+                SyncDirection::Broadcast => broadcast_entries.push(entry.clone()),
+            }
+        }
+
+        tracing::debug!(
+            "Hierarchical routing: {} upward, {} downward, {} lateral, {} broadcast",
+            upward_entries.len(),
+            downward_entries.len(),
+            lateral_entries.len(),
+            broadcast_entries.len()
+        );
+
+        // Route each direction separately
+        if !upward_entries.is_empty() {
+            let upward_batch = SyncBatch::with_entries(upward_entries);
+            let targets = self.get_sync_targets(SyncDirection::Upward).await;
+            self.send_batch_to_peers(&upward_batch, &targets).await?;
+        }
+
+        if !downward_entries.is_empty() {
+            let downward_batch = SyncBatch::with_entries(downward_entries);
+            let targets = self.get_sync_targets(SyncDirection::Downward).await;
+            self.send_batch_to_peers(&downward_batch, &targets).await?;
+        }
+
+        if !lateral_entries.is_empty() {
+            let lateral_batch = SyncBatch::with_entries(lateral_entries);
+            let targets = self.get_sync_targets(SyncDirection::Lateral).await;
+            self.send_batch_to_peers(&lateral_batch, &targets).await?;
+        }
+
+        if !broadcast_entries.is_empty() {
+            let broadcast_batch = SyncBatch::with_entries(broadcast_entries);
+            let targets = self.get_sync_targets(SyncDirection::Broadcast).await;
+            self.send_batch_to_peers(&broadcast_batch, &targets).await?;
+        }
+
+        Ok(())
+    }
+
+    /// Send batch to specific peers
+    async fn send_batch_to_peers(&self, batch: &SyncBatch, peers: &[EndpointId]) -> Result<()> {
+        if peers.is_empty() {
+            tracing::trace!("No peers to send batch to");
+            return Ok(());
+        }
+
+        tracing::debug!("Sending batch {} to {} peers", batch.batch_id, peers.len());
+
+        for peer_id in peers {
+            if let Err(e) = self.send_batch_message(*peer_id, batch).await {
+                tracing::warn!("Failed to send batch to peer {:?}: {}", peer_id, e);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Broadcast batch to all connected peers
+    async fn broadcast_batch(&self, batch: &SyncBatch) -> Result<()> {
+        let peers = self.transport.connected_peers();
+        self.send_batch_to_peers(batch, &peers).await
+    }
+
+    /// Check if hierarchical routing is enabled
+    pub fn has_hierarchical_routing(&self) -> bool {
+        self.hierarchical_router.is_some()
+    }
+
+    /// Get hierarchical router reference (if configured)
+    pub fn hierarchical_router(&self) -> Option<&Arc<HierarchicalRouter>> {
+        self.hierarchical_router.as_ref()
     }
 
     // === Tombstone sync methods (ADR-034 Phase 2) ===
@@ -1168,6 +2101,11 @@ impl AutomergeSyncCoordinator {
             ReceivedSyncPayload::TombstoneBatch(batch) => {
                 // Tombstone batch sync (ADR-034 Phase 2)
                 self.handle_incoming_tombstone_batch(&doc_key, peer_id, batch, payload_size)
+                    .await?;
+            }
+            ReceivedSyncPayload::Batch(batch) => {
+                // Sync batch for multiple documents (Issue #438)
+                self.receive_batch_message(peer_id, batch, payload_size)
                     .await?;
             }
         }
@@ -1740,6 +2678,257 @@ mod tests {
         let coordinator = AutomergeSyncCoordinator::new(store, transport);
         (coordinator, temp_dir)
     }
+
+    // === Batch sync tests (Issue #438) ===
+
+    #[test]
+    fn test_sync_entry_encode_decode() {
+        // Test with DeltaSync type
+        let entry = SyncEntry::new(
+            "nodes:test-node-1".to_string(),
+            SyncMessageType::DeltaSync,
+            vec![1, 2, 3, 4, 5],
+        );
+
+        let encoded = entry.encode();
+
+        // Verify wire format
+        // [2 bytes: doc_key_len][doc_key][1 byte: sync_type][4 bytes: payload_len][payload]
+        assert_eq!(u16::from_be_bytes([encoded[0], encoded[1]]), 17); // "nodes:test-node-1" len
+        assert_eq!(&encoded[2..19], b"nodes:test-node-1");
+        assert_eq!(encoded[19], 0x00); // DeltaSync
+        assert_eq!(
+            u32::from_be_bytes([encoded[20], encoded[21], encoded[22], encoded[23]]),
+            5
+        );
+        assert_eq!(&encoded[24..], &[1, 2, 3, 4, 5]);
+
+        // Decode and verify roundtrip
+        let (decoded, consumed) = SyncEntry::decode(&encoded).unwrap();
+        assert_eq!(consumed, encoded.len());
+        assert_eq!(decoded.doc_key, "nodes:test-node-1");
+        assert_eq!(decoded.sync_type, SyncMessageType::DeltaSync);
+        assert_eq!(decoded.payload, vec![1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn test_sync_entry_encode_decode_state_snapshot() {
+        let entry = SyncEntry::new(
+            "beacons:beacon-42".to_string(),
+            SyncMessageType::StateSnapshot,
+            vec![10, 20, 30, 40, 50, 60],
+        );
+
+        let encoded = entry.encode();
+        let (decoded, _) = SyncEntry::decode(&encoded).unwrap();
+
+        assert_eq!(decoded.doc_key, "beacons:beacon-42");
+        assert_eq!(decoded.sync_type, SyncMessageType::StateSnapshot);
+        assert_eq!(decoded.payload, vec![10, 20, 30, 40, 50, 60]);
+    }
+
+    #[test]
+    fn test_sync_batch_empty() {
+        let batch = SyncBatch::new();
+        assert!(batch.is_empty());
+        assert_eq!(batch.len(), 0);
+        assert_eq!(batch.payload_size(), 0);
+    }
+
+    #[test]
+    fn test_sync_batch_encode_decode() {
+        let mut batch = SyncBatch::with_id(12345);
+
+        // Add entries
+        batch.entries.push(SyncEntry::new(
+            "nodes:node-1".to_string(),
+            SyncMessageType::DeltaSync,
+            vec![1, 2, 3],
+        ));
+        batch.entries.push(SyncEntry::new(
+            "beacons:beacon-1".to_string(),
+            SyncMessageType::StateSnapshot,
+            vec![4, 5, 6, 7],
+        ));
+
+        assert_eq!(batch.len(), 2);
+        assert_eq!(batch.payload_size(), 7); // 3 + 4
+
+        let encoded = batch.encode();
+
+        // Verify header
+        // [8 bytes: batch_id][8 bytes: created_at][1 byte: ttl][4 bytes: entry_count][entries...]
+        assert_eq!(u64::from_be_bytes(encoded[0..8].try_into().unwrap()), 12345);
+        assert_eq!(encoded[16], DEFAULT_SYNC_BATCH_TTL); // TTL byte
+        assert_eq!(u32::from_be_bytes(encoded[17..21].try_into().unwrap()), 2); // 2 entries
+
+        // Decode and verify roundtrip
+        let decoded = SyncBatch::decode(&encoded).unwrap();
+        assert_eq!(decoded.batch_id, 12345);
+        assert_eq!(decoded.entries.len(), 2);
+
+        assert_eq!(decoded.entries[0].doc_key, "nodes:node-1");
+        assert_eq!(decoded.entries[0].sync_type, SyncMessageType::DeltaSync);
+        assert_eq!(decoded.entries[0].payload, vec![1, 2, 3]);
+
+        assert_eq!(decoded.entries[1].doc_key, "beacons:beacon-1");
+        assert_eq!(decoded.entries[1].sync_type, SyncMessageType::StateSnapshot);
+        assert_eq!(decoded.entries[1].payload, vec![4, 5, 6, 7]);
+    }
+
+    #[test]
+    fn test_sync_batch_with_many_entries() {
+        let mut batch = SyncBatch::with_id(99999);
+
+        // Add 100 entries
+        for i in 0..100 {
+            batch.entries.push(SyncEntry::new(
+                format!("docs:doc-{}", i),
+                SyncMessageType::DeltaSync,
+                vec![i as u8; 10],
+            ));
+        }
+
+        assert_eq!(batch.len(), 100);
+        assert_eq!(batch.payload_size(), 1000); // 100 * 10
+
+        let encoded = batch.encode();
+        let decoded = SyncBatch::decode(&encoded).unwrap();
+
+        assert_eq!(decoded.batch_id, 99999);
+        assert_eq!(decoded.entries.len(), 100);
+
+        // Verify a few entries
+        assert_eq!(decoded.entries[0].doc_key, "docs:doc-0");
+        assert_eq!(decoded.entries[0].payload, vec![0u8; 10]);
+
+        assert_eq!(decoded.entries[50].doc_key, "docs:doc-50");
+        assert_eq!(decoded.entries[50].payload, vec![50u8; 10]);
+
+        assert_eq!(decoded.entries[99].doc_key, "docs:doc-99");
+        assert_eq!(decoded.entries[99].payload, vec![99u8; 10]);
+    }
+
+    #[test]
+    fn test_sync_entry_decode_error_too_short() {
+        let result = SyncEntry::decode(&[0, 1, 2]);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("too short"));
+    }
+
+    #[test]
+    fn test_sync_batch_decode_error_too_short() {
+        let result = SyncBatch::decode(&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("too short"));
+    }
+
+    // === End batch sync tests ===
+
+    // === SyncDirection tests (Issue #438 Phase 3) ===
+
+    #[test]
+    fn test_sync_direction_upward() {
+        // Node-related collections should sync upward
+        assert_eq!(
+            SyncDirection::from_doc_key("nodes:node-1"),
+            SyncDirection::Upward
+        );
+        assert_eq!(
+            SyncDirection::from_doc_key("beacons:beacon-42"),
+            SyncDirection::Upward
+        );
+        assert_eq!(
+            SyncDirection::from_doc_key("platforms:platform-a"),
+            SyncDirection::Upward
+        );
+        assert_eq!(
+            SyncDirection::from_doc_key("summaries:cell-1"),
+            SyncDirection::Upward
+        );
+    }
+
+    #[test]
+    fn test_sync_direction_downward() {
+        // Commands flow from coordinators to executors
+        assert_eq!(
+            SyncDirection::from_doc_key("commands:cmd-123"),
+            SyncDirection::Downward
+        );
+        assert_eq!(
+            SyncDirection::from_doc_key("commands:urgent-456"),
+            SyncDirection::Downward
+        );
+    }
+
+    #[test]
+    fn test_sync_direction_lateral() {
+        // Cell state syncs between peers
+        assert_eq!(
+            SyncDirection::from_doc_key("cells:cell-alpha"),
+            SyncDirection::Lateral
+        );
+        assert_eq!(
+            SyncDirection::from_doc_key("cells:formation-1"),
+            SyncDirection::Lateral
+        );
+    }
+
+    #[test]
+    fn test_sync_direction_broadcast() {
+        // Alerts and reports go everywhere
+        assert_eq!(
+            SyncDirection::from_doc_key("alerts:alert-1"),
+            SyncDirection::Broadcast
+        );
+        assert_eq!(
+            SyncDirection::from_doc_key("contact_reports:cr-789"),
+            SyncDirection::Broadcast
+        );
+        assert_eq!(
+            SyncDirection::from_doc_key("events:event-1"),
+            SyncDirection::Broadcast
+        );
+        // Unknown collections default to broadcast
+        assert_eq!(
+            SyncDirection::from_doc_key("unknown:item-1"),
+            SyncDirection::Broadcast
+        );
+        assert_eq!(
+            SyncDirection::from_doc_key("custom_collection:x"),
+            SyncDirection::Broadcast
+        );
+    }
+
+    #[test]
+    fn test_sync_direction_edge_cases() {
+        // Document key without colon - should use whole key as collection
+        assert_eq!(SyncDirection::from_doc_key("nodes"), SyncDirection::Upward);
+        assert_eq!(
+            SyncDirection::from_doc_key("commands"),
+            SyncDirection::Downward
+        );
+        // Empty key defaults to broadcast
+        assert_eq!(SyncDirection::from_doc_key(""), SyncDirection::Broadcast);
+    }
+
+    #[test]
+    fn test_sync_batch_with_entries() {
+        let entries = vec![
+            SyncEntry::new("nodes:n1".to_string(), SyncMessageType::DeltaSync, vec![1]),
+            SyncEntry::new(
+                "commands:c1".to_string(),
+                SyncMessageType::StateSnapshot,
+                vec![2],
+            ),
+        ];
+        let batch = SyncBatch::with_entries(entries);
+        assert_eq!(batch.len(), 2);
+        assert_eq!(batch.entries[0].doc_key, "nodes:n1");
+        assert_eq!(batch.entries[1].doc_key, "commands:c1");
+    }
+
+    // === End SyncDirection tests ===
 
     #[tokio::test]
     async fn test_coordinator_creation() {
