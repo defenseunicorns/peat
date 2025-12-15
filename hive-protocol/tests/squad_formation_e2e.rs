@@ -28,26 +28,26 @@ use hive_protocol::models::{
 use hive_protocol::storage::{CellStore, NodeStore};
 use hive_protocol::sync::ditto::DittoBackend;
 use hive_protocol::testing::E2EHarness;
-use serial_test::serial;
 use std::sync::Arc;
 use std::time::Duration;
 
 /// Returns the number of sync attempts based on environment.
-/// CI environments and concurrent test execution need more time due to resource contention and network latency.
-///
-/// - Local: 40 attempts × 500ms = 20 seconds (increased to handle concurrent test execution)
-/// - CI: 60 attempts × 500ms = 30 seconds
+/// With 200ms polling interval:
+/// - Local: 20 attempts × 200ms = 4 seconds
+/// - CI: 30 attempts × 200ms = 6 seconds
 fn sync_timeout_attempts() -> usize {
     if std::env::var("CI").is_ok() {
-        60 // 30 seconds for CI
+        30 // 6 seconds for CI
     } else {
-        40 // 20 seconds for local (increased for concurrent test stability)
+        20 // 4 seconds for local
     }
 }
 
+/// Polling interval for sync checks (200ms for faster test execution)
+const SYNC_POLL_INTERVAL: Duration = Duration::from_millis(200);
+
 /// Test: Verify E2E test harness creates isolated Ditto stores
 #[tokio::test]
-#[serial]
 async fn test_harness_creates_isolated_stores() {
     // Fail if Ditto credentials not properly configured
     let ditto_app_id = std::env::var("HIVE_APP_ID")
@@ -73,7 +73,6 @@ async fn test_harness_creates_isolated_stores() {
 /// - Observers trigger on data changes
 /// - Sync happens deterministically
 #[tokio::test]
-#[serial]
 async fn test_ditto_peer_sync_with_observers() {
     // Fail if Ditto credentials not properly configured
     let ditto_app_id = std::env::var("HIVE_APP_ID")
@@ -102,7 +101,7 @@ async fn test_ditto_peer_sync_with_observers() {
 
     // Wait for peers to connect (event-driven, not polling)
     let connection_result = harness
-        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(60))
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(15))
         .await;
 
     if connection_result.is_err() {
@@ -135,7 +134,6 @@ async fn test_ditto_peer_sync_with_observers() {
 /// Validates that NodeConfig stored on peer1 syncs to peer2 via CRDT replication.
 /// This is the foundation for distributed node discovery.
 #[tokio::test]
-#[serial]
 async fn test_e2e_node_advertisement_sync() {
     let ditto_app_id = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
@@ -169,7 +167,7 @@ async fn test_e2e_node_advertisement_sync() {
 
     // Wait for peers to connect
     let connection_result = harness
-        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(60))
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(15))
         .await;
 
     if connection_result.is_err() {
@@ -182,7 +180,7 @@ async fn test_e2e_node_advertisement_sync() {
     println!("  ✓ Peers connected");
 
     // Allow time for Ditto sync channels to stabilize after connection
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Create node configuration on peer1
     let mut node_config = NodeConfig::new("UAV".to_string());
@@ -204,7 +202,7 @@ async fn test_e2e_node_advertisement_sync() {
     // Poll peer2 for the node (Ditto sync is eventual)
     let mut synced_node = None;
     for attempt in 1..=sync_timeout_attempts() {
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        tokio::time::sleep(SYNC_POLL_INTERVAL).await;
 
         if let Ok(Some(node)) = node_store2.get_config("node_alpha").await {
             synced_node = Some(node);
@@ -236,7 +234,6 @@ async fn test_e2e_node_advertisement_sync() {
 /// Validates that nodes with different capabilities sync across mesh.
 /// Tests G-Set CRDT semantics for capability aggregation.
 #[tokio::test]
-#[serial]
 async fn test_e2e_capability_multi_peer_propagation() {
     let ditto_app_id = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
@@ -275,10 +272,10 @@ async fn test_e2e_capability_multi_peer_propagation() {
 
     // Wait for peers to connect
     let conn1 = harness
-        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(60))
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(15))
         .await;
     let conn2 = harness
-        .wait_for_peer_connection(&store2, &store3, Duration::from_secs(60))
+        .wait_for_peer_connection(&store2, &store3, Duration::from_secs(15))
         .await;
 
     if conn1.is_err() || conn2.is_err() {
@@ -292,7 +289,7 @@ async fn test_e2e_capability_multi_peer_propagation() {
     println!("  ✓ All peers connected");
 
     // Allow time for Ditto sync channels to stabilize after connection
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Create nodes with different capability types
     let mut node1 = NodeConfig::new("UAV".to_string());
@@ -334,7 +331,7 @@ async fn test_e2e_capability_multi_peer_propagation() {
     // Verify all nodes sync to peer1
     let mut synced_count = 0;
     for attempt in 1..=sync_timeout_attempts() {
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        tokio::time::sleep(SYNC_POLL_INTERVAL).await;
 
         let sensor = node_store1.get_config("node_sensor").await.ok().flatten();
         let payload = node_store1.get_config("node_payload").await.ok().flatten();
@@ -395,7 +392,6 @@ async fn test_e2e_capability_multi_peer_propagation() {
 ///
 /// Validates that CellState member list syncs across peers via OR-Set CRDT.
 #[tokio::test]
-#[serial]
 async fn test_e2e_cell_formation_multi_peer() {
     let ditto_app_id = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
@@ -430,7 +426,7 @@ async fn test_e2e_cell_formation_multi_peer() {
     println!("  1. Waiting for peer connection...");
 
     let connection_result = harness
-        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(60))
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(15))
         .await;
 
     if connection_result.is_err() {
@@ -443,7 +439,7 @@ async fn test_e2e_cell_formation_multi_peer() {
     println!("  ✓ Peers connected");
 
     // Allow time for Ditto sync channels to stabilize after connection
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Create cell with 3 members on peer1
     let cell_config = CellConfig::new(5);
@@ -462,7 +458,7 @@ async fn test_e2e_cell_formation_multi_peer() {
     // Poll peer2 for the cell
     let mut synced_cell = None;
     for attempt in 1..=sync_timeout_attempts() {
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        tokio::time::sleep(SYNC_POLL_INTERVAL).await;
 
         if let Ok(Some(cell)) = cell_store2.get_cell(&cell_id).await {
             synced_cell = Some(cell);
@@ -493,7 +489,6 @@ async fn test_e2e_cell_formation_multi_peer() {
 ///
 /// Validates that role assignments (leader_id) propagate via LWW-Register CRDT.
 #[tokio::test]
-#[serial]
 async fn test_e2e_role_assignment_sync() {
     let ditto_app_id = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
@@ -528,7 +523,7 @@ async fn test_e2e_role_assignment_sync() {
     println!("  1. Waiting for peer connection...");
 
     let connection_result = harness
-        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(60))
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(15))
         .await;
 
     if connection_result.is_err() {
@@ -541,7 +536,7 @@ async fn test_e2e_role_assignment_sync() {
     println!("  ✓ Peers connected");
 
     // Allow time for Ditto sync channels to stabilize after connection
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Create cell with members
     let cell_config = CellConfig::new(5);
@@ -560,7 +555,7 @@ async fn test_e2e_role_assignment_sync() {
     // Wait for cell to sync to peer2 using observer (event-driven, not polling!)
     println!("  2a. Waiting for cell to sync to peer2 (observer-based)...");
     match observer2
-        .wait_and_verify(&cell_store2, Duration::from_secs(15))
+        .wait_and_verify(&cell_store2, Duration::from_secs(5))
         .await
     {
         Ok(_) => println!("  ✓ Cell synced to peer2 and verified queryable"),
@@ -578,8 +573,7 @@ async fn test_e2e_role_assignment_sync() {
     let mut observer2_leader = harness.observe_cell(&store2, &cell_id).await.unwrap();
 
     // Give observer time to fully register before mutation
-    // Increased from 500ms to 2000ms to ensure observer is fully active
-    tokio::time::sleep(Duration::from_millis(2000)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Set leader on peer1
     cell_store1
@@ -612,7 +606,7 @@ async fn test_e2e_role_assignment_sync() {
 
     // Wait for peer2 observer AND verify leader_id is actually set (handles CRDT indexing lag)
     match observer2_leader
-        .wait_and_verify_with(&cell_store2, Duration::from_secs(15), |cell| {
+        .wait_and_verify_with(&cell_store2, Duration::from_secs(5), |cell| {
             cell.leader_id == Some("node_leader".to_string())
         })
         .await
@@ -637,7 +631,6 @@ async fn test_e2e_role_assignment_sync() {
 ///
 /// Validates that leader election results distribute mesh-wide via LWW-Register.
 #[tokio::test]
-#[serial]
 async fn test_e2e_leader_election_propagation() {
     let ditto_app_id = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
@@ -678,10 +671,10 @@ async fn test_e2e_leader_election_propagation() {
     println!("  1. Waiting for peer connections...");
 
     let conn1 = harness
-        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(60))
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(15))
         .await;
     let conn2 = harness
-        .wait_for_peer_connection(&store2, &store3, Duration::from_secs(60))
+        .wait_for_peer_connection(&store2, &store3, Duration::from_secs(15))
         .await;
 
     if conn1.is_err() || conn2.is_err() {
@@ -695,7 +688,7 @@ async fn test_e2e_leader_election_propagation() {
     println!("  ✓ All peers connected");
 
     // Allow time for Ditto sync channels to stabilize after connection
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Create cell with members
     let cell_config = CellConfig::new(5);
@@ -714,7 +707,7 @@ async fn test_e2e_leader_election_propagation() {
     let mut cell_synced_to_2 = false;
     let mut cell_synced_to_3 = false;
     for attempt in 1..=sync_timeout_attempts() {
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        tokio::time::sleep(SYNC_POLL_INTERVAL).await;
         if !cell_synced_to_2
             && cell_store2
                 .get_cell(&cell_id)
@@ -779,14 +772,14 @@ async fn test_e2e_leader_election_propagation() {
     }
 
     // Give Ditto time to propagate the update to other peers
-    tokio::time::sleep(Duration::from_millis(1000)).await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
 
     println!("  4. Waiting for election result to propagate mesh-wide...");
 
     // Poll all peers for leader update
     let mut leader_synced = false;
     for attempt in 1..=sync_timeout_attempts() {
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        tokio::time::sleep(SYNC_POLL_INTERVAL).await;
 
         let cell1 = cell_store1.get_cell(&cell_id).await.ok().flatten();
         let cell2 = cell_store2.get_cell(&cell_id).await.ok().flatten();
@@ -831,7 +824,6 @@ async fn test_e2e_leader_election_propagation() {
 ///
 /// Validates LWW-Register semantics where latest update wins across peers.
 #[tokio::test]
-#[serial]
 async fn test_e2e_timestamped_state_updates() {
     dotenvy::dotenv().ok();
 
@@ -870,7 +862,7 @@ async fn test_e2e_timestamped_state_updates() {
     println!("  1. Waiting for peer connection...");
 
     let connection_result = harness
-        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(60))
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(15))
         .await;
 
     if connection_result.is_err() {
@@ -887,7 +879,7 @@ async fn test_e2e_timestamped_state_updates() {
     println!("  ✓ Peers connected");
 
     // Allow time for Ditto sync channels to stabilize after connection
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Create cell with members
     let cell_config = CellConfig::new(5);
@@ -904,7 +896,7 @@ async fn test_e2e_timestamped_state_updates() {
     println!("  2a. Waiting for cell to sync to peer2...");
     let mut cell_synced = false;
     for attempt in 1..=sync_timeout_attempts() {
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        tokio::time::sleep(SYNC_POLL_INTERVAL).await;
         if cell_store2
             .get_cell(&cell_id)
             .await
@@ -942,7 +934,7 @@ async fn test_e2e_timestamped_state_updates() {
     set_leader_result.unwrap();
 
     // Give Ditto time to propagate the update before we start polling
-    tokio::time::sleep(Duration::from_millis(1000)).await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
 
     // Verify peer1 sees its own update
     let peer1_cell = cell_store1.get_cell(&cell_id).await.unwrap().unwrap();
@@ -955,7 +947,7 @@ async fn test_e2e_timestamped_state_updates() {
     println!("  3c. Waiting for leader update to sync to peer2...");
     let mut alpha_synced = false;
     for attempt in 1..=sync_timeout_attempts() {
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        tokio::time::sleep(SYNC_POLL_INTERVAL).await;
 
         let cell1 = cell_store1.get_cell(&cell_id).await.ok().flatten();
         let cell2 = cell_store2.get_cell(&cell_id).await.ok().flatten();
@@ -998,7 +990,7 @@ async fn test_e2e_timestamped_state_updates() {
     set_beta_result.unwrap();
 
     // Give Ditto time to propagate the update before we start polling
-    tokio::time::sleep(Duration::from_millis(1000)).await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
 
     // Verify peer2 sees its own update
     let peer2_cell_after = cell_store2.get_cell(&cell_id).await.unwrap().unwrap();
@@ -1014,7 +1006,7 @@ async fn test_e2e_timestamped_state_updates() {
     let mut peer2_converged = false;
 
     for attempt in 1..=sync_timeout_attempts() {
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        tokio::time::sleep(SYNC_POLL_INTERVAL).await;
 
         let cell1 = cell_store1.get_cell(&cell_id).await.ok().flatten();
         let cell2 = cell_store2.get_cell(&cell_id).await.ok().flatten();
@@ -1066,7 +1058,6 @@ async fn test_e2e_timestamped_state_updates() {
 ///
 /// Full lifecycle test: capability advertisement → cell formation → leader election → validation.
 #[tokio::test]
-#[serial]
 async fn test_e2e_complete_formation_convergence() {
     let ditto_app_id = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
@@ -1111,10 +1102,10 @@ async fn test_e2e_complete_formation_convergence() {
     println!("  1. Waiting for peer connections...");
 
     let conn1 = harness
-        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(60))
+        .wait_for_peer_connection(&store1, &store2, Duration::from_secs(15))
         .await;
     let conn2 = harness
-        .wait_for_peer_connection(&store2, &store3, Duration::from_secs(60))
+        .wait_for_peer_connection(&store2, &store3, Duration::from_secs(15))
         .await;
 
     if conn1.is_err() || conn2.is_err() {
@@ -1128,7 +1119,7 @@ async fn test_e2e_complete_formation_convergence() {
     println!("  ✓ All peers connected");
 
     // Allow time for Ditto sync channels to stabilize after connection
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Step 1: Nodes advertise capabilities
     println!("  2. Nodes advertising capabilities...");
@@ -1165,7 +1156,7 @@ async fn test_e2e_complete_formation_convergence() {
     node_store3.store_config(&node3).await.unwrap();
 
     // Wait for capability sync
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Step 2: Cell formation
     println!("  3. Forming cell with all nodes...");
@@ -1195,7 +1186,7 @@ async fn test_e2e_complete_formation_convergence() {
 
     // Wait for peer2 observer AND verify document is queryable (handles CRDT indexing lag)
     match observer2
-        .wait_and_verify(&cell_store2, Duration::from_secs(15))
+        .wait_and_verify(&cell_store2, Duration::from_secs(5))
         .await
     {
         Ok(_) => println!("  ✓ Cell synced to peer2 and verified queryable"),
@@ -1210,7 +1201,7 @@ async fn test_e2e_complete_formation_convergence() {
 
     // Wait for peer3 observer AND verify document is queryable
     match observer3
-        .wait_and_verify(&cell_store3, Duration::from_secs(15))
+        .wait_and_verify(&cell_store3, Duration::from_secs(5))
         .await
     {
         Ok(_) => println!("  ✓ Cell synced to peer3 and verified queryable"),
@@ -1241,7 +1232,7 @@ async fn test_e2e_complete_formation_convergence() {
     let mut observer3_leader = harness.observe_cell(&store3, &cell_id).await.unwrap();
 
     // Give observers time to fully register before mutation
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    tokio::time::sleep(SYNC_POLL_INTERVAL).await;
 
     // Perform leader election on peer2
     cell_store2
@@ -1254,7 +1245,7 @@ async fn test_e2e_complete_formation_convergence() {
 
     // Wait for peer1 observer AND verify leader_id is actually set (handles CRDT indexing lag)
     match observer1
-        .wait_and_verify_with(&cell_store1, Duration::from_secs(15), |cell| {
+        .wait_and_verify_with(&cell_store1, Duration::from_secs(5), |cell| {
             cell.leader_id == Some("node_2".to_string())
         })
         .await
@@ -1271,7 +1262,7 @@ async fn test_e2e_complete_formation_convergence() {
 
     // Wait for peer3 observer AND verify leader_id is actually set
     match observer3_leader
-        .wait_and_verify_with(&cell_store3, Duration::from_secs(15), |cell| {
+        .wait_and_verify_with(&cell_store3, Duration::from_secs(5), |cell| {
             cell.leader_id == Some("node_2".to_string())
         })
         .await
@@ -1363,7 +1354,6 @@ async fn test_e2e_complete_formation_convergence() {
 /// protocol operations beyond basic document sync.
 #[cfg(feature = "automerge-backend")]
 #[tokio::test]
-#[serial]
 async fn test_e2e_automerge_node_advertisement_sync() {
     use hive_protocol::sync::automerge::AutomergeIrohBackend;
 
@@ -1418,7 +1408,7 @@ async fn test_e2e_automerge_node_advertisement_sync() {
 
     // Allow time for sync channels to stabilize after connection
     // Automerge needs time for both peers' subscriptions to activate
-    tokio::time::sleep(Duration::from_secs(4)).await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
 
     // Create node configuration on peer1
     let mut node_config = NodeConfig::new("UAV".to_string());
@@ -1440,7 +1430,7 @@ async fn test_e2e_automerge_node_advertisement_sync() {
     // Poll peer2 for the node (CRDT sync is eventual)
     let mut synced_node = None;
     for attempt in 1..=sync_timeout_attempts() {
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        tokio::time::sleep(SYNC_POLL_INTERVAL).await;
 
         if let Ok(Some(node)) = node_store2.get_config("node_alpha").await {
             synced_node = Some(node);

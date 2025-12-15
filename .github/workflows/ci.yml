@@ -60,9 +60,7 @@ jobs:
       - run: cargo clippy -p hive-btle --all-targets -- -D warnings
 
   # ============================================
-  # Tests (single compile, nextest for speed)
-  # PRs: all tests except E2E (~8 min)
-  # Main: all tests including E2E (~10 min)
+  # Unit & Integration Tests (excludes E2E, ~5 min)
   # ============================================
   test:
     name: Test
@@ -88,24 +86,43 @@ jobs:
           cache-on-failure: true
           shared-key: test
 
-      - name: Run tests (excluding E2E for PRs)
-        if: github.event_name == 'pull_request'
-        env:
-          HIVE_APP_ID: ${{ secrets.HIVE_APP_ID }}
-          HIVE_SHARED_KEY: ${{ secrets.HIVE_SHARED_KEY }}
-          HIVE_OFFLINE_TOKEN: ${{ secrets.HIVE_OFFLINE_TOKEN }}
+      - name: Run unit & integration tests
         run: |
           cargo nextest run --all-features --workspace --exclude hive-ffi --exclude hive-inference --exclude hive-btle -E 'not test(e2e)'
           cargo nextest run -p hive-inference -E 'not test(e2e)'
           cargo nextest run -p hive-btle -E 'not test(e2e)'
 
-      - name: Run all tests (including E2E for main)
-        if: github.event_name != 'pull_request'
+  # ============================================
+  # E2E Tests (parallel job, ~3 min)
+  # ============================================
+  test-e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h
+
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler mold clang
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: test-e2e
+
+      - name: Run E2E tests
         env:
           HIVE_APP_ID: ${{ secrets.HIVE_APP_ID }}
           HIVE_SHARED_KEY: ${{ secrets.HIVE_SHARED_KEY }}
           HIVE_OFFLINE_TOKEN: ${{ secrets.HIVE_OFFLINE_TOKEN }}
         run: |
-          cargo nextest run --all-features --workspace --exclude hive-ffi --exclude hive-inference --exclude hive-btle
-          cargo nextest run -p hive-inference
-          cargo nextest run -p hive-btle
+          cargo nextest run --all-features --workspace --exclude hive-ffi --exclude hive-inference --exclude hive-btle -E 'test(e2e)'
