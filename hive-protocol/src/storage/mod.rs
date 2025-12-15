@@ -52,6 +52,8 @@ pub mod partition_detection;
 #[cfg(feature = "automerge-backend")]
 pub mod query;
 #[cfg(feature = "automerge-backend")]
+pub mod sync_channel;
+#[cfg(feature = "automerge-backend")]
 pub mod sync_errors;
 #[cfg(feature = "automerge-backend")]
 pub mod sync_persistence;
@@ -78,7 +80,7 @@ pub use automerge_store::AutomergeStore;
 #[cfg(feature = "automerge-backend")]
 pub use automerge_summary_storage::AutomergeSummaryStorage;
 #[cfg(feature = "automerge-backend")]
-pub use automerge_sync::AutomergeSyncCoordinator;
+pub use automerge_sync::{AutomergeSyncCoordinator, SyncDirection};
 #[cfg(feature = "automerge-backend")]
 pub use iroh_blob_store::{IrohBlobStore, NetworkedIrohBlobStore};
 #[cfg(feature = "automerge-backend")]
@@ -100,6 +102,8 @@ pub use flow_control::{
     BoundedQueue, FlowControlConfig, FlowControlError, FlowControlStats, FlowController,
     PeerResourceTracker, SyncCooldownTracker, TokenBucket,
 };
+#[cfg(feature = "automerge-backend")]
+pub use sync_channel::{ChannelManagerStats, ChannelState, SyncChannel, SyncChannelManager};
 #[cfg(feature = "automerge-backend")]
 pub use sync_persistence::{
     Checkpoint, PersistedSyncState, PersistenceStats, SyncStatePersistence,
