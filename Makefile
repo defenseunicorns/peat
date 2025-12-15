@@ -185,16 +185,18 @@ check: fmt clippy test
 pre-commit: clean-ditto
 	@echo "Running pre-commit checks..."
 	@cargo fmt --all
-	@cargo clippy --all-targets --all-features --workspace --exclude hive-ffi --exclude hive-inference -- -D warnings
+	@cargo clippy --all-targets --all-features --workspace --exclude hive-ffi --exclude hive-inference --exclude hive-btle -- -D warnings
 	@cargo clippy --all-targets --workspace -p hive-inference -- -D warnings
+	@cargo clippy --all-targets --workspace -p hive-btle -- -D warnings
 	@$(MAKE) test-unit
 	@echo "✅ Pre-commit checks passed!"
 
 ci: clean-ditto
 	@echo "Running CI pipeline..."
 	@cargo fmt --all -- --check
-	@cargo clippy --all-targets --all-features --workspace --exclude hive-ffi --exclude hive-inference -- -D warnings
+	@cargo clippy --all-targets --all-features --workspace --exclude hive-ffi --exclude hive-inference --exclude hive-btle -- -D warnings
 	@cargo clippy --all-targets --workspace -p hive-inference -- -D warnings
+	@cargo clippy --all-targets --workspace -p hive-btle -- -D warnings
 	@$(MAKE) test-integration
 	@echo "✅ CI pipeline passed!"
 
