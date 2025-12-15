@@ -68,13 +68,17 @@ async fn test_e2e_command_propagation() {
 
     println!("=== E2E: Command Propagation ===");
 
+    // Allocate random TCP port to avoid conflicts with concurrent tests
+    let tcp_port = E2EHarness::allocate_tcp_port().expect("Failed to allocate TCP port");
+    println!("  Using TCP port: {}", tcp_port);
+
     // Create two Ditto stores: leader and member
     let leader_store = harness
-        .create_ditto_store_with_tcp(Some(12350), None)
+        .create_ditto_store_with_tcp(Some(tcp_port), None)
         .await
         .unwrap();
     let member_store = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12350".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
         .await
         .unwrap();
 
@@ -177,13 +181,17 @@ async fn test_e2e_acknowledgment_propagation() {
 
     println!("=== E2E: Acknowledgment Propagation ===");
 
+    // Allocate random TCP port to avoid conflicts with concurrent tests
+    let tcp_port = E2EHarness::allocate_tcp_port().expect("Failed to allocate TCP port");
+    println!("  Using TCP port: {}", tcp_port);
+
     // Create two Ditto stores: leader and member
     let leader_store = harness
-        .create_ditto_store_with_tcp(Some(12351), None)
+        .create_ditto_store_with_tcp(Some(tcp_port), None)
         .await
         .unwrap();
     let member_store = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12351".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
         .await
         .unwrap();
 
@@ -291,17 +299,21 @@ async fn test_e2e_full_duplex_command_ack_flow() {
 
     println!("=== E2E: Full-Duplex Bidirectional Flow ===");
 
+    // Allocate random TCP port to avoid conflicts with concurrent tests
+    let tcp_port = E2EHarness::allocate_tcp_port().expect("Failed to allocate TCP port");
+    println!("  Using TCP port: {}", tcp_port);
+
     // Create three Ditto stores: leader + 2 members (squad)
     let leader_store = harness
-        .create_ditto_store_with_tcp(Some(12352), None)
+        .create_ditto_store_with_tcp(Some(tcp_port), None)
         .await
         .unwrap();
     let member1_store = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12352".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
         .await
         .unwrap();
     let member2_store = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12352".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
         .await
         .unwrap();
 
@@ -513,13 +525,17 @@ async fn test_e2e_concurrent_commands() {
 
     println!("=== E2E: Concurrent Commands ===");
 
+    // Allocate random TCP port to avoid conflicts with concurrent tests
+    let tcp_port = E2EHarness::allocate_tcp_port().expect("Failed to allocate TCP port");
+    println!("  Using TCP port: {}", tcp_port);
+
     // Create two Ditto stores
     let leader_store = harness
-        .create_ditto_store_with_tcp(Some(12353), None)
+        .create_ditto_store_with_tcp(Some(tcp_port), None)
         .await
         .unwrap();
     let member_store = harness
-        .create_ditto_store_with_tcp(None, Some("127.0.0.1:12353".to_string()))
+        .create_ditto_store_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
         .await
         .unwrap();
 
