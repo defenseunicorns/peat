@@ -47,13 +47,19 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 /// Returns the number of sync attempts based on environment.
+/// With 200ms polling interval:
+/// - Local: 20 attempts × 200ms = 4 seconds
+/// - CI: 30 attempts × 200ms = 6 seconds
 fn sync_timeout_attempts() -> usize {
     if std::env::var("CI").is_ok() {
-        60 // 30 seconds for CI
+        30 // 6 seconds for CI
     } else {
-        20 // 10 seconds for local
+        20 // 4 seconds for local
     }
 }
+
+/// Polling interval for sync checks (200ms for faster test execution)
+const SYNC_POLL_INTERVAL: Duration = Duration::from_millis(200);
 
 /// Test: Command propagates from leader to member via Ditto sync
 #[tokio::test]
@@ -156,7 +162,7 @@ async fn test_e2e_command_propagation() {
             synced = true;
             break;
         }
-        sleep(Duration::from_millis(500)).await;
+        sleep(SYNC_POLL_INTERVAL).await;
     }
 
     assert!(synced, "Command failed to sync to member within timeout");
@@ -271,7 +277,7 @@ async fn test_e2e_acknowledgment_propagation() {
                 break;
             }
         }
-        sleep(Duration::from_millis(500)).await;
+        sleep(SYNC_POLL_INTERVAL).await;
     }
 
     assert!(
@@ -425,7 +431,7 @@ async fn test_e2e_full_duplex_command_ack_flow() {
             break;
         }
 
-        sleep(Duration::from_millis(500)).await;
+        sleep(SYNC_POLL_INTERVAL).await;
     }
 
     assert!(
@@ -496,7 +502,7 @@ async fn test_e2e_full_duplex_command_ack_flow() {
                 break;
             }
         }
-        sleep(Duration::from_millis(500)).await;
+        sleep(SYNC_POLL_INTERVAL).await;
     }
 
     assert!(
@@ -628,7 +634,7 @@ async fn test_e2e_concurrent_commands() {
             break;
         }
 
-        sleep(Duration::from_millis(500)).await;
+        sleep(SYNC_POLL_INTERVAL).await;
     }
 
     assert!(all_synced, "Not all commands synced within timeout");
@@ -678,7 +684,7 @@ async fn test_e2e_concurrent_commands() {
                     break;
                 }
             }
-            sleep(Duration::from_millis(500)).await;
+            sleep(SYNC_POLL_INTERVAL).await;
         }
 
         assert!(

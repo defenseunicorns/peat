@@ -16,6 +16,9 @@ use hive_protocol::testing::E2EHarness;
 use std::collections::HashMap;
 use std::time::Duration;
 
+/// Polling interval for sync checks (200ms for faster test execution)
+const SYNC_POLL_INTERVAL: Duration = Duration::from_millis(200);
+
 /// Test: 5-node hierarchical topology (1 leader + 4 soldiers)
 ///
 /// Topology:
@@ -169,7 +172,7 @@ async fn test_hierarchical_sync_soldiers_to_leader() {
     }
 
     // Wait for connections to stabilize
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    tokio::time::sleep(SYNC_POLL_INTERVAL).await;
 
     // Verify connections
     let leader_peers = leader_transport.connected_peers();
@@ -399,7 +402,7 @@ async fn test_hierarchical_sync_leader_to_soldiers() {
         }
     }
 
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    tokio::time::sleep(SYNC_POLL_INTERVAL).await;
 
     // Create command on leader
     println!("1. Creating command document on leader...");

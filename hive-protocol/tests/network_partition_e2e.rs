@@ -29,6 +29,9 @@ use hive_protocol::sync::ditto::DittoBackend;
 use hive_protocol::testing::E2EHarness;
 use std::time::Duration;
 
+/// Polling interval for sync checks (200ms for faster test execution)
+const SYNC_POLL_INTERVAL: Duration = Duration::from_millis(200);
+
 /// Test 1: Partition during cell formation
 ///
 /// Scenario:
@@ -65,7 +68,7 @@ async fn test_e2e_partition_during_formation() {
 
     println!("  1. All peers connected, forming mesh...");
 
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Create cell on peer1
     let mut cell = CellState::new(CellConfig::with_id("cell_partition_1".to_string(), 10));
@@ -79,7 +82,7 @@ async fn test_e2e_partition_during_formation() {
     println!("  3. Partitioning peer2 (stopping sync)...");
     store2.stop_sync();
 
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    tokio::time::sleep(SYNC_POLL_INTERVAL).await;
 
     // Continue formation on peer1 and peer3 (peer2 is partitioned)
     println!("  4. Adding members while peer2 is partitioned...");
@@ -94,7 +97,7 @@ async fn test_e2e_partition_during_formation() {
         .unwrap();
 
     // Wait for sync between peer1 and peer3
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Verify peer3 got updates (but peer2 didn't)
     if let Ok(Some(cell_peer3)) = cell_store3.get_cell("cell_partition_1").await {
@@ -109,14 +112,14 @@ async fn test_e2e_partition_during_formation() {
     store2.start_sync().unwrap();
 
     // Wait for partition recovery
-    tokio::time::sleep(Duration::from_secs(3)).await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
 
     println!("  6. Waiting for peer2 to catch up...");
 
     // Verify peer2 catches up
     let mut peer2_converged = false;
     for attempt in 1..=20 {
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        tokio::time::sleep(SYNC_POLL_INTERVAL).await;
         if let Ok(Some(cell_peer2)) = cell_store2.get_cell("cell_partition_1").await {
             if cell_peer2.members.len() == 3 {
                 peer2_converged = true;
@@ -212,7 +215,7 @@ async fn test_e2e_multi_zone_partition_isolation() {
 
     println!("  1. Creating zones alpha and beta...");
 
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Create cells in zone alpha
     let mut cell_alpha = CellState::new(CellConfig::with_id("cell_alpha_1".to_string(), 10));
@@ -228,7 +231,7 @@ async fn test_e2e_multi_zone_partition_isolation() {
 
     cell_store_beta1.store_cell(&cell_beta).await.unwrap();
 
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     println!("  2. Zones created, partitioning zones...");
 
@@ -236,7 +239,7 @@ async fn test_e2e_multi_zone_partition_isolation() {
     store_beta1.stop_sync();
     store_beta2.stop_sync();
 
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    tokio::time::sleep(SYNC_POLL_INTERVAL).await;
 
     // Make changes in zone alpha while beta is partitioned
     println!("  3. Zone alpha: Adding members while partitioned...");
@@ -252,7 +255,7 @@ async fn test_e2e_multi_zone_partition_isolation() {
         .await
         .unwrap();
 
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Heal partition
     println!("  5. Healing zone partition...");
@@ -261,12 +264,12 @@ async fn test_e2e_multi_zone_partition_isolation() {
 
     // Wait for convergence
     println!("  6. Waiting for cross-zone convergence...");
-    tokio::time::sleep(Duration::from_secs(4)).await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
 
     // Validate zone isolation (each zone should see its own cells)
     let mut zones_converged = false;
     for attempt in 1..=20 {
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        tokio::time::sleep(SYNC_POLL_INTERVAL).await;
 
         let cell_alpha_from_alpha = cell_store_alpha1
             .get_cell("cell_alpha_1")
@@ -371,7 +374,7 @@ async fn test_e2e_automerge_partition_during_formation() {
 
     println!("  ✓ Peers connected");
 
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Create cell on peer1
     let mut cell = CellState::new(CellConfig::with_id("cell_automerge_1".to_string(), 10));
@@ -386,7 +389,7 @@ async fn test_e2e_automerge_partition_during_formation() {
     // Note: For Automerge, we can't truly "stop sync" like Ditto, so we'll
     // just proceed with the test knowing that reconnection will sync changes
 
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    tokio::time::sleep(SYNC_POLL_INTERVAL).await;
 
     // Continue formation on peer1 (peer2 may or may not see this immediately)
     println!("  4. Adding members on peer1...");
@@ -396,14 +399,14 @@ async fn test_e2e_automerge_partition_during_formation() {
         .await
         .unwrap();
 
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     println!("  5. Waiting for sync to peer2...");
 
     // Verify peer2 catches up (eventual consistency)
     let mut peer2_converged = false;
     for attempt in 1..=20 {
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        tokio::time::sleep(SYNC_POLL_INTERVAL).await;
         if let Ok(Some(cell_peer2)) = cell_store2.get_cell("cell_automerge_1").await {
             if cell_peer2.members.len() == 2 {
                 peer2_converged = true;
