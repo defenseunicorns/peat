@@ -237,10 +237,11 @@ def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
         lines.append(f"    # ===== COMPANY {company_idx} =====")
         lines.append("")
 
-        # Company commander connects to all platoon leaders (bidirectional for automerge)
+        # Company commander: top of hierarchy, accepts incoming connections only
+        # (platoon leaders connect UP to commander, not the other way around)
         cred_vars = get_credential_env_vars(backend)
         circuit_vars = get_circuit_breaker_env_vars()  # Lab defaults: aggressive (2s windows)
-        tcp_connect = get_tcp_connect_list(commander_platoon_leaders[commander_id], name, backend)
+        tcp_connect = []  # No outgoing connections - commander accepts incoming only
         lines.extend([
             f"    {commander_id}:",
             "      kind: linux",
@@ -264,11 +265,10 @@ def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
             lines.append(f"    # ----- Platoon {company_idx}-{platoon_idx} -----")
             lines.append("")
 
-            # Platoon leader connects to:
-            # 1. Company commander (upstream)
-            # 2. All squad leaders (downstream, for bidirectional sync)
+            # Platoon leader connects UP to company commander only
+            # (squad leaders connect UP to platoon leader, not the other way around)
+            # QUIC provides bidirectional streams - only need one-way connection establishment
             platoon_peers = [(commander_id, node_ports[commander_id])]
-            platoon_peers.extend(platoon_squad_leaders[leader_id])
 
             # Also collect squad IDs for SQUAD_IDS env var
             squad_ids = [f"{platoon_id}-squad-{i}" for i in range(1, squads_per_platoon + 1)]
