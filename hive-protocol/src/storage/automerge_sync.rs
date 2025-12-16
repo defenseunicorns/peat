@@ -998,8 +998,12 @@ impl AutomergeSyncCoordinator {
             self.send_sync_message_for_doc(peer_id, doc_key, &response)
                 .await?;
         } else {
-            // Store sync state even if no response needed
-            self.update_sync_state(doc_key, peer_id, sync_state);
+            // Sync converged - reset state to prevent memory accumulation (Issue #435)
+            // Only preserve shared_heads (what both peers have), discard session data
+            // like sent_hashes which accumulates unboundedly during sync rounds.
+            let mut fresh_state = SyncState::new();
+            fresh_state.shared_heads = sync_state.shared_heads;
+            self.update_sync_state(doc_key, peer_id, fresh_state);
         }
 
         Ok(())
