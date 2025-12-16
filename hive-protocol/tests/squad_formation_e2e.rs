@@ -49,6 +49,7 @@ const SYNC_POLL_INTERVAL: Duration = Duration::from_millis(200);
 /// Test: Verify E2E test harness creates isolated Ditto stores
 #[tokio::test]
 async fn test_harness_creates_isolated_stores() {
+    dotenvy::dotenv().ok();
     // Fail if Ditto credentials not properly configured
     let ditto_app_id = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
@@ -74,6 +75,7 @@ async fn test_harness_creates_isolated_stores() {
 /// - Sync happens deterministically
 #[tokio::test]
 async fn test_ditto_peer_sync_with_observers() {
+    dotenvy::dotenv().ok();
     // Fail if Ditto credentials not properly configured
     let ditto_app_id = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
@@ -135,6 +137,7 @@ async fn test_ditto_peer_sync_with_observers() {
 /// This is the foundation for distributed node discovery.
 #[tokio::test]
 async fn test_e2e_node_advertisement_sync() {
+    dotenvy::dotenv().ok();
     let ditto_app_id = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
         .expect("HIVE_APP_ID must be set for E2E tests");
@@ -235,6 +238,7 @@ async fn test_e2e_node_advertisement_sync() {
 /// Tests G-Set CRDT semantics for capability aggregation.
 #[tokio::test]
 async fn test_e2e_capability_multi_peer_propagation() {
+    dotenvy::dotenv().ok();
     let ditto_app_id = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
         .expect("HIVE_APP_ID must be set for E2E tests");
@@ -393,6 +397,7 @@ async fn test_e2e_capability_multi_peer_propagation() {
 /// Validates that CellState member list syncs across peers via OR-Set CRDT.
 #[tokio::test]
 async fn test_e2e_cell_formation_multi_peer() {
+    dotenvy::dotenv().ok();
     let ditto_app_id = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
         .expect("HIVE_APP_ID must be set for E2E tests");
@@ -490,6 +495,7 @@ async fn test_e2e_cell_formation_multi_peer() {
 /// Validates that role assignments (leader_id) propagate via LWW-Register CRDT.
 #[tokio::test]
 async fn test_e2e_role_assignment_sync() {
+    dotenvy::dotenv().ok();
     let ditto_app_id = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
         .expect("HIVE_APP_ID must be set for E2E tests");
@@ -632,6 +638,7 @@ async fn test_e2e_role_assignment_sync() {
 /// Validates that leader election results distribute mesh-wide via LWW-Register.
 #[tokio::test]
 async fn test_e2e_leader_election_propagation() {
+    dotenvy::dotenv().ok();
     let ditto_app_id = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
         .expect("HIVE_APP_ID must be set for E2E tests");
@@ -1059,6 +1066,7 @@ async fn test_e2e_timestamped_state_updates() {
 /// Full lifecycle test: capability advertisement → cell formation → leader election → validation.
 #[tokio::test]
 async fn test_e2e_complete_formation_convergence() {
+    dotenvy::dotenv().ok();
     let ditto_app_id = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
         .expect("HIVE_APP_ID must be set for E2E tests");

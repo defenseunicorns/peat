@@ -554,12 +554,18 @@ impl SyncCapable for AutomergeBackend {
         }
 
         // Issue #438 Phase 2: Initialize sync channel manager for persistent channels
+        // Issue #435: Wire up coordinator to use channel manager for all sends
         {
             let transport = self.transport.clone().unwrap();
             let coordinator = self.sync_coordinator.clone().unwrap();
-            let manager = super::sync_channel::SyncChannelManager::new(transport, coordinator);
-            *self.channel_manager.write().unwrap() = Some(Arc::new(manager));
-            tracing::debug!("SyncChannelManager initialized for persistent channels");
+            let manager = Arc::new(super::sync_channel::SyncChannelManager::new(
+                transport,
+                Arc::clone(&coordinator),
+            ));
+            // Enable coordinator to use persistent channels for sending
+            coordinator.set_channel_manager(Arc::clone(&manager));
+            *self.channel_manager.write().unwrap() = Some(manager);
+            tracing::debug!("SyncChannelManager initialized with bidirectional wiring");
         }
 
         // Phase 6.2: Spawn incoming sync handler task
