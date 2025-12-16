@@ -1439,9 +1439,8 @@ async fn test_e2e_automerge_node_advertisement_sync() {
         }
     }
 
-    if synced_node.is_some() {
+    if let Some(synced) = synced_node {
         // Validate synced data
-        let synced = synced_node.unwrap();
         assert_eq!(synced.id, "node_alpha");
         assert_eq!(synced.platform_type, "UAV");
         assert_eq!(synced.capabilities.len(), 1);
