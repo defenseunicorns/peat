@@ -61,7 +61,7 @@ use std::collections::HashMap;
 #[cfg(feature = "automerge-backend")]
 use std::sync::atomic::{AtomicU64, Ordering};
 #[cfg(feature = "automerge-backend")]
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, Weak};
 #[cfg(feature = "automerge-backend")]
 use std::time::SystemTime;
 #[cfg(feature = "automerge-backend")]
@@ -516,6 +516,9 @@ pub struct AutomergeSyncCoordinator {
     next_batch_id: Arc<AtomicU64>,
     /// Optional hierarchical router for direction-based sync routing (Issue #438 Phase 3)
     hierarchical_router: Option<Arc<HierarchicalRouter>>,
+    /// Optional channel manager for persistent stream sync (Issue #435)
+    /// Uses Weak to avoid circular reference with SyncChannelManager
+    channel_manager: Arc<RwLock<Option<Weak<super::sync_channel::SyncChannelManager>>>>,
 }
 
 #[cfg(feature = "automerge-backend")]
@@ -555,6 +558,7 @@ impl AutomergeSyncCoordinator {
             sync_mode_registry: Arc::new(SyncModeRegistry::with_defaults()),
             next_batch_id: Arc::new(AtomicU64::new(1)),
             hierarchical_router: None,
+            channel_manager: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -583,7 +587,25 @@ impl AutomergeSyncCoordinator {
             sync_mode_registry,
             next_batch_id: Arc::new(AtomicU64::new(1)),
             hierarchical_router: None,
+            channel_manager: Arc::new(RwLock::new(None)),
         }
+    }
+
+    /// Set the channel manager for persistent stream sync (Issue #435)
+    ///
+    /// This enables routing all sync operations through persistent channels
+    /// instead of opening new streams for each operation.
+    pub fn set_channel_manager(&self, manager: Arc<super::sync_channel::SyncChannelManager>) {
+        *self.channel_manager.write().unwrap() = Some(Arc::downgrade(&manager));
+    }
+
+    /// Get the channel manager if available
+    fn get_channel_manager(&self) -> Option<Arc<super::sync_channel::SyncChannelManager>> {
+        self.channel_manager
+            .read()
+            .unwrap()
+            .as_ref()
+            .and_then(|weak| weak.upgrade())
     }
 
     /// Create a new sync coordinator with hierarchical routing (Issue #438 Phase 3)
@@ -618,6 +640,7 @@ impl AutomergeSyncCoordinator {
             sync_mode_registry: Arc::new(SyncModeRegistry::with_defaults()),
             next_batch_id: Arc::new(AtomicU64::new(1)),
             hierarchical_router: Some(router),
+            channel_manager: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -814,73 +837,81 @@ impl AutomergeSyncCoordinator {
         Ok(())
     }
 
-    /// Send a state snapshot for LatestOnly sync mode (Issue #355)
+    /// Send a state snapshot for LatestOnly sync mode (Issue #355, #435)
     ///
     /// Instead of delta-based sync, sends the full document state.
-    /// This is ~300× more efficient for high-frequency data after reconnection.
-    ///
-    /// # Wire Format
-    ///
-    /// ```text
-    /// [2 bytes: doc_key_len][N bytes: doc_key][1 byte: msg_type=0x01][4 bytes: state_len][M bytes: state]
-    /// ```
+    /// Uses persistent channels when available.
     async fn send_state_snapshot(
         &self,
         peer_id: EndpointId,
         doc_key: &str,
         state_bytes: &[u8],
     ) -> Result<()> {
-        // Get connection to peer
+        // Issue #435: Use persistent channel if available
+        if let Some(channel_manager) = self.get_channel_manager() {
+            let total_bytes = channel_manager
+                .send_state_snapshot(peer_id, doc_key, state_bytes.to_vec())
+                .await?;
+
+            self.total_bytes_sent
+                .fetch_add(total_bytes as u64, Ordering::Relaxed);
+
+            {
+                let mut stats = self.peer_stats.write().unwrap();
+                let peer_stat = stats.entry(peer_id).or_default();
+                peer_stat.bytes_sent += total_bytes as u64;
+                peer_stat.sync_count += 1;
+                peer_stat.last_sync = Some(SystemTime::now());
+            }
+
+            tracing::debug!(
+                "Sent state snapshot for {} to {:?} via persistent channel ({} bytes)",
+                doc_key,
+                peer_id,
+                total_bytes
+            );
+            return Ok(());
+        }
+
+        // Fallback: Open a new stream (legacy path)
         let conn = self
             .transport
             .get_connection(&peer_id)
             .context("No connection to peer")?;
 
-        // Open a bidirectional stream
-        let (mut send, _recv) = conn
+        let (mut send, mut recv) = conn
             .open_bi()
             .await
             .context("Failed to open bidirectional stream")?;
 
-        // Encode doc_key as UTF-8 bytes
         let doc_key_bytes = doc_key.as_bytes();
         let doc_key_len = doc_key_bytes.len() as u16;
 
-        // Write doc_key length prefix (2 bytes, big-endian)
         send.write_all(&doc_key_len.to_be_bytes())
             .await
             .context("Failed to write doc_key length")?;
-
-        // Write doc_key
         send.write_all(doc_key_bytes)
             .await
             .context("Failed to write doc_key")?;
-
-        // Write message type (1 byte) - StateSnapshot = 0x01
         send.write_all(&[SyncMessageType::StateSnapshot as u8])
             .await
             .context("Failed to write message type")?;
 
-        // Write state length prefix (4 bytes, big-endian)
         let state_len = state_bytes.len() as u32;
         send.write_all(&state_len.to_be_bytes())
             .await
             .context("Failed to write state length")?;
-
-        // Write the state bytes
         send.write_all(state_bytes)
             .await
             .context("Failed to write state bytes")?;
 
-        // Finish the stream
         send.finish().context("Failed to finish stream")?;
+        let _ = recv.stop(0u32.into());
 
-        // Track statistics: bytes sent = doc_key overhead + type + state size
         let total_bytes = 2 + doc_key_bytes.len() + 1 + 4 + state_bytes.len();
         self.total_bytes_sent
             .fetch_add(total_bytes as u64, Ordering::Relaxed);
 
-        // Update per-peer statistics
         {
             let mut stats = self.peer_stats.write().unwrap();
             let peer_stat = stats.entry(peer_id).or_default();
@@ -974,72 +1005,87 @@ impl AutomergeSyncCoordinator {
         Ok(())
     }
 
-    /// Send a sync message to a peer over Iroh stream
+    /// Send a sync message to a peer through persistent channel (Issue #435)
     ///
-    /// Wire format (v2 with message type - Issue #355):
-    /// ```text
-    /// [2 bytes: doc_key_len][N bytes: doc_key][1 byte: msg_type=0x00][4 bytes: msg_len][M bytes: msg]
-    /// ```
+    /// Uses SyncChannelManager for persistent stream multiplexing instead of
+    /// opening a new stream for each message.
     async fn send_sync_message_for_doc(
         &self,
         peer_id: EndpointId,
         doc_key: &str,
         message: &SyncMessage,
     ) -> Result<()> {
-        // Get connection to peer
+        // Issue #435: Use persistent channel if available
+        if let Some(channel_manager) = self.get_channel_manager() {
+            let total_bytes = channel_manager
+                .send_delta_sync(peer_id, doc_key, message)
+                .await?;
+
+            // Track statistics
+            self.total_bytes_sent
+                .fetch_add(total_bytes as u64, Ordering::Relaxed);
+
+            {
+                let mut stats = self.peer_stats.write().unwrap();
+                let peer_stat = stats.entry(peer_id).or_default();
+                peer_stat.bytes_sent += total_bytes as u64;
+                peer_stat.sync_count += 1;
+                peer_stat.last_sync = Some(SystemTime::now());
+            }
+
+            tracing::debug!(
+                "Sent delta sync for {} to peer {:?} via persistent channel ({} bytes)",
+                doc_key,
+                peer_id,
+                total_bytes
+            );
+            return Ok(());
+        }
+
+        // Fallback: Open a new stream (legacy path)
         let conn = self
             .transport
             .get_connection(&peer_id)
             .context("No connection to peer")?;
 
-        // Open a bidirectional stream
-        let (mut send, _recv) = conn
+        let (mut send, mut recv) = conn
             .open_bi()
             .await
             .context("Failed to open bidirectional stream")?;
 
-        // Encode doc_key as UTF-8 bytes
         let doc_key_bytes = doc_key.as_bytes();
         let doc_key_len = doc_key_bytes.len() as u16;
 
-        // Write doc_key length prefix (2 bytes, big-endian)
         send.write_all(&doc_key_len.to_be_bytes())
             .await
             .context("Failed to write doc_key length")?;
 
-        // Write doc_key
         send.write_all(doc_key_bytes)
             .await
             .context("Failed to write doc_key")?;
 
-        // Write message type (1 byte) - DeltaSync = 0x00 (Issue #355)
         send.write_all(&[SyncMessageType::DeltaSync as u8])
             .await
             .context("Failed to write message type")?;
 
-        // Encode the sync message (clone since encode() takes ownership)
         let encoded = message.clone().encode();
 
-        // Write message length prefix (4 bytes, big-endian)
         let message_len = encoded.len() as u32;
         send.write_all(&message_len.to_be_bytes())
             .await
             .context("Failed to write message length")?;
 
-        // Write the message
         send.write_all(&encoded)
             .await
             .context("Failed to write message")?;
 
-        // Finish the stream
         send.finish().context("Failed to finish stream")?;
+        let _ = recv.stop(0u32.into());
 
-        // Track statistics: bytes sent = doc_key overhead + type + message size
         let total_bytes = 2 + doc_key_bytes.len() + 1 + 4 + encoded.len();
         self.total_bytes_sent
             .fetch_add(total_bytes as u64, Ordering::Relaxed);
 
-        // Update per-peer statistics
         {
             let mut stats = self.peer_stats.write().unwrap();
             let peer_stat = stats.entry(peer_id).or_default();
@@ -1418,7 +1464,7 @@ impl AutomergeSyncCoordinator {
             .context("No connection to peer")?;
 
         // Open a bidirectional stream
-        let (mut send, _recv) = conn
+        let (mut send, mut recv) = conn
             .open_bi()
             .await
             .context("Failed to open bidirectional stream for batch")?;
@@ -1459,6 +1505,9 @@ impl AutomergeSyncCoordinator {
 
         // Finish the stream
         send.finish().context("Failed to finish batch stream")?;
+
+        // Issue #435: Explicitly stop recv stream to prevent resource accumulation
+        let _ = recv.stop(0u32.into());
 
         // Track statistics
         let total_bytes = 2 + doc_key_bytes.len() + 1 + 4 + batch_bytes.len();
@@ -1925,7 +1974,7 @@ impl AutomergeSyncCoordinator {
             .context("No connection to peer for tombstone exchange")?;
 
         // Open a bidirectional stream
-        let (mut send, _recv) = conn
+        let (mut send, mut recv) = conn
             .open_bi()
             .await
             .context("Failed to open bidirectional stream for tombstone exchange")?;
@@ -1963,6 +2012,9 @@ impl AutomergeSyncCoordinator {
 
         // Finish the stream
         send.finish().context("Failed to finish tombstone stream")?;
+
+        // Issue #435: Explicitly stop recv stream to prevent resource accumulation
+        let _ = recv.stop(0u32.into());
 
         // Track statistics: bytes sent = doc_key overhead + type + payload size
         let total_bytes = 2 + doc_key_bytes.len() + 1 + 4 + payload.len();
@@ -2334,7 +2386,7 @@ impl AutomergeSyncCoordinator {
             .context("No connection to peer for single tombstone")?;
 
         // Open a bidirectional stream
-        let (mut send, _recv) = conn
+        let (mut send, mut recv) = conn
             .open_bi()
             .await
             .context("Failed to open bidirectional stream for single tombstone")?;
@@ -2378,6 +2430,9 @@ impl AutomergeSyncCoordinator {
 
         // Finish the stream
         send.finish().context("Failed to finish tombstone stream")?;
+
+        // Issue #435: Explicitly stop recv stream to prevent resource accumulation
+        let _ = recv.stop(0u32.into());
 
         // Track statistics
         let total_bytes = 2 + doc_key_bytes.len() + 1 + 4 + payload.len();
