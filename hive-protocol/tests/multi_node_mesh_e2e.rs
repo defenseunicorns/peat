@@ -23,6 +23,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
+/// Polling interval for sync checks (200ms for faster test execution)
+const SYNC_POLL_INTERVAL: Duration = Duration::from_millis(200);
+
 // ============================================================================
 // Ditto Backend Tests
 // ============================================================================
@@ -252,7 +255,7 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
     let _ = (&_sub1, &_sub2, &_sub3);
 
     // Wait a bit for sync to initialize
-    sleep(Duration::from_millis(500)).await;
+    sleep(SYNC_POLL_INTERVAL).await;
 
     // Create document on Node 1
     println!("  2. Creating document on Node 1...");
@@ -281,7 +284,7 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
     let mut all_synced = false;
 
     for i in 0..retries {
-        sleep(Duration::from_millis(500)).await;
+        sleep(SYNC_POLL_INTERVAL).await;
 
         let doc_on_node1 = backend1
             .document_store()
@@ -372,7 +375,7 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
     let mut all_synced2 = false;
 
     for i in 0..retries {
-        sleep(Duration::from_millis(500)).await;
+        sleep(SYNC_POLL_INTERVAL).await;
 
         let doc2_on_node1 = backend1
             .document_store()
