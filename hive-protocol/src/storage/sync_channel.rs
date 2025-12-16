@@ -139,16 +139,17 @@ impl SyncChannel {
         };
 
         // Spawn receiver task
-        channel.spawn_receiver(recv, coordinator).await;
+        channel.spawn_receiver(recv, coordinator);
 
         tracing::debug!("Sync channel connected to peer {:?}", peer_id);
         Ok(channel)
     }
 
     /// Spawn the inbound receiver task
-    async fn spawn_receiver(&self, recv: RecvStream, coordinator: Arc<AutomergeSyncCoordinator>) {
+    fn spawn_receiver(&self, recv: RecvStream, coordinator: Arc<AutomergeSyncCoordinator>) {
         let peer_id = self.peer_id;
         let state = Arc::clone(&self.state);
+        let recv_task = Arc::clone(&self.recv_task);
 
         let task = tokio::spawn(async move {
             tracing::debug!("Sync channel receiver started for peer {:?}", peer_id);
@@ -166,7 +167,10 @@ impl SyncChannel {
             tracing::debug!("Sync channel receiver ended for peer {:?}", peer_id);
         });
 
-        *self.recv_task.lock().await = Some(task);
+        // Store task handle (spawn a task to avoid blocking)
+        tokio::spawn(async move {
+            *recv_task.lock().await = Some(task);
+        });
     }
 
     /// Main receive loop - processes incoming batches
@@ -228,9 +232,9 @@ impl SyncChannel {
 
     /// Send a batch through this channel
     ///
-    /// Wire format on persistent channel:
+    /// Wire format (compatible with receive_sync_payload_from_stream):
     /// ```text
-    /// [1 byte: 0x07 (SyncBatch marker)][4 bytes: batch_len][batch_bytes...]
+    /// [2 bytes: doc_key_len][N bytes: "batch"][1 byte: 0x07][4 bytes: batch_len][batch_bytes...]
     /// ```
     pub async fn send(&self, batch: &SyncBatch) -> Result<()> {
         // Check channel state (read and release lock before any await)
@@ -255,6 +259,17 @@ impl SyncChannel {
             .as_mut()
             .ok_or_else(|| anyhow::anyhow!("No send stream available"))?;
 
+        // Write doc_key length prefix (2 bytes) - "batch" = 5 chars
+        let doc_key = b"batch";
+        send.write_all(&(doc_key.len() as u16).to_be_bytes())
+            .await
+            .context("Failed to write doc_key length")?;
+
+        // Write doc_key
+        send.write_all(doc_key)
+            .await
+            .context("Failed to write doc_key")?;
+
         // Write message type marker
         send.write_all(&[SyncMessageType::SyncBatch as u8])
             .await
@@ -271,8 +286,8 @@ impl SyncChannel {
             .await
             .context("Failed to write batch data")?;
 
-        // Update statistics
-        let total_bytes = 1 + 4 + batch_bytes.len();
+        // Update statistics (2 + doc_key_len + 1 + 4 + batch_bytes)
+        let total_bytes = 2 + doc_key.len() + 1 + 4 + batch_bytes.len();
         self.bytes_sent
             .fetch_add(total_bytes as u64, Ordering::Relaxed);
         self.batches_sent.fetch_add(1, Ordering::Relaxed);
@@ -319,10 +334,14 @@ impl SyncChannel {
             .context("No connection to peer for reconnection")?;
 
         // Open new stream
-        let (send, _recv) = conn
+        let (send, mut recv) = conn
             .open_bi()
             .await
             .context("Failed to open bidirectional stream for reconnection")?;
+
+        // Issue #435: Explicitly stop recv stream to prevent resource accumulation
+        // (reconnect only uses send half, recv is not needed)
+        let _ = recv.stop(0u32.into());
 
         // Update send stream
         *self.send.lock().await = Some(send);
@@ -449,6 +468,129 @@ impl SyncChannelManager {
         }
 
         Ok(())
+    }
+
+    /// Send a delta sync message to a specific peer through persistent channel
+    ///
+    /// Packages the message into a SyncBatch and sends it.
+    pub async fn send_delta_sync(
+        &self,
+        peer_id: EndpointId,
+        doc_key: &str,
+        message: &automerge::sync::Message,
+    ) -> Result<usize> {
+        let encoded = message.clone().encode();
+        let payload_len = encoded.len();
+
+        let mut batch = SyncBatch::new();
+        batch.entries.push(super::automerge_sync::SyncEntry::new(
+            doc_key.to_string(),
+            SyncMessageType::DeltaSync,
+            encoded,
+        ));
+
+        self.send_to_peer(peer_id, &batch).await?;
+
+        // Return bytes sent: marker + len + batch_bytes
+        Ok(1 + 4 + batch.encode().len() + payload_len)
+    }
+
+    /// Send a state snapshot to a specific peer through persistent channel
+    pub async fn send_state_snapshot(
+        &self,
+        peer_id: EndpointId,
+        doc_key: &str,
+        state_bytes: Vec<u8>,
+    ) -> Result<usize> {
+        let payload_len = state_bytes.len();
+
+        let mut batch = SyncBatch::new();
+        batch.entries.push(super::automerge_sync::SyncEntry::new(
+            doc_key.to_string(),
+            SyncMessageType::StateSnapshot,
+            state_bytes,
+        ));
+
+        self.send_to_peer(peer_id, &batch).await?;
+
+        Ok(1 + 4 + batch.encode().len() + payload_len)
+    }
+
+    /// Send a tombstone to a specific peer through persistent channel
+    pub async fn send_tombstone(
+        &self,
+        peer_id: EndpointId,
+        tombstone_msg: &crate::qos::TombstoneSyncMessage,
+    ) -> Result<usize> {
+        let mut batch = SyncBatch::new();
+        batch.add_tombstone(tombstone_msg);
+
+        let batch_bytes = batch.encode();
+        self.send_to_peer(peer_id, &batch).await?;
+
+        Ok(1 + 4 + batch_bytes.len())
+    }
+
+    /// Send multiple tombstones to a specific peer through persistent channel
+    pub async fn send_tombstone_batch(
+        &self,
+        peer_id: EndpointId,
+        tombstones: &[crate::qos::TombstoneSyncMessage],
+    ) -> Result<usize> {
+        let mut batch = SyncBatch::new();
+        for tombstone in tombstones {
+            batch.add_tombstone(tombstone);
+        }
+
+        let batch_bytes = batch.encode();
+        self.send_to_peer(peer_id, &batch).await?;
+
+        Ok(1 + 4 + batch_bytes.len())
+    }
+
+    /// Broadcast a delta sync message to all connected peers
+    pub async fn broadcast_delta_sync(
+        &self,
+        doc_key: &str,
+        message: &automerge::sync::Message,
+    ) -> Result<()> {
+        let encoded = message.clone().encode();
+
+        let mut batch = SyncBatch::new();
+        batch.entries.push(super::automerge_sync::SyncEntry::new(
+            doc_key.to_string(),
+            SyncMessageType::DeltaSync,
+            encoded,
+        ));
+
+        self.broadcast(&batch).await
+    }
+
+    /// Broadcast a state snapshot to all connected peers
+    pub async fn broadcast_state_snapshot(
+        &self,
+        doc_key: &str,
+        state_bytes: Vec<u8>,
+    ) -> Result<()> {
+        let mut batch = SyncBatch::new();
+        batch.entries.push(super::automerge_sync::SyncEntry::new(
+            doc_key.to_string(),
+            SyncMessageType::StateSnapshot,
+            state_bytes,
+        ));
+
+        self.broadcast(&batch).await
+    }
+
+    /// Broadcast a tombstone to all connected peers
+    pub async fn broadcast_tombstone(
+        &self,
+        tombstone_msg: &crate::qos::TombstoneSyncMessage,
+    ) -> Result<()> {
+        let mut batch = SyncBatch::new();
+        batch.add_tombstone(tombstone_msg);
+
+        self.broadcast(&batch).await
     }
 
     /// Remove channel for a peer (e.g., on disconnect)
