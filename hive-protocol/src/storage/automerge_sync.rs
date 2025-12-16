@@ -837,7 +837,7 @@ impl AutomergeSyncCoordinator {
             .context("No connection to peer")?;
 
         // Open a bidirectional stream
-        let (mut send, _recv) = conn
+        let (mut send, mut recv) = conn
             .open_bi()
             .await
             .context("Failed to open bidirectional stream")?;
@@ -874,6 +874,9 @@ impl AutomergeSyncCoordinator {
 
         // Finish the stream
         send.finish().context("Failed to finish stream")?;
+
+        // Issue #435: Explicitly stop recv stream to prevent resource accumulation
+        let _ = recv.stop(0u32.into());
 
         // Track statistics: bytes sent = doc_key overhead + type + state size
         let total_bytes = 2 + doc_key_bytes.len() + 1 + 4 + state_bytes.len();
@@ -993,7 +996,7 @@ impl AutomergeSyncCoordinator {
             .context("No connection to peer")?;
 
         // Open a bidirectional stream
-        let (mut send, _recv) = conn
+        let (mut send, mut recv) = conn
             .open_bi()
             .await
             .context("Failed to open bidirectional stream")?;
@@ -1033,6 +1036,9 @@ impl AutomergeSyncCoordinator {
 
         // Finish the stream
         send.finish().context("Failed to finish stream")?;
+
+        // Issue #435: Explicitly stop recv stream to prevent resource accumulation
+        let _ = recv.stop(0u32.into());
 
         // Track statistics: bytes sent = doc_key overhead + type + message size
         let total_bytes = 2 + doc_key_bytes.len() + 1 + 4 + encoded.len();
@@ -1418,7 +1424,7 @@ impl AutomergeSyncCoordinator {
             .context("No connection to peer")?;
 
         // Open a bidirectional stream
-        let (mut send, _recv) = conn
+        let (mut send, mut recv) = conn
             .open_bi()
             .await
             .context("Failed to open bidirectional stream for batch")?;
@@ -1459,6 +1465,9 @@ impl AutomergeSyncCoordinator {
 
         // Finish the stream
         send.finish().context("Failed to finish batch stream")?;
+
+        // Issue #435: Explicitly stop recv stream to prevent resource accumulation
+        let _ = recv.stop(0u32.into());
 
         // Track statistics
         let total_bytes = 2 + doc_key_bytes.len() + 1 + 4 + batch_bytes.len();
@@ -1925,7 +1934,7 @@ impl AutomergeSyncCoordinator {
             .context("No connection to peer for tombstone exchange")?;
 
         // Open a bidirectional stream
-        let (mut send, _recv) = conn
+        let (mut send, mut recv) = conn
             .open_bi()
             .await
             .context("Failed to open bidirectional stream for tombstone exchange")?;
@@ -1963,6 +1972,9 @@ impl AutomergeSyncCoordinator {
 
         // Finish the stream
         send.finish().context("Failed to finish tombstone stream")?;
+
+        // Issue #435: Explicitly stop recv stream to prevent resource accumulation
+        let _ = recv.stop(0u32.into());
 
         // Track statistics: bytes sent = doc_key overhead + type + payload size
         let total_bytes = 2 + doc_key_bytes.len() + 1 + 4 + payload.len();
@@ -2334,7 +2346,7 @@ impl AutomergeSyncCoordinator {
             .context("No connection to peer for single tombstone")?;
 
         // Open a bidirectional stream
-        let (mut send, _recv) = conn
+        let (mut send, mut recv) = conn
             .open_bi()
             .await
             .context("Failed to open bidirectional stream for single tombstone")?;
@@ -2378,6 +2390,9 @@ impl AutomergeSyncCoordinator {
 
         // Finish the stream
         send.finish().context("Failed to finish tombstone stream")?;
+
+        // Issue #435: Explicitly stop recv stream to prevent resource accumulation
+        let _ = recv.stop(0u32.into());
 
         // Track statistics
         let total_bytes = 2 + doc_key_bytes.len() + 1 + 4 + payload.len();

@@ -23,6 +23,7 @@ use std::sync::Arc;
 /// Test: Complete 3-tier aggregation flow with protocol APIs
 #[tokio::test]
 async fn test_three_tier_hierarchical_aggregation() {
+    dotenvy::dotenv().ok();
     let ditto_app_id = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
         .expect("HIVE_APP_ID must be set for E2E tests");
@@ -170,6 +171,7 @@ async fn test_three_tier_hierarchical_aggregation() {
 /// Test: Dynamic squad count validation (not hardcoded)
 #[tokio::test]
 async fn test_dynamic_squad_count_validation() {
+    dotenvy::dotenv().ok();
     let ditto_app_id = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
         .expect("HIVE_APP_ID must be set for E2E tests");

@@ -319,10 +319,14 @@ impl SyncChannel {
             .context("No connection to peer for reconnection")?;
 
         // Open new stream
-        let (send, _recv) = conn
+        let (send, mut recv) = conn
             .open_bi()
             .await
             .context("Failed to open bidirectional stream for reconnection")?;
+
+        // Issue #435: Explicitly stop recv stream to prevent resource accumulation
+        // (reconnect only uses send half, recv is not needed)
+        let _ = recv.stop(0u32.into());
 
         // Update send stream
         *self.send.lock().await = Some(send);
