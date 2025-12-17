@@ -19,7 +19,7 @@ use automerge::sync::State as SyncState;
 #[cfg(feature = "automerge-backend")]
 use iroh::EndpointId;
 #[cfg(feature = "automerge-backend")]
-use redb::{Database, TableDefinition};
+use redb::{Database, ReadableDatabase, TableDefinition};
 #[cfg(feature = "automerge-backend")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "automerge-backend")]
