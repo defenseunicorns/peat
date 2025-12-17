@@ -3126,6 +3126,7 @@ dependencies = [
  "log",
  "lru 0.12.5",
  "mdns-sd",
+ "negentropy",
  "proptest",
  "prost",
  "quick-xml",
@@ -4565,6 +4566,12 @@ checksum = "ee6cda3051665f1fb8d9e08fc35c96d5a244fb1be711a03b71118828afc9a873"
 dependencies = [
  "jni-sys",
 ]
+
+[[package]]
+name = "negentropy"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0efe882e02d206d8d279c20eb40e03baf7cb5136a1476dc084a324fbc3ec42d"
 
 [[package]]
 name = "nested_enum_utils"
