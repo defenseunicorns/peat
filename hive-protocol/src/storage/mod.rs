@@ -48,6 +48,8 @@ pub mod geohash_index;
 #[cfg(feature = "automerge-backend")]
 pub mod iroh_blob_store;
 #[cfg(feature = "automerge-backend")]
+pub mod negentropy_sync;
+#[cfg(feature = "automerge-backend")]
 pub mod partition_detection;
 #[cfg(feature = "automerge-backend")]
 pub mod query;
@@ -104,6 +106,8 @@ pub use flow_control::{
     BoundedQueue, FlowControlConfig, FlowControlError, FlowControlStats, FlowController,
     PeerResourceTracker, SyncCooldownTracker, TokenBucket,
 };
+#[cfg(feature = "automerge-backend")]
+pub use negentropy_sync::{NegentropyStats, NegentropySync, ReconcileResult, SyncItem};
 #[cfg(feature = "automerge-backend")]
 pub use sync_channel::{ChannelManagerStats, ChannelState, SyncChannel, SyncChannelManager};
 #[cfg(feature = "automerge-backend")]

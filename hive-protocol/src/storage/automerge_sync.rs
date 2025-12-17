@@ -37,6 +37,8 @@ use super::automerge_store::AutomergeStore;
 #[cfg(feature = "automerge-backend")]
 use super::flow_control::{FlowControlConfig, FlowControlStats, FlowController};
 #[cfg(feature = "automerge-backend")]
+use super::negentropy_sync::{NegentropySync, SyncItem};
+#[cfg(feature = "automerge-backend")]
 use super::partition_detection::PartitionDetector;
 #[cfg(feature = "automerge-backend")]
 use super::sync_errors::{SyncError, SyncErrorHandler};
@@ -102,6 +104,12 @@ pub enum SyncMessageType {
     TombstoneAck = 0x06,
     /// Batch of sync messages for multiple documents (Issue #438)
     SyncBatch = 0x07,
+    /// Negentropy set reconciliation initiate (ADR-040, Issue #435)
+    NegentropyInit = 0x08,
+    /// Negentropy set reconciliation response (ADR-040, Issue #435)
+    NegentropyResponse = 0x09,
+    /// Negentropy reconciliation complete - request missing docs (ADR-040, Issue #435)
+    NegentropyRequest = 0x0A,
 }
 
 /// Sync direction for hierarchical routing (Issue #438 Phase 3)
@@ -457,6 +465,10 @@ pub enum ReceivedSyncPayload {
     TombstoneBatch(crate::qos::TombstoneBatch),
     /// Batch of sync messages for multiple documents (Issue #438)
     Batch(SyncBatch),
+    /// Negentropy init message - initiates set reconciliation (ADR-040)
+    NegentropyInit(Vec<u8>),
+    /// Negentropy response message - reconciliation round (ADR-040)
+    NegentropyResponse(Vec<u8>),
 }
 
 /// Per-peer sync statistics
@@ -519,6 +531,8 @@ pub struct AutomergeSyncCoordinator {
     /// Optional channel manager for persistent stream sync (Issue #435)
     /// Uses Weak to avoid circular reference with SyncChannelManager
     channel_manager: Arc<RwLock<Option<Weak<super::sync_channel::SyncChannelManager>>>>,
+    /// Negentropy set reconciliation for efficient document discovery (ADR-040, Issue #435)
+    negentropy_sync: Arc<NegentropySync>,
 }
 
 #[cfg(feature = "automerge-backend")]
@@ -559,6 +573,7 @@ impl AutomergeSyncCoordinator {
             next_batch_id: Arc::new(AtomicU64::new(1)),
             hierarchical_router: None,
             channel_manager: Arc::new(RwLock::new(None)),
+            negentropy_sync: Arc::new(NegentropySync::new()),
         }
     }
 
@@ -588,6 +603,7 @@ impl AutomergeSyncCoordinator {
             next_batch_id: Arc::new(AtomicU64::new(1)),
             hierarchical_router: None,
             channel_manager: Arc::new(RwLock::new(None)),
+            negentropy_sync: Arc::new(NegentropySync::new()),
         }
     }
 
@@ -641,6 +657,7 @@ impl AutomergeSyncCoordinator {
             next_batch_id: Arc::new(AtomicU64::new(1)),
             hierarchical_router: Some(router),
             channel_manager: Arc::new(RwLock::new(None)),
+            negentropy_sync: Arc::new(NegentropySync::new()),
         }
     }
 
@@ -1214,6 +1231,19 @@ impl AutomergeSyncCoordinator {
                     .map_err(|e| anyhow::anyhow!("Failed to decode sync batch: {}", e))?;
                 ReceivedSyncPayload::Batch(batch)
             }
+            0x08 => {
+                // NegentropyInit - Negentropy set reconciliation init (ADR-040, Issue #435)
+                tracing::debug!("Received Negentropy init from peer: {} bytes", buffer.len());
+                ReceivedSyncPayload::NegentropyInit(buffer)
+            }
+            0x09 => {
+                // NegentropyResponse - Negentropy reconciliation response (ADR-040, Issue #435)
+                tracing::debug!(
+                    "Received Negentropy response from peer: {} bytes",
+                    buffer.len()
+                );
+                ReceivedSyncPayload::NegentropyResponse(buffer)
+            }
             other => {
                 return Err(anyhow::anyhow!(
                     "Unknown sync message type: 0x{:02x}",
@@ -1251,6 +1281,12 @@ impl AutomergeSyncCoordinator {
                 "Received sync batch but expected delta sync message for {}",
                 doc_key
             )),
+            ReceivedSyncPayload::NegentropyInit(_) | ReceivedSyncPayload::NegentropyResponse(_) => {
+                Err(anyhow::anyhow!(
+                    "Received Negentropy message but expected delta sync message for {}",
+                    doc_key
+                ))
+            }
         }
     }
 
@@ -2126,12 +2162,12 @@ impl AutomergeSyncCoordinator {
     /// # Arguments
     ///
     /// * `peer_id` - The EndpointId of the peer (for stats tracking)
-    /// * `_send` - The send half of the bidirectional stream (unused for now)
+    /// * `send` - The send half of the bidirectional stream (used for Negentropy responses)
     /// * `recv` - The receive half of the bidirectional stream
     pub async fn handle_incoming_sync_stream(
         &self,
         peer_id: EndpointId,
-        _send: iroh::endpoint::SendStream,
+        mut send: iroh::endpoint::SendStream,
         recv: iroh::endpoint::RecvStream,
     ) -> Result<()> {
         // Receive the sync payload (includes doc_key and message type in wire format)
@@ -2162,6 +2198,16 @@ impl AutomergeSyncCoordinator {
             ReceivedSyncPayload::Batch(batch) => {
                 // Sync batch for multiple documents (Issue #438)
                 self.receive_batch_message(peer_id, batch, payload_size)
+                    .await?;
+            }
+            ReceivedSyncPayload::NegentropyInit(message) => {
+                // Negentropy set reconciliation init (ADR-040, Issue #435)
+                self.handle_negentropy_init(peer_id, message, &mut send)
+                    .await?;
+            }
+            ReceivedSyncPayload::NegentropyResponse(message) => {
+                // Negentropy reconciliation response (ADR-040, Issue #435)
+                self.handle_negentropy_response(peer_id, message, &mut send)
                     .await?;
             }
         }
@@ -2562,6 +2608,391 @@ impl AutomergeSyncCoordinator {
     /// Get flow control statistics
     pub fn flow_control_stats(&self) -> FlowControlStats {
         self.flow_controller.stats()
+    }
+
+    // ========================================================================
+    // Negentropy Set Reconciliation (ADR-040, Issue #435)
+    // ========================================================================
+
+    /// Get local document inventory as SyncItems for Negentropy reconciliation
+    ///
+    /// Returns a list of all documents with their keys and timestamps,
+    /// suitable for Negentropy set reconciliation.
+    fn get_local_sync_items(&self) -> Vec<SyncItem> {
+        // Get all documents by scanning with empty prefix
+        let docs = self.store.scan_prefix("").unwrap_or_default();
+        docs.into_iter()
+            .map(|(key, _doc)| {
+                // Use current timestamp - could be improved with actual doc timestamps
+                let timestamp = SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                SyncItem::from_doc_key(&key, timestamp)
+            })
+            .collect()
+    }
+
+    /// Initiate Negentropy sync with a peer
+    ///
+    /// This discovers which documents need to be synced using O(log n) rounds
+    /// instead of syncing all documents blindly.
+    ///
+    /// # Returns
+    ///
+    /// The initial Negentropy message to send to the peer.
+    pub fn initiate_negentropy_sync(&self, peer_id: EndpointId) -> Result<Vec<u8>> {
+        let items = self.get_local_sync_items();
+        tracing::debug!(
+            "Initiating Negentropy sync with peer {:?}, local_docs={}",
+            peer_id,
+            items.len()
+        );
+        self.negentropy_sync.initiate_sync(peer_id, items)
+    }
+
+    /// Handle incoming Negentropy message from a peer
+    ///
+    /// Processes the Negentropy reconciliation message and returns:
+    /// - Response message to send back (if reconciliation not complete)
+    /// - List of document keys we have that peer needs (have_keys)
+    /// - List of document keys peer has that we need (need_keys)
+    pub fn handle_negentropy_message(
+        &self,
+        peer_id: EndpointId,
+        message: &[u8],
+    ) -> Result<super::negentropy_sync::ReconcileResult> {
+        let items = self.get_local_sync_items();
+        self.negentropy_sync.handle_message(peer_id, message, items)
+    }
+
+    /// Send Negentropy initiation message to peer
+    ///
+    /// Opens a bidirectional stream and sends the initial Negentropy message.
+    pub async fn send_negentropy_init(&self, peer_id: EndpointId) -> Result<()> {
+        let init_msg = self.initiate_negentropy_sync(peer_id)?;
+
+        let conn = self
+            .transport
+            .get_connection(&peer_id)
+            .context("No connection to peer")?;
+
+        let (mut send, mut recv) = conn
+            .open_bi()
+            .await
+            .context("Failed to open bidirectional stream")?;
+
+        // Wire format: [2 bytes: doc_key_len][doc_key][1 byte: msg_type][4 bytes: len][payload]
+        let doc_key = "_negentropy";
+        let doc_key_bytes = doc_key.as_bytes();
+
+        send.write_all(&(doc_key_bytes.len() as u16).to_be_bytes())
+            .await?;
+        send.write_all(doc_key_bytes).await?;
+        send.write_all(&[SyncMessageType::NegentropyInit as u8])
+            .await?;
+        send.write_all(&(init_msg.len() as u32).to_be_bytes())
+            .await?;
+        send.write_all(&init_msg).await?;
+        send.finish()?;
+
+        // Close recv side - we don't need it for this message
+        recv.stop(0u32.into())?;
+
+        self.total_bytes_sent.fetch_add(
+            2 + doc_key_bytes.len() as u64 + 1 + 4 + init_msg.len() as u64,
+            Ordering::Relaxed,
+        );
+
+        tracing::debug!(
+            "Sent Negentropy init to peer {:?}, msg_len={}",
+            peer_id,
+            init_msg.len()
+        );
+
+        Ok(())
+    }
+
+    /// Perform full Negentropy-based sync with a peer
+    ///
+    /// This is the main entry point for efficient sync:
+    /// 1. Negentropy reconciliation to discover differences
+    /// 2. Send documents we have that peer needs
+    /// 3. Request documents peer has that we need
+    pub async fn sync_with_peer_negentropy(&self, peer_id: EndpointId) -> Result<()> {
+        let conn = self
+            .transport
+            .get_connection(&peer_id)
+            .context("No connection to peer")?;
+
+        // Phase 1: Initiate Negentropy sync
+        let init_msg = self.initiate_negentropy_sync(peer_id)?;
+
+        let (mut send, mut recv) = conn
+            .open_bi()
+            .await
+            .context("Failed to open bidirectional stream")?;
+
+        // Wire format: [2 bytes: doc_key_len][doc_key][1 byte: msg_type][4 bytes: len][payload]
+        let doc_key = "_negentropy";
+        let doc_key_bytes = doc_key.as_bytes();
+
+        // Send init message
+        send.write_all(&(doc_key_bytes.len() as u16).to_be_bytes())
+            .await?;
+        send.write_all(doc_key_bytes).await?;
+        send.write_all(&[SyncMessageType::NegentropyInit as u8])
+            .await?;
+        send.write_all(&(init_msg.len() as u32).to_be_bytes())
+            .await?;
+        send.write_all(&init_msg).await?;
+
+        self.total_bytes_sent.fetch_add(
+            2 + doc_key_bytes.len() as u64 + 1 + 4 + init_msg.len() as u64,
+            Ordering::Relaxed,
+        );
+
+        // Phase 2: Reconciliation loop
+        let mut have_keys: Vec<String> = Vec::new();
+        let mut need_keys: Vec<String> = Vec::new();
+
+        loop {
+            // Read response with doc_key prefix
+            let mut doc_key_len_bytes = [0u8; 2];
+            recv.read_exact(&mut doc_key_len_bytes).await?;
+            let resp_doc_key_len = u16::from_be_bytes(doc_key_len_bytes) as usize;
+
+            let mut resp_doc_key_bytes = vec![0u8; resp_doc_key_len];
+            recv.read_exact(&mut resp_doc_key_bytes).await?;
+
+            let mut type_buf = [0u8; 1];
+            recv.read_exact(&mut type_buf).await?;
+
+            let mut len_buf = [0u8; 4];
+            recv.read_exact(&mut len_buf).await?;
+            let len = u32::from_be_bytes(len_buf) as usize;
+
+            let mut payload = vec![0u8; len];
+            recv.read_exact(&mut payload).await?;
+
+            self.total_bytes_received.fetch_add(
+                2 + resp_doc_key_len as u64 + 1 + 4 + len as u64,
+                Ordering::Relaxed,
+            );
+
+            // Process response
+            let result = self.handle_negentropy_message(peer_id, &payload)?;
+
+            have_keys.extend(result.have_keys);
+            need_keys.extend(result.need_keys);
+
+            if result.is_complete {
+                tracing::info!(
+                    "Negentropy sync complete with {:?}: have={}, need={}",
+                    peer_id,
+                    have_keys.len(),
+                    need_keys.len()
+                );
+                break;
+            }
+
+            // Send next message
+            if let Some(next_msg) = result.next_message {
+                send.write_all(&(doc_key_bytes.len() as u16).to_be_bytes())
+                    .await?;
+                send.write_all(doc_key_bytes).await?;
+                send.write_all(&[SyncMessageType::NegentropyResponse as u8])
+                    .await?;
+                send.write_all(&(next_msg.len() as u32).to_be_bytes())
+                    .await?;
+                send.write_all(&next_msg).await?;
+
+                self.total_bytes_sent.fetch_add(
+                    2 + doc_key_bytes.len() as u64 + 1 + 4 + next_msg.len() as u64,
+                    Ordering::Relaxed,
+                );
+            }
+        }
+
+        send.finish()?;
+
+        // Phase 3: Sync documents based on discovery
+        // Send documents we have that peer needs
+        if !have_keys.is_empty() {
+            tracing::debug!(
+                "Sending {} documents to peer {:?}",
+                have_keys.len(),
+                peer_id
+            );
+            let doc_key_refs: Vec<&str> = have_keys.iter().map(|s| s.as_str()).collect();
+            self.sync_documents_batch(&doc_key_refs, peer_id).await?;
+        }
+
+        // Request documents peer has that we need
+        // (The peer will send these based on their have_keys from reconciliation)
+
+        Ok(())
+    }
+
+    /// Get Negentropy sync statistics
+    pub fn negentropy_stats(&self) -> super::negentropy_sync::NegentropyStats {
+        self.negentropy_sync.stats()
+    }
+
+    /// Handle incoming Negentropy init message from a peer
+    ///
+    /// This is called when a peer initiates Negentropy sync with us.
+    /// We process their init message and send back a response.
+    async fn handle_negentropy_init(
+        &self,
+        peer_id: EndpointId,
+        message: Vec<u8>,
+        send: &mut iroh::endpoint::SendStream,
+    ) -> Result<()> {
+        tracing::debug!(
+            "Handling Negentropy init from {:?}, msg_len={}",
+            peer_id,
+            message.len()
+        );
+
+        // Get our local documents to compare
+        let items = self.get_local_sync_items();
+
+        // Start a new session and process their init message
+        // First initiate our side (to create session)
+        let _init = self.negentropy_sync.initiate_sync(peer_id, items.clone())?;
+
+        // Then handle their message
+        let result = self
+            .negentropy_sync
+            .handle_message(peer_id, &message, items)?;
+
+        // Send documents we have that peer needs
+        if !result.have_keys.is_empty() {
+            tracing::debug!(
+                "Negentropy: we have {} docs peer {:?} needs",
+                result.have_keys.len(),
+                peer_id
+            );
+            // Will sync these after reconciliation completes
+        }
+
+        // Track documents peer has that we need
+        if !result.need_keys.is_empty() {
+            tracing::debug!(
+                "Negentropy: peer {:?} has {} docs we need",
+                peer_id,
+                result.need_keys.len()
+            );
+        }
+
+        // Send response if not complete
+        if let Some(next_msg) = &result.next_message {
+            // Wire format: [2 bytes: doc_key_len][doc_key][1 byte: msg_type][4 bytes: len][payload]
+            // Use "_negentropy" as doc_key for Negentropy messages
+            let doc_key = "_negentropy";
+            let doc_key_bytes = doc_key.as_bytes();
+
+            send.write_all(&(doc_key_bytes.len() as u16).to_be_bytes())
+                .await?;
+            send.write_all(doc_key_bytes).await?;
+            send.write_all(&[SyncMessageType::NegentropyResponse as u8])
+                .await?;
+            send.write_all(&(next_msg.len() as u32).to_be_bytes())
+                .await?;
+            send.write_all(next_msg).await?;
+            send.finish()?;
+
+            self.total_bytes_sent.fetch_add(
+                2 + doc_key_bytes.len() as u64 + 1 + 4 + next_msg.len() as u64,
+                Ordering::Relaxed,
+            );
+
+            tracing::debug!(
+                "Sent Negentropy response to {:?}, msg_len={}",
+                peer_id,
+                next_msg.len()
+            );
+        } else {
+            // Reconciliation complete on first round
+            tracing::info!(
+                "Negentropy sync complete with {:?} on init (have={}, need={})",
+                peer_id,
+                result.have_keys.len(),
+                result.need_keys.len()
+            );
+
+            // Send our documents that peer needs
+            if !result.have_keys.is_empty() {
+                let doc_key_refs: Vec<&str> = result.have_keys.iter().map(|s| s.as_str()).collect();
+                self.sync_documents_batch(&doc_key_refs, peer_id).await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Handle incoming Negentropy response message from a peer
+    ///
+    /// This is called during ongoing Negentropy reconciliation.
+    async fn handle_negentropy_response(
+        &self,
+        peer_id: EndpointId,
+        message: Vec<u8>,
+        send: &mut iroh::endpoint::SendStream,
+    ) -> Result<()> {
+        tracing::debug!(
+            "Handling Negentropy response from {:?}, msg_len={}",
+            peer_id,
+            message.len()
+        );
+
+        // Process the response
+        let items = self.get_local_sync_items();
+        let result = self
+            .negentropy_sync
+            .handle_message(peer_id, &message, items)?;
+
+        if result.is_complete {
+            tracing::info!(
+                "Negentropy sync complete with {:?} (have={}, need={})",
+                peer_id,
+                result.have_keys.len(),
+                result.need_keys.len()
+            );
+
+            // Send our documents that peer needs
+            if !result.have_keys.is_empty() {
+                let doc_key_refs: Vec<&str> = result.have_keys.iter().map(|s| s.as_str()).collect();
+                self.sync_documents_batch(&doc_key_refs, peer_id).await?;
+            }
+        } else if let Some(next_msg) = &result.next_message {
+            // Send next reconciliation message
+            let doc_key = "_negentropy";
+            let doc_key_bytes = doc_key.as_bytes();
+
+            send.write_all(&(doc_key_bytes.len() as u16).to_be_bytes())
+                .await?;
+            send.write_all(doc_key_bytes).await?;
+            send.write_all(&[SyncMessageType::NegentropyResponse as u8])
+                .await?;
+            send.write_all(&(next_msg.len() as u32).to_be_bytes())
+                .await?;
+            send.write_all(next_msg).await?;
+
+            self.total_bytes_sent.fetch_add(
+                2 + doc_key_bytes.len() as u64 + 1 + 4 + next_msg.len() as u64,
+                Ordering::Relaxed,
+            );
+
+            tracing::debug!(
+                "Sent next Negentropy message to {:?}, msg_len={}",
+                peer_id,
+                next_msg.len()
+            );
+        }
+
+        Ok(())
     }
 
     /// Send a heartbeat to a peer
