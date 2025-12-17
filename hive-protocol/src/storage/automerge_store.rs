@@ -11,7 +11,9 @@ use automerge::{transaction::Transactable, Automerge, ReadDoc};
 #[cfg(feature = "automerge-backend")]
 use lru::LruCache;
 #[cfg(feature = "automerge-backend")]
-use redb::{Builder, Database, ReadableTable, ReadableTableMetadata, TableDefinition};
+use redb::{
+    Builder, Database, ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition,
+};
 #[cfg(feature = "automerge-backend")]
 use std::num::NonZeroUsize;
 #[cfg(feature = "automerge-backend")]
