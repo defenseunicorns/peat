@@ -11,7 +11,7 @@ use automerge::{transaction::Transactable, Automerge, ReadDoc};
 #[cfg(feature = "automerge-backend")]
 use lru::LruCache;
 #[cfg(feature = "automerge-backend")]
-use redb::{Database, ReadableTable, ReadableTableMetadata, TableDefinition};
+use redb::{Builder, Database, ReadableTable, ReadableTableMetadata, TableDefinition};
 #[cfg(feature = "automerge-backend")]
 use std::num::NonZeroUsize;
 #[cfg(feature = "automerge-backend")]
@@ -29,6 +29,16 @@ use anyhow::{Context, Result};
 /// Value: serialized Automerge document bytes
 #[cfg(feature = "automerge-backend")]
 const DOCUMENTS_TABLE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("documents");
+
+/// Default redb cache size in bytes (Issue #446)
+///
+/// The redb default is 1 GiB which is excessive for our use case.
+/// We set a much smaller default (16 MiB) that's sufficient for typical
+/// document storage while preventing unbounded memory growth.
+///
+/// Can be overridden via `CAP_REDB_CACHE_SIZE` environment variable (in bytes).
+#[cfg(feature = "automerge-backend")]
+const DEFAULT_REDB_CACHE_SIZE: usize = 16 * 1024 * 1024; // 16 MiB
 
 /// Table definition for tombstone storage (ADR-034 Phase 2)
 /// Key: "collection:document_id" as string bytes
@@ -90,7 +100,20 @@ impl AutomergeStore {
             }
         }
 
-        let db = Database::create(&db_path).context("Failed to open redb database")?;
+        // Configure redb cache size (Issue #446)
+        // Default redb cache is 1 GiB which causes excessive memory growth.
+        // Use a smaller cache (default 16 MiB) or allow override via environment variable.
+        let cache_size = std::env::var("CAP_REDB_CACHE_SIZE")
+            .ok()
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(DEFAULT_REDB_CACHE_SIZE);
+
+        tracing::debug!("Opening redb database with cache_size={} bytes", cache_size);
+
+        let db = Builder::new()
+            .set_cache_size(cache_size)
+            .create(&db_path)
+            .context("Failed to open redb database")?;
 
         // Initialize the tables (redb requires this on first use)
         {
