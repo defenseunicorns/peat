@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 
+#[allow(unused_imports)]
 use crate::config::{BleConfig, BlePhy, DiscoveryConfig};
 use crate::error::{BleError, Result};
 use crate::platform::{
@@ -22,6 +23,7 @@ use super::connection::AndroidConnection;
 use super::jni_bridge::JniBridge;
 
 /// Internal state for the adapter
+#[allow(dead_code)]
 struct AdapterState {
     /// Active connections by node ID
     connections: HashMap<NodeId, AndroidConnection>,
@@ -63,6 +65,7 @@ impl Default for AdapterState {
 /// adapter.init(&config).await?;
 /// adapter.start().await?;
 /// ```
+#[allow(dead_code)]
 pub struct AndroidAdapter {
     /// JNI bridge for Android Bluetooth API calls
     jni_bridge: Arc<RwLock<JniBridge>>,
@@ -142,6 +145,7 @@ impl AndroidAdapter {
     }
 
     /// Process scan result from JNI callback
+    #[allow(dead_code)]
     async fn process_scan_result(&self, device: DiscoveredDevice) {
         // Store in discovered map
         {
@@ -168,6 +172,7 @@ impl AndroidAdapter {
     }
 
     /// Process connection event from JNI callback
+    #[allow(dead_code)]
     async fn process_connection_event(&self, node_id: NodeId, event: ConnectionEvent) {
         // Update connection state
         match &event {
@@ -185,12 +190,13 @@ impl AndroidAdapter {
     }
 
     /// Start background task to process JNI callbacks
+    #[allow(dead_code)]
     fn start_callback_processor(&self) -> tokio::task::JoinHandle<()> {
-        let scan_rx = self.scan_rx.clone();
-        let connection_rx = self.connection_rx.clone();
-        let discovery_callback = self.discovery_callback.clone();
-        let connection_callback = self.connection_callback.clone();
-        let state = self.state.clone();
+        let _scan_rx = self.scan_rx.clone();
+        let _connection_rx = self.connection_rx.clone();
+        let _discovery_callback = self.discovery_callback.clone();
+        let _connection_callback = self.connection_callback.clone();
+        let _state = self.state.clone();
 
         tokio::spawn(async move {
             // TODO: Implement callback processing loop
