@@ -101,8 +101,7 @@ pub mod class_names {
     pub const BLUETOOTH_GATT: &str = "android/bluetooth/BluetoothGatt";
     pub const BLUETOOTH_GATT_CALLBACK: &str = "android/bluetooth/BluetoothGattCallback";
     pub const BLUETOOTH_GATT_SERVICE: &str = "android/bluetooth/BluetoothGattService";
-    pub const BLUETOOTH_GATT_CHARACTERISTIC: &str =
-        "android/bluetooth/BluetoothGattCharacteristic";
+    pub const BLUETOOTH_GATT_CHARACTERISTIC: &str = "android/bluetooth/BluetoothGattCharacteristic";
     pub const BLUETOOTH_LE_SCANNER: &str = "android/bluetooth/le/BluetoothLeScanner";
     pub const BLUETOOTH_LE_ADVERTISER: &str = "android/bluetooth/le/BluetoothLeAdvertiser";
     pub const SCAN_CALLBACK: &str = "android/bluetooth/le/ScanCallback";
@@ -472,7 +471,11 @@ pub extern "system" fn Java_com_hive_btle_ScanCallbackProxy_nativeOnScanResult<'
     // Create DiscoveredDevice and send via channel
     let device = DiscoveredDevice {
         address: address.clone(),
-        name: if name.is_empty() { None } else { Some(name.clone()) },
+        name: if name.is_empty() {
+            None
+        } else {
+            Some(name.clone())
+        },
         rssi: rssi as i8,
         is_hive_node: is_hive,
         node_id,
@@ -517,7 +520,9 @@ pub extern "system" fn Java_com_hive_btle_ScanCallbackProxy_nativeOnScanFailed<'
 ///
 /// Called from Kotlin GattCallbackProxy.nativeOnConnectionStateChange()
 #[no_mangle]
-pub extern "system" fn Java_com_hive_btle_GattCallbackProxy_nativeOnConnectionStateChange<'local>(
+pub extern "system" fn Java_com_hive_btle_GattCallbackProxy_nativeOnConnectionStateChange<
+    'local,
+>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     connection_id: jlong,
@@ -557,7 +562,9 @@ pub extern "system" fn Java_com_hive_btle_GattCallbackProxy_nativeOnConnectionSt
         Some(id) => id,
         None => {
             // Create a temporary NodeId from address hash if we don't have one
-            let hash = address.bytes().fold(0u32, |acc, b| acc.wrapping_add(b as u32));
+            let hash = address
+                .bytes()
+                .fold(0u32, |acc, b| acc.wrapping_add(b as u32));
             NodeId::new(hash)
         }
     };
@@ -626,9 +633,7 @@ pub extern "system" fn Java_com_hive_btle_GattCallbackProxy_nativeOnServicesDisc
         }
     }
 
-    let has_hive_service = uuids
-        .iter()
-        .any(|u| u.to_uppercase().contains("D479"));
+    let has_hive_service = uuids.iter().any(|u| u.to_uppercase().contains("D479"));
 
     log::info!(
         "Services discovered: conn={} addr={} status={} services={} hive={}",
@@ -645,9 +650,7 @@ pub extern "system" fn Java_com_hive_btle_GattCallbackProxy_nativeOnServicesDisc
             if let Ok(state) = state.lock() {
                 if let Some(node_id) = state.connection_map.get(&connection_id) {
                     if let Some(ref tx) = state.connection_tx {
-                        let event = ConnectionEvent::ServicesDiscovered {
-                            has_hive_service,
-                        };
+                        let event = ConnectionEvent::ServicesDiscovered { has_hive_service };
                         let _ = tx.try_send((node_id.clone(), event));
                     }
                 }
@@ -731,7 +734,9 @@ pub extern "system" fn Java_com_hive_btle_GattCallbackProxy_nativeOnCharacterist
 
 /// Native callback for characteristic changed (notifications)
 #[no_mangle]
-pub extern "system" fn Java_com_hive_btle_GattCallbackProxy_nativeOnCharacteristicChanged<'local>(
+pub extern "system" fn Java_com_hive_btle_GattCallbackProxy_nativeOnCharacteristicChanged<
+    'local,
+>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     connection_id: jlong,
