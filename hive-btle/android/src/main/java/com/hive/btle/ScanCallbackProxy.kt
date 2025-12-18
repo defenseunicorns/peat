@@ -2,6 +2,7 @@ package com.hive.btle
 
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
 import android.util.Log
 
 /**
@@ -91,7 +92,7 @@ class ScanCallbackProxy : ScanCallback() {
     override fun onBatchScanResults(results: MutableList<ScanResult>) {
         Log.d(TAG, "Batch scan results: ${results.size} devices")
         for (result in results) {
-            onScanResult(CALLBACK_TYPE_ALL_MATCHES, result)
+            onScanResult(ScanSettings.CALLBACK_TYPE_ALL_MATCHES, result)
         }
     }
 

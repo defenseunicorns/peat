@@ -9,6 +9,10 @@ repository = "https://github.com/revolveteam/hive"
 keywords = ["bluetooth", "ble", "mesh", "hive", "tactical"]
 categories = ["network-programming", "embedded"]
 
+[lib]
+# Build as both a Rust library and a C dynamic library (for Android JNI)
+crate-type = ["rlib", "cdylib"]
+
 [features]
 default = ["std"]
 
