@@ -646,6 +646,9 @@ impl HiveNode {
 #[cfg(feature = "sync")]
 #[uniffi::export]
 pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
+    use std::time::Instant;
+    let total_start = Instant::now();
+
     // Validate credentials
     if config.app_id.is_empty() {
         return Err(HiveError::InvalidInput {
@@ -658,6 +661,9 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
         });
     }
 
+    // TIMING: Create runtime
+    let phase_start = Instant::now();
+
     // Create a dedicated Tokio runtime for this node
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
@@ -666,6 +672,12 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
         .map_err(|e| HiveError::SyncError {
             msg: format!("Failed to create runtime: {}", e),
         })?;
+
+    let runtime_ms = phase_start.elapsed().as_millis();
+    #[cfg(target_os = "android")]
+    android_log(&format!("[TIMING] Runtime creation: {}ms", runtime_ms));
+    #[cfg(not(target_os = "android"))]
+    eprintln!("[HIVE TIMING] Runtime creation: {}ms", runtime_ms);
 
     // Parse bind address
     let bind_addr: SocketAddr = config
@@ -683,25 +695,87 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
         msg: format!("Failed to create storage directory: {}", e),
     })?;
 
-    // Create AutomergeStore
-    let store =
-        Arc::new(
-            AutomergeStore::open(&storage_path).map_err(|e| HiveError::StorageError {
-                msg: format!("Failed to open store: {}", e),
-            })?,
-        );
+    // TIMING: Parallel store + transport initialization
+    let phase_start = Instant::now();
 
-    // Create IrohTransport with mDNS discovery enabled (Issue #233)
-    // Use app_id + storage_path as seed for deterministic but unique EndpointId
+    // OPTIMIZATION: Run store opening and transport creation in parallel
+    // These are independent operations that can overlap to reduce startup time.
+    // - AutomergeStore::open() is blocking I/O (redb database)
+    // - IrohTransport creation is async (QUIC endpoint binding)
+    //
+    // OPTIMIZATION: Use fast constructor WITHOUT mDNS discovery for faster startup.
+    // mDNS discovery is deferred until after the sync backend is initialized.
+    // This reduces "startup intensity" that was causing Docker API timeouts
+    // in large-scale deployments (see 384-node hierarchical simulations).
     let seed = format!("{}/{}", config.app_id, config.storage_path);
-    let transport = runtime.block_on(async {
-        IrohTransport::from_seed_with_discovery_at_addr(&seed, bind_addr)
-            .await
-            .map_err(|e| HiveError::ConnectionError {
-                msg: format!("Failed to create transport with discovery: {}", e),
-            })
+    let storage_path_for_store = storage_path.clone();
+
+    let (store, transport, store_ms, transport_ms) = runtime.block_on(async {
+        let store_start = Instant::now();
+        let transport_start = Instant::now();
+
+        // Spawn store opening on blocking thread pool (it does sync I/O)
+        let store_handle = tokio::task::spawn_blocking(move || {
+            let result = AutomergeStore::open(&storage_path_for_store);
+            (result, store_start.elapsed().as_millis())
+        });
+
+        // FAST STARTUP: Create transport WITHOUT mDNS discovery
+        // mDNS will be enabled later via enable_mdns_discovery()
+        let transport_future = async {
+            let result = IrohTransport::from_seed_at_addr(&seed, bind_addr).await;
+            (result, transport_start.elapsed().as_millis())
+        };
+
+        // Wait for both to complete
+        let (store_result, transport_result) = tokio::join!(store_handle, transport_future);
+
+        // Unwrap the JoinHandle result first, then the actual result
+        let (store_inner, store_elapsed) = store_result.map_err(|e| HiveError::StorageError {
+            msg: format!("Store task panicked: {}", e),
+        })?;
+        let store = store_inner.map_err(|e| HiveError::StorageError {
+            msg: format!("Failed to open store: {}", e),
+        })?;
+
+        let (transport_inner, transport_elapsed) = transport_result;
+        let transport = transport_inner.map_err(|e| HiveError::ConnectionError {
+            msg: format!("Failed to create transport (fast mode, no mDNS): {}", e),
+        })?;
+
+        Ok::<_, HiveError>((
+            Arc::new(store),
+            Arc::new(transport),
+            store_elapsed,
+            transport_elapsed,
+        ))
     })?;
-    let transport = Arc::new(transport);
+
+    let parallel_total_ms = phase_start.elapsed().as_millis();
+    #[cfg(target_os = "android")]
+    {
+        android_log(&format!("[TIMING] Store open: {}ms", store_ms));
+        android_log(&format!(
+            "[TIMING] Transport create (no mDNS): {}ms",
+            transport_ms
+        ));
+        android_log(&format!(
+            "[TIMING] Parallel total (max of above): {}ms",
+            parallel_total_ms
+        ));
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        eprintln!("[HIVE TIMING] Store open: {}ms", store_ms);
+        eprintln!(
+            "[HIVE TIMING] Transport create (no mDNS): {}ms",
+            transport_ms
+        );
+        eprintln!(
+            "[HIVE TIMING] Parallel total (max of above): {}ms",
+            parallel_total_ms
+        );
+    }
 
     // Create storage backend with transport
     let storage_backend = Arc::new(AutomergeBackend::with_transport(
@@ -721,6 +795,9 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
     // to catch all connection events including the initial ones.
     let mut event_rx = transport.subscribe_peer_events();
 
+    // TIMING: Sync backend initialization
+    let phase_start = Instant::now();
+
     // Initialize sync backend with credentials for FormationKey authentication
     let backend_config = BackendConfig {
         app_id: config.app_id.clone(),
@@ -739,8 +816,14 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
             })
     })?;
 
+    let sync_init_ms = phase_start.elapsed().as_millis();
     #[cfg(target_os = "android")]
-    android_log("=== sync_backend.initialize() completed successfully ===");
+    {
+        android_log(&format!("[TIMING] Sync backend init: {}ms", sync_init_ms));
+        android_log("=== sync_backend.initialize() completed successfully ===");
+    }
+    #[cfg(not(target_os = "android"))]
+    eprintln!("[HIVE TIMING] Sync backend init: {}ms", sync_init_ms);
 
     // Start background task to listen for peer events and forward to Java (Issue #275)
     let cleanup_running = Arc::new(AtomicBool::new(true));
@@ -749,6 +832,31 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
 
     // Clone transport for the cleanup task
     let transport_for_cleanup = Arc::clone(&transport);
+
+    // DEFERRED mDNS DISCOVERY: Enable mDNS in background after startup completes
+    // This keeps the initial startup fast while still enabling LAN peer discovery.
+    // The transport was created with from_seed_at_addr() (no mDNS) for fast startup.
+    let transport_for_mdns = Arc::clone(&transport);
+    runtime_arc.spawn(async move {
+        // Small delay to ensure critical startup path completes first
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        match transport_for_mdns.enable_mdns_discovery().await {
+            Ok(()) => {
+                #[cfg(target_os = "android")]
+                android_log("Deferred mDNS discovery enabled successfully");
+                #[cfg(not(target_os = "android"))]
+                eprintln!("[HIVE] Deferred mDNS discovery enabled successfully");
+            }
+            Err(e) => {
+                // Not critical - static peer config still works
+                #[cfg(target_os = "android")]
+                android_log(&format!("Failed to enable deferred mDNS discovery: {}", e));
+                #[cfg(not(target_os = "android"))]
+                eprintln!("[HIVE] Failed to enable deferred mDNS discovery: {} (static peer config still works)", e);
+            }
+        }
+    });
 
     // Log that we're starting the peer event listener
     #[cfg(target_os = "android")]
@@ -806,6 +914,16 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
     // Creating a separate AutomergeBackend would cause sync coordinator state to be split,
     // resulting in data not being received from peers.
     let storage_backend = sync_backend.storage_backend();
+
+    // TIMING: Total startup time
+    let total_ms = total_start.elapsed().as_millis();
+    #[cfg(target_os = "android")]
+    android_log(&format!(
+        "[TIMING] === TOTAL create_node: {}ms ===",
+        total_ms
+    ));
+    #[cfg(not(target_os = "android"))]
+    eprintln!("[HIVE TIMING] === TOTAL create_node: {}ms ===", total_ms);
 
     Ok(Arc::new(HiveNode {
         sync_backend,
