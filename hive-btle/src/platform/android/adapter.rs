@@ -67,21 +67,21 @@ pub struct AndroidAdapter {
     /// JNI bridge for Android Bluetooth API calls
     jni_bridge: Arc<RwLock<JniBridge>>,
     /// Configuration
-    config: RwLock<Option<BleConfig>>,
+    config: Arc<RwLock<Option<BleConfig>>>,
     /// Internal state
-    state: RwLock<AdapterState>,
+    state: Arc<RwLock<AdapterState>>,
     /// Discovery callback
-    discovery_callback: RwLock<Option<DiscoveryCallback>>,
+    discovery_callback: Arc<RwLock<Option<DiscoveryCallback>>>,
     /// Connection callback
-    connection_callback: RwLock<Option<ConnectionCallback>>,
+    connection_callback: Arc<RwLock<Option<ConnectionCallback>>>,
     /// Channel receiver for scan results (from JNI callbacks)
-    scan_rx: RwLock<mpsc::Receiver<DiscoveredDevice>>,
+    scan_rx: Arc<RwLock<mpsc::Receiver<DiscoveredDevice>>>,
     /// Channel receiver for connection events (from JNI callbacks)
-    connection_rx: RwLock<mpsc::Receiver<(NodeId, ConnectionEvent)>>,
+    connection_rx: Arc<RwLock<mpsc::Receiver<(NodeId, ConnectionEvent)>>>,
     /// Whether scanning is active
-    scanning: RwLock<bool>,
+    scanning: Arc<RwLock<bool>>,
     /// Whether advertising is active
-    advertising: RwLock<bool>,
+    advertising: Arc<RwLock<bool>>,
 }
 
 impl AndroidAdapter {
@@ -115,14 +115,14 @@ impl AndroidAdapter {
 
         Ok(Self {
             jni_bridge: Arc::new(RwLock::new(jni_bridge)),
-            config: RwLock::new(None),
-            state: RwLock::new(AdapterState::default()),
-            discovery_callback: RwLock::new(None),
-            connection_callback: RwLock::new(None),
-            scan_rx: RwLock::new(scan_rx),
-            connection_rx: RwLock::new(connection_rx),
-            scanning: RwLock::new(false),
-            advertising: RwLock::new(false),
+            config: Arc::new(RwLock::new(None)),
+            state: Arc::new(RwLock::new(AdapterState::default())),
+            discovery_callback: Arc::new(RwLock::new(None)),
+            connection_callback: Arc::new(RwLock::new(None)),
+            scan_rx: Arc::new(RwLock::new(scan_rx)),
+            connection_rx: Arc::new(RwLock::new(connection_rx)),
+            scanning: Arc::new(RwLock::new(false)),
+            advertising: Arc::new(RwLock::new(false)),
         })
     }
 

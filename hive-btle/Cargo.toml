@@ -17,7 +17,7 @@ std = ["thiserror/std", "uuid/std"]
 
 # Platform-specific features
 linux = ["dep:bluer", "dep:tokio"]
-android = ["dep:jni", "dep:ndk"]
+android = ["dep:jni", "dep:ndk", "dep:tokio"]
 macos = ["dep:objc2", "dep:block2"]
 ios = ["dep:objc2", "dep:block2"]
 windows = ["dep:windows"]
