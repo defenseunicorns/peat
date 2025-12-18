@@ -180,8 +180,8 @@ pub struct IrohTransport {
     /// Accept loop task handle
     accept_task: Arc<RwLock<Option<JoinHandle<()>>>>,
     /// mDNS discovery (optional, for automatic peer discovery on local network)
-    #[allow(dead_code)]
-    mdns_discovery: Option<MdnsDiscovery>,
+    /// Uses interior mutability to support deferred initialization via enable_mdns_discovery()
+    mdns_discovery: Arc<RwLock<Option<MdnsDiscovery>>>,
     /// Event senders for peer events (Issue #275)
     /// Multiple receivers can subscribe via subscribe_peer_events()
     event_senders: Arc<RwLock<Vec<TransportEventSender>>>,
@@ -227,7 +227,7 @@ impl IrohTransport {
             connection_timestamps: Arc::new(RwLock::new(HashMap::new())),
             accept_running: Arc::new(AtomicBool::new(false)),
             accept_task: Arc::new(RwLock::new(None)),
-            mdns_discovery: None,
+            mdns_discovery: Arc::new(RwLock::new(None)),
             event_senders: Arc::new(RwLock::new(Vec::new())),
             runtime_handle: tokio::runtime::Handle::current(),
         })
@@ -292,7 +292,7 @@ impl IrohTransport {
             connection_timestamps: Arc::new(RwLock::new(HashMap::new())),
             accept_running: Arc::new(AtomicBool::new(false)),
             accept_task: Arc::new(RwLock::new(None)),
-            mdns_discovery: Some(discovery),
+            mdns_discovery: Arc::new(RwLock::new(Some(discovery))),
             event_senders: Arc::new(RwLock::new(Vec::new())),
             runtime_handle: tokio::runtime::Handle::current(),
         })
@@ -364,7 +364,7 @@ impl IrohTransport {
             connection_timestamps: Arc::new(RwLock::new(HashMap::new())),
             accept_running: Arc::new(AtomicBool::new(false)),
             accept_task: Arc::new(RwLock::new(None)),
-            mdns_discovery: None,
+            mdns_discovery: Arc::new(RwLock::new(None)),
             event_senders: Arc::new(RwLock::new(Vec::new())),
             runtime_handle: tokio::runtime::Handle::current(),
         })
@@ -428,7 +428,7 @@ impl IrohTransport {
             connection_timestamps: Arc::new(RwLock::new(HashMap::new())),
             accept_running: Arc::new(AtomicBool::new(false)),
             accept_task: Arc::new(RwLock::new(None)),
-            mdns_discovery: Some(discovery),
+            mdns_discovery: Arc::new(RwLock::new(Some(discovery))),
             event_senders: Arc::new(RwLock::new(Vec::new())),
             runtime_handle: tokio::runtime::Handle::current(),
         })
@@ -508,10 +508,158 @@ impl IrohTransport {
             connection_timestamps: Arc::new(RwLock::new(HashMap::new())),
             accept_running: Arc::new(AtomicBool::new(false)),
             accept_task: Arc::new(RwLock::new(None)),
-            mdns_discovery: Some(discovery),
+            mdns_discovery: Arc::new(RwLock::new(Some(discovery))),
             event_senders: Arc::new(RwLock::new(Vec::new())),
             runtime_handle: tokio::runtime::Handle::current(),
         })
+    }
+
+    /// Create transport with deterministic key and specific bind address, WITHOUT mDNS discovery
+    ///
+    /// This is the FAST constructor for startup optimization. It creates a fully functional
+    /// transport without the overhead of mDNS discovery initialization. Use this when:
+    /// - Fast startup time is critical (mobile apps, frequent restarts)
+    /// - Peers are discovered via static configuration rather than mDNS
+    /// - mDNS discovery will be enabled later via `enable_mdns_discovery()`
+    ///
+    /// # Performance
+    ///
+    /// This constructor is significantly faster than `from_seed_with_discovery_at_addr()`
+    /// because it skips mDNS service initialization. The mDNS setup involves:
+    /// - Creating UDP multicast sockets
+    /// - Setting up service advertisement
+    /// - Starting background discovery tasks
+    ///
+    /// # Arguments
+    ///
+    /// * `seed` - Seed for deterministic key generation (e.g., "app-id/device-uuid")
+    /// * `bind_addr` - Socket address to bind to (IPv4 only)
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Fast startup without mDNS (use static peer config instead)
+    /// let seed = format!("{}/{}", app_id, device_uuid);
+    /// let addr = "0.0.0.0:9000".parse()?;
+    /// let transport = IrohTransport::from_seed_at_addr(&seed, addr).await?;
+    ///
+    /// // Later, optionally enable mDNS for automatic LAN discovery
+    /// transport.enable_mdns_discovery().await?;
+    /// ```
+    pub async fn from_seed_at_addr(seed: &str, bind_addr: SocketAddr) -> Result<Self> {
+        use sha2::{Digest, Sha256};
+
+        // Convert SocketAddr to SocketAddrV4 if it's IPv4
+        let bind_addr_v4 = match bind_addr {
+            SocketAddr::V4(addr) => addr,
+            SocketAddr::V6(_) => anyhow::bail!("Only IPv4 addresses supported for now"),
+        };
+
+        // Derive 32 bytes from seed using SHA-256
+        let mut hasher = Sha256::new();
+        hasher.update(b"hive-iroh-key-v1:"); // Domain separator
+        hasher.update(seed.as_bytes());
+        let hash = hasher.finalize();
+
+        // Convert hash to secret key bytes
+        let mut seed_bytes = [0u8; 32];
+        seed_bytes.copy_from_slice(&hash);
+
+        // Create deterministic secret key
+        let secret_key = iroh::SecretKey::from_bytes(&seed_bytes);
+        let endpoint_id = secret_key.public();
+
+        tracing::info!(
+            seed = seed,
+            endpoint_id = %endpoint_id,
+            bind_addr = %bind_addr,
+            "Created IrohTransport with deterministic key (NO mDNS discovery - fast startup)"
+        );
+
+        let endpoint = Endpoint::builder()
+            .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
+            .secret_key(secret_key)
+            .bind_addr_v4(bind_addr_v4)
+            .transport_config(create_tactical_transport_config())
+            .bind()
+            .await
+            .context("Failed to create Iroh endpoint from seed at addr")?;
+
+        Ok(Self {
+            endpoint,
+            connections: Arc::new(RwLock::new(HashMap::new())),
+            connection_timestamps: Arc::new(RwLock::new(HashMap::new())),
+            accept_running: Arc::new(AtomicBool::new(false)),
+            accept_task: Arc::new(RwLock::new(None)),
+            mdns_discovery: Arc::new(RwLock::new(None)),
+            event_senders: Arc::new(RwLock::new(Vec::new())),
+            runtime_handle: tokio::runtime::Handle::current(),
+        })
+    }
+
+    /// Enable mDNS discovery after transport creation (deferred discovery)
+    ///
+    /// This allows fast startup with `from_seed_at_addr()` followed by optional
+    /// mDNS discovery enablement. The discovery service is started but not wired
+    /// into the QUIC endpoint (which doesn't support dynamic discovery addition).
+    ///
+    /// # How It Works
+    ///
+    /// Since Iroh endpoints don't support adding discovery after creation, this method:
+    /// 1. Creates an MdnsDiscovery service for this endpoint's ID
+    /// 2. Stores it for later access via `mdns_discovery()`
+    /// 3. The caller can subscribe to discovery events and connect to discovered peers
+    ///
+    /// Note: This is a "manual" discovery mode - discovered peers must be connected
+    /// explicitly rather than automatically by the QUIC endpoint.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(())` if mDNS discovery was enabled successfully
+    /// - `Err` if discovery is already enabled or creation failed
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Create transport without mDNS (fast)
+    /// let transport = IrohTransport::from_seed_at_addr(&seed, addr).await?;
+    ///
+    /// // ... do critical startup work ...
+    ///
+    /// // Now enable mDNS for LAN peer discovery (non-blocking, runs in background)
+    /// transport.enable_mdns_discovery().await?;
+    ///
+    /// // Subscribe to discovery events
+    /// if let Some(mdns) = transport.mdns_discovery() {
+    ///     let mut events = mdns.subscribe().await;
+    ///     // Handle discovery events...
+    /// }
+    /// ```
+    pub async fn enable_mdns_discovery(&self) -> Result<()> {
+        // Check if already enabled
+        {
+            let guard = self.mdns_discovery.read().unwrap();
+            if guard.is_some() {
+                anyhow::bail!("mDNS discovery is already enabled");
+            }
+        }
+
+        let endpoint_id = self.endpoint.id();
+
+        // Create mDNS discovery service
+        let discovery = MdnsDiscovery::builder()
+            .build(endpoint_id)
+            .context("Failed to create mDNS discovery")?;
+
+        tracing::info!(
+            endpoint_id = %endpoint_id,
+            "Enabled mDNS discovery (deferred initialization)"
+        );
+
+        // Store the discovery service for later access
+        *self.mdns_discovery.write().unwrap() = Some(discovery);
+
+        Ok(())
     }
 
     /// Compute the EndpointId from a seed without creating a transport (Issue #226)
@@ -604,7 +752,7 @@ impl IrohTransport {
             connection_timestamps: Arc::new(RwLock::new(HashMap::new())),
             accept_running: Arc::new(AtomicBool::new(false)),
             accept_task: Arc::new(RwLock::new(None)),
-            mdns_discovery: None,
+            mdns_discovery: Arc::new(RwLock::new(None)),
             event_senders: Arc::new(RwLock::new(Vec::new())),
             runtime_handle: tokio::runtime::Handle::current(),
         })
@@ -844,10 +992,10 @@ impl IrohTransport {
 
     /// Check if mDNS discovery is enabled
     pub fn has_discovery(&self) -> bool {
-        self.mdns_discovery.is_some()
+        self.mdns_discovery.read().unwrap().is_some()
     }
 
-    /// Get a reference to the mDNS discovery service (Issue #233)
+    /// Get a clone of the mDNS discovery service (Issue #233)
     ///
     /// This allows subscribing to mDNS discovery events to learn about newly
     /// discovered peers on the local network. The returned discovery service
@@ -855,7 +1003,8 @@ impl IrohTransport {
     ///
     /// # Returns
     ///
-    /// `Some(&MdnsDiscovery)` if mDNS discovery is enabled, `None` otherwise.
+    /// `Some(MdnsDiscovery)` if mDNS discovery is enabled, `None` otherwise.
+    /// The discovery service is cloned (Arc internally) so this is cheap.
     ///
     /// # Example
     ///
@@ -875,8 +1024,8 @@ impl IrohTransport {
     ///     }
     /// }
     /// ```
-    pub fn mdns_discovery(&self) -> Option<&MdnsDiscovery> {
-        self.mdns_discovery.as_ref()
+    pub fn mdns_discovery(&self) -> Option<MdnsDiscovery> {
+        self.mdns_discovery.read().unwrap().clone()
     }
 
     /// Accept an incoming connection
