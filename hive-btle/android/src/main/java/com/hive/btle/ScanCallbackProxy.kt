@@ -56,9 +56,9 @@ class ScanCallbackProxy : ScanCallback() {
             val serviceUuids = scanRecord?.serviceUuids?.map { it.toString() } ?: emptyList()
 
             // Extract service data for HIVE service UUID
-            // HIVE uses 16-bit UUID 0xD479
+            // HIVE uses 16-bit UUID 0xF47A (matches M5Stack Core2 demo firmware)
             val hiveServiceData = scanRecord?.getServiceData(
-                android.os.ParcelUuid.fromString("0000D479-0000-1000-8000-00805F9B34FB")
+                android.os.ParcelUuid.fromString(HiveBtle.HIVE_SERVICE_UUID.toString())
             )
 
             // Extract manufacturer data (if any)
