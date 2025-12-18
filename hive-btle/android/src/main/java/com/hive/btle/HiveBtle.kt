@@ -240,12 +240,10 @@ class HiveBtle(
         val scanner = leScanner
             ?: throw IllegalStateException("BLE scanner not available")
 
-        // Build scan filters for HIVE devices
-        val filters = listOf(
-            ScanFilter.Builder()
-                .setServiceUuid(ParcelUuid(HIVE_SERVICE_UUID))
-                .build()
-        )
+        // Scan without strict UUID filter - the M5Stack may not advertise the UUID
+        // in a way Android's filter recognizes. We filter by name prefix instead.
+        // An empty filter list means scan for all devices.
+        val filters = emptyList<ScanFilter>()
 
         // Build scan settings
         val settings = ScanSettings.Builder()
@@ -256,13 +254,13 @@ class HiveBtle(
             .setReportDelay(0)
             .build()
 
-        // Create callback proxy
-        scanCallback = ScanCallbackProxy()
+        // Create callback proxy with the onDeviceFound callback
+        scanCallback = ScanCallbackProxy(onDeviceFound)
 
         try {
             scanner.startScan(filters, settings, scanCallback)
             isScanning = true
-            Log.i(TAG, "Started scanning for HIVE devices")
+            Log.i(TAG, "Started scanning for HIVE devices (no UUID filter)")
         } catch (e: SecurityException) {
             Log.e(TAG, "Missing BLUETOOTH_SCAN permission", e)
             throw e

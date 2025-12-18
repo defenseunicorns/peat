@@ -18,7 +18,9 @@ import android.util.Log
  * bluetoothLeScanner.startScan(filters, settings, proxy)
  * ```
  */
-class ScanCallbackProxy : ScanCallback() {
+class ScanCallbackProxy(
+    private val onDeviceFound: ((DiscoveredDevice) -> Unit)? = null
+) : ScanCallback() {
 
     companion object {
         private const val TAG = "HiveBtle.ScanCallback"
@@ -62,10 +64,32 @@ class ScanCallbackProxy : ScanCallback() {
                 android.os.ParcelUuid.fromString(HiveBtle.HIVE_SERVICE_UUID.toString())
             )
 
-            // Extract manufacturer data (if any)
-            val manufacturerData = scanRecord?.manufacturerSpecificData
+            // Check if this is a HIVE device (by name prefix or service UUID)
+            val isHiveDevice = name.startsWith(HiveBtle.HIVE_NAME_PREFIX) ||
+                serviceUuids.any { it.contains("F47A", ignoreCase = true) }
 
-            Log.d(TAG, "Scan result: $address ($name) RSSI=$rssi, services=${serviceUuids.size}")
+            // Parse node ID from name if present (HIVE-XXXXXXXX format)
+            val nodeId: Long? = if (name.startsWith(HiveBtle.HIVE_NAME_PREFIX)) {
+                try {
+                    name.removePrefix(HiveBtle.HIVE_NAME_PREFIX).toLong(16)
+                } catch (e: NumberFormatException) {
+                    null
+                }
+            } else null
+
+            Log.d(TAG, "Scan result: $address ($name) RSSI=$rssi, isHive=$isHiveDevice, nodeId=${nodeId?.let { String.format("%08X", it) }}")
+
+            // Create discovered device and invoke callback
+            val discoveredDevice = DiscoveredDevice(
+                address = address,
+                name = name,
+                rssi = rssi,
+                nodeId = nodeId,
+                timestampNanos = result.timestampNanos
+            )
+
+            // Invoke Kotlin callback for UI updates
+            onDeviceFound?.invoke(discoveredDevice)
 
             // Forward to native code
             nativeOnScanResult(

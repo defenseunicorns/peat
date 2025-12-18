@@ -410,7 +410,10 @@ pub extern "system" fn Java_com_hive_btle_HiveBtle_nativeInit<'local>(
     _context: JObject<'local>,
     node_id: jlong,
 ) -> jlong {
-    log::info!("HiveBtle native init called for node {:08X}", node_id as u32);
+    log::info!(
+        "HiveBtle native init called for node {:08X}",
+        node_id as u32
+    );
 
     // Initialize global state if not already done
     // For now, we create dummy channels - the real channels will be set up

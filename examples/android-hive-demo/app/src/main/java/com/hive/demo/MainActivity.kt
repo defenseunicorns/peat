@@ -89,9 +89,37 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        // Stop scanning when app goes to background to save battery
+        if (::hiveBtle.isInitialized && hiveBtle.isScanning()) {
+            hiveBtle.stopScan()
+            Log.i(TAG, "Stopped scanning (app paused)")
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Resume scanning when app comes back
+        if (::hiveBtle.isInitialized && !hiveBtle.isScanning()) {
+            try {
+                hiveBtle.startScan { device ->
+                    runOnUiThread {
+                        onDeviceDiscovered(device)
+                    }
+                }
+                scanButton.text = "Stop Scan"
+                Log.i(TAG, "Resumed scanning")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to resume scanning", e)
+            }
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         if (::hiveBtle.isInitialized) {
+            Log.i(TAG, "Shutting down HIVE BLE")
             hiveBtle.shutdown()
         }
     }
@@ -136,13 +164,41 @@ class MainActivity : AppCompatActivity() {
         try {
             hiveBtle = HiveBtle(applicationContext, NODE_ID)
             hiveBtle.init()
-            updateStatus("Ready - Node ID: ${String.format("%08X", NODE_ID)}")
             Log.i(TAG, "HIVE BLE initialized")
+
+            // Auto-start scanning and advertising
+            startAutoMode()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize HIVE BLE", e)
             updateStatus("Error: ${e.message}")
             Toast.makeText(this, "Failed to initialize: ${e.message}", Toast.LENGTH_LONG).show()
         }
+    }
+
+    private fun startAutoMode() {
+        // Start advertising
+        try {
+            hiveBtle.startAdvertising()
+            advertiseButton.text = "Stop Advertise"
+            Log.i(TAG, "Auto-started advertising")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to auto-start advertising", e)
+        }
+
+        // Start scanning with callback
+        try {
+            hiveBtle.startScan { device ->
+                runOnUiThread {
+                    onDeviceDiscovered(device)
+                }
+            }
+            scanButton.text = "Stop Scan"
+            Log.i(TAG, "Auto-started scanning")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to auto-start scanning", e)
+        }
+
+        updateStatus("Scanning & Advertising - HIVE-${String.format("%08X", NODE_ID)}")
     }
 
     private fun toggleScan() {
