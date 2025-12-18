@@ -395,6 +395,53 @@ impl JniBridge {
 }
 
 // ============================================================================
+// JNI Native Method Exports - HiveBtle Lifecycle
+// ============================================================================
+
+/// Native initialization for HiveBtle
+///
+/// Called from Kotlin HiveBtle.init()
+///
+/// JNI Signature: (Landroid/content/Context;J)J
+#[no_mangle]
+pub extern "system" fn Java_com_hive_btle_HiveBtle_nativeInit<'local>(
+    _env: JNIEnv<'local>,
+    _this: JObject<'local>,
+    _context: JObject<'local>,
+    node_id: jlong,
+) -> jlong {
+    log::info!("HiveBtle native init called for node {:08X}", node_id as u32);
+
+    // Initialize global state if not already done
+    // For now, we create dummy channels - the real channels will be set up
+    // when AndroidAdapter is created
+    if GLOBAL_STATE.get().is_none() {
+        let (scan_tx, _scan_rx) = mpsc::channel(100);
+        let (connection_tx, _connection_rx) = mpsc::channel(100);
+        init_global_state(scan_tx, connection_tx);
+    }
+
+    // Return a non-zero handle to indicate success
+    // In a full implementation, this would return a pointer to native state
+    node_id
+}
+
+/// Native shutdown for HiveBtle
+///
+/// Called from Kotlin HiveBtle.shutdown()
+///
+/// JNI Signature: (J)V
+#[no_mangle]
+pub extern "system" fn Java_com_hive_btle_HiveBtle_nativeShutdown<'local>(
+    _env: JNIEnv<'local>,
+    _this: JObject<'local>,
+    handle: jlong,
+) {
+    log::info!("HiveBtle native shutdown called for handle {}", handle);
+    // Clean up native resources if needed
+}
+
+// ============================================================================
 // JNI Native Method Exports - Scan Callbacks
 // ============================================================================
 
