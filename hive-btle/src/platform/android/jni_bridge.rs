@@ -444,6 +444,41 @@ pub extern "system" fn Java_com_hive_btle_HiveBtle_nativeShutdown<'local>(
     // Clean up native resources if needed
 }
 
+/// Derive NodeId from a BLE MAC address string
+///
+/// Called from Kotlin HiveBtle.nativeDeriveNodeId()
+///
+/// JNI Signature: (Ljava/lang/String;)J
+#[no_mangle]
+pub extern "system" fn Java_com_hive_btle_HiveBtle_nativeDeriveNodeId<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    mac_address: JString<'local>,
+) -> jlong {
+    let mac_str: String = match env.get_string(&mac_address) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            log::error!("Failed to get MAC address string: {:?}", e);
+            return 0;
+        }
+    };
+
+    match NodeId::from_mac_string(&mac_str) {
+        Some(node_id) => {
+            log::debug!(
+                "Derived NodeId {:08X} from MAC {}",
+                node_id.as_u32(),
+                mac_str
+            );
+            node_id.as_u32() as jlong
+        }
+        None => {
+            log::warn!("Failed to parse MAC address: {}", mac_str);
+            0
+        }
+    }
+}
+
 // ============================================================================
 // JNI Native Method Exports - Scan Callbacks
 // ============================================================================
