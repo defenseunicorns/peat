@@ -58,12 +58,18 @@ import android.os.Looper
  * ```
  *
  * @param context Android context (Activity, Service, or Application)
- * @param nodeId This node's HIVE ID (32-bit unsigned)
+ * @param nodeId This node's HIVE ID (32-bit unsigned). If null, auto-generated from Bluetooth MAC address.
  */
 class HiveBtle(
     private val context: Context,
-    private val nodeId: Long
+    private var _nodeId: Long? = null
 ) {
+    /**
+     * This node's HIVE ID. Auto-generated from Bluetooth MAC address if not specified.
+     * Available after init() is called.
+     */
+    val nodeId: Long
+        get() = _nodeId ?: 0L
     companion object {
         private const val TAG = "HiveBtle"
 
@@ -103,6 +109,16 @@ class HiveBtle(
 
         /** HIVE device name prefix */
         const val HIVE_NAME_PREFIX = "HIVE-"
+
+        /**
+         * Derive a NodeId from a BLE MAC address using the native Rust implementation.
+         * This ensures consistency across all platforms (Android, iOS, ESP32).
+         *
+         * @param macAddress MAC address in "AA:BB:CC:DD:EE:FF" format
+         * @return NodeId derived from last 4 bytes of MAC, or 0 if parsing fails
+         */
+        @JvmStatic
+        external fun nativeDeriveNodeId(macAddress: String): Long
 
         init {
             try {
@@ -202,6 +218,12 @@ class HiveBtle(
 
         // Get LE advertiser (may be null if not supported)
         leAdvertiser = bluetoothAdapter?.bluetoothLeAdvertiser
+
+        // Auto-generate nodeId from adapter address if not provided
+        if (_nodeId == null) {
+            _nodeId = generateNodeIdFromAdapter()
+            Log.i(TAG, "Auto-generated nodeId from adapter: ${String.format("%08X", nodeId)}")
+        }
 
         // Initialize native adapter
         nativeHandle = nativeInit(context, nodeId)
@@ -604,7 +626,7 @@ class HiveBtle(
         }
 
         // Derive nodeId from name, service data, or address for new peers
-        val peerNodeId = device.nodeId ?: deriveNodeIdFromAddress(device.address)
+        val peerNodeId = device.nodeId ?: nativeDeriveNodeId(device.address)
 
         // Don't track ourselves
         if (peerNodeId == nodeId) return
@@ -825,10 +847,43 @@ class HiveBtle(
     }
 
     /**
-     * Derive a nodeId from a BLE MAC address.
+     * Generate nodeId from the local Bluetooth adapter's address.
+     * Falls back to a random ID if adapter address is unavailable (Android 12+ restrictions).
+     */
+    @Suppress("MissingPermission")
+    private fun generateNodeIdFromAdapter(): Long {
+        return try {
+            // On Android 12+, getAddress() requires BLUETOOTH_CONNECT and may return "02:00:00:00:00:00"
+            val address = bluetoothAdapter?.address
+            if (address != null && address != "02:00:00:00:00:00") {
+                // Use native Rust implementation for consistency across platforms
+                val nodeId = nativeDeriveNodeId(address)
+                if (nodeId != 0L) {
+                    nodeId
+                } else {
+                    // Fallback if native call fails
+                    deriveNodeIdFromAddressFallback(address)
+                }
+            } else {
+                // Fallback: generate from device identifiers or random
+                val fallback = (System.currentTimeMillis() and 0xFFFFFFFFL) xor
+                    (android.os.Process.myPid().toLong() shl 16)
+                Log.w(TAG, "Adapter address unavailable, using fallback nodeId: ${String.format("%08X", fallback)}")
+                fallback
+            }
+        } catch (e: SecurityException) {
+            // No permission to get adapter address
+            val fallback = (System.currentTimeMillis() and 0xFFFFFFFFL)
+            Log.w(TAG, "No permission for adapter address, using fallback nodeId: ${String.format("%08X", fallback)}")
+            fallback
+        }
+    }
+
+    /**
+     * Derive a nodeId from a BLE MAC address (fallback if native call fails).
      * Uses the last 4 bytes of the MAC as a 32-bit node ID.
      */
-    private fun deriveNodeIdFromAddress(address: String): Long {
+    private fun deriveNodeIdFromAddressFallback(address: String): Long {
         // MAC format: "AA:BB:CC:DD:EE:FF"
         val parts = address.split(":")
         if (parts.size != 6) return 0L
