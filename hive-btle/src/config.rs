@@ -208,9 +208,17 @@ impl Default for GattConfig {
     }
 }
 
+/// Default mesh ID for demos and testing
+pub const DEFAULT_MESH_ID: &str = "DEMO";
+
 /// Mesh configuration
 #[derive(Debug, Clone)]
 pub struct MeshConfig {
+    /// Mesh identifier - nodes only auto-connect to peers with matching mesh ID
+    ///
+    /// Format: 4-character alphanumeric (e.g., "DEMO", "ALFA", "TEST")
+    /// This maps to the `app_id` concept in hive-protocol.
+    pub mesh_id: String,
     /// Maximum number of simultaneous connections
     pub max_connections: u8,
     /// Maximum children for this node (0 = leaf node)
@@ -225,9 +233,61 @@ pub struct MeshConfig {
     pub conn_interval_max_ms: u16,
 }
 
+impl MeshConfig {
+    /// Create a new mesh config with the given mesh ID
+    pub fn new(mesh_id: impl Into<String>) -> Self {
+        Self {
+            mesh_id: mesh_id.into(),
+            ..Default::default()
+        }
+    }
+
+    /// Generate the BLE device name for this node
+    ///
+    /// Format: `HIVE_<MESH_ID>-<NODE_ID>` (e.g., "HIVE_DEMO-12345678")
+    pub fn device_name(&self, node_id: NodeId) -> String {
+        format!("HIVE_{}-{:08X}", self.mesh_id, node_id.as_u32())
+    }
+
+    /// Parse mesh ID and node ID from a device name
+    ///
+    /// Returns `Some((mesh_id, node_id))` for valid names, `None` otherwise.
+    ///
+    /// Supports both formats:
+    /// - New: `HIVE_<MESH_ID>-<NODE_ID>` (e.g., "HIVE_DEMO-12345678")
+    /// - Legacy: `HIVE-<NODE_ID>` (e.g., "HIVE-12345678") - returns None for mesh_id
+    pub fn parse_device_name(name: &str) -> Option<(Option<String>, NodeId)> {
+        if let Some(rest) = name.strip_prefix("HIVE_") {
+            // New format: HIVE_MESHID-NODEID
+            let (mesh_id, node_id_str) = rest.split_once('-')?;
+            let node_id = u32::from_str_radix(node_id_str, 16).ok()?;
+            Some((Some(mesh_id.to_string()), NodeId::new(node_id)))
+        } else if let Some(node_id_str) = name.strip_prefix("HIVE-") {
+            // Legacy format: HIVE-NODEID (no mesh ID)
+            let node_id = u32::from_str_radix(node_id_str, 16).ok()?;
+            Some((None, NodeId::new(node_id)))
+        } else {
+            None
+        }
+    }
+
+    /// Check if a discovered device matches this mesh
+    ///
+    /// Returns true if:
+    /// - The device has the same mesh ID, OR
+    /// - The device has no mesh ID (legacy format - backwards compatible)
+    pub fn matches_mesh(&self, device_mesh_id: Option<&str>) -> bool {
+        match device_mesh_id {
+            Some(id) => id == self.mesh_id,
+            None => true, // Legacy devices match any mesh
+        }
+    }
+}
+
 impl Default for MeshConfig {
     fn default() -> Self {
         Self {
+            mesh_id: DEFAULT_MESH_ID.to_string(),
             max_connections: 7,
             max_children: 3,
             supervision_timeout_ms: 4000,
@@ -410,5 +470,76 @@ mod tests {
         config.apply_power_profile();
         assert_eq!(config.discovery.scan_interval_ms, 5000);
         assert_eq!(config.discovery.adv_interval_ms, 2000);
+    }
+
+    #[test]
+    fn test_mesh_config_default() {
+        let config = MeshConfig::default();
+        assert_eq!(config.mesh_id, DEFAULT_MESH_ID);
+        assert_eq!(config.mesh_id, "DEMO");
+    }
+
+    #[test]
+    fn test_mesh_config_new() {
+        let config = MeshConfig::new("ALFA");
+        assert_eq!(config.mesh_id, "ALFA");
+    }
+
+    #[test]
+    fn test_device_name_generation() {
+        let config = MeshConfig::new("DEMO");
+        let name = config.device_name(NodeId::new(0x12345678));
+        assert_eq!(name, "HIVE_DEMO-12345678");
+
+        let config = MeshConfig::new("ALFA");
+        let name = config.device_name(NodeId::new(0xDEADBEEF));
+        assert_eq!(name, "HIVE_ALFA-DEADBEEF");
+    }
+
+    #[test]
+    fn test_parse_device_name_new_format() {
+        // New format: HIVE_MESHID-NODEID
+        let result = MeshConfig::parse_device_name("HIVE_DEMO-12345678");
+        assert!(result.is_some());
+        let (mesh_id, node_id) = result.unwrap();
+        assert_eq!(mesh_id, Some("DEMO".to_string()));
+        assert_eq!(node_id.as_u32(), 0x12345678);
+
+        let result = MeshConfig::parse_device_name("HIVE_ALFA-DEADBEEF");
+        assert!(result.is_some());
+        let (mesh_id, node_id) = result.unwrap();
+        assert_eq!(mesh_id, Some("ALFA".to_string()));
+        assert_eq!(node_id.as_u32(), 0xDEADBEEF);
+    }
+
+    #[test]
+    fn test_parse_device_name_legacy_format() {
+        // Legacy format: HIVE-NODEID (no mesh ID)
+        let result = MeshConfig::parse_device_name("HIVE-12345678");
+        assert!(result.is_some());
+        let (mesh_id, node_id) = result.unwrap();
+        assert_eq!(mesh_id, None);
+        assert_eq!(node_id.as_u32(), 0x12345678);
+    }
+
+    #[test]
+    fn test_parse_device_name_invalid() {
+        assert!(MeshConfig::parse_device_name("NotHIVE").is_none());
+        assert!(MeshConfig::parse_device_name("HIVE_DEMO").is_none()); // Missing node ID
+        assert!(MeshConfig::parse_device_name("").is_none());
+    }
+
+    #[test]
+    fn test_matches_mesh() {
+        let config = MeshConfig::new("DEMO");
+
+        // Same mesh ID matches
+        assert!(config.matches_mesh(Some("DEMO")));
+
+        // Different mesh ID does not match
+        assert!(!config.matches_mesh(Some("ALFA")));
+
+        // Legacy devices (no mesh ID) match any mesh for backwards compatibility
+        assert!(config.matches_mesh(None));
     }
 }
