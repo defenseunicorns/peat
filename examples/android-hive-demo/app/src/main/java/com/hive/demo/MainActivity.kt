@@ -150,12 +150,14 @@ class MainActivity : AppCompatActivity(), HiveMeshListener {
 
     private fun initializeHiveBtle() {
         try {
-            hiveBtle = HiveBtle(applicationContext) // nodeId auto-generated from adapter
+            // Get mesh ID from environment (HIVE_APP_ID, HIVE_MESH_ID, or default "DEMO")
+            val meshId = HiveBtle.getMeshIdFromEnvironment()
+            hiveBtle = HiveBtle(applicationContext, meshId = meshId) // nodeId auto-generated from adapter
             hiveBtle.init()
             Log.i(TAG, "HIVE BLE initialized with nodeId: ${String.format("%08X", hiveBtle.nodeId)}")
 
-            // Update UI with our node ID
-            localNodeIdText.text = "Node: HIVE-${String.format("%08X", hiveBtle.nodeId)}"
+            // Update UI with our node ID and mesh ID
+            localNodeIdText.text = "Node: ${HiveBtle.generateDeviceName(hiveBtle.getMeshId(), hiveBtle.nodeId)}"
 
             // Start the mesh - it handles everything automatically
             hiveBtle.startMesh(this)
@@ -291,14 +293,15 @@ class MainActivity : AppCompatActivity(), HiveMeshListener {
             val notAckedNodes = pendingAcks.filter { !it.value }.keys
 
             val statusBuilder = StringBuilder()
+            val meshId = if (::hiveBtle.isInitialized) hiveBtle.getMeshId() else HiveBtle.DEFAULT_MESH_ID
             if (ackedNodes.isNotEmpty()) {
                 statusBuilder.append("✓ ACK'd: ")
-                statusBuilder.append(ackedNodes.joinToString(", ") { "HIVE-${String.format("%08X", it)}" })
+                statusBuilder.append(ackedNodes.joinToString(", ") { HiveBtle.generateDeviceName(meshId, it) })
             }
             if (notAckedNodes.isNotEmpty()) {
                 if (statusBuilder.isNotEmpty()) statusBuilder.append("\n")
                 statusBuilder.append("⏳ Waiting: ")
-                statusBuilder.append(notAckedNodes.joinToString(", ") { "HIVE-${String.format("%08X", it)}" })
+                statusBuilder.append(notAckedNodes.joinToString(", ") { HiveBtle.generateDeviceName(meshId, it) })
             }
 
             ackStatusText.text = statusBuilder.toString()
