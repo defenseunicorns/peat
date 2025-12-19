@@ -59,10 +59,12 @@ import android.os.Looper
  *
  * @param context Android context (Activity, Service, or Application)
  * @param nodeId This node's HIVE ID (32-bit unsigned). If null, auto-generated from Bluetooth MAC address.
+ * @param meshId Mesh identifier for mesh isolation (e.g., "DEMO", "ALFA"). Defaults to "DEMO".
  */
 class HiveBtle(
     private val context: Context,
-    private var _nodeId: Long? = null
+    private var _nodeId: Long? = null,
+    private val meshId: String = DEFAULT_MESH_ID
 ) {
     /**
      * This node's HIVE ID. Auto-generated from Bluetooth MAC address if not specified.
@@ -70,6 +72,11 @@ class HiveBtle(
      */
     val nodeId: Long
         get() = _nodeId ?: 0L
+
+    /**
+     * Get the mesh ID this node belongs to.
+     */
+    fun getMeshId(): String = meshId
     companion object {
         private const val TAG = "HiveBtle"
 
@@ -107,8 +114,133 @@ class HiveBtle(
         /** Client Characteristic Configuration Descriptor UUID */
         val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805F9B34FB")
 
-        /** HIVE device name prefix */
+        /** HIVE device name prefix (legacy format) */
         const val HIVE_NAME_PREFIX = "HIVE-"
+
+        /** HIVE device name prefix with mesh ID (new format) */
+        const val HIVE_MESH_PREFIX = "HIVE_"
+
+        /** Default mesh ID for demos and testing */
+        const val DEFAULT_MESH_ID = "DEMO"
+
+        /**
+         * Derive a short mesh ID from an app ID string.
+         *
+         * The mesh ID is used in BLE device names and should be short (4-8 chars).
+         * This function takes a potentially long app_id (e.g., "default-atak-formation")
+         * and derives a short mesh ID from it.
+         *
+         * Strategy:
+         * - If app_id is 8 chars or less, use it directly (uppercased)
+         * - Otherwise, use first 4 chars of a hash (uppercased hex)
+         *
+         * @param appId The application/formation ID (e.g., from HIVE_APP_ID env var)
+         * @return A short mesh ID suitable for BLE device names
+         */
+        @JvmStatic
+        fun deriveMeshId(appId: String): String {
+            val normalized = appId.trim().uppercase()
+            return if (normalized.length <= 8) {
+                normalized.ifEmpty { DEFAULT_MESH_ID }
+            } else {
+                // Use first 4 hex chars of hash for longer app IDs
+                String.format("%04X", appId.hashCode() and 0xFFFF)
+            }
+        }
+
+        /**
+         * Get the mesh ID from environment or system properties.
+         *
+         * Checks in order:
+         * 1. System property "hive.mesh_id"
+         * 2. System property "hive.app_id" (derives mesh ID from it)
+         * 3. Environment variable "HIVE_MESH_ID"
+         * 4. Environment variable "HIVE_APP_ID" (derives mesh ID from it)
+         * 5. Falls back to DEFAULT_MESH_ID ("DEMO")
+         *
+         * @return The mesh ID to use for this node
+         */
+        @JvmStatic
+        fun getMeshIdFromEnvironment(): String {
+            // Direct mesh ID takes priority
+            System.getProperty("hive.mesh_id")?.let { return it }
+            System.getenv("HIVE_MESH_ID")?.let { return it }
+
+            // Derive from app ID if available
+            System.getProperty("hive.app_id")?.let { return deriveMeshId(it) }
+            System.getenv("HIVE_APP_ID")?.let { return deriveMeshId(it) }
+
+            return DEFAULT_MESH_ID
+        }
+
+        /**
+         * Generate a device name in the new mesh format: HIVE_<MESH_ID>-<NODE_ID>
+         *
+         * @param meshId Mesh identifier (e.g., "DEMO", "ALFA")
+         * @param nodeId Node ID as 32-bit unsigned long
+         * @return Device name string (e.g., "HIVE_DEMO-12345678")
+         */
+        @JvmStatic
+        fun generateDeviceName(meshId: String, nodeId: Long): String {
+            return "HIVE_${meshId}-${String.format("%08X", nodeId)}"
+        }
+
+        /**
+         * Parse mesh ID and node ID from a device name.
+         *
+         * Supports both formats:
+         * - New: HIVE_<MESH_ID>-<NODE_ID> (e.g., "HIVE_DEMO-12345678")
+         * - Legacy: HIVE-<NODE_ID> (e.g., "HIVE-12345678") - returns null meshId
+         *
+         * @param name Device name to parse
+         * @return Pair of (meshId, nodeId) or null if parsing fails
+         */
+        @JvmStatic
+        fun parseDeviceName(name: String): Pair<String?, Long>? {
+            return when {
+                name.startsWith(HIVE_MESH_PREFIX) -> {
+                    // New format: HIVE_MESHID-NODEID
+                    val rest = name.removePrefix(HIVE_MESH_PREFIX)
+                    val dashIndex = rest.indexOf('-')
+                    if (dashIndex <= 0) return null
+                    val meshId = rest.substring(0, dashIndex)
+                    val nodeIdStr = rest.substring(dashIndex + 1)
+                    try {
+                        val nodeId = nodeIdStr.toLong(16)
+                        Pair(meshId, nodeId)
+                    } catch (e: NumberFormatException) {
+                        null
+                    }
+                }
+                name.startsWith(HIVE_NAME_PREFIX) -> {
+                    // Legacy format: HIVE-NODEID (no mesh ID)
+                    val nodeIdStr = name.removePrefix(HIVE_NAME_PREFIX)
+                    try {
+                        val nodeId = nodeIdStr.toLong(16)
+                        Pair(null, nodeId)
+                    } catch (e: NumberFormatException) {
+                        null
+                    }
+                }
+                else -> null
+            }
+        }
+
+        /**
+         * Check if a device matches our mesh.
+         *
+         * Returns true if:
+         * - The device has the same mesh ID, OR
+         * - The device has no mesh ID (legacy format - backwards compatible)
+         *
+         * @param ourMeshId Our mesh ID
+         * @param deviceMeshId Device's mesh ID (null for legacy format)
+         * @return true if the device matches our mesh
+         */
+        @JvmStatic
+        fun matchesMesh(ourMeshId: String, deviceMeshId: String?): Boolean {
+            return deviceMeshId == null || deviceMeshId == ourMeshId
+        }
 
         /**
          * Derive a NodeId from a BLE MAC address using the native Rust implementation.
@@ -401,7 +533,7 @@ class HiveBtle(
         try {
             advertiser.startAdvertising(settings, data, scanResponse, advertiseCallback)
             isAdvertising = true
-            Log.i(TAG, "Started advertising as HIVE-${String.format("%08X", nodeId)}")
+            Log.i(TAG, "Started advertising as ${generateDeviceName(meshId, nodeId)}")
         } catch (e: SecurityException) {
             Log.e(TAG, "Missing BLUETOOTH_ADVERTISE permission", e)
             throw e
@@ -631,6 +763,13 @@ class HiveBtle(
         // Don't track ourselves
         if (peerNodeId == nodeId) return
 
+        // Check mesh ID - only auto-connect to peers in the same mesh or legacy peers
+        val sameMesh = matchesMesh(meshId, device.meshId)
+        if (!sameMesh) {
+            Log.d(TAG, "Skipping peer ${String.format("%08X", peerNodeId)} - different mesh (${device.meshId} != $meshId)")
+            return
+        }
+
         val now = System.currentTimeMillis()
         addressToNodeId[device.address] = peerNodeId
 
@@ -644,14 +783,15 @@ class HiveBtle(
             val peer = HivePeer(
                 nodeId = peerNodeId,
                 address = device.address,
-                name = device.name.ifEmpty { "HIVE-${String.format("%08X", peerNodeId)}" },
+                name = device.name.ifEmpty { generateDeviceName(device.meshId ?: meshId, peerNodeId) },
+                meshId = device.meshId,
                 rssi = device.rssi,
                 isConnected = false,
                 lastDocument = null,
                 lastSeen = now
             )
             peers[peerNodeId] = peer
-            Log.i(TAG, "New peer discovered: ${peer.displayName()}")
+            Log.i(TAG, "New peer discovered: ${peer.displayName()} (mesh: ${device.meshId ?: "legacy"})")
 
             // Auto-connect to new peer
             connectToPeer(peer)
@@ -1014,6 +1154,7 @@ data class DiscoveredDevice(
     val name: String,
     val rssi: Int,
     val nodeId: Long?,
+    val meshId: String?,
     val timestampNanos: Long,
     val isHiveDevice: Boolean = false
 )
@@ -1025,15 +1166,24 @@ data class HivePeer(
     val nodeId: Long,
     val address: String,
     val name: String,
+    val meshId: String?,
     var rssi: Int,
     var isConnected: Boolean,
     var lastDocument: HiveDocument?,
     var lastSeen: Long
 ) {
     /**
-     * Get the display name for this peer (HIVE-XXXXXXXX format).
+     * Get the display name for this peer.
+     * Uses new format (HIVE_MESHID-NODEID) if mesh ID is available,
+     * otherwise falls back to legacy format (HIVE-NODEID).
      */
-    fun displayName(): String = "HIVE-${String.format("%08X", nodeId)}"
+    fun displayName(): String {
+        return if (meshId != null) {
+            "HIVE_${meshId}-${String.format("%08X", nodeId)}"
+        } else {
+            "HIVE-${String.format("%08X", nodeId)}"
+        }
+    }
 
     /**
      * Get the current event type from this peer's last document.
