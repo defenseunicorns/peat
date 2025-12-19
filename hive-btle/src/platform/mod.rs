@@ -86,15 +86,25 @@ pub enum ConnectionEvent {
         /// Reason for disconnection
         reason: DisconnectReason,
     },
+    /// GATT services discovered
+    ServicesDiscovered {
+        /// Whether the HIVE service was found
+        has_hive_service: bool,
+    },
+    /// Data received from peer (characteristic read or notification)
+    DataReceived {
+        /// The received data
+        data: Vec<u8>,
+    },
     /// MTU changed
     MtuChanged {
         /// New MTU value
-        new_mtu: u16,
+        mtu: u16,
     },
     /// PHY changed
     PhyChanged {
         /// New PHY
-        new_phy: BlePhy,
+        phy: BlePhy,
     },
     /// RSSI updated
     RssiUpdated {
