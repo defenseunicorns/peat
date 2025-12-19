@@ -8,6 +8,26 @@ import android.bluetooth.BluetoothProfile
 import android.util.Log
 
 /**
+ * Listener interface for HIVE document events.
+ */
+interface HiveDocumentListener {
+    /**
+     * Called when document data is received (via read or notification).
+     */
+    fun onDocumentReceived(data: ByteArray)
+
+    /**
+     * Called when services are discovered.
+     */
+    fun onServicesDiscovered() {}
+
+    /**
+     * Called when connection state changes.
+     */
+    fun onConnectionStateChanged(connected: Boolean) {}
+}
+
+/**
  * Proxy class that forwards GATT events to native Rust code via JNI.
  *
  * This class extends Android's BluetoothGattCallback and bridges all GATT
@@ -23,6 +43,11 @@ import android.util.Log
  * @param connectionId Unique identifier for this connection (used by native code)
  */
 class GattCallbackProxy(private val connectionId: Long) : BluetoothGattCallback() {
+
+    /**
+     * Optional listener for document events.
+     */
+    var documentListener: HiveDocumentListener? = null
 
     companion object {
         private const val TAG = "HiveBtle.GattCallback"
@@ -65,6 +90,9 @@ class GattCallbackProxy(private val connectionId: Long) : BluetoothGattCallback(
         val address = gatt.device?.address ?: ""
         nativeOnConnectionStateChange(connectionId, address, status, newState)
 
+        // Notify listener
+        documentListener?.onConnectionStateChanged(newState == STATE_CONNECTED)
+
         // Auto-discover services on connect
         if (newState == STATE_CONNECTED && status == GATT_SUCCESS) {
             Log.d(TAG, "Starting service discovery")
@@ -99,6 +127,11 @@ class GattCallbackProxy(private val connectionId: Long) : BluetoothGattCallback(
         }
 
         nativeOnServicesDiscovered(connectionId, address, status, serviceUuids)
+
+        // Notify listener
+        if (status == GATT_SUCCESS) {
+            documentListener?.onServicesDiscovered()
+        }
     }
 
     /**
@@ -124,6 +157,15 @@ class GattCallbackProxy(private val connectionId: Long) : BluetoothGattCallback(
             status,
             value
         )
+
+        // Notify listener if this is the HIVE document characteristic
+        if (status == GATT_SUCCESS && isHiveDocumentCharacteristic(characteristic)) {
+            documentListener?.onDocumentReceived(value)
+        }
+    }
+
+    private fun isHiveDocumentCharacteristic(characteristic: BluetoothGattCharacteristic): Boolean {
+        return characteristic.uuid.toString().contains("F47B", ignoreCase = true)
     }
 
     /**
@@ -144,6 +186,11 @@ class GattCallbackProxy(private val connectionId: Long) : BluetoothGattCallback(
             status,
             value
         )
+
+        // Notify listener if this is the HIVE document characteristic
+        if (status == GATT_SUCCESS && isHiveDocumentCharacteristic(characteristic)) {
+            documentListener?.onDocumentReceived(value)
+        }
     }
 
     /**
@@ -188,6 +235,11 @@ class GattCallbackProxy(private val connectionId: Long) : BluetoothGattCallback(
             characteristic.uuid.toString(),
             value
         )
+
+        // Notify listener if this is the HIVE document characteristic
+        if (isHiveDocumentCharacteristic(characteristic)) {
+            documentListener?.onDocumentReceived(value)
+        }
     }
 
     /**
@@ -206,6 +258,11 @@ class GattCallbackProxy(private val connectionId: Long) : BluetoothGattCallback(
             characteristic.uuid.toString(),
             value
         )
+
+        // Notify listener if this is the HIVE document characteristic
+        if (isHiveDocumentCharacteristic(characteristic)) {
+            documentListener?.onDocumentReceived(value)
+        }
     }
 
     /**

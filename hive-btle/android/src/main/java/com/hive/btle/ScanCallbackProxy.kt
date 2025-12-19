@@ -66,16 +66,33 @@ class ScanCallbackProxy(
 
             // Check if this is a HIVE device (by name prefix or service UUID)
             val isHiveDevice = name.startsWith(HiveBtle.HIVE_NAME_PREFIX) ||
-                serviceUuids.any { it.contains("F47A", ignoreCase = true) }
+                serviceUuids.any { it.contains("F47A", ignoreCase = true) } ||
+                hiveServiceData != null
 
-            // Parse node ID from name if present (HIVE-XXXXXXXX format)
-            val nodeId: Long? = if (name.startsWith(HiveBtle.HIVE_NAME_PREFIX)) {
-                try {
-                    name.removePrefix(HiveBtle.HIVE_NAME_PREFIX).toLong(16)
-                } catch (e: NumberFormatException) {
-                    null
+            // Parse node ID from name (HIVE-XXXXXXXX format) or service data
+            val nodeId: Long? = when {
+                // Try parsing from name first
+                name.startsWith(HiveBtle.HIVE_NAME_PREFIX) -> {
+                    try {
+                        name.removePrefix(HiveBtle.HIVE_NAME_PREFIX).toLong(16)
+                    } catch (e: NumberFormatException) {
+                        null
+                    }
                 }
-            } else null
+                // Try parsing from service data (4 bytes, big-endian node ID)
+                hiveServiceData != null && hiveServiceData.size >= 4 -> {
+                    ((hiveServiceData[0].toLong() and 0xFF) shl 24) or
+                    ((hiveServiceData[1].toLong() and 0xFF) shl 16) or
+                    ((hiveServiceData[2].toLong() and 0xFF) shl 8) or
+                    (hiveServiceData[3].toLong() and 0xFF)
+                }
+                else -> null
+            }
+
+            // Debug: log service data if present
+            if (hiveServiceData != null) {
+                Log.d(TAG, "HIVE service data (${hiveServiceData.size} bytes): ${hiveServiceData.joinToString(" ") { String.format("%02X", it) }}")
+            }
 
             Log.d(TAG, "Scan result: $address ($name) RSSI=$rssi, isHive=$isHiveDevice, nodeId=${nodeId?.let { String.format("%08X", it) }}")
 
@@ -85,7 +102,8 @@ class ScanCallbackProxy(
                 name = name,
                 rssi = rssi,
                 nodeId = nodeId,
-                timestampNanos = result.timestampNanos
+                timestampNanos = result.timestampNanos,
+                isHiveDevice = isHiveDevice
             )
 
             // Invoke Kotlin callback for UI updates
