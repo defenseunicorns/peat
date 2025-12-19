@@ -99,7 +99,9 @@ pub mod sync;
 pub mod transport;
 
 // Re-exports for convenience
-pub use config::{BleConfig, BlePhy, DiscoveryConfig, GattConfig, MeshConfig, PowerProfile};
+pub use config::{
+    BleConfig, BlePhy, DiscoveryConfig, GattConfig, MeshConfig, PowerProfile, DEFAULT_MESH_ID,
+};
 #[cfg(feature = "std")]
 pub use discovery::Scanner;
 pub use discovery::{Advertiser, HiveBeacon, ScanFilter};
