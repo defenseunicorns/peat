@@ -4,6 +4,8 @@ import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
+import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
@@ -20,6 +22,8 @@ import androidx.core.content.ContextCompat
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
+import android.os.Handler
+import android.os.Looper
 
 /**
  * Main entry point for HIVE BLE operations on Android.
@@ -129,9 +133,41 @@ class HiveBtle(
     private var isInitialized = false
     private var isScanning = false
     private var isAdvertising = false
+    private var isMeshRunning = false
 
     // Native handle
     private var nativeHandle: Long = 0
+
+    // Mesh management
+    private val peers = ConcurrentHashMap<Long, HivePeer>() // nodeId -> peer
+    private val addressToNodeId = ConcurrentHashMap<String, Long>() // address -> nodeId
+    private var meshListener: HiveMeshListener? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private var localDocument: HiveDocument? = null
+    private var localCounter = mutableListOf<GCounterEntry>()
+
+    // Mesh configuration
+    private val PEER_TIMEOUT_MS = 30000L // Remove peers after 30s without advertisement
+    private val CLEANUP_INTERVAL_MS = 10000L // Cleanup check interval
+    private val SYNC_INTERVAL_MS = 3000L // Sync documents every 3s
+
+    private val cleanupRunnable = object : Runnable {
+        override fun run() {
+            cleanupStalePeers()
+            if (isMeshRunning) {
+                handler.postDelayed(this, CLEANUP_INTERVAL_MS)
+            }
+        }
+    }
+
+    private val syncRunnable = object : Runnable {
+        override fun run() {
+            syncWithPeers()
+            if (isMeshRunning) {
+                handler.postDelayed(this, SYNC_INTERVAL_MS)
+            }
+        }
+    }
 
     /**
      * Initialize the HIVE BLE adapter.
@@ -432,10 +468,439 @@ class HiveBtle(
         }
     }
 
+    // ==================== Mesh Management API ====================
+
+    /**
+     * Start the HIVE mesh network.
+     *
+     * This starts scanning, advertising, and automatically manages
+     * connections to discovered HIVE peers. The mesh handles document
+     * synchronization automatically.
+     *
+     * @param listener Callback for mesh events (peer updates, events)
+     */
+    fun startMesh(listener: HiveMeshListener) {
+        checkInitialized()
+
+        if (isMeshRunning) {
+            Log.w(TAG, "Mesh already running")
+            return
+        }
+
+        meshListener = listener
+        isMeshRunning = true
+
+        // Start advertising
+        try {
+            startAdvertising()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start advertising", e)
+        }
+
+        // Start scanning with internal handler
+        try {
+            startScan { device -> onDeviceDiscovered(device) }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start scanning", e)
+        }
+
+        // Start periodic tasks
+        handler.post(cleanupRunnable)
+        handler.postDelayed(syncRunnable, SYNC_INTERVAL_MS)
+
+        Log.i(TAG, "Mesh started for HIVE-${String.format("%08X", nodeId)}")
+    }
+
+    /**
+     * Stop the HIVE mesh network.
+     */
+    fun stopMesh() {
+        if (!isMeshRunning) return
+
+        isMeshRunning = false
+        handler.removeCallbacks(cleanupRunnable)
+        handler.removeCallbacks(syncRunnable)
+
+        stopScan()
+        stopAdvertising()
+
+        // Disconnect all peers
+        for (address in connections.keys.toList()) {
+            disconnect(address)
+        }
+
+        peers.clear()
+        addressToNodeId.clear()
+        meshListener = null
+
+        Log.i(TAG, "Mesh stopped")
+    }
+
+    /**
+     * Send an event to all peers in the mesh.
+     *
+     * @param eventType The event to broadcast
+     */
+    fun sendEvent(eventType: HiveEventType) {
+        if (!isMeshRunning) {
+            Log.w(TAG, "Mesh not running, cannot send event")
+            return
+        }
+
+        Log.i(TAG, "Broadcasting event: $eventType")
+
+        // Increment our counter
+        incrementLocalCounter()
+
+        // Create document with event
+        val peripheral = HivePeripheral(
+            id = nodeId,
+            parentNode = 0,
+            peripheralType = HivePeripheralType.SOLDIER_SENSOR,
+            callsign = "ANDROID",
+            health = HiveHealthStatus(100, null, 0, 0),
+            lastEvent = HivePeripheralEvent(eventType, System.currentTimeMillis()),
+            timestamp = System.currentTimeMillis()
+        )
+
+        val documentBytes = HiveDocument.encode(nodeId, localCounter, peripheral)
+
+        // Send to all connected peers
+        for ((address, gatt) in connections) {
+            writeDocumentToGatt(gatt, documentBytes)
+        }
+    }
+
+    /**
+     * Get the current list of peers in the mesh.
+     */
+    fun getPeers(): List<HivePeer> = peers.values.toList()
+
+    /**
+     * Get a specific peer by node ID.
+     */
+    fun getPeer(nodeId: Long): HivePeer? = peers[nodeId]
+
+    /**
+     * Check if the mesh is running.
+     */
+    fun isMeshRunning(): Boolean = isMeshRunning
+
+    // ==================== Internal Mesh Methods ====================
+
+    private fun onDeviceDiscovered(device: DiscoveredDevice) {
+        if (!device.isHiveDevice) return
+
+        // Check if we already know this address (peer might have been renamed by document)
+        val knownNodeId = addressToNodeId[device.address]
+        if (knownNodeId != null) {
+            // Update existing peer by address
+            peers[knownNodeId]?.let { peer ->
+                peer.rssi = device.rssi
+                peer.lastSeen = System.currentTimeMillis()
+                notifyMeshUpdated()
+            }
+            return
+        }
+
+        // Derive nodeId from name, service data, or address for new peers
+        val peerNodeId = device.nodeId ?: deriveNodeIdFromAddress(device.address)
+
+        // Don't track ourselves
+        if (peerNodeId == nodeId) return
+
+        val now = System.currentTimeMillis()
+        addressToNodeId[device.address] = peerNodeId
+
+        val existingPeer = peers[peerNodeId]
+        if (existingPeer != null) {
+            // Update existing peer
+            existingPeer.rssi = device.rssi
+            existingPeer.lastSeen = now
+        } else {
+            // New peer discovered
+            val peer = HivePeer(
+                nodeId = peerNodeId,
+                address = device.address,
+                name = device.name.ifEmpty { "HIVE-${String.format("%08X", peerNodeId)}" },
+                rssi = device.rssi,
+                isConnected = false,
+                lastDocument = null,
+                lastSeen = now
+            )
+            peers[peerNodeId] = peer
+            Log.i(TAG, "New peer discovered: ${peer.displayName()}")
+
+            // Auto-connect to new peer
+            connectToPeer(peer)
+        }
+
+        notifyMeshUpdated()
+    }
+
+    private fun connectToPeer(peer: HivePeer) {
+        if (connections.containsKey(peer.address)) {
+            Log.d(TAG, "Already connected to ${peer.displayName()}")
+            return
+        }
+
+        Log.i(TAG, "Connecting to peer: ${peer.displayName()}")
+
+        val adapter = bluetoothAdapter ?: return
+
+        try {
+            val device = adapter.getRemoteDevice(peer.address)
+            val connectionId = connectionIdCounter.incrementAndGet()
+            val callback = GattCallbackProxy(connectionId)
+
+            // Set up document listener
+            callback.documentListener = object : HiveDocumentListener {
+                override fun onDocumentReceived(data: ByteArray) {
+                    handlePeerDocument(peer, data)
+                }
+
+                override fun onServicesDiscovered() {
+                    Log.i(TAG, "Services discovered for ${peer.displayName()}")
+                    peer.isConnected = true
+                    notifyMeshUpdated()
+
+                    // Enable notifications first, then read after a delay
+                    connections[peer.address]?.let { gatt ->
+                        enableNotificationsForGatt(gatt)
+                        // Delay read to allow descriptor write to complete
+                        handler.postDelayed({
+                            readDocumentFromGatt(gatt)
+                        }, 500)
+                    }
+                }
+
+                override fun onConnectionStateChanged(connected: Boolean) {
+                    Log.i(TAG, "Peer ${peer.displayName()} connected: $connected")
+                    // Find the current peer entry (may have been updated with new nodeId)
+                    val currentPeer = peers.values.find { it.address == peer.address }
+                    if (currentPeer != null) {
+                        currentPeer.isConnected = connected
+                        currentPeer.lastSeen = System.currentTimeMillis()
+                    }
+                    if (!connected) {
+                        connections.remove(peer.address)
+                        gattCallbacks.remove(peer.address)
+                        // Retry connection after a delay if mesh is still running
+                        if (isMeshRunning && currentPeer != null) {
+                            handler.postDelayed({
+                                if (isMeshRunning && !connections.containsKey(peer.address)) {
+                                    Log.i(TAG, "Retrying connection to ${currentPeer.displayName()}")
+                                    connectToPeer(currentPeer)
+                                }
+                            }, 2000)
+                        }
+                    }
+                    notifyMeshUpdated()
+                }
+            }
+
+            val gatt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                device.connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
+            } else {
+                device.connectGatt(context, false, callback)
+            }
+
+            if (gatt != null) {
+                connections[peer.address] = gatt
+                gattCallbacks[peer.address] = callback
+            }
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Missing BLUETOOTH_CONNECT permission", e)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to connect to peer", e)
+        }
+    }
+
+    private fun handlePeerDocument(peer: HivePeer, data: ByteArray) {
+        val document = HiveDocument.decode(data) ?: return
+
+        Log.d(TAG, "Received document from ${peer.displayName()} (docNodeId=${String.format("%08X", document.nodeId)}): event=${document.currentEventType()}")
+
+        // Update peer's nodeId from document if different (document nodeId is authoritative)
+        if (document.nodeId != peer.nodeId && document.nodeId != 0L) {
+            val oldNodeId = peer.nodeId
+            Log.i(TAG, "Updating peer nodeId from ${String.format("%08X", oldNodeId)} to ${String.format("%08X", document.nodeId)}")
+
+            // Re-register peer with correct nodeId
+            peers.remove(oldNodeId)
+            val updatedPeer = peer.copy(nodeId = document.nodeId)
+            peers[document.nodeId] = updatedPeer
+            addressToNodeId[peer.address] = document.nodeId
+
+            // Continue with updated peer reference
+            handlePeerDocumentInternal(updatedPeer, document)
+            return
+        }
+
+        handlePeerDocumentInternal(peer, document)
+    }
+
+    private fun handlePeerDocumentInternal(peer: HivePeer, document: HiveDocument) {
+        // Store last document
+        val previousEventType = peer.lastDocument?.currentEventType() ?: HiveEventType.NONE
+        peer.lastDocument = document
+        peer.lastSeen = System.currentTimeMillis()
+
+        // Merge counters (CRDT merge)
+        mergeCounter(document.counter)
+
+        // Check for new events
+        val eventType = document.currentEventType()
+        if (eventType != HiveEventType.NONE && eventType != previousEventType) {
+            handler.post {
+                meshListener?.onPeerEvent(peer, eventType)
+            }
+        }
+
+        handler.post {
+            meshListener?.onDocumentSynced(document)
+        }
+
+        notifyMeshUpdated()
+    }
+
+    private fun mergeCounter(remoteCounter: List<GCounterEntry>) {
+        for (entry in remoteCounter) {
+            val existing = localCounter.find { it.nodeId == entry.nodeId }
+            if (existing != null) {
+                if (entry.count > existing.count) {
+                    val index = localCounter.indexOf(existing)
+                    localCounter[index] = entry
+                }
+            } else {
+                localCounter.add(entry)
+            }
+        }
+    }
+
+    private fun incrementLocalCounter() {
+        val existing = localCounter.find { it.nodeId == nodeId }
+        if (existing != null) {
+            val index = localCounter.indexOf(existing)
+            localCounter[index] = GCounterEntry(nodeId, existing.count + 1)
+        } else {
+            localCounter.add(GCounterEntry(nodeId, 1))
+        }
+    }
+
+    private fun syncWithPeers() {
+        if (connections.isEmpty()) return
+
+        // Create sync document (no event, just counter state - don't increment on sync)
+        val documentBytes = HiveDocument.encode(nodeId, localCounter, null)
+
+        for ((address, gatt) in connections) {
+            writeDocumentToGatt(gatt, documentBytes)
+        }
+    }
+
+    private fun cleanupStalePeers() {
+        val now = System.currentTimeMillis()
+        val staleNodeIds = peers.filter { (_, peer) ->
+            now - peer.lastSeen > PEER_TIMEOUT_MS && !peer.isConnected
+        }.keys
+
+        if (staleNodeIds.isNotEmpty()) {
+            Log.d(TAG, "Removing ${staleNodeIds.size} stale peers")
+            for (nodeId in staleNodeIds) {
+                val peer = peers.remove(nodeId)
+                peer?.let {
+                    addressToNodeId.remove(it.address)
+                    disconnect(it.address)
+                }
+            }
+            notifyMeshUpdated()
+        }
+    }
+
+    private fun notifyMeshUpdated() {
+        handler.post {
+            meshListener?.onMeshUpdated(peers.values.toList())
+        }
+    }
+
+    /**
+     * Derive a nodeId from a BLE MAC address.
+     * Uses the last 4 bytes of the MAC as a 32-bit node ID.
+     */
+    private fun deriveNodeIdFromAddress(address: String): Long {
+        // MAC format: "AA:BB:CC:DD:EE:FF"
+        val parts = address.split(":")
+        if (parts.size != 6) return 0L
+
+        return try {
+            // Use last 4 bytes of MAC as node ID
+            val b2 = parts[2].toLong(16)
+            val b3 = parts[3].toLong(16)
+            val b4 = parts[4].toLong(16)
+            val b5 = parts[5].toLong(16)
+            (b2 shl 24) or (b3 shl 16) or (b4 shl 8) or b5
+        } catch (e: NumberFormatException) {
+            0L
+        }
+    }
+
+    private fun writeDocumentToGatt(gatt: BluetoothGatt, data: ByteArray) {
+        try {
+            val service = gatt.getService(HIVE_SERVICE_UUID) ?: return
+            val char = service.getCharacteristic(HIVE_CHAR_DOCUMENT) ?: return
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                gatt.writeCharacteristic(char, data, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+            } else {
+                @Suppress("DEPRECATION")
+                char.value = data
+                @Suppress("DEPRECATION")
+                gatt.writeCharacteristic(char)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to write document", e)
+        }
+    }
+
+    private fun readDocumentFromGatt(gatt: BluetoothGatt) {
+        try {
+            val service = gatt.getService(HIVE_SERVICE_UUID) ?: return
+            val char = service.getCharacteristic(HIVE_CHAR_DOCUMENT) ?: return
+            gatt.readCharacteristic(char)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to read document", e)
+        }
+    }
+
+    private fun enableNotificationsForGatt(gatt: BluetoothGatt) {
+        try {
+            val service = gatt.getService(HIVE_SERVICE_UUID) ?: return
+            val char = service.getCharacteristic(HIVE_CHAR_DOCUMENT) ?: return
+
+            gatt.setCharacteristicNotification(char, true)
+
+            val descriptor = char.getDescriptor(CCCD_UUID)
+            if (descriptor != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    gatt.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                    @Suppress("DEPRECATION")
+                    gatt.writeDescriptor(descriptor)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to enable notifications", e)
+        }
+    }
+
     /**
      * Disconnect all devices and clean up resources.
      */
     fun shutdown() {
+        stopMesh()
         stopScan()
         stopAdvertising()
 
@@ -494,8 +959,56 @@ data class DiscoveredDevice(
     val name: String,
     val rssi: Int,
     val nodeId: Long?,
-    val timestampNanos: Long
+    val timestampNanos: Long,
+    val isHiveDevice: Boolean = false
 )
+
+/**
+ * Represents a peer in the HIVE mesh network.
+ */
+data class HivePeer(
+    val nodeId: Long,
+    val address: String,
+    val name: String,
+    var rssi: Int,
+    var isConnected: Boolean,
+    var lastDocument: HiveDocument?,
+    var lastSeen: Long
+) {
+    /**
+     * Get the display name for this peer (HIVE-XXXXXXXX format).
+     */
+    fun displayName(): String = "HIVE-${String.format("%08X", nodeId)}"
+
+    /**
+     * Get the current event type from this peer's last document.
+     */
+    fun currentEventType(): HiveEventType = lastDocument?.currentEventType() ?: HiveEventType.NONE
+}
+
+/**
+ * Listener interface for HIVE mesh events.
+ */
+interface HiveMeshListener {
+    /**
+     * Called when the mesh state changes (peers added/removed/updated).
+     * @param peers Current list of all known peers
+     */
+    fun onMeshUpdated(peers: List<HivePeer>)
+
+    /**
+     * Called when a peer sends an event (Emergency, ACK, etc.).
+     * @param peer The peer that sent the event
+     * @param eventType The event type
+     */
+    fun onPeerEvent(peer: HivePeer, eventType: HiveEventType)
+
+    /**
+     * Called when mesh document is synced.
+     * @param document The merged document state
+     */
+    fun onDocumentSynced(document: HiveDocument) {}
+}
 
 /**
  * Represents an active GATT connection to a HIVE device.
@@ -505,6 +1018,13 @@ class HiveConnection internal constructor(
     private val gatt: BluetoothGatt,
     private val callback: GattCallbackProxy
 ) {
+    /**
+     * Set a listener for document events.
+     */
+    fun setDocumentListener(listener: HiveDocumentListener?) {
+        callback.documentListener = listener
+    }
+
     /**
      * Request MTU change.
      *
@@ -547,4 +1067,633 @@ class HiveConnection internal constructor(
             false
         }
     }
+
+    /**
+     * Read the HIVE document characteristic.
+     *
+     * @return true if read was initiated
+     */
+    fun readDocument(): Boolean {
+        return try {
+            val service = gatt.getService(HiveBtle.HIVE_SERVICE_UUID)
+            if (service == null) {
+                Log.e("HiveConnection", "HIVE service not found")
+                return false
+            }
+            val char = service.getCharacteristic(HiveBtle.HIVE_CHAR_DOCUMENT)
+            if (char == null) {
+                Log.e("HiveConnection", "HIVE document characteristic not found")
+                return false
+            }
+            gatt.readCharacteristic(char)
+        } catch (e: SecurityException) {
+            Log.e("HiveConnection", "Missing BLUETOOTH_CONNECT permission", e)
+            false
+        }
+    }
+
+    /**
+     * Write data to the HIVE document characteristic.
+     *
+     * @param data The document data to write
+     * @return true if write was initiated
+     */
+    fun writeDocument(data: ByteArray): Boolean {
+        return try {
+            val service = gatt.getService(HiveBtle.HIVE_SERVICE_UUID)
+            if (service == null) {
+                Log.e("HiveConnection", "HIVE service not found")
+                return false
+            }
+            val char = service.getCharacteristic(HiveBtle.HIVE_CHAR_DOCUMENT)
+            if (char == null) {
+                Log.e("HiveConnection", "HIVE document characteristic not found")
+                return false
+            }
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                gatt.writeCharacteristic(char, data, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+            } else {
+                @Suppress("DEPRECATION")
+                char.value = data
+                @Suppress("DEPRECATION")
+                gatt.writeCharacteristic(char)
+            }
+            true
+        } catch (e: SecurityException) {
+            Log.e("HiveConnection", "Missing BLUETOOTH_CONNECT permission", e)
+            false
+        }
+    }
+
+    /**
+     * Enable notifications for the HIVE document characteristic.
+     *
+     * @return true if notification was enabled
+     */
+    fun enableDocumentNotifications(): Boolean {
+        return try {
+            val service = gatt.getService(HiveBtle.HIVE_SERVICE_UUID)
+            if (service == null) {
+                Log.e("HiveConnection", "HIVE service not found")
+                return false
+            }
+            val char = service.getCharacteristic(HiveBtle.HIVE_CHAR_DOCUMENT)
+            if (char == null) {
+                Log.e("HiveConnection", "HIVE document characteristic not found")
+                return false
+            }
+
+            // Enable local notifications
+            if (!gatt.setCharacteristicNotification(char, true)) {
+                Log.e("HiveConnection", "Failed to enable local notifications")
+                return false
+            }
+
+            // Write to CCCD to enable remote notifications
+            val descriptor = char.getDescriptor(HiveBtle.CCCD_UUID)
+            if (descriptor == null) {
+                Log.w("HiveConnection", "CCCD descriptor not found, notifications may not work")
+                return true  // Local notifications are enabled at least
+            }
+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                gatt.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
+            } else {
+                @Suppress("DEPRECATION")
+                descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                @Suppress("DEPRECATION")
+                gatt.writeDescriptor(descriptor)
+            }
+            true
+        } catch (e: SecurityException) {
+            Log.e("HiveConnection", "Missing BLUETOOTH_CONNECT permission", e)
+            false
+        }
+    }
+}
+
+/**
+ * HIVE document event types.
+ * Values must match the Rust EventType enum in hive-btle/src/sync/crdt.rs
+ */
+enum class HiveEventType(val value: Int) {
+    NONE(0),
+    PING(1),
+    NEED_ASSIST(2),
+    EMERGENCY(3),
+    MOVING(4),
+    IN_POSITION(5),
+    ACK(6);
+
+    companion object {
+        fun fromValue(v: Int): HiveEventType = entries.find { it.value == v } ?: NONE
+    }
+}
+
+/**
+ * HIVE Peripheral type.
+ */
+enum class HivePeripheralType(val value: Int) {
+    UNKNOWN(0),
+    SOLDIER_SENSOR(1),
+    VEHICLE(2),
+    ASSET_TAG(3);
+
+    companion object {
+        fun fromValue(v: Int): HivePeripheralType = entries.find { it.value == v } ?: UNKNOWN
+    }
+}
+
+/**
+ * HIVE health status data.
+ */
+data class HiveHealthStatus(
+    val batteryPercent: Int,
+    val heartRate: Int?,
+    val activityLevel: Int,
+    val alerts: Int
+) {
+    companion object {
+        const val ALERT_MAN_DOWN = 0x01
+        const val ALERT_LOW_BATTERY = 0x02
+        const val ALERT_GEOFENCE = 0x04
+        const val ALERT_PANIC = 0x08
+
+        fun decode(data: ByteArray, offset: Int): HiveHealthStatus? {
+            if (data.size < offset + 4) return null
+            val battery = data[offset].toInt() and 0xFF
+            val hr = data[offset + 1].toInt() and 0xFF
+            val activity = data[offset + 2].toInt() and 0xFF
+            val alerts = data[offset + 3].toInt() and 0xFF
+            return HiveHealthStatus(
+                batteryPercent = battery,
+                heartRate = if (hr > 0) hr else null,
+                activityLevel = activity,
+                alerts = alerts
+            )
+        }
+
+        fun encode(status: HiveHealthStatus): ByteArray {
+            return byteArrayOf(
+                status.batteryPercent.toByte(),
+                (status.heartRate ?: 0).toByte(),
+                status.activityLevel.toByte(),
+                status.alerts.toByte()
+            )
+        }
+    }
+
+    fun hasAlert(flag: Int): Boolean = (alerts and flag) != 0
+}
+
+/**
+ * HIVE peripheral event.
+ */
+data class HivePeripheralEvent(
+    val eventType: HiveEventType,
+    val timestamp: Long
+) {
+    companion object {
+        private const val SIZE = 9
+
+        fun decode(data: ByteArray, offset: Int): HivePeripheralEvent? {
+            if (data.size < offset + SIZE) return null
+            val eventType = HiveEventType.fromValue(data[offset].toInt() and 0xFF)
+            val timestamp = readU64LE(data, offset + 1)
+            return HivePeripheralEvent(eventType, timestamp)
+        }
+
+        fun encode(event: HivePeripheralEvent): ByteArray {
+            val buf = ByteArray(SIZE)
+            buf[0] = event.eventType.value.toByte()
+            writeU64LE(buf, 1, event.timestamp)
+            return buf
+        }
+
+        private fun readU64LE(data: ByteArray, offset: Int): Long {
+            return ((data[offset].toLong() and 0xFF) or
+                    ((data[offset + 1].toLong() and 0xFF) shl 8) or
+                    ((data[offset + 2].toLong() and 0xFF) shl 16) or
+                    ((data[offset + 3].toLong() and 0xFF) shl 24) or
+                    ((data[offset + 4].toLong() and 0xFF) shl 32) or
+                    ((data[offset + 5].toLong() and 0xFF) shl 40) or
+                    ((data[offset + 6].toLong() and 0xFF) shl 48) or
+                    ((data[offset + 7].toLong() and 0xFF) shl 56))
+        }
+
+        private fun writeU64LE(data: ByteArray, offset: Int, value: Long) {
+            data[offset] = (value and 0xFF).toByte()
+            data[offset + 1] = ((value shr 8) and 0xFF).toByte()
+            data[offset + 2] = ((value shr 16) and 0xFF).toByte()
+            data[offset + 3] = ((value shr 24) and 0xFF).toByte()
+            data[offset + 4] = ((value shr 32) and 0xFF).toByte()
+            data[offset + 5] = ((value shr 40) and 0xFF).toByte()
+            data[offset + 6] = ((value shr 48) and 0xFF).toByte()
+            data[offset + 7] = ((value shr 56) and 0xFF).toByte()
+        }
+    }
+}
+
+/**
+ * HIVE Peripheral data structure.
+ * Format: [id:4][parent:4][type:1][callsign:12][health:4][has_event:1][event:9?][timestamp:8]
+ */
+data class HivePeripheral(
+    val id: Long,
+    val parentNode: Long,
+    val peripheralType: HivePeripheralType,
+    val callsign: String,
+    val health: HiveHealthStatus,
+    val lastEvent: HivePeripheralEvent?,
+    val timestamp: Long
+) {
+    companion object {
+        private const val TAG = "HivePeripheral"
+        private const val MIN_SIZE = 34  // Without event
+        private const val SIZE_WITH_EVENT = 43
+
+        fun decode(data: ByteArray, offset: Int = 0): HivePeripheral? {
+            if (data.size < offset + MIN_SIZE) {
+                Log.e(TAG, "Peripheral data too short: ${data.size - offset} bytes (need $MIN_SIZE)")
+                return null
+            }
+
+            var pos = offset
+            val id = readU32LE(data, pos)
+            pos += 4
+            val parentNode = readU32LE(data, pos)
+            pos += 4
+            val peripheralType = HivePeripheralType.fromValue(data[pos].toInt() and 0xFF)
+            pos += 1
+
+            // Read callsign (12 bytes, null-terminated string)
+            val callsignBytes = data.sliceArray(pos until pos + 12)
+            val nullIndex = callsignBytes.indexOf(0)
+            val callsign = if (nullIndex >= 0) {
+                String(callsignBytes, 0, nullIndex, Charsets.UTF_8)
+            } else {
+                String(callsignBytes, Charsets.UTF_8)
+            }
+            pos += 12
+
+            val health = HiveHealthStatus.decode(data, pos)
+            if (health == null) {
+                Log.e(TAG, "Failed to decode health status")
+                return null
+            }
+            pos += 4
+
+            val hasEvent = data[pos] != 0.toByte()
+            pos += 1
+
+            val lastEvent = if (hasEvent) {
+                if (data.size < offset + SIZE_WITH_EVENT) {
+                    Log.e(TAG, "Peripheral with event too short: ${data.size - offset} bytes (need $SIZE_WITH_EVENT)")
+                    return null
+                }
+                val event = HivePeripheralEvent.decode(data, pos)
+                pos += 9
+                event
+            } else {
+                null
+            }
+
+            if (data.size < pos + 8) {
+                Log.e(TAG, "No room for timestamp at offset $pos")
+                return null
+            }
+            val timestamp = readU64LE(data, pos)
+
+            Log.d(TAG, "Decoded: id=${String.format("%08X", id)}, type=$peripheralType, " +
+                    "event=${lastEvent?.eventType}, health=${health.batteryPercent}%")
+
+            return HivePeripheral(
+                id = id,
+                parentNode = parentNode,
+                peripheralType = peripheralType,
+                callsign = callsign,
+                health = health,
+                lastEvent = lastEvent,
+                timestamp = timestamp
+            )
+        }
+
+        fun encode(peripheral: HivePeripheral): ByteArray {
+            val hasEvent = peripheral.lastEvent != null
+            val size = if (hasEvent) SIZE_WITH_EVENT else MIN_SIZE
+            val buf = ByteArray(size)
+            var pos = 0
+
+            writeU32LE(buf, pos, peripheral.id)
+            pos += 4
+            writeU32LE(buf, pos, peripheral.parentNode)
+            pos += 4
+            buf[pos] = peripheral.peripheralType.value.toByte()
+            pos += 1
+
+            // Write callsign (12 bytes)
+            val callsignBytes = peripheral.callsign.toByteArray(Charsets.UTF_8)
+            for (i in 0 until 12) {
+                buf[pos + i] = if (i < callsignBytes.size) callsignBytes[i] else 0
+            }
+            pos += 12
+
+            val healthBytes = HiveHealthStatus.encode(peripheral.health)
+            healthBytes.copyInto(buf, pos)
+            pos += 4
+
+            buf[pos] = if (hasEvent) 1 else 0
+            pos += 1
+
+            if (hasEvent && peripheral.lastEvent != null) {
+                val eventBytes = HivePeripheralEvent.encode(peripheral.lastEvent)
+                eventBytes.copyInto(buf, pos)
+                pos += 9
+            }
+
+            writeU64LE(buf, pos, peripheral.timestamp)
+            return buf
+        }
+
+        private fun readU32LE(data: ByteArray, offset: Int): Long {
+            return ((data[offset].toLong() and 0xFF) or
+                    ((data[offset + 1].toLong() and 0xFF) shl 8) or
+                    ((data[offset + 2].toLong() and 0xFF) shl 16) or
+                    ((data[offset + 3].toLong() and 0xFF) shl 24))
+        }
+
+        private fun readU64LE(data: ByteArray, offset: Int): Long {
+            return ((data[offset].toLong() and 0xFF) or
+                    ((data[offset + 1].toLong() and 0xFF) shl 8) or
+                    ((data[offset + 2].toLong() and 0xFF) shl 16) or
+                    ((data[offset + 3].toLong() and 0xFF) shl 24) or
+                    ((data[offset + 4].toLong() and 0xFF) shl 32) or
+                    ((data[offset + 5].toLong() and 0xFF) shl 40) or
+                    ((data[offset + 6].toLong() and 0xFF) shl 48) or
+                    ((data[offset + 7].toLong() and 0xFF) shl 56))
+        }
+
+        private fun writeU32LE(data: ByteArray, offset: Int, value: Long) {
+            data[offset] = (value and 0xFF).toByte()
+            data[offset + 1] = ((value shr 8) and 0xFF).toByte()
+            data[offset + 2] = ((value shr 16) and 0xFF).toByte()
+            data[offset + 3] = ((value shr 24) and 0xFF).toByte()
+        }
+
+        private fun writeU64LE(data: ByteArray, offset: Int, value: Long) {
+            data[offset] = (value and 0xFF).toByte()
+            data[offset + 1] = ((value shr 8) and 0xFF).toByte()
+            data[offset + 2] = ((value shr 16) and 0xFF).toByte()
+            data[offset + 3] = ((value shr 24) and 0xFF).toByte()
+            data[offset + 4] = ((value shr 32) and 0xFF).toByte()
+            data[offset + 5] = ((value shr 40) and 0xFF).toByte()
+            data[offset + 6] = ((value shr 48) and 0xFF).toByte()
+            data[offset + 7] = ((value shr 56) and 0xFF).toByte()
+        }
+    }
+
+    /**
+     * Get the current event type, or NONE if no event.
+     */
+    fun currentEventType(): HiveEventType = lastEvent?.eventType ?: HiveEventType.NONE
+}
+
+/**
+ * HIVE CRDT GCounter entry.
+ */
+data class GCounterEntry(
+    val nodeId: Long,
+    val count: Long
+)
+
+/**
+ * HIVE document format (compatible with M5Stack HIVE-lite).
+ *
+ * Wire format:
+ * - Header: version (u32 LE) + node_id (u32 LE)
+ * - GCounter: num_entries (u32 LE) + [node_id (u32 LE) + count (u64 LE)] * N
+ * - Extended: 0xAB marker + reserved (u8) + peripheral_len (u16 LE) + peripheral data
+ */
+data class HiveDocument(
+    val version: Long,
+    val nodeId: Long,
+    val counter: List<GCounterEntry>,
+    val peripheral: HivePeripheral?
+) {
+    companion object {
+        private const val TAG = "HiveDocument"
+        private const val EXTENDED_MARKER: Byte = 0xAB.toByte()
+
+        /**
+         * Decode a HIVE document from raw bytes.
+         *
+         * @param data Raw document bytes
+         * @return Decoded document, or null if parsing failed
+         */
+        fun decode(data: ByteArray): HiveDocument? {
+            if (data.size < 8) {
+                Log.e(TAG, "Document too short: ${data.size} bytes (minimum 8)")
+                return null
+            }
+
+            try {
+                var offset = 0
+
+                // Read header
+                val version = readU32LE(data, offset)
+                offset += 4
+                val nodeId = readU32LE(data, offset)
+                offset += 4
+
+                Log.d(TAG, "Header: version=$version, nodeId=${String.format("%08X", nodeId)}")
+
+                // Read GCounter
+                if (data.size < offset + 4) {
+                    Log.e(TAG, "Document too short for GCounter count")
+                    return null
+                }
+                val numEntries = readU32LE(data, offset).toInt()
+                offset += 4
+
+                if (data.size < offset + numEntries * 12) {
+                    Log.e(TAG, "Document too short for GCounter entries: need ${offset + numEntries * 12}, have ${data.size}")
+                    return null
+                }
+
+                val counter = mutableListOf<GCounterEntry>()
+                for (i in 0 until numEntries) {
+                    val entryNodeId = readU32LE(data, offset)
+                    offset += 4
+                    val count = readU64LE(data, offset)
+                    offset += 8
+                    counter.add(GCounterEntry(entryNodeId, count))
+                    Log.d(TAG, "GCounter[$i]: nodeId=${String.format("%08X", entryNodeId)}, count=$count")
+                }
+
+                // Check for extended data (peripheral)
+                var peripheral: HivePeripheral? = null
+                if (data.size > offset && data[offset] == EXTENDED_MARKER) {
+                    offset += 1  // Skip marker
+                    if (data.size >= offset + 3) {
+                        val reserved = data[offset].toInt() and 0xFF
+                        offset += 1
+                        val peripheralLen = readU16LE(data, offset).toInt()
+                        offset += 2
+
+                        Log.d(TAG, "Extended: reserved=$reserved, peripheralLen=$peripheralLen")
+
+                        if (data.size >= offset + peripheralLen && peripheralLen > 0) {
+                            // Decode full Peripheral structure
+                            peripheral = HivePeripheral.decode(data, offset)
+                            if (peripheral != null) {
+                                Log.d(TAG, "Peripheral: eventType=${peripheral.currentEventType()}, " +
+                                        "battery=${peripheral.health.batteryPercent}%")
+                            } else {
+                                Log.w(TAG, "Failed to decode peripheral data ($peripheralLen bytes)")
+                            }
+                        }
+                    }
+                }
+
+                return HiveDocument(version, nodeId, counter, peripheral)
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to decode document", e)
+                return null
+            }
+        }
+
+        /**
+         * Create an encoded HIVE document with full Peripheral structure.
+         *
+         * @param nodeId This node's ID
+         * @param counter GCounter entries
+         * @param peripheral Optional Peripheral data (contains event, health, etc.)
+         * @return Encoded document bytes
+         */
+        fun encode(nodeId: Long, counter: List<GCounterEntry>, peripheral: HivePeripheral? = null): ByteArray {
+            val headerSize = 8  // version + nodeId
+            val counterSize = 4 + counter.size * 12  // count + entries
+            val peripheralBytes = peripheral?.let { HivePeripheral.encode(it) }
+            val extendedSize = if (peripheralBytes != null) 4 + peripheralBytes.size else 0  // marker + reserved + len(2) + data
+            val totalSize = headerSize + counterSize + extendedSize
+
+            val data = ByteArray(totalSize)
+            var offset = 0
+
+            // Write header
+            writeU32LE(data, offset, 1)  // version = 1
+            offset += 4
+            writeU32LE(data, offset, nodeId)
+            offset += 4
+
+            // Write GCounter
+            writeU32LE(data, offset, counter.size.toLong())
+            offset += 4
+            for (entry in counter) {
+                writeU32LE(data, offset, entry.nodeId)
+                offset += 4
+                writeU64LE(data, offset, entry.count)
+                offset += 8
+            }
+
+            // Write extended data (Peripheral)
+            if (peripheralBytes != null) {
+                data[offset] = EXTENDED_MARKER
+                offset += 1
+                data[offset] = 0  // reserved
+                offset += 1
+                writeU16LE(data, offset, peripheralBytes.size.toLong())
+                offset += 2
+                peripheralBytes.copyInto(data, offset)
+            }
+
+            return data
+        }
+
+        /**
+         * Create an encoded HIVE document with just an event type (simple form).
+         *
+         * @param nodeId This node's ID
+         * @param counter GCounter entries
+         * @param eventType Optional event type
+         * @return Encoded document bytes
+         */
+        fun encodeWithEvent(nodeId: Long, counter: List<GCounterEntry>, eventType: HiveEventType = HiveEventType.NONE): ByteArray {
+            val peripheral = if (eventType != HiveEventType.NONE) {
+                val timestamp = System.currentTimeMillis()
+                HivePeripheral(
+                    id = nodeId,
+                    parentNode = 0,
+                    peripheralType = HivePeripheralType.SOLDIER_SENSOR,
+                    callsign = "",
+                    health = HiveHealthStatus(100, null, 0, 0),
+                    lastEvent = HivePeripheralEvent(eventType, timestamp),
+                    timestamp = timestamp
+                )
+            } else null
+            return encode(nodeId, counter, peripheral)
+        }
+
+        private fun readU16LE(data: ByteArray, offset: Int): Long {
+            return ((data[offset].toLong() and 0xFF) or
+                    ((data[offset + 1].toLong() and 0xFF) shl 8))
+        }
+
+        private fun readU32LE(data: ByteArray, offset: Int): Long {
+            return ((data[offset].toLong() and 0xFF) or
+                    ((data[offset + 1].toLong() and 0xFF) shl 8) or
+                    ((data[offset + 2].toLong() and 0xFF) shl 16) or
+                    ((data[offset + 3].toLong() and 0xFF) shl 24))
+        }
+
+        private fun readU64LE(data: ByteArray, offset: Int): Long {
+            return ((data[offset].toLong() and 0xFF) or
+                    ((data[offset + 1].toLong() and 0xFF) shl 8) or
+                    ((data[offset + 2].toLong() and 0xFF) shl 16) or
+                    ((data[offset + 3].toLong() and 0xFF) shl 24) or
+                    ((data[offset + 4].toLong() and 0xFF) shl 32) or
+                    ((data[offset + 5].toLong() and 0xFF) shl 40) or
+                    ((data[offset + 6].toLong() and 0xFF) shl 48) or
+                    ((data[offset + 7].toLong() and 0xFF) shl 56))
+        }
+
+        private fun writeU16LE(data: ByteArray, offset: Int, value: Long) {
+            data[offset] = (value and 0xFF).toByte()
+            data[offset + 1] = ((value shr 8) and 0xFF).toByte()
+        }
+
+        private fun writeU32LE(data: ByteArray, offset: Int, value: Long) {
+            data[offset] = (value and 0xFF).toByte()
+            data[offset + 1] = ((value shr 8) and 0xFF).toByte()
+            data[offset + 2] = ((value shr 16) and 0xFF).toByte()
+            data[offset + 3] = ((value shr 24) and 0xFF).toByte()
+        }
+
+        private fun writeU64LE(data: ByteArray, offset: Int, value: Long) {
+            data[offset] = (value and 0xFF).toByte()
+            data[offset + 1] = ((value shr 8) and 0xFF).toByte()
+            data[offset + 2] = ((value shr 16) and 0xFF).toByte()
+            data[offset + 3] = ((value shr 24) and 0xFF).toByte()
+            data[offset + 4] = ((value shr 32) and 0xFF).toByte()
+            data[offset + 5] = ((value shr 40) and 0xFF).toByte()
+            data[offset + 6] = ((value shr 48) and 0xFF).toByte()
+            data[offset + 7] = ((value shr 56) and 0xFF).toByte()
+        }
+    }
+
+    /**
+     * Get the total count from all GCounter entries.
+     */
+    fun totalCount(): Long = counter.sumOf { it.count }
+
+    /**
+     * Get the current event type from peripheral data.
+     */
+    fun currentEventType(): HiveEventType = peripheral?.currentEventType() ?: HiveEventType.NONE
+
+    /**
+     * Get the battery percentage from peripheral health data.
+     */
+    fun batteryPercent(): Int? = peripheral?.health?.batteryPercent
 }

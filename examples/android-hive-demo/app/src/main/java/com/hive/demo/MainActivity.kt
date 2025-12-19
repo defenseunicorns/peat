@@ -9,6 +9,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,20 +17,22 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.hive.btle.DiscoveredDevice
 import com.hive.btle.HiveBtle
+import com.hive.btle.HiveEventType
+import com.hive.btle.HiveMeshListener
+import com.hive.btle.HivePeer
 import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Demo activity for HIVE BLE mesh connectivity.
  *
  * This app demonstrates:
- * 1. Scanning for HIVE BLE nodes (e.g., M5Stack Core2 devices)
- * 2. Connecting to discovered nodes
- * 3. Advertising as a HIVE node
- * 4. CRDT sync data exchange
+ * 1. Starting a HIVE mesh network
+ * 2. Automatic peer discovery and connection
+ * 3. Sending/receiving events (Emergency, ACK)
+ * 4. CRDT sync across the mesh
  */
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), HiveMeshListener {
 
     companion object {
         private const val TAG = "HiveDemo"
@@ -37,14 +40,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     private lateinit var hiveBtle: HiveBtle
-    private lateinit var deviceAdapter: DeviceAdapter
-    private val discoveredDevices = ConcurrentHashMap<String, DiscoveredDevice>()
+    private lateinit var peerAdapter: PeerAdapter
 
     // UI elements
     private lateinit var statusText: TextView
-    private lateinit var scanButton: Button
-    private lateinit var advertiseButton: Button
-    private lateinit var deviceList: RecyclerView
+    private lateinit var connectedCountText: TextView
+    private lateinit var peerList: RecyclerView
+    private lateinit var emergencyButton: Button
+    private lateinit var ackButton: Button
+    private lateinit var resetButton: Button
+    private lateinit var ackStatusPanel: LinearLayout
+    private lateinit var ackStatusText: TextView
+
+    // Alert state
+    private var alertActive = false
+    private val pendingAcks = ConcurrentHashMap<Long, Boolean>() // nodeId -> has acked
+    private var emergencySourceNodeId: Long? = null
 
     // Permission launcher
     private val permissionLauncher = registerForActivityResult(
@@ -66,20 +77,23 @@ class MainActivity : AppCompatActivity() {
 
         // Initialize UI
         statusText = findViewById(R.id.statusText)
-        scanButton = findViewById(R.id.scanButton)
-        advertiseButton = findViewById(R.id.advertiseButton)
-        deviceList = findViewById(R.id.deviceList)
+        connectedCountText = findViewById(R.id.connectedDeviceText)
+        peerList = findViewById(R.id.deviceList)
+        emergencyButton = findViewById(R.id.emergencyButton)
+        ackButton = findViewById(R.id.ackButton)
+        resetButton = findViewById(R.id.resetButton)
+        ackStatusPanel = findViewById(R.id.ackStatusPanel)
+        ackStatusText = findViewById(R.id.ackStatusText)
 
         // Setup RecyclerView
-        deviceAdapter = DeviceAdapter(
-            onDeviceClick = { device -> connectToDevice(device) }
-        )
-        deviceList.layoutManager = LinearLayoutManager(this)
-        deviceList.adapter = deviceAdapter
+        peerAdapter = PeerAdapter()
+        peerList.layoutManager = LinearLayoutManager(this)
+        peerList.adapter = peerAdapter
 
         // Setup button listeners
-        scanButton.setOnClickListener { toggleScan() }
-        advertiseButton.setOnClickListener { toggleAdvertise() }
+        emergencyButton.setOnClickListener { sendEmergency() }
+        ackButton.setOnClickListener { sendAck() }
+        resetButton.setOnClickListener { resetAlert() }
 
         // Check permissions
         if (hasAllPermissions()) {
@@ -89,37 +103,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onPause() {
-        super.onPause()
-        // Stop scanning when app goes to background to save battery
-        if (::hiveBtle.isInitialized && hiveBtle.isScanning()) {
-            hiveBtle.stopScan()
-            Log.i(TAG, "Stopped scanning (app paused)")
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        // Resume scanning when app comes back
-        if (::hiveBtle.isInitialized && !hiveBtle.isScanning()) {
-            try {
-                hiveBtle.startScan { device ->
-                    runOnUiThread {
-                        onDeviceDiscovered(device)
-                    }
-                }
-                scanButton.text = "Stop Scan"
-                Log.i(TAG, "Resumed scanning")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to resume scanning", e)
-            }
-        }
-    }
-
     override fun onDestroy() {
         super.onDestroy()
         if (::hiveBtle.isInitialized) {
-            Log.i(TAG, "Shutting down HIVE BLE")
+            Log.i(TAG, "Shutting down HIVE mesh")
             hiveBtle.shutdown()
         }
     }
@@ -166,8 +153,10 @@ class MainActivity : AppCompatActivity() {
             hiveBtle.init()
             Log.i(TAG, "HIVE BLE initialized")
 
-            // Auto-start scanning and advertising
-            startAutoMode()
+            // Start the mesh - it handles everything automatically
+            hiveBtle.startMesh(this)
+            updateStatus("Mesh active - HIVE-${String.format("%08X", NODE_ID)}")
+
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize HIVE BLE", e)
             updateStatus("Error: ${e.message}")
@@ -175,115 +164,171 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun startAutoMode() {
-        // Start advertising
-        try {
-            hiveBtle.startAdvertising()
-            advertiseButton.text = "Stop Advertise"
-            Log.i(TAG, "Auto-started advertising")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to auto-start advertising", e)
+    // ==================== HiveMeshListener Implementation ====================
+
+    override fun onMeshUpdated(peers: List<HivePeer>) {
+        Log.d(TAG, "Mesh updated: ${peers.size} peers")
+        for (peer in peers) {
+            Log.d(TAG, "  Peer: ${peer.displayName()} connected=${peer.isConnected} rssi=${peer.rssi}")
         }
+        runOnUiThread {
+            peerAdapter.updatePeers(peers)
 
-        // Start scanning with callback
-        try {
-            hiveBtle.startScan { device ->
-                runOnUiThread {
-                    onDeviceDiscovered(device)
-                }
-            }
-            scanButton.text = "Stop Scan"
-            Log.i(TAG, "Auto-started scanning")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to auto-start scanning", e)
-        }
-
-        updateStatus("Scanning & Advertising - HIVE-${String.format("%08X", NODE_ID)}")
-    }
-
-    private fun toggleScan() {
-        if (!::hiveBtle.isInitialized) {
-            Toast.makeText(this, "Not initialized", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        if (hiveBtle.isScanning()) {
-            hiveBtle.stopScan()
-            scanButton.text = "Start Scan"
-            updateStatus("Scan stopped")
-        } else {
-            discoveredDevices.clear()
-            deviceAdapter.updateDevices(emptyList())
-
-            hiveBtle.startScan { device ->
-                runOnUiThread {
-                    onDeviceDiscovered(device)
-                }
-            }
-            scanButton.text = "Stop Scan"
-            updateStatus("Scanning for HIVE devices...")
-        }
-    }
-
-    private fun toggleAdvertise() {
-        if (!::hiveBtle.isInitialized) {
-            Toast.makeText(this, "Not initialized", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        if (hiveBtle.isAdvertising()) {
-            hiveBtle.stopAdvertising()
-            advertiseButton.text = "Start Advertise"
-            updateStatus("Advertising stopped")
-        } else {
-            hiveBtle.startAdvertising()
-            advertiseButton.text = "Stop Advertise"
-            updateStatus("Advertising as HIVE-${String.format("%08X", NODE_ID)}")
-        }
-    }
-
-    private fun onDeviceDiscovered(device: DiscoveredDevice) {
-        Log.d(TAG, "Discovered: ${device.address} (${device.name}) RSSI=${device.rssi}")
-        discoveredDevices[device.address] = device
-        deviceAdapter.updateDevices(discoveredDevices.values.toList().sortedByDescending { it.rssi })
-    }
-
-    private fun connectToDevice(device: DiscoveredDevice) {
-        Log.i(TAG, "Connecting to ${device.address}")
-        updateStatus("Connecting to ${device.name.ifEmpty { device.address }}...")
-
-        try {
-            val connection = hiveBtle.connect(device.address)
-            if (connection != null) {
-                updateStatus("Connected to ${device.address}")
-                Toast.makeText(this, "Connected!", Toast.LENGTH_SHORT).show()
+            val connectedCount = peers.count { it.isConnected }
+            if (peers.isEmpty()) {
+                connectedCountText.visibility = View.GONE
             } else {
-                updateStatus("Connection failed")
-                Toast.makeText(this, "Connection failed", Toast.LENGTH_SHORT).show()
+                connectedCountText.text = "$connectedCount/${peers.size} peers connected"
+                connectedCountText.visibility = View.VISIBLE
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Connection error", e)
-            updateStatus("Error: ${e.message}")
+        }
+    }
+
+    override fun onPeerEvent(peer: HivePeer, eventType: HiveEventType) {
+        Log.i(TAG, "Peer event: ${peer.displayName()} sent $eventType")
+
+        runOnUiThread {
+            when (eventType) {
+                HiveEventType.EMERGENCY -> handleEmergencyReceived(peer)
+                HiveEventType.ACK -> handleAckReceived(peer)
+                HiveEventType.NEED_ASSIST -> {
+                    Toast.makeText(this, "🆘 ${peer.displayName()} needs assistance", Toast.LENGTH_LONG).show()
+                }
+                HiveEventType.PING -> {
+                    Toast.makeText(this, "📍 Ping from ${peer.displayName()}", Toast.LENGTH_SHORT).show()
+                }
+                else -> {}
+            }
+        }
+    }
+
+    // ==================== Event Handling ====================
+
+    private fun handleEmergencyReceived(peer: HivePeer) {
+        alertActive = true
+        emergencySourceNodeId = peer.nodeId
+
+        // Initialize ACK tracking
+        pendingAcks.clear()
+        for (p in hiveBtle.getPeers()) {
+            pendingAcks[p.nodeId] = false
+        }
+        pendingAcks[NODE_ID] = false // We haven't acked yet
+        pendingAcks[peer.nodeId] = true // Source has implicitly acked
+
+        Toast.makeText(this, "🚨 EMERGENCY from ${peer.displayName()}!", Toast.LENGTH_LONG).show()
+        updateStatus("⚠️ EMERGENCY - TAP ACK")
+        updateAckStatusDisplay()
+
+        // Vibrate
+        vibrate()
+    }
+
+    private fun handleAckReceived(peer: HivePeer) {
+        pendingAcks[peer.nodeId] = true
+        Toast.makeText(this, "✓ ACK from ${peer.displayName()}", Toast.LENGTH_SHORT).show()
+        checkAllAcked()
+    }
+
+    private fun sendEmergency() {
+        Log.i(TAG, ">>> SENDING EMERGENCY")
+        alertActive = true
+        emergencySourceNodeId = NODE_ID
+
+        // Initialize ACK tracking
+        pendingAcks.clear()
+        for (peer in hiveBtle.getPeers()) {
+            pendingAcks[peer.nodeId] = false
+        }
+        pendingAcks[NODE_ID] = true // We sent it, so we're acked
+
+        hiveBtle.sendEvent(HiveEventType.EMERGENCY)
+        Toast.makeText(this, "🚨 EMERGENCY SENT!", Toast.LENGTH_SHORT).show()
+        updateAckStatusDisplay()
+    }
+
+    private fun sendAck() {
+        Log.i(TAG, ">>> SENDING ACK")
+
+        hiveBtle.sendEvent(HiveEventType.ACK)
+        Toast.makeText(this, "✓ ACK sent", Toast.LENGTH_SHORT).show()
+
+        pendingAcks[NODE_ID] = true
+        checkAllAcked()
+    }
+
+    private fun resetAlert() {
+        Log.i(TAG, ">>> RESETTING ALERT")
+        alertActive = false
+        pendingAcks.clear()
+        emergencySourceNodeId = null
+        updateAckStatusDisplay()
+        updateStatus("Mesh active - HIVE-${String.format("%08X", NODE_ID)}")
+        Toast.makeText(this, "Alert reset", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun checkAllAcked() {
+        if (pendingAcks.isNotEmpty() && pendingAcks.values.all { it }) {
+            alertActive = false
+            pendingAcks.clear()
+            emergencySourceNodeId = null
+            updateAckStatusDisplay()
+            updateStatus("All peers acknowledged")
+        } else {
+            updateAckStatusDisplay()
+        }
+    }
+
+    private fun updateAckStatusDisplay() {
+        if (alertActive && pendingAcks.isNotEmpty()) {
+            ackStatusPanel.visibility = View.VISIBLE
+
+            val ackedNodes = pendingAcks.filter { it.value }.keys
+            val notAckedNodes = pendingAcks.filter { !it.value }.keys
+
+            val statusBuilder = StringBuilder()
+            if (ackedNodes.isNotEmpty()) {
+                statusBuilder.append("✓ ACK'd: ")
+                statusBuilder.append(ackedNodes.joinToString(", ") { "HIVE-${String.format("%08X", it)}" })
+            }
+            if (notAckedNodes.isNotEmpty()) {
+                if (statusBuilder.isNotEmpty()) statusBuilder.append("\n")
+                statusBuilder.append("⏳ Waiting: ")
+                statusBuilder.append(notAckedNodes.joinToString(", ") { "HIVE-${String.format("%08X", it)}" })
+            }
+
+            ackStatusText.text = statusBuilder.toString()
+        } else {
+            ackStatusPanel.visibility = View.GONE
         }
     }
 
     private fun updateStatus(text: String) {
-        runOnUiThread {
-            statusText.text = text
+        statusText.text = text
+    }
+
+    private fun vibrate() {
+        try {
+            val vibrator = getSystemService(android.content.Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator?.vibrate(android.os.VibrationEffect.createOneShot(500, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(500)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Vibration failed", e)
         }
     }
 
-    /**
-     * RecyclerView adapter for discovered devices
-     */
-    inner class DeviceAdapter(
-        private val onDeviceClick: (DiscoveredDevice) -> Unit
-    ) : RecyclerView.Adapter<DeviceAdapter.ViewHolder>() {
+    // ==================== RecyclerView Adapter ====================
 
-        private var devices: List<DiscoveredDevice> = emptyList()
+    inner class PeerAdapter : RecyclerView.Adapter<PeerAdapter.ViewHolder>() {
 
-        fun updateDevices(newDevices: List<DiscoveredDevice>) {
-            devices = newDevices
+        private var peers: List<HivePeer> = emptyList()
+
+        fun updatePeers(newPeers: List<HivePeer>) {
+            peers = newPeers.sortedByDescending { it.rssi }
             notifyDataSetChanged()
         }
 
@@ -294,30 +339,28 @@ class MainActivity : AppCompatActivity() {
         }
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-            val device = devices[position]
-            holder.bind(device)
+            holder.bind(peers[position])
         }
 
-        override fun getItemCount() = devices.size
+        override fun getItemCount() = peers.size
 
         inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             private val nameText: TextView = view.findViewById(R.id.deviceName)
             private val addressText: TextView = view.findViewById(R.id.deviceAddress)
             private val rssiText: TextView = view.findViewById(R.id.deviceRssi)
 
-            fun bind(device: DiscoveredDevice) {
-                nameText.text = device.name.ifEmpty { "Unknown" }
-                addressText.text = device.address
-                rssiText.text = "${device.rssi} dBm"
+            fun bind(peer: HivePeer) {
+                nameText.text = peer.displayName()
+                addressText.text = if (peer.isConnected) "● Connected" else "○ Discovered"
+                rssiText.text = "${peer.rssi} dBm"
 
-                // Highlight HIVE devices
-                if (device.name.startsWith("HIVE-") || device.nodeId != null) {
-                    nameText.setTextColor(ContextCompat.getColor(itemView.context, android.R.color.holo_green_dark))
+                // Color based on connection status
+                val color = if (peer.isConnected) {
+                    ContextCompat.getColor(itemView.context, android.R.color.holo_green_light)
                 } else {
-                    nameText.setTextColor(ContextCompat.getColor(itemView.context, android.R.color.white))
+                    ContextCompat.getColor(itemView.context, android.R.color.darker_gray)
                 }
-
-                itemView.setOnClickListener { onDeviceClick(device) }
+                nameText.setTextColor(color)
             }
         }
     }

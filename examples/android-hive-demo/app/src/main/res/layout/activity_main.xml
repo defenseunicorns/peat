@@ -26,9 +26,20 @@
         android:text="Initializing..."
         android:textSize="14sp"
         android:textColor="#888888"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Connected device info -->
+    <TextView
+        android:id="@+id/connectedDeviceText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Not connected"
+        android:textSize="16sp"
+        android:textColor="#00aa00"
+        android:visibility="gone"
         android:layout_marginBottom="16dp" />
 
-    <!-- Control buttons -->
+    <!-- Action buttons (Emergency/Ack/Reset) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -36,28 +47,72 @@
         android:layout_marginBottom="16dp">
 
         <Button
-            android:id="@+id/scanButton"
+            android:id="@+id/emergencyButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Start Scan"
-            android:layout_marginEnd="8dp" />
+            android:text="EMERGENCY"
+            android:backgroundTint="#cc0000"
+            android:textColor="#ffffff"
+            android:layout_marginEnd="4dp" />
 
         <Button
-            android:id="@+id/advertiseButton"
+            android:id="@+id/ackButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Start Advertise"
-            android:layout_marginStart="8dp" />
+            android:text="ACK"
+            android:backgroundTint="#00aa00"
+            android:textColor="#ffffff"
+            android:layout_marginHorizontal="4dp" />
+
+        <Button
+            android:id="@+id/resetButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="RESET"
+            android:backgroundTint="#666666"
+            android:textColor="#ffffff"
+            android:layout_marginStart="4dp" />
 
     </LinearLayout>
 
-    <!-- Device list header -->
+    <!-- ACK Status Panel (shown during emergency) -->
+    <LinearLayout
+        android:id="@+id/ackStatusPanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#331a00"
+        android:padding="8dp"
+        android:layout_marginBottom="8dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⚠️ EMERGENCY ACTIVE"
+            android:textSize="14sp"
+            android:textColor="#ffaa00"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/ackStatusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Waiting for acknowledgments..."
+            android:textSize="12sp"
+            android:textColor="#cccccc"
+            android:layout_marginTop="4dp" />
+
+    </LinearLayout>
+
+    <!-- Peer list header -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Discovered Devices"
+        android:text="Mesh Peers"
         android:textSize="16sp"
         android:textColor="#ffffff"
         android:layout_marginBottom="8dp" />
