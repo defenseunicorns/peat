@@ -65,28 +65,23 @@ class ScanCallbackProxy(
             )
 
             // Check if this is a HIVE device (by name prefix or service UUID)
-            val isHiveDevice = name.startsWith(HiveBtle.HIVE_NAME_PREFIX) ||
+            val isHiveDevice = name.startsWith(HiveBtle.HIVE_MESH_PREFIX) ||
+                name.startsWith(HiveBtle.HIVE_NAME_PREFIX) ||
                 serviceUuids.any { it.contains("F47A", ignoreCase = true) } ||
                 hiveServiceData != null
 
-            // Parse node ID from name (HIVE-XXXXXXXX format) or service data
-            val nodeId: Long? = when {
-                // Try parsing from name first
-                name.startsWith(HiveBtle.HIVE_NAME_PREFIX) -> {
-                    try {
-                        name.removePrefix(HiveBtle.HIVE_NAME_PREFIX).toLong(16)
-                    } catch (e: NumberFormatException) {
-                        null
-                    }
-                }
-                // Try parsing from service data (4 bytes, big-endian node ID)
-                hiveServiceData != null && hiveServiceData.size >= 4 -> {
-                    ((hiveServiceData[0].toLong() and 0xFF) shl 24) or
+            // Parse mesh ID and node ID from device name
+            // Supports both new format (HIVE_MESHID-NODEID) and legacy format (HIVE-NODEID)
+            val parsed = HiveBtle.parseDeviceName(name)
+            var meshId: String? = parsed?.first
+            var nodeId: Long? = parsed?.second
+
+            // If name parsing failed, try service data (4 bytes, big-endian node ID)
+            if (nodeId == null && hiveServiceData != null && hiveServiceData.size >= 4) {
+                nodeId = ((hiveServiceData[0].toLong() and 0xFF) shl 24) or
                     ((hiveServiceData[1].toLong() and 0xFF) shl 16) or
                     ((hiveServiceData[2].toLong() and 0xFF) shl 8) or
                     (hiveServiceData[3].toLong() and 0xFF)
-                }
-                else -> null
             }
 
             // Debug: log service data if present
@@ -94,7 +89,7 @@ class ScanCallbackProxy(
                 Log.d(TAG, "HIVE service data (${hiveServiceData.size} bytes): ${hiveServiceData.joinToString(" ") { String.format("%02X", it) }}")
             }
 
-            Log.d(TAG, "Scan result: $address ($name) RSSI=$rssi, isHive=$isHiveDevice, nodeId=${nodeId?.let { String.format("%08X", it) }}")
+            Log.d(TAG, "Scan result: $address ($name) RSSI=$rssi, isHive=$isHiveDevice, meshId=$meshId, nodeId=${nodeId?.let { String.format("%08X", it) }}")
 
             // Create discovered device and invoke callback
             val discoveredDevice = DiscoveredDevice(
@@ -102,6 +97,7 @@ class ScanCallbackProxy(
                 name = name,
                 rssi = rssi,
                 nodeId = nodeId,
+                meshId = meshId,
                 timestampNanos = result.timestampNanos,
                 isHiveDevice = isHiveDevice
             )
