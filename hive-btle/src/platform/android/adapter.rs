@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 
+#[allow(unused_imports)]
 use crate::config::{BleConfig, BlePhy, DiscoveryConfig};
 use crate::error::{BleError, Result};
 use crate::platform::{
@@ -22,6 +23,7 @@ use super::connection::AndroidConnection;
 use super::jni_bridge::JniBridge;
 
 /// Internal state for the adapter
+#[allow(dead_code)]
 struct AdapterState {
     /// Active connections by node ID
     connections: HashMap<NodeId, AndroidConnection>,
@@ -63,25 +65,26 @@ impl Default for AdapterState {
 /// adapter.init(&config).await?;
 /// adapter.start().await?;
 /// ```
+#[allow(dead_code)]
 pub struct AndroidAdapter {
     /// JNI bridge for Android Bluetooth API calls
     jni_bridge: Arc<RwLock<JniBridge>>,
     /// Configuration
-    config: RwLock<Option<BleConfig>>,
+    config: Arc<RwLock<Option<BleConfig>>>,
     /// Internal state
-    state: RwLock<AdapterState>,
+    state: Arc<RwLock<AdapterState>>,
     /// Discovery callback
-    discovery_callback: RwLock<Option<DiscoveryCallback>>,
+    discovery_callback: Arc<RwLock<Option<DiscoveryCallback>>>,
     /// Connection callback
-    connection_callback: RwLock<Option<ConnectionCallback>>,
+    connection_callback: Arc<RwLock<Option<ConnectionCallback>>>,
     /// Channel receiver for scan results (from JNI callbacks)
-    scan_rx: RwLock<mpsc::Receiver<DiscoveredDevice>>,
+    scan_rx: Arc<RwLock<mpsc::Receiver<DiscoveredDevice>>>,
     /// Channel receiver for connection events (from JNI callbacks)
-    connection_rx: RwLock<mpsc::Receiver<(NodeId, ConnectionEvent)>>,
+    connection_rx: Arc<RwLock<mpsc::Receiver<(NodeId, ConnectionEvent)>>>,
     /// Whether scanning is active
-    scanning: RwLock<bool>,
+    scanning: Arc<RwLock<bool>>,
     /// Whether advertising is active
-    advertising: RwLock<bool>,
+    advertising: Arc<RwLock<bool>>,
 }
 
 impl AndroidAdapter {
@@ -115,14 +118,14 @@ impl AndroidAdapter {
 
         Ok(Self {
             jni_bridge: Arc::new(RwLock::new(jni_bridge)),
-            config: RwLock::new(None),
-            state: RwLock::new(AdapterState::default()),
-            discovery_callback: RwLock::new(None),
-            connection_callback: RwLock::new(None),
-            scan_rx: RwLock::new(scan_rx),
-            connection_rx: RwLock::new(connection_rx),
-            scanning: RwLock::new(false),
-            advertising: RwLock::new(false),
+            config: Arc::new(RwLock::new(None)),
+            state: Arc::new(RwLock::new(AdapterState::default())),
+            discovery_callback: Arc::new(RwLock::new(None)),
+            connection_callback: Arc::new(RwLock::new(None)),
+            scan_rx: Arc::new(RwLock::new(scan_rx)),
+            connection_rx: Arc::new(RwLock::new(connection_rx)),
+            scanning: Arc::new(RwLock::new(false)),
+            advertising: Arc::new(RwLock::new(false)),
         })
     }
 
@@ -142,6 +145,7 @@ impl AndroidAdapter {
     }
 
     /// Process scan result from JNI callback
+    #[allow(dead_code)]
     async fn process_scan_result(&self, device: DiscoveredDevice) {
         // Store in discovered map
         {
@@ -168,6 +172,7 @@ impl AndroidAdapter {
     }
 
     /// Process connection event from JNI callback
+    #[allow(dead_code)]
     async fn process_connection_event(&self, node_id: NodeId, event: ConnectionEvent) {
         // Update connection state
         match &event {
@@ -185,12 +190,13 @@ impl AndroidAdapter {
     }
 
     /// Start background task to process JNI callbacks
+    #[allow(dead_code)]
     fn start_callback_processor(&self) -> tokio::task::JoinHandle<()> {
-        let scan_rx = self.scan_rx.clone();
-        let connection_rx = self.connection_rx.clone();
-        let discovery_callback = self.discovery_callback.clone();
-        let connection_callback = self.connection_callback.clone();
-        let state = self.state.clone();
+        let _scan_rx = self.scan_rx.clone();
+        let _connection_rx = self.connection_rx.clone();
+        let _discovery_callback = self.discovery_callback.clone();
+        let _connection_callback = self.connection_callback.clone();
+        let _state = self.state.clone();
 
         tokio::spawn(async move {
             // TODO: Implement callback processing loop
