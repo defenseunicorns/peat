@@ -36,13 +36,13 @@ class MainActivity : AppCompatActivity(), HiveMeshListener {
 
     companion object {
         private const val TAG = "HiveDemo"
-        private const val NODE_ID = 0x12345678L // Demo node ID
     }
 
     private lateinit var hiveBtle: HiveBtle
     private lateinit var peerAdapter: PeerAdapter
 
     // UI elements
+    private lateinit var localNodeIdText: TextView
     private lateinit var statusText: TextView
     private lateinit var connectedCountText: TextView
     private lateinit var peerList: RecyclerView
@@ -76,6 +76,7 @@ class MainActivity : AppCompatActivity(), HiveMeshListener {
         setContentView(R.layout.activity_main)
 
         // Initialize UI
+        localNodeIdText = findViewById(R.id.localNodeIdText)
         statusText = findViewById(R.id.statusText)
         connectedCountText = findViewById(R.id.connectedDeviceText)
         peerList = findViewById(R.id.deviceList)
@@ -149,13 +150,16 @@ class MainActivity : AppCompatActivity(), HiveMeshListener {
 
     private fun initializeHiveBtle() {
         try {
-            hiveBtle = HiveBtle(applicationContext, NODE_ID)
+            hiveBtle = HiveBtle(applicationContext) // nodeId auto-generated from adapter
             hiveBtle.init()
-            Log.i(TAG, "HIVE BLE initialized")
+            Log.i(TAG, "HIVE BLE initialized with nodeId: ${String.format("%08X", hiveBtle.nodeId)}")
+
+            // Update UI with our node ID
+            localNodeIdText.text = "Node: HIVE-${String.format("%08X", hiveBtle.nodeId)}"
 
             // Start the mesh - it handles everything automatically
             hiveBtle.startMesh(this)
-            updateStatus("Mesh active - HIVE-${String.format("%08X", NODE_ID)}")
+            updateStatus("Mesh active")
 
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize HIVE BLE", e)
@@ -213,7 +217,7 @@ class MainActivity : AppCompatActivity(), HiveMeshListener {
         for (p in hiveBtle.getPeers()) {
             pendingAcks[p.nodeId] = false
         }
-        pendingAcks[NODE_ID] = false // We haven't acked yet
+        pendingAcks[hiveBtle.nodeId] = false // We haven't acked yet
         pendingAcks[peer.nodeId] = true // Source has implicitly acked
 
         Toast.makeText(this, "🚨 EMERGENCY from ${peer.displayName()}!", Toast.LENGTH_LONG).show()
@@ -233,14 +237,14 @@ class MainActivity : AppCompatActivity(), HiveMeshListener {
     private fun sendEmergency() {
         Log.i(TAG, ">>> SENDING EMERGENCY")
         alertActive = true
-        emergencySourceNodeId = NODE_ID
+        emergencySourceNodeId = hiveBtle.nodeId
 
         // Initialize ACK tracking
         pendingAcks.clear()
         for (peer in hiveBtle.getPeers()) {
             pendingAcks[peer.nodeId] = false
         }
-        pendingAcks[NODE_ID] = true // We sent it, so we're acked
+        pendingAcks[hiveBtle.nodeId] = true // We sent it, so we're acked
 
         hiveBtle.sendEvent(HiveEventType.EMERGENCY)
         Toast.makeText(this, "🚨 EMERGENCY SENT!", Toast.LENGTH_SHORT).show()
@@ -253,7 +257,7 @@ class MainActivity : AppCompatActivity(), HiveMeshListener {
         hiveBtle.sendEvent(HiveEventType.ACK)
         Toast.makeText(this, "✓ ACK sent", Toast.LENGTH_SHORT).show()
 
-        pendingAcks[NODE_ID] = true
+        pendingAcks[hiveBtle.nodeId] = true
         checkAllAcked()
     }
 
@@ -263,7 +267,7 @@ class MainActivity : AppCompatActivity(), HiveMeshListener {
         pendingAcks.clear()
         emergencySourceNodeId = null
         updateAckStatusDisplay()
-        updateStatus("Mesh active - HIVE-${String.format("%08X", NODE_ID)}")
+        updateStatus("Mesh active")
         Toast.makeText(this, "Alert reset", Toast.LENGTH_SHORT).show()
     }
 
