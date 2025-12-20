@@ -9,26 +9,43 @@
 import Foundation
 import Combine
 import CoreBluetooth
+
+/// Flush stdout after print to ensure logs appear immediately
+func log(_ message: String) {
+    print(message)
+    fflush(stdout)
+}
 // Rust hive-btle UniFFI bindings are in HiveBridge/hive_apple_ffi.swift
 // Functions: getDefaultMeshId(), parseHiveDeviceName(), matchesMesh(), generateHiveDeviceName()
 
 // MARK: - HIVE Service UUIDs
 
-/// HIVE BLE Service UUID (0xF47A)
-let HIVE_SERVICE_UUID = CBUUID(string: "F47A")
+/// HIVE BLE Service UUID (canonical 128-bit UUID)
+/// Must match: f47ac10b-58cc-4372-a567-0e02b2c3d479
+let HIVE_SERVICE_UUID = CBUUID(string: "F47AC10B-58CC-4372-A567-0E02B2C3D479")
 
-/// HIVE Document Characteristic UUID (0xF47B)
-let HIVE_DOC_CHAR_UUID = CBUUID(string: "F47B")
+/// HIVE Sync Data Characteristic UUID (canonical)
+/// Must match: f47a0003-58cc-4372-a567-0e02b2c3d479
+let HIVE_DOC_CHAR_UUID = CBUUID(string: "F47A0003-58CC-4372-A567-0E02B2C3D479")
 
 // MARK: - BLE Manager
 
-/// CoreBluetooth manager for HIVE BLE scanning and connections
-class HiveBLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
+/// CoreBluetooth manager for HIVE BLE scanning, connections, and advertising
+class HiveBLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate, CBPeripheralManagerDelegate {
     private var centralManager: CBCentralManager!
+    private var peripheralManager: CBPeripheralManager!
     private var discoveredPeripherals: [String: CBPeripheral] = [:]
+    private var connectedPeripherals: [String: CBPeripheral] = [:]  // Peripherals we connected to as Central
+    private var subscribedCentrals: [CBCentral] = []  // Centrals subscribed to our notifications
+    private var hiveService: CBMutableService?
+    private var syncDataCharacteristic: CBMutableCharacteristic?
+
+    /// Local node ID and device name for advertising
+    var localNodeId: UInt32 = 0
+    var localDeviceName: String = "HIVE-00000000"
 
     var onStateChanged: ((CBManagerState) -> Void)?
-    var onPeerDiscovered: ((String, String?, Int, Data?) -> Void)?  // identifier, name, rssi, manufacturerData
+    var onPeerDiscovered: ((String, String?, Int, Data?, Data?) -> Void)?  // identifier, name, rssi, manufacturerData, serviceData
     var onPeerConnected: ((String) -> Void)?
     var onPeerDisconnected: ((String) -> Void)?
     var onDataReceived: ((String, Data) -> Void)?
@@ -36,11 +53,159 @@ class HiveBLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     override init() {
         super.init()
         centralManager = CBCentralManager(delegate: self, queue: nil)
+        peripheralManager = CBPeripheralManager(delegate: self, queue: nil)
     }
 
     var state: CBManagerState {
         centralManager.state
     }
+
+    // MARK: - Peripheral (Advertising) Mode
+
+    private func setupGattService() {
+        // Create the sync data characteristic (read/write/notify)
+        syncDataCharacteristic = CBMutableCharacteristic(
+            type: HIVE_DOC_CHAR_UUID,
+            properties: [.read, .write, .notify],
+            value: nil,
+            permissions: [.readable, .writeable]
+        )
+
+        // Create the HIVE service
+        hiveService = CBMutableService(type: HIVE_SERVICE_UUID, primary: true)
+        hiveService?.characteristics = [syncDataCharacteristic!]
+
+        // Add service to peripheral manager
+        peripheralManager.add(hiveService!)
+        print("[BLE Peripheral] Added HIVE service")
+    }
+
+    private func startAdvertising() {
+        guard peripheralManager.state == .poweredOn else {
+            print("[BLE Peripheral] Cannot advertise - not powered on")
+            return
+        }
+
+        // Advertise with local name and service UUID
+        let advertisementData: [String: Any] = [
+            CBAdvertisementDataLocalNameKey: localDeviceName,
+            CBAdvertisementDataServiceUUIDsKey: [HIVE_SERVICE_UUID]
+        ]
+
+        peripheralManager.startAdvertising(advertisementData)
+        print("[BLE Peripheral] Started advertising as '\(localDeviceName)'")
+    }
+
+    func stopAdvertising() {
+        peripheralManager.stopAdvertising()
+        print("[BLE Peripheral] Stopped advertising")
+    }
+
+    // MARK: - CBPeripheralManagerDelegate
+
+    func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
+        print("[BLE Peripheral] State changed: \(peripheral.state.rawValue)")
+
+        if peripheral.state == .poweredOn {
+            setupGattService()
+        }
+    }
+
+    func peripheralManager(_ peripheral: CBPeripheralManager, didAdd service: CBService, error: Error?) {
+        if let error = error {
+            print("[BLE Peripheral] Failed to add service: \(error.localizedDescription)")
+        } else {
+            print("[BLE Peripheral] Service added, starting advertising...")
+            startAdvertising()
+        }
+    }
+
+    func peripheralManagerDidStartAdvertising(_ peripheral: CBPeripheralManager, error: Error?) {
+        if let error = error {
+            print("[BLE Peripheral] Failed to start advertising: \(error.localizedDescription)")
+        } else {
+            print("[BLE Peripheral] Advertising started successfully")
+        }
+    }
+
+    func peripheralManager(_ peripheral: CBPeripheralManager, didReceiveRead request: CBATTRequest) {
+        log("[BLE Peripheral] Read request for \(request.characteristic.uuid)")
+
+        if request.characteristic.uuid == HIVE_DOC_CHAR_UUID {
+            // Return node ID as 4 bytes
+            var nodeId = localNodeId
+            let data = Data(bytes: &nodeId, count: 4)
+            request.value = data
+            peripheral.respond(to: request, withResult: .success)
+        } else {
+            peripheral.respond(to: request, withResult: .attributeNotFound)
+        }
+    }
+
+    func peripheralManager(_ peripheral: CBPeripheralManager, didReceiveWrite requests: [CBATTRequest]) {
+        for request in requests {
+            let dataSize = request.value?.count ?? 0
+            log("[BLE Peripheral] Write request: \(dataSize) bytes")
+
+            if let data = request.value {
+                log("[BLE Peripheral] Data: \(data.map { String(format: "%02X", $0) }.joined(separator: " "))")
+                // Notify the app of received data
+                if onDataReceived != nil {
+                    onDataReceived?("peripheral", data)
+                } else {
+                    log("[BLE Peripheral] WARNING: onDataReceived callback not set!")
+                }
+            }
+
+            peripheral.respond(to: request, withResult: .success)
+        }
+    }
+
+    func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral, didSubscribeTo characteristic: CBCharacteristic) {
+        log("[BLE Peripheral] Central \(central.identifier) subscribed to \(characteristic.uuid)")
+        if !subscribedCentrals.contains(where: { $0.identifier == central.identifier }) {
+            subscribedCentrals.append(central)
+            log("[BLE Peripheral] Now have \(subscribedCentrals.count) subscribed centrals")
+        }
+    }
+
+    func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral, didUnsubscribeFrom characteristic: CBCharacteristic) {
+        log("[BLE Peripheral] Central unsubscribed from \(characteristic.uuid)")
+        subscribedCentrals.removeAll { $0.identifier == central.identifier }
+    }
+
+    /// Send data to all connected peers (both as Central and Peripheral)
+    func sendData(_ data: Data) {
+        print("[BLE] Sending \(data.count) bytes to peers")
+        print("[BLE] connectedPeripherals=\(connectedPeripherals.count), subscribedCentrals=\(subscribedCentrals.count)")
+
+        // Send to subscribed centrals (when we're acting as Peripheral)
+        if let characteristic = syncDataCharacteristic, !subscribedCentrals.isEmpty {
+            let success = peripheralManager.updateValue(data, for: characteristic, onSubscribedCentrals: nil)
+            print("[BLE Peripheral] Sent notification to \(subscribedCentrals.count) centrals, success=\(success)")
+        }
+
+        // Send to connected peripherals (when we're acting as Central)
+        for (identifier, peripheral) in connectedPeripherals {
+            print("[BLE Central] Checking peripheral \(identifier): services=\(peripheral.services?.count ?? 0)")
+            if let services = peripheral.services {
+                for svc in services {
+                    print("[BLE Central]   Service: \(svc.uuid), chars=\(svc.characteristics?.count ?? 0)")
+                }
+            }
+            if let services = peripheral.services,
+               let hiveService = services.first(where: { $0.uuid == HIVE_SERVICE_UUID }),
+               let chars = hiveService.characteristics,
+               let syncChar = chars.first(where: { $0.uuid == HIVE_DOC_CHAR_UUID }) {
+                peripheral.writeValue(data, for: syncChar, type: .withResponse)
+                print("[BLE Central] Wrote \(data.count) bytes to peripheral \(identifier)")
+            } else {
+                print("[BLE Central] No HIVE service/char found on \(identifier)")
+            }
+        }
+    }
+
+    // MARK: - Central (Scanning) Mode
 
     func startScanning() {
         guard centralManager.state == .poweredOn else {
@@ -49,7 +214,6 @@ class HiveBLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         }
 
         print("[BLE] Starting scan for HIVE service \(HIVE_SERVICE_UUID)")
-        // Scan for devices advertising HIVE service, or nil to scan all
         centralManager.scanForPeripherals(
             withServices: [HIVE_SERVICE_UUID],
             options: [CBCentralManagerScanOptionAllowDuplicatesKey: true]
@@ -92,26 +256,45 @@ class HiveBLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         let name = peripheral.name ?? advertisementData[CBAdvertisementDataLocalNameKey] as? String
         let rssi = RSSI.intValue
 
-        // Get manufacturer data (contains node ID)
+        // Get manufacturer data (contains node ID on some devices)
         let manufacturerData = advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data
+
+        // Get service data (Android HIVE puts node ID here)
+        var serviceData: Data? = nil
+        if let serviceDataDict = advertisementData[CBAdvertisementDataServiceDataKey] as? [CBUUID: Data] {
+            // Log what UUIDs are in the service data dict
+            for (uuid, data) in serviceDataDict {
+                print("[BLE] ServiceData UUID: \(uuid) len=\(data.count) hex=\(data.map { String(format: "%02X", $0) }.joined())")
+            }
+            serviceData = serviceDataDict[HIVE_SERVICE_UUID]
+            // Also try lowercase UUID
+            if serviceData == nil {
+                serviceData = serviceDataDict[CBUUID(string: "f47ac10b-58cc-4372-a567-0e02b2c3d479")]
+            }
+        }
 
         // Store peripheral reference for connection
         discoveredPeripherals[identifier] = peripheral
 
-        print("[BLE] Discovered: \(name ?? "Unknown") RSSI=\(rssi) mfg=\(manufacturerData?.count ?? 0) bytes")
-        onPeerDiscovered?(identifier, name, rssi, manufacturerData)
+        print("[BLE] Discovered: \(name ?? "Unknown") RSSI=\(rssi) svcData=\(serviceData?.count ?? 0)")
+        onPeerDiscovered?(identifier, name, rssi, manufacturerData, serviceData)
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        print("[BLE] Connected to \(peripheral.name ?? peripheral.identifier.uuidString)")
+        let identifier = peripheral.identifier.uuidString
+        log("[BLE] Connected to \(peripheral.name ?? identifier)")
         peripheral.delegate = self
-        peripheral.discoverServices([HIVE_SERVICE_UUID])
-        onPeerConnected?(peripheral.identifier.uuidString)
+        connectedPeripherals[identifier] = peripheral
+        // Discover ALL services to see what Android exposes
+        peripheral.discoverServices(nil)
+        onPeerConnected?(identifier)
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
-        print("[BLE] Disconnected from \(peripheral.name ?? peripheral.identifier.uuidString)")
-        onPeerDisconnected?(peripheral.identifier.uuidString)
+        let identifier = peripheral.identifier.uuidString
+        print("[BLE] Disconnected from \(peripheral.name ?? identifier)")
+        connectedPeripherals.removeValue(forKey: identifier)
+        onPeerDisconnected?(identifier)
     }
 
     var onConnectionFailed: ((String) -> Void)?
@@ -124,20 +307,29 @@ class HiveBLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     // MARK: - CBPeripheralDelegate
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        guard let services = peripheral.services else { return }
+        if let error = error {
+            log("[BLE] Service discovery error: \(error)")
+            return
+        }
+        guard let services = peripheral.services else {
+            log("[BLE] No services found on \(peripheral.name ?? "unknown")")
+            return
+        }
+        log("[BLE] Found \(services.count) services on \(peripheral.name ?? "unknown")")
         for service in services {
-            print("[BLE] Discovered service: \(service.uuid)")
-            if service.uuid == HIVE_SERVICE_UUID {
-                peripheral.discoverCharacteristics([HIVE_DOC_CHAR_UUID], for: service)
-            }
+            log("[BLE] Service: \(service.uuid)")
+            // Discover ALL characteristics to see what's available
+            peripheral.discoverCharacteristics(nil, for: service)
         }
     }
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
         guard let characteristics = service.characteristics else { return }
+        log("[BLE] Service \(service.uuid) has \(characteristics.count) characteristics:")
         for char in characteristics {
-            print("[BLE] Discovered characteristic: \(char.uuid)")
+            log("[BLE]   Char: \(char.uuid) props=\(char.properties.rawValue)")
             if char.uuid == HIVE_DOC_CHAR_UUID {
+                log("[BLE] Found HIVE doc characteristic!")
                 // Subscribe to notifications
                 peripheral.setNotifyValue(true, for: char)
                 // Read current value
@@ -259,15 +451,19 @@ class HiveViewModel: ObservableObject {
         // Initialize BLE manager
         bleManager = HiveBLEManager()
 
+        // Configure for advertising (peripheral mode)
+        bleManager?.localNodeId = localNodeId
+        bleManager?.localDeviceName = localDisplayName
+
         bleManager?.onStateChanged = { [weak self] state in
             Task { @MainActor [weak self] in
                 self?.handleBLEStateChange(state)
             }
         }
 
-        bleManager?.onPeerDiscovered = { [weak self] identifier, name, rssi, mfgData in
+        bleManager?.onPeerDiscovered = { [weak self] identifier, name, rssi, mfgData, svcData in
             Task { @MainActor [weak self] in
-                self?.handlePeerDiscovered(identifier: identifier, name: name, rssi: rssi, manufacturerData: mfgData)
+                self?.handlePeerDiscovered(identifier: identifier, name: name, rssi: rssi, manufacturerData: mfgData, serviceData: svcData)
             }
         }
 
@@ -298,10 +494,11 @@ class HiveViewModel: ObservableObject {
         isMeshActive = true
         statusMessage = "Scanning for HIVE nodes..."
 
-        // Cleanup stale peers periodically
-        peerCleanupTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
+        // Cleanup stale peers periodically and log scan status
+        peerCleanupTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.cleanupStalePeers()
+                print("[HiveDemo] Heartbeat: peers=\(self?.peers.count ?? 0), BLE state=\(self?.bleManager?.state.rawValue ?? -1)")
             }
         }
     }
@@ -311,6 +508,7 @@ class HiveViewModel: ObservableObject {
         print("[HiveDemo] Shutting down HIVE mesh...")
 
         bleManager?.stopScanning()
+        bleManager?.stopAdvertising()
         bleManager = nil
         peerCleanupTimer?.invalidate()
         peerCleanupTimer = nil
@@ -352,7 +550,7 @@ class HiveViewModel: ObservableObject {
         }
     }
 
-    private func handlePeerDiscovered(identifier: String, name: String?, rssi: Int, manufacturerData: Data?) {
+    private func handlePeerDiscovered(identifier: String, name: String?, rssi: Int, manufacturerData: Data?, serviceData: Data?) {
         // Parse mesh ID and node ID from name using Rust hive-btle via UniFFI
         var nodeId: UInt32 = 0
         var meshId: String? = nil
@@ -363,7 +561,15 @@ class HiveViewModel: ObservableObject {
             nodeId = parsed.nodeId
         }
 
-        // If no node ID from name, try manufacturer data
+        // If no node ID from name, try service data (Android HIVE uses this)
+        if nodeId == 0, let svcData = serviceData, svcData.count >= 4 {
+            // Service data contains 4-byte node ID directly
+            nodeId = svcData.withUnsafeBytes { $0.load(as: UInt32.self) }
+            meshId = HiveViewModel.MESH_ID  // Assume same mesh since it's advertising HIVE service
+            print("[HiveDemo] Got nodeId from service data: \(String(format: "%08X", nodeId))")
+        }
+
+        // If no node ID from service data, try manufacturer data
         if nodeId == 0, let mfgData = manufacturerData, mfgData.count >= 4 {
             // Skip 2-byte company ID, read 4-byte node ID
             if mfgData.count >= 6 {
@@ -371,9 +577,14 @@ class HiveViewModel: ObservableObject {
             }
         }
 
-        // Generate node ID from identifier if still zero
+        // If we couldn't get a node ID, use a placeholder based on identifier hash
+        // The real node ID will be updated when we receive documents
         if nodeId == 0 {
-            nodeId = UInt32(identifier.hashValue & 0xFFFFFFFF)
+            // Generate temporary node ID from identifier hash
+            let hash = identifier.hashValue
+            nodeId = UInt32(truncatingIfNeeded: abs(hash))
+            meshId = HiveViewModel.MESH_ID  // Assume same mesh since it's advertising HIVE service
+            print("[HiveDemo] Using temp nodeId \(String(format: "%08X", nodeId)) for \(name ?? "Unknown") - will update from document")
         }
 
         // Check if this is a new peer
@@ -400,22 +611,28 @@ class HiveViewModel: ObservableObject {
         // Sort by RSSI (strongest first)
         peers.sort { $0.rssi > $1.rssi }
 
+        print("[HiveDemo] Peers list now has \(peers.count) items: \(peers.map { $0.displayName })")
+
         // Auto-connect to new HIVE peers in SAME MESH only
         // Don't connect to ourselves!
+        log("[HiveDemo] Auto-connect check: isNewPeer=\(isNewPeer), nodeId=\(String(format: "%08X", nodeId)), localNodeId=\(String(format: "%08X", localNodeId))")
         if isNewPeer && nodeId != localNodeId {
             // Check mesh ID match using Rust matchesMesh() via UniFFI
             // Returns true if same mesh or if legacy format (nil mesh ID)
             let sameMesh = matchesMesh(ourMeshId: Self.MESH_ID, deviceMeshId: meshId)
+            log("[HiveDemo] Mesh check: ourMesh=\(Self.MESH_ID), deviceMesh=\(meshId ?? "nil"), sameMesh=\(sameMesh)")
             if sameMesh {
-                print("[HiveDemo] Auto-connecting to \(String(format: "HIVE-%08X", nodeId)) (mesh: \(meshId ?? "any"))...")
+                log("[HiveDemo] >>> Auto-connecting to \(String(format: "HIVE-%08X", nodeId)) (mesh: \(meshId ?? "any"))...")
                 bleManager?.connect(identifier: identifier)
             } else {
-                print("[HiveDemo] Skipping peer \(String(format: "HIVE-%08X", nodeId)) - different mesh (\(meshId ?? "?") != \(Self.MESH_ID))")
+                log("[HiveDemo] Skipping peer \(String(format: "HIVE-%08X", nodeId)) - different mesh (\(meshId ?? "?") != \(Self.MESH_ID))")
             }
         } else if nodeId == localNodeId {
             print("[HiveDemo] Skipping self-connection to \(String(format: "HIVE-%08X", nodeId))")
             // Remove ourselves from the peer list
             peers.removeAll { $0.nodeId == localNodeId }
+        } else if !isNewPeer {
+            print("[HiveDemo] Peer already known, not reconnecting")
         }
     }
 
@@ -429,63 +646,291 @@ class HiveViewModel: ObservableObject {
     private func handlePeerDisconnected(identifier: String) {
         if let index = peers.firstIndex(where: { $0.identifier == identifier }) {
             let peerName = peers[index].displayName
-            peers.remove(at: index)
+            // Keep peer in list, just mark as disconnected
+            peers[index].isConnected = false
             showToast("Disconnected from \(peerName)")
-            print("[HiveDemo] Removed peer \(peerName) - will re-add if discovered again")
+            print("[HiveDemo] Peer \(peerName) disconnected - keeping in list")
         }
     }
 
     private func handleConnectionFailed(identifier: String) {
         if let index = peers.firstIndex(where: { $0.identifier == identifier }) {
             let peerName = peers[index].displayName
-            peers.remove(at: index)
-            print("[HiveDemo] Connection failed to \(peerName) - removed from list")
+            peers[index].isConnected = false
+            print("[HiveDemo] Connection failed to \(peerName) - keeping in list for retry")
         }
     }
 
     private func handleDataReceived(identifier: String, data: Data) {
-        // Parse HIVE document format
-        // [version: 4 bytes] [node_id: 4 bytes] [counter_data: N bytes] [0xAB marker] [reserved: 1 byte] [peripheral_len: 2 bytes] [peripheral_data: M bytes]
+        // Parse HIVE document format (Android HiveDocument compatible)
+        // Header: [version: 4] [node_id: 4]
+        // GCounter: [num_entries: 4] + [node_id: 4, count: 8] * N
+        // Extended: [0xAB marker: 1] [reserved: 1] [peripheral_len: 2] [peripheral: M bytes]
+        // Peripheral: [id: 4] [parent: 4] [type: 1] [callsign: 12] [health: 4] [has_event: 1] [event?: 9] [timestamp: 8]
 
         guard data.count >= 8 else { return }
 
         let version = data.subdata(in: 0..<4).withUnsafeBytes { $0.load(as: UInt32.self) }
         let sourceNodeId = data.subdata(in: 4..<8).withUnsafeBytes { $0.load(as: UInt32.self) }
 
-        print("[HiveDemo] Received document v\(version) from \(String(format: "HIVE-%08X", sourceNodeId))")
+        log("[HiveDemo] Received document v\(version) from \(String(format: "HIVE-%08X", sourceNodeId)), \(data.count) bytes")
+        log("[HiveDemo] Raw data: \(data.map { String(format: "%02X", $0) }.joined(separator: " "))")
 
-        // Look for event marker (0xAB)
-        if let markerIndex = data.firstIndex(of: 0xAB), markerIndex + 4 < data.count {
+        // Add or update peer from incoming data (handles case where remote connected to us)
+        if sourceNodeId != localNodeId {
+            // First try to find peer by exact nodeId
+            if let index = peers.firstIndex(where: { $0.nodeId == sourceNodeId }) {
+                // Update existing peer
+                peers[index].lastSeen = Date()
+                peers[index].isConnected = true
+                log("[HiveDemo] Updated existing peer \(peers[index].displayName)")
+            } else if identifier != "peripheral", let index = peers.firstIndex(where: { $0.identifier == identifier }) {
+                // Update peer found by BLE identifier (when we connected to them)
+                log("[HiveDemo] Updating peer nodeId from \(String(format: "%08X", peers[index].nodeId)) to \(String(format: "%08X", sourceNodeId))")
+                peers[index] = HivePeer(
+                    identifier: identifier,
+                    nodeId: sourceNodeId,
+                    meshId: Self.MESH_ID,
+                    advertisedName: peers[index].advertisedName,
+                    isConnected: true,
+                    rssi: peers[index].rssi,
+                    lastSeen: Date()
+                )
+            } else if identifier == "peripheral" {
+                // Data came from a central that connected to US - try to find the discovered peer with temp nodeId
+                // Look for a peer that was discovered but has a temp nodeId (not yet confirmed by document)
+                if let index = peers.firstIndex(where: { !$0.isConnected || $0.rssi != 0 }) {
+                    // Found a discovered peer - update its nodeId to the real one from the document
+                    let oldNodeId = peers[index].nodeId
+                    log("[HiveDemo] Merging incoming peer: updating \(String(format: "%08X", oldNodeId)) -> \(String(format: "%08X", sourceNodeId))")
+                    peers[index] = HivePeer(
+                        identifier: peers[index].identifier,
+                        nodeId: sourceNodeId,
+                        meshId: Self.MESH_ID,
+                        advertisedName: peers[index].advertisedName,
+                        isConnected: true,
+                        rssi: peers[index].rssi,
+                        lastSeen: Date()
+                    )
+                } else {
+                    // No discovered peer to merge with - add new
+                    let peer = HivePeer(
+                        identifier: "incoming-\(sourceNodeId)",
+                        nodeId: sourceNodeId,
+                        meshId: Self.MESH_ID,
+                        advertisedName: String(format: "HIVE-%08X", sourceNodeId),
+                        isConnected: true,
+                        rssi: 0,
+                        lastSeen: Date()
+                    )
+                    peers.append(peer)
+                    log("[HiveDemo] Added peer from incoming connection: \(peer.displayName)")
+                    showToast("Peer connected: \(peer.displayName)")
+                }
+            } else {
+                // Add new peer
+                let peer = HivePeer(
+                    identifier: identifier,
+                    nodeId: sourceNodeId,
+                    meshId: Self.MESH_ID,
+                    advertisedName: String(format: "HIVE-%08X", sourceNodeId),
+                    isConnected: true,
+                    rssi: 0,
+                    lastSeen: Date()
+                )
+                peers.append(peer)
+                log("[HiveDemo] Added peer from incoming connection: \(peer.displayName)")
+                showToast("Peer connected: \(peer.displayName)")
+            }
+        }
+
+        // Calculate exact position of extended marker (0xAB) after header and GCounter
+        // Header: 8 bytes (version + node_id)
+        // GCounter: 4 bytes (num_entries) + num_entries * 12 bytes
+        guard data.count >= 12 else { return }  // Need at least header + num_entries
+
+        let numEntries = data.subdata(in: 8..<12).withUnsafeBytes { $0.load(as: UInt32.self) }
+        let counterEnd = 8 + 4 + Int(numEntries) * 12  // header + num_entries + entries
+
+        print("[HiveDemo] Document: \(data.count) bytes, numEntries=\(numEntries), counterEnd=\(counterEnd)")
+
+        // Check for extended marker at calculated position
+        if data.count > counterEnd && data[counterEnd] == 0xAB {
+            let markerIndex = counterEnd
             let peripheralLen = data.subdata(in: (markerIndex + 2)..<(markerIndex + 4)).withUnsafeBytes { $0.load(as: UInt16.self) }
-            if peripheralLen > 0 && markerIndex + 4 + Int(peripheralLen) <= data.count {
-                let eventByte = data[markerIndex + 4]
-                handleEventByte(eventByte, fromNodeId: sourceNodeId)
+            let peripheralStart = markerIndex + 4
+
+            print("[HiveDemo] Found 0xAB marker at \(markerIndex), peripheralLen=\(peripheralLen)")
+
+            if peripheralLen >= 26 && peripheralStart + Int(peripheralLen) <= data.count {
+                // Parse HivePeripheral structure
+                // [id: 4] [parent: 4] [type: 1] [callsign: 12] [health: 4] [has_event: 1] [event?: 9] [timestamp: 8]
+                // has_event is at offset 25 (4+4+1+12+4)
+                let hasEventOffset = peripheralStart + 25
+
+                if hasEventOffset < data.count {
+                    let hasEvent = data[hasEventOffset] != 0
+                    print("[HiveDemo] Peripheral: len=\(peripheralLen), hasEvent=\(hasEvent)")
+
+                    if hasEvent && hasEventOffset + 1 < data.count {
+                        // Event is at offset 26 within peripheral
+                        let eventTypeOffset = hasEventOffset + 1
+                        let androidEventType = data[eventTypeOffset]
+                        print("[HiveDemo] Android event type: \(androidEventType)")
+
+                        // Map Android event types to iOS handling:
+                        // Android: EMERGENCY=3, ACK=6
+                        // iOS internal: 1 = Emergency, 2 = ACK
+                        let iosEventType: UInt8
+                        switch androidEventType {
+                        case 3: iosEventType = 1  // Emergency
+                        case 6: iosEventType = 2  // ACK
+                        default: iosEventType = androidEventType
+                        }
+                        handleEventByte(iosEventType, fromNodeId: sourceNodeId)
+                    }
+                }
             }
         }
     }
 
     private func handleEventByte(_ eventByte: UInt8, fromNodeId: UInt32) {
+        print("[HiveDemo] Event byte=\(eventByte) from node=\(String(format: "%08X", fromNodeId))")
+        print("[HiveDemo] Known peers: \(peers.map { String(format: "%08X", $0.nodeId) })")
+
         // Event types from HIVE protocol
         switch eventByte {
         case 1: // Emergency
+            print("[HiveDemo] EMERGENCY event received!")
             if let peer = peers.first(where: { $0.nodeId == fromNodeId }) {
                 handleEmergencyReceived(from: peer)
+            } else {
+                // Create temporary peer for emergency from unknown source
+                print("[HiveDemo] Emergency from unknown peer, creating temp peer")
+                let tempPeer = HivePeer(
+                    identifier: "emergency-\(fromNodeId)",
+                    nodeId: fromNodeId,
+                    meshId: Self.MESH_ID,
+                    advertisedName: String(format: "HIVE-%08X", fromNodeId),
+                    isConnected: true,
+                    rssi: 0,
+                    lastSeen: Date()
+                )
+                peers.append(tempPeer)
+                handleEmergencyReceived(from: tempPeer)
             }
         case 2: // ACK
+            print("[HiveDemo] ACK event received!")
             if let peer = peers.first(where: { $0.nodeId == fromNodeId }) {
                 handleAckReceived(from: peer)
+            } else {
+                // Handle ACK from peer we may not have tracked
+                print("[HiveDemo] ACK from node \(String(format: "%08X", fromNodeId))")
+                ackStatus.pendingAcks[fromNodeId] = true
+                showToast("✓ ACK from \(String(format: "HIVE-%08X", fromNodeId))")
+                checkAllAcked()
             }
         default:
-            break
+            print("[HiveDemo] Unknown event type: \(eventByte)")
         }
     }
 
     private func cleanupStalePeers() {
-        let staleThreshold = Date().addingTimeInterval(-30) // 30 seconds
-        peers.removeAll { !$0.isConnected && $0.lastSeen < staleThreshold }
+        let staleThreshold = Date().addingTimeInterval(-60) // 60 seconds
+        let staleCount = peers.filter { !$0.isConnected && $0.lastSeen < staleThreshold }.count
+        if staleCount > 0 {
+            print("[HiveDemo] Cleaning up \(staleCount) stale peers")
+            peers.removeAll { !$0.isConnected && $0.lastSeen < staleThreshold }
+        }
     }
 
     // MARK: - Event Handling
+
+    /// Build a HIVE document compatible with Android HiveDocument format
+    /// Format:
+    /// - Header: [version: 4] [node_id: 4]
+    /// - GCounter: [num_entries: 4] + [node_id: 4, count: 8] * N
+    /// - Extended: [0xAB marker: 1] [reserved: 1] [peripheral_len: 2] [peripheral: M bytes]
+    /// - Peripheral: [id: 4] [parent: 4] [type: 1] [callsign: 12] [health: 4] [has_event: 1] [event?: 9] [timestamp: 8]
+    private func buildHiveDocument(eventType: UInt8) -> Data {
+        var data = Data()
+
+        // === Header (8 bytes) ===
+        // Version (4 bytes, little-endian)
+        var version: UInt32 = 1
+        data.append(Data(bytes: &version, count: 4))
+
+        // Node ID (4 bytes, little-endian)
+        var nodeId = localNodeId
+        data.append(Data(bytes: &nodeId, count: 4))
+
+        // === GCounter (4 bytes for empty counter) ===
+        var numEntries: UInt32 = 0
+        data.append(Data(bytes: &numEntries, count: 4))
+
+        // === Extended section with HivePeripheral ===
+        // Event marker (0xAB)
+        data.append(0xAB)
+
+        // Reserved (1 byte)
+        data.append(0x00)
+
+        // Build HivePeripheral data
+        let hasEvent = eventType != 0
+        let peripheralSize: UInt16 = hasEvent ? 43 : 34
+        var peripheralLen = peripheralSize
+        data.append(Data(bytes: &peripheralLen, count: 2))
+
+        // Peripheral data starts here
+        // id (4 bytes)
+        var peripheralId = localNodeId
+        data.append(Data(bytes: &peripheralId, count: 4))
+
+        // parentNode (4 bytes)
+        var parentNode: UInt32 = 0
+        data.append(Data(bytes: &parentNode, count: 4))
+
+        // peripheralType (1 byte) - SOLDIER_SENSOR = 1
+        data.append(1)
+
+        // callsign (12 bytes, null-padded)
+        var callsignBytes = "SWIFT".data(using: .utf8) ?? Data()
+        callsignBytes.append(contentsOf: [UInt8](repeating: 0, count: 12 - callsignBytes.count))
+        data.append(callsignBytes.prefix(12))
+
+        // health (4 bytes: battery, heartRate, activity, alerts)
+        data.append(contentsOf: [100, 0, 0, 0] as [UInt8])
+
+        // has_event (1 byte)
+        data.append(hasEvent ? 1 : 0)
+
+        // event (9 bytes if present): eventType (1 byte) + timestamp (8 bytes)
+        if hasEvent {
+            // Map iOS event types to Android:
+            // iOS: 1 = Emergency, 2 = ACK
+            // Android: EMERGENCY=3, ACK=6
+            let androidEventType: UInt8
+            switch eventType {
+            case 1: androidEventType = 3  // Emergency
+            case 2: androidEventType = 6  // ACK
+            default: androidEventType = eventType
+            }
+            data.append(androidEventType)
+
+            // timestamp (8 bytes, little-endian)
+            var timestamp: UInt64 = UInt64(Date().timeIntervalSince1970 * 1000)
+            data.append(Data(bytes: &timestamp, count: 8))
+        }
+
+        // timestamp (8 bytes, little-endian) - peripheral timestamp
+        var peripheralTimestamp: UInt64 = UInt64(Date().timeIntervalSince1970 * 1000)
+        data.append(Data(bytes: &peripheralTimestamp, count: 8))
+
+        print("[HiveDemo] Built document: \(data.count) bytes")
+        print("[HiveDemo] Document hex: \(data.map { String(format: "%02X", $0) }.joined(separator: " "))")
+
+        return data
+    }
 
     /// Send an emergency alert to all peers
     func sendEmergency() {
@@ -504,7 +949,9 @@ class HiveViewModel: ObservableObject {
         ackStatus.pendingAcks[localNodeId] = true  // We sent it, so we're acked
         ackStatus.emergencySourceNodeId = localNodeId
 
-        // TODO: Send via GATT write to connected peers
+        // Build and send emergency document (event type 1)
+        let document = buildHiveDocument(eventType: 1)
+        bleManager?.sendData(document)
 
         showToast("🚨 EMERGENCY SENT!")
         statusMessage = "⚠️ EMERGENCY - TAP ACK"
@@ -519,7 +966,9 @@ class HiveViewModel: ObservableObject {
 
         print("[HiveDemo] >>> SENDING ACK")
 
-        // TODO: Send via GATT write to connected peers
+        // Build and send ACK document (event type 2)
+        let document = buildHiveDocument(eventType: 2)
+        bleManager?.sendData(document)
 
         ackStatus.pendingAcks[localNodeId] = true
         showToast("✓ ACK sent")
