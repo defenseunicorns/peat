@@ -274,6 +274,11 @@ impl PeripheralManager {
                 "Registered HIVE service with node ID {:08X}",
                 node_id.as_u32()
             );
+
+            // Set initial characteristic values in the delegate for read requests
+            // Node Info (0001) - contains the node ID
+            self.delegate
+                .set_characteristic_value("0001", node_id.as_u32().to_le_bytes().to_vec());
         }
         // All ObjC objects are now dropped, safe to await
 
@@ -505,6 +510,20 @@ impl PeripheralManager {
     pub async fn is_advertising(&self) -> bool {
         // Use the actual CoreBluetooth state
         unsafe { self.manager.isAdvertising() }
+    }
+
+    /// Set the value for a characteristic
+    ///
+    /// This value will be returned when a central device reads the characteristic.
+    /// Use this to set sync data or other readable values.
+    pub fn set_characteristic_value(&self, characteristic_uuid: &str, value: Vec<u8>) {
+        self.delegate
+            .set_characteristic_value(characteristic_uuid, value);
+    }
+
+    /// Get the current value for a characteristic
+    pub fn get_characteristic_value(&self, characteristic_uuid: &str) -> Option<Vec<u8>> {
+        self.delegate.get_characteristic_value(characteristic_uuid)
     }
 
     /// Send notification to subscribed centrals
