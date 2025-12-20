@@ -550,8 +550,8 @@ class HiveViewModel: ObservableObject {
     private func handleConnectionFailed(identifier: String) {
         if let index = peers.firstIndex(where: { $0.identifier == identifier }) {
             let peerName = peers[index].displayName
-            peers.remove(at: index)
-            print("[HiveDemo] Connection failed to \(peerName) - removed from list")
+            peers[index].isConnected = false
+            print("[HiveDemo] Connection failed to \(peerName) - keeping in list for retry")
         }
     }
 
