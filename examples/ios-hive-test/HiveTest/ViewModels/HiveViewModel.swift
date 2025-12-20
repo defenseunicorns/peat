@@ -14,18 +14,27 @@ import CoreBluetooth
 
 // MARK: - HIVE Service UUIDs
 
-/// HIVE BLE Service UUID (0xF47A)
-let HIVE_SERVICE_UUID = CBUUID(string: "F47A")
+/// HIVE BLE Service UUID (canonical 128-bit UUID)
+/// Must match: f47ac10b-58cc-4372-a567-0e02b2c3d479
+let HIVE_SERVICE_UUID = CBUUID(string: "F47AC10B-58CC-4372-A567-0E02B2C3D479")
 
-/// HIVE Document Characteristic UUID (0xF47B)
-let HIVE_DOC_CHAR_UUID = CBUUID(string: "F47B")
+/// HIVE Sync Data Characteristic UUID (canonical)
+/// Must match: f47a0003-58cc-4372-a567-0e02b2c3d479
+let HIVE_DOC_CHAR_UUID = CBUUID(string: "F47A0003-58CC-4372-A567-0E02B2C3D479")
 
 // MARK: - BLE Manager
 
-/// CoreBluetooth manager for HIVE BLE scanning and connections
-class HiveBLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
+/// CoreBluetooth manager for HIVE BLE scanning, connections, and advertising
+class HiveBLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate, CBPeripheralManagerDelegate {
     private var centralManager: CBCentralManager!
+    private var peripheralManager: CBPeripheralManager!
     private var discoveredPeripherals: [String: CBPeripheral] = [:]
+    private var hiveService: CBMutableService?
+    private var syncDataCharacteristic: CBMutableCharacteristic?
+
+    /// Local node ID and device name for advertising
+    var localNodeId: UInt32 = 0
+    var localDeviceName: String = "HIVE-00000000"
 
     var onStateChanged: ((CBManagerState) -> Void)?
     var onPeerDiscovered: ((String, String?, Int, Data?) -> Void)?  // identifier, name, rssi, manufacturerData
@@ -36,11 +45,109 @@ class HiveBLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     override init() {
         super.init()
         centralManager = CBCentralManager(delegate: self, queue: nil)
+        peripheralManager = CBPeripheralManager(delegate: self, queue: nil)
     }
 
     var state: CBManagerState {
         centralManager.state
     }
+
+    // MARK: - Peripheral (Advertising) Mode
+
+    private func setupGattService() {
+        // Create the sync data characteristic (read/write/notify)
+        syncDataCharacteristic = CBMutableCharacteristic(
+            type: HIVE_DOC_CHAR_UUID,
+            properties: [.read, .write, .notify],
+            value: nil,
+            permissions: [.readable, .writeable]
+        )
+
+        // Create the HIVE service
+        hiveService = CBMutableService(type: HIVE_SERVICE_UUID, primary: true)
+        hiveService?.characteristics = [syncDataCharacteristic!]
+
+        // Add service to peripheral manager
+        peripheralManager.add(hiveService!)
+        print("[BLE Peripheral] Added HIVE service")
+    }
+
+    private func startAdvertising() {
+        guard peripheralManager.state == .poweredOn else {
+            print("[BLE Peripheral] Cannot advertise - not powered on")
+            return
+        }
+
+        // Advertise with local name and service UUID
+        let advertisementData: [String: Any] = [
+            CBAdvertisementDataLocalNameKey: localDeviceName,
+            CBAdvertisementDataServiceUUIDsKey: [HIVE_SERVICE_UUID]
+        ]
+
+        peripheralManager.startAdvertising(advertisementData)
+        print("[BLE Peripheral] Started advertising as '\(localDeviceName)'")
+    }
+
+    func stopAdvertising() {
+        peripheralManager.stopAdvertising()
+        print("[BLE Peripheral] Stopped advertising")
+    }
+
+    // MARK: - CBPeripheralManagerDelegate
+
+    func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
+        print("[BLE Peripheral] State changed: \(peripheral.state.rawValue)")
+
+        if peripheral.state == .poweredOn {
+            setupGattService()
+        }
+    }
+
+    func peripheralManager(_ peripheral: CBPeripheralManager, didAdd service: CBService, error: Error?) {
+        if let error = error {
+            print("[BLE Peripheral] Failed to add service: \(error.localizedDescription)")
+        } else {
+            print("[BLE Peripheral] Service added, starting advertising...")
+            startAdvertising()
+        }
+    }
+
+    func peripheralManagerDidStartAdvertising(_ peripheral: CBPeripheralManager, error: Error?) {
+        if let error = error {
+            print("[BLE Peripheral] Failed to start advertising: \(error.localizedDescription)")
+        } else {
+            print("[BLE Peripheral] Advertising started successfully")
+        }
+    }
+
+    func peripheralManager(_ peripheral: CBPeripheralManager, didReceiveRead request: CBATTRequest) {
+        print("[BLE Peripheral] Read request for \(request.characteristic.uuid)")
+
+        if request.characteristic.uuid == HIVE_DOC_CHAR_UUID {
+            // Return node ID as 4 bytes
+            var nodeId = localNodeId
+            let data = Data(bytes: &nodeId, count: 4)
+            request.value = data
+            peripheral.respond(to: request, withResult: .success)
+        } else {
+            peripheral.respond(to: request, withResult: .attributeNotFound)
+        }
+    }
+
+    func peripheralManager(_ peripheral: CBPeripheralManager, didReceiveWrite requests: [CBATTRequest]) {
+        for request in requests {
+            print("[BLE Peripheral] Write request: \(request.value?.count ?? 0) bytes")
+
+            if let data = request.value {
+                // Notify the app of received data
+                onDataReceived?("peripheral", data)
+            }
+
+            peripheral.respond(to: request, withResult: .success)
+        }
+    }
+
+    // MARK: - Central (Scanning) Mode
 
     func startScanning() {
         guard centralManager.state == .poweredOn else {
@@ -259,6 +366,10 @@ class HiveViewModel: ObservableObject {
         // Initialize BLE manager
         bleManager = HiveBLEManager()
 
+        // Configure for advertising (peripheral mode)
+        bleManager?.localNodeId = localNodeId
+        bleManager?.localDeviceName = localDisplayName
+
         bleManager?.onStateChanged = { [weak self] state in
             Task { @MainActor [weak self] in
                 self?.handleBLEStateChange(state)
@@ -311,6 +422,7 @@ class HiveViewModel: ObservableObject {
         print("[HiveDemo] Shutting down HIVE mesh...")
 
         bleManager?.stopScanning()
+        bleManager?.stopAdvertising()
         bleManager = nil
         peerCleanupTimer?.invalidate()
         peerCleanupTimer = nil
