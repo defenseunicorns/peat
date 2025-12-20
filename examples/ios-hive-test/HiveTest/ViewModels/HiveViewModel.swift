@@ -512,6 +512,8 @@ class HiveViewModel: ObservableObject {
         // Sort by RSSI (strongest first)
         peers.sort { $0.rssi > $1.rssi }
 
+        print("[HiveDemo] Peers list now has \(peers.count) items: \(peers.map { $0.displayName })")
+
         // Auto-connect to new HIVE peers in SAME MESH only
         // Don't connect to ourselves!
         if isNewPeer && nodeId != localNodeId {
@@ -541,9 +543,10 @@ class HiveViewModel: ObservableObject {
     private func handlePeerDisconnected(identifier: String) {
         if let index = peers.firstIndex(where: { $0.identifier == identifier }) {
             let peerName = peers[index].displayName
-            peers.remove(at: index)
+            // Keep peer in list, just mark as disconnected
+            peers[index].isConnected = false
             showToast("Disconnected from \(peerName)")
-            print("[HiveDemo] Removed peer \(peerName) - will re-add if discovered again")
+            print("[HiveDemo] Peer \(peerName) disconnected - keeping in list")
         }
     }
 
@@ -593,8 +596,12 @@ class HiveViewModel: ObservableObject {
     }
 
     private func cleanupStalePeers() {
-        let staleThreshold = Date().addingTimeInterval(-30) // 30 seconds
-        peers.removeAll { !$0.isConnected && $0.lastSeen < staleThreshold }
+        let staleThreshold = Date().addingTimeInterval(-60) // 60 seconds
+        let staleCount = peers.filter { !$0.isConnected && $0.lastSeen < staleThreshold }.count
+        if staleCount > 0 {
+            print("[HiveDemo] Cleaning up \(staleCount) stale peers")
+            peers.removeAll { !$0.isConnected && $0.lastSeen < staleThreshold }
+        }
     }
 
     // MARK: - Event Handling
