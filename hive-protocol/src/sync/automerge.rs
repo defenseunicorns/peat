@@ -35,6 +35,8 @@ use tokio::sync::mpsc;
 
 use crate::error::{Error, Result};
 use crate::qos::{DeletionPolicy, DeletionPolicyRegistry, Tombstone};
+#[cfg(feature = "automerge-backend")]
+use crate::storage::automerge_conversion::automerge_to_message;
 use crate::sync::traits::*;
 use crate::sync::types::*;
 
@@ -1576,25 +1578,43 @@ impl DocumentStore for IrohDocumentStore {
     }
 
     fn observe(&self, collection: &str, query: &Query) -> Result<ChangeStream> {
-        use crate::storage::traits::StorageBackend;
-
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
         // Get initial snapshot
-        let coll = self.backend.collection(collection);
-        let all_items = coll.scan().map_err(|e| Error::Storage {
-            message: e.to_string(),
-            operation: Some("scan".to_string()),
-            key: None,
-            source: None,
-        })?;
+        // Issue #457: Use direct store scan to handle both Collection::upsert
+        // and message_to_automerge storage formats
+        let collection_prefix = format!("{}:", collection);
+        let all_docs = self
+            .backend
+            .automerge_store()
+            .scan_prefix(&collection_prefix)
+            .map_err(|e| Error::Storage {
+                message: e.to_string(),
+                operation: Some("scan_prefix".to_string()),
+                key: None,
+                source: None,
+            })?;
 
         let mut initial_docs = Vec::new();
-        for (doc_id, bytes) in all_items {
-            if let Ok(mut doc) = serde_json::from_slice::<Document>(&bytes) {
-                if doc.id.is_none() {
-                    doc.id = Some(doc_id);
-                }
+        for (doc_key, automerge_doc) in all_docs {
+            // Extract doc_id from key
+            let doc_id = match doc_key.strip_prefix(&collection_prefix) {
+                Some(id) => id.to_string(),
+                None => continue,
+            };
+
+            // Convert Automerge doc to Document
+            if let Ok(json_value) = automerge_to_message::<serde_json::Value>(&automerge_doc) {
+                let fields = if let serde_json::Value::Object(map) = json_value {
+                    map.into_iter().collect()
+                } else {
+                    serde_json::Map::new().into_iter().collect()
+                };
+                let doc = Document {
+                    id: Some(doc_id),
+                    fields,
+                    updated_at: std::time::SystemTime::now(),
+                };
 
                 if matches_query(&doc, query) {
                     initial_docs.push(doc);
@@ -1637,27 +1657,52 @@ impl DocumentStore for IrohDocumentStore {
                             None => continue,
                         };
 
-                        // Fetch the updated document
-                        let coll = backend.collection(collection_prefix.trim_end_matches(':'));
-                        if let Ok(Some(bytes)) = coll.get(&doc_id) {
-                            if let Ok(mut doc) = serde_json::from_slice::<Document>(&bytes) {
-                                if doc.id.is_none() {
-                                    doc.id = Some(doc_id);
-                                }
+                        // Fetch the updated document directly from store
+                        // Issue #457: AutomergeSummaryStorage uses message_to_automerge which stores
+                        // fields at ROOT, but Collection::get expects a "data" field wrapper.
+                        // Use direct store access for consistent handling of all document formats.
+                        let maybe_doc: Option<Document> = if let Ok(Some(automerge_doc)) =
+                            backend.automerge_store().get(&doc_key)
+                        {
+                            // Convert Automerge doc to JSON Value, then to Document
+                            if let Ok(json_value) =
+                                automerge_to_message::<serde_json::Value>(&automerge_doc)
+                            {
+                                // Convert JSON Value to Document
+                                let fields = if let serde_json::Value::Object(map) = json_value {
+                                    map.into_iter().collect()
+                                } else {
+                                    serde_json::Map::new().into_iter().collect()
+                                };
+                                Some(Document {
+                                    id: Some(doc_id.clone()),
+                                    fields,
+                                    updated_at: std::time::SystemTime::now(),
+                                })
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
 
-                                // Check if document matches query
-                                if matches_query(&doc, &query_clone) {
-                                    // Emit Updated event
-                                    if tx_clone
-                                        .send(ChangeEvent::Updated {
-                                            collection: collection_name.clone(),
-                                            document: doc,
-                                        })
-                                        .is_err()
-                                    {
-                                        // Receiver dropped, stop listening
-                                        break;
-                                    }
+                        if let Some(mut doc) = maybe_doc {
+                            if doc.id.is_none() {
+                                doc.id = Some(doc_id);
+                            }
+
+                            // Check if document matches query
+                            if matches_query(&doc, &query_clone) {
+                                // Emit Updated event
+                                if tx_clone
+                                    .send(ChangeEvent::Updated {
+                                        collection: collection_name.clone(),
+                                        document: doc,
+                                    })
+                                    .is_err()
+                                {
+                                    // Receiver dropped, stop listening
+                                    break;
                                 }
                             }
                         }
@@ -1672,14 +1717,37 @@ impl DocumentStore for IrohDocumentStore {
                         );
 
                         // Re-scan collection and emit Updated for all matching documents
-                        let coll = backend.collection(collection_prefix.trim_end_matches(':'));
-                        if let Ok(all_items) = coll.scan() {
-                            for (doc_id, bytes) in all_items {
-                                if let Ok(mut doc) = serde_json::from_slice::<Document>(&bytes) {
-                                    if doc.id.is_none() {
-                                        doc.id = Some(doc_id);
-                                    }
+                        // Issue #457: Use direct store scan to handle both Collection::upsert
+                        // and message_to_automerge storage formats
+                        let prefix = &collection_prefix;
+                        if let Ok(all_docs) = backend.automerge_store().scan_prefix(prefix) {
+                            for (doc_key, automerge_doc) in all_docs {
+                                // Extract doc_id from key
+                                let doc_id = match doc_key.strip_prefix(prefix) {
+                                    Some(id) => id.to_string(),
+                                    None => continue,
+                                };
 
+                                // Try to convert Automerge doc to Document
+                                let maybe_doc: Option<Document> = if let Ok(json_value) =
+                                    automerge_to_message::<serde_json::Value>(&automerge_doc)
+                                {
+                                    let fields = if let serde_json::Value::Object(map) = json_value
+                                    {
+                                        map.into_iter().collect()
+                                    } else {
+                                        serde_json::Map::new().into_iter().collect()
+                                    };
+                                    Some(Document {
+                                        id: Some(doc_id),
+                                        fields,
+                                        updated_at: std::time::SystemTime::now(),
+                                    })
+                                } else {
+                                    None
+                                };
+
+                                if let Some(doc) = maybe_doc {
                                     // Send event if document matches query
                                     #[allow(clippy::collapsible_if)]
                                     if matches_query(&doc, &query_clone) {

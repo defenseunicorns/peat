@@ -5,13 +5,16 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+
+use objc2::rc::Retained;
+use objc2_core_bluetooth::{CBCentralManager, CBPeripheral};
 use tokio::sync::{mpsc, RwLock};
 
 use crate::config::DiscoveryConfig;
 use crate::error::{BleError, Result};
 use crate::NodeId;
 
-use super::delegates::{CentralDelegate, CentralEvent, CentralState};
+use super::delegates::{CentralEvent, CentralState, RustCentralManagerDelegate};
 
 /// Wrapper around CBCentralManager for BLE scanning and connecting
 ///
@@ -20,13 +23,22 @@ use super::delegates::{CentralDelegate, CentralEvent, CentralState};
 /// - Connect to peripherals
 /// - Discover services and characteristics
 /// - Read/write characteristic values
+///
+/// # Safety
+/// This type is marked `Send + Sync` because CoreBluetooth callbacks are
+/// dispatched on the main queue and the manager is only accessed from async
+/// tasks that ensure proper synchronization. The underlying CBCentralManager
+/// and CBPeripheralManager are not inherently thread-safe, but our usage pattern
+/// (single async context + main queue dispatch) ensures safety.
 pub struct CentralManager {
+    /// The actual CBCentralManager instance
+    manager: Retained<CBCentralManager>,
+    /// The delegate that receives callbacks
+    delegate: Retained<RustCentralManagerDelegate>,
     /// Current state of the central manager
     state: Arc<RwLock<CentralState>>,
     /// Channel receiver for delegate events
     event_rx: Arc<RwLock<mpsc::Receiver<CentralEvent>>>,
-    /// Delegate instance (must be kept alive)
-    delegate: Arc<CentralDelegate>,
     /// Known peripherals by identifier
     peripherals: Arc<RwLock<HashMap<String, PeripheralInfo>>>,
     /// Whether scanning is active
@@ -50,6 +62,13 @@ pub struct PeripheralInfo {
     pub connected: bool,
 }
 
+// SAFETY: CentralManager uses interior mutability via Arc<RwLock<_>> for all
+// mutable state. The CBCentralManager is only accessed from the async context
+// and its callbacks are dispatched on the main queue. We ensure that all
+// access to the Objective-C objects goes through the proper synchronization.
+unsafe impl Send for CentralManager {}
+unsafe impl Sync for CentralManager {}
+
 impl CentralManager {
     /// Create a new CentralManager
     ///
@@ -57,34 +76,24 @@ impl CentralManager {
     /// The manager won't be ready until `state` becomes `PoweredOn`.
     pub fn new() -> Result<Self> {
         let (event_tx, event_rx) = mpsc::channel(100);
-        let delegate = Arc::new(CentralDelegate::new(event_tx));
 
-        // TODO: Initialize CBCentralManager with objc2
-        // 1. Create dispatch queue for callbacks
-        // 2. Create CBCentralManager with delegate and queue
-        // 3. Store reference to manager
-        //
-        // Example objc2 code:
-        // ```
-        // use objc2::rc::Retained;
-        // use objc2_core_bluetooth::{CBCentralManager, CBCentralManagerDelegate};
-        //
-        // let queue = dispatch::Queue::new("com.hive.btle.central", dispatch::QueueAttribute::Serial);
-        // let manager = unsafe {
-        //     CBCentralManager::initWithDelegate_queue_(
-        //         CBCentralManager::alloc(),
-        //         delegate_obj,
-        //         queue,
-        //     )
-        // };
-        // ```
+        // Create delegate
+        let delegate = RustCentralManagerDelegate::new(event_tx);
 
-        log::warn!("CentralManager::new() - CoreBluetooth initialization not yet implemented");
+        // Create CBCentralManager and set delegate
+        // Using main queue for callbacks
+        let manager = unsafe { CBCentralManager::new() };
+        unsafe {
+            manager.setDelegate(Some(delegate.as_protocol()));
+        }
+
+        log::info!("CBCentralManager initialized");
 
         Ok(Self {
+            manager,
+            delegate,
             state: Arc::new(RwLock::new(CentralState::Unknown)),
             event_rx: Arc::new(RwLock::new(event_rx)),
-            delegate,
             peripherals: Arc::new(RwLock::new(HashMap::new())),
             scanning: Arc::new(RwLock::new(false)),
         })
@@ -99,27 +108,32 @@ impl CentralManager {
     ///
     /// Returns an error if Bluetooth is unavailable or unauthorized.
     pub async fn wait_ready(&self) -> Result<()> {
-        // TODO: Wait for state to become PoweredOn
         // Process events until state changes to a terminal state
+        loop {
+            self.process_events().await?;
 
-        let state = self.state().await;
-        match state {
-            CentralState::PoweredOn => Ok(()),
-            CentralState::Unsupported => Err(BleError::NotSupported(
-                "Bluetooth not supported".to_string(),
-            )),
-            CentralState::Unauthorized => Err(BleError::PlatformError(
-                "Bluetooth not authorized".to_string(),
-            )),
-            CentralState::PoweredOff => Err(BleError::PlatformError(
-                "Bluetooth is powered off".to_string(),
-            )),
-            _ => {
-                log::warn!("CentralManager not ready, state: {:?}", state);
-                Err(BleError::PlatformError(format!(
-                    "Bluetooth not ready: {:?}",
-                    state
-                )))
+            let state = self.state().await;
+            match state {
+                CentralState::PoweredOn => return Ok(()),
+                CentralState::Unsupported => {
+                    return Err(BleError::NotSupported(
+                        "Bluetooth not supported".to_string(),
+                    ))
+                }
+                CentralState::Unauthorized => {
+                    return Err(BleError::PlatformError(
+                        "Bluetooth not authorized".to_string(),
+                    ))
+                }
+                CentralState::PoweredOff => {
+                    return Err(BleError::PlatformError(
+                        "Bluetooth is powered off".to_string(),
+                    ))
+                }
+                CentralState::Unknown | CentralState::Resetting => {
+                    // Wait a bit and try again
+                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                }
             }
         }
     }
@@ -131,40 +145,28 @@ impl CentralManager {
     /// * `service_uuids` - Optional list of service UUIDs to filter by
     pub async fn start_scan(
         &self,
-        config: &DiscoveryConfig,
-        service_uuids: Option<Vec<String>>,
+        _config: &DiscoveryConfig,
+        _service_uuids: Option<Vec<String>>,
     ) -> Result<()> {
-        // TODO: Call CBCentralManager.scanForPeripheralsWithServices:options:
-        //
-        // Options to set:
-        // - CBCentralManagerScanOptionAllowDuplicatesKey: based on config.filter_duplicates
-        //
-        // Example objc2 code:
-        // ```
-        // let options = NSDictionary::from_keys_and_objects(
-        //     &[ns_string!("CBCentralManagerScanOptionAllowDuplicatesKey")],
-        //     &[NSNumber::new_bool(!config.filter_duplicates)],
-        // );
-        // manager.scanForPeripheralsWithServices_options_(service_uuids, Some(&options));
-        // ```
+        // Scan with no service filter and allow duplicates for RSSI updates
+        // TODO: Create proper options dictionary based on config
+        unsafe {
+            self.manager
+                .scanForPeripheralsWithServices_options(None, None);
+        }
 
-        log::warn!(
-            "CentralManager::start_scan() - Not yet implemented (filter_duplicates: {})",
-            config.filter_duplicates
-        );
-
+        log::info!("Started BLE scanning");
         *self.scanning.write().await = true;
-        Err(BleError::NotSupported(
-            "CoreBluetooth scanning not yet implemented".to_string(),
-        ))
+        Ok(())
     }
 
     /// Stop scanning for peripherals
     pub async fn stop_scan(&self) -> Result<()> {
-        // TODO: Call CBCentralManager.stopScan()
+        unsafe {
+            self.manager.stopScan();
+        }
 
-        log::warn!("CentralManager::stop_scan() - Not yet implemented");
-
+        log::info!("Stopped BLE scanning");
         *self.scanning.write().await = false;
         Ok(())
     }
@@ -179,45 +181,36 @@ impl CentralManager {
     /// # Arguments
     /// * `identifier` - The peripheral's UUID identifier
     pub async fn connect(&self, identifier: &str) -> Result<()> {
-        // TODO: Call CBCentralManager.connectPeripheral:options:
-        //
-        // 1. Look up CBPeripheral from stored peripherals
-        // 2. Call connectPeripheral with options:
-        //    - CBConnectPeripheralOptionNotifyOnConnectionKey: true
-        //    - CBConnectPeripheralOptionNotifyOnDisconnectionKey: true
-        //
-        // Example objc2 code:
-        // ```
-        // let options = NSDictionary::from_keys_and_objects(
-        //     &[
-        //         ns_string!("CBConnectPeripheralOptionNotifyOnConnectionKey"),
-        //         ns_string!("CBConnectPeripheralOptionNotifyOnDisconnectionKey"),
-        //     ],
-        //     &[NSNumber::new_bool(true), NSNumber::new_bool(true)],
-        // );
-        // manager.connectPeripheral_options_(peripheral, Some(&options));
-        // ```
+        // Get the CBPeripheral from delegate's storage
+        let peripheral = self.delegate.get_peripheral(identifier).ok_or_else(|| {
+            BleError::ConnectionFailed(format!("Unknown peripheral: {}", identifier))
+        })?;
 
-        log::warn!(
-            "CentralManager::connect({}) - Not yet implemented",
-            identifier
-        );
+        // Connect without specific options
+        unsafe {
+            self.manager.connectPeripheral_options(&peripheral, None);
+        }
 
-        Err(BleError::NotSupported(
-            "CoreBluetooth connection not yet implemented".to_string(),
-        ))
+        log::info!("Connecting to peripheral: {}", identifier);
+        Ok(())
     }
 
     /// Disconnect from a peripheral
     pub async fn disconnect(&self, identifier: &str) -> Result<()> {
-        // TODO: Call CBCentralManager.cancelPeripheralConnection()
-
-        log::warn!(
-            "CentralManager::disconnect({}) - Not yet implemented",
-            identifier
-        );
+        // Get the CBPeripheral from delegate's storage
+        if let Some(peripheral) = self.delegate.get_peripheral(identifier) {
+            unsafe {
+                self.manager.cancelPeripheralConnection(&peripheral);
+            }
+            log::info!("Disconnecting from peripheral: {}", identifier);
+        }
 
         Ok(())
+    }
+
+    /// Get the CBPeripheral for an identifier
+    pub fn get_cb_peripheral(&self, identifier: &str) -> Option<Retained<CBPeripheral>> {
+        self.delegate.get_peripheral(identifier)
     }
 
     /// Get information about a discovered peripheral
@@ -251,6 +244,7 @@ impl CentralManager {
         while let Ok(event) = event_rx.try_recv() {
             match event {
                 CentralEvent::StateChanged(state) => {
+                    log::debug!("Central state changed: {:?}", state);
                     *self.state.write().await = state;
                 }
                 CentralEvent::DiscoveredPeripheral {
@@ -275,12 +269,14 @@ impl CentralManager {
                     );
                 }
                 CentralEvent::Connected { identifier } => {
+                    log::info!("Connected to peripheral: {}", identifier);
                     let mut peripherals = self.peripherals.write().await;
                     if let Some(peripheral) = peripherals.get_mut(&identifier) {
                         peripheral.connected = true;
                     }
                 }
                 CentralEvent::Disconnected { identifier, .. } => {
+                    log::info!("Disconnected from peripheral: {}", identifier);
                     let mut peripherals = self.peripherals.write().await;
                     if let Some(peripheral) = peripherals.get_mut(&identifier) {
                         peripheral.connected = false;

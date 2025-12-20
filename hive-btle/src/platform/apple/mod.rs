@@ -77,7 +77,8 @@ mod peripheral;
 pub use adapter::CoreBluetoothAdapter;
 pub use connection::CoreBluetoothConnection;
 
-// Re-export for internal use
+// These are used internally by adapter.rs
+#[allow(unused_imports)]
 pub(crate) use central::CentralManager;
-pub(crate) use delegates::{CentralDelegate, PeripheralDelegate, PeripheralManagerDelegate};
+#[allow(unused_imports)]
 pub(crate) use peripheral::PeripheralManager;
