@@ -29,6 +29,8 @@ class HiveBLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate, 
     private var centralManager: CBCentralManager!
     private var peripheralManager: CBPeripheralManager!
     private var discoveredPeripherals: [String: CBPeripheral] = [:]
+    private var connectedPeripherals: [String: CBPeripheral] = [:]  // Peripherals we connected to as Central
+    private var subscribedCentrals: [CBCentral] = []  // Centrals subscribed to our notifications
     private var hiveService: CBMutableService?
     private var syncDataCharacteristic: CBMutableCharacteristic?
 
@@ -144,6 +146,40 @@ class HiveBLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate, 
             }
 
             peripheral.respond(to: request, withResult: .success)
+        }
+    }
+
+    func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral, didSubscribeTo characteristic: CBCharacteristic) {
+        print("[BLE Peripheral] Central subscribed to \(characteristic.uuid)")
+        if !subscribedCentrals.contains(where: { $0.identifier == central.identifier }) {
+            subscribedCentrals.append(central)
+        }
+    }
+
+    func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral, didUnsubscribeFrom characteristic: CBCharacteristic) {
+        print("[BLE Peripheral] Central unsubscribed from \(characteristic.uuid)")
+        subscribedCentrals.removeAll { $0.identifier == central.identifier }
+    }
+
+    /// Send data to all connected peers (both as Central and Peripheral)
+    func sendData(_ data: Data) {
+        print("[BLE] Sending \(data.count) bytes to peers")
+
+        // Send to subscribed centrals (when we're acting as Peripheral)
+        if let characteristic = syncDataCharacteristic, !subscribedCentrals.isEmpty {
+            let success = peripheralManager.updateValue(data, for: characteristic, onSubscribedCentrals: nil)
+            print("[BLE Peripheral] Sent notification to \(subscribedCentrals.count) centrals, success=\(success)")
+        }
+
+        // Send to connected peripherals (when we're acting as Central)
+        for (identifier, peripheral) in connectedPeripherals {
+            if let services = peripheral.services,
+               let hiveService = services.first(where: { $0.uuid == HIVE_SERVICE_UUID }),
+               let chars = hiveService.characteristics,
+               let syncChar = chars.first(where: { $0.uuid == HIVE_DOC_CHAR_UUID }) {
+                peripheral.writeValue(data, for: syncChar, type: .withResponse)
+                print("[BLE Central] Wrote to peripheral \(identifier)")
+            }
         }
     }
 
@@ -483,9 +519,10 @@ class HiveViewModel: ObservableObject {
             }
         }
 
-        // Generate node ID from identifier if still zero
+        // If we couldn't get a real node ID, don't add to peer list
+        // The device will appear when it connects and sends its real node ID
         if nodeId == 0 {
-            nodeId = UInt32(identifier.hashValue & 0xFFFFFFFF)
+            return
         }
 
         // Check if this is a new peer
@@ -567,7 +604,8 @@ class HiveViewModel: ObservableObject {
         let version = data.subdata(in: 0..<4).withUnsafeBytes { $0.load(as: UInt32.self) }
         let sourceNodeId = data.subdata(in: 4..<8).withUnsafeBytes { $0.load(as: UInt32.self) }
 
-        print("[HiveDemo] Received document v\(version) from \(String(format: "HIVE-%08X", sourceNodeId))")
+        print("[HiveDemo] Received document v\(version) from \(String(format: "HIVE-%08X", sourceNodeId)), \(data.count) bytes")
+        print("[HiveDemo] Raw data: \(data.map { String(format: "%02X", $0) }.joined(separator: " "))")
 
         // Add or update peer from incoming data (handles case where remote connected to us)
         if sourceNodeId != localNodeId {
@@ -603,18 +641,43 @@ class HiveViewModel: ObservableObject {
     }
 
     private func handleEventByte(_ eventByte: UInt8, fromNodeId: UInt32) {
+        print("[HiveDemo] Event byte=\(eventByte) from node=\(String(format: "%08X", fromNodeId))")
+        print("[HiveDemo] Known peers: \(peers.map { String(format: "%08X", $0.nodeId) })")
+
         // Event types from HIVE protocol
         switch eventByte {
         case 1: // Emergency
+            print("[HiveDemo] EMERGENCY event received!")
             if let peer = peers.first(where: { $0.nodeId == fromNodeId }) {
                 handleEmergencyReceived(from: peer)
+            } else {
+                // Create temporary peer for emergency from unknown source
+                print("[HiveDemo] Emergency from unknown peer, creating temp peer")
+                let tempPeer = HivePeer(
+                    identifier: "emergency-\(fromNodeId)",
+                    nodeId: fromNodeId,
+                    meshId: Self.MESH_ID,
+                    advertisedName: String(format: "HIVE-%08X", fromNodeId),
+                    isConnected: true,
+                    rssi: 0,
+                    lastSeen: Date()
+                )
+                peers.append(tempPeer)
+                handleEmergencyReceived(from: tempPeer)
             }
         case 2: // ACK
+            print("[HiveDemo] ACK event received!")
             if let peer = peers.first(where: { $0.nodeId == fromNodeId }) {
                 handleAckReceived(from: peer)
+            } else {
+                // Handle ACK from peer we may not have tracked
+                print("[HiveDemo] ACK from node \(String(format: "%08X", fromNodeId))")
+                ackStatus.pendingAcks[fromNodeId] = true
+                showToast("✓ ACK from \(String(format: "HIVE-%08X", fromNodeId))")
+                checkAllAcked()
             }
         default:
-            break
+            print("[HiveDemo] Unknown event type: \(eventByte)")
         }
     }
 
@@ -628,6 +691,35 @@ class HiveViewModel: ObservableObject {
     }
 
     // MARK: - Event Handling
+
+    /// Build a HIVE document with an event
+    /// Format: [version: 4 bytes] [node_id: 4 bytes] [0xAB marker] [reserved: 1 byte] [event_len: 2 bytes] [event_type: 1 byte]
+    private func buildHiveDocument(eventType: UInt8) -> Data {
+        var data = Data()
+
+        // Version (4 bytes, little-endian)
+        var version: UInt32 = 1
+        data.append(Data(bytes: &version, count: 4))
+
+        // Node ID (4 bytes, little-endian)
+        var nodeId = localNodeId
+        data.append(Data(bytes: &nodeId, count: 4))
+
+        // Event marker (0xAB)
+        data.append(0xAB)
+
+        // Reserved (1 byte)
+        data.append(0x00)
+
+        // Event length (2 bytes, little-endian) - 1 byte for event type
+        var eventLen: UInt16 = 1
+        data.append(Data(bytes: &eventLen, count: 2))
+
+        // Event type (1 byte)
+        data.append(eventType)
+
+        return data
+    }
 
     /// Send an emergency alert to all peers
     func sendEmergency() {
@@ -646,7 +738,9 @@ class HiveViewModel: ObservableObject {
         ackStatus.pendingAcks[localNodeId] = true  // We sent it, so we're acked
         ackStatus.emergencySourceNodeId = localNodeId
 
-        // TODO: Send via GATT write to connected peers
+        // Build and send emergency document (event type 1)
+        let document = buildHiveDocument(eventType: 1)
+        bleManager?.sendData(document)
 
         showToast("🚨 EMERGENCY SENT!")
         statusMessage = "⚠️ EMERGENCY - TAP ACK"
@@ -661,7 +755,9 @@ class HiveViewModel: ObservableObject {
 
         print("[HiveDemo] >>> SENDING ACK")
 
-        // TODO: Send via GATT write to connected peers
+        // Build and send ACK document (event type 2)
+        let document = buildHiveDocument(eventType: 2)
+        bleManager?.sendData(document)
 
         ackStatus.pendingAcks[localNodeId] = true
         showToast("✓ ACK sent")
