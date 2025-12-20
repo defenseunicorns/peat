@@ -17,10 +17,13 @@ use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
 use objc2::{declare_class, msg_send_id, mutability, ClassType, DeclaredClass};
 use objc2_core_bluetooth::{
-    CBCentralManager, CBCentralManagerDelegate, CBCharacteristic, CBPeripheral,
-    CBPeripheralDelegate, CBPeripheralManager, CBPeripheralManagerDelegate, CBService,
+    CBATTError, CBATTRequest, CBCentralManager, CBCentralManagerDelegate, CBCharacteristic,
+    CBPeripheral, CBPeripheralDelegate, CBPeripheralManager, CBPeripheralManagerDelegate,
+    CBService,
 };
-use objc2_foundation::{NSDictionary, NSError, NSNumber, NSObject, NSObjectProtocol, NSString};
+use objc2_foundation::{
+    NSArray, NSData, NSDictionary, NSError, NSNumber, NSObject, NSObjectProtocol, NSString,
+};
 use tokio::sync::mpsc;
 
 use crate::NodeId;
@@ -597,12 +600,15 @@ impl RustPeripheralDelegate {
 /// Ivars for RustPeripheralManagerDelegate
 pub struct PeripheralManagerDelegateIvars {
     event_tx: Mutex<Option<mpsc::Sender<PeripheralManagerEvent>>>,
+    /// Stored characteristic values by UUID (for responding to read requests)
+    characteristic_values: Mutex<HashMap<String, Vec<u8>>>,
 }
 
 impl Default for PeripheralManagerDelegateIvars {
     fn default() -> Self {
         Self {
             event_tx: Mutex::new(None),
+            characteristic_values: Mutex::new(HashMap::new()),
         }
     }
 }
@@ -691,6 +697,143 @@ declare_class!(
                 }
             }
         }
+
+        #[method(peripheralManager:didReceiveReadRequest:)]
+        fn peripheral_manager_did_receive_read_request(
+            &self,
+            peripheral: &CBPeripheralManager,
+            request: &CBATTRequest,
+        ) {
+            let characteristic_uuid = unsafe {
+                request.characteristic().UUID().UUIDString().to_string()
+            };
+            let offset = unsafe { request.offset() } as usize;
+            let central_id = unsafe {
+                request.central().identifier().UUIDString().to_string()
+            };
+
+            log::debug!(
+                "Read request from {} for characteristic {} at offset {}",
+                central_id,
+                characteristic_uuid,
+                offset
+            );
+
+            // Look up the characteristic value
+            let response_result = if let Ok(values) = self.ivars().characteristic_values.lock() {
+                if let Some(value) = values.get(&characteristic_uuid) {
+                    if offset <= value.len() {
+                        // Set the response value (from offset to end)
+                        let response_data = &value[offset..];
+                        unsafe {
+                            let ns_data = NSData::with_bytes(response_data);
+                            request.setValue(Some(&ns_data));
+                        }
+                        CBATTError::Success
+                    } else {
+                        CBATTError::InvalidOffset
+                    }
+                } else {
+                    log::warn!("No value stored for characteristic {}", characteristic_uuid);
+                    CBATTError::AttributeNotFound
+                }
+            } else {
+                CBATTError::UnlikelyError
+            };
+
+            // Respond to the request
+            unsafe {
+                peripheral.respondToRequest_withResult(request, response_result);
+            }
+
+            // Send event to Rust code
+            if let Ok(guard) = self.ivars().event_tx.lock() {
+                if let Some(tx) = guard.as_ref() {
+                    let _ = tx.try_send(PeripheralManagerEvent::ReadRequest {
+                        request_id: 0, // CoreBluetooth handles request tracking internally
+                        central_identifier: central_id,
+                        characteristic_uuid,
+                        offset,
+                    });
+                }
+            }
+        }
+
+        #[method(peripheralManager:didReceiveWriteRequests:)]
+        fn peripheral_manager_did_receive_write_requests(
+            &self,
+            peripheral: &CBPeripheralManager,
+            requests: &NSArray<CBATTRequest>,
+        ) {
+            log::debug!("Received {} write request(s)", requests.len());
+
+            // Process all write requests
+            for i in 0..requests.len() {
+                let request = &requests[i];
+
+                let characteristic_uuid = unsafe {
+                    request.characteristic().UUID().UUIDString().to_string()
+                };
+                let offset = unsafe { request.offset() } as usize;
+                let central_id = unsafe {
+                    request.central().identifier().UUIDString().to_string()
+                };
+                let value = unsafe {
+                    request.value()
+                        .map(|d| d.bytes().to_vec())
+                        .unwrap_or_default()
+                };
+
+                log::debug!(
+                    "Write request from {} for {} at offset {}: {} bytes",
+                    central_id,
+                    characteristic_uuid,
+                    offset,
+                    value.len()
+                );
+
+                // Store the new value
+                if let Ok(mut values) = self.ivars().characteristic_values.lock() {
+                    if offset == 0 {
+                        // Replace entire value
+                        values.insert(characteristic_uuid.clone(), value.clone());
+                    } else {
+                        // Append at offset (or extend if needed)
+                        let entry = values.entry(characteristic_uuid.clone()).or_default();
+                        if offset <= entry.len() {
+                            entry.truncate(offset);
+                            entry.extend_from_slice(&value);
+                        } else {
+                            // Pad with zeros if writing past end
+                            entry.resize(offset, 0);
+                            entry.extend_from_slice(&value);
+                        }
+                    }
+                }
+
+                // Send event to Rust code
+                if let Ok(guard) = self.ivars().event_tx.lock() {
+                    if let Some(tx) = guard.as_ref() {
+                        let _ = tx.try_send(PeripheralManagerEvent::WriteRequest {
+                            request_id: i as u64,
+                            central_identifier: central_id,
+                            characteristic_uuid,
+                            value,
+                            offset,
+                            response_needed: true, // CoreBluetooth always needs a response
+                        });
+                    }
+                }
+            }
+
+            // Respond to the first request (CoreBluetooth requirement)
+            // All requests in the array share the same response
+            if !requests.is_empty() {
+                unsafe {
+                    peripheral.respondToRequest_withResult(&requests[0], CBATTError::Success);
+                }
+            }
+        }
     }
 );
 
@@ -700,6 +843,7 @@ impl RustPeripheralManagerDelegate {
         let this = Self::alloc();
         let this = this.set_ivars(PeripheralManagerDelegateIvars {
             event_tx: Mutex::new(Some(event_tx)),
+            characteristic_values: Mutex::new(HashMap::new()),
         });
         unsafe { msg_send_id![super(this), init] }
     }
@@ -707,6 +851,32 @@ impl RustPeripheralManagerDelegate {
     /// Get as a protocol object for setting as delegate
     pub fn as_protocol(&self) -> &ProtocolObject<dyn CBPeripheralManagerDelegate> {
         ProtocolObject::from_ref(self)
+    }
+
+    /// Set the value for a characteristic (used for read requests)
+    ///
+    /// This value will be returned when a central device reads the characteristic.
+    pub fn set_characteristic_value(&self, characteristic_uuid: &str, value: Vec<u8>) {
+        if let Ok(mut values) = self.ivars().characteristic_values.lock() {
+            values.insert(characteristic_uuid.to_string(), value);
+            log::debug!(
+                "Set characteristic {} value ({} bytes)",
+                characteristic_uuid,
+                values
+                    .get(characteristic_uuid)
+                    .map(|v| v.len())
+                    .unwrap_or(0)
+            );
+        }
+    }
+
+    /// Get the current value for a characteristic
+    pub fn get_characteristic_value(&self, characteristic_uuid: &str) -> Option<Vec<u8>> {
+        if let Ok(values) = self.ivars().characteristic_values.lock() {
+            values.get(characteristic_uuid).cloned()
+        } else {
+            None
+        }
     }
 }
 
