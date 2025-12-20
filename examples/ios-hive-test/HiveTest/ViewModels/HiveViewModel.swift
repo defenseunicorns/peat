@@ -156,7 +156,6 @@ class HiveBLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate, 
         }
 
         print("[BLE] Starting scan for HIVE service \(HIVE_SERVICE_UUID)")
-        // Scan for devices advertising HIVE service, or nil to scan all
         centralManager.scanForPeripherals(
             withServices: [HIVE_SERVICE_UUID],
             options: [CBCentralManagerScanOptionAllowDuplicatesKey: true]
@@ -205,7 +204,7 @@ class HiveBLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate, 
         // Store peripheral reference for connection
         discoveredPeripherals[identifier] = peripheral
 
-        print("[BLE] Discovered: \(name ?? "Unknown") RSSI=\(rssi) mfg=\(manufacturerData?.count ?? 0) bytes")
+        print("[BLE] Discovered: \(name ?? "Unknown") RSSI=\(rssi)")
         onPeerDiscovered?(identifier, name, rssi, manufacturerData)
     }
 
@@ -409,10 +408,11 @@ class HiveViewModel: ObservableObject {
         isMeshActive = true
         statusMessage = "Scanning for HIVE nodes..."
 
-        // Cleanup stale peers periodically
-        peerCleanupTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
+        // Cleanup stale peers periodically and log scan status
+        peerCleanupTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.cleanupStalePeers()
+                print("[HiveDemo] Heartbeat: peers=\(self?.peers.count ?? 0), BLE state=\(self?.bleManager?.state.rawValue ?? -1)")
             }
         }
     }
@@ -568,6 +568,29 @@ class HiveViewModel: ObservableObject {
         let sourceNodeId = data.subdata(in: 4..<8).withUnsafeBytes { $0.load(as: UInt32.self) }
 
         print("[HiveDemo] Received document v\(version) from \(String(format: "HIVE-%08X", sourceNodeId))")
+
+        // Add or update peer from incoming data (handles case where remote connected to us)
+        if sourceNodeId != localNodeId {
+            if let index = peers.firstIndex(where: { $0.nodeId == sourceNodeId }) {
+                // Update existing peer
+                peers[index].lastSeen = Date()
+                peers[index].isConnected = true
+            } else {
+                // Add new peer from incoming connection
+                let peer = HivePeer(
+                    identifier: identifier,
+                    nodeId: sourceNodeId,
+                    meshId: Self.MESH_ID,  // Assume same mesh since they connected to us
+                    advertisedName: String(format: "HIVE-%08X", sourceNodeId),
+                    isConnected: true,
+                    rssi: 0,  // Unknown RSSI for incoming connections
+                    lastSeen: Date()
+                )
+                peers.append(peer)
+                print("[HiveDemo] Added peer from incoming connection: \(peer.displayName)")
+                showToast("Peer connected: \(peer.displayName)")
+            }
+        }
 
         // Look for event marker (0xAB)
         if let markerIndex = data.firstIndex(of: 0xAB), markerIndex + 4 < data.count {
