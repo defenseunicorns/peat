@@ -59,15 +59,16 @@ class ScanCallbackProxy(
             val serviceUuids = scanRecord?.serviceUuids?.map { it.toString() } ?: emptyList()
 
             // Extract service data for HIVE service UUID
-            // HIVE uses 16-bit UUID 0xF47A (matches M5Stack Core2 demo firmware)
+            // Canonical HIVE service UUID: f47ac10b-58cc-4372-a567-0e02b2c3d479 (16-bit: 0xD479)
             val hiveServiceData = scanRecord?.getServiceData(
                 android.os.ParcelUuid.fromString(HiveBtle.HIVE_SERVICE_UUID.toString())
             )
 
             // Check if this is a HIVE device (by name prefix or service UUID)
+            // Look for canonical UUID pattern "f47ac10b" or 16-bit form "d479"
             val isHiveDevice = name.startsWith(HiveBtle.HIVE_MESH_PREFIX) ||
                 name.startsWith(HiveBtle.HIVE_NAME_PREFIX) ||
-                serviceUuids.any { it.contains("F47A", ignoreCase = true) } ||
+                serviceUuids.any { it.contains("f47ac10b", ignoreCase = true) || it.contains("d479", ignoreCase = true) } ||
                 hiveServiceData != null
 
             // Parse mesh ID and node ID from device name

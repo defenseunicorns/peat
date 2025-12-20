@@ -165,7 +165,8 @@ class GattCallbackProxy(private val connectionId: Long) : BluetoothGattCallback(
     }
 
     private fun isHiveDocumentCharacteristic(characteristic: BluetoothGattCharacteristic): Boolean {
-        return characteristic.uuid.toString().contains("F47B", ignoreCase = true)
+        // Check against canonical HIVE document characteristic UUID (CHAR_SYNC_DATA)
+        return characteristic.uuid == HiveBtle.HIVE_CHAR_DOCUMENT
     }
 
     /**

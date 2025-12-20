@@ -81,35 +81,36 @@ class HiveBtle(
         private const val TAG = "HiveBtle"
 
         /**
-         * HIVE BLE Service UUID (16-bit: 0xF47A)
+         * HIVE BLE Service UUID (canonical: f47ac10b-58cc-4372-a567-0e02b2c3d479)
          *
-         * This matches the M5Stack Core2 demo firmware for interoperability testing.
-         * The canonical HIVE service UUID is 0xD479 but the M5Stack uses 0xF47A.
+         * This is the canonical HIVE service UUID used across all platforms.
+         * 16-bit short form: 0xD479
          */
-        val HIVE_SERVICE_UUID: UUID = UUID.fromString("0000F47A-0000-1000-8000-00805F9B34FB")
+        val HIVE_SERVICE_UUID: UUID = UUID.fromString("f47ac10b-58cc-4372-a567-0e02b2c3d479")
 
         /**
-         * HIVE Document Characteristic UUID (16-bit: 0xF47B)
+         * HIVE Document Characteristic UUID (canonical: f47a0003-58cc-4372-a567-0e02b2c3d479)
          *
          * Used for exchanging CRDT document data between peers.
          * Supports read, write, and notify operations.
+         * Maps to CHAR_SYNC_DATA in the canonical protocol.
          */
-        val HIVE_CHAR_DOCUMENT: UUID = UUID.fromString("0000F47B-0000-1000-8000-00805F9B34FB")
+        val HIVE_CHAR_DOCUMENT: UUID = UUID.fromString("f47a0003-58cc-4372-a567-0e02b2c3d479")
 
-        /** HIVE Node Info Characteristic UUID (legacy, not used by M5Stack) */
-        val HIVE_CHAR_NODE_INFO: UUID = UUID.fromString("00000001-F47A-0000-1000-00805F9B34FB")
+        /** HIVE Node Info Characteristic UUID (canonical) */
+        val HIVE_CHAR_NODE_INFO: UUID = UUID.fromString("f47a0001-58cc-4372-a567-0e02b2c3d479")
 
-        /** HIVE Sync State Characteristic UUID (legacy, not used by M5Stack) */
-        val HIVE_CHAR_SYNC_STATE: UUID = UUID.fromString("00000002-F47A-0000-1000-00805F9B34FB")
+        /** HIVE Sync State Characteristic UUID (canonical) */
+        val HIVE_CHAR_SYNC_STATE: UUID = UUID.fromString("f47a0002-58cc-4372-a567-0e02b2c3d479")
 
-        /** HIVE Sync Data Characteristic UUID (legacy, not used by M5Stack) */
-        val HIVE_CHAR_SYNC_DATA: UUID = UUID.fromString("00000003-F47A-0000-1000-00805F9B34FB")
+        /** HIVE Sync Data Characteristic UUID (canonical) - same as HIVE_CHAR_DOCUMENT */
+        val HIVE_CHAR_SYNC_DATA: UUID = UUID.fromString("f47a0003-58cc-4372-a567-0e02b2c3d479")
 
-        /** HIVE Command Characteristic UUID (legacy, not used by M5Stack) */
-        val HIVE_CHAR_COMMAND: UUID = UUID.fromString("00000004-F47A-0000-1000-00805F9B34FB")
+        /** HIVE Command Characteristic UUID (canonical) */
+        val HIVE_CHAR_COMMAND: UUID = UUID.fromString("f47a0004-58cc-4372-a567-0e02b2c3d479")
 
-        /** HIVE Status Characteristic UUID (legacy, not used by M5Stack) */
-        val HIVE_CHAR_STATUS: UUID = UUID.fromString("00000005-F47A-0000-1000-00805F9B34FB")
+        /** HIVE Status Characteristic UUID (canonical) */
+        val HIVE_CHAR_STATUS: UUID = UUID.fromString("f47a0005-58cc-4372-a567-0e02b2c3d479")
 
         /** Client Characteristic Configuration Descriptor UUID */
         val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805F9B34FB")

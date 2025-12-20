@@ -25,16 +25,16 @@ use crate::error::{BleError, Result};
 use crate::platform::{ConnectionEvent, DisconnectReason, DiscoveredDevice};
 use crate::NodeId;
 
-/// HIVE BLE Service UUID (16-bit short form: 0xF47A)
+/// HIVE BLE Service UUID (canonical: f47ac10b-58cc-4372-a567-0e02b2c3d479)
 /// Used to identify HIVE nodes during BLE scanning.
-/// This matches the M5Stack Core2 demo firmware for interoperability testing.
+/// This is the canonical HIVE service UUID matching all platforms.
 #[allow(dead_code)]
-pub const HIVE_SERVICE_UUID: &str = "0000F47A-0000-1000-8000-00805F9B34FB";
+pub const HIVE_SERVICE_UUID: &str = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
 
-/// HIVE Document Characteristic UUID (16-bit short form: 0xF47B)
+/// HIVE Sync Data Characteristic UUID (derived from base service UUID)
 /// Used for exchanging CRDT document data between peers.
 #[allow(dead_code)]
-pub const HIVE_DOC_CHAR_UUID: &str = "0000F47B-0000-1000-8000-00805F9B34FB";
+pub const HIVE_DOC_CHAR_UUID: &str = "f47a0003-58cc-4372-a567-0e02b2c3d479";
 
 /// Global state for JNI callbacks
 /// This is necessary because JNI callbacks are static functions that can't access instance state

@@ -22,8 +22,8 @@ std = ["thiserror/std", "uuid/std"]
 # Platform-specific features
 linux = ["dep:bluer", "dep:tokio"]
 android = ["dep:jni", "dep:ndk", "dep:tokio"]
-macos = ["dep:objc2", "dep:block2"]
-ios = ["dep:objc2", "dep:block2"]
+macos = ["dep:objc2", "dep:block2", "dep:tokio", "dep:objc2-foundation", "dep:objc2-core-bluetooth"]
+ios = ["dep:objc2", "dep:block2", "dep:tokio", "dep:objc2-foundation", "dep:objc2-core-bluetooth"]
 windows = ["dep:windows"]
 
 # Embedded/no_std support
@@ -60,6 +60,8 @@ ndk = { version = "0.9", optional = true }
 # Apple CoreBluetooth (optional)
 objc2 = { version = "0.5", optional = true }
 block2 = { version = "0.5", optional = true }
+objc2-foundation = { version = "0.2", optional = true }
+objc2-core-bluetooth = { version = "0.2", features = ["all"], optional = true }
 
 # Windows WinRT (optional)
 windows = { version = "0.58", features = [
