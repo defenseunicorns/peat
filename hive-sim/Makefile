@@ -1,7 +1,7 @@
 # Hive-Sim Makefile
 # Simple interface for running network simulations and tests
 
-.PHONY: help build clean deploy destroy lab4-48 lab4-96 lab4-384 lab4-status lab4-watch lab4-destroy
+.PHONY: help build clean deploy destroy lab4-24 lab4-48 lab4-96 lab4-384 lab4-start lab4-status lab4-metrics lab4-results lab4-watch lab4-experiment lab4-single lab4-analyze lab4-save-logs lab4-destroy
 
 # Default target
 .DEFAULT_GOAL := help
@@ -11,7 +11,7 @@
 help: ## Display this help message
 	@echo "Hive-Sim - Network Simulation Testing"
 	@echo ""
-	@awk 'BEGIN {FS = ":.*##"; printf "Usage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*##"; printf "Usage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 build: ## Build Docker image for nodes
 	@echo "🔨 Building hive-sim-node Docker image..."
@@ -192,52 +192,95 @@ example-tactical: ## Example: Full tactical radio scenario
 	@echo ""
 	@echo "View profiles: make hierarchical-list-profiles"
 
-##@ Lab 4: Backend Comparison (Ditto vs Automerge)
+##@ Lab 4: Hierarchical Aggregation Testing
+# BANDWIDTH options: 1gbps (default), 100mbps, 1mbps, 256kbps
 
-lab4-48: ## Deploy Lab 4 with 48 nodes (BACKEND=automerge by default)
+lab4-24: ## Deploy Lab 4 with 24 nodes (BACKEND=automerge, BANDWIDTH=1gbps by default)
 	@echo "╔════════════════════════════════════════════════════════════╗"
-	@echo "║  Lab 4: 48 nodes (BACKEND=$${BACKEND:-automerge})           ║"
+	@echo "║  Lab 4: 24 nodes (BACKEND=$${BACKEND:-automerge}, BW=$${BANDWIDTH:-1gbps}) ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@if [ ! -f ../.env ]; then \
+		echo "ERROR: ../.env file required with HIVE_APP_ID, HIVE_SHARED_KEY"; \
+		exit 1; \
+	fi
+	@TOPO="topologies/lab4-24n-$${BANDWIDTH:-1gbps}.yaml"; \
+	if [ ! -f "$$TOPO" ]; then \
+		echo "Generating topology: $$TOPO"; \
+		python3 generate-lab4-hierarchical-topology.py --nodes 24 --bandwidth $${BANDWIDTH:-1gbps} --output "$$TOPO" --name lab4-24n; \
+	fi; \
+	set -a && . ../.env && set +a && \
+		BACKEND=$${BACKEND:-automerge} \
+		CAP_IN_MEMORY=$${CAP_IN_MEMORY:-true} \
+		containerlab deploy -t "$$TOPO" --reconfigure --timeout 5m
+	@echo ""
+	@echo "✓ Lab 4 (24 nodes) deployed. Monitor with: make lab4-status"
+
+lab4-48: ## Deploy Lab 4 with 48 nodes (BACKEND=automerge, BANDWIDTH=1gbps by default)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 4: 48 nodes (BACKEND=$${BACKEND:-automerge}, BW=$${BANDWIDTH:-1gbps}) ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@if [ ! -f ../.env ]; then \
 		echo "ERROR: ../.env file required with HIVE_APP_ID, HIVE_SECRET_KEY"; \
 		exit 1; \
 	fi
-	@set -a && . ../.env && set +a && \
+	@TOPO="topologies/lab4-48n-$${BANDWIDTH:-1gbps}.yaml"; \
+	if [ ! -f "$$TOPO" ]; then \
+		echo "Generating topology: $$TOPO"; \
+		python3 generate-lab4-hierarchical-topology.py --nodes 48 --bandwidth $${BANDWIDTH:-1gbps} --output "$$TOPO" --name lab4-48n; \
+	fi; \
+	set -a && . ../.env && set +a && \
 		BACKEND=$${BACKEND:-automerge} \
 		CAP_IN_MEMORY=$${CAP_IN_MEMORY:-true} \
-		containerlab deploy -t topologies/lab4-48n-1gbps.yaml --reconfigure --timeout 5m
+		containerlab deploy -t "$$TOPO" --reconfigure --timeout 5m
 	@echo ""
 	@echo "✓ Lab 4 (48 nodes) deployed. Monitor with: make lab4-status"
 
-lab4-96: ## Deploy Lab 4 with 96 nodes (BACKEND=automerge by default)
+lab4-96: ## Deploy Lab 4 with 96 nodes (BACKEND=automerge, BANDWIDTH=1gbps by default)
 	@echo "╔════════════════════════════════════════════════════════════╗"
-	@echo "║  Lab 4: 96 nodes (BACKEND=$${BACKEND:-automerge})           ║"
+	@echo "║  Lab 4: 96 nodes (BACKEND=$${BACKEND:-automerge}, BW=$${BANDWIDTH:-1gbps}) ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@if [ ! -f ../.env ]; then \
 		echo "ERROR: ../.env file required with HIVE_APP_ID, HIVE_SECRET_KEY"; \
 		exit 1; \
 	fi
-	@set -a && . ../.env && set +a && \
+	@TOPO="topologies/lab4-96n-$${BANDWIDTH:-1gbps}.yaml"; \
+	if [ ! -f "$$TOPO" ]; then \
+		echo "Generating topology: $$TOPO"; \
+		python3 generate-lab4-hierarchical-topology.py --nodes 96 --bandwidth $${BANDWIDTH:-1gbps} --output "$$TOPO" --name lab4-96n; \
+	fi; \
+	set -a && . ../.env && set +a && \
 		BACKEND=$${BACKEND:-automerge} \
 		CAP_IN_MEMORY=$${CAP_IN_MEMORY:-true} \
-		containerlab deploy -t topologies/lab4-96n-1gbps.yaml --reconfigure --timeout 5m
+		containerlab deploy -t "$$TOPO" --reconfigure --timeout 5m
 	@echo ""
 	@echo "✓ Lab 4 (96 nodes) deployed. Monitor with: make lab4-status"
 
-lab4-384: ## Deploy Lab 4 with 384 nodes (BACKEND=automerge by default)
+lab4-384: ## Deploy Lab 4 with 384 nodes (BACKEND=automerge, BANDWIDTH=1gbps by default)
 	@echo "╔════════════════════════════════════════════════════════════╗"
-	@echo "║  Lab 4: 384 nodes (BACKEND=$${BACKEND:-automerge})          ║"
+	@echo "║  Lab 4: 384 nodes (BACKEND=$${BACKEND:-automerge}, BW=$${BANDWIDTH:-1gbps})║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@if [ ! -f ../.env ]; then \
 		echo "ERROR: ../.env file required with HIVE_APP_ID, HIVE_SECRET_KEY"; \
 		exit 1; \
 	fi
-	@set -a && . ../.env && set +a && \
+	@TOPO="topologies/lab4-384n-$${BANDWIDTH:-1gbps}.yaml"; \
+	if [ ! -f "$$TOPO" ]; then \
+		echo "Generating topology: $$TOPO"; \
+		python3 generate-lab4-hierarchical-topology.py --nodes 384 --bandwidth $${BANDWIDTH:-1gbps} --output "$$TOPO" --name lab4-384n; \
+	fi; \
+	set -a && . ../.env && set +a && \
 		BACKEND=$${BACKEND:-automerge} \
 		CAP_IN_MEMORY=$${CAP_IN_MEMORY:-true} \
-		containerlab deploy -t topologies/lab4-384n-1gbps.yaml --reconfigure --timeout 10m
+		containerlab deploy -t "$$TOPO" --reconfigure --timeout 10m
 	@echo ""
 	@echo "✓ Lab 4 (384 nodes) deployed. Monitor with: make lab4-status"
+
+lab4-start: ## Trigger simulation start for all Lab 4 containers
+	@echo "Triggering simulation start..."
+	@for container in $$(docker ps --format '{{.Names}}' | grep clab-lab4); do \
+		docker exec "$$container" touch /data/start 2>/dev/null || true; \
+	done
+	@echo "✓ Start triggered for all Lab 4 containers"
 
 lab4-status: ## Show Lab 4 deployment status
 	@echo "╔════════════════════════════════════════════════════════════╗"
@@ -253,13 +296,123 @@ lab4-status: ## Show Lab 4 deployment status
 	@echo "Errors (if any):"
 	@docker ps --filter "name=clab-lab4" -q | head -10 | xargs -I{} docker logs {} 2>&1 | grep -iE "error|panic|fatal" | grep -v "No error" | head -5 || echo "  None found"
 
+lab4-metrics: ## Show latency and throughput metrics
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 4: Latency & Throughput Metrics                       ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "=== Aggregation Processing Time (µs) ==="
+	@echo -n "  Squad:   "; docker logs $$(docker ps --format '{{.Names}}' | grep "squad-1-leader" | head -1) 2>&1 | grep "AggregationCompleted.*squad" | tail -1 | grep -oP '"processing_time_us":\K[0-9]+' || echo "N/A"
+	@echo -n "  Platoon: "; docker logs $$(docker ps --format '{{.Names}}' | grep "platoon-1-leader" | head -1) 2>&1 | grep "AggregationCompleted.*platoon" | tail -1 | grep -oP '"processing_time_us":\K[0-9]+' || echo "N/A"
+	@echo -n "  Company: "; docker logs $$(docker ps --format '{{.Names}}' | grep "commander" | head -1) 2>&1 | grep "AggregationCompleted.*company" | tail -1 | grep -oP '"processing_time_us":\K[0-9]+' || echo "N/A"
+	@echo ""
+	@echo "=== Reduction Ratio (per tier) ==="
+	@echo -n "  Squad (7 NodeStates → 1 Summary):   "; docker logs $$(docker ps --format '{{.Names}}' | grep "squad-1-leader" | head -1) 2>&1 | grep "AggregationEfficiency.*squad" | tail -1 | grep -oP '"reduction_ratio":\K[0-9.]+' || echo "N/A"
+	@echo -n "  Platoon (3 Squads → 1 Summary):     "; docker logs $$(docker ps --format '{{.Names}}' | grep "platoon-1-leader" | head -1) 2>&1 | grep "AggregationEfficiency.*platoon" | tail -1 | grep -oP '"reduction_ratio":\K[0-9.]+' || echo "N/A"
+	@echo -n "  Company (1 Platoon → 1 Summary):    "; docker logs $$(docker ps --format '{{.Names}}' | grep "commander" | head -1) 2>&1 | grep "AggregationEfficiency.*company" | tail -1 | grep -oP '"reduction_ratio":\K[0-9.]+' || echo "N/A"
+	@echo ""
+	@echo "=== Aggregation Throughput ==="
+	@COMMANDER=$$(docker ps --format '{{.Names}}' | grep "commander" | head -1); \
+	COUNT=$$(docker logs $$COMMANDER 2>&1 | grep "AggregationCompleted.*company" | wc -l); \
+	echo "  Total company aggregations: $$COUNT"
+	@echo ""
+	@echo "=== P2P Sync Latency (per tier, excluding warmup >500ms) ==="
+	@echo -n "  Soldier → Squad:   "; docker ps --format '{{.Names}}' | grep "squad-1-leader" | head -1 | xargs -I{} docker logs {} 2>&1 | grep "soldier_to_squad_leader" | grep -oP '"latency_ms":\K[0-9.]+' | awk '$$1 <= 500 {sum+=$$1;count++;if(min=="" || $$1<min)min=$$1;if($$1>max)max=$$1} END{if(count>0) printf "Min: %.2f ms | Avg: %.2f ms | Max: %.2f ms (n=%d)\n", min, sum/count, max, count; else print "N/A"}'
+	@echo -n "  Squad → Platoon:   "; docker ps --format '{{.Names}}' | grep "platoon-1-leader" | head -1 | xargs -I{} docker logs {} 2>&1 | grep "squad_to_platoon_leader" | grep -oP '"latency_ms":\K[0-9.]+' | awk '$$1 <= 500 {sum+=$$1;count++;if(min=="" || $$1<min)min=$$1;if($$1>max)max=$$1} END{if(count>0) printf "Min: %.2f ms | Avg: %.2f ms | Max: %.2f ms (n=%d)\n", min, sum/count, max, count; else print "N/A"}'
+	@echo -n "  Platoon → Company: "; docker ps --format '{{.Names}}' | grep "commander" | head -1 | xargs -I{} docker logs {} 2>&1 | grep "platoon_to_company_commander" | grep -oP '"latency_ms":\K[0-9.]+' | awk '$$1 <= 500 {sum+=$$1;count++;if(min=="" || $$1<min)min=$$1;if($$1>max)max=$$1} END{if(count>0) printf "Min: %.2f ms | Avg: %.2f ms | Max: %.2f ms (n=%d)\n", min, sum/count, max, count; else print "N/A"}'
+	@echo ""
+	@echo "=== CRDT Upsert Latency ==="
+	@docker logs $$(docker ps --format '{{.Names}}' | grep "commander" | head -1) 2>&1 | grep "CRDTUpsert" | grep -oP '"latency_ms":\K[0-9.]+' | awk 'BEGIN{min=999999;max=0} {sum+=$$1;count++;if($$1<min)min=$$1;if($$1>max)max=$$1} END{if(count>0) printf "  Min: %.3f ms | Avg: %.3f ms | Max: %.3f ms (n=%d)\n", min, sum/count, max, count; else print "  N/A"}'
+
+lab4-results: ## Show hierarchical aggregation results
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 4: Hierarchical Aggregation Results                   ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "=== Topology ==="
+	@NODES=$$(docker ps --filter "name=clab-lab4" -q | wc -l); \
+	SQUADS=$$(docker ps --filter "name=clab-lab4" --format '{{.Names}}' | grep -E "squad-[0-9]+-leader" | wc -l); \
+	PLATOONS=$$(docker ps --filter "name=clab-lab4" --format '{{.Names}}' | grep -E "platoon-[0-9]+-leader" | wc -l); \
+	COMPANIES=$$(docker ps --filter "name=clab-lab4" --format '{{.Names}}' | grep "commander" | wc -l); \
+	echo "  Nodes: $$NODES | Squads: $$SQUADS | Platoons: $$PLATOONS | Companies: $$COMPANIES"
+	@echo ""
+	@echo "=== Aggregation Flow ==="
+	@SQUAD_METRICS=$$(docker ps --format '{{.Names}}' | grep -E "squad-[0-9]+-leader" | head -1 | xargs -I{} docker logs {} 2>&1 | grep "AggregationEfficiency.*squad" | tail -1); \
+	if [ -n "$$SQUAD_METRICS" ]; then \
+		INPUT=$$(echo "$$SQUAD_METRICS" | grep -o '"input_docs":[0-9]*' | cut -d: -f2); \
+		echo "  Squad: $$INPUT NodeStates → 1 SquadSummary (7 members each)"; \
+	fi
+	@PLATOON_METRICS=$$(docker ps --format '{{.Names}}' | grep -E "platoon-[0-9]+-leader" | head -1 | xargs -I{} docker logs {} 2>&1 | grep "AggregationEfficiency.*platoon" | tail -1); \
+	if [ -n "$$PLATOON_METRICS" ]; then \
+		INPUT=$$(echo "$$PLATOON_METRICS" | grep -o '"input_docs":[0-9]*' | cut -d: -f2); \
+		MEMBERS=$$(echo "$$PLATOON_METRICS" | grep -o '"total_members":[0-9]*' | cut -d: -f2); \
+		echo "  Platoon: $$INPUT SquadSummaries → 1 PlatoonSummary ($$MEMBERS members)"; \
+	fi
+	@COMPANY_METRICS=$$(docker ps --format '{{.Names}}' | grep "commander" | head -1 | xargs -I{} docker logs {} 2>&1 | grep "AggregationEfficiency.*company" | tail -1); \
+	if [ -n "$$COMPANY_METRICS" ]; then \
+		INPUT=$$(echo "$$COMPANY_METRICS" | grep -o '"input_docs":[0-9]*' | cut -d: -f2); \
+		MEMBERS=$$(echo "$$COMPANY_METRICS" | grep -o '"total_members":[0-9]*' | cut -d: -f2); \
+		echo "  Company: $$INPUT PlatoonSummaries → 1 CompanySummary ($$MEMBERS members)"; \
+	fi
+	@echo ""
+	@echo "=== Sync Status ==="
+	@COMMANDER=$$(docker ps --format '{{.Names}}' | grep "commander" | head -1); \
+	if [ -n "$$COMMANDER" ]; then \
+		COMPLETE=$$(docker logs $$COMMANDER 2>&1 | grep "AggregationCompleted.*company" | wc -l); \
+		echo "  Company aggregations completed: $$COMPLETE"; \
+	fi
+	@echo ""
+	@echo "=== Memory Usage (Leaders) ==="
+	@docker stats --no-stream --format "  {{.Name}}: {{.MemUsage}}" | grep -E "squad.*leader|platoon.*leader|commander" | head -5
+
 lab4-watch: ## Continuously monitor Lab 4 (Ctrl+C to stop)
 	@watch -n 5 'docker stats --no-stream --format "table {{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}" | grep -E "squad.*leader|platoon.*leader|commander" | head -20'
 
+lab4-experiment: ## Run full Lab 4 matrix (all backends × nodes × bandwidths) with analysis
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 4 Full Experiment Matrix                              ║"
+	@echo "║  Backends: ditto, automerge                                ║"
+	@echo "║  Nodes: 24, 48, 96, 384                                    ║"
+	@echo "║  Bandwidths: 1gbps, 100mbps, 1mbps, 256kbps                ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@./run-lab4-comparison.sh --duration $${DURATION:-120}
+
+lab4-single: ## Run single Lab 4 test (NODES=24, BACKEND=automerge, BANDWIDTH=1gbps)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 4 Single Test: $${NODES:-24}n, $${BACKEND:-automerge}, $${BANDWIDTH:-1gbps}  ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@./run-lab4-experiment.sh \
+		--nodes $${NODES:-24} \
+		--backend $${BACKEND:-automerge} \
+		--bandwidth $${BANDWIDTH:-1gbps} \
+		--duration $${DURATION:-120}
+
+lab4-analyze: ## Analyze Lab 4 results (RESULTS_DIR=path or uses --latest)
+	@if [ -n "$${RESULTS_DIR:-}" ]; then \
+		./process-lab4-metrics.sh "$$RESULTS_DIR"; \
+	else \
+		./process-lab4-metrics.sh --latest; \
+	fi
+
+lab4-save-logs: ## Save current Lab 4 container logs to results directory
+	@BACKEND=$${BACKEND:-automerge}; \
+	BANDWIDTH=$${BANDWIDTH:-1gbps}; \
+	NODES=$$(docker ps --filter "name=clab-lab4" -q | wc -l); \
+	TIMESTAMP=$$(date +%Y%m%d-%H%M%S); \
+	RESULTS_DIR="/work/hive-sim-results/lab4-$${BACKEND}-$${NODES}n-$${BANDWIDTH}-$${TIMESTAMP}"; \
+	mkdir -p "$$RESULTS_DIR/logs"; \
+	echo "Saving logs to: $$RESULTS_DIR/logs"; \
+	for container in $$(docker ps --format '{{.Names}}' | grep clab-lab4); do \
+		docker logs "$$container" > "$$RESULTS_DIR/logs/$${container}.log" 2>&1; \
+	done; \
+	echo "✓ Saved $$(ls $$RESULTS_DIR/logs/*.log 2>/dev/null | wc -l) log files"; \
+	echo "Results: $$RESULTS_DIR"
+
 lab4-destroy: ## Destroy Lab 4 deployment
 	@echo "Destroying Lab 4 deployment..."
-	-containerlab destroy -t topologies/lab4-48n-1gbps.yaml --cleanup 2>/dev/null || true
-	-containerlab destroy -t topologies/lab4-96n-1gbps.yaml --cleanup 2>/dev/null || true
-	-containerlab destroy -t topologies/lab4-384n-1gbps.yaml --cleanup 2>/dev/null || true
+	-containerlab destroy -t topologies/lab4-24n-$${BANDWIDTH:-1gbps}.yaml --cleanup 2>/dev/null || true
+	-containerlab destroy -t topologies/lab4-48n-$${BANDWIDTH:-1gbps}.yaml --cleanup 2>/dev/null || true
+	-containerlab destroy -t topologies/lab4-96n-$${BANDWIDTH:-1gbps}.yaml --cleanup 2>/dev/null || true
+	-containerlab destroy -t topologies/lab4-384n-$${BANDWIDTH:-1gbps}.yaml --cleanup 2>/dev/null || true
 	-docker network prune -f 2>/dev/null || true
 	@echo "✓ Lab 4 destroyed"
