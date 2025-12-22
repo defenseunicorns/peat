@@ -88,9 +88,16 @@ class HiveBtle(
          * HIVE BLE Service UUID (canonical: f47ac10b-58cc-4372-a567-0e02b2c3d479)
          *
          * This is the canonical HIVE service UUID used across all platforms.
-         * 16-bit short form: 0xD479
          */
         val HIVE_SERVICE_UUID: UUID = UUID.fromString("f47ac10b-58cc-4372-a567-0e02b2c3d479")
+
+        /**
+         * HIVE BLE Service UUID - 16-bit alias (0xF47A) for space-constrained advertising
+         *
+         * Used by ESP32/Core2 devices to fit service UUID in BLE advertising payload.
+         * Expands to standard Bluetooth SIG base: 0000f47a-0000-1000-8000-00805f9b34fb
+         */
+        val HIVE_SERVICE_UUID_16: UUID = UUID.fromString("0000f47a-0000-1000-8000-00805f9b34fb")
 
         /**
          * HIVE Document Characteristic UUID (canonical: f47a0003-58cc-4372-a567-0e02b2c3d479)
@@ -1237,45 +1244,78 @@ class HiveBtle(
 
     private fun handlePeerDocument(peer: HivePeer, data: ByteArray) {
         val document = HiveDocument.decode(data) ?: return
+        val docNodeId = document.nodeId
 
-        Log.d(TAG, "Received document from ${peer.displayName()} (docNodeId=${String.format("%08X", document.nodeId)}): event=${document.currentEventType()}")
+        Log.d(TAG, "Received document from ${peer.displayName()} (docNodeId=${String.format("%08X", docNodeId)}): event=${document.currentEventType()}")
 
-        // Look up current peer by address first (peer reference may be stale if nodeId changed)
-        val currentPeer = peers.values.find { it.address == peer.address }
-            ?: peers[document.nodeId]
-            ?: peer
+        // Skip if document is from ourselves
+        if (docNodeId == nodeId || docNodeId == 0L) return
 
-        // Update peer's nodeId from document if different (document nodeId is authoritative)
-        if (document.nodeId != currentPeer.nodeId && document.nodeId != 0L) {
-            val oldNodeId = currentPeer.nodeId
-            Log.i(TAG, "Updating peer nodeId from ${String.format("%08X", oldNodeId)} to ${String.format("%08X", document.nodeId)}")
+        // Check if document is from the connected peer or relayed from another node
+        val connectedPeer = peers.values.find { it.address == peer.address }
 
-            // Re-register peer with correct nodeId, preserving lastDocument
-            peers.remove(oldNodeId)
-            val updatedPeer = currentPeer.copy(nodeId = document.nodeId)
-            peers[document.nodeId] = updatedPeer
-            addressToNodeId[currentPeer.address] = document.nodeId
-
-            // Continue with updated peer reference
-            handlePeerDocumentInternal(updatedPeer, document)
-            return
+        if (connectedPeer != null && connectedPeer.nodeId == docNodeId) {
+            // Document is from the directly connected peer
+            handlePeerDocumentInternal(connectedPeer, document)
+        } else if (connectedPeer != null && connectedPeer.nodeId != docNodeId) {
+            // Document is RELAYED through connectedPeer from a different originating node
+            // Find or create peer entry for the originating nodeId
+            var originatingPeer = peers[docNodeId]
+            if (originatingPeer == null) {
+                // Create a virtual peer for the relayed node (we don't have direct connection)
+                originatingPeer = HivePeer(
+                    nodeId = docNodeId,
+                    address = "", // No direct address - relayed via mesh
+                    name = generateDeviceName(meshId, docNodeId),
+                    meshId = meshId,
+                    rssi = 0,
+                    isConnected = false, // Not directly connected
+                    lastDocument = null,
+                    lastSeen = System.currentTimeMillis()
+                )
+                peers[docNodeId] = originatingPeer
+                Log.i(TAG, "Created relayed peer ${originatingPeer.displayName()} (via ${connectedPeer.displayName()})")
+            }
+            // Process document for the originating peer
+            Log.d(TAG, "Processing relayed document from ${originatingPeer.displayName()} via ${connectedPeer.displayName()}")
+            handlePeerDocumentInternal(originatingPeer, document)
+        } else {
+            // Fallback: peer not in our list yet, use document nodeId
+            val newPeer = peers[docNodeId] ?: HivePeer(
+                nodeId = docNodeId,
+                address = peer.address,
+                name = peer.name.ifEmpty { generateDeviceName(meshId, docNodeId) },
+                meshId = peer.meshId,
+                rssi = peer.rssi,
+                isConnected = peer.isConnected,
+                lastDocument = null,
+                lastSeen = System.currentTimeMillis()
+            ).also { peers[docNodeId] = it }
+            handlePeerDocumentInternal(newPeer, document)
         }
-
-        handlePeerDocumentInternal(currentPeer, document)
     }
 
     private fun handlePeerDocumentInternal(peer: HivePeer, document: HiveDocument) {
         // Store last document
-        val previousEventType = peer.lastDocument?.currentEventType() ?: HiveEventType.NONE
+        val previousEvent = peer.lastDocument?.peripheral?.lastEvent
+        val previousEventType = previousEvent?.eventType ?: HiveEventType.NONE
+        val previousEventTimestamp = previousEvent?.timestamp ?: 0L
         peer.lastDocument = document
         peer.lastSeen = System.currentTimeMillis()
 
         // Merge counters (CRDT merge)
         mergeCounter(document.counter)
 
-        // Check for new events
-        val eventType = document.currentEventType()
-        if (eventType != HiveEventType.NONE && eventType != previousEventType) {
+        // Check for new events - trigger if event type changed OR same type with newer timestamp
+        val currentEvent = document.peripheral?.lastEvent
+        val eventType = currentEvent?.eventType ?: HiveEventType.NONE
+        val eventTimestamp = currentEvent?.timestamp ?: 0L
+        val isNewEvent = eventType != HiveEventType.NONE && (
+            eventType != previousEventType ||
+            (eventType == previousEventType && eventTimestamp > previousEventTimestamp)
+        )
+        if (isNewEvent) {
+            Log.i(TAG, "New event from ${peer.displayName()}: $eventType (timestamp=$eventTimestamp, prev=$previousEventTimestamp)")
             handler.post {
                 meshListener?.onPeerEvent(peer, eventType)
             }
