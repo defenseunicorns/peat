@@ -89,9 +89,15 @@ extern crate alloc;
 
 pub mod config;
 pub mod discovery;
+pub mod document;
+pub mod document_sync;
 pub mod error;
 pub mod gatt;
+pub mod hive_mesh;
 pub mod mesh;
+pub mod observer;
+pub mod peer;
+pub mod peer_manager;
 pub mod phy;
 pub mod platform;
 pub mod power;
@@ -117,6 +123,17 @@ pub use platform::{BleAdapter, ConnectionEvent, DisconnectReason, DiscoveredDevi
 pub use power::{BatteryState, RadioScheduler, SyncPriority};
 pub use sync::{GattSyncProtocol, SyncConfig, SyncState};
 pub use transport::{BleConnection, BluetoothLETransport, MeshTransport, TransportCapabilities};
+
+// New centralized mesh management types
+pub use document::{HiveDocument, MergeResult, EXTENDED_MARKER};
+pub use document_sync::{DocumentCheck, DocumentSync};
+#[cfg(feature = "std")]
+pub use hive_mesh::{DataReceivedResult, HiveMesh, HiveMeshConfig};
+#[cfg(feature = "std")]
+pub use observer::{CollectingObserver, ObserverManager};
+pub use observer::{DisconnectReason as HiveDisconnectReason, HiveEvent, HiveObserver};
+pub use peer::{HivePeer, PeerManagerConfig, SignalStrength};
+pub use peer_manager::PeerManager;
 
 /// HIVE BLE Service UUID (128-bit)
 ///
@@ -151,7 +168,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 ///
 /// Represents a unique node in the HIVE mesh. For BLE, this is typically
 /// derived from the Bluetooth MAC address or a configured value.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct NodeId {
     /// 32-bit node identifier
     id: u32,
