@@ -98,6 +98,48 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Architecture
 
+### Standalone vs HIVE Integration
+
+hive-btle is designed for **dual use**:
+
+1. **Standalone**: Pure embedded mesh (ESP32/Pico devices) without any full HIVE nodes
+2. **HIVE Integration**: BLE transport for full HIVE nodes, with gateway translation to Automerge
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         HIVE Integration Mode                            │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│  │                    Full HIVE Node (Phone)                          │  │
+│  │  ┌─────────────────────────────────────────────────────────────┐  │  │
+│  │  │                   AutomergeIroh                              │  │  │
+│  │  │             (Full CRDT documents)                            │  │  │
+│  │  └─────────────────────────────────────────────────────────────┘  │  │
+│  │                            ↕                                       │  │
+│  │  ┌─────────────────────────────────────────────────────────────┐  │  │
+│  │  │              Translation Layer (HIVE repo)                   │  │  │
+│  │  │        Maps: Automerge ↔ hive-btle lightweight               │  │  │
+│  │  └─────────────────────────────────────────────────────────────┘  │  │
+│  │                            ↕                                       │  │
+│  │  ┌─────────────────────────────────────────────────────────────┐  │  │
+│  │  │                      hive-btle                               │  │  │
+│  │  │            (BLE transport + lightweight CRDTs)               │  │  │
+│  │  └─────────────────────────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+│                                ↕ BLE                                     │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│  │               Embedded Node (ESP32/Pico)                           │  │
+│  │                        hive-btle                                   │  │
+│  │              (standalone, lightweight CRDTs)                       │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Why two modes?** Automerge is too resource-intensive for embedded targets (requires ~10MB+ RAM, `std` library). hive-btle's lightweight CRDTs (GCounter, Peripheral) provide the same semantics in <256KB RAM. Full HIVE nodes translate between formats.
+
+See [ADR-041](docs/adr/041-multi-transport-embedded-integration.md) for the full architectural rationale.
+
+### Component Architecture
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                      Application                             │
@@ -208,10 +250,9 @@ cargo test sync::
 
 ## Related Documentation
 
-- [ADR-039: HIVE-BTLE Mesh Transport](docs/adr/039-hive-btle-mesh-transport.md) - Full architecture design
-- [Implementation Kickstart](hive-btle-implementation-kickstart.md) - Getting started guide
-- [M5Stack-Samsung Test Plan](hive-btle-m5stack-samsung-test-plan.md) - Hardware test procedures
-- [Quick Start Guide](hive-btle-quickstart-guide.md) - Rapid prototyping guide
+- [ADR-039: HIVE-BTLE Mesh Transport](../docs/adr/039-hive-btle-mesh-transport.md) - Full architecture design
+- [ADR-041: Multi-Transport Integration](../docs/adr/041-multi-transport-embedded-integration.md) - HIVE integration architecture
+- [ADR-035: HIVE-Lite Embedded Nodes](../docs/adr/035-hive-lite-embedded-nodes.md) - Embedded node design
 
 ## Contributing
 

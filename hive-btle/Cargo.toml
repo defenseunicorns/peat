@@ -47,6 +47,9 @@ log = "0.4"
 # Error handling
 thiserror = { version = "2.0", default-features = false }
 
+# Spin locks for no_std
+spin = { version = "0.9", default-features = false, features = ["rwlock"] }
+
 # Async runtime (optional, for std platforms)
 tokio = { version = "1.42", features = ["sync", "time", "macros", "rt-multi-thread"], optional = true }
 
