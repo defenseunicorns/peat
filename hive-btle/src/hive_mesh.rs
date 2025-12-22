@@ -135,11 +135,11 @@ pub struct HiveMesh {
     /// Observer manager
     observers: ObserverManager,
 
-    /// Last sync broadcast time
-    last_sync_ms: std::sync::atomic::AtomicU64,
+    /// Last sync broadcast time (u32 wraps every ~49 days, sufficient for intervals)
+    last_sync_ms: std::sync::atomic::AtomicU32,
 
     /// Last cleanup time
-    last_cleanup_ms: std::sync::atomic::AtomicU64,
+    last_cleanup_ms: std::sync::atomic::AtomicU32,
 }
 
 #[cfg(feature = "std")]
@@ -158,8 +158,8 @@ impl HiveMesh {
             peer_manager,
             document_sync,
             observers: ObserverManager::new(),
-            last_sync_ms: std::sync::atomic::AtomicU64::new(0),
-            last_cleanup_ms: std::sync::atomic::AtomicU64::new(0),
+            last_sync_ms: std::sync::atomic::AtomicU32::new(0),
+            last_cleanup_ms: std::sync::atomic::AtomicU32::new(0),
         }
     }
 
@@ -464,10 +464,14 @@ impl HiveMesh {
     pub fn tick(&self, now_ms: u64) -> Option<Vec<u8>> {
         use std::sync::atomic::Ordering;
 
+        // Use u32 for atomic storage (wraps every ~49 days, intervals still work)
+        let now_ms_32 = now_ms as u32;
+
         // Cleanup stale peers
         let last_cleanup = self.last_cleanup_ms.load(Ordering::Relaxed);
-        if now_ms.saturating_sub(last_cleanup) >= self.config.peer_config.cleanup_interval_ms {
-            self.last_cleanup_ms.store(now_ms, Ordering::Relaxed);
+        let cleanup_elapsed = now_ms_32.wrapping_sub(last_cleanup);
+        if cleanup_elapsed >= self.config.peer_config.cleanup_interval_ms as u32 {
+            self.last_cleanup_ms.store(now_ms_32, Ordering::Relaxed);
             let removed = self.peer_manager.cleanup_stale(now_ms);
             for node_id in &removed {
                 self.notify(HiveEvent::PeerLost { node_id: *node_id });
@@ -479,8 +483,9 @@ impl HiveMesh {
 
         // Check if sync broadcast is needed
         let last_sync = self.last_sync_ms.load(Ordering::Relaxed);
-        if now_ms.saturating_sub(last_sync) >= self.config.sync_interval_ms {
-            self.last_sync_ms.store(now_ms, Ordering::Relaxed);
+        let sync_elapsed = now_ms_32.wrapping_sub(last_sync);
+        if sync_elapsed >= self.config.sync_interval_ms as u32 {
+            self.last_sync_ms.store(now_ms_32, Ordering::Relaxed);
             // Only broadcast if we have connected peers
             if self.peer_manager.connected_count() > 0 {
                 return Some(self.document_sync.build_document());

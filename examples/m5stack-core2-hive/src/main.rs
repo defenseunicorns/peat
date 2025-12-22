@@ -682,7 +682,7 @@ fn main() -> anyhow::Result<()> {
     loop {
         let button = read_button(&mut i2c);
         let connected = nimble::is_connected();
-        let now_ms = unsafe { esp_idf_svc::sys::esp_timer_get_time() as u32 / 1000 };
+        let current_time = unsafe { esp_idf_svc::sys::esp_timer_get_time() as u32 / 1000 };
 
         // Check for connection state changes
         if nimble::take_connection_changed() {
@@ -696,11 +696,11 @@ fn main() -> anyhow::Result<()> {
 
         // Handle vibration buzzing when alert is active
         if alert_active {
-            let elapsed = now_ms.saturating_sub(last_vibration_toggle);
+            let elapsed = current_time.saturating_sub(last_vibration_toggle);
             if elapsed >= VIBRATION_INTERVAL_MS {
                 vibration_on = !vibration_on;
                 axp_set_vibration(&mut i2c, vibration_on);
-                last_vibration_toggle = now_ms;
+                last_vibration_toggle = current_time;
             }
         } else if vibration_on {
             // Turn off vibration if alert cleared
@@ -753,7 +753,7 @@ fn main() -> anyhow::Result<()> {
 
                     // Enter alert mode locally too (buzz until ACK'd)
                     alert_active = true;
-                    last_vibration_toggle = now_ms;
+                    last_vibration_toggle = current_time;
                     vibration_on = true;
                     axp_set_vibration(&mut i2c, true);
 
@@ -794,7 +794,7 @@ fn main() -> anyhow::Result<()> {
                 if result.is_emergency && !alert_active {
                     info!(">>> RECEIVED EMERGENCY FROM PEER!");
                     alert_active = true;
-                    last_vibration_toggle = now_ms;
+                    last_vibration_toggle = current_time;
                     vibration_on = true;
                     axp_set_vibration(&mut i2c, true);
                     needs_redraw = true;
