@@ -28,14 +28,14 @@ def get_credential_env_vars(backend):
     """Return the credential environment variables based on backend."""
     if backend == "automerge":
         return [
-            "        DITTO_APP_ID: test-formation",
+            "        HIVE_APP_ID: test-formation",
             "        HIVE_SECRET_KEY: aGl2ZS10ZXN0LWZvcm1hdGlvbi1zZWNyZXQta2V5LTA=",  # base64 of "hive-test-formation-secret-key-0" (32 bytes)
         ]
     else:
         return [
-            "        DITTO_APP_ID: ${DITTO_APP_ID}",
-            "        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}",
-            "        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}",
+            "        HIVE_APP_ID: ${HIVE_APP_ID}",
+            "        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}",
+            "        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}",
         ]
 
 
