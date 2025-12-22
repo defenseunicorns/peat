@@ -3035,6 +3035,7 @@ dependencies = [
  "objc2",
  "objc2-core-bluetooth",
  "objc2-foundation",
+ "spin 0.9.8",
  "thiserror 2.0.17",
  "tokio",
  "tokio-test",
