@@ -16,6 +16,7 @@ static METRICS_FILE: OnceLock<Mutex<Option<File>>> = OnceLock::new();
 /// Metrics event for JSON logging
 #[derive(Debug, serde::Serialize)]
 #[serde(tag = "event_type")]
+#[allow(dead_code)]
 pub enum MetricsEvent {
     DocumentInserted {
         node_id: String,
@@ -32,7 +33,13 @@ pub enum MetricsEvent {
         latency_ms: f64,
         version: u64,             // Document version
         is_first_reception: bool, // true = creation sync, false = update/recovery sync
-        latency_type: String,     // "creation", "update", or "recovery"
+        latency_type: String,     // "soldier_to_squad_leader", "squad_to_platoon_leader", etc.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        source_tier: Option<String>, // "soldier", "squad_leader", etc.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        dest_tier: Option<String>, // "squad_leader", "platoon_leader", etc.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        is_warmup: Option<bool>, // true if during warmup phase (exclude from analysis)
     },
     MessageSent {
         node_id: String,
@@ -135,6 +142,52 @@ pub enum MetricsEvent {
         output_doc_id: String,
         input_count: usize,
         processing_time_us: u128, // Time spent aggregating
+        timestamp_us: u128,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        input_bytes: Option<usize>, // Total bytes of input documents
+        #[serde(skip_serializing_if = "Option::is_none")]
+        output_bytes: Option<usize>, // Total bytes of output document
+        #[serde(skip_serializing_if = "Option::is_none")]
+        bytes_saved: Option<usize>, // input_bytes - output_bytes
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reduction_ratio: Option<f64>, // input_count / 1.0
+    },
+    // Warmup complete event - emitted when node is ready for measurement
+    WarmupComplete {
+        node_id: String,
+        tier: String,
+        peers_connected: usize,
+        docs_synced: usize,
+        warmup_duration_ms: u64,
+        ready_for_measurement: bool,
+        timestamp_us: u128,
+    },
+    // Throughput event - emitted periodically (every 10 seconds)
+    TierThroughput {
+        node_id: String,
+        tier: String,
+        interval_secs: u64,
+        bytes_received: usize,
+        bytes_sent: usize,
+        docs_received: usize,
+        docs_sent: usize,
+        throughput_in_bps: f64,  // bytes per second received
+        throughput_out_bps: f64, // bytes per second sent
+        timestamp_us: u128,
+    },
+    // Aggregation efficiency - shows bandwidth savings
+    AggregationEfficiency {
+        node_id: String,
+        tier: String,
+        input_docs: usize,
+        output_docs: usize,
+        reduction_ratio: f64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        input_bytes: Option<usize>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        output_bytes: Option<usize>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        bytes_saved_pct: Option<f64>,
         timestamp_us: u128,
     },
 }
