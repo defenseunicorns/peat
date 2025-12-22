@@ -1,8 +1,8 @@
 # Lab 4: Hierarchical HIVE CRDT - Testing Guide
 
-**Purpose**: Test hierarchical HIVE CRDT architecture to prove logarithmic scaling to 1000+ nodes
+**Purpose**: Prove hierarchical architecture enables O(log n) scaling with bounded latency and 95% bandwidth savings
 
-**Status**: Phase 2 Complete - Test scripts ready
+**Core Thesis**: Hierarchical aggregation reduces cross-tier traffic, enabling 1000+ node deployments where flat mesh fails at 30-50 nodes
 
 ---
 
@@ -10,426 +10,486 @@
 
 ### Prerequisites
 
-1. **Docker Image Built**:
-   ```bash
-   cd hive-sim
-   docker build -t hive-sim-node:latest .
-   ```
+Ensure you have a `.env` file in the parent directory (`hive/.env`) with:
+```bash
+HIVE_APP_ID="your-app-id"
+HIVE_SHARED_KEY="your-shared-key"
+HIVE_SECRET_KEY="your-secret-key"
+```
 
-2. **Environment Variables** (Ditto credentials):
-   ```bash
-   export DITTO_APP_ID="your-app-id"
-   export DITTO_OFFLINE_TOKEN="your-token"
-   export DITTO_SHARED_KEY="your-key"
-   ```
-
-3. **ContainerLab Installed** (no sudo required per CLAUDE.md)
-
----
-
-## Test Scripts
-
-### 1. Quick Validation Test (2 minutes)
-
-Validates Lab 4 infrastructure with single 24-node test:
+### Deploy and Monitor
 
 ```bash
-./quick-test-lab4.sh
+# Build the Docker image first
+make build
+
+# Deploy 24-node topology (fastest for validation)
+make lab4-24
+
+# Wait 30 seconds for connections to establish, then check metrics
+make lab4-metrics
+
+# Watch real-time status
+make lab4-watch
+
+# View aggregation results
+make lab4-results
+
+# Clean up when done
+make lab4-destroy
 ```
 
-**Expected Output**:
-```
-✅ SUCCESS: Lab 4 metrics instrumentation is working
+### Available Scale Options
 
-Metrics collected:
-  - Soldier CRDT latencies: 10+ samples
-  - Squad leader CRDT latencies: 3+ samples
-  - Platoon leader CRDT latencies: 1+ samples
-  - Aggregation efficiency events: 3+ events
-```
+| Command | Nodes | Structure | Use Case |
+|---------|-------|-----------|----------|
+| `make lab4-24` | 24 | 1 company, 1 platoon, 3 squads × 7 soldiers | Quick validation |
+| `make lab4-48` | 48 | 1 company, 2 platoons, 6 squads × 7 soldiers | Medium test |
+| `make lab4-96` | 96 | 1 company, 4 platoons, 12 squads × 7 soldiers | Scale test |
+| `make lab4-384` | 384 | 1 company, 16 platoons, 48 squads × 7 soldiers | Full scale |
 
-**What It Tests**:
-- Hierarchical mode deployment
-- Tier-specific CRDT metrics
-- Aggregation efficiency tracking
-- Metrics JSON format
+### Metrics Commands
 
----
+| Command | Description |
+|---------|-------------|
+| `make lab4-metrics` | Show latency, throughput, and aggregation metrics |
+| `make lab4-results` | Show hierarchical aggregation results |
+| `make lab4-status` | Show deployment status and memory usage |
+| `make lab4-watch` | Continuously monitor (Ctrl+C to stop) |
+| `make lab4-save-logs` | Save container logs to `/work/hive-sim-results/` |
+| `make lab4-experiment` | Run full matrix (all backends × nodes × bandwidths) with comparison |
+| `make lab4-single` | Run single test (NODES, BACKEND, BANDWIDTH) |
+| `make lab4-analyze` | Analyze saved results (uses `--latest` or `RESULTS_DIR=path`) |
+| `make lab4-destroy` | Destroy all Lab 4 containers |
 
-### 2. Full Lab 4 Test Suite (6-8 hours)
+### Running Full Experiments
 
-Runs complete test matrix for Epic #132 comparison:
+#### Full Matrix Comparison (Recommended)
+
+Run all combinations of backends, node counts, and bandwidths:
 
 ```bash
-./test-lab4-hierarchical-hive-crdt.sh
+# Run full matrix: 2 backends × 4 node counts × 4 bandwidths = 32 tests
+make lab4-experiment
+
+# With custom duration per test (default: 120s)
+DURATION=60 make lab4-experiment
 ```
 
-**Test Matrix**:
-```
-5 node counts × 4 bandwidths = 20 tests
+**Output:**
+- Individual results: `/work/hive-sim-results/lab4-{backend}-{nodes}n-{bandwidth}-{timestamp}/`
+- Summary CSV: `/work/hive-sim-results/lab4-comparison-{timestamp}.csv`
+- Comparison report: `/work/hive-sim-results/lab4-comparison-report-{timestamp}.md`
 
-Node Counts:  24, 48, 96, 384, 1000
-Bandwidths:   1 Gbps, 100 Mbps, 1 Mbps, 256 Kbps
-Duration:     120 seconds per test
-Total Time:   ~6-8 hours (including setup/teardown)
-```
+#### Single Test
 
-**Topology Structures**:
-| Nodes | Companies | Platoons | Squads | Soldiers/Squad |
-|-------|-----------|----------|--------|----------------|
-| 24    | 1         | 1        | 3      | 7              |
-| 48    | 1         | 2        | 3      | 7              |
-| 96    | 1         | 4        | 3      | 7              |
-| 384   | 3         | 4        | 4      | 8              |
-| 1000  | 8         | 4        | 4      | 8              |
+Run a specific configuration:
 
-**Output**: `hive-hierarchical-TIMESTAMP/hive-hierarchical-results.csv`
-
----
-
-## Results Format
-
-### CSV Output
-
-```csv
-NodeCount,Bandwidth,Topology,Soldier_P50_ms,Soldier_P95_ms,Squad_P50_ms,Squad_P95_ms,Platoon_P50_ms,Platoon_P95_ms,Aggregation_Ratio,Total_Operations,Status
-24,1gbps,1_platoon_3_squads,2.1,2.7,5.2,8.3,0,0,7.0,120,PASS
-48,1gbps,2_platoons_6_squads,2.3,3.1,5.8,9.1,12.4,15.2,7.0,240,PASS
-```
-
-### Metrics Explanation
-
-**Soldier Tier** (P50/P95):
-- CRDT upsert latency at edge nodes
-- Baseline CRDT performance
-- Expected: <5ms P95 at all scales
-
-**Squad Tier** (P50/P95):
-- First-level aggregation latency
-- N soldiers → 1 squad summary
-- Expected: <20ms P95 at all scales
-
-**Platoon Tier** (P50/P95):
-- Second-level aggregation latency
-- N squads → 1 platoon summary
-- Expected: <50ms P95 at all scales
-
-**Aggregation Ratio**:
-- Documents reduced at each tier
-- Example: 7 soldiers → 1 squad summary = 7:1 ratio
-- Shows bandwidth efficiency
-
-**Total Operations**:
-- Sum of all CRDT operations across all tiers
-- Compare to flat mesh: Lab 4 should show O(n log n) vs Lab 3b's O(n²)
-
----
-
-## Comparison to Lab 3b
-
-Lab 4 tests **hierarchical CRDT** vs Lab 3b's **flat mesh CRDT**:
-
-| Aspect | Lab 3b (Flat) | Lab 4 (Hierarchical) |
-|--------|---------------|----------------------|
-| Topology | All nodes same tier | Squad → Platoon → Company |
-| Connections | O(n²) | O(n log n) |
-| Node Scales | 5-50 (breaks at 30) | 24-1000 (no limit observed) |
-| CRDT Operations | N × (N-1) | N + log(N) tiers |
-| Key Proof | Breaks at squad/platoon boundary | Scales to battalion |
-
-**Direct Comparison Test**:
 ```bash
-# Run Lab 3b (if not already done)
-./test-lab3b-hive-mesh.sh
+# Single test with specific parameters
+NODES=96 BACKEND=automerge BANDWIDTH=256kbps make lab4-single
 
-# Run Lab 4
-./test-lab4-hierarchical-hive-crdt.sh
+# Results saved to: /work/hive-sim-results/lab4-automerge-96n-256kbps-YYYYMMDD-HHMMSS/
+```
 
-# Compare results
-python3 compare-lab3b-vs-lab4.py \
-    hive-flat-mesh-TIMESTAMP/hive-flat-mesh-results.csv \
-    hive-hierarchical-TIMESTAMP/hive-hierarchical-results.csv
+#### Manual Workflow
+
+```bash
+# Deploy first
+BANDWIDTH=256kbps make lab4-24
+
+# Check live metrics
+make lab4-metrics
+
+# Save logs before destroying
+BACKEND=automerge BANDWIDTH=256kbps make lab4-save-logs
+
+# Analyze saved results
+make lab4-analyze                           # Uses most recent results
+RESULTS_DIR=/work/hive-sim-results/lab4-... make lab4-analyze  # Specific dir
+```
+
+### Backend Options
+
+Lab 4 supports both Automerge and Ditto backends. Override with the `BACKEND` environment variable:
+
+```bash
+# Default: Automerge backend
+make lab4-24
+
+# Explicitly use Automerge
+BACKEND=automerge make lab4-24
+
+# Use Ditto backend
+BACKEND=ditto make lab4-24
+
+# In-memory storage (default: true for faster testing)
+CAP_IN_MEMORY=false BACKEND=automerge make lab4-24
+```
+
+### Bandwidth Options
+
+Lab 4 supports 4 bandwidth profiles to simulate different network conditions:
+
+| Bandwidth | Use Case | Example |
+|-----------|----------|---------|
+| `1gbps` | LAN/datacenter (default) | `make lab4-24` |
+| `100mbps` | Good tactical network | `BANDWIDTH=100mbps make lab4-24` |
+| `1mbps` | Degraded tactical network | `BANDWIDTH=1mbps make lab4-24` |
+| `256kbps` | VHF radio / SATCOM | `BANDWIDTH=256kbps make lab4-24` |
+
+```bash
+# Deploy 24 nodes with 256kbps bandwidth constraint
+BANDWIDTH=256kbps make lab4-24
+
+# Combine backend and bandwidth options
+BACKEND=ditto BANDWIDTH=1mbps make lab4-96
+
+# Full example: Ditto backend, 100mbps, persistent storage
+BACKEND=ditto BANDWIDTH=100mbps CAP_IN_MEMORY=false make lab4-384
+```
+
+Topology files are auto-generated on first use if they don't exist.
+
+### Example Output
+
+```
+=== P2P Sync Latency (per tier, excluding warmup >500ms) ===
+  Soldier → Squad:   Min: 0.91 ms | Avg: 110.94 ms | Max: 466.47 ms (n=17)
+  Squad → Platoon:   Min: 0.35 ms | Avg: 1.78 ms | Max: 3.49 ms (n=3)
+  Platoon → Company: Min: 0.00 ms | Avg: 0.01 ms | Max: 0.01 ms (n=11)
+
+=== Reduction Ratio (per tier) ===
+  Squad (7 NodeStates → 1 Summary):   7.0
+  Platoon (3 Squads → 1 Summary):     3.0
+  Company (1 Platoon → 1 Summary):    1.0
 ```
 
 ---
 
-## Understanding the Metrics
+## What We Are Proving
 
-### 1. Tier-Specific Latencies
+### The Problem with Flat Mesh (Lab 3b)
+- Every node syncs with every other node: O(n²) connections
+- At 50 nodes: 2,450 sync relationships, network saturated
+- Latency explodes as n grows
 
-Lab 4 measures CRDT latency at each hierarchy tier:
+### The Hierarchical Solution (Lab 4)
+- Soldiers sync only with their squad leader (7:1)
+- Squad leaders sync only with their platoon leader (3:1)
+- Platoon leaders sync only with company commander (4:1)
+- Total reduction: 7 × 3 × 4 = **84:1 bandwidth savings per update cycle**
 
-**Soldier → Squad Leader**:
+---
+
+## Critical Metrics (What We MUST Measure)
+
+### 1. Cross-Tier Propagation Latency (PRIMARY METRIC)
+
+**NOT local upsert latency** - we measure time for data to traverse tiers:
+
+| Metric | Description | Target |
+|--------|-------------|--------|
+| Soldier → Squad Leader | Time from soldier write to squad leader DocumentReceived | <50ms P95 |
+| Squad → Platoon Leader | Time from squad summary to platoon leader DocumentReceived | <50ms P95 |
+| Platoon → Commander | Time from platoon summary to commander DocumentReceived | <50ms P95 |
+| **End-to-End** | Total time: Soldier write → Commander receives | <100ms P95 |
+
+**How to measure**:
 ```json
-{"event_type":"CRDTUpsert","tier":"soldier","latency_ms":2.345}
+{"event_type":"DocumentReceived","latency_type":"soldier_to_squad_leader","latency_ms":45.2}
+{"event_type":"DocumentReceived","latency_type":"squad_to_platoon_leader","latency_ms":38.1}
+{"event_type":"DocumentReceived","latency_type":"platoon_to_commander","latency_ms":22.5}
 ```
 
-**Squad Leader Aggregation**:
-```json
-{"event_type":"CRDTUpsert","tier":"squad_leader","members_aggregated":7,"latency_ms":5.678}
+### 2. Throughput (Bytes/Second Per Tier)
+
+| Tier | Expected Traffic | Measurement |
+|------|------------------|-------------|
+| Soldier → Squad | High (raw data) | bytes_sent / duration |
+| Squad → Platoon | ~7x less (aggregated) | bytes_sent / duration |
+| Platoon → Commander | ~21x less (double aggregated) | bytes_sent / duration |
+
+**Bandwidth Savings Calculation**:
+```
+Flat Mesh (Lab 3b):    n × (n-1) × msg_size × updates_per_sec
+Hierarchical (Lab 4):  n × msg_size × updates_per_sec (soldiers only send to 1 leader)
+
+Savings = 1 - (Hierarchical / Flat Mesh) = 95%+ at 100 nodes
 ```
 
-**Platoon Leader Aggregation**:
-```json
-{"event_type":"CRDTUpsert","tier":"platoon_leader","squads_aggregated":3,"latency_ms":12.345}
+### 3. Connection Establishment (MUST COMPLETE BEFORE MEASURING)
+
+**Warmup Phase Requirements**:
+1. All nodes start and initialize backend
+2. All TCP/QUIC connections established
+3. Initial sync handshake completed
+4. First document exchange verified
+5. **ONLY THEN** start measuring latency/throughput
+
+**Warmup Verification**:
 ```
-
-### 2. Aggregation Efficiency
-
-Shows document reduction at each tier:
-
-```json
-{"event_type":"AggregationEfficiency","tier":"squad","input_docs":7,"output_docs":1,"reduction_ratio":7.0}
-```
-
-**Interpretation**:
-- 7 NodeState documents → 1 SquadSummary
-- 7:1 reduction = 85.7% bandwidth savings
-- Cumulative across tiers: 95%+ total reduction
-
-### 3. Comparison Metrics
-
-**Lab 3b @ 50 nodes** (from previous tests):
-- P95 Latency: 399.6ms (unacceptable)
-- Connections: 1,225 (O(n²))
-- Breaking point reached
-
-**Lab 4 @ 96 nodes** (expected):
-- P95 Latency: <30ms (acceptable)
-- Logical connections: ~200 (O(n log n))
-- Scales comfortably
-
----
-
-## Troubleshooting
-
-### No Metrics Collected
-
-**Symptoms**:
-```
-⚠️  WARNING: Limited metrics collected
-Soldier metrics: 0
-Squad metrics: 0
-```
-
-**Causes**:
-1. Docker image not rebuilt after instrumentation
-2. Hierarchical mode not triggered (MODE env var)
-3. Test duration too short
-
-**Fix**:
-```bash
-# Rebuild Docker image
-docker build -t hive-sim-node:latest .
-
-# Verify MODE=hierarchical in topology
-grep "MODE:" topologies/test-backend-ditto-24n-hierarchical-1gbps.yaml
-
-# Run quick test
-./quick-test-lab4.sh
-```
-
-### Topology Not Found
-
-**Symptoms**:
-```
-⚠️  Topology not found: topologies/test-backend-ditto-24n-hierarchical-1gbps.yaml
-```
-
-**Fix**:
-```bash
-# Pre-generated topologies exist for 24, 48, 96 nodes
-ls topologies/test-backend-ditto-*-hierarchical-*.yaml
-
-# Large scales (384, 1000) are generated on-demand by test script
-# No action needed
-```
-
-### Deployment Failed
-
-**Symptoms**:
-```
-❌ Deployment failed
-```
-
-**Causes**:
-1. Previous containers not cleaned up
-2. Port conflicts
-3. Resource limits
-
-**Fix**:
-```bash
-# Cleanup all labs
-containerlab destroy --all --cleanup
-
-# Check Docker resources
-docker system df
-docker system prune -f  # if needed
-```
-
-### Metrics Format Issues
-
-**Symptoms**: JSON parsing errors in analysis
-
-**Check Logs**:
-```bash
-docker logs clab-lab4-test-soldier-1 2>&1 | grep "METRICS:"
-```
-
-**Expected Format**:
-```json
-METRICS: {"event_type":"CRDTUpsert","node_id":"soldier-1","tier":"soldier","latency_ms":2.345,"timestamp_us":1732456789123456}
+[squad-1-leader] ✓ Connected to platoon-1-leader
+[squad-1-leader] ✓ 7/7 soldiers connected
+[squad-1-leader] WARMUP COMPLETE - starting measurement phase
 ```
 
 ---
 
-## Analysis Scripts
+## Experiment Protocol
 
-### 1. Tier-by-Tier Analysis
-
-Extract latencies by tier:
-
-```bash
-# Soldier latencies
-grep 'METRICS:' hive-hierarchical-*/logs/*/soldier*.log | \
-    grep '"tier":"soldier"' | \
-    sed 's/.*"latency_ms":\([0-9.]*\).*/\1/' | \
-    sort -n | \
-    awk '{sum+=$1; a[NR]=$1} END {print "P50:", a[int(NR*0.5)], "P95:", a[int(NR*0.95)]}'
+### Phase 1: Deploy and Warmup (DO NOT MEASURE)
+```
+0:00 - 0:30   Deploy containers
+0:30 - 1:00   Connection establishment
+1:00 - 1:30   Initial sync and document exchange
+1:30 - 2:00   Verify all connections stable
 ```
 
-### 2. Aggregation Efficiency
-
-Calculate reduction ratios:
-
-```bash
-grep 'AggregationEfficiency' hive-hierarchical-*/logs/*/*.log | \
-    grep -o '"reduction_ratio":[0-9.]*' | \
-    cut -d: -f2 | \
-    awk '{sum+=$1; count++} END {print "Average reduction:", sum/count, ":1"}'
+### Phase 2: Measurement (MEASURE HERE)
+```
+2:00 - 4:00   Steady-state measurement period
+              - Cross-tier latency samples
+              - Throughput bytes/second
+              - Aggregation events
 ```
 
-### 3. Scaling Validation
-
-Compare Lab 3b vs Lab 4:
-
-```python
-#!/usr/bin/env python3
-import sys, csv
-
-lab3b_file = sys.argv[1]  # hive-flat-mesh-results.csv
-lab4_file = sys.argv[2]   # hive-hierarchical-results.csv
-
-# Parse both CSVs
-# Compare P95 latencies at common node counts
-# Show where Lab 3b fails and Lab 4 succeeds
+### Phase 3: Cleanup
 ```
+4:00 - 4:30   Final log collection
+              Destroy topology
+              Process metrics
+```
+
+---
+
+## Metrics Events (What the Code MUST Emit)
+
+### Cross-Tier Latency (REQUIRED)
+
+When a document propagates from one tier to another:
+
+```json
+{
+  "event_type": "DocumentReceived",
+  "node_id": "squad-1-leader",
+  "doc_id": "soldier-1-status",
+  "source_tier": "soldier",
+  "dest_tier": "squad_leader",
+  "latency_type": "soldier_to_squad_leader",
+  "created_at_us": 1766129764445279,
+  "received_at_us": 1766129764495279,
+  "latency_ms": 50.0,
+  "is_warmup": false
+}
+```
+
+### Throughput (REQUIRED)
+
+Every 10 seconds, emit tier throughput:
+
+```json
+{
+  "event_type": "TierThroughput",
+  "node_id": "squad-1-leader",
+  "tier": "squad_leader",
+  "interval_secs": 10,
+  "bytes_received": 25600,
+  "bytes_sent": 3657,
+  "docs_received": 70,
+  "docs_sent": 10,
+  "throughput_in_bps": 2560,
+  "throughput_out_bps": 365
+}
+```
+
+### Aggregation Efficiency (REQUIRED)
+
+On each aggregation cycle:
+
+```json
+{
+  "event_type": "AggregationCompleted",
+  "node_id": "squad-1-leader",
+  "tier": "squad",
+  "input_docs": 7,
+  "input_bytes": 2450,
+  "output_docs": 1,
+  "output_bytes": 350,
+  "reduction_ratio": 7.0,
+  "bytes_saved": 2100,
+  "processing_time_us": 150
+}
+```
+
+### Warmup Complete (REQUIRED)
+
+When a node is ready for measurement:
+
+```json
+{
+  "event_type": "WarmupComplete",
+  "node_id": "squad-1-leader",
+  "peers_connected": 8,
+  "docs_synced": 14,
+  "ready_for_measurement": true,
+  "timestamp_us": 1766129760000000
+}
+```
+
+---
+
+## Expected Results
+
+### Latency Comparison: Lab 3b vs Lab 4
+
+| Nodes | Lab 3b P95 | Lab 4 P95 (End-to-End) | Improvement |
+|-------|------------|------------------------|-------------|
+| 24    | ~77ms      | <30ms                  | 2.5× faster |
+| 48    | ~400ms     | <50ms                  | 8× faster   |
+| 96    | FAIL       | <70ms                  | ∞ (3b breaks) |
+| 384   | N/A        | <100ms                 | Proves scaling |
+| 1000  | N/A        | <150ms                 | Battalion scale |
+
+### Throughput Comparison
+
+| Scale | Flat Mesh Bytes/sec | Hierarchical Bytes/sec | Savings |
+|-------|---------------------|------------------------|---------|
+| 24    | 86,400              | 8,640                  | 90%     |
+| 96    | 1,382,400           | 34,560                 | 97.5%   |
+| 384   | 22,118,400          | 138,240                | 99.4%   |
 
 ---
 
 ## Success Criteria
 
-### Technical Success ✅
+### ✅ Technical Success
 
-1. **All 20 tests pass** (or WARN with metrics)
-2. **Metrics collected** at all tiers (soldier, squad, platoon)
-3. **CSV output** matches expected format
-4. **Aggregation ratios** show 7:1+ reduction
+1. **Warmup completes** before measurement starts
+2. **Cross-tier latency** measured (not local upsert)
+3. **Throughput** measured at each tier
+4. **All tiers receive documents** (soldier → squad → platoon → commander)
 
-### Scientific Success ✅
+### ✅ Scientific Success
 
-1. **Bounded Latency**: P95 <100ms at 1000 nodes
-2. **Logarithmic Scaling**: Latency grows with log(N), not N²
-3. **Hierarchy Benefit**: Lab 4 succeeds where Lab 3b fails (>50 nodes)
-4. **Bandwidth Efficiency**: 95%+ reduction via aggregation
+1. **End-to-end P95 <100ms** at 384 nodes
+2. **Throughput reduction** matches theoretical (7:1 at squad, 21:1 at platoon)
+3. **Scales beyond Lab 3b** failure point (50 nodes)
+4. **Bandwidth savings >90%** vs flat mesh
 
-### Epic #132 Completion ✅
+### ✅ Epic #132 Completion
 
-1. **Lab 4 data collected** for all scales
-2. **Comparison scripts** show Lab 3b vs Lab 4
-3. **Final report** demonstrates HIVE's logarithmic scaling
-4. **Reproducible** methodology documented
-
----
-
-## Next Steps After Lab 4
-
-### 1. Run Full Test Suite
-
-```bash
-# Set aside 6-8 hours
-./test-lab4-hierarchical-hive-crdt.sh
-```
-
-### 2. Analyze Results
-
-```bash
-# Extract key metrics
-python3 analyze-lab4-results.py hive-hierarchical-TIMESTAMP/
-
-# Compare to Lab 3b
-python3 compare-lab3b-vs-lab4.py
-```
-
-### 3. Generate Final Report
-
-```bash
-# Compare all labs (1, 2, 3, 3b, 4)
-python3 compare-all-labs.py
-
-# Generate Epic #132 final validation report
-```
-
-### 4. Create Pull Request
-
-```bash
-git add test-lab4-*.sh generate-lab4-*.py LAB-4-*.md
-git commit -m "feat: Complete Lab 4 testing infrastructure (Phase 2)"
-git push
-
-# Create PR with results
-```
+1. **Hierarchical architecture proven** to enable scale
+2. **Quantitative comparison** with Lab 3b
+3. **Reproducible methodology** documented
+4. **No measuring during warmup** - only steady-state
 
 ---
 
-## Expected Results Summary
+## Common Mistakes to Avoid
 
-### Lab 4 Hypothesis
+### ❌ WRONG: Measuring CRDTUpsert Latency
+```json
+{"event_type":"CRDTUpsert","latency_ms":2.3}  // This is LOCAL write time, not useful
+```
 
-**Claim**: Hierarchical CRDT maintains <100ms P95 latency at 1000 nodes
+### ✅ RIGHT: Measuring Cross-Tier Propagation
+```json
+{"event_type":"DocumentReceived","latency_type":"soldier_to_squad_leader","latency_ms":45.2}
+```
 
-**Expected Data**:
-| Nodes | Lab 3b P95 | Lab 4 P95 | Improvement |
-|-------|------------|-----------|-------------|
-| 24    | ~77ms      | <10ms     | 7.7× faster |
-| 48    | ~400ms     | <20ms     | 20× faster  |
-| 96    | FAIL       | <30ms     | ∞ (Lab 3b breaks) |
-| 384   | N/A        | <50ms     | Proves scaling |
-| 1000  | N/A        | <100ms    | Battalion-scale proof |
+### ❌ WRONG: Measuring During Connection Setup
+```
+[0:05] Started measurement  // TOO EARLY - connections not established
+```
 
-### Key Insights
+### ✅ RIGHT: Wait for Warmup
+```
+[0:05] Connecting peers...
+[0:30] All peers connected
+[0:45] Initial sync complete
+[1:00] WARMUP COMPLETE - starting measurement
+[1:00] Started measurement  // CORRECT - steady state
+```
 
-1. **Lab 3b Breaking Point**: ~30 nodes (tail latency explosion)
-2. **Lab 4 Scaling**: Maintains bounded latency to 1000 nodes
-3. **Hierarchy Benefit**: 10-20× latency improvement at scale
-4. **Bandwidth Savings**: 95% reduction via aggregation
+### ❌ WRONG: Only Measuring Latency
+```
+P95 latency: 45ms  // Incomplete - where's throughput?
+```
 
-### Epic #132 Impact
-
-Proves HIVE's core thesis:
-- **O(log n) scaling** vs traditional O(n²)
-- **Bounded latency** at battalion scale
-- **Bandwidth efficiency** via hierarchical aggregation
-- **Empirically validated** with reproducible tests
+### ✅ RIGHT: Latency AND Throughput
+```
+End-to-End P95: 45ms
+Soldier → Squad: 2,560 bytes/sec (7 soldiers × 365 bytes × 1/sec)
+Squad → Platoon: 365 bytes/sec (1 summary × 365 bytes × 1/sec)
+Bandwidth Savings: 85.7%
+```
 
 ---
 
-## Conclusion
+## Implementation Checklist
 
-Lab 4 testing infrastructure is complete and ready to run. This final lab will prove that hierarchical HIVE CRDT scales logarithmically to 1000+ nodes where flat mesh architectures fail at 30-50 nodes.
+Before running Lab 4, verify:
 
-**Ready to execute**: `./quick-test-lab4.sh` for validation, then `./test-lab4-hierarchical-hive-crdt.sh` for full suite.
+- [ ] `DocumentReceived` events emit `latency_type` for cross-tier tracking
+- [ ] `TierThroughput` events emit every 10 seconds
+- [ ] `WarmupComplete` event emitted when node is ready
+- [ ] Measurement phase does NOT start until ALL nodes emit `WarmupComplete`
+- [ ] End-to-end latency calculated (soldier write → commander receive)
+- [ ] Throughput calculated for each tier direction
 
-**ETA to results**: 6-8 hours runtime + 2-3 hours analysis
+---
 
-**ETA to Epic #132 completion**: 1-2 days after Lab 4 tests complete
+## Quick Validation
+
+```bash
+# Run 24-node test with 2-minute duration
+./run-lab4-experiment.sh --nodes 24 --duration 120
+
+# Check for required metrics
+grep "DocumentReceived" logs/*.log | grep "latency_type" | head -5
+grep "TierThroughput" logs/*.log | head -5
+grep "WarmupComplete" logs/*.log | head -5
+
+# If any of these are missing, the metrics code needs fixing
+```
+
+---
+
+## Troubleshooting
+
+### Latency Shows N/A
+
+**Symptom**: `make lab4-metrics` shows "N/A" for sync latencies.
+
+**Cause**: Latency measurements filter out warmup period (>500ms). If all measurements are during warmup, no steady-state data exists.
+
+**Solution**: Wait 30+ seconds after deployment before running `make lab4-metrics`.
+
+### High Latency (>1 second)
+
+**Symptom**: Avg latency is several seconds instead of milliseconds.
+
+**Cause**: Initial peer discovery takes ~5 seconds. Measurements during this phase inflate averages.
+
+**Solution**: The metrics automatically filter latencies >500ms. If still high:
+1. Check container logs for connection errors: `docker logs <container> 2>&1 | grep -i error`
+2. Verify all containers are running: `make lab4-status`
+3. Ensure adequate system resources (CPU, memory, network)
+
+### Sync Loop / Excessive Messages
+
+**Historical Fix**: Prior versions had a bug where receiving a document triggered syncing it back to the sender, creating an infinite loop.
+
+**Resolution** (already applied in `hive-protocol/src/storage/automerge_sync.rs`):
+- Changed `store.put()` to `store.put_without_notify()` when saving received documents
+- This still triggers observers (for aggregation) but avoids the sync-back loop
+
+### Reduction Ratio Shows Wrong Values
+
+**Expected values**:
+- Squad: 7.0 (7 soldiers → 1 summary)
+- Platoon: 3.0 (3 squads → 1 summary)
+- Company: varies by topology (e.g., 1.0 for single platoon, 4.0 for 4 platoons)
+
+**If incorrect**: Check that aggregation is completing (`AggregationCompleted` events in logs).

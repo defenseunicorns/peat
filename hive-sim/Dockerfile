@@ -64,14 +64,13 @@ COPY hive-sim/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Default environment variables (can be overridden in containerlab topology)
-ENV DITTO_APP_ID="" \
-    DITTO_OFFLINE_TOKEN="" \
-    DITTO_SHARED_KEY="" \
-    NODE_ID="node1" \
+# Note: Secrets (HIVE_SHARED_KEY, HIVE_SECRET_KEY) should be passed at runtime
+# via docker run -e or containerlab env, not baked into image
+ENV NODE_ID="node1" \
     MODE="reader" \
     LOG_LEVEL="info"
 
-# Expose potential ports (Ditto can use dynamic ports, but good to document)
+# Expose ports for P2P communication
 EXPOSE 12345
 
 ENTRYPOINT ["/entrypoint.sh"]

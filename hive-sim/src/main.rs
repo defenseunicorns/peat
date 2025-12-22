@@ -68,6 +68,7 @@ mod utils;
 use metrics::{init_metrics_file, log_metrics, MetricsEvent};
 use utils::time::{extract_timestamp_us, now_micros};
 
+use hive_protocol::credentials::HiveCredentials;
 #[cfg(feature = "automerge-backend")]
 use hive_protocol::sync::automerge::AutomergeIrohBackend;
 use hive_protocol::sync::ditto::DittoBackend;
@@ -404,7 +405,8 @@ async fn squad_leader_aggregation_loop(
 
                 match event_result {
                     Ok(Some(change_event)) => {
-                        if let ChangeEvent::Updated { document, .. } = change_event {
+                        // Helper to process a single document for latency tracking
+                        let process_doc = |document: &Document, is_first: bool| {
                             let received_at_us = now_micros();
                             if let Some(doc_id) = &document.id {
                                 // Track soldier documents from squad members
@@ -433,8 +435,11 @@ async fn squad_leader_aggregation_loop(
                                                 latency_us,
                                                 latency_ms,
                                                 version: 1,
-                                                is_first_reception: false,
+                                                is_first_reception: is_first,
                                                 latency_type: "soldier_to_squad_leader".to_string(),
+                                                source_tier: Some("soldier".to_string()),
+                                                dest_tier: Some("squad_leader".to_string()),
+                                                is_warmup: None,
                                             });
 
                                             // Signal aggregation loop that a member updated
@@ -443,6 +448,18 @@ async fn squad_leader_aggregation_loop(
                                     }
                                 }
                             }
+                        };
+
+                        match change_event {
+                            ChangeEvent::Initial { documents } => {
+                                for doc in documents {
+                                    process_doc(&doc, true);
+                                }
+                            }
+                            ChangeEvent::Updated { document, .. } => {
+                                process_doc(&document, false);
+                            }
+                            _ => {}
                         }
                     }
                     Ok(None) => break,  // Channel closed
@@ -586,6 +603,10 @@ async fn squad_leader_aggregation_loop(
                     input_count: squad_summary.member_count as usize,
                     processing_time_us,
                     timestamp_us,
+                    input_bytes: None,
+                    output_bytes: None,
+                    bytes_saved: None,
+                    reduction_ratio: Some(squad_summary.member_count as f64),
                 });
 
                 // Log aggregation efficiency for Lab 4 analysis
@@ -743,10 +764,35 @@ async fn platoon_leader_aggregation_loop(
                           squad_ids: Vec<String>| async move {
         // Collect latest squad summaries
         let mut squad_summaries = Vec::new();
+        let mut missing_squads = Vec::new();
 
         for squad_id in &squad_ids {
-            if let Ok(Some(summary)) = coordinator.get_squad_summary(squad_id).await {
-                squad_summaries.push(summary);
+            match coordinator.get_squad_summary(squad_id).await {
+                Ok(Some(summary)) => {
+                    squad_summaries.push(summary);
+                }
+                Ok(None) => {
+                    missing_squads.push(squad_id.clone());
+                }
+                Err(e) => {
+                    eprintln!("[{}] Error fetching squad {}: {}", node_id, squad_id, e);
+                    missing_squads.push(squad_id.clone());
+                }
+            }
+        }
+
+        // Log aggregation readiness
+        if !missing_squads.is_empty() {
+            // Only log occasionally to avoid spam (every 10 seconds based on timestamp)
+            let ts_secs = now_micros() / 1_000_000;
+            if ts_secs % 10 == 0 {
+                println!(
+                    "[{}] Aggregation pending: {}/{} squads ready, missing: {:?}",
+                    node_id,
+                    squad_summaries.len(),
+                    squad_ids.len(),
+                    missing_squads
+                );
             }
         }
 
@@ -845,11 +891,15 @@ async fn platoon_leader_aggregation_loop(
                         input_count: platoon_summary.squad_count as usize,
                         processing_time_us,
                         timestamp_us: now_micros(),
+                        input_bytes: None,
+                        output_bytes: None,
+                        bytes_saved: None,
+                        reduction_ratio: Some(platoon_summary.squad_count as f64),
                     });
 
                     // Log aggregation efficiency for Lab 4 analysis
-                    let reduction_ratio = platoon_summary.total_member_count as f64
-                        / platoon_summary.squad_count as f64;
+                    // Reduction ratio = input_docs / output_docs = squad_count / 1
+                    let reduction_ratio = platoon_summary.squad_count as f64;
                     println!(
                         "METRICS: {{\"event_type\":\"AggregationEfficiency\",\"node_id\":\"{}\",\"tier\":\"platoon\",\"input_docs\":{},\"output_docs\":1,\"reduction_ratio\":{:.1},\"total_members\":{},\"timestamp_us\":{}}}",
                         node_id, platoon_summary.squad_count, reduction_ratio, platoon_summary.total_member_count, now_micros()
@@ -881,20 +931,30 @@ async fn platoon_leader_aggregation_loop(
                                 // - Automerge: "{squad_id}" after prefix strip (e.g., "company-1-platoon-1-squad-1")
                                 if doc_id.starts_with("squad-") || doc_id.contains("-squad-") {
                                     // Extract timestamps with proper delta sync semantics
+                                    // Fallback to doc.updated_at for Automerge (which doesn't store timestamps in fields)
+                                    let doc_updated_at_us = doc
+                                        .updated_at
+                                        .duration_since(std::time::UNIX_EPOCH)
+                                        .unwrap_or_default()
+                                        .as_micros();
+
                                     let created_at_us = if let Some(ts) = doc.get("created_at_us") {
                                         ts.as_u64().unwrap_or(0) as u128
                                     } else if let Some(ts) = doc.get("timestamp_us") {
                                         ts.as_u64().unwrap_or(0) as u128
                                     } else {
-                                        0
+                                        doc_updated_at_us // Automerge fallback
                                     };
 
                                     // Note: Storage writes "last_update_us", so check that first
+                                    // Fallback to doc.updated_at for Automerge
                                     let last_modified_us =
                                         if let Some(ts) = doc.get("last_update_us") {
                                             ts.as_u64().unwrap_or(0) as u128
                                         } else if let Some(ts) = doc.get("last_modified_us") {
                                             ts.as_u64().unwrap_or(0) as u128
+                                        } else if doc_updated_at_us > 0 {
+                                            doc_updated_at_us // Automerge fallback
                                         } else {
                                             created_at_us
                                         };
@@ -938,11 +998,10 @@ async fn platoon_leader_aggregation_loop(
                                             latency_ms,
                                             version,
                                             is_first_reception: is_first,
-                                            latency_type: if is_first {
-                                                "creation".to_string()
-                                            } else {
-                                                "update".to_string()
-                                            },
+                                            latency_type: "squad_to_platoon_leader".to_string(),
+                                            source_tier: Some("squad_leader".to_string()),
+                                            dest_tier: Some("platoon_leader".to_string()),
+                                            is_warmup: None,
                                         });
 
                                         // EVENT-DRIVEN: Aggregate immediately when squad summary arrives
@@ -978,6 +1037,13 @@ async fn platoon_leader_aggregation_loop(
                                 doc_id.starts_with("squad-") || doc_id.contains("-squad-");
                             if matches {
                                 // Extract timestamps with proper delta sync semantics
+                                // Fallback to document.updated_at for Automerge (which doesn't store timestamps in fields)
+                                let doc_updated_at_us = document
+                                    .updated_at
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap_or_default()
+                                    .as_micros();
+
                                 // Squad summaries use "aggregated_at" for their timestamp (protobuf format)
                                 let created_at_us = if let Some(ts) = document.get("created_at_us")
                                 {
@@ -987,11 +1053,12 @@ async fn platoon_leader_aggregation_loop(
                                 } else if let Some(ts) = document.get("aggregated_at") {
                                     extract_timestamp_us(ts)
                                 } else {
-                                    0
+                                    doc_updated_at_us // Automerge fallback
                                 };
 
                                 // Note: Storage writes "last_update_us", so check that first
                                 // Squad summaries use "aggregated_at" as their modification time
+                                // Fallback to document.updated_at for Automerge
                                 let last_modified_us =
                                     if let Some(ts) = document.get("last_update_us") {
                                         extract_timestamp_us(ts)
@@ -999,6 +1066,8 @@ async fn platoon_leader_aggregation_loop(
                                         extract_timestamp_us(ts)
                                     } else if let Some(ts) = document.get("aggregated_at") {
                                         extract_timestamp_us(ts)
+                                    } else if doc_updated_at_us > 0 {
+                                        doc_updated_at_us // Automerge fallback
                                     } else {
                                         created_at_us
                                     };
@@ -1034,7 +1103,10 @@ async fn platoon_leader_aggregation_loop(
                                         latency_ms,
                                         version,
                                         is_first_reception: false,
-                                        latency_type: "update".to_string(),
+                                        latency_type: "squad_to_platoon_leader".to_string(),
+                                        source_tier: Some("squad_leader".to_string()),
+                                        dest_tier: Some("platoon_leader".to_string()),
+                                        is_warmup: None,
                                     });
 
                                     // EVENT-DRIVEN: Aggregate immediately when squad summary updated
@@ -1122,10 +1194,35 @@ async fn company_commander_aggregation_loop(
                           platoon_ids: Vec<String>| async move {
         // Collect latest platoon summaries
         let mut platoon_summaries = Vec::new();
+        let mut missing_platoons = Vec::new();
 
         for platoon_id in &platoon_ids {
-            if let Ok(Some(summary)) = coordinator.get_platoon_summary(platoon_id).await {
-                platoon_summaries.push(summary);
+            match coordinator.get_platoon_summary(platoon_id).await {
+                Ok(Some(summary)) => {
+                    platoon_summaries.push(summary);
+                }
+                Ok(None) => {
+                    missing_platoons.push(platoon_id.clone());
+                }
+                Err(e) => {
+                    eprintln!("[{}] Error fetching platoon {}: {}", node_id, platoon_id, e);
+                    missing_platoons.push(platoon_id.clone());
+                }
+            }
+        }
+
+        // Log aggregation readiness
+        if !missing_platoons.is_empty() {
+            // Only log occasionally to avoid spam (every 10 seconds based on timestamp)
+            let ts_secs = now_micros() / 1_000_000;
+            if ts_secs % 10 == 0 {
+                println!(
+                    "[{}] Company aggregation: {}/{} platoons ready, missing: {:?}",
+                    node_id,
+                    platoon_summaries.len(),
+                    platoon_ids.len(),
+                    missing_platoons
+                );
             }
         }
 
@@ -1235,6 +1332,10 @@ async fn company_commander_aggregation_loop(
                         input_count: company_summary.platoon_count as usize,
                         processing_time_us,
                         timestamp_us: now_micros(),
+                        input_bytes: None,
+                        output_bytes: None,
+                        bytes_saved: None,
+                        reduction_ratio: Some(company_summary.platoon_count as f64),
                     });
 
                     // Log aggregation efficiency for Lab 4 analysis
@@ -1267,12 +1368,19 @@ async fn company_commander_aggregation_loop(
                             if let Some(doc_id) = &doc.id {
                                 // Match platoon summaries
                                 if doc_id.contains("platoon-") {
+                                    // Fallback to doc.updated_at for Automerge
+                                    let doc_updated_at_us = doc
+                                        .updated_at
+                                        .duration_since(std::time::UNIX_EPOCH)
+                                        .unwrap_or_default()
+                                        .as_micros();
+
                                     let created_at_us = if let Some(ts) = doc.get("created_at_us") {
                                         ts.as_u64().unwrap_or(0) as u128
                                     } else if let Some(ts) = doc.get("timestamp_us") {
                                         ts.as_u64().unwrap_or(0) as u128
                                     } else {
-                                        0
+                                        doc_updated_at_us // Automerge fallback
                                     };
 
                                     let last_modified_us =
@@ -1280,6 +1388,8 @@ async fn company_commander_aggregation_loop(
                                             ts.as_u64().unwrap_or(0) as u128
                                         } else if let Some(ts) = doc.get("last_modified_us") {
                                             ts.as_u64().unwrap_or(0) as u128
+                                        } else if doc_updated_at_us > 0 {
+                                            doc_updated_at_us // Automerge fallback
                                         } else {
                                             created_at_us
                                         };
@@ -1299,6 +1409,23 @@ async fn company_commander_aggregation_loop(
                                             node_id, doc_id, latency_ms
                                         );
 
+                                        log_metrics(&MetricsEvent::DocumentReceived {
+                                            node_id: node_id.to_string(),
+                                            doc_id: doc_id.to_string(),
+                                            created_at_us,
+                                            last_modified_us,
+                                            received_at_us,
+                                            latency_us,
+                                            latency_ms,
+                                            version: 1,
+                                            is_first_reception: true,
+                                            latency_type: "platoon_to_company_commander"
+                                                .to_string(),
+                                            source_tier: Some("platoon_leader".to_string()),
+                                            dest_tier: Some("company_commander".to_string()),
+                                            is_warmup: None,
+                                        });
+
                                         // EVENT-DRIVEN: Aggregate immediately when platoon summary arrives
                                         do_aggregation(
                                             Arc::clone(&coordinator),
@@ -1316,13 +1443,20 @@ async fn company_commander_aggregation_loop(
                         let received_at_us = now_micros();
                         if let Some(doc_id) = &document.id {
                             if doc_id.contains("platoon-") {
+                                // Fallback to document.updated_at for Automerge
+                                let doc_updated_at_us = document
+                                    .updated_at
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap_or_default()
+                                    .as_micros();
+
                                 let created_at_us = if let Some(ts) = document.get("created_at_us")
                                 {
                                     ts.as_u64().unwrap_or(0) as u128
                                 } else if let Some(ts) = document.get("timestamp_us") {
                                     ts.as_u64().unwrap_or(0) as u128
                                 } else {
-                                    0
+                                    doc_updated_at_us // Automerge fallback
                                 };
 
                                 let last_modified_us =
@@ -1330,6 +1464,8 @@ async fn company_commander_aggregation_loop(
                                         ts.as_u64().unwrap_or(0) as u128
                                     } else if let Some(ts) = document.get("last_modified_us") {
                                         ts.as_u64().unwrap_or(0) as u128
+                                    } else if doc_updated_at_us > 0 {
+                                        doc_updated_at_us // Automerge fallback
                                     } else {
                                         created_at_us
                                     };
@@ -1346,6 +1482,22 @@ async fn company_commander_aggregation_loop(
                                         "[{}] ✓ Platoon summary received (update): {} (latency: {:.3}ms)",
                                         node_id, doc_id, latency_ms
                                     );
+
+                                    log_metrics(&MetricsEvent::DocumentReceived {
+                                        node_id: node_id.to_string(),
+                                        doc_id: doc_id.to_string(),
+                                        created_at_us,
+                                        last_modified_us,
+                                        received_at_us,
+                                        latency_us,
+                                        latency_ms,
+                                        version: 1,
+                                        is_first_reception: false,
+                                        latency_type: "platoon_to_company_commander".to_string(),
+                                        source_tier: Some("platoon_leader".to_string()),
+                                        dest_tier: Some("company_commander".to_string()),
+                                        is_warmup: None,
+                                    });
 
                                     // EVENT-DRIVEN: Aggregate immediately
                                     do_aggregation(
@@ -2354,11 +2506,22 @@ async fn create_backend(
                 "0.0.0.0:0".parse()?
             };
 
-            let transport = Arc::new(
+            // Use optimized startup (no mDNS) when TCP_CONNECT is configured (hierarchical mode)
+            // mDNS discovery adds ~200ms+ overhead that's unnecessary when using static peer config
+            let tcp_connect_configured = std::env::var("TCP_CONNECT").is_ok();
+            let use_mdns = tcp_listen_port.is_none() && !tcp_connect_configured;
+
+            let transport = Arc::new(if use_mdns {
+                // mDNS discovery enabled - use full constructor
                 IrohTransport::from_seed_with_discovery_at_addr(&seed, bind_addr)
                     .await
-                    .map_err(|e| format!("Failed to create IrohTransport: {}", e))?,
-            );
+                    .map_err(|e| format!("Failed to create IrohTransport: {}", e))?
+            } else {
+                // Fast startup without mDNS (PR #451 optimization)
+                IrohTransport::from_seed_at_addr(&seed, bind_addr)
+                    .await
+                    .map_err(|e| format!("Failed to create IrohTransport: {}", e))?
+            });
 
             eprintln!(
                 "[{}] Created Automerge transport with seed '{}', EndpointId: {}",
@@ -2499,40 +2662,30 @@ fn create_backend_config(
         node_id, tcp_listen_port, normalized_tcp_connect, enable_mdns
     );
 
+    // Load credentials using unified helper (handles HIVE_* and DITTO_* fallbacks)
+    let credentials =
+        HiveCredentials::from_env().map_err(|e| format!("Failed to load credentials: {}", e))?;
+    let secret_key = credentials
+        .require_secret_key()
+        .map_err(|e| format!("Failed to load secret key: {}", e))?
+        .to_string();
+
     let config = match backend_type {
-        "ditto" => {
-            // Load Ditto-specific environment variables
-            let app_id = std::env::var("DITTO_APP_ID")?;
-            let shared_key = std::env::var("DITTO_SHARED_KEY")?;
-
-            BackendConfig {
-                app_id,
-                persistence_dir,
-                shared_key: Some(shared_key),
-                transport,
-                extra: HashMap::new(),
-            }
-        }
+        "ditto" => BackendConfig {
+            app_id: credentials.app_id().to_string(),
+            persistence_dir,
+            shared_key: Some(secret_key),
+            transport,
+            extra: HashMap::new(),
+        },
         #[cfg(feature = "automerge-backend")]
-        "automerge" => {
-            // Automerge requires shared_key for peer authentication (ADR-030)
-            // Try HIVE_SECRET_KEY first, fall back to DITTO_SHARED_KEY for compatibility
-            let shared_key =
-                std::env::var("HIVE_SECRET_KEY").or_else(|_| std::env::var("DITTO_SHARED_KEY"))?;
-            // Use shared formation ID for all nodes (Issue #399)
-            // This ensures formation handshake succeeds in hierarchical topologies
-            // where nodes at different levels need to connect (soldiers → squad leaders → etc.)
-            let app_id =
-                std::env::var("DITTO_APP_ID").unwrap_or_else(|_| "default-formation".to_string());
-
-            BackendConfig {
-                app_id,
-                persistence_dir,
-                shared_key: Some(shared_key),
-                transport,
-                extra: HashMap::new(),
-            }
-        }
+        "automerge" => BackendConfig {
+            app_id: credentials.app_id().to_string(),
+            persistence_dir,
+            shared_key: Some(secret_key),
+            transport,
+            extra: HashMap::new(),
+        },
         _ => return Err(format!("Unknown backend type: {}", backend_type).into()),
     };
 
@@ -2919,6 +3072,9 @@ async fn soldier_capability_mode(
                                             version: 1,
                                             is_first_reception: false,
                                             latency_type: "peer_soldier".to_string(),
+                                            source_tier: Some("soldier".to_string()),
+                                            dest_tier: Some("soldier".to_string()),
+                                            is_warmup: None,
                                         });
                                     }
                                 }
@@ -2946,6 +3102,9 @@ async fn soldier_capability_mode(
                                             version: 1,
                                             is_first_reception: false,
                                             latency_type: "squad_summary_downward".to_string(),
+                                            source_tier: Some("squad_leader".to_string()),
+                                            dest_tier: Some("soldier".to_string()),
+                                            is_warmup: None,
                                         });
                                     }
                                 }
@@ -3390,19 +3549,29 @@ async fn process_document(
     let doc_id = doc.id.as_ref().ok_or("Document missing ID")?;
 
     // Extract timestamps with proper delta sync semantics
+    // Fallback to doc.updated_at for Automerge (which doesn't store timestamps in fields)
+    let doc_updated_at_us = doc
+        .updated_at
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_micros();
+
     let created_at_us = if let Some(ts) = doc.get("created_at_us") {
         ts.as_u64().unwrap_or(0) as u128
     } else if let Some(ts) = doc.get("timestamp_us") {
         ts.as_u64().unwrap_or(0) as u128
     } else {
-        0
+        doc_updated_at_us // Automerge fallback
     };
 
     // Note: Storage writes "last_update_us", so check that first
+    // Fallback to doc.updated_at for Automerge
     let last_modified_us = if let Some(ts) = doc.get("last_update_us") {
         ts.as_u64().unwrap_or(0) as u128
     } else if let Some(ts) = doc.get("last_modified_us") {
         ts.as_u64().unwrap_or(0) as u128
+    } else if doc_updated_at_us > 0 {
+        doc_updated_at_us // Automerge fallback
     } else {
         created_at_us
     };
@@ -3455,6 +3624,9 @@ async fn process_document(
                     version,
                     is_first_reception,
                     latency_type: latency_type.clone(),
+                    source_tier: None,
+                    dest_tier: None,
+                    is_warmup: None,
                 });
             }
         }
@@ -3485,6 +3657,9 @@ async fn process_document(
                         version,
                         is_first_reception,
                         latency_type: latency_type.clone(),
+                        source_tier: None,
+                        dest_tier: None,
+                        is_warmup: None,
                     });
 
                     // Check if acknowledgment is required
@@ -3582,6 +3757,9 @@ async fn process_document(
                 version,
                 is_first_reception: true, // Inside conditional, so always first reception
                 latency_type: latency_type.clone(),
+                source_tier: Some("squad_leader".to_string()),
+                dest_tier: None, // Will be determined by receiver context
+                is_warmup: None,
             });
         }
     }
@@ -3609,6 +3787,9 @@ async fn process_document(
             version,
             is_first_reception: true, // Inside conditional, so always first reception
             latency_type: latency_type.clone(),
+            source_tier: Some("platoon_leader".to_string()),
+            dest_tier: None, // Will be determined by receiver context
+            is_warmup: None,
         });
     }
 

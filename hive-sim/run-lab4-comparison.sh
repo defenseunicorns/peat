@@ -33,6 +33,7 @@ ARG_NODES=""
 ARG_BANDWIDTH=""
 DRY_RUN=false
 CLEANUP_ONLY=false
+CONTINUE_ON_ERROR=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -57,6 +58,10 @@ while [[ $# -gt 0 ]]; do
             CLEANUP_ONLY=true
             shift
             ;;
+        --continue-on-error)
+            CONTINUE_ON_ERROR=true
+            shift
+            ;;
         --duration)
             TEST_DURATION_SECS="$2"
             shift 2
@@ -74,6 +79,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --duration <secs>            Test duration (default: 120)"
             echo "  --dry-run                    Show what would run without executing"
             echo "  --cleanup-only               Clean up environment and exit"
+            echo "  --continue-on-error          Continue running tests even if one fails"
             echo "  --help                       Show this help"
             exit 0
             ;;
@@ -144,8 +150,8 @@ preflight_checks() {
     log_success "Pre-flight checks passed"
 }
 
-# Run a single test configuration
-run_single_test() {
+# Run a single backend test (deploy, run, cleanup)
+run_backend_test() {
     local BACKEND="$1"
     local NODES="$2"
     local BANDWIDTH="$3"
@@ -159,62 +165,83 @@ run_single_test() {
     # Create results directory
     mkdir -p "${RESULTS_DIR}/logs"
 
-    # Generate topology on-demand
-    local TOPO_FILE="${RESULTS_DIR}/${TEST_NAME}.yaml"
-    log_info "  Generating topology..."
+    # Use cached topology (cache key includes backend since it's baked into the file)
+    local TOPO_CACHE_DIR="${RESULTS_BASE_DIR}/.topo-cache"
+    mkdir -p "${TOPO_CACHE_DIR}"
+    local TOPO_FILE="${TOPO_CACHE_DIR}/lab4-${BACKEND}-${NODES}n-${BANDWIDTH}.yaml"
 
-    python3 generate-lab4-hierarchical-topology.py \
-        --nodes "${NODES}" \
-        --bandwidth "${BANDWIDTH}" \
-        --backend "${BACKEND}" \
-        --output "${TOPO_FILE}" || {
-        log_error "Failed to generate topology"
-        echo "FAIL" > "${RESULTS_DIR}/status.txt"
-        return 1
-    }
+    # Generate topology if not cached
+    if [[ ! -f "${TOPO_FILE}" ]]; then
+        log_info "  Generating topology..."
+        python3 generate-lab4-hierarchical-topology.py \
+            --nodes "${NODES}" \
+            --bandwidth "${BANDWIDTH}" \
+            --backend "${BACKEND}" \
+            --output "${TOPO_FILE}" || {
+            log_error "Failed to generate topology"
+            echo "FAIL" > "${RESULTS_DIR}/status.txt"
+            return 1
+        }
+    fi
 
-    # Get lab name from topology
+    # Get lab name and expected nodes
     local LAB_NAME=$(grep '^name:' "$TOPO_FILE" | awk '{print $2}')
     local EXPECTED_NODES=$(grep -c "kind: linux" "$TOPO_FILE")
+    echo "$LAB_NAME" > /tmp/lab4-current-lab-name
 
-    # Deploy with specified backend
     log_info "  Deploying ${EXPECTED_NODES} nodes with BACKEND=${BACKEND}..."
 
-    # Copy topology to /tmp for orchestrator bind mount
-    cp "${TOPO_FILE}" "/tmp/${LAB_NAME}.yaml"
+    # Track deployment time
+    local DEPLOY_START=$(date +%s.%N)
 
-    if ! BACKEND="${BACKEND}" containerlab deploy -t "$TOPO_FILE" --reconfigure > "${RESULTS_DIR}/deploy.log" 2>&1; then
-        log_error "Deployment failed"
-        cat "${RESULTS_DIR}/deploy.log"
+    # Substitute environment variables in topology file
+    local TOPO_RESOLVED="${RESULTS_DIR}/topology-resolved.yaml"
+    envsubst < "$TOPO_FILE" > "$TOPO_RESOLVED"
+
+    # Deploy with resolved topology (no timeout - let it complete)
+    if ! containerlab deploy -t "$TOPO_RESOLVED" --reconfigure > "${RESULTS_DIR}/deploy.log" 2>&1; then
+        local DEPLOY_END=$(date +%s.%N)
+        local DEPLOY_DURATION=$(echo "$DEPLOY_END - $DEPLOY_START" | bc)
+        log_error "Deployment failed after ${DEPLOY_DURATION}s"
+        tail -20 "${RESULTS_DIR}/deploy.log" 2>/dev/null || true
         echo "FAIL" > "${RESULTS_DIR}/status.txt"
-        containerlab destroy -t "$TOPO_FILE" --cleanup > /dev/null 2>&1 || true
+        echo "deploy_duration_secs=${DEPLOY_DURATION}" > "${RESULTS_DIR}/timing.txt"
+        echo "deploy_status=FAILED" >> "${RESULTS_DIR}/timing.txt"
+        docker ps -aq --filter "name=clab-" | xargs -r docker rm -f > /dev/null 2>&1 || true
         return 1
     fi
 
-    # Wait for containers
-    log_info "  Waiting for containers to start..."
-    local MAX_WAIT=$((60 + (EXPECTED_NODES / 50) * 30))
-    local WAIT_COUNT=0
+    local DEPLOY_END=$(date +%s.%N)
+    local DEPLOY_DURATION=$(echo "$DEPLOY_END - $DEPLOY_START" | bc)
 
-    while true; do
-        local RUNNING=$(docker ps --filter "name=clab-${LAB_NAME}" --format "{{.Names}}" 2>/dev/null | wc -l)
-        if [ "$RUNNING" -ge "$EXPECTED_NODES" ]; then
-            log_info "  All ${RUNNING} containers running"
-            break
-        fi
-        WAIT_COUNT=$((WAIT_COUNT + 1))
-        if [ "$WAIT_COUNT" -ge "$MAX_WAIT" ]; then
-            log_error "Timeout waiting for containers (${RUNNING}/${EXPECTED_NODES})"
-            echo "FAIL" > "${RESULTS_DIR}/status.txt"
-            containerlab destroy -t "$TOPO_FILE" --cleanup > /dev/null 2>&1 || true
-            return 1
-        fi
-        sleep 2
-    done
+    # Verify all containers are running
+    local RUNNING=$(docker ps --filter "name=clab-${LAB_NAME}" --filter "status=running" -q 2>/dev/null | wc -l)
+    if [[ "$RUNNING" -lt "$EXPECTED_NODES" ]]; then
+        log_error "Only ${RUNNING}/${EXPECTED_NODES} containers running after deploy"
+        echo "FAIL" > "${RESULTS_DIR}/status.txt"
+        echo "deploy_duration_secs=${DEPLOY_DURATION}" > "${RESULTS_DIR}/timing.txt"
+        echo "deploy_status=INCOMPLETE" >> "${RESULTS_DIR}/timing.txt"
+        echo "expected_nodes=${EXPECTED_NODES}" >> "${RESULTS_DIR}/timing.txt"
+        echo "running_nodes=${RUNNING}" >> "${RESULTS_DIR}/timing.txt"
+        docker ps -aq --filter "name=clab-" | xargs -r docker rm -f > /dev/null 2>&1 || true
+        return 1
+    fi
+
+    log_success "  Deployed ${RUNNING} containers in ${DEPLOY_DURATION}s"
+
+    # Save timing info
+    echo "deploy_duration_secs=${DEPLOY_DURATION}" > "${RESULTS_DIR}/timing.txt"
+    echo "deploy_status=SUCCESS" >> "${RESULTS_DIR}/timing.txt"
+    echo "expected_nodes=${EXPECTED_NODES}" >> "${RESULTS_DIR}/timing.txt"
+    echo "running_nodes=${RUNNING}" >> "${RESULTS_DIR}/timing.txt"
 
     # Run test
     log_info "  Running test for ${TEST_DURATION_SECS}s..."
+    local TEST_START=$(date +%s.%N)
     sleep "${TEST_DURATION_SECS}"
+    local TEST_END=$(date +%s.%N)
+    local TEST_DURATION=$(echo "$TEST_END - $TEST_START" | bc)
+    echo "test_duration_secs=${TEST_DURATION}" >> "${RESULTS_DIR}/timing.txt"
 
     # Collect logs
     log_info "  Collecting logs..."
@@ -224,13 +251,21 @@ run_single_test() {
     log_info "  Extracting metrics..."
     extract_test_metrics "${RESULTS_DIR}" > "${RESULTS_DIR}/metrics.csv"
 
-    # Cleanup
-    log_info "  Cleaning up..."
-    containerlab destroy -t "$TOPO_FILE" --cleanup > /dev/null 2>&1 || true
+    # Track cleanup time
+    log_info "  Cleanup..."
+    local CLEANUP_START=$(date +%s.%N)
+    docker ps -aq --filter "name=clab-${LAB_NAME}" | xargs -r docker rm -f > /dev/null 2>&1 || true
     docker network ls --format '{{.Name}}' | grep "${LAB_NAME}" | xargs -r docker network rm 2>/dev/null || true
+    local CLEANUP_END=$(date +%s.%N)
+    local CLEANUP_DURATION=$(echo "$CLEANUP_END - $CLEANUP_START" | bc)
+    echo "cleanup_duration_secs=${CLEANUP_DURATION}" >> "${RESULTS_DIR}/timing.txt"
+
+    # Calculate total time
+    local TOTAL_DURATION=$(echo "$DEPLOY_DURATION + $TEST_DURATION + $CLEANUP_DURATION" | bc)
+    echo "total_duration_secs=${TOTAL_DURATION}" >> "${RESULTS_DIR}/timing.txt"
 
     echo "PASS" > "${RESULTS_DIR}/status.txt"
-    log_success "Completed: ${TEST_NAME}"
+    log_success "Completed: ${TEST_NAME} (deploy: ${DEPLOY_DURATION}s, test: ${TEST_DURATION}s, cleanup: ${CLEANUP_DURATION}s)"
     return 0
 }
 
@@ -349,40 +384,53 @@ main() {
     # Create results summary file
     local SUMMARY_FILE="${RESULTS_BASE_DIR}/lab4-comparison-${TIMESTAMP}.csv"
     mkdir -p "$(dirname "$SUMMARY_FILE")"
-    echo "backend,nodes,bandwidth,status,s2s_p50,s2s_p95,s2p_p50,s2p_p95,total_ops" > "$SUMMARY_FILE"
+    echo "backend,nodes,bandwidth,status,deploy_secs,s2s_p50,s2s_p95,s2p_p50,s2p_p95,total_ops" > "$SUMMARY_FILE"
 
-    # Run test matrix
-    for BACKEND in "${BACKENDS[@]}"; do
-        for NODES in "${NODE_COUNTS[@]}"; do
-            for BANDWIDTH in "${BANDWIDTHS[@]}"; do
+    # Run test matrix - each test deploys its own topology (topology files are cached)
+    for NODES in "${NODE_COUNTS[@]}"; do
+        for BANDWIDTH in "${BANDWIDTHS[@]}"; do
+            for BACKEND in "${BACKENDS[@]}"; do
                 CURRENT_TEST=$((CURRENT_TEST + 1))
                 echo ""
-                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                echo " Test ${CURRENT_TEST}/${TOTAL_TESTS}"
-                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                echo "╔══════════════════════════════════════════════════════════════╗"
+                echo "║  Test ${CURRENT_TEST}/${TOTAL_TESTS}: ${BACKEND} @ ${NODES}n, ${BANDWIDTH}"
+                echo "╚══════════════════════════════════════════════════════════════╝"
 
                 local TEST_NAME="lab4-${BACKEND}-${NODES}n-${BANDWIDTH}"
                 local TEST_RESULTS_DIR="${RESULTS_BASE_DIR}/${TEST_NAME}-${TIMESTAMP}"
 
-                if run_single_test "$BACKEND" "$NODES" "$BANDWIDTH" "$TIMESTAMP"; then
-                    # Extract summary metrics
+                if run_backend_test "$BACKEND" "$NODES" "$BANDWIDTH" "$TIMESTAMP"; then
+                    # Extract summary metrics and timing
                     local METRICS_FILE="${TEST_RESULTS_DIR}/metrics.csv"
+                    local TIMING_FILE="${TEST_RESULTS_DIR}/timing.txt"
+                    local DEPLOY_SECS=$(grep "deploy_duration_secs" "$TIMING_FILE" 2>/dev/null | cut -d= -f2 | cut -d. -f1)
                     if [ -f "$METRICS_FILE" ]; then
                         local S2S_P50=$(grep "soldier_to_squad.*p50" "$METRICS_FILE" | cut -d, -f4)
                         local S2S_P95=$(grep "soldier_to_squad.*p95" "$METRICS_FILE" | cut -d, -f4)
                         local S2P_P50=$(grep "squad_to_platoon.*p50" "$METRICS_FILE" | cut -d, -f4)
                         local S2P_P95=$(grep "squad_to_platoon.*p95" "$METRICS_FILE" | cut -d, -f4)
                         local TOTAL_OPS=$(grep "overall.*total_count" "$METRICS_FILE" | cut -d, -f4)
-                        echo "${BACKEND},${NODES},${BANDWIDTH},PASS,${S2S_P50:-0},${S2S_P95:-0},${S2P_P50:-0},${S2P_P95:-0},${TOTAL_OPS:-0}" >> "$SUMMARY_FILE"
+                        echo "${BACKEND},${NODES},${BANDWIDTH},PASS,${DEPLOY_SECS:-0},${S2S_P50:-0},${S2S_P95:-0},${S2P_P50:-0},${S2P_P95:-0},${TOTAL_OPS:-0}" >> "$SUMMARY_FILE"
                     else
-                        echo "${BACKEND},${NODES},${BANDWIDTH},PASS,0,0,0,0,0" >> "$SUMMARY_FILE"
+                        echo "${BACKEND},${NODES},${BANDWIDTH},PASS,${DEPLOY_SECS:-0},0,0,0,0,0" >> "$SUMMARY_FILE"
                     fi
                 else
-                    echo "${BACKEND},${NODES},${BANDWIDTH},FAIL,0,0,0,0,0" >> "$SUMMARY_FILE"
+                    # Try to get deploy time even on failure
+                    local TIMING_FILE="${TEST_RESULTS_DIR}/timing.txt"
+                    local DEPLOY_SECS=$(grep "deploy_duration_secs" "$TIMING_FILE" 2>/dev/null | cut -d= -f2 | cut -d. -f1)
+                    echo "${BACKEND},${NODES},${BANDWIDTH},FAIL,${DEPLOY_SECS:-0},0,0,0,0,0" >> "$SUMMARY_FILE"
+                    if [[ "$CONTINUE_ON_ERROR" == "true" ]]; then
+                        log_warning "Test failed, continuing (--continue-on-error set)..."
+                    else
+                        log_error "Test failed! Aborting remaining tests."
+                        echo ""
+                        echo "Partial results saved to: ${SUMMARY_FILE}"
+                        echo "To continue despite failures, use: --continue-on-error"
+                        # Cleanup before exit
+                        docker ps -aq --filter "name=clab-" | xargs -r docker rm -f > /dev/null 2>&1 || true
+                        exit 1
+                    fi
                 fi
-
-                # Brief pause between tests
-                sleep 5
             done
         done
     done
@@ -401,6 +449,152 @@ main() {
     local PASSED=$(grep -c ",PASS," "$SUMMARY_FILE" || echo "0")
     local FAILED=$(grep -c ",FAIL," "$SUMMARY_FILE" || echo "0")
     echo "Passed: ${PASSED} / Failed: ${FAILED}"
+
+    # Print deployment timing summary
+    echo ""
+    echo "Deployment Timing by Node Count:"
+    for nodes in 24 48 96 384; do
+        local TIMES=$(grep ",${nodes}," "$SUMMARY_FILE" | grep ",PASS," | cut -d, -f5 | tr '\n' ' ')
+        if [ -n "$TIMES" ]; then
+            local AVG=$(echo "$TIMES" | tr ' ' '\n' | awk '{sum+=$1; n++} END {if(n>0) printf "%.1f", sum/n}')
+            local MIN=$(echo "$TIMES" | tr ' ' '\n' | sort -n | head -1)
+            local MAX=$(echo "$TIMES" | tr ' ' '\n' | sort -n | tail -1)
+            echo "  ${nodes} nodes: avg=${AVG}s min=${MIN}s max=${MAX}s"
+        fi
+    done
+
+    # Run analysis sweep on all collected data
+    echo ""
+    echo "========================================"
+    echo " Analysis Sweep"
+    echo "========================================"
+    run_analysis_sweep "${TIMESTAMP}"
+
+    # Generate comparison report
+    generate_comparison_report "${SUMMARY_FILE}" "${RESULTS_BASE_DIR}/lab4-comparison-report-${TIMESTAMP}.md"
+}
+
+# Run analysis on all result directories from this run
+run_analysis_sweep() {
+    local TIMESTAMP="$1"
+
+    echo ""
+    echo "Analyzing all results from run ${TIMESTAMP}..."
+
+    local ANALYSIS_COUNT=0
+    local ANALYSIS_FAILED=0
+
+    for RESULTS_DIR in "${RESULTS_BASE_DIR}"/lab4-*-${TIMESTAMP}; do
+        if [[ -d "$RESULTS_DIR" && -f "${RESULTS_DIR}/status.txt" ]]; then
+            local TEST_NAME=$(basename "$RESULTS_DIR")
+            echo -n "  Analyzing ${TEST_NAME}... "
+
+            if [[ -x "${SCRIPT_DIR}/process-lab4-metrics.sh" ]]; then
+                if "${SCRIPT_DIR}/process-lab4-metrics.sh" "${RESULTS_DIR}" > "${RESULTS_DIR}/analysis-report.txt" 2>&1; then
+                    echo "OK"
+                    ANALYSIS_COUNT=$((ANALYSIS_COUNT + 1))
+                else
+                    echo "WARN"
+                    ANALYSIS_FAILED=$((ANALYSIS_FAILED + 1))
+                fi
+            else
+                echo "SKIP (no analyzer)"
+            fi
+        fi
+    done
+
+    echo ""
+    echo "Analysis complete: ${ANALYSIS_COUNT} succeeded, ${ANALYSIS_FAILED} with warnings"
+}
+
+# Generate markdown comparison report
+generate_comparison_report() {
+    local SUMMARY_CSV="$1"
+    local REPORT_FILE="$2"
+
+    echo ""
+    echo "========================================"
+    echo " Generating Comparison Report"
+    echo "========================================"
+
+    cat > "$REPORT_FILE" << 'HEADER'
+# Lab 4: Backend Comparison Report
+
+## Overview
+
+This report compares Ditto and Automerge backends across different node counts and bandwidth configurations.
+
+HEADER
+
+    echo "## Test Matrix Results" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "| Backend | Nodes | Bandwidth | Status | Deploy(s) | S→Squad P50 | S→Squad P95 | Squad→Platoon P50 | Squad→Platoon P95 |" >> "$REPORT_FILE"
+    echo "|---------|-------|-----------|--------|-----------|-------------|-------------|-------------------|-------------------|" >> "$REPORT_FILE"
+
+    # Skip header line, format each row
+    tail -n +2 "$SUMMARY_CSV" | while IFS=, read -r backend nodes bw status deploy_secs s2s_p50 s2s_p95 s2p_p50 s2p_p95 ops; do
+        echo "| $backend | $nodes | $bw | $status | ${deploy_secs}s | ${s2s_p50}ms | ${s2s_p95}ms | ${s2p_p50}ms | ${s2p_p95}ms |" >> "$REPORT_FILE"
+    done
+
+    # Deployment timing summary
+    echo "" >> "$REPORT_FILE"
+    echo "## Deployment Timing Analysis" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "| Nodes | Avg Deploy Time |" >> "$REPORT_FILE"
+    echo "|-------|-----------------|" >> "$REPORT_FILE"
+    for nodes in 24 48 96 384; do
+        local AVG_DEPLOY=$(grep ",${nodes}," "$SUMMARY_CSV" | grep ",PASS," | cut -d, -f5 | awk '{sum+=$1; n++} END {if(n>0) printf "%.0f", sum/n; else print "N/A"}')
+        echo "| $nodes | ${AVG_DEPLOY}s |" >> "$REPORT_FILE"
+    done
+
+    echo "" >> "$REPORT_FILE"
+    echo "## Backend Comparison by Node Count" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+
+    for nodes in 24 48 96 384; do
+        echo "### ${nodes} Nodes" >> "$REPORT_FILE"
+        echo "" >> "$REPORT_FILE"
+
+        local DITTO_P95=$(grep "^ditto,${nodes}," "$SUMMARY_CSV" | grep "1gbps" | cut -d, -f6)
+        local AUTOMERGE_P95=$(grep "^automerge,${nodes}," "$SUMMARY_CSV" | grep "1gbps" | cut -d, -f6)
+
+        if [[ -n "$DITTO_P95" && -n "$AUTOMERGE_P95" ]]; then
+            echo "- **Ditto** Soldier→Squad P95: ${DITTO_P95}ms" >> "$REPORT_FILE"
+            echo "- **Automerge** Soldier→Squad P95: ${AUTOMERGE_P95}ms" >> "$REPORT_FILE"
+
+            # Calculate winner
+            if (( $(echo "$DITTO_P95 < $AUTOMERGE_P95" | bc -l 2>/dev/null || echo 0) )); then
+                echo "- **Winner**: Ditto ($(echo "scale=1; $AUTOMERGE_P95 - $DITTO_P95" | bc)ms faster)" >> "$REPORT_FILE"
+            elif (( $(echo "$AUTOMERGE_P95 < $DITTO_P95" | bc -l 2>/dev/null || echo 0) )); then
+                echo "- **Winner**: Automerge ($(echo "scale=1; $DITTO_P95 - $AUTOMERGE_P95" | bc)ms faster)" >> "$REPORT_FILE"
+            else
+                echo "- **Result**: Tied" >> "$REPORT_FILE"
+            fi
+        else
+            echo "- Data not available for comparison" >> "$REPORT_FILE"
+        fi
+        echo "" >> "$REPORT_FILE"
+    done
+
+    echo "## Bandwidth Impact" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "| Bandwidth | Automerge P95 (96n) | Ditto P95 (96n) |" >> "$REPORT_FILE"
+    echo "|-----------|---------------------|-----------------|" >> "$REPORT_FILE"
+
+    for bw in 1gbps 100mbps 1mbps 256kbps; do
+        local AM=$(grep "^automerge,96,${bw}" "$SUMMARY_CSV" | cut -d, -f6)
+        local DT=$(grep "^ditto,96,${bw}" "$SUMMARY_CSV" | cut -d, -f6)
+        echo "| $bw | ${AM:-N/A}ms | ${DT:-N/A}ms |" >> "$REPORT_FILE"
+    done
+
+    echo "" >> "$REPORT_FILE"
+    echo "---" >> "$REPORT_FILE"
+    echo "" >> "$REPORT_FILE"
+    echo "*Generated: $(date)*" >> "$REPORT_FILE"
+
+    log_success "Comparison report: ${REPORT_FILE}"
+    echo ""
+    cat "$REPORT_FILE"
 }
 
 main "$@"
