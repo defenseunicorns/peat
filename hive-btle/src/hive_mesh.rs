@@ -469,6 +469,11 @@ impl HiveMesh {
         self.peer_manager.connected_count()
     }
 
+    /// Check if a device mesh ID matches our mesh
+    pub fn matches_mesh(&self, device_mesh_id: Option<&str>) -> bool {
+        self.peer_manager.matches_mesh(device_mesh_id)
+    }
+
     /// Get total counter value
     pub fn total_count(&self) -> u64 {
         self.document_sync.total_count()

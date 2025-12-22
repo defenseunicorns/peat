@@ -4,6 +4,7 @@
 //
 //  Main view model coordinating HIVE BLE mesh operations
 //  Uses CoreBluetooth directly to discover real HIVE nodes
+//  Peer management and document sync handled by Rust HiveMesh
 //
 
 import Foundation
@@ -15,8 +16,10 @@ func log(_ message: String) {
     print(message)
     fflush(stdout)
 }
+
 // Rust hive-btle UniFFI bindings are in HiveBridge/hive_apple_ffi.swift
 // Functions: getDefaultMeshId(), parseHiveDeviceName(), matchesMesh(), generateHiveDeviceName()
+// HiveMeshWrapper: Centralized peer management, document sync, event handling
 
 // MARK: - HIVE Service UUIDs
 
@@ -345,9 +348,29 @@ class HiveBLEManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate, 
     }
 }
 
+// MARK: - MeshEventHandler
+
+/// Bridge from Rust MeshEventCallback to Swift @MainActor updates
+class MeshEventHandler: MeshEventCallback {
+    weak var viewModel: HiveViewModel?
+
+    init(viewModel: HiveViewModel) {
+        self.viewModel = viewModel
+    }
+
+    func onEvent(event: MeshEvent) {
+        // Dispatch to main actor for UI updates
+        Task { @MainActor [weak self] in
+            self?.viewModel?.handleMeshEvent(event)
+        }
+    }
+}
+
 // MARK: - HiveViewModel
 
 /// Main view model for HIVE BLE mesh operations
+/// CoreBluetooth handling remains in Swift, but peer management
+/// and document sync are delegated to Rust HiveMeshWrapper
 @MainActor
 class HiveViewModel: ObservableObject {
     // MARK: - Constants
@@ -392,7 +415,7 @@ class HiveViewModel: ObservableObject {
 
     // MARK: - Published State
 
-    /// Peers in the mesh (discovered and/or connected)
+    /// Peers in the mesh (derived from HiveMesh)
     @Published var peers: [HivePeer] = []
 
     /// Current mesh status message
@@ -415,26 +438,27 @@ class HiveViewModel: ObservableObject {
 
     // MARK: - Computed Properties
 
-    /// Connected peer count
+    /// Connected peer count (from HiveMesh)
     var connectedCount: Int {
-        peers.filter { $0.isConnected }.count
+        Int(hiveMesh?.connectedCount() ?? 0)
     }
 
-    /// Total peer count
+    /// Total peer count (from HiveMesh)
     var totalPeerCount: Int {
-        peers.count
+        Int(hiveMesh?.peerCount() ?? 0)
     }
 
-    /// Display name for local node (includes mesh ID)
-    /// Uses Rust hive-btle MeshConfig::device_name() via UniFFI
+    /// Display name for local node (from HiveMesh)
     var localDisplayName: String {
-        generateHiveDeviceName(meshId: Self.MESH_ID, nodeId: localNodeId)
+        hiveMesh?.deviceName() ?? generateHiveDeviceName(meshId: Self.MESH_ID, nodeId: localNodeId)
     }
 
     // MARK: - Private Properties
 
     private var bleManager: HiveBLEManager?
-    private var peerCleanupTimer: Timer?
+    private var hiveMesh: HiveMeshWrapper?
+    private var meshEventHandler: MeshEventHandler?
+    private var maintenanceTimer: Timer?
 
     // MARK: - Initialization
 
@@ -446,14 +470,26 @@ class HiveViewModel: ObservableObject {
     func startMesh() {
         guard !isMeshActive else { return }
 
-        print("[HiveDemo] Starting HIVE mesh with CoreBluetooth...")
+        print("[HiveDemo] Starting HIVE mesh with CoreBluetooth + HiveMeshWrapper...")
+
+        // Initialize Rust HiveMesh for peer management & document sync
+        hiveMesh = HiveMeshWrapper(
+            nodeId: localNodeId,
+            callsign: "SWIFT",
+            meshId: Self.MESH_ID,
+            peripheralType: .soldierSensor
+        )
+
+        // Set up event observer
+        meshEventHandler = MeshEventHandler(viewModel: self)
+        hiveMesh?.addObserver(callback: meshEventHandler!)
 
         // Initialize BLE manager
         bleManager = HiveBLEManager()
 
         // Configure for advertising (peripheral mode)
         bleManager?.localNodeId = localNodeId
-        bleManager?.localDeviceName = localDisplayName
+        bleManager?.localDeviceName = hiveMesh?.deviceName() ?? localDisplayName
 
         bleManager?.onStateChanged = { [weak self] state in
             Task { @MainActor [weak self] in
@@ -494,11 +530,10 @@ class HiveViewModel: ObservableObject {
         isMeshActive = true
         statusMessage = "Scanning for HIVE nodes..."
 
-        // Cleanup stale peers periodically and log scan status
-        peerCleanupTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        // Periodic maintenance timer (peer cleanup, sync)
+        maintenanceTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.cleanupStalePeers()
-                print("[HiveDemo] Heartbeat: peers=\(self?.peers.count ?? 0), BLE state=\(self?.bleManager?.state.rawValue ?? -1)")
+                self?.performMaintenance()
             }
         }
     }
@@ -507,11 +542,13 @@ class HiveViewModel: ObservableObject {
     func shutdown() {
         print("[HiveDemo] Shutting down HIVE mesh...")
 
+        maintenanceTimer?.invalidate()
+        maintenanceTimer = nil
         bleManager?.stopScanning()
         bleManager?.stopAdvertising()
         bleManager = nil
-        peerCleanupTimer?.invalidate()
-        peerCleanupTimer = nil
+        meshEventHandler = nil
+        hiveMesh = nil
         isMeshActive = false
         peers.removeAll()
         ackStatus.reset()
@@ -551,390 +588,191 @@ class HiveViewModel: ObservableObject {
     }
 
     private func handlePeerDiscovered(identifier: String, name: String?, rssi: Int, manufacturerData: Data?, serviceData: Data?) {
-        // Parse mesh ID and node ID from name using Rust hive-btle via UniFFI
-        var nodeId: UInt32 = 0
+        guard let mesh = hiveMesh else { return }
+
+        // Parse mesh ID from name
         var meshId: String? = nil
-
         if let name = name, let parsed = parseHiveDeviceName(name: name) {
-            // Successfully parsed using Rust MeshConfig::parse_device_name()
             meshId = parsed.meshId
-            nodeId = parsed.nodeId
         }
 
-        // If no node ID from name, try service data (Android HIVE uses this)
-        if nodeId == 0, let svcData = serviceData, svcData.count >= 4 {
-            // Service data contains 4-byte node ID directly
-            nodeId = svcData.withUnsafeBytes { $0.load(as: UInt32.self) }
-            meshId = HiveViewModel.MESH_ID  // Assume same mesh since it's advertising HIVE service
-            print("[HiveDemo] Got nodeId from service data: \(String(format: "%08X", nodeId))")
-        }
+        let nowMs = UInt64(Date().timeIntervalSince1970 * 1000)
 
-        // If no node ID from service data, try manufacturer data
-        if nodeId == 0, let mfgData = manufacturerData, mfgData.count >= 4 {
-            // Skip 2-byte company ID, read 4-byte node ID
-            if mfgData.count >= 6 {
-                nodeId = mfgData.subdata(in: 2..<6).withUnsafeBytes { $0.load(as: UInt32.self) }
-            }
-        }
+        // Delegate to HiveMesh - it handles peer tracking, filtering, and deduplication
+        if let meshPeer = mesh.onBleDiscovered(
+            identifier: identifier,
+            name: name,
+            rssi: Int8(clamping: rssi),
+            meshId: meshId,
+            nowMs: nowMs
+        ) {
+            log("[HiveDemo] HiveMesh discovered peer: \(meshPeer.name ?? String(format: "HIVE-%08X", meshPeer.nodeId))")
 
-        // If we couldn't get a node ID, use a placeholder based on identifier hash
-        // The real node ID will be updated when we receive documents
-        if nodeId == 0 {
-            // Generate temporary node ID from identifier hash
-            let hash = identifier.hashValue
-            nodeId = UInt32(truncatingIfNeeded: abs(hash))
-            meshId = HiveViewModel.MESH_ID  // Assume same mesh since it's advertising HIVE service
-            print("[HiveDemo] Using temp nodeId \(String(format: "%08X", nodeId)) for \(name ?? "Unknown") - will update from document")
-        }
+            // Update local peers list from HiveMesh
+            syncPeersFromMesh()
 
-        // Check if this is a new peer
-        let isNewPeer = !peers.contains(where: { $0.identifier == identifier })
-
-        // Update or add peer
-        if let index = peers.firstIndex(where: { $0.identifier == identifier }) {
-            peers[index].rssi = Int8(clamping: rssi)
-            peers[index].lastSeen = Date()
-        } else {
-            let peer = HivePeer(
-                identifier: identifier,
-                nodeId: nodeId,
-                meshId: meshId,
-                advertisedName: name,
-                isConnected: false,
-                rssi: Int8(clamping: rssi),
-                lastSeen: Date()
-            )
-            peers.append(peer)
-            print("[HiveDemo] New HIVE peer: \(peer.displayName) meshId=\(meshId ?? "none") RSSI=\(rssi)")
-        }
-
-        // Sort by RSSI (strongest first)
-        peers.sort { $0.rssi > $1.rssi }
-
-        print("[HiveDemo] Peers list now has \(peers.count) items: \(peers.map { $0.displayName })")
-
-        // Auto-connect to new HIVE peers in SAME MESH only
-        // Don't connect to ourselves!
-        log("[HiveDemo] Auto-connect check: isNewPeer=\(isNewPeer), nodeId=\(String(format: "%08X", nodeId)), localNodeId=\(String(format: "%08X", localNodeId))")
-        if isNewPeer && nodeId != localNodeId {
-            // Check mesh ID match using Rust matchesMesh() via UniFFI
-            // Returns true if same mesh or if legacy format (nil mesh ID)
-            let sameMesh = matchesMesh(ourMeshId: Self.MESH_ID, deviceMeshId: meshId)
-            log("[HiveDemo] Mesh check: ourMesh=\(Self.MESH_ID), deviceMesh=\(meshId ?? "nil"), sameMesh=\(sameMesh)")
-            if sameMesh {
-                log("[HiveDemo] >>> Auto-connecting to \(String(format: "HIVE-%08X", nodeId)) (mesh: \(meshId ?? "any"))...")
+            // Auto-connect if it matches our mesh and isn't ourselves
+            if meshPeer.nodeId != localNodeId && mesh.matchesMesh(deviceMeshId: meshId) {
+                log("[HiveDemo] >>> Auto-connecting to \(String(format: "HIVE-%08X", meshPeer.nodeId))...")
                 bleManager?.connect(identifier: identifier)
-            } else {
-                log("[HiveDemo] Skipping peer \(String(format: "HIVE-%08X", nodeId)) - different mesh (\(meshId ?? "?") != \(Self.MESH_ID))")
             }
-        } else if nodeId == localNodeId {
-            print("[HiveDemo] Skipping self-connection to \(String(format: "HIVE-%08X", nodeId))")
-            // Remove ourselves from the peer list
-            peers.removeAll { $0.nodeId == localNodeId }
-        } else if !isNewPeer {
-            print("[HiveDemo] Peer already known, not reconnecting")
         }
     }
 
     private func handlePeerConnected(identifier: String) {
-        if let index = peers.firstIndex(where: { $0.identifier == identifier }) {
-            peers[index].isConnected = true
-            showToast("Connected to \(peers[index].displayName)")
+        guard let mesh = hiveMesh else { return }
+        let nowMs = UInt64(Date().timeIntervalSince1970 * 1000)
+
+        if let nodeId = mesh.onBleConnected(identifier: identifier, nowMs: nowMs) {
+            log("[HiveDemo] HiveMesh connected: \(String(format: "%08X", nodeId))")
+            syncPeersFromMesh()
+            showToast("Connected to \(String(format: "HIVE-%08X", nodeId))")
         }
     }
 
     private func handlePeerDisconnected(identifier: String) {
-        if let index = peers.firstIndex(where: { $0.identifier == identifier }) {
-            let peerName = peers[index].displayName
-            // Keep peer in list, just mark as disconnected
-            peers[index].isConnected = false
-            showToast("Disconnected from \(peerName)")
-            print("[HiveDemo] Peer \(peerName) disconnected - keeping in list")
+        guard let mesh = hiveMesh else { return }
+
+        if let nodeId = mesh.onBleDisconnected(identifier: identifier, reason: .linkLoss) {
+            log("[HiveDemo] HiveMesh disconnected: \(String(format: "%08X", nodeId))")
+            syncPeersFromMesh()
+            showToast("Disconnected from \(String(format: "HIVE-%08X", nodeId))")
         }
     }
 
     private func handleConnectionFailed(identifier: String) {
-        if let index = peers.firstIndex(where: { $0.identifier == identifier }) {
-            let peerName = peers[index].displayName
-            peers[index].isConnected = false
-            print("[HiveDemo] Connection failed to \(peerName) - keeping in list for retry")
+        guard let mesh = hiveMesh else { return }
+
+        if let nodeId = mesh.onBleDisconnected(identifier: identifier, reason: .connectionFailed) {
+            log("[HiveDemo] Connection failed: \(String(format: "%08X", nodeId))")
+            syncPeersFromMesh()
         }
     }
 
     private func handleDataReceived(identifier: String, data: Data) {
-        // Parse HIVE document format (Android HiveDocument compatible)
-        // Header: [version: 4] [node_id: 4]
-        // GCounter: [num_entries: 4] + [node_id: 4, count: 8] * N
-        // Extended: [0xAB marker: 1] [reserved: 1] [peripheral_len: 2] [peripheral: M bytes]
-        // Peripheral: [id: 4] [parent: 4] [type: 1] [callsign: 12] [health: 4] [has_event: 1] [event?: 9] [timestamp: 8]
+        guard let mesh = hiveMesh else { return }
+        let nowMs = UInt64(Date().timeIntervalSince1970 * 1000)
 
-        guard data.count >= 8 else { return }
+        log("[HiveDemo] Received \(data.count) bytes from \(identifier)")
 
-        let version = data.subdata(in: 0..<4).withUnsafeBytes { $0.load(as: UInt32.self) }
-        let sourceNodeId = data.subdata(in: 4..<8).withUnsafeBytes { $0.load(as: UInt32.self) }
+        // Delegate document parsing and merging to HiveMesh
+        if let result = mesh.onBleDataReceived(identifier: identifier, data: data, nowMs: nowMs) {
+            log("[HiveDemo] Data from \(String(format: "HIVE-%08X", result.sourceNode)): emergency=\(result.isEmergency), ack=\(result.isAck), count=\(result.totalCount)")
 
-        log("[HiveDemo] Received document v\(version) from \(String(format: "HIVE-%08X", sourceNodeId)), \(data.count) bytes")
-        log("[HiveDemo] Raw data: \(data.map { String(format: "%02X", $0) }.joined(separator: " "))")
+            // Sync peers list from mesh (may have added incoming connection)
+            syncPeersFromMesh()
 
-        // Add or update peer from incoming data (handles case where remote connected to us)
-        if sourceNodeId != localNodeId {
-            // First try to find peer by exact nodeId
-            if let index = peers.firstIndex(where: { $0.nodeId == sourceNodeId }) {
-                // Update existing peer
-                peers[index].lastSeen = Date()
-                peers[index].isConnected = true
-                log("[HiveDemo] Updated existing peer \(peers[index].displayName)")
-            } else if identifier != "peripheral", let index = peers.firstIndex(where: { $0.identifier == identifier }) {
-                // Update peer found by BLE identifier (when we connected to them)
-                log("[HiveDemo] Updating peer nodeId from \(String(format: "%08X", peers[index].nodeId)) to \(String(format: "%08X", sourceNodeId))")
-                peers[index] = HivePeer(
-                    identifier: identifier,
-                    nodeId: sourceNodeId,
-                    meshId: Self.MESH_ID,
-                    advertisedName: peers[index].advertisedName,
-                    isConnected: true,
-                    rssi: peers[index].rssi,
-                    lastSeen: Date()
-                )
-            } else if identifier == "peripheral" {
-                // Data came from a central that connected to US - try to find the discovered peer with temp nodeId
-                // Look for a peer that was discovered but has a temp nodeId (not yet confirmed by document)
-                if let index = peers.firstIndex(where: { !$0.isConnected || $0.rssi != 0 }) {
-                    // Found a discovered peer - update its nodeId to the real one from the document
-                    let oldNodeId = peers[index].nodeId
-                    log("[HiveDemo] Merging incoming peer: updating \(String(format: "%08X", oldNodeId)) -> \(String(format: "%08X", sourceNodeId))")
-                    peers[index] = HivePeer(
-                        identifier: peers[index].identifier,
-                        nodeId: sourceNodeId,
-                        meshId: Self.MESH_ID,
-                        advertisedName: peers[index].advertisedName,
-                        isConnected: true,
-                        rssi: peers[index].rssi,
-                        lastSeen: Date()
-                    )
-                } else {
-                    // No discovered peer to merge with - add new
-                    let peer = HivePeer(
-                        identifier: "incoming-\(sourceNodeId)",
-                        nodeId: sourceNodeId,
-                        meshId: Self.MESH_ID,
-                        advertisedName: String(format: "HIVE-%08X", sourceNodeId),
-                        isConnected: true,
-                        rssi: 0,
-                        lastSeen: Date()
-                    )
-                    peers.append(peer)
-                    log("[HiveDemo] Added peer from incoming connection: \(peer.displayName)")
-                    showToast("Peer connected: \(peer.displayName)")
-                }
-            } else {
-                // Add new peer
-                let peer = HivePeer(
-                    identifier: identifier,
-                    nodeId: sourceNodeId,
-                    meshId: Self.MESH_ID,
-                    advertisedName: String(format: "HIVE-%08X", sourceNodeId),
-                    isConnected: true,
-                    rssi: 0,
-                    lastSeen: Date()
-                )
-                peers.append(peer)
-                log("[HiveDemo] Added peer from incoming connection: \(peer.displayName)")
-                showToast("Peer connected: \(peer.displayName)")
-            }
-        }
-
-        // Calculate exact position of extended marker (0xAB) after header and GCounter
-        // Header: 8 bytes (version + node_id)
-        // GCounter: 4 bytes (num_entries) + num_entries * 12 bytes
-        guard data.count >= 12 else { return }  // Need at least header + num_entries
-
-        let numEntries = data.subdata(in: 8..<12).withUnsafeBytes { $0.load(as: UInt32.self) }
-        let counterEnd = 8 + 4 + Int(numEntries) * 12  // header + num_entries + entries
-
-        print("[HiveDemo] Document: \(data.count) bytes, numEntries=\(numEntries), counterEnd=\(counterEnd)")
-
-        // Check for extended marker at calculated position
-        if data.count > counterEnd && data[counterEnd] == 0xAB {
-            let markerIndex = counterEnd
-            let peripheralLen = data.subdata(in: (markerIndex + 2)..<(markerIndex + 4)).withUnsafeBytes { $0.load(as: UInt16.self) }
-            let peripheralStart = markerIndex + 4
-
-            print("[HiveDemo] Found 0xAB marker at \(markerIndex), peripheralLen=\(peripheralLen)")
-
-            if peripheralLen >= 26 && peripheralStart + Int(peripheralLen) <= data.count {
-                // Parse HivePeripheral structure
-                // [id: 4] [parent: 4] [type: 1] [callsign: 12] [health: 4] [has_event: 1] [event?: 9] [timestamp: 8]
-                // has_event is at offset 25 (4+4+1+12+4)
-                let hasEventOffset = peripheralStart + 25
-
-                if hasEventOffset < data.count {
-                    let hasEvent = data[hasEventOffset] != 0
-                    print("[HiveDemo] Peripheral: len=\(peripheralLen), hasEvent=\(hasEvent)")
-
-                    if hasEvent && hasEventOffset + 1 < data.count {
-                        // Event is at offset 26 within peripheral
-                        let eventTypeOffset = hasEventOffset + 1
-                        let androidEventType = data[eventTypeOffset]
-                        print("[HiveDemo] Android event type: \(androidEventType)")
-
-                        // Map Android event types to iOS handling:
-                        // Android: EMERGENCY=3, ACK=6
-                        // iOS internal: 1 = Emergency, 2 = ACK
-                        let iosEventType: UInt8
-                        switch androidEventType {
-                        case 3: iosEventType = 1  // Emergency
-                        case 6: iosEventType = 2  // ACK
-                        default: iosEventType = androidEventType
-                        }
-                        handleEventByte(iosEventType, fromNodeId: sourceNodeId)
-                    }
-                }
+            // Handle events - HiveMesh notifies via observer, but we also check here for UI updates
+            if result.isEmergency {
+                handleEmergencyReceivedFromNode(result.sourceNode)
+            } else if result.isAck {
+                handleAckReceivedFromNode(result.sourceNode)
             }
         }
     }
 
-    private func handleEventByte(_ eventByte: UInt8, fromNodeId: UInt32) {
-        print("[HiveDemo] Event byte=\(eventByte) from node=\(String(format: "%08X", fromNodeId))")
-        print("[HiveDemo] Known peers: \(peers.map { String(format: "%08X", $0.nodeId) })")
+    /// Handle emergency received (called from mesh event or data parsing)
+    private func handleEmergencyReceivedFromNode(_ nodeId: UInt32) {
+        log("[HiveDemo] EMERGENCY from \(String(format: "%08X", nodeId))")
 
-        // Event types from HIVE protocol
-        switch eventByte {
-        case 1: // Emergency
-            print("[HiveDemo] EMERGENCY event received!")
-            if let peer = peers.first(where: { $0.nodeId == fromNodeId }) {
-                handleEmergencyReceived(from: peer)
-            } else {
-                // Create temporary peer for emergency from unknown source
-                print("[HiveDemo] Emergency from unknown peer, creating temp peer")
-                let tempPeer = HivePeer(
-                    identifier: "emergency-\(fromNodeId)",
-                    nodeId: fromNodeId,
-                    meshId: Self.MESH_ID,
-                    advertisedName: String(format: "HIVE-%08X", fromNodeId),
-                    isConnected: true,
-                    rssi: 0,
-                    lastSeen: Date()
-                )
-                peers.append(tempPeer)
-                handleEmergencyReceived(from: tempPeer)
-            }
-        case 2: // ACK
-            print("[HiveDemo] ACK event received!")
-            if let peer = peers.first(where: { $0.nodeId == fromNodeId }) {
-                handleAckReceived(from: peer)
-            } else {
-                // Handle ACK from peer we may not have tracked
-                print("[HiveDemo] ACK from node \(String(format: "%08X", fromNodeId))")
-                ackStatus.pendingAcks[fromNodeId] = true
-                showToast("✓ ACK from \(String(format: "HIVE-%08X", fromNodeId))")
-                checkAllAcked()
-            }
-        default:
-            print("[HiveDemo] Unknown event type: \(eventByte)")
+        // Initialize ACK tracking
+        ackStatus.pendingAcks.removeAll()
+        for peer in peers {
+            ackStatus.pendingAcks[peer.nodeId] = false
+        }
+        ackStatus.pendingAcks[localNodeId] = false  // We haven't acked yet
+        ackStatus.pendingAcks[nodeId] = true  // Source has implicitly acked
+        ackStatus.emergencySourceNodeId = nodeId
+
+        showToast("🚨 EMERGENCY from \(String(format: "HIVE-%08X", nodeId))!")
+        statusMessage = "⚠️ EMERGENCY - TAP ACK"
+        triggerVibration()
+    }
+
+    /// Handle ACK received (called from mesh event or data parsing)
+    private func handleAckReceivedFromNode(_ nodeId: UInt32) {
+        log("[HiveDemo] ACK from \(String(format: "%08X", nodeId))")
+        ackStatus.pendingAcks[nodeId] = true
+        showToast("✓ ACK from \(String(format: "HIVE-%08X", nodeId))")
+        checkAllAcked()
+    }
+
+    /// Periodic maintenance - delegates to HiveMesh.tick()
+    private func performMaintenance() {
+        guard let mesh = hiveMesh else { return }
+        let nowMs = UInt64(Date().timeIntervalSince1970 * 1000)
+
+        // tick() handles peer cleanup and returns sync data if needed
+        if let syncData = mesh.tick(nowMs: nowMs) {
+            log("[HiveDemo] Maintenance: broadcasting sync document (\(syncData.count) bytes)")
+            bleManager?.sendData(Data(syncData))
+        }
+
+        // Refresh peers from mesh
+        syncPeersFromMesh()
+
+        log("[HiveDemo] Heartbeat: peers=\(mesh.peerCount()), connected=\(mesh.connectedCount()), BLE=\(bleManager?.state.rawValue ?? -1)")
+    }
+
+    /// Sync local peers array from HiveMesh state
+    private func syncPeersFromMesh() {
+        guard let mesh = hiveMesh else { return }
+
+        let meshPeers = mesh.getPeers()
+        peers = meshPeers.map { mp in
+            HivePeer(
+                identifier: mp.identifier,
+                nodeId: mp.nodeId,
+                meshId: mp.meshId,
+                advertisedName: mp.name,
+                isConnected: mp.isConnected,
+                rssi: mp.rssi,
+                lastSeen: Date(timeIntervalSince1970: Double(mp.lastSeenMs) / 1000.0)
+            )
+        }
+        // Sort by RSSI (strongest first)
+        peers.sort { $0.rssi > $1.rssi }
+    }
+
+    /// Handle mesh events from Rust HiveMesh observer
+    func handleMeshEvent(_ event: MeshEvent) {
+        switch event {
+        case .peerDiscovered(let peer):
+            log("[HiveDemo] Event: PeerDiscovered \(peer.nodeId)")
+            syncPeersFromMesh()
+
+        case .peerConnected(let nodeId):
+            log("[HiveDemo] Event: PeerConnected \(String(format: "%08X", nodeId))")
+            syncPeersFromMesh()
+
+        case .peerDisconnected(let nodeId, _):
+            log("[HiveDemo] Event: PeerDisconnected \(String(format: "%08X", nodeId))")
+            syncPeersFromMesh()
+
+        case .peerLost(let nodeId):
+            log("[HiveDemo] Event: PeerLost \(String(format: "%08X", nodeId))")
+            syncPeersFromMesh()
+
+        case .emergencyReceived(let fromNode):
+            handleEmergencyReceivedFromNode(fromNode)
+
+        case .ackReceived(let fromNode):
+            handleAckReceivedFromNode(fromNode)
+
+        case .documentSynced(let fromNode, let totalCount):
+            log("[HiveDemo] Event: DocumentSynced from \(String(format: "%08X", fromNode)), count=\(totalCount)")
+
+        case .meshStateChanged(let peerCount, let connectedCount):
+            log("[HiveDemo] Event: MeshStateChanged peers=\(peerCount), connected=\(connectedCount)")
+            syncPeersFromMesh()
         }
     }
 
-    private func cleanupStalePeers() {
-        let staleThreshold = Date().addingTimeInterval(-60) // 60 seconds
-        let staleCount = peers.filter { !$0.isConnected && $0.lastSeen < staleThreshold }.count
-        if staleCount > 0 {
-            print("[HiveDemo] Cleaning up \(staleCount) stale peers")
-            peers.removeAll { !$0.isConnected && $0.lastSeen < staleThreshold }
-        }
-    }
-
-    // MARK: - Event Handling
-
-    /// Build a HIVE document compatible with Android HiveDocument format
-    /// Format:
-    /// - Header: [version: 4] [node_id: 4]
-    /// - GCounter: [num_entries: 4] + [node_id: 4, count: 8] * N
-    /// - Extended: [0xAB marker: 1] [reserved: 1] [peripheral_len: 2] [peripheral: M bytes]
-    /// - Peripheral: [id: 4] [parent: 4] [type: 1] [callsign: 12] [health: 4] [has_event: 1] [event?: 9] [timestamp: 8]
-    private func buildHiveDocument(eventType: UInt8) -> Data {
-        var data = Data()
-
-        // === Header (8 bytes) ===
-        // Version (4 bytes, little-endian)
-        var version: UInt32 = 1
-        data.append(Data(bytes: &version, count: 4))
-
-        // Node ID (4 bytes, little-endian)
-        var nodeId = localNodeId
-        data.append(Data(bytes: &nodeId, count: 4))
-
-        // === GCounter (4 bytes for empty counter) ===
-        var numEntries: UInt32 = 0
-        data.append(Data(bytes: &numEntries, count: 4))
-
-        // === Extended section with HivePeripheral ===
-        // Event marker (0xAB)
-        data.append(0xAB)
-
-        // Reserved (1 byte)
-        data.append(0x00)
-
-        // Build HivePeripheral data
-        let hasEvent = eventType != 0
-        let peripheralSize: UInt16 = hasEvent ? 43 : 34
-        var peripheralLen = peripheralSize
-        data.append(Data(bytes: &peripheralLen, count: 2))
-
-        // Peripheral data starts here
-        // id (4 bytes)
-        var peripheralId = localNodeId
-        data.append(Data(bytes: &peripheralId, count: 4))
-
-        // parentNode (4 bytes)
-        var parentNode: UInt32 = 0
-        data.append(Data(bytes: &parentNode, count: 4))
-
-        // peripheralType (1 byte) - SOLDIER_SENSOR = 1
-        data.append(1)
-
-        // callsign (12 bytes, null-padded)
-        var callsignBytes = "SWIFT".data(using: .utf8) ?? Data()
-        callsignBytes.append(contentsOf: [UInt8](repeating: 0, count: 12 - callsignBytes.count))
-        data.append(callsignBytes.prefix(12))
-
-        // health (4 bytes: battery, heartRate, activity, alerts)
-        data.append(contentsOf: [100, 0, 0, 0] as [UInt8])
-
-        // has_event (1 byte)
-        data.append(hasEvent ? 1 : 0)
-
-        // event (9 bytes if present): eventType (1 byte) + timestamp (8 bytes)
-        if hasEvent {
-            // Map iOS event types to Android:
-            // iOS: 1 = Emergency, 2 = ACK
-            // Android: EMERGENCY=3, ACK=6
-            let androidEventType: UInt8
-            switch eventType {
-            case 1: androidEventType = 3  // Emergency
-            case 2: androidEventType = 6  // ACK
-            default: androidEventType = eventType
-            }
-            data.append(androidEventType)
-
-            // timestamp (8 bytes, little-endian)
-            var timestamp: UInt64 = UInt64(Date().timeIntervalSince1970 * 1000)
-            data.append(Data(bytes: &timestamp, count: 8))
-        }
-
-        // timestamp (8 bytes, little-endian) - peripheral timestamp
-        var peripheralTimestamp: UInt64 = UInt64(Date().timeIntervalSince1970 * 1000)
-        data.append(Data(bytes: &peripheralTimestamp, count: 8))
-
-        print("[HiveDemo] Built document: \(data.count) bytes")
-        print("[HiveDemo] Document hex: \(data.map { String(format: "%02X", $0) }.joined(separator: " "))")
-
-        return data
-    }
+    // MARK: - User Actions (delegate to HiveMesh)
 
     /// Send an emergency alert to all peers
     func sendEmergency() {
-        guard isMeshActive else {
+        guard isMeshActive, let mesh = hiveMesh else {
             showToast("Mesh not active")
             return
         }
@@ -949,9 +787,10 @@ class HiveViewModel: ObservableObject {
         ackStatus.pendingAcks[localNodeId] = true  // We sent it, so we're acked
         ackStatus.emergencySourceNodeId = localNodeId
 
-        // Build and send emergency document (event type 1)
-        let document = buildHiveDocument(eventType: 1)
-        bleManager?.sendData(document)
+        // Build emergency document via HiveMesh and broadcast
+        let timestamp = UInt64(Date().timeIntervalSince1970 * 1000)
+        let document = mesh.sendEmergency(timestamp: timestamp)
+        bleManager?.sendData(Data(document))
 
         showToast("🚨 EMERGENCY SENT!")
         statusMessage = "⚠️ EMERGENCY - TAP ACK"
@@ -959,16 +798,17 @@ class HiveViewModel: ObservableObject {
 
     /// Send an ACK
     func sendAck() {
-        guard isMeshActive else {
+        guard isMeshActive, let mesh = hiveMesh else {
             showToast("Mesh not active")
             return
         }
 
         print("[HiveDemo] >>> SENDING ACK")
 
-        // Build and send ACK document (event type 2)
-        let document = buildHiveDocument(eventType: 2)
-        bleManager?.sendData(document)
+        // Build ACK document via HiveMesh and broadcast
+        let timestamp = UInt64(Date().timeIntervalSince1970 * 1000)
+        let document = mesh.sendAck(timestamp: timestamp)
+        bleManager?.sendData(Data(document))
 
         ackStatus.pendingAcks[localNodeId] = true
         showToast("✓ ACK sent")
@@ -980,38 +820,10 @@ class HiveViewModel: ObservableObject {
     func resetAlert() {
         print("[HiveDemo] >>> RESETTING ALERT")
 
+        hiveMesh?.clearEvent()
         ackStatus.reset()
         statusMessage = "Mesh active - \(localDisplayName)"
         showToast("Alert reset")
-    }
-
-    /// Handle emergency received from a peer
-    func handleEmergencyReceived(from peer: HivePeer) {
-        print("[HiveDemo] Received EMERGENCY from \(peer.displayName)")
-
-        // Initialize ACK tracking
-        ackStatus.pendingAcks.removeAll()
-        for p in peers {
-            ackStatus.pendingAcks[p.nodeId] = false
-        }
-        ackStatus.pendingAcks[localNodeId] = false  // We haven't acked yet
-        ackStatus.pendingAcks[peer.nodeId] = true   // Source has implicitly acked
-        ackStatus.emergencySourceNodeId = peer.nodeId
-
-        showToast("🚨 EMERGENCY from \(peer.displayName)!")
-        statusMessage = "⚠️ EMERGENCY - TAP ACK"
-
-        triggerVibration()
-    }
-
-    /// Handle ACK received from a peer
-    func handleAckReceived(from peer: HivePeer) {
-        print("[HiveDemo] Received ACK from \(peer.displayName)")
-
-        ackStatus.pendingAcks[peer.nodeId] = true
-        showToast("✓ ACK from \(peer.displayName)")
-
-        checkAllAcked()
     }
 
     // MARK: - Private Helpers

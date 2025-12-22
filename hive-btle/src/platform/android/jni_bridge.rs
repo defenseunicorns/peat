@@ -1044,6 +1044,493 @@ pub extern "system" fn Java_com_hive_btle_AdvertiseCallbackProxy_nativeOnStartFa
     log::error!("Advertising failed: {} (code={})", msg, error_code);
 }
 
+// ============================================================================
+// JNI Native Method Exports - HiveMesh (Centralized Peer/Document Management)
+// ============================================================================
+
+use crate::hive_mesh::{DataReceivedResult, HiveMesh, HiveMeshConfig};
+use crate::observer::{DisconnectReason, HiveEvent, HiveObserver, ObserverManager};
+use crate::peer::HivePeer;
+use crate::sync::crdt::PeripheralType;
+use std::sync::Arc;
+
+/// Global HiveMesh instance storage
+/// Maps a handle (node_id) to a HiveMesh instance
+static MESH_INSTANCES: OnceLock<Mutex<HashMap<i64, Arc<HiveMesh>>>> = OnceLock::new();
+
+fn get_mesh_storage() -> &'static Mutex<HashMap<i64, Arc<HiveMesh>>> {
+    MESH_INSTANCES.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Create a new HiveMesh instance
+///
+/// JNI Signature: (JLjava/lang/String;Ljava/lang/String;I)J
+#[no_mangle]
+pub extern "system" fn Java_com_hive_btle_HiveMesh_nativeCreate<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    node_id: jlong,
+    callsign: JString<'local>,
+    mesh_id: JString<'local>,
+    peripheral_type: jint,
+) -> jlong {
+    let callsign: String = env
+        .get_string(&callsign)
+        .map(|s| s.into())
+        .unwrap_or_else(|_| "ANDROID".to_string());
+
+    let mesh_id_str: String = env
+        .get_string(&mesh_id)
+        .map(|s| s.into())
+        .unwrap_or_else(|_| "DEMO".to_string());
+
+    let ptype = match peripheral_type {
+        1 => PeripheralType::SoldierSensor,
+        2 => PeripheralType::FixedSensor,
+        3 => PeripheralType::Relay,
+        _ => PeripheralType::Unknown,
+    };
+
+    let config = HiveMeshConfig::new(NodeId::new(node_id as u32), &callsign, &mesh_id_str)
+        .with_peripheral_type(ptype);
+
+    let mesh = Arc::new(HiveMesh::new(config));
+    let handle = node_id;
+
+    if let Ok(mut storage) = get_mesh_storage().lock() {
+        storage.insert(handle, mesh);
+    }
+
+    log::info!(
+        "HiveMesh created: handle={}, nodeId={:08X}, mesh={}",
+        handle,
+        node_id as u32,
+        mesh_id_str
+    );
+
+    handle
+}
+
+/// Destroy a HiveMesh instance
+///
+/// JNI Signature: (J)V
+#[no_mangle]
+pub extern "system" fn Java_com_hive_btle_HiveMesh_nativeDestroy<'local>(
+    _env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+) {
+    if let Ok(mut storage) = get_mesh_storage().lock() {
+        storage.remove(&handle);
+    }
+    log::info!("HiveMesh destroyed: handle={}", handle);
+}
+
+/// Get device name for BLE advertising
+///
+/// JNI Signature: (J)Ljava/lang/String;
+#[no_mangle]
+pub extern "system" fn Java_com_hive_btle_HiveMesh_nativeGetDeviceName<'local>(
+    env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+) -> JString<'local> {
+    let device_name = if let Ok(storage) = get_mesh_storage().lock() {
+        storage.get(&handle).map(|m| m.device_name())
+    } else {
+        None
+    };
+
+    let name = device_name.unwrap_or_else(|| "HIVE-00000000".to_string());
+    env.new_string(name)
+        .unwrap_or_else(|_| env.new_string("").expect("Failed to create empty string"))
+}
+
+/// Send emergency event
+///
+/// JNI Signature: (JJ)[B
+#[no_mangle]
+pub extern "system" fn Java_com_hive_btle_HiveMesh_nativeSendEmergency<'local>(
+    env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+    timestamp: jlong,
+) -> JByteArray<'local> {
+    let doc_bytes = if let Ok(storage) = get_mesh_storage().lock() {
+        storage
+            .get(&handle)
+            .map(|m| m.send_emergency(timestamp as u64))
+    } else {
+        None
+    };
+
+    match doc_bytes {
+        Some(bytes) => env
+            .byte_array_from_slice(&bytes)
+            .unwrap_or_else(|_| env.new_byte_array(0).expect("Failed to create byte array")),
+        None => env.new_byte_array(0).expect("Failed to create byte array"),
+    }
+}
+
+/// Send ACK event
+///
+/// JNI Signature: (JJ)[B
+#[no_mangle]
+pub extern "system" fn Java_com_hive_btle_HiveMesh_nativeSendAck<'local>(
+    env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+    timestamp: jlong,
+) -> JByteArray<'local> {
+    let doc_bytes = if let Ok(storage) = get_mesh_storage().lock() {
+        storage.get(&handle).map(|m| m.send_ack(timestamp as u64))
+    } else {
+        None
+    };
+
+    match doc_bytes {
+        Some(bytes) => env
+            .byte_array_from_slice(&bytes)
+            .unwrap_or_else(|_| env.new_byte_array(0).expect("Failed to create byte array")),
+        None => env.new_byte_array(0).expect("Failed to create byte array"),
+    }
+}
+
+/// Build current document for sync
+///
+/// JNI Signature: (J)[B
+#[no_mangle]
+pub extern "system" fn Java_com_hive_btle_HiveMesh_nativeBuildDocument<'local>(
+    env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+) -> JByteArray<'local> {
+    let doc_bytes = if let Ok(storage) = get_mesh_storage().lock() {
+        storage.get(&handle).map(|m| m.build_document())
+    } else {
+        None
+    };
+
+    match doc_bytes {
+        Some(bytes) => env
+            .byte_array_from_slice(&bytes)
+            .unwrap_or_else(|_| env.new_byte_array(0).expect("Failed to create byte array")),
+        None => env.new_byte_array(0).expect("Failed to create byte array"),
+    }
+}
+
+/// Called when a BLE device is discovered
+///
+/// JNI Signature: (JLjava/lang/String;Ljava/lang/String;ILjava/lang/String;J)Z
+#[no_mangle]
+pub extern "system" fn Java_com_hive_btle_HiveMesh_nativeOnBleDiscovered<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+    identifier: JString<'local>,
+    name: JString<'local>,
+    rssi: jint,
+    mesh_id: JString<'local>,
+    now_ms: jlong,
+) -> jboolean {
+    let identifier: String = env
+        .get_string(&identifier)
+        .map(|s| s.into())
+        .unwrap_or_default();
+
+    let name: Option<String> = if name.is_null() {
+        None
+    } else {
+        env.get_string(&name).ok().map(|s| s.into())
+    };
+
+    let mesh_id_opt: Option<String> = if mesh_id.is_null() {
+        None
+    } else {
+        env.get_string(&mesh_id).ok().map(|s| s.into())
+    };
+
+    let result = if let Ok(storage) = get_mesh_storage().lock() {
+        storage.get(&handle).and_then(|m| {
+            m.on_ble_discovered(
+                &identifier,
+                name.as_deref(),
+                rssi as i8,
+                mesh_id_opt.as_deref(),
+                now_ms as u64,
+            )
+        })
+    } else {
+        None
+    };
+
+    if result.is_some() {
+        1
+    } else {
+        0
+    }
+}
+
+/// Called when a BLE connection is established
+///
+/// JNI Signature: (JLjava/lang/String;J)J
+#[no_mangle]
+pub extern "system" fn Java_com_hive_btle_HiveMesh_nativeOnBleConnected<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+    identifier: JString<'local>,
+    now_ms: jlong,
+) -> jlong {
+    let identifier: String = env
+        .get_string(&identifier)
+        .map(|s| s.into())
+        .unwrap_or_default();
+
+    let result = if let Ok(storage) = get_mesh_storage().lock() {
+        storage
+            .get(&handle)
+            .and_then(|m| m.on_ble_connected(&identifier, now_ms as u64))
+    } else {
+        None
+    };
+
+    result.map(|id| id.as_u32() as jlong).unwrap_or(0)
+}
+
+/// Called when a BLE connection is lost
+///
+/// JNI Signature: (JLjava/lang/String;I)J
+#[no_mangle]
+pub extern "system" fn Java_com_hive_btle_HiveMesh_nativeOnBleDisconnected<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+    identifier: JString<'local>,
+    reason: jint,
+) -> jlong {
+    let identifier: String = env
+        .get_string(&identifier)
+        .map(|s| s.into())
+        .unwrap_or_default();
+
+    let disconnect_reason = match reason {
+        0 => DisconnectReason::LocalRequest,
+        1 => DisconnectReason::RemoteRequest,
+        2 => DisconnectReason::Timeout,
+        3 => DisconnectReason::LinkLoss,
+        4 => DisconnectReason::ConnectionFailed,
+        _ => DisconnectReason::Unknown,
+    };
+
+    let result = if let Ok(storage) = get_mesh_storage().lock() {
+        storage
+            .get(&handle)
+            .and_then(|m| m.on_ble_disconnected(&identifier, disconnect_reason))
+    } else {
+        None
+    };
+
+    result.map(|id| id.as_u32() as jlong).unwrap_or(0)
+}
+
+/// Called when BLE data is received
+///
+/// Returns encoded result: [source_node: 4][is_emergency: 1][is_ack: 1][counter_changed: 1][total_count: 8]
+///
+/// JNI Signature: (JLjava/lang/String;[BJ)[B
+#[no_mangle]
+pub extern "system" fn Java_com_hive_btle_HiveMesh_nativeOnBleDataReceived<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+    identifier: JString<'local>,
+    data: JByteArray<'local>,
+    now_ms: jlong,
+) -> JByteArray<'local> {
+    let identifier: String = env
+        .get_string(&identifier)
+        .map(|s| s.into())
+        .unwrap_or_default();
+
+    let data_bytes: Vec<u8> = env.convert_byte_array(data).unwrap_or_default();
+
+    let result = if let Ok(storage) = get_mesh_storage().lock() {
+        storage
+            .get(&handle)
+            .and_then(|m| m.on_ble_data_received(&identifier, &data_bytes, now_ms as u64))
+    } else {
+        None
+    };
+
+    match result {
+        Some(r) => {
+            // Encode result: [source_node: 4][is_emergency: 1][is_ack: 1][counter_changed: 1][total_count: 8]
+            let mut encoded = Vec::with_capacity(15);
+            encoded.extend_from_slice(&r.source_node.as_u32().to_le_bytes());
+            encoded.push(if r.is_emergency { 1 } else { 0 });
+            encoded.push(if r.is_ack { 1 } else { 0 });
+            encoded.push(if r.counter_changed { 1 } else { 0 });
+            encoded.extend_from_slice(&r.total_count.to_le_bytes());
+
+            env.byte_array_from_slice(&encoded)
+                .unwrap_or_else(|_| env.new_byte_array(0).expect("Failed to create byte array"))
+        }
+        None => env.new_byte_array(0).expect("Failed to create byte array"),
+    }
+}
+
+/// Perform periodic maintenance (tick)
+///
+/// JNI Signature: (JJ)[B
+#[no_mangle]
+pub extern "system" fn Java_com_hive_btle_HiveMesh_nativeTick<'local>(
+    env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+    now_ms: jlong,
+) -> JByteArray<'local> {
+    let doc_bytes = if let Ok(storage) = get_mesh_storage().lock() {
+        storage.get(&handle).and_then(|m| m.tick(now_ms as u64))
+    } else {
+        None
+    };
+
+    match doc_bytes {
+        Some(bytes) => env
+            .byte_array_from_slice(&bytes)
+            .unwrap_or_else(|_| env.new_byte_array(0).expect("Failed to create byte array")),
+        None => env.new_byte_array(0).expect("Failed to create byte array"),
+    }
+}
+
+/// Get peer count
+///
+/// JNI Signature: (J)I
+#[no_mangle]
+pub extern "system" fn Java_com_hive_btle_HiveMesh_nativeGetPeerCount<'local>(
+    _env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+) -> jint {
+    if let Ok(storage) = get_mesh_storage().lock() {
+        storage
+            .get(&handle)
+            .map(|m| m.peer_count() as jint)
+            .unwrap_or(0)
+    } else {
+        0
+    }
+}
+
+/// Get connected peer count
+///
+/// JNI Signature: (J)I
+#[no_mangle]
+pub extern "system" fn Java_com_hive_btle_HiveMesh_nativeGetConnectedCount<'local>(
+    _env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+) -> jint {
+    if let Ok(storage) = get_mesh_storage().lock() {
+        storage
+            .get(&handle)
+            .map(|m| m.connected_count() as jint)
+            .unwrap_or(0)
+    } else {
+        0
+    }
+}
+
+/// Get total counter value
+///
+/// JNI Signature: (J)J
+#[no_mangle]
+pub extern "system" fn Java_com_hive_btle_HiveMesh_nativeGetTotalCount<'local>(
+    _env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+) -> jlong {
+    if let Ok(storage) = get_mesh_storage().lock() {
+        storage
+            .get(&handle)
+            .map(|m| m.total_count() as jlong)
+            .unwrap_or(0)
+    } else {
+        0
+    }
+}
+
+/// Check if emergency is active
+///
+/// JNI Signature: (J)Z
+#[no_mangle]
+pub extern "system" fn Java_com_hive_btle_HiveMesh_nativeIsEmergencyActive<'local>(
+    _env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+) -> jboolean {
+    if let Ok(storage) = get_mesh_storage().lock() {
+        storage
+            .get(&handle)
+            .map(|m| if m.is_emergency_active() { 1 } else { 0 })
+            .unwrap_or(0)
+    } else {
+        0
+    }
+}
+
+/// Check if ACK is active
+///
+/// JNI Signature: (J)Z
+#[no_mangle]
+pub extern "system" fn Java_com_hive_btle_HiveMesh_nativeIsAckActive<'local>(
+    _env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+) -> jboolean {
+    if let Ok(storage) = get_mesh_storage().lock() {
+        storage
+            .get(&handle)
+            .map(|m| if m.is_ack_active() { 1 } else { 0 })
+            .unwrap_or(0)
+    } else {
+        0
+    }
+}
+
+/// Check if device matches our mesh
+///
+/// JNI Signature: (JLjava/lang/String;)Z
+#[no_mangle]
+pub extern "system" fn Java_com_hive_btle_HiveMesh_nativeMatchesMesh<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+    device_mesh_id: JString<'local>,
+) -> jboolean {
+    let mesh_id_opt: Option<String> = if device_mesh_id.is_null() {
+        None
+    } else {
+        env.get_string(&device_mesh_id).ok().map(|s| s.into())
+    };
+
+    if let Ok(storage) = get_mesh_storage().lock() {
+        storage
+            .get(&handle)
+            .map(|m| {
+                if m.matches_mesh(mesh_id_opt.as_deref()) {
+                    1
+                } else {
+                    0
+                }
+            })
+            .unwrap_or(0)
+    } else {
+        0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     // JNI tests require Android runtime environment
