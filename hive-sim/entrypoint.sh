@@ -8,6 +8,17 @@ echo "[${NODE_ID}] CAP Protocol Simulation Node starting"
 echo "[${NODE_ID}] Mode: ${MODE}"
 echo "[${NODE_ID}] Container IP: $(hostname -I)"
 
+# Staged deployment support: wait for start signal before proceeding
+# This allows all containers to be deployed before starting the HIVE service
+WAIT_FOR_START=${WAIT_FOR_START:-false}
+if [ "$WAIT_FOR_START" = "true" ]; then
+    echo "[${NODE_ID}] STAGED MODE: Waiting for start signal..."
+    while [ ! -f /data/start ]; do
+        sleep 0.5
+    done
+    echo "[${NODE_ID}] Start signal received, proceeding..."
+fi
+
 # Check if we're using traditional baseline (no Ditto required)
 USE_TRADITIONAL=${USE_TRADITIONAL:-false}
 USE_PRODUCER_ONLY=${USE_PRODUCER_ONLY:-false}
@@ -19,28 +30,23 @@ if [ "$MODE" = "p2p_mesh" ]; then
 fi
 
 # Check required environment variables (skip for traditional/producer-only/p2p-mesh baseline or automerge backend)
-# BACKEND defaults to "ditto" but can be overridden to "automerge" which doesn't need Ditto credentials
+# BACKEND defaults to "ditto" but can be overridden to "automerge" which doesn't need credentials
 BACKEND=${BACKEND:-ditto}
 
-# Support both DITTO_APP_ID (legacy) and HIVE_APP_ID (new) for the Ditto backend
-# If HIVE_APP_ID is set but DITTO_APP_ID is not, use HIVE_APP_ID
-if [ -n "$HIVE_APP_ID" ] && [ -z "$DITTO_APP_ID" ]; then
-    DITTO_APP_ID="$HIVE_APP_ID"
-fi
-
+# For ditto backend, verify HIVE credentials are set
+# The Rust code in credentials.rs handles fallbacks internally
 if [ "$USE_TRADITIONAL" != "true" ] && [ "$USE_PRODUCER_ONLY" != "true" ] && [ "$USE_P2P_MESH" != "true" ] && [ "$BACKEND" != "automerge" ]; then
-    if [ -z "$DITTO_APP_ID" ] && [ -z "$HIVE_APP_ID" ]; then
-        echo "[${NODE_ID}] ERROR: DITTO_APP_ID or HIVE_APP_ID not set"
+    if [ -z "$HIVE_APP_ID" ]; then
+        echo "[${NODE_ID}] ERROR: HIVE_APP_ID not set"
         exit 1
     fi
-
-    if [ -z "$DITTO_OFFLINE_TOKEN" ]; then
-        echo "[${NODE_ID}] ERROR: DITTO_OFFLINE_TOKEN not set"
+    if [ -z "$HIVE_OFFLINE_TOKEN" ]; then
+        echo "[${NODE_ID}] ERROR: HIVE_OFFLINE_TOKEN not set"
         exit 1
     fi
-
-    if [ -z "$DITTO_SHARED_KEY" ]; then
-        echo "[${NODE_ID}] ERROR: DITTO_SHARED_KEY not set"
+    # Accept either HIVE_SECRET_KEY or HIVE_SHARED_KEY (credentials.rs handles both)
+    if [ -z "$HIVE_SECRET_KEY" ] && [ -z "$HIVE_SHARED_KEY" ]; then
+        echo "[${NODE_ID}] ERROR: HIVE_SECRET_KEY or HIVE_SHARED_KEY not set"
         exit 1
     fi
 fi
@@ -92,12 +98,6 @@ if [ -n "$BANDWIDTH" ]; then
     tc qdisc add dev eth0 root tbf rate "$TC_RATE" burst 32kbit latency 400ms 2>/dev/null || \
         echo "[${NODE_ID}] Warning: Failed to apply bandwidth constraint (may already exist or no permission)"
 fi
-
-# Export Ditto/HIVE environment variables
-export DITTO_APP_ID
-export DITTO_OFFLINE_TOKEN
-export DITTO_SHARED_KEY
-export HIVE_APP_ID
 
 # Run the appropriate simulation node
 if [ "$USE_P2P_MESH" = "true" ] || [ "$MODE" = "p2p_mesh" ]; then
