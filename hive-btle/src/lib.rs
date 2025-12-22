@@ -125,9 +125,9 @@ pub const HIVE_SERVICE_UUID: uuid::Uuid = uuid::uuid!("f47ac10b-58cc-4372-a567-0
 
 /// HIVE BLE Service UUID (16-bit short form)
 ///
-/// Used for legacy advertising to fit within 31-byte limit.
-/// Assigned from Bluetooth SIG custom range.
-pub const HIVE_SERVICE_UUID_16BIT: u16 = 0xD479;
+/// Derived from the first two bytes of the 128-bit UUID (0xF47A from f47ac10b).
+/// Used for space-constrained advertising to fit within 31-byte limit.
+pub const HIVE_SERVICE_UUID_16BIT: u16 = 0xF47A;
 
 /// HIVE Node Info Characteristic UUID
 pub const CHAR_NODE_INFO_UUID: u16 = 0x0001;

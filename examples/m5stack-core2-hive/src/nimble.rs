@@ -652,12 +652,22 @@ static mut GATT_SVCS: [ble_gatt_svc_def; 2] = unsafe { core::mem::zeroed() };
 static mut GATT_CHARS: [ble_gatt_chr_def; 2] = unsafe { core::mem::zeroed() };
 static mut SVC_UUID: ble_uuid128_t = unsafe { core::mem::zeroed() };
 static mut CHR_UUID: ble_uuid128_t = unsafe { core::mem::zeroed() };
-static mut ADV_UUID: ble_uuid16_t = unsafe { core::mem::zeroed() };
+/// Device name for advertising (e.g., "HIVE_DEMO-12345678")
+static mut DEVICE_NAME: [u8; 20] = [0; 20];
+static mut DEVICE_NAME_LEN: u8 = 0;
 
 /// Initialize NimBLE stack
-pub fn init(_node_id: NodeId) -> Result<(), i32> {
+pub fn init(node_id: NodeId) -> Result<(), i32> {
     unsafe {
         info!("BLE: Initializing NimBLE");
+
+        // Build device name from node ID (e.g., "HIVE_DEMO-12345678")
+        let name = format!("HIVE_DEMO-{:08X}", node_id.as_u32());
+        let name_bytes = name.as_bytes();
+        let len = name_bytes.len().min(DEVICE_NAME.len());
+        DEVICE_NAME[..len].copy_from_slice(&name_bytes[..len]);
+        DEVICE_NAME_LEN = len as u8;
+        info!("BLE: Device name: {}", name);
 
         // Store our MAC for connection arbitration
         let mut mac = [0u8; 6];
@@ -695,10 +705,6 @@ pub fn init(_node_id: NodeId) -> Result<(), i32> {
         // Set up characteristic UUID (128-bit)
         CHR_UUID.u.type_ = BLE_UUID_TYPE_128 as u8;
         CHR_UUID.value = DOC_CHAR_UUID;
-
-        // Set up 16-bit UUID for advertising
-        ADV_UUID.u.type_ = BLE_UUID_TYPE_16 as u8;
-        ADV_UUID.value = HIVE_SERVICE_UUID_16;
 
         // Configure document characteristic
         GATT_CHARS[0].uuid = &raw const CHR_UUID.u as *const _;
@@ -772,17 +778,29 @@ pub fn start_advertising() -> Result<(), i32> {
         adv_params.itvl_min = 160; // 100ms
         adv_params.itvl_max = 320; // 200ms
 
-        // Build advertising data
+        // Build advertising data with 128-bit UUID (standard across all platforms)
         let mut fields: ble_hs_adv_fields = core::mem::zeroed();
         fields.flags = (BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP) as u8;
-        fields.uuids16 = &raw const ADV_UUID as *const _ as *mut ble_uuid16_t;
-        fields.num_uuids16 = 1;
-        fields.set_uuids16_is_complete(1);
+        fields.uuids128 = &raw const SVC_UUID as *const _ as *mut ble_uuid128_t;
+        fields.num_uuids128 = 1;
+        fields.set_uuids128_is_complete(1);
 
         let ret = ble_gap_adv_set_fields(&fields);
         if ret != 0 {
             error!("BLE: ble_gap_adv_set_fields failed: {}", ret);
             return Err(ret);
+        }
+
+        // Set scan response with device name
+        let mut rsp_fields: ble_hs_adv_fields = core::mem::zeroed();
+        rsp_fields.name = DEVICE_NAME.as_ptr();
+        rsp_fields.name_len = DEVICE_NAME_LEN;
+        rsp_fields.set_name_is_complete(1);
+
+        let ret = ble_gap_adv_rsp_set_fields(&rsp_fields);
+        if ret != 0 {
+            warn!("BLE: ble_gap_adv_rsp_set_fields failed: {}", ret);
+            // Continue anyway - name is optional
         }
 
         let ret = ble_gap_adv_start(
