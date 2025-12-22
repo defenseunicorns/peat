@@ -18,11 +18,22 @@ const BLE_HS_FOREVER: i32 = i32::MAX;
 
 use hive_btle::NodeId;
 
-/// HIVE Service UUID (16-bit)
-pub const HIVE_SERVICE_UUID: u16 = 0xF47A;
+/// HIVE Service UUID (128-bit) - must match Android/iOS
+/// f47ac10b-58cc-4372-a567-0e02b2c3d479
+pub const HIVE_SERVICE_UUID: [u8; 16] = [
+    0x79, 0xd4, 0xc3, 0xb2, 0x02, 0x0e, 0x67, 0xa5,
+    0x72, 0x43, 0xcc, 0x58, 0x0b, 0xc1, 0x7a, 0xf4
+];
 
-/// Document characteristic UUID (16-bit)
-pub const DOC_CHAR_UUID: u16 = 0xF47B;
+/// Document characteristic UUID (128-bit) - must match Android/iOS
+/// f47a0003-58cc-4372-a567-0e02b2c3d479
+pub const DOC_CHAR_UUID: [u8; 16] = [
+    0x79, 0xd4, 0xc3, 0xb2, 0x02, 0x0e, 0x67, 0xa5,
+    0x72, 0x43, 0xcc, 0x58, 0x03, 0x00, 0x7a, 0xf4
+];
+
+/// 16-bit alias for advertising (Android scans for this too)
+pub const HIVE_SERVICE_UUID_16: u16 = 0xF47A;
 
 /// Maximum document size
 const MAX_DOC_SIZE: usize = 256;
@@ -122,7 +133,7 @@ fn get_peer_last_sync(mac: &[u8; 6]) -> u32 {
     0
 }
 
-/// Check if advertising data contains HIVE service UUID
+/// Check if advertising data contains HIVE service UUID (16-bit or 128-bit)
 unsafe fn has_hive_service(data: *const u8, len: u8) -> bool {
     if data.is_null() || len < 4 {
         return false;
@@ -142,12 +153,29 @@ unsafe fn has_hive_service(data: *const u8, len: u8) -> bool {
             let mut j = 2usize;
             while j + 1 < field_len + 1 {
                 let uuid = u16::from_le_bytes([*data.add(i + j), *data.add(i + j + 1)]);
-                if uuid == HIVE_SERVICE_UUID {
+                if uuid == HIVE_SERVICE_UUID_16 {
                     return true;
                 }
                 j += 2;
             }
         }
+
+        // Check for Complete or Incomplete 128-bit Service UUIDs (0x07 or 0x06)
+        if (field_type == 0x06 || field_type == 0x07) && field_len >= 17 {
+            // Parse 128-bit UUIDs
+            let mut j = 2usize;
+            while j + 15 < field_len + 1 {
+                let mut uuid_bytes = [0u8; 16];
+                for k in 0..16 {
+                    uuid_bytes[k] = *data.add(i + j + k);
+                }
+                if uuid_bytes == HIVE_SERVICE_UUID {
+                    return true;
+                }
+                j += 16;
+            }
+        }
+
         i += field_len + 1;
     }
     false
@@ -412,22 +440,30 @@ unsafe extern "C" fn gatt_disc_chr_cb(
 
     if !chr.is_null() {
         let c = &*chr;
-        // Check if this is the HIVE document characteristic
-        if c.uuid.u.type_ == BLE_UUID_TYPE_16 as u8 {
+        // Check if this is the HIVE document characteristic (128-bit or 16-bit)
+        let is_hive_char = if c.uuid.u.type_ == BLE_UUID_TYPE_128 as u8 {
+            let uuid128 = &*((&c.uuid) as *const ble_uuid_any_t as *const ble_uuid128_t);
+            uuid128.value == DOC_CHAR_UUID
+        } else if c.uuid.u.type_ == BLE_UUID_TYPE_16 as u8 {
+            // Also check for 16-bit alias (0xF47B) for legacy devices
             let uuid16 = &*((&c.uuid) as *const ble_uuid_any_t as *const ble_uuid16_t);
-            if uuid16.value == DOC_CHAR_UUID {
-                info!("BLE: Found HIVE document characteristic, handle={}", c.val_handle);
-                PEER_DOC_HANDLE.store(c.val_handle, Ordering::SeqCst);
+            uuid16.value == 0xF47B
+        } else {
+            false
+        };
 
-                // Store in the connection struct
-                let disc_conn = DISCOVERING_CONN.load(Ordering::SeqCst);
-                if let Ok(mut conns) = CONNECTIONS.lock() {
-                    for conn in conns.iter_mut() {
-                        if conn.active && conn.handle == disc_conn {
-                            conn.peer_doc_handle = c.val_handle;
-                            info!("BLE: Stored peer doc handle {} for conn {}", c.val_handle, disc_conn);
-                            break;
-                        }
+        if is_hive_char {
+            info!("BLE: Found HIVE document characteristic, handle={}", c.val_handle);
+            PEER_DOC_HANDLE.store(c.val_handle, Ordering::SeqCst);
+
+            // Store in the connection struct
+            let disc_conn = DISCOVERING_CONN.load(Ordering::SeqCst);
+            if let Ok(mut conns) = CONNECTIONS.lock() {
+                for conn in conns.iter_mut() {
+                    if conn.active && conn.handle == disc_conn {
+                        conn.peer_doc_handle = c.val_handle;
+                        info!("BLE: Stored peer doc handle {} for conn {}", c.val_handle, disc_conn);
+                        break;
                     }
                 }
             }
@@ -614,8 +650,9 @@ unsafe extern "C" fn gatt_access_cb(
 /// GATT service definition (must be static)
 static mut GATT_SVCS: [ble_gatt_svc_def; 2] = unsafe { core::mem::zeroed() };
 static mut GATT_CHARS: [ble_gatt_chr_def; 2] = unsafe { core::mem::zeroed() };
-static mut SVC_UUID: ble_uuid16_t = unsafe { core::mem::zeroed() };
-static mut CHR_UUID: ble_uuid16_t = unsafe { core::mem::zeroed() };
+static mut SVC_UUID: ble_uuid128_t = unsafe { core::mem::zeroed() };
+static mut CHR_UUID: ble_uuid128_t = unsafe { core::mem::zeroed() };
+static mut ADV_UUID: ble_uuid16_t = unsafe { core::mem::zeroed() };
 
 /// Initialize NimBLE stack
 pub fn init(_node_id: NodeId) -> Result<(), i32> {
@@ -651,13 +688,17 @@ pub fn init(_node_id: NodeId) -> Result<(), i32> {
             info!("BLE: Preferred MTU set to 128");
         }
 
-        // Set up service UUID
-        SVC_UUID.u.type_ = BLE_UUID_TYPE_16 as u8;
+        // Set up service UUID (128-bit)
+        SVC_UUID.u.type_ = BLE_UUID_TYPE_128 as u8;
         SVC_UUID.value = HIVE_SERVICE_UUID;
 
-        // Set up characteristic UUID
-        CHR_UUID.u.type_ = BLE_UUID_TYPE_16 as u8;
+        // Set up characteristic UUID (128-bit)
+        CHR_UUID.u.type_ = BLE_UUID_TYPE_128 as u8;
         CHR_UUID.value = DOC_CHAR_UUID;
+
+        // Set up 16-bit UUID for advertising
+        ADV_UUID.u.type_ = BLE_UUID_TYPE_16 as u8;
+        ADV_UUID.value = HIVE_SERVICE_UUID_16;
 
         // Configure document characteristic
         GATT_CHARS[0].uuid = &raw const CHR_UUID.u as *const _;
@@ -734,7 +775,7 @@ pub fn start_advertising() -> Result<(), i32> {
         // Build advertising data
         let mut fields: ble_hs_adv_fields = core::mem::zeroed();
         fields.flags = (BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP) as u8;
-        fields.uuids16 = &raw const SVC_UUID as *const _ as *mut ble_uuid16_t;
+        fields.uuids16 = &raw const ADV_UUID as *const _ as *mut ble_uuid16_t;
         fields.num_uuids16 = 1;
         fields.set_uuids16_is_complete(1);
 
@@ -876,25 +917,37 @@ pub fn check_rotation() -> bool {
 pub fn gossip_document(data: &[u8]) -> usize {
     let mut sent_count = 0;
 
-    // Update local buffer
+    // Update local buffer (for GATT reads)
     set_document(data);
 
     // Send via notification to all peers (we're peripheral)
+    // Use ble_gatts_notify_custom to send actual data, not just trigger a read
     let our_handle = DOC_CHAR_HANDLE.load(Ordering::SeqCst);
     if our_handle != 0 {
         if let Ok(conns) = CONNECTIONS.lock() {
             for conn in conns.iter() {
                 if conn.active {
                     unsafe {
-                        let ret = ble_gatts_notify(conn.handle, our_handle);
-                        if ret == 0 {
-                            info!("BLE: Gossiped via notify to conn {}", conn.handle);
-                            sent_count += 1;
+                        // Create mbuf with the data to send
+                        let om = ble_hs_mbuf_from_flat(data.as_ptr() as *const c_void, data.len() as u16);
+                        if !om.is_null() {
+                            let ret = ble_gatts_notify_custom(conn.handle, our_handle, om);
+                            if ret == 0 {
+                                info!("BLE: Gossiped via notify to conn {} ({} bytes)", conn.handle, data.len());
+                                sent_count += 1;
+                            } else {
+                                warn!("BLE: Notify failed: {} (conn={}, handle={})", ret, conn.handle, our_handle);
+                                os_mbuf_free_chain(om);
+                            }
+                        } else {
+                            warn!("BLE: Failed to create mbuf for notify");
                         }
                     }
                 }
             }
         }
+    } else {
+        warn!("BLE: our_handle is 0, cannot send notifications");
     }
 
     // Also write to peers where we're the central
@@ -906,9 +959,10 @@ pub fn gossip_document(data: &[u8]) -> usize {
                     if !om.is_null() {
                         let ret = ble_gattc_write_no_rsp(conn.handle, conn.peer_doc_handle, om);
                         if ret == 0 {
-                            info!("BLE: Gossiped via write to conn {} handle {}", conn.handle, conn.peer_doc_handle);
+                            info!("BLE: Gossiped via write to conn {} handle {} ({} bytes)", conn.handle, conn.peer_doc_handle, data.len());
                             sent_count += 1;
                         } else {
+                            warn!("BLE: Write failed: {}", ret);
                             os_mbuf_free_chain(om);
                         }
                     }
@@ -917,7 +971,7 @@ pub fn gossip_document(data: &[u8]) -> usize {
         }
     }
 
-    info!("BLE: Gossiped to {} peers", sent_count);
+    info!("BLE: Gossiped to {} peers total", sent_count);
     sent_count
 }
 
