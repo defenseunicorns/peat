@@ -6,7 +6,11 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
+import android.bluetooth.BluetoothGattServer
+import android.bluetooth.BluetoothGattServerCallback
+import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
 import android.bluetooth.le.BluetoothLeAdvertiser
@@ -273,10 +277,16 @@ class HiveBtle(
     private var scanCallback: ScanCallbackProxy? = null
     private var advertiseCallback: AdvertiseCallbackProxy? = null
 
-    // Active GATT connections
+    // Active GATT connections (as Central - connecting to others)
     private val connections = ConcurrentHashMap<String, BluetoothGatt>()
     private val gattCallbacks = ConcurrentHashMap<String, GattCallbackProxy>()
     private val connectionIdCounter = AtomicLong(0)
+
+    // GATT Server (as Peripheral - others connect to us)
+    private var gattServer: BluetoothGattServer? = null
+    private var gattServerCallback: GattServerCallback? = null
+    private val connectedCentrals = ConcurrentHashMap<String, BluetoothDevice>() // address -> device
+    private var syncDataCharacteristic: BluetoothGattCharacteristic? = null
 
     // State
     private var isInitialized = false
@@ -508,22 +518,14 @@ class HiveBtle(
             .setTimeout(0) // Advertise indefinitely
             .build()
 
-        // Build advertise data
-        // Include HIVE service UUID and node ID in service data
-        val nodeIdBytes = byteArrayOf(
-            (nodeId shr 24).toByte(),
-            (nodeId shr 16).toByte(),
-            (nodeId shr 8).toByte(),
-            nodeId.toByte()
-        )
-
+        // Build advertise data - just service UUID to stay within 31-byte limit
+        // Full 128-bit UUID + service data exceeds the limit
         val data = AdvertiseData.Builder()
             .setIncludeDeviceName(false) // Name goes in scan response
             .addServiceUuid(ParcelUuid(HIVE_SERVICE_UUID))
-            .addServiceData(ParcelUuid(HIVE_SERVICE_UUID), nodeIdBytes)
             .build()
 
-        // Build scan response with device name
+        // Build scan response with device name (contains mesh ID and node ID)
         val scanResponse = AdvertiseData.Builder()
             .setIncludeDeviceName(true)
             .build()
@@ -558,6 +560,349 @@ class HiveBtle(
         advertiseCallback = null
         isAdvertising = false
         Log.i(TAG, "Stopped advertising")
+    }
+
+    // ==================== GATT Server (Peripheral Mode) ====================
+
+    /**
+     * Start the GATT server to accept incoming connections.
+     *
+     * This allows iOS and other devices to connect to this Android device
+     * and read/write the HIVE document characteristic.
+     */
+    private fun startGattServer() {
+        if (gattServer != null) {
+            Log.w(TAG, "GATT server already running")
+            return
+        }
+
+        val manager = bluetoothManager ?: return
+
+        try {
+            gattServerCallback = GattServerCallback()
+            gattServer = manager.openGattServer(context, gattServerCallback)
+
+            if (gattServer == null) {
+                Log.e(TAG, "Failed to open GATT server")
+                return
+            }
+
+            // Create the HIVE service
+            val service = BluetoothGattService(
+                HIVE_SERVICE_UUID,
+                BluetoothGattService.SERVICE_TYPE_PRIMARY
+            )
+
+            // Create the sync data characteristic with read, write, notify properties
+            syncDataCharacteristic = BluetoothGattCharacteristic(
+                HIVE_CHAR_DOCUMENT,
+                BluetoothGattCharacteristic.PROPERTY_READ or
+                        BluetoothGattCharacteristic.PROPERTY_WRITE or
+                        BluetoothGattCharacteristic.PROPERTY_NOTIFY,
+                BluetoothGattCharacteristic.PERMISSION_READ or
+                        BluetoothGattCharacteristic.PERMISSION_WRITE
+            )
+
+            // Add CCCD for notifications
+            val cccd = BluetoothGattDescriptor(
+                CCCD_UUID,
+                BluetoothGattDescriptor.PERMISSION_READ or BluetoothGattDescriptor.PERMISSION_WRITE
+            )
+            syncDataCharacteristic?.addDescriptor(cccd)
+
+            service.addCharacteristic(syncDataCharacteristic)
+
+            // Add the service to the server
+            val added = gattServer?.addService(service) ?: false
+            if (added) {
+                Log.i(TAG, "GATT server started with HIVE service")
+            } else {
+                Log.e(TAG, "Failed to add HIVE service to GATT server")
+            }
+
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Missing BLUETOOTH_CONNECT permission for GATT server", e)
+        }
+    }
+
+    /**
+     * Stop the GATT server.
+     */
+    private fun stopGattServer() {
+        try {
+            gattServer?.close()
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Missing permission to close GATT server", e)
+        }
+        gattServer = null
+        gattServerCallback = null
+        connectedCentrals.clear()
+        Log.i(TAG, "GATT server stopped")
+    }
+
+    /**
+     * Send a notification to all connected centrals (devices that connected to us).
+     */
+    private fun notifyConnectedCentrals(data: ByteArray) {
+        val server = gattServer ?: return
+        val characteristic = syncDataCharacteristic ?: return
+
+        if (connectedCentrals.isEmpty()) {
+            Log.d(TAG, "No connected centrals to notify")
+            return
+        }
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                for ((address, device) in connectedCentrals) {
+                    val result = server.notifyCharacteristicChanged(device, characteristic, false, data)
+                    Log.d(TAG, "Notified central $address: result=$result")
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                characteristic.value = data
+                for ((address, device) in connectedCentrals) {
+                    @Suppress("DEPRECATION")
+                    val result = server.notifyCharacteristicChanged(device, characteristic, false)
+                    Log.d(TAG, "Notified central $address: result=$result")
+                }
+            }
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Missing permission to notify centrals", e)
+        }
+    }
+
+    /**
+     * GATT Server callback for handling incoming connections and requests.
+     */
+    private inner class GattServerCallback : BluetoothGattServerCallback() {
+
+        override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
+            try {
+                val address = device.address
+                val name = device.name ?: "Unknown"
+
+                when (newState) {
+                    BluetoothProfile.STATE_CONNECTED -> {
+                        Log.i(TAG, "Central connected: $name ($address)")
+                        connectedCentrals[address] = device
+
+                        // Notify mesh listener about new connection
+                        handler.post {
+                            meshListener?.onMeshUpdated(peers.values.toList())
+                        }
+                    }
+                    BluetoothProfile.STATE_DISCONNECTED -> {
+                        Log.i(TAG, "Central disconnected: $name ($address)")
+                        connectedCentrals.remove(address)
+
+                        handler.post {
+                            meshListener?.onMeshUpdated(peers.values.toList())
+                        }
+                    }
+                }
+            } catch (e: SecurityException) {
+                Log.e(TAG, "Missing permission in onConnectionStateChange", e)
+            }
+        }
+
+        override fun onCharacteristicReadRequest(
+            device: BluetoothDevice,
+            requestId: Int,
+            offset: Int,
+            characteristic: BluetoothGattCharacteristic
+        ) {
+            try {
+                val address = device.address
+                Log.d(TAG, "Read request from $address for ${characteristic.uuid}")
+
+                if (characteristic.uuid == HIVE_CHAR_DOCUMENT) {
+                    // Return current document state
+                    val documentBytes = HiveDocument.encode(nodeId, localCounter, null)
+                    val response = if (offset > documentBytes.size) {
+                        ByteArray(0)
+                    } else {
+                        documentBytes.copyOfRange(offset, documentBytes.size)
+                    }
+
+                    gattServer?.sendResponse(
+                        device,
+                        requestId,
+                        BluetoothGatt.GATT_SUCCESS,
+                        offset,
+                        response
+                    )
+                    Log.d(TAG, "Sent ${response.size} bytes to $address")
+                } else {
+                    gattServer?.sendResponse(
+                        device,
+                        requestId,
+                        BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED,
+                        0,
+                        null
+                    )
+                }
+            } catch (e: SecurityException) {
+                Log.e(TAG, "Missing permission in onCharacteristicReadRequest", e)
+            }
+        }
+
+        override fun onCharacteristicWriteRequest(
+            device: BluetoothDevice,
+            requestId: Int,
+            characteristic: BluetoothGattCharacteristic,
+            preparedWrite: Boolean,
+            responseNeeded: Boolean,
+            offset: Int,
+            value: ByteArray?
+        ) {
+            try {
+                val address = device.address
+                val dataSize = value?.size ?: 0
+                Log.i(TAG, "Write request from $address: $dataSize bytes")
+
+                if (characteristic.uuid == HIVE_CHAR_DOCUMENT && value != null) {
+                    // Log raw data for debugging
+                    val hexData = value.joinToString(" ") { String.format("%02X", it) }
+                    Log.d(TAG, "Received data: $hexData")
+
+                    // Parse the document
+                    val document = HiveDocument.decode(value)
+                    if (document != null) {
+                        Log.i(TAG, "Received document from ${String.format("%08X", document.nodeId)}, event=${document.currentEventType()}")
+
+                        // Handle the document - find or create peer
+                        val sourceNodeId = document.nodeId
+                        if (sourceNodeId != nodeId && sourceNodeId != 0L) {
+                            // Find existing peer or create new one
+                            var peer = peers.values.find { it.address == address }
+                            if (peer == null) {
+                                // Check if we know this node by nodeId
+                                peer = peers[sourceNodeId]
+                            }
+
+                            if (peer == null) {
+                                // New peer from incoming connection
+                                // Set lastDocument = null so the first event triggers onPeerEvent
+                                peer = HivePeer(
+                                    nodeId = sourceNodeId,
+                                    address = address,
+                                    name = generateDeviceName(meshId, sourceNodeId),
+                                    meshId = meshId,
+                                    rssi = 0,
+                                    isConnected = true,
+                                    lastDocument = null,
+                                    lastSeen = System.currentTimeMillis()
+                                )
+                                peers[sourceNodeId] = peer
+                                addressToNodeId[address] = sourceNodeId
+                                Log.i(TAG, "Added peer from GATT write: ${peer.displayName()}")
+                            } else {
+                                // Update existing peer
+                                if (peer.nodeId != sourceNodeId) {
+                                    // NodeId changed - update mapping
+                                    peers.remove(peer.nodeId)
+                                    val updatedPeer = peer.copy(nodeId = sourceNodeId)
+                                    peers[sourceNodeId] = updatedPeer
+                                    addressToNodeId[address] = sourceNodeId
+                                    peer = updatedPeer
+                                }
+                            }
+
+                            // Handle document content
+                            handlePeerDocumentInternal(peer, document)
+                        }
+                    } else {
+                        Log.w(TAG, "Failed to decode document from $address")
+                    }
+
+                    if (responseNeeded) {
+                        gattServer?.sendResponse(
+                            device,
+                            requestId,
+                            BluetoothGatt.GATT_SUCCESS,
+                            0,
+                            null
+                        )
+                    }
+                } else {
+                    if (responseNeeded) {
+                        gattServer?.sendResponse(
+                            device,
+                            requestId,
+                            BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED,
+                            0,
+                            null
+                        )
+                    }
+                }
+            } catch (e: SecurityException) {
+                Log.e(TAG, "Missing permission in onCharacteristicWriteRequest", e)
+            }
+        }
+
+        override fun onDescriptorReadRequest(
+            device: BluetoothDevice,
+            requestId: Int,
+            offset: Int,
+            descriptor: BluetoothGattDescriptor
+        ) {
+            try {
+                if (descriptor.uuid == CCCD_UUID) {
+                    val value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                    gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, value)
+                } else {
+                    gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, 0, null)
+                }
+            } catch (e: SecurityException) {
+                Log.e(TAG, "Missing permission in onDescriptorReadRequest", e)
+            }
+        }
+
+        override fun onDescriptorWriteRequest(
+            device: BluetoothDevice,
+            requestId: Int,
+            descriptor: BluetoothGattDescriptor,
+            preparedWrite: Boolean,
+            responseNeeded: Boolean,
+            offset: Int,
+            value: ByteArray?
+        ) {
+            try {
+                val address = device.address
+                if (descriptor.uuid == CCCD_UUID) {
+                    // Client is subscribing to notifications
+                    val enabled = value?.contentEquals(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE) == true
+                    Log.i(TAG, "Notification ${if (enabled) "enabled" else "disabled"} for $address")
+
+                    if (responseNeeded) {
+                        gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
+                    }
+                } else {
+                    if (responseNeeded) {
+                        gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, 0, null)
+                    }
+                }
+            } catch (e: SecurityException) {
+                Log.e(TAG, "Missing permission in onDescriptorWriteRequest", e)
+            }
+        }
+
+        override fun onServiceAdded(status: Int, service: BluetoothGattService) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.i(TAG, "GATT service added: ${service.uuid}")
+            } else {
+                Log.e(TAG, "Failed to add GATT service: status=$status")
+            }
+        }
+
+        override fun onMtuChanged(device: BluetoothDevice, mtu: Int) {
+            try {
+                Log.d(TAG, "MTU changed to $mtu for ${device.address}")
+            } catch (e: SecurityException) {
+                Log.e(TAG, "Missing permission in onMtuChanged", e)
+            }
+        }
     }
 
     /**
@@ -645,6 +990,13 @@ class HiveBtle(
         meshListener = listener
         isMeshRunning = true
 
+        // Start GATT server first (so iOS can connect to us)
+        try {
+            startGattServer()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start GATT server", e)
+        }
+
         // Start advertising
         try {
             startAdvertising()
@@ -663,7 +1015,7 @@ class HiveBtle(
         handler.post(cleanupRunnable)
         handler.postDelayed(syncRunnable, SYNC_INTERVAL_MS)
 
-        Log.i(TAG, "Mesh started for HIVE-${String.format("%08X", nodeId)}")
+        Log.i(TAG, "Mesh started for HIVE-${String.format("%08X", nodeId)} with GATT server")
     }
 
     /**
@@ -678,6 +1030,7 @@ class HiveBtle(
 
         stopScan()
         stopAdvertising()
+        stopGattServer()
 
         // Disconnect all peers
         for (address in connections.keys.toList()) {
@@ -702,7 +1055,7 @@ class HiveBtle(
             return
         }
 
-        Log.i(TAG, "Broadcasting event: $eventType")
+        Log.i(TAG, "Broadcasting event: $eventType to ${connections.size} peripherals and ${connectedCentrals.size} centrals")
 
         // Increment our counter
         incrementLocalCounter()
@@ -720,10 +1073,13 @@ class HiveBtle(
 
         val documentBytes = HiveDocument.encode(nodeId, localCounter, peripheral)
 
-        // Send to all connected peers
+        // Send to all connected peripherals (devices we connected to as Central)
         for ((address, gatt) in connections) {
             writeDocumentToGatt(gatt, documentBytes)
         }
+
+        // Send to all connected centrals (devices that connected to us as Peripheral)
+        notifyConnectedCentrals(documentBytes)
     }
 
     /**
@@ -884,23 +1240,28 @@ class HiveBtle(
 
         Log.d(TAG, "Received document from ${peer.displayName()} (docNodeId=${String.format("%08X", document.nodeId)}): event=${document.currentEventType()}")
 
+        // Look up current peer by address first (peer reference may be stale if nodeId changed)
+        val currentPeer = peers.values.find { it.address == peer.address }
+            ?: peers[document.nodeId]
+            ?: peer
+
         // Update peer's nodeId from document if different (document nodeId is authoritative)
-        if (document.nodeId != peer.nodeId && document.nodeId != 0L) {
-            val oldNodeId = peer.nodeId
+        if (document.nodeId != currentPeer.nodeId && document.nodeId != 0L) {
+            val oldNodeId = currentPeer.nodeId
             Log.i(TAG, "Updating peer nodeId from ${String.format("%08X", oldNodeId)} to ${String.format("%08X", document.nodeId)}")
 
-            // Re-register peer with correct nodeId
+            // Re-register peer with correct nodeId, preserving lastDocument
             peers.remove(oldNodeId)
-            val updatedPeer = peer.copy(nodeId = document.nodeId)
+            val updatedPeer = currentPeer.copy(nodeId = document.nodeId)
             peers[document.nodeId] = updatedPeer
-            addressToNodeId[peer.address] = document.nodeId
+            addressToNodeId[currentPeer.address] = document.nodeId
 
             // Continue with updated peer reference
             handlePeerDocumentInternal(updatedPeer, document)
             return
         }
 
-        handlePeerDocumentInternal(peer, document)
+        handlePeerDocumentInternal(currentPeer, document)
     }
 
     private fun handlePeerDocumentInternal(peer: HivePeer, document: HiveDocument) {
@@ -952,14 +1313,18 @@ class HiveBtle(
     }
 
     private fun syncWithPeers() {
-        if (connections.isEmpty()) return
+        if (connections.isEmpty() && connectedCentrals.isEmpty()) return
 
         // Create sync document (no event, just counter state - don't increment on sync)
         val documentBytes = HiveDocument.encode(nodeId, localCounter, null)
 
+        // Send to peripherals we connected to
         for ((address, gatt) in connections) {
             writeDocumentToGatt(gatt, documentBytes)
         }
+
+        // Send to centrals that connected to us
+        notifyConnectedCentrals(documentBytes)
     }
 
     private fun cleanupStalePeers() {
@@ -989,35 +1354,55 @@ class HiveBtle(
 
     /**
      * Generate nodeId from the local Bluetooth adapter's address.
-     * Falls back to a random ID if adapter address is unavailable (Android 12+ restrictions).
+     * Falls back to a persistent random ID if adapter address is unavailable (Android 12+ restrictions).
+     * The nodeId is persisted to SharedPreferences to remain consistent across app restarts.
      */
     @Suppress("MissingPermission")
     private fun generateNodeIdFromAdapter(): Long {
-        return try {
-            // On Android 12+, getAddress() requires BLUETOOTH_CONNECT and may return "02:00:00:00:00:00"
+        val prefs = context.getSharedPreferences("hive_btle", Context.MODE_PRIVATE)
+        val savedNodeId = prefs.getLong("node_id", 0L)
+
+        // Return saved nodeId if we have one
+        if (savedNodeId != 0L) {
+            Log.i(TAG, "Using persisted nodeId: ${String.format("%08X", savedNodeId)}")
+            return savedNodeId
+        }
+
+        // Try to get from adapter address first
+        val nodeId = try {
             val address = bluetoothAdapter?.address
             if (address != null && address != "02:00:00:00:00:00") {
                 // Use native Rust implementation for consistency across platforms
-                val nodeId = nativeDeriveNodeId(address)
-                if (nodeId != 0L) {
-                    nodeId
+                val derived = nativeDeriveNodeId(address)
+                if (derived != 0L) {
+                    derived
                 } else {
-                    // Fallback if native call fails
                     deriveNodeIdFromAddressFallback(address)
                 }
             } else {
-                // Fallback: generate from device identifiers or random
-                val fallback = (System.currentTimeMillis() and 0xFFFFFFFFL) xor
-                    (android.os.Process.myPid().toLong() shl 16)
-                Log.w(TAG, "Adapter address unavailable, using fallback nodeId: ${String.format("%08X", fallback)}")
-                fallback
+                // Generate random nodeId from UUID (similar to iOS approach)
+                val uuid = java.util.UUID.randomUUID()
+                val bytes = java.nio.ByteBuffer.allocate(16)
+                    .putLong(uuid.mostSignificantBits)
+                    .putLong(uuid.leastSignificantBits)
+                    .array()
+                // Use last 4 bytes like iOS does
+                ((bytes[12].toLong() and 0xFF) shl 24) or
+                    ((bytes[13].toLong() and 0xFF) shl 16) or
+                    ((bytes[14].toLong() and 0xFF) shl 8) or
+                    (bytes[15].toLong() and 0xFF)
             }
         } catch (e: SecurityException) {
-            // No permission to get adapter address
-            val fallback = (System.currentTimeMillis() and 0xFFFFFFFFL)
-            Log.w(TAG, "No permission for adapter address, using fallback nodeId: ${String.format("%08X", fallback)}")
-            fallback
+            // Generate random nodeId
+            val uuid = java.util.UUID.randomUUID()
+            (uuid.leastSignificantBits and 0xFFFFFFFFL)
         }
+
+        // Persist the nodeId
+        prefs.edit().putLong("node_id", nodeId).apply()
+        Log.i(TAG, "Generated and persisted new nodeId: ${String.format("%08X", nodeId)}")
+
+        return nodeId
     }
 
     /**
@@ -1131,9 +1516,19 @@ class HiveBtle(
     fun connectionCount(): Int = connections.size
 
     /**
-     * Get list of connected device addresses.
+     * Get list of connected device addresses (devices we connected to as Central).
      */
     fun connectedDevices(): List<String> = connections.keys.toList()
+
+    /**
+     * Get the number of connected centrals (devices that connected to us as Peripheral).
+     */
+    fun connectedCentralsCount(): Int = connectedCentrals.size
+
+    /**
+     * Check if GATT server is running.
+     */
+    fun isGattServerRunning(): Boolean = gattServer != null
 
     private fun checkInitialized() {
         if (!isInitialized) {
