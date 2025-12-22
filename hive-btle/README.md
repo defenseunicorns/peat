@@ -144,7 +144,7 @@ hive-btle defines a custom GATT service for mesh communication:
 
 | UUID | Characteristic | Description |
 |------|----------------|-------------|
-| `0xD479` | Service | HIVE BLE Service (16-bit short form) |
+| `0xF47A` | Service | HIVE BLE Service (16-bit short form) |
 | `0x0001` | Node Info | Node ID, capabilities, hierarchy level |
 | `0x0002` | Sync State | Vector clock and sync metadata |
 | `0x0003` | Sync Data | CRDT delta payloads (chunked) |
