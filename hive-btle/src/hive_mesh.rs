@@ -404,6 +404,54 @@ impl HiveMesh {
         })
     }
 
+    /// Called when data is received without a known identifier
+    ///
+    /// This is the simplest data receive method - it extracts the source node_id
+    /// from the document itself. Use this when you don't track identifiers
+    /// (e.g., ESP32 NimBLE).
+    pub fn on_ble_data(
+        &self,
+        identifier: &str,
+        data: &[u8],
+        now_ms: u64,
+    ) -> Option<DataReceivedResult> {
+        // Merge the document (extracts node_id internally)
+        let result = self.document_sync.merge_document(data)?;
+
+        // Record sync using the source_node from the merged document
+        self.peer_manager.record_sync(result.source_node, now_ms);
+
+        // Add the peer if not already known (creates peer entry from document data)
+        self.peer_manager
+            .on_incoming_connection(identifier, result.source_node, now_ms);
+
+        // Generate events based on what was received
+        if result.is_emergency() {
+            self.notify(HiveEvent::EmergencyReceived {
+                from_node: result.source_node,
+            });
+        } else if result.is_ack() {
+            self.notify(HiveEvent::AckReceived {
+                from_node: result.source_node,
+            });
+        }
+
+        if result.counter_changed {
+            self.notify(HiveEvent::DocumentSynced {
+                from_node: result.source_node,
+                total_count: result.total_count,
+            });
+        }
+
+        Some(DataReceivedResult {
+            source_node: result.source_node,
+            is_emergency: result.is_emergency(),
+            is_ack: result.is_ack(),
+            counter_changed: result.counter_changed,
+            total_count: result.total_count,
+        })
+    }
+
     // ==================== Periodic Maintenance ====================
 
     /// Periodic tick - call this regularly (e.g., every second)
@@ -482,6 +530,16 @@ impl HiveMesh {
     /// Get document version
     pub fn document_version(&self) -> u32 {
         self.document_sync.version()
+    }
+
+    /// Get document version (alias)
+    pub fn version(&self) -> u32 {
+        self.document_sync.version()
+    }
+
+    /// Update health status (battery percentage)
+    pub fn update_health(&self, battery_percent: u8) {
+        self.document_sync.update_health(battery_percent);
     }
 
     /// Build current document for transmission

@@ -5,6 +5,8 @@
 //! - Single tap: Acknowledge (silence local buzz, send ACK)
 //! - Long press (3s): Reset counter
 //!
+//! Uses centralized HiveMesh from hive-btle for peer management and document sync.
+//!
 //! ## Building
 //!
 //! ```bash
@@ -36,7 +38,8 @@ use mipidsi::models::ILI9342CRgb565;
 use mipidsi::options::Orientation;
 use mipidsi::Builder;
 
-use hive_btle::sync::{EventType, GCounter, HealthStatus, Peripheral, PeripheralType};
+use hive_btle::hive_mesh::{HiveMesh, HiveMeshConfig};
+use hive_btle::sync::PeripheralType;
 use hive_btle::NodeId;
 
 // NVS storage
@@ -47,199 +50,12 @@ const NVS_KEY_COUNTER: &str = "counter";
 const FT6336U_ADDR: u8 = 0x38;
 const FT6336U_REG_STATUS: u8 = 0x02;
 
-/// CRDT Document with persistence and Peripheral state
-struct HiveDocument {
-    pub counter: GCounter,
-    pub peripheral: Peripheral,
-    node_id: NodeId,
-    version: u32,
+/// Get current timestamp in milliseconds
+fn now_ms() -> u64 {
+    unsafe { esp_idf_svc::sys::esp_timer_get_time() as u64 / 1000 }
 }
 
-impl HiveDocument {
-    fn new(node_id: NodeId) -> Self {
-        let mut peripheral = Peripheral::new(node_id.as_u32(), PeripheralType::SoldierSensor);
-        peripheral.health = HealthStatus::new(100); // Will be updated with real battery
-        Self {
-            counter: GCounter::new(),
-            peripheral,
-            node_id,
-            version: 0,
-        }
-    }
-
-    /// Send EMERGENCY alert (double-tap)
-    fn send_emergency(&mut self) {
-        info!(">>> EMERGENCY from node {:08X}", self.node_id.as_u32());
-        self.debug_dump("BEFORE EMERGENCY");
-        self.counter.increment(&self.node_id, 1);
-        self.version += 1;
-
-        let timestamp = unsafe { esp_idf_svc::sys::esp_timer_get_time() as u64 / 1000 };
-        self.peripheral.set_event(EventType::Emergency, timestamp);
-        self.peripheral.timestamp = timestamp;
-
-        self.debug_dump("AFTER EMERGENCY");
-    }
-
-    /// Send ACK (single-tap when alert is active)
-    fn send_ack(&mut self) {
-        info!(">>> ACK from node {:08X}", self.node_id.as_u32());
-        self.counter.increment(&self.node_id, 1);
-        self.version += 1;
-
-        let timestamp = unsafe { esp_idf_svc::sys::esp_timer_get_time() as u64 / 1000 };
-        self.peripheral.set_event(EventType::Ack, timestamp);
-        self.peripheral.timestamp = timestamp;
-    }
-
-    /// Clear event (after timeout or processing)
-    fn clear_event(&mut self) {
-        self.peripheral.clear_event();
-    }
-
-    fn current_event(&self) -> EventType {
-        self.peripheral.last_event.as_ref()
-            .map(|e| e.event_type)
-            .unwrap_or(EventType::None)
-    }
-
-    fn update_health(&mut self, battery_pct: u8) {
-        self.peripheral.health.battery_percent = battery_pct;
-        if battery_pct < 20 {
-            self.peripheral.health.set_alert(HealthStatus::ALERT_LOW_BATTERY);
-        } else {
-            self.peripheral.health.clear_alert(HealthStatus::ALERT_LOW_BATTERY);
-        }
-    }
-
-    fn total_taps(&self) -> u64 {
-        self.counter.value()
-    }
-
-    fn num_nodes(&self) -> usize {
-        self.counter.node_count_total()
-    }
-
-    /// Debug dump the GCounter state
-    fn debug_dump(&self, prefix: &str) {
-        let encoded = self.counter.encode();
-        if encoded.len() >= 4 {
-            let num_entries = u32::from_le_bytes([encoded[0], encoded[1], encoded[2], encoded[3]]);
-            info!("{}: {} entries, total={}, v{}", prefix, num_entries, self.total_taps(), self.version);
-            let mut offset = 4;
-            for i in 0..num_entries as usize {
-                if offset + 12 <= encoded.len() {
-                    let node = u32::from_le_bytes([
-                        encoded[offset], encoded[offset+1], encoded[offset+2], encoded[offset+3]
-                    ]);
-                    let count = u64::from_le_bytes([
-                        encoded[offset+4], encoded[offset+5], encoded[offset+6], encoded[offset+7],
-                        encoded[offset+8], encoded[offset+9], encoded[offset+10], encoded[offset+11]
-                    ]);
-                    info!("{}:   [{}] node={:08X} count={}", prefix, i, node, count);
-                    offset += 12;
-                }
-            }
-        }
-    }
-
-    /// Merge another document into this one
-    fn merge(&mut self, other: &HiveDocument) -> bool {
-        info!("=== MERGE START ===");
-        self.debug_dump("OURS BEFORE");
-        other.debug_dump("THEIRS");
-
-        let old_value = self.counter.value();
-        self.counter.merge(&other.counter);
-        let changed = self.counter.value() != old_value;
-        if changed {
-            self.version += 1;
-        }
-
-        self.debug_dump("OURS AFTER");
-        info!("=== MERGE END (changed={}) ===", changed);
-        changed
-    }
-
-    fn encode(&self) -> Vec<u8> {
-        let mut buf = Vec::new();
-        // Header: version (4) + node_id (4) = 8 bytes (same as Build 11)
-        buf.extend_from_slice(&self.version.to_le_bytes());
-        buf.extend_from_slice(&self.node_id.as_u32().to_le_bytes());
-
-        // Counter data FIRST (for backwards compatibility with Build 11)
-        let counter_data = self.counter.encode();
-        buf.extend_from_slice(&counter_data);
-
-        // Peripheral data after counter (Build 12+)
-        // Marker byte 0xAB to indicate extended format
-        buf.push(0xAB);
-        buf.push(0); // reserved byte
-        let peripheral_data = self.peripheral.encode();
-        buf.extend_from_slice(&(peripheral_data.len() as u16).to_le_bytes());
-        buf.extend_from_slice(&peripheral_data);
-
-        info!("Encoded doc: {} bytes (header=8, counter={}, peripheral={})",
-              buf.len(), counter_data.len(), peripheral_data.len());
-        buf
-    }
-
-    fn decode(data: &[u8]) -> Option<Self> {
-        if data.len() < 8 {
-            return None;
-        }
-        let version = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-        let node_id = NodeId::new(u32::from_le_bytes([data[4], data[5], data[6], data[7]]));
-
-        // Counter data starts at offset 8 (same as Build 11)
-        let counter = GCounter::decode(&data[8..])?;
-
-        // Calculate where counter data ends
-        let num_entries = u32::from_le_bytes([data[8], data[9], data[10], data[11]]) as usize;
-        let counter_end = 8 + 4 + num_entries * 12;
-
-        // Check for extended format (Build 12+)
-        let peripheral = if data.len() > counter_end && data[counter_end] == 0xAB {
-            // data[counter_end + 1] is reserved byte, skip it
-            let peripheral_len =
-                u16::from_le_bytes([data[counter_end + 2], data[counter_end + 3]]) as usize;
-            let peripheral_start = counter_end + 4;
-            if data.len() >= peripheral_start + peripheral_len {
-                let p = Peripheral::decode(&data[peripheral_start..peripheral_start + peripheral_len]);
-                if p.is_some() {
-                    info!("Decoded Peripheral OK ({} bytes), event={:?}",
-                          peripheral_len, p.as_ref().map(|x| x.last_event.as_ref().map(|e| e.event_type)));
-                } else {
-                    warn!("Peripheral decode FAILED ({} bytes available)", peripheral_len);
-                }
-                p
-            } else {
-                warn!("Peripheral data truncated! need {} bytes at offset {}, have {}",
-                      peripheral_len, peripheral_start, data.len());
-                None
-            }
-        } else {
-            // Old format (Build 11) - no peripheral data
-            info!("No peripheral marker (counter_end={}, data.len={})", counter_end, data.len());
-            None
-        };
-
-        // Create peripheral if not decoded from message
-        let peripheral = peripheral.unwrap_or_else(|| {
-            warn!("Creating default Peripheral (no event data from peer)");
-            Peripheral::new(node_id.as_u32(), PeripheralType::SoldierSensor)
-        });
-
-        Some(Self {
-            counter,
-            peripheral,
-            node_id,
-            version,
-        })
-    }
-}
-
-/// Document store with NVS persistence
+/// NVS persistence for HiveMesh documents
 struct DocumentStore {
     nvs: EspNvs<NvsDefault>,
 }
@@ -250,32 +66,31 @@ impl DocumentStore {
         Ok(Self { nvs })
     }
 
-    fn load(&self, node_id: NodeId) -> HiveDocument {
+    /// Save HiveMesh document to NVS
+    fn save(&mut self, mesh: &HiveMesh) -> anyhow::Result<()> {
+        let data = mesh.build_document();
+        self.nvs.set_raw(NVS_KEY_COUNTER, &data)?;
+        info!("NVS: Saved {} bytes", data.len());
+        Ok(())
+    }
+
+    /// Load document bytes from NVS (for initial merge into HiveMesh)
+    fn load_raw(&self) -> Option<Vec<u8>> {
         let mut buf = [0u8; 256];
         match self.nvs.get_raw(NVS_KEY_COUNTER, &mut buf) {
             Ok(Some(data)) => {
-                info!("NVS: loaded {} raw bytes", data.len());
-                if let Some(mut doc) = HiveDocument::decode(data) {
-                    // Update node_id to our own (in case it was from a merge)
-                    doc.node_id = node_id;
-                    info!("Loaded document:");
-                    doc.debug_dump("  LOADED");
-                    return doc;
-                } else {
-                    warn!("Failed to decode NVS data!");
-                }
+                info!("NVS: Loaded {} raw bytes", data.len());
+                Some(data.to_vec())
             }
-            Ok(None) => info!("No saved document, starting fresh"),
-            Err(e) => warn!("NVS load error: {:?}", e),
+            Ok(None) => {
+                info!("NVS: No saved document");
+                None
+            }
+            Err(e) => {
+                warn!("NVS load error: {:?}", e);
+                None
+            }
         }
-        info!("Creating fresh document for node {:08X}", node_id.as_u32());
-        HiveDocument::new(node_id)
-    }
-
-    fn save(&mut self, doc: &HiveDocument) -> anyhow::Result<()> {
-        let data = doc.encode();
-        self.nvs.set_raw(NVS_KEY_COUNTER, &data)?;
-        Ok(())
     }
 }
 
@@ -340,19 +155,19 @@ fn get_node_id_from_mac() -> NodeId {
     NodeId::new(u32::from_be_bytes([mac[2], mac[3], mac[4], mac[5]]))
 }
 
-fn print_status(doc: &HiveDocument, connected: bool, status: &str) {
+fn print_status(mesh: &HiveMesh, connected: bool, status: &str) {
     let conn_sym = if connected { "●" } else { "○" };
     info!("========================================");
-    info!("  HIVE-Lite BLE Sync Demo");
+    info!("  HIVE-Lite BLE Sync Demo (HiveMesh)");
     info!("----------------------------------------");
     info!(
         "  Node: {:08X}  v{}  BLE:{}",
-        doc.node_id.as_u32(),
-        doc.version,
+        mesh.node_id().as_u32(),
+        mesh.version(),
         conn_sym
     );
     info!("----------------------------------------");
-    info!("  Taps: {}", doc.total_taps());
+    info!("  Taps: {}", mesh.total_count());
     info!("----------------------------------------");
     info!("  {}", status);
     info!("========================================");
@@ -643,7 +458,7 @@ where
 /// Update only the dynamic parts of the display (no flicker)
 fn update_display<D>(
     display: &mut D,
-    doc: &HiveDocument,
+    mesh: &HiveMesh,
     alert_active: bool,
     battery_pct: Option<u8>,
     status: &str,
@@ -699,12 +514,12 @@ fn update_display<D>(
         let _ = Text::new("READY", Point::new(120, 110), green).draw(display);
 
         // Show total taps (smaller, informational)
-        let total_str = format!("taps: {}", doc.total_taps());
+        let total_str = format!("taps: {}", mesh.total_count());
         let _ = Text::new(&total_str, Point::new(105, 140), white).draw(display);
 
-        // Show node count
-        let node_str = format!("peers: {}", doc.num_nodes().saturating_sub(1));
-        let _ = Text::new(&node_str, Point::new(105, 165), white).draw(display);
+        // Show peer count (from HiveMesh)
+        let peer_str = format!("peers: {}", mesh.peer_count());
+        let _ = Text::new(&peer_str, Point::new(105, 165), white).draw(display);
     }
 
     // Status line (above button labels)
@@ -810,11 +625,23 @@ fn main() -> anyhow::Result<()> {
     let _ = display.clear(Rgb565::BLUE);
     info!("Display cleared to blue");
 
-    // Initialize document store and load state
-    info!("Initializing document store...");
+    // Initialize HiveMesh for centralized peer management and document sync
+    info!("Initializing HiveMesh...");
+    let config = HiveMeshConfig::new(node_id, "ESP32", "DEMO")
+        .with_peripheral_type(PeripheralType::SoldierSensor);
+    let mesh = HiveMesh::new(config);
+    info!("HiveMesh created for node {:08X}", node_id.as_u32());
+
+    // Initialize NVS store for persistence
     let mut store = DocumentStore::new(nvs_partition)?;
-    let mut doc = store.load(node_id);
-    info!("Loaded document: {} total taps", doc.total_taps());
+
+    // Load any previously saved document and merge into mesh
+    if let Some(saved_data) = store.load_raw() {
+        if let Some(result) = mesh.on_ble_data("nvs", &saved_data, now_ms()) {
+            info!("Loaded saved state: total_count={}", result.total_count);
+        }
+    }
+    info!("HiveMesh initialized: {} total taps", mesh.total_count());
 
     // Initialize BLE
     info!("Initializing BLE...");
@@ -824,7 +651,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     // Update BLE with initial document
-    let encoded = doc.encode();
+    let encoded = mesh.build_document();
     nimble::set_document(&encoded);
 
     info!("All initialization complete!");
@@ -838,8 +665,8 @@ fn main() -> anyhow::Result<()> {
 
     // Draw static UI once, then update dynamic parts
     draw_static_ui(&mut display, node_id.as_u32());
-    update_display(&mut display, &doc, false, battery_pct, "BtnC=EMERG  BtnA=ACK");
-    print_status(&doc, false, "BtnC=EMERG  BtnA=ACK");
+    update_display(&mut display, &mesh, false, battery_pct, "BtnC=EMERG  BtnA=ACK");
+    print_status(&mesh, false, "BtnC=EMERG  BtnA=ACK");
 
     // Main loop state
     let mut last_button = Button::None;
@@ -883,46 +710,46 @@ fn main() -> anyhow::Result<()> {
 
         // Handle button releases (action on release)
         if button == Button::None && last_button != Button::None {
+            let now_ms_u64 = now_ms() as u64;
             match last_button {
                 Button::BtnA => {
                     // Button A = ACK (also silences alert)
                     info!(">>> BUTTON A - SENDING ACK");
-                    doc.send_ack();
+                    let encoded = mesh.send_ack(now_ms_u64);
                     alert_active = false;
                     axp_set_vibration(&mut i2c, false);
                     vibration_on = false;
 
                     // Save and gossip
-                    if let Err(e) = store.save(&doc) {
+                    if let Err(e) = store.save(&mesh) {
                         error!("Failed to save: {:?}", e);
                     }
-                    let encoded = doc.encode();
                     let sent = nimble::gossip_document(&encoded);
                     info!(">>> Gossiped ACK to {} peers", sent);
 
                     needs_redraw = true;
-                    update_display(&mut display, &doc, false, battery_pct, "ACK sent!");
+                    update_display(&mut display, &mesh, false, battery_pct, "ACK sent!");
                 }
                 Button::BtnB => {
-                    // Button B = RESET
-                    info!(">>> BUTTON B - RESETTING!");
-                    doc = HiveDocument::new(node_id);
+                    // Button B = RESET (clear event, but counter is CRDT - can't truly reset)
+                    info!(">>> BUTTON B - CLEARING EVENT");
+                    mesh.clear_event();
                     alert_active = false;
                     axp_set_vibration(&mut i2c, false);
                     vibration_on = false;
 
-                    if let Err(e) = store.save(&doc) {
+                    if let Err(e) = store.save(&mesh) {
                         error!("Failed to save reset: {:?}", e);
                     }
-                    let encoded = doc.encode();
+                    let encoded = mesh.build_document();
                     nimble::set_document(&encoded);
                     needs_redraw = true;
-                    update_display(&mut display, &doc, false, battery_pct, "RESET!");
+                    update_display(&mut display, &mesh, false, battery_pct, "CLEARED!");
                 }
                 Button::BtnC => {
                     // Button C = EMERGENCY
                     info!(">>> BUTTON C - SENDING EMERGENCY!");
-                    doc.send_emergency();
+                    let encoded = mesh.send_emergency(now_ms_u64);
 
                     // Enter alert mode locally too (buzz until ACK'd)
                     alert_active = true;
@@ -931,15 +758,14 @@ fn main() -> anyhow::Result<()> {
                     axp_set_vibration(&mut i2c, true);
 
                     // Save and gossip
-                    if let Err(e) = store.save(&doc) {
+                    if let Err(e) = store.save(&mesh) {
                         error!("Failed to save: {:?}", e);
                     }
-                    let encoded = doc.encode();
                     let sent = nimble::gossip_document(&encoded);
                     info!(">>> Gossiped EMERGENCY to {} peers", sent);
 
                     needs_redraw = true;
-                    update_display(&mut display, &doc, true, battery_pct, "EMERGENCY!");
+                    update_display(&mut display, &mesh, true, battery_pct, "EMERGENCY!");
                 }
                 Button::None => {}
             }
@@ -953,13 +779,19 @@ fn main() -> anyhow::Result<()> {
             info!("!!! RECEIVED {} BYTES FROM BLE !!!", data.len());
             info!("!!! Raw: {:02X?}", &data[..data.len().min(32)]);
             info!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-            if let Some(peer_doc) = HiveDocument::decode(&data) {
-                info!("Decoded peer doc from node {:08X}:", peer_doc.node_id.as_u32());
-                peer_doc.debug_dump("  PEER");
+
+            let now_ms_u64 = now_ms();
+            if let Some(result) = mesh.on_ble_data("ble-peer", &data, now_ms_u64) {
+                info!(
+                    "Received from {:08X}: emergency={}, ack={}, counter_changed={}",
+                    result.source_node.as_u32(),
+                    result.is_emergency,
+                    result.is_ack,
+                    result.counter_changed
+                );
 
                 // Check if peer is sending EMERGENCY
-                let peer_event = peer_doc.current_event();
-                if peer_event == EventType::Emergency && !alert_active {
+                if result.is_emergency && !alert_active {
                     info!(">>> RECEIVED EMERGENCY FROM PEER!");
                     alert_active = true;
                     last_vibration_toggle = now_ms;
@@ -968,26 +800,26 @@ fn main() -> anyhow::Result<()> {
                     needs_redraw = true;
                 }
 
-                if doc.merge(&peer_doc) {
-                    info!(">>> MERGED! New total: {}", doc.total_taps());
+                if result.counter_changed {
+                    info!(">>> MERGED! New total: {}", mesh.total_count());
 
                     // Save merged state
-                    if let Err(e) = store.save(&doc) {
+                    if let Err(e) = store.save(&mesh) {
                         error!("Failed to save merged doc: {:?}", e);
                     }
 
                     // GOSSIP: Forward merged state to ALL other peers (multi-hop!)
-                    let encoded = doc.encode();
+                    let encoded = mesh.build_document();
                     let sent = nimble::gossip_document(&encoded);
                     info!(">>> Forwarded merged doc to {} peers (multi-hop)", sent);
 
                     needs_redraw = true;
-                    print_status(&doc, connected, "Merged & forwarded!");
+                    print_status(&mesh, connected, "Merged & forwarded!");
                 } else {
                     info!("No changes from merge (peer had same or less data)");
                 }
             } else {
-                warn!("Failed to decode peer document ({} bytes)", data.len());
+                warn!("Failed to process peer document ({} bytes)", data.len());
             }
         }
 
@@ -1000,7 +832,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 "Advertising..."
             };
-            update_display(&mut display, &doc, alert_active, battery_pct, status);
+            update_display(&mut display, &mesh, alert_active, battery_pct, status);
             needs_redraw = false;
         }
 
@@ -1013,7 +845,7 @@ fn main() -> anyhow::Result<()> {
             if let Some(mv) = axp_read_battery_voltage(&mut i2c) {
                 let pct = battery_percent_from_voltage(mv);
                 battery_pct = Some(pct);
-                doc.update_health(pct);
+                mesh.update_health(pct);
             }
 
             let status = if alert_active {
@@ -1023,8 +855,8 @@ fn main() -> anyhow::Result<()> {
             } else {
                 "Advertising..."
             };
-            update_display(&mut display, &doc, alert_active, battery_pct, status);
-            print_status(&doc, connected, status);
+            update_display(&mut display, &mesh, alert_active, battery_pct, status);
+            print_status(&mesh, connected, status);
         }
 
         FreeRtos::delay_ms(50);
