@@ -418,7 +418,7 @@ fn axp_set_vibration(i2c: &mut I2cDriver, enable: bool) {
 }
 
 /// Build number for tracking firmware versions
-const BUILD_NUM: u32 = 17;
+const BUILD_NUM: u32 = 24;
 
 /// Draw initial static UI elements (call once at startup)
 fn draw_static_ui<D>(display: &mut D, node_id: u32)
@@ -520,6 +520,14 @@ fn update_display<D>(
         // Show peer count (from HiveMesh)
         let peer_str = format!("peers: {}", mesh.peer_count());
         let _ = Text::new(&peer_str, Point::new(105, 165), white).draw(display);
+
+        // Debug: wr/st/tk (gatt writes/stored/taken)
+        let debug_str = format!("wr:{} st:{} tk:{}",
+            nimble::gatt_write_count(),
+            nimble::doc_stored_count(),
+            nimble::doc_taken_count());
+        let cyan = MonoTextStyle::new(&FONT_10X20, Rgb565::CYAN);
+        let _ = Text::new(&debug_str, Point::new(30, 175), cyan).draw(display);
     }
 
     // Status line (above button labels)
@@ -716,16 +724,20 @@ fn main() -> anyhow::Result<()> {
                     // Button A = ACK (also silences alert)
                     info!(">>> BUTTON A - SENDING ACK");
                     let encoded = mesh.send_ack(now_ms_u64);
+                    info!("ACK document: {} bytes", encoded.len());
+
+                    // Silence alert after building document (matches EMERGENCY pattern)
                     alert_active = false;
                     axp_set_vibration(&mut i2c, false);
                     vibration_on = false;
 
-                    // Save and gossip
+                    // Save before gossip (matches EMERGENCY pattern)
                     if let Err(e) = store.save(&mesh) {
                         error!("Failed to save: {:?}", e);
                     }
+
                     let sent = nimble::gossip_document(&encoded);
-                    info!(">>> Gossiped ACK to {} peers", sent);
+                    info!("Gossiped to {} peers", sent);
 
                     needs_redraw = true;
                     update_display(&mut display, &mesh, false, battery_pct, "ACK sent!");
@@ -797,6 +809,15 @@ fn main() -> anyhow::Result<()> {
                     last_vibration_toggle = current_time;
                     vibration_on = true;
                     axp_set_vibration(&mut i2c, true);
+                    needs_redraw = true;
+                }
+
+                // Check if peer is sending ACK - clear our alert if active
+                if result.is_ack && alert_active {
+                    info!(">>> RECEIVED ACK FROM PEER - clearing alert");
+                    alert_active = false;
+                    vibration_on = false;
+                    axp_set_vibration(&mut i2c, false);
                     needs_redraw = true;
                 }
 
