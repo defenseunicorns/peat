@@ -361,7 +361,8 @@ class HiveViewModel: ObservableObject {
     /// Bluetooth state
     @Published var bluetoothState: LocalBluetoothState = .unknown
 
-    /// Track which node's emergency we've ACK'd (to suppress re-triggering from same source)
+    /// Track which node's emergency we've already ACK'd (to suppress re-triggering)
+    /// Cleared when user presses RESET
     private var ackedEmergencyNodeId: UInt32?
 
     /// Local node ID
@@ -598,13 +599,15 @@ class HiveViewModel: ObservableObject {
 
     /// Handle emergency received (called from mesh event or data parsing)
     private func handleEmergencyReceivedFromNode(_ nodeId: UInt32) {
-        // Don't re-trigger if we already ACK'd this node's emergency
-        if ackedEmergencyNodeId == nodeId {
+        // Don't re-trigger if already in alert mode for the same emergency
+        if ackStatus.isActive && ackStatus.emergencySourceNodeId == nodeId {
             return
         }
 
-        // Don't re-trigger if already in alert mode for the same emergency
-        if ackStatus.isActive && ackStatus.emergencySourceNodeId == nodeId {
+        // Don't re-trigger if we already ACK'd this node's emergency
+        // User must press RESET to clear this and allow new emergencies from same node
+        if ackedEmergencyNodeId == nodeId {
+            log("[HiveDemo] Suppressing emergency re-trigger (already ACK'd node \(String(format: "%08X", nodeId)))")
             return
         }
 
@@ -729,7 +732,7 @@ class HiveViewModel: ObservableObject {
             log("[HiveDemo]   Peer \(String(format: "%08X", peer.nodeId)): connected=\(peer.isConnected), id=\(peer.identifier)")
         }
 
-        // Record which node's emergency we're ACK'ing (to suppress re-triggering)
+        // Record which node's emergency we ACK'd (to suppress re-triggering from CRDT sync)
         ackedEmergencyNodeId = ackStatus.emergencySourceNodeId
 
         // Build ACK document via HiveMesh and broadcast
@@ -752,7 +755,7 @@ class HiveViewModel: ObservableObject {
 
         hiveMesh?.clearEvent()
         ackStatus.reset()
-        ackedEmergencyNodeId = nil  // Allow new emergencies from same node
+        ackedEmergencyNodeId = nil  // Clear to allow new emergencies from same node
         statusMessage = "Mesh active - \(localDisplayName)"
         showToast("Alert reset")
     }

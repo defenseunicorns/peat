@@ -418,7 +418,7 @@ fn axp_set_vibration(i2c: &mut I2cDriver, enable: bool) {
 }
 
 /// Build number for tracking firmware versions
-const BUILD_NUM: u32 = 29;
+const BUILD_NUM: u32 = 30;
 
 /// Mesh ID for this device
 const MESH_ID: &str = "DEMO";
@@ -430,7 +430,8 @@ struct DisplayState {
     battery_pct: u8,
     alert_active: bool,
     peer_count: usize,
-    peer_ids: Vec<u32>,  // Node IDs of connected peers
+    peer_ids: Vec<u32>,      // Node IDs of connected peers
+    acked_peers: Vec<u32>,   // Node IDs that have ACK'd the current emergency
 }
 
 /// Draw initial static UI elements (call once at startup)
@@ -498,6 +499,7 @@ fn update_display<D>(
     battery_pct: Option<u8>,
     _status: &'static str,
     prev: &DisplayState,
+    acked_peers: &[u32],
 ) -> DisplayState
 where
     D: DrawTarget<Color = Rgb565>,
@@ -513,6 +515,7 @@ where
         alert_active,
         peer_count: peers.len(),
         peer_ids: peer_ids.clone(),
+        acked_peers: acked_peers.to_vec(),
     };
 
     // Skip if nothing changed
@@ -541,9 +544,10 @@ where
             .draw(display);
     }
 
-    // Main content area - update if alert state or peers changed
+    // Main content area - update if alert state, peers, or acks changed
     let content_changed = current.alert_active != prev.alert_active
-        || current.peer_ids != prev.peer_ids;
+        || current.peer_ids != prev.peer_ids
+        || current.acked_peers != prev.acked_peers;
 
     if content_changed {
         // Clear main content area
@@ -552,13 +556,33 @@ where
             .draw(display);
 
         if current.alert_active {
-            // ALERT MODE - big red box with EMERGENCY
-            let _ = Rectangle::new(Point::new(20, 60), Size::new(280, 120))
+            // ALERT MODE - big red box with EMERGENCY and ACK status
+            let _ = Rectangle::new(Point::new(20, 50), Size::new(280, 150))
                 .into_styled(PrimitiveStyle::with_fill(Rgb565::RED))
                 .draw(display);
             let white_style = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
-            let _ = Text::new("EMERGENCY", Point::new(90, 115), white_style).draw(display);
-            let _ = Text::new("Tap ACK to clear", Point::new(70, 150), white_style).draw(display);
+            let green_style = MonoTextStyle::new(&FONT_10X20, Rgb565::GREEN);
+            let _ = Text::new("EMERGENCY", Point::new(90, 80), white_style).draw(display);
+
+            // Show ACK status for each peer
+            if !peer_ids.is_empty() {
+                let mut y = 110;
+                for id in peer_ids.iter().take(3) {
+                    let acked = current.acked_peers.contains(id);
+                    let status = if acked {
+                        format!("{:08X} [ACK]", id)
+                    } else {
+                        format!("{:08X} ...", id)
+                    };
+                    let style = if acked { green_style } else { white_style };
+                    let _ = Text::new(&status, Point::new(70, y), style).draw(display);
+                    y += 25;
+                }
+            } else {
+                let _ = Text::new("No peers connected", Point::new(60, 120), white_style).draw(display);
+            }
+
+            let _ = Text::new("Tap ACK to clear", Point::new(70, 185), white_style).draw(display);
         } else {
             // READY MODE with peer info
             let green = MonoTextStyle::new(&FONT_10X20, Rgb565::GREEN);
@@ -734,7 +758,8 @@ fn main() -> anyhow::Result<()> {
     draw_static_ui(&mut display, node_id.as_u32());
     update_button_labels(&mut display, false);  // Initial state: ACK greyed out
     let mut display_state = DisplayState::default();
-    display_state = update_display(&mut display, &mesh, false, battery_pct, "BtnC=EMERG  BtnA=ACK", &display_state);
+    let mut acked_peers: Vec<u32> = Vec::new();
+    display_state = update_display(&mut display, &mesh, false, battery_pct, "BtnC=EMERG  BtnA=ACK", &display_state, &acked_peers);
     print_status(&mesh, false, "BtnC=EMERG  BtnA=ACK");
 
     // Main loop state
@@ -800,13 +825,19 @@ fn main() -> anyhow::Result<()> {
                     let sent = nimble::gossip_document(&encoded);
                     info!("Gossiped to {} peers", sent);
 
-                    display_state = update_display(&mut display, &mesh, false, battery_pct, "ACK sent!", &display_state);
+                    // Clear alert state after sending ACK
+                    alert_active = false;
+                    acked_peers.clear();
+                    axp_set_vibration(&mut i2c, false);
+                    vibration_on = false;
+                    display_state = update_display(&mut display, &mesh, false, battery_pct, "ACK sent!", &display_state, &acked_peers);
                 }
                 Button::BtnB => {
                     // Button B = RESET (clear event, but counter is CRDT - can't truly reset)
                     info!(">>> BUTTON B - CLEARING EVENT");
                     mesh.clear_event();
                     alert_active = false;
+                    acked_peers.clear();
                     axp_set_vibration(&mut i2c, false);
                     vibration_on = false;
 
@@ -815,7 +846,7 @@ fn main() -> anyhow::Result<()> {
                     }
                     let encoded = mesh.build_document();
                     nimble::set_document(&encoded);
-                    display_state = update_display(&mut display, &mesh, false, battery_pct, "CLEARED!", &display_state);
+                    display_state = update_display(&mut display, &mesh, false, battery_pct, "CLEARED!", &display_state, &acked_peers);
                 }
                 Button::BtnC => {
                     // Button C = EMERGENCY
@@ -824,6 +855,7 @@ fn main() -> anyhow::Result<()> {
 
                     // Enter alert mode locally too (buzz until ACK'd)
                     alert_active = true;
+                    acked_peers.clear();  // Fresh emergency, clear old ACKs
                     last_vibration_toggle = current_time;
                     vibration_on = true;
                     axp_set_vibration(&mut i2c, true);
@@ -835,7 +867,7 @@ fn main() -> anyhow::Result<()> {
                     let sent = nimble::gossip_document(&encoded);
                     info!(">>> Gossiped EMERGENCY to {} peers", sent);
 
-                    display_state = update_display(&mut display, &mesh, true, battery_pct, "EMERGENCY!", &display_state);
+                    display_state = update_display(&mut display, &mesh, true, battery_pct, "EMERGENCY!", &display_state, &acked_peers);
                 }
                 Button::None => {}
             }
@@ -870,13 +902,14 @@ fn main() -> anyhow::Result<()> {
                     needs_redraw = true;
                 }
 
-                // Check if peer is sending ACK - clear our alert if active
+                // Check if peer is sending ACK - track it for display
                 if result.is_ack && alert_active {
-                    info!(">>> RECEIVED ACK FROM PEER - clearing alert");
-                    alert_active = false;
-                    vibration_on = false;
-                    axp_set_vibration(&mut i2c, false);
-                    needs_redraw = true;
+                    let ack_node = result.source_node.as_u32();
+                    if !acked_peers.contains(&ack_node) {
+                        info!(">>> RECEIVED ACK FROM {:08X}", ack_node);
+                        acked_peers.push(ack_node);
+                        needs_redraw = true;
+                    }
                 }
 
                 if result.counter_changed {
@@ -911,7 +944,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 "Advertising..."
             };
-            display_state = update_display(&mut display, &mesh, alert_active, battery_pct, status, &display_state);
+            display_state = update_display(&mut display, &mesh, alert_active, battery_pct, status, &display_state, &acked_peers);
             needs_redraw = false;
         }
 
@@ -934,7 +967,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 "Advertising..."
             };
-            display_state = update_display(&mut display, &mesh, alert_active, battery_pct, status, &display_state);
+            display_state = update_display(&mut display, &mesh, alert_active, battery_pct, status, &display_state, &acked_peers);
             print_status(&mesh, connected, status);
         }
 
