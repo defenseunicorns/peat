@@ -1118,6 +1118,507 @@ public func FfiConverterTypeHiveAdapter_lower(_ value: HiveAdapter) -> UnsafeMut
 }
 
 
+
+
+/**
+ * Main HiveMesh wrapper for UniFFI
+ */
+public protocol HiveMeshWrapperProtocol : AnyObject {
+    
+    /**
+     * Add an event observer
+     */
+    func addObserver(callback: MeshEventCallback) 
+    
+    /**
+     * Build current document for sync
+     */
+    func buildDocument()  -> Data
+    
+    /**
+     * Clear the current event
+     */
+    func clearEvent() 
+    
+    /**
+     * Get connected peer count
+     */
+    func connectedCount()  -> UInt32
+    
+    /**
+     * Get device name for BLE advertising
+     */
+    func deviceName()  -> String
+    
+    /**
+     * Get connected peers only
+     */
+    func getConnectedPeers()  -> [MeshPeer]
+    
+    /**
+     * Get all known peers
+     */
+    func getPeers()  -> [MeshPeer]
+    
+    /**
+     * Check if ACK is currently active
+     */
+    func isAckActive()  -> Bool
+    
+    /**
+     * Check if emergency is currently active
+     */
+    func isEmergencyActive()  -> Bool
+    
+    /**
+     * Check if a device matches our mesh
+     */
+    func matchesMesh(deviceMeshId: String?)  -> Bool
+    
+    /**
+     * Get mesh ID
+     */
+    func meshId()  -> String
+    
+    /**
+     * Get local node ID
+     */
+    func nodeId()  -> UInt32
+    
+    /**
+     * Called when a BLE connection is established
+     */
+    func onBleConnected(identifier: String, nowMs: UInt64)  -> UInt32?
+    
+    /**
+     * Called when BLE data is received from a peer
+     * Returns merge result if successful
+     */
+    func onBleDataReceived(identifier: String, data: Data, nowMs: UInt64)  -> DataReceivedResult?
+    
+    /**
+     * Called when a BLE connection is lost
+     */
+    func onBleDisconnected(identifier: String, reason: MeshDisconnectReason)  -> UInt32?
+    
+    /**
+     * Called when a BLE device is discovered
+     * Returns the peer if it's a valid HIVE peer, None otherwise
+     */
+    func onBleDiscovered(identifier: String, name: String?, rssi: Int8, meshId: String?, nowMs: UInt64)  -> MeshPeer?
+    
+    /**
+     * Called when a remote device connects to us (incoming connection)
+     */
+    func onIncomingConnection(identifier: String, nodeId: UInt32, nowMs: UInt64)  -> Bool
+    
+    /**
+     * Get peer count
+     */
+    func peerCount()  -> UInt32
+    
+    /**
+     * Send an ACK event
+     * Returns the document bytes to broadcast via BLE
+     */
+    func sendAck(timestamp: UInt64)  -> Data
+    
+    /**
+     * Send an emergency event
+     * Returns the document bytes to broadcast via BLE
+     */
+    func sendEmergency(timestamp: UInt64)  -> Data
+    
+    /**
+     * Call periodically to perform maintenance tasks
+     * Returns document bytes if a sync broadcast is needed
+     */
+    func tick(nowMs: UInt64)  -> Data?
+    
+    /**
+     * Get total counter value
+     */
+    func totalCount()  -> UInt64
+    
+}
+
+/**
+ * Main HiveMesh wrapper for UniFFI
+ */
+open class HiveMeshWrapper:
+    HiveMeshWrapperProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoPointer {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_hive_apple_ffi_fn_clone_hivemeshwrapper(self.pointer, $0) }
+    }
+    /**
+     * Create a new HiveMesh with the given configuration
+     */
+public convenience init(nodeId: UInt32, callsign: String, meshId: String, peripheralType: MeshPeripheralType) {
+    let pointer =
+        try! rustCall() {
+    uniffi_hive_apple_ffi_fn_constructor_hivemeshwrapper_new(
+        FfiConverterUInt32.lower(nodeId),
+        FfiConverterString.lower(callsign),
+        FfiConverterString.lower(meshId),
+        FfiConverterTypeMeshPeripheralType.lower(peripheralType),$0
+    )
+}
+    self.init(unsafeFromRawPointer: pointer)
+}
+
+    deinit {
+        guard let pointer = pointer else {
+            return
+        }
+
+        try! rustCall { uniffi_hive_apple_ffi_fn_free_hivemeshwrapper(pointer, $0) }
+    }
+
+    
+    /**
+     * Create with default configuration
+     */
+public static func withDefaults(nodeId: UInt32, callsign: String) -> HiveMeshWrapper {
+    return try!  FfiConverterTypeHiveMeshWrapper.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_constructor_hivemeshwrapper_with_defaults(
+        FfiConverterUInt32.lower(nodeId),
+        FfiConverterString.lower(callsign),$0
+    )
+})
+}
+    
+
+    
+    /**
+     * Add an event observer
+     */
+open func addObserver(callback: MeshEventCallback) {try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_add_observer(self.uniffiClonePointer(),
+        FfiConverterCallbackInterfaceMeshEventCallback.lower(callback),$0
+    )
+}
+}
+    
+    /**
+     * Build current document for sync
+     */
+open func buildDocument() -> Data {
+    return try!  FfiConverterData.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_build_document(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Clear the current event
+     */
+open func clearEvent() {try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_clear_event(self.uniffiClonePointer(),$0
+    )
+}
+}
+    
+    /**
+     * Get connected peer count
+     */
+open func connectedCount() -> UInt32 {
+    return try!  FfiConverterUInt32.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_connected_count(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Get device name for BLE advertising
+     */
+open func deviceName() -> String {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_device_name(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Get connected peers only
+     */
+open func getConnectedPeers() -> [MeshPeer] {
+    return try!  FfiConverterSequenceTypeMeshPeer.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_get_connected_peers(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Get all known peers
+     */
+open func getPeers() -> [MeshPeer] {
+    return try!  FfiConverterSequenceTypeMeshPeer.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_get_peers(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Check if ACK is currently active
+     */
+open func isAckActive() -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_is_ack_active(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Check if emergency is currently active
+     */
+open func isEmergencyActive() -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_is_emergency_active(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Check if a device matches our mesh
+     */
+open func matchesMesh(deviceMeshId: String?) -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_matches_mesh(self.uniffiClonePointer(),
+        FfiConverterOptionString.lower(deviceMeshId),$0
+    )
+})
+}
+    
+    /**
+     * Get mesh ID
+     */
+open func meshId() -> String {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_mesh_id(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Get local node ID
+     */
+open func nodeId() -> UInt32 {
+    return try!  FfiConverterUInt32.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_node_id(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Called when a BLE connection is established
+     */
+open func onBleConnected(identifier: String, nowMs: UInt64) -> UInt32? {
+    return try!  FfiConverterOptionUInt32.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_on_ble_connected(self.uniffiClonePointer(),
+        FfiConverterString.lower(identifier),
+        FfiConverterUInt64.lower(nowMs),$0
+    )
+})
+}
+    
+    /**
+     * Called when BLE data is received from a peer
+     * Returns merge result if successful
+     */
+open func onBleDataReceived(identifier: String, data: Data, nowMs: UInt64) -> DataReceivedResult? {
+    return try!  FfiConverterOptionTypeDataReceivedResult.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_on_ble_data_received(self.uniffiClonePointer(),
+        FfiConverterString.lower(identifier),
+        FfiConverterData.lower(data),
+        FfiConverterUInt64.lower(nowMs),$0
+    )
+})
+}
+    
+    /**
+     * Called when a BLE connection is lost
+     */
+open func onBleDisconnected(identifier: String, reason: MeshDisconnectReason) -> UInt32? {
+    return try!  FfiConverterOptionUInt32.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_on_ble_disconnected(self.uniffiClonePointer(),
+        FfiConverterString.lower(identifier),
+        FfiConverterTypeMeshDisconnectReason.lower(reason),$0
+    )
+})
+}
+    
+    /**
+     * Called when a BLE device is discovered
+     * Returns the peer if it's a valid HIVE peer, None otherwise
+     */
+open func onBleDiscovered(identifier: String, name: String?, rssi: Int8, meshId: String?, nowMs: UInt64) -> MeshPeer? {
+    return try!  FfiConverterOptionTypeMeshPeer.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_on_ble_discovered(self.uniffiClonePointer(),
+        FfiConverterString.lower(identifier),
+        FfiConverterOptionString.lower(name),
+        FfiConverterInt8.lower(rssi),
+        FfiConverterOptionString.lower(meshId),
+        FfiConverterUInt64.lower(nowMs),$0
+    )
+})
+}
+    
+    /**
+     * Called when a remote device connects to us (incoming connection)
+     */
+open func onIncomingConnection(identifier: String, nodeId: UInt32, nowMs: UInt64) -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_on_incoming_connection(self.uniffiClonePointer(),
+        FfiConverterString.lower(identifier),
+        FfiConverterUInt32.lower(nodeId),
+        FfiConverterUInt64.lower(nowMs),$0
+    )
+})
+}
+    
+    /**
+     * Get peer count
+     */
+open func peerCount() -> UInt32 {
+    return try!  FfiConverterUInt32.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_peer_count(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Send an ACK event
+     * Returns the document bytes to broadcast via BLE
+     */
+open func sendAck(timestamp: UInt64) -> Data {
+    return try!  FfiConverterData.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_send_ack(self.uniffiClonePointer(),
+        FfiConverterUInt64.lower(timestamp),$0
+    )
+})
+}
+    
+    /**
+     * Send an emergency event
+     * Returns the document bytes to broadcast via BLE
+     */
+open func sendEmergency(timestamp: UInt64) -> Data {
+    return try!  FfiConverterData.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_send_emergency(self.uniffiClonePointer(),
+        FfiConverterUInt64.lower(timestamp),$0
+    )
+})
+}
+    
+    /**
+     * Call periodically to perform maintenance tasks
+     * Returns document bytes if a sync broadcast is needed
+     */
+open func tick(nowMs: UInt64) -> Data? {
+    return try!  FfiConverterOptionData.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_tick(self.uniffiClonePointer(),
+        FfiConverterUInt64.lower(nowMs),$0
+    )
+})
+}
+    
+    /**
+     * Get total counter value
+     */
+open func totalCount() -> UInt64 {
+    return try!  FfiConverterUInt64.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_total_count(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeHiveMeshWrapper: FfiConverter {
+
+    typealias FfiType = UnsafeMutableRawPointer
+    typealias SwiftType = HiveMeshWrapper
+
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> HiveMeshWrapper {
+        return HiveMeshWrapper(unsafeFromRawPointer: pointer)
+    }
+
+    public static func lower(_ value: HiveMeshWrapper) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> HiveMeshWrapper {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
+    }
+
+    public static func write(_ value: HiveMeshWrapper, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeHiveMeshWrapper_lift(_ pointer: UnsafeMutableRawPointer) throws -> HiveMeshWrapper {
+    return try FfiConverterTypeHiveMeshWrapper.lift(pointer)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeHiveMeshWrapper_lower(_ value: HiveMeshWrapper) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeHiveMeshWrapper.lower(value)
+}
+
+
 /**
  * Information about an active connection
  */
@@ -1220,6 +1721,129 @@ public func FfiConverterTypeConnectionInfo_lower(_ value: ConnectionInfo) -> Rus
 
 
 /**
+ * Result of receiving BLE data
+ */
+public struct DataReceivedResult {
+    /**
+     * Node ID of sender
+     */
+    public var sourceNode: UInt32
+    /**
+     * Whether document contained an emergency event
+     */
+    public var isEmergency: Bool
+    /**
+     * Whether document contained an ACK event
+     */
+    public var isAck: Bool
+    /**
+     * Whether counter changed (new data)
+     */
+    public var counterChanged: Bool
+    /**
+     * Total counter value after merge
+     */
+    public var totalCount: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Node ID of sender
+         */sourceNode: UInt32, 
+        /**
+         * Whether document contained an emergency event
+         */isEmergency: Bool, 
+        /**
+         * Whether document contained an ACK event
+         */isAck: Bool, 
+        /**
+         * Whether counter changed (new data)
+         */counterChanged: Bool, 
+        /**
+         * Total counter value after merge
+         */totalCount: UInt64) {
+        self.sourceNode = sourceNode
+        self.isEmergency = isEmergency
+        self.isAck = isAck
+        self.counterChanged = counterChanged
+        self.totalCount = totalCount
+    }
+}
+
+
+
+extension DataReceivedResult: Equatable, Hashable {
+    public static func ==(lhs: DataReceivedResult, rhs: DataReceivedResult) -> Bool {
+        if lhs.sourceNode != rhs.sourceNode {
+            return false
+        }
+        if lhs.isEmergency != rhs.isEmergency {
+            return false
+        }
+        if lhs.isAck != rhs.isAck {
+            return false
+        }
+        if lhs.counterChanged != rhs.counterChanged {
+            return false
+        }
+        if lhs.totalCount != rhs.totalCount {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(sourceNode)
+        hasher.combine(isEmergency)
+        hasher.combine(isAck)
+        hasher.combine(counterChanged)
+        hasher.combine(totalCount)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDataReceivedResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DataReceivedResult {
+        return
+            try DataReceivedResult(
+                sourceNode: FfiConverterUInt32.read(from: &buf), 
+                isEmergency: FfiConverterBool.read(from: &buf), 
+                isAck: FfiConverterBool.read(from: &buf), 
+                counterChanged: FfiConverterBool.read(from: &buf), 
+                totalCount: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: DataReceivedResult, into buf: inout [UInt8]) {
+        FfiConverterUInt32.write(value.sourceNode, into: &buf)
+        FfiConverterBool.write(value.isEmergency, into: &buf)
+        FfiConverterBool.write(value.isAck, into: &buf)
+        FfiConverterBool.write(value.counterChanged, into: &buf)
+        FfiConverterUInt64.write(value.totalCount, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDataReceivedResult_lift(_ buf: RustBuffer) throws -> DataReceivedResult {
+    return try FfiConverterTypeDataReceivedResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDataReceivedResult_lower(_ value: DataReceivedResult) -> RustBuffer {
+    return FfiConverterTypeDataReceivedResult.lower(value)
+}
+
+
+/**
  * Information about a discovered BLE device
  */
 public struct DiscoveredPeer {
@@ -1309,6 +1933,157 @@ public func FfiConverterTypeDiscoveredPeer_lift(_ buf: RustBuffer) throws -> Dis
 #endif
 public func FfiConverterTypeDiscoveredPeer_lower(_ value: DiscoveredPeer) -> RustBuffer {
     return FfiConverterTypeDiscoveredPeer.lower(value)
+}
+
+
+/**
+ * UniFFI-compatible peer representation
+ */
+public struct MeshPeer {
+    /**
+     * Unique node ID (32-bit)
+     */
+    public var nodeId: UInt32
+    /**
+     * Platform-specific identifier (CBPeripheral UUID, MAC address, etc.)
+     */
+    public var identifier: String
+    /**
+     * Mesh ID this peer belongs to
+     */
+    public var meshId: String?
+    /**
+     * Display name
+     */
+    public var name: String?
+    /**
+     * Signal strength (RSSI in dBm)
+     */
+    public var rssi: Int8
+    /**
+     * Whether currently connected
+     */
+    public var isConnected: Bool
+    /**
+     * Last seen timestamp (milliseconds since epoch)
+     */
+    public var lastSeenMs: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Unique node ID (32-bit)
+         */nodeId: UInt32, 
+        /**
+         * Platform-specific identifier (CBPeripheral UUID, MAC address, etc.)
+         */identifier: String, 
+        /**
+         * Mesh ID this peer belongs to
+         */meshId: String?, 
+        /**
+         * Display name
+         */name: String?, 
+        /**
+         * Signal strength (RSSI in dBm)
+         */rssi: Int8, 
+        /**
+         * Whether currently connected
+         */isConnected: Bool, 
+        /**
+         * Last seen timestamp (milliseconds since epoch)
+         */lastSeenMs: UInt64) {
+        self.nodeId = nodeId
+        self.identifier = identifier
+        self.meshId = meshId
+        self.name = name
+        self.rssi = rssi
+        self.isConnected = isConnected
+        self.lastSeenMs = lastSeenMs
+    }
+}
+
+
+
+extension MeshPeer: Equatable, Hashable {
+    public static func ==(lhs: MeshPeer, rhs: MeshPeer) -> Bool {
+        if lhs.nodeId != rhs.nodeId {
+            return false
+        }
+        if lhs.identifier != rhs.identifier {
+            return false
+        }
+        if lhs.meshId != rhs.meshId {
+            return false
+        }
+        if lhs.name != rhs.name {
+            return false
+        }
+        if lhs.rssi != rhs.rssi {
+            return false
+        }
+        if lhs.isConnected != rhs.isConnected {
+            return false
+        }
+        if lhs.lastSeenMs != rhs.lastSeenMs {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(nodeId)
+        hasher.combine(identifier)
+        hasher.combine(meshId)
+        hasher.combine(name)
+        hasher.combine(rssi)
+        hasher.combine(isConnected)
+        hasher.combine(lastSeenMs)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMeshPeer: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MeshPeer {
+        return
+            try MeshPeer(
+                nodeId: FfiConverterUInt32.read(from: &buf), 
+                identifier: FfiConverterString.read(from: &buf), 
+                meshId: FfiConverterOptionString.read(from: &buf), 
+                name: FfiConverterOptionString.read(from: &buf), 
+                rssi: FfiConverterInt8.read(from: &buf), 
+                isConnected: FfiConverterBool.read(from: &buf), 
+                lastSeenMs: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: MeshPeer, into buf: inout [UInt8]) {
+        FfiConverterUInt32.write(value.nodeId, into: &buf)
+        FfiConverterString.write(value.identifier, into: &buf)
+        FfiConverterOptionString.write(value.meshId, into: &buf)
+        FfiConverterOptionString.write(value.name, into: &buf)
+        FfiConverterInt8.write(value.rssi, into: &buf)
+        FfiConverterBool.write(value.isConnected, into: &buf)
+        FfiConverterUInt64.write(value.lastSeenMs, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMeshPeer_lift(_ buf: RustBuffer) throws -> MeshPeer {
+    return try FfiConverterTypeMeshPeer.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMeshPeer_lower(_ value: MeshPeer) -> RustBuffer {
+    return FfiConverterTypeMeshPeer.lower(value)
 }
 
 
@@ -1766,6 +2541,423 @@ extension HiveError: Foundation.LocalizedError {
     }
 }
 
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Disconnect reason
+ */
+
+public enum MeshDisconnectReason {
+    
+    case localRequest
+    case remoteRequest
+    case timeout
+    case linkLoss
+    case connectionFailed
+    case unknown
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMeshDisconnectReason: FfiConverterRustBuffer {
+    typealias SwiftType = MeshDisconnectReason
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MeshDisconnectReason {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .localRequest
+        
+        case 2: return .remoteRequest
+        
+        case 3: return .timeout
+        
+        case 4: return .linkLoss
+        
+        case 5: return .connectionFailed
+        
+        case 6: return .unknown
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: MeshDisconnectReason, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .localRequest:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .remoteRequest:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .timeout:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .linkLoss:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .connectionFailed:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .unknown:
+            writeInt(&buf, Int32(6))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMeshDisconnectReason_lift(_ buf: RustBuffer) throws -> MeshDisconnectReason {
+    return try FfiConverterTypeMeshDisconnectReason.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMeshDisconnectReason_lower(_ value: MeshDisconnectReason) -> RustBuffer {
+    return FfiConverterTypeMeshDisconnectReason.lower(value)
+}
+
+
+
+extension MeshDisconnectReason: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Event received from the mesh
+ */
+
+public enum MeshEvent {
+    
+    /**
+     * New peer discovered
+     */
+    case peerDiscovered(peer: MeshPeer
+    )
+    /**
+     * Peer connected
+     */
+    case peerConnected(nodeId: UInt32
+    )
+    /**
+     * Peer disconnected
+     */
+    case peerDisconnected(nodeId: UInt32, reason: MeshDisconnectReason
+    )
+    /**
+     * Peer lost (cleanup timeout)
+     */
+    case peerLost(nodeId: UInt32
+    )
+    /**
+     * Emergency received from peer
+     */
+    case emergencyReceived(fromNode: UInt32
+    )
+    /**
+     * ACK received from peer
+     */
+    case ackReceived(fromNode: UInt32
+    )
+    /**
+     * Document synced with peer
+     */
+    case documentSynced(fromNode: UInt32, totalCount: UInt64
+    )
+    /**
+     * Mesh state changed (peer count, etc.)
+     */
+    case meshStateChanged(peerCount: UInt32, connectedCount: UInt32
+    )
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMeshEvent: FfiConverterRustBuffer {
+    typealias SwiftType = MeshEvent
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MeshEvent {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .peerDiscovered(peer: try FfiConverterTypeMeshPeer.read(from: &buf)
+        )
+        
+        case 2: return .peerConnected(nodeId: try FfiConverterUInt32.read(from: &buf)
+        )
+        
+        case 3: return .peerDisconnected(nodeId: try FfiConverterUInt32.read(from: &buf), reason: try FfiConverterTypeMeshDisconnectReason.read(from: &buf)
+        )
+        
+        case 4: return .peerLost(nodeId: try FfiConverterUInt32.read(from: &buf)
+        )
+        
+        case 5: return .emergencyReceived(fromNode: try FfiConverterUInt32.read(from: &buf)
+        )
+        
+        case 6: return .ackReceived(fromNode: try FfiConverterUInt32.read(from: &buf)
+        )
+        
+        case 7: return .documentSynced(fromNode: try FfiConverterUInt32.read(from: &buf), totalCount: try FfiConverterUInt64.read(from: &buf)
+        )
+        
+        case 8: return .meshStateChanged(peerCount: try FfiConverterUInt32.read(from: &buf), connectedCount: try FfiConverterUInt32.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: MeshEvent, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .peerDiscovered(peer):
+            writeInt(&buf, Int32(1))
+            FfiConverterTypeMeshPeer.write(peer, into: &buf)
+            
+        
+        case let .peerConnected(nodeId):
+            writeInt(&buf, Int32(2))
+            FfiConverterUInt32.write(nodeId, into: &buf)
+            
+        
+        case let .peerDisconnected(nodeId,reason):
+            writeInt(&buf, Int32(3))
+            FfiConverterUInt32.write(nodeId, into: &buf)
+            FfiConverterTypeMeshDisconnectReason.write(reason, into: &buf)
+            
+        
+        case let .peerLost(nodeId):
+            writeInt(&buf, Int32(4))
+            FfiConverterUInt32.write(nodeId, into: &buf)
+            
+        
+        case let .emergencyReceived(fromNode):
+            writeInt(&buf, Int32(5))
+            FfiConverterUInt32.write(fromNode, into: &buf)
+            
+        
+        case let .ackReceived(fromNode):
+            writeInt(&buf, Int32(6))
+            FfiConverterUInt32.write(fromNode, into: &buf)
+            
+        
+        case let .documentSynced(fromNode,totalCount):
+            writeInt(&buf, Int32(7))
+            FfiConverterUInt32.write(fromNode, into: &buf)
+            FfiConverterUInt64.write(totalCount, into: &buf)
+            
+        
+        case let .meshStateChanged(peerCount,connectedCount):
+            writeInt(&buf, Int32(8))
+            FfiConverterUInt32.write(peerCount, into: &buf)
+            FfiConverterUInt32.write(connectedCount, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMeshEvent_lift(_ buf: RustBuffer) throws -> MeshEvent {
+    return try FfiConverterTypeMeshEvent.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMeshEvent_lower(_ value: MeshEvent) -> RustBuffer {
+    return FfiConverterTypeMeshEvent.lower(value)
+}
+
+
+
+extension MeshEvent: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Peripheral type
+ */
+
+public enum MeshPeripheralType {
+    
+    case unknown
+    case soldierSensor
+    case fixedSensor
+    case relay
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMeshPeripheralType: FfiConverterRustBuffer {
+    typealias SwiftType = MeshPeripheralType
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MeshPeripheralType {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .unknown
+        
+        case 2: return .soldierSensor
+        
+        case 3: return .fixedSensor
+        
+        case 4: return .relay
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: MeshPeripheralType, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .unknown:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .soldierSensor:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .fixedSensor:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .relay:
+            writeInt(&buf, Int32(4))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMeshPeripheralType_lift(_ buf: RustBuffer) throws -> MeshPeripheralType {
+    return try FfiConverterTypeMeshPeripheralType.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMeshPeripheralType_lower(_ value: MeshPeripheralType) -> RustBuffer {
+    return FfiConverterTypeMeshPeripheralType.lower(value)
+}
+
+
+
+extension MeshPeripheralType: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Signal strength category
+ */
+
+public enum MeshSignalStrength {
+    
+    case excellent
+    case good
+    case fair
+    case weak
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMeshSignalStrength: FfiConverterRustBuffer {
+    typealias SwiftType = MeshSignalStrength
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MeshSignalStrength {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .excellent
+        
+        case 2: return .good
+        
+        case 3: return .fair
+        
+        case 4: return .weak
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: MeshSignalStrength, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .excellent:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .good:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .fair:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .weak:
+            writeInt(&buf, Int32(4))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMeshSignalStrength_lift(_ buf: RustBuffer) throws -> MeshSignalStrength {
+    return try FfiConverterTypeMeshSignalStrength.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMeshSignalStrength_lower(_ value: MeshSignalStrength) -> RustBuffer {
+    return FfiConverterTypeMeshSignalStrength.lower(value)
+}
+
+
+
+extension MeshSignalStrength: Equatable, Hashable {}
+
+
+
 
 
 
@@ -2164,6 +3356,108 @@ extension FfiConverterCallbackInterfaceDiscoveryCallback : FfiConverter {
     }
 }
 
+
+
+
+/**
+ * Callback interface for mesh events
+ */
+public protocol MeshEventCallback : AnyObject {
+    
+    func onEvent(event: MeshEvent) 
+    
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceMeshEventCallback {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    static var vtable: UniffiVTableCallbackInterfaceMeshEventCallback = UniffiVTableCallbackInterfaceMeshEventCallback(
+        onEvent: { (
+            uniffiHandle: UInt64,
+            event: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceMeshEventCallback.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onEvent(
+                     event: try FfiConverterTypeMeshEvent.lift(event)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            let result = try? FfiConverterCallbackInterfaceMeshEventCallback.handleMap.remove(handle: uniffiHandle)
+            if result == nil {
+                print("Uniffi callback interface MeshEventCallback: handle missing in uniffiFree")
+            }
+        }
+    )
+}
+
+private func uniffiCallbackInitMeshEventCallback() {
+    uniffi_hive_apple_ffi_fn_init_callback_vtable_mesheventcallback(&UniffiCallbackInterfaceMeshEventCallback.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterCallbackInterfaceMeshEventCallback {
+    fileprivate static var handleMap = UniffiHandleMap<MeshEventCallback>()
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+extension FfiConverterCallbackInterfaceMeshEventCallback : FfiConverter {
+    typealias SwiftType = MeshEventCallback
+    typealias FfiType = UInt64
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
@@ -2263,6 +3557,30 @@ fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionData: FfiConverterRustBuffer {
+    typealias SwiftType = Data?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterData.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterData.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeConnectionInfo: FfiConverterRustBuffer {
     typealias SwiftType = ConnectionInfo?
 
@@ -2279,6 +3597,54 @@ fileprivate struct FfiConverterOptionTypeConnectionInfo: FfiConverterRustBuffer 
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeConnectionInfo.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeDataReceivedResult: FfiConverterRustBuffer {
+    typealias SwiftType = DataReceivedResult?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeDataReceivedResult.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeDataReceivedResult.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeMeshPeer: FfiConverterRustBuffer {
+    typealias SwiftType = MeshPeer?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeMeshPeer.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeMeshPeer.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -2353,6 +3719,31 @@ fileprivate struct FfiConverterSequenceTypeDiscoveredPeer: FfiConverterRustBuffe
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeDiscoveredPeer.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeMeshPeer: FfiConverterRustBuffer {
+    typealias SwiftType = [MeshPeer]
+
+    public static func write(_ value: [MeshPeer], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeMeshPeer.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [MeshPeer] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [MeshPeer]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeMeshPeer.read(from: &buf))
         }
         return seq
     }
@@ -2531,10 +3922,82 @@ private var initializationResult: InitializationResult = {
     if (uniffi_hive_apple_ffi_checksum_method_hiveadapter_trigger_sync() != 21274) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_add_observer() != 7641) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_build_document() != 52541) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_clear_event() != 65017) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_connected_count() != 23818) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_device_name() != 11978) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_get_connected_peers() != 62169) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_get_peers() != 61043) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_is_ack_active() != 56292) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_is_emergency_active() != 15447) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_matches_mesh() != 20651) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_mesh_id() != 61676) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_node_id() != 35762) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_on_ble_connected() != 47658) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_on_ble_data_received() != 14592) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_on_ble_disconnected() != 41090) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_on_ble_discovered() != 18383) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_on_incoming_connection() != 45906) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_peer_count() != 29710) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_send_ack() != 12739) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_send_emergency() != 31245) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_tick() != 22459) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_total_count() != 36231) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_hive_apple_ffi_checksum_constructor_hiveadapter_new() != 389) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_hive_apple_ffi_checksum_constructor_hiveadapter_with_mesh_id() != 63879) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_constructor_hivemeshwrapper_new() != 54979) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_constructor_hivemeshwrapper_with_defaults() != 59396) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_hive_apple_ffi_checksum_method_connectioncallback_on_connected() != 25180) {
@@ -2555,10 +4018,14 @@ private var initializationResult: InitializationResult = {
     if (uniffi_hive_apple_ffi_checksum_method_discoverycallback_on_peer_lost() != 10655) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_hive_apple_ffi_checksum_method_mesheventcallback_on_event() != 2323) {
+        return InitializationResult.apiChecksumMismatch
+    }
 
     uniffiCallbackInitConnectionCallback()
     uniffiCallbackInitDataCallback()
     uniffiCallbackInitDiscoveryCallback()
+    uniffiCallbackInitMeshEventCallback()
     return InitializationResult.ok
 }()
 

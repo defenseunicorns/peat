@@ -14,7 +14,7 @@ name = "hive_apple_ffi"
 
 [dependencies]
 # hive-btle with Apple platform support
-hive-btle = { path = "../../../hive-btle", features = ["macos"] }
+hive-btle = { path = "../..", features = ["macos"] }
 
 # UniFFI for Swift bindings
 uniffi = { version = "0.28", features = ["cli"] }

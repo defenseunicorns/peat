@@ -185,6 +185,13 @@ impl DocumentSync {
         self.increment_counter_internal();
     }
 
+    /// Update health status (battery percentage)
+    pub fn update_health(&self, battery_percent: u8) {
+        let mut peripheral = self.peripheral.write().unwrap();
+        peripheral.health.battery_percent = battery_percent;
+        self.bump_version();
+    }
+
     // ==================== Document I/O ====================
 
     /// Build the document for transmission
