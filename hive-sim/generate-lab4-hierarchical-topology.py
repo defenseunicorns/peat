@@ -88,46 +88,53 @@ def calculate_hierarchy(total_nodes):
 
 
 def get_tcp_connect_list(peers, topology_name, backend):
-    """Generate TCP_CONNECT env var for automerge backend with multiple peers.
+    """Generate TCP_CONNECT env var for mesh connectivity.
 
     Docker's embedded DNS resolves container names on user-defined networks.
     Containerlab container names are: clab-{topology-name}-{node-name}
     Format for automerge: "peer_name|hostname:port,peer_name2|hostname2:port2,..."
+    Format for ditto: "hostname:port,hostname2:port2,..."
 
     Args:
         peers: List of (peer_name, port) tuples
         topology_name: Name of the containerlab topology
         backend: Backend type ("automerge" or "ditto")
     """
-    if backend != "automerge" or not peers:
+    if not peers:
         return []
 
     # Build connection string for all peers
     connections = []
     for peer_name, port in peers:
         container_name = f"clab-{topology_name}-{peer_name}"
-        connections.append(f"{peer_name}|{container_name}:{port}")
+        if backend == "automerge":
+            connections.append(f"{peer_name}|{container_name}:{port}")
+        else:
+            # Ditto uses simple hostname:port format
+            connections.append(f"{container_name}:{port}")
 
     return [f"        TCP_CONNECT: \"{','.join(connections)}\""]
 
 
 def get_tcp_connect(node_name, parent_name, parent_port, name, backend):
-    """Generate TCP_CONNECT env var for automerge backend (single peer - legacy).
+    """Generate TCP_CONNECT env var for single peer connection.
 
     Docker's embedded DNS resolves container names on user-defined networks.
     Containerlab container names are: clab-{topology-name}-{node-name}
     Format for automerge: "peer_name|hostname:port"
+    Format for ditto: "hostname:port"
     """
-    if backend != "automerge":
-        return []
-
-    # For automerge, we need TCP_CONNECT to connect to parent
+    # Company commander has no parent
     if parent_name is None:
-        return []  # Company commander has no parent
+        return []
 
     # Use full container name as hostname (Docker DNS resolves this)
     container_name = f"clab-{name}-{parent_name}"
-    return [f"        TCP_CONNECT: \"{parent_name}|{container_name}:{parent_port}\""]
+    if backend == "automerge":
+        return [f"        TCP_CONNECT: \"{parent_name}|{container_name}:{parent_port}\""]
+    else:
+        # Ditto uses simple hostname:port format
+        return [f"        TCP_CONNECT: \"{container_name}:{parent_port}\""]
 
 
 def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
