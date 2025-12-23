@@ -912,7 +912,11 @@ async fn platoon_leader_aggregation_loop(
         }
     };
 
+    // Track last aggregation time for periodic fallback (Issue #493 - recovery time fix)
+    let mut last_aggregation = Instant::now();
+
     // EVENT-DRIVEN: Listen for squad summary changes and aggregate IMMEDIATELY
+    // With periodic fallback every 5 seconds if change stream events fail
     loop {
         // Wait for next change event with timeout
         let event =
@@ -1131,8 +1135,19 @@ async fn platoon_leader_aggregation_loop(
                 return Err("Change stream closed unexpectedly".into());
             }
             Err(_) => {
-                // Timeout waiting for event - continue loop
-                continue;
+                // Timeout waiting for event - perform periodic aggregation if needed
+                // This ensures aggregation happens even when change stream events fail
+                // (Issue #493 - fix 32s recovery time due to deserialization errors)
+                if last_aggregation.elapsed() >= Duration::from_secs(5) {
+                    do_aggregation(
+                        Arc::clone(&coordinator),
+                        platoon_id.clone(),
+                        node_id.clone(),
+                        squad_ids.clone(),
+                    )
+                    .await;
+                    last_aggregation = Instant::now();
+                }
             }
         }
     }
@@ -1352,7 +1367,11 @@ async fn company_commander_aggregation_loop(
         }
     };
 
+    // Track last aggregation time for periodic fallback (Issue #493 - recovery time fix)
+    let mut last_aggregation = Instant::now();
+
     // EVENT-DRIVEN: Listen for platoon summary changes and aggregate IMMEDIATELY
+    // With periodic fallback every 5 seconds if change stream events fail
     loop {
         // Wait for next change event with timeout
         let event =
@@ -1518,7 +1537,19 @@ async fn company_commander_aggregation_loop(
                 return Err("Change stream closed unexpectedly".into());
             }
             Err(_) => {
-                continue;
+                // Timeout waiting for event - perform periodic aggregation if needed
+                // This ensures aggregation happens even when change stream events fail
+                // (Issue #493 - fix 32s recovery time due to deserialization errors)
+                if last_aggregation.elapsed() >= Duration::from_secs(5) {
+                    do_aggregation(
+                        Arc::clone(&coordinator),
+                        company_id.clone(),
+                        node_id.clone(),
+                        platoon_ids.clone(),
+                    )
+                    .await;
+                    last_aggregation = Instant::now();
+                }
             }
         }
     }
