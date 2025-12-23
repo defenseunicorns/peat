@@ -130,6 +130,10 @@ if [ ${#FRAMEWORKS[@]} -gt 0 ]; then
     xcodebuild -create-xcframework \
         "${FRAMEWORKS[@]}" \
         -output "$XCFRAMEWORK_DIR"
+
+    # Remove duplicate modulemap files that xcodebuild sometimes creates
+    find "$XCFRAMEWORK_DIR" -path "*/include/module.modulemap" -delete 2>/dev/null || true
+
     echo ""
     echo "=== xcframework created: $XCFRAMEWORK_DIR ==="
 else

@@ -79,6 +79,15 @@ static DOC_LEN: AtomicU16 = AtomicU16::new(0);
 /// Pending received document (set by GATT callback, read by main loop)
 static PENDING_DOC: Mutex<Option<Vec<u8>>> = Mutex::new(None);
 
+/// Debug: Count of GATT writes received (to verify callback is running)
+static GATT_WRITE_COUNT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+/// Debug: Count of documents successfully stored in PENDING_DOC
+static DOC_STORED_COUNT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+/// Debug: Count of documents taken from PENDING_DOC
+static DOC_TAKEN_COUNT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
 /// Connection state change flag
 static CONNECTION_CHANGED: AtomicBool = AtomicBool::new(false);
 
@@ -407,27 +416,21 @@ unsafe extern "C" fn gatt_disc_chr_cb(
     let err = &*error;
     if err.status == BLE_HS_EDONE as u16 {
         info!("BLE: Characteristic discovery complete");
-        // Subscribe to notifications first
         let peer_handle = PEER_DOC_HANDLE.load(Ordering::SeqCst);
         if peer_handle != 0 {
-            // Subscribe to notifications (CCCD is handle + 1 typically)
-            let cccd_handle = peer_handle + 1;
-            let notify_enable: [u8; 2] = [0x01, 0x00]; // Enable notifications
-            info!("BLE: Subscribing to notifications on handle {}", cccd_handle);
-            let om = ble_hs_mbuf_from_flat(notify_enable.as_ptr() as *const c_void, 2);
-            if !om.is_null() {
-                let ret = ble_gattc_write_flat(conn_handle, cccd_handle, notify_enable.as_ptr() as *const c_void, 2, Some(gatt_write_cb), ptr::null_mut());
-                if ret != 0 {
-                    warn!("BLE: Failed to subscribe to notifications: {}", ret);
-                    os_mbuf_free_chain(om);
-                }
-            }
-
-            // Read the peer's document
-            info!("BLE: Reading peer document from handle {}", peer_handle);
-            let ret = ble_gattc_read(conn_handle, peer_handle, Some(gatt_read_cb), ptr::null_mut());
+            // Discover descriptors to find the actual CCCD handle
+            info!("BLE: Discovering descriptors for characteristic handle {}", peer_handle);
+            let ret = ble_gattc_disc_all_dscs(
+                conn_handle,
+                peer_handle,
+                peer_handle + 10,  // Search up to 10 handles ahead
+                Some(gatt_disc_dsc_cb),
+                ptr::null_mut(),
+            );
             if ret != 0 {
-                warn!("BLE: Failed to read peer document: {}", ret);
+                warn!("BLE: Failed to start descriptor discovery: {}, falling back to handle+1", ret);
+                // Fallback: try handle+1 as the CCCD
+                subscribe_to_notifications(conn_handle, peer_handle + 1);
             }
         }
         return 0;
@@ -494,6 +497,74 @@ unsafe extern "C" fn mtu_exchange_cb(
     if ret != 0 {
         warn!("BLE: Failed to start service discovery after MTU exchange: {}", ret);
     }
+    0
+}
+
+/// CCCD UUID (Client Characteristic Configuration Descriptor)
+const BLE_GATT_DSC_CLT_CFG_UUID16: u16 = 0x2902;
+
+/// Helper to subscribe to notifications on a given CCCD handle
+unsafe fn subscribe_to_notifications(conn_handle: u16, cccd_handle: u16) {
+    let notify_enable: [u8; 2] = [0x01, 0x00]; // Enable notifications
+    info!("BLE: Subscribing to notifications on CCCD handle {}", cccd_handle);
+    let ret = ble_gattc_write_flat(
+        conn_handle,
+        cccd_handle,
+        notify_enable.as_ptr() as *const c_void,
+        2,
+        Some(gatt_write_cb),
+        ptr::null_mut(),
+    );
+    if ret != 0 {
+        warn!("BLE: Failed to subscribe to notifications: {}", ret);
+    }
+
+    // Also read the peer's document
+    let peer_handle = PEER_DOC_HANDLE.load(Ordering::SeqCst);
+    if peer_handle != 0 {
+        info!("BLE: Reading peer document from handle {}", peer_handle);
+        let ret = ble_gattc_read(conn_handle, peer_handle, Some(gatt_read_cb), ptr::null_mut());
+        if ret != 0 {
+            warn!("BLE: Failed to read peer document: {}", ret);
+        }
+    }
+}
+
+/// GATT descriptor discovery callback - finds CCCD for notification subscription
+unsafe extern "C" fn gatt_disc_dsc_cb(
+    conn_handle: u16,
+    error: *const ble_gatt_error,
+    chr_val_handle: u16,
+    dsc: *const ble_gatt_dsc,
+    _arg: *mut c_void,
+) -> c_int {
+    if error.is_null() {
+        return 0;
+    }
+
+    let err = &*error;
+    if err.status == BLE_HS_EDONE as u16 {
+        info!("BLE: Descriptor discovery complete");
+        return 0;
+    }
+
+    if err.status != 0 {
+        warn!("BLE: Descriptor discovery error: {}", err.status);
+        return 0;
+    }
+
+    if !dsc.is_null() {
+        let d = &*dsc;
+        // Check if this is the CCCD (UUID 0x2902)
+        if d.uuid.u.type_ == BLE_UUID_TYPE_16 as u8 {
+            let uuid16 = &*((&d.uuid) as *const ble_uuid_any_t as *const ble_uuid16_t);
+            if uuid16.value == BLE_GATT_DSC_CLT_CFG_UUID16 {
+                info!("BLE: Found CCCD at handle {} (chr_val={})", d.handle, chr_val_handle);
+                subscribe_to_notifications(conn_handle, d.handle);
+            }
+        }
+    }
+
     0
 }
 
@@ -618,25 +689,31 @@ unsafe extern "C" fn gatt_access_cb(
         }
         BLE_GATT_ACCESS_OP_WRITE_CHR => {
             // Peer is sending their document (write from central)
-            info!("BLE: GATT write request received");
+            GATT_WRITE_COUNT.fetch_add(1, Ordering::SeqCst);
+            info!("BLE: GATT write #{}", GATT_WRITE_COUNT.load(Ordering::SeqCst));
             let om = ctxt.om;
             if !om.is_null() {
                 // Get total length across all mbuf segments using OS_MBUF_PKTLEN
                 let len = os_mbuf_len(om) as usize;
-                info!("BLE: Write total data length: {}", len);
+                info!("BLE: Write len={}", len);
                 if len > 0 && len <= MAX_DOC_SIZE {
                     let mut buf = vec![0u8; len];
                     // Copy all data from mbuf chain
                     let ret = os_mbuf_copydata(om, 0, len as i32, buf.as_mut_ptr() as *mut c_void);
                     if ret == 0 {
-                        info!("BLE: Received document via write, {} bytes", len);
                         // Store in pending queue
                         if let Ok(mut pending) = PENDING_DOC.lock() {
                             *pending = Some(buf);
+                            DOC_STORED_COUNT.fetch_add(1, Ordering::SeqCst);
+                            info!("BLE: Stored {} bytes (total stored: {})", len, DOC_STORED_COUNT.load(Ordering::SeqCst));
+                        } else {
+                            warn!("BLE: Failed to lock PENDING_DOC!");
                         }
                     } else {
                         warn!("BLE: Failed to copy mbuf data: {}", ret);
                     }
+                } else {
+                    warn!("BLE: Invalid write len={}", len);
                 }
             } else {
                 warn!("BLE: Write request with null om");
@@ -710,7 +787,7 @@ pub fn init(node_id: NodeId) -> Result<(), i32> {
         GATT_CHARS[0].uuid = &raw const CHR_UUID.u as *const _;
         GATT_CHARS[0].access_cb = Some(gatt_access_cb);
         GATT_CHARS[0].flags =
-            (BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_NOTIFY) as ble_gatt_chr_flags;
+            (BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP | BLE_GATT_CHR_F_NOTIFY) as ble_gatt_chr_flags;
         GATT_CHARS[0].val_handle = &DOC_CHAR_HANDLE as *const _ as *mut u16;
         // Null terminator
         GATT_CHARS[1] = core::mem::zeroed();
@@ -910,10 +987,30 @@ pub fn notify_document(data: &[u8]) -> Result<(), i32> {
 /// Take pending received document (returns None if no document waiting)
 pub fn take_pending_document() -> Option<Vec<u8>> {
     if let Ok(mut pending) = PENDING_DOC.lock() {
-        pending.take()
+        if let Some(doc) = pending.take() {
+            DOC_TAKEN_COUNT.fetch_add(1, Ordering::SeqCst);
+            Some(doc)
+        } else {
+            None
+        }
     } else {
         None
     }
+}
+
+/// Get count of GATT writes received (debug)
+pub fn gatt_write_count() -> u32 {
+    GATT_WRITE_COUNT.load(Ordering::SeqCst)
+}
+
+/// Get count of documents stored (debug)
+pub fn doc_stored_count() -> u32 {
+    DOC_STORED_COUNT.load(Ordering::SeqCst)
+}
+
+/// Get count of documents taken (debug)
+pub fn doc_taken_count() -> u32 {
+    DOC_TAKEN_COUNT.load(Ordering::SeqCst)
 }
 
 /// Check if connection state changed (and clear the flag)

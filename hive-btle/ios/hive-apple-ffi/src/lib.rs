@@ -685,6 +685,420 @@ impl HiveAdapter {
     }
 }
 
+// ============================================================================
+// HiveMesh Bindings - Centralized Peer & Document Management
+// ============================================================================
+
+use hive_btle::hive_mesh::{HiveMesh as RustHiveMesh, HiveMeshConfig as RustHiveMeshConfig};
+use hive_btle::observer::{
+    DisconnectReason as RustDisconnectReason, HiveEvent as RustHiveEvent,
+};
+use hive_btle::peer::HivePeer as RustHivePeer;
+use hive_btle::sync::crdt::PeripheralType as RustPeripheralType;
+
+/// UniFFI-compatible peer representation
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MeshPeer {
+    /// Unique node ID (32-bit)
+    pub node_id: u32,
+    /// Platform-specific identifier (CBPeripheral UUID, MAC address, etc.)
+    pub identifier: String,
+    /// Mesh ID this peer belongs to
+    pub mesh_id: Option<String>,
+    /// Display name
+    pub name: Option<String>,
+    /// Signal strength (RSSI in dBm)
+    pub rssi: i8,
+    /// Whether currently connected
+    pub is_connected: bool,
+    /// Last seen timestamp (milliseconds since epoch)
+    pub last_seen_ms: u64,
+}
+
+impl From<RustHivePeer> for MeshPeer {
+    fn from(peer: RustHivePeer) -> Self {
+        MeshPeer {
+            node_id: peer.node_id.as_u32(),
+            identifier: peer.identifier.clone(),
+            mesh_id: peer.mesh_id.clone(),
+            name: peer.name.clone(),
+            rssi: peer.rssi,
+            is_connected: peer.is_connected,
+            last_seen_ms: peer.last_seen_ms,
+        }
+    }
+}
+
+/// Signal strength category
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum MeshSignalStrength {
+    Excellent,
+    Good,
+    Fair,
+    Weak,
+}
+
+/// Disconnect reason
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum MeshDisconnectReason {
+    LocalRequest,
+    RemoteRequest,
+    Timeout,
+    LinkLoss,
+    ConnectionFailed,
+    Unknown,
+}
+
+impl From<RustDisconnectReason> for MeshDisconnectReason {
+    fn from(reason: RustDisconnectReason) -> Self {
+        match reason {
+            RustDisconnectReason::LocalRequest => MeshDisconnectReason::LocalRequest,
+            RustDisconnectReason::RemoteRequest => MeshDisconnectReason::RemoteRequest,
+            RustDisconnectReason::Timeout => MeshDisconnectReason::Timeout,
+            RustDisconnectReason::LinkLoss => MeshDisconnectReason::LinkLoss,
+            RustDisconnectReason::ConnectionFailed => MeshDisconnectReason::ConnectionFailed,
+            RustDisconnectReason::Unknown => MeshDisconnectReason::Unknown,
+        }
+    }
+}
+
+impl From<MeshDisconnectReason> for RustDisconnectReason {
+    fn from(reason: MeshDisconnectReason) -> Self {
+        match reason {
+            MeshDisconnectReason::LocalRequest => RustDisconnectReason::LocalRequest,
+            MeshDisconnectReason::RemoteRequest => RustDisconnectReason::RemoteRequest,
+            MeshDisconnectReason::Timeout => RustDisconnectReason::Timeout,
+            MeshDisconnectReason::LinkLoss => RustDisconnectReason::LinkLoss,
+            MeshDisconnectReason::ConnectionFailed => RustDisconnectReason::ConnectionFailed,
+            MeshDisconnectReason::Unknown => RustDisconnectReason::Unknown,
+        }
+    }
+}
+
+/// Peripheral type
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum MeshPeripheralType {
+    Unknown,
+    SoldierSensor,
+    FixedSensor,
+    Relay,
+}
+
+impl From<MeshPeripheralType> for RustPeripheralType {
+    fn from(t: MeshPeripheralType) -> Self {
+        match t {
+            MeshPeripheralType::Unknown => RustPeripheralType::Unknown,
+            MeshPeripheralType::SoldierSensor => RustPeripheralType::SoldierSensor,
+            MeshPeripheralType::FixedSensor => RustPeripheralType::FixedSensor,
+            MeshPeripheralType::Relay => RustPeripheralType::Relay,
+        }
+    }
+}
+
+/// Event received from the mesh
+#[derive(Debug, Clone, uniffi::Enum)]
+pub enum MeshEvent {
+    /// New peer discovered
+    PeerDiscovered { peer: MeshPeer },
+    /// Peer connected
+    PeerConnected { node_id: u32 },
+    /// Peer disconnected
+    PeerDisconnected {
+        node_id: u32,
+        reason: MeshDisconnectReason,
+    },
+    /// Peer lost (cleanup timeout)
+    PeerLost { node_id: u32 },
+    /// Emergency received from peer
+    EmergencyReceived { from_node: u32 },
+    /// ACK received from peer
+    AckReceived { from_node: u32 },
+    /// Document synced with peer
+    DocumentSynced { from_node: u32, total_count: u64 },
+    /// Mesh state changed (peer count, etc.)
+    MeshStateChanged { peer_count: u32, connected_count: u32 },
+}
+
+impl From<RustHiveEvent> for MeshEvent {
+    fn from(event: RustHiveEvent) -> Self {
+        match event {
+            RustHiveEvent::PeerDiscovered { peer } => MeshEvent::PeerDiscovered {
+                peer: peer.into(),
+            },
+            RustHiveEvent::PeerConnected { node_id } => MeshEvent::PeerConnected {
+                node_id: node_id.as_u32(),
+            },
+            RustHiveEvent::PeerDisconnected { node_id, reason } => MeshEvent::PeerDisconnected {
+                node_id: node_id.as_u32(),
+                reason: reason.into(),
+            },
+            RustHiveEvent::PeerLost { node_id } => MeshEvent::PeerLost {
+                node_id: node_id.as_u32(),
+            },
+            RustHiveEvent::EmergencyReceived { from_node } => MeshEvent::EmergencyReceived {
+                from_node: from_node.as_u32(),
+            },
+            RustHiveEvent::AckReceived { from_node } => MeshEvent::AckReceived {
+                from_node: from_node.as_u32(),
+            },
+            RustHiveEvent::DocumentSynced {
+                from_node,
+                total_count,
+            } => MeshEvent::DocumentSynced {
+                from_node: from_node.as_u32(),
+                total_count,
+            },
+            RustHiveEvent::MeshStateChanged {
+                peer_count,
+                connected_count,
+            } => MeshEvent::MeshStateChanged {
+                peer_count: peer_count as u32,
+                connected_count: connected_count as u32,
+            },
+            // Handle any other events by converting to MeshStateChanged with 0s
+            _ => MeshEvent::MeshStateChanged {
+                peer_count: 0,
+                connected_count: 0,
+            },
+        }
+    }
+}
+
+/// Result of receiving BLE data
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct DataReceivedResult {
+    /// Node ID of sender
+    pub source_node: u32,
+    /// Whether document contained an emergency event
+    pub is_emergency: bool,
+    /// Whether document contained an ACK event
+    pub is_ack: bool,
+    /// Whether counter changed (new data)
+    pub counter_changed: bool,
+    /// Total counter value after merge
+    pub total_count: u64,
+}
+
+/// Callback interface for mesh events
+#[uniffi::export(callback_interface)]
+pub trait MeshEventCallback: Send + Sync {
+    fn on_event(&self, event: MeshEvent);
+}
+
+/// Observer that forwards events to Swift callback
+struct SwiftMeshObserver {
+    callback: Box<dyn MeshEventCallback>,
+}
+
+impl hive_btle::observer::HiveObserver for SwiftMeshObserver {
+    fn on_event(&self, event: RustHiveEvent) {
+        self.callback.on_event(event.into());
+    }
+}
+
+/// Main HiveMesh wrapper for UniFFI
+#[derive(uniffi::Object)]
+pub struct HiveMeshWrapper {
+    mesh: RustHiveMesh,
+}
+
+#[uniffi::export]
+impl HiveMeshWrapper {
+    /// Create a new HiveMesh with the given configuration
+    #[uniffi::constructor]
+    pub fn new(
+        node_id: u32,
+        callsign: String,
+        mesh_id: String,
+        peripheral_type: MeshPeripheralType,
+    ) -> Arc<Self> {
+        let config = RustHiveMeshConfig::new(HiveNodeId::new(node_id), &callsign, &mesh_id)
+            .with_peripheral_type(peripheral_type.into());
+
+        Arc::new(HiveMeshWrapper {
+            mesh: RustHiveMesh::new(config),
+        })
+    }
+
+    /// Create with default configuration
+    #[uniffi::constructor]
+    pub fn with_defaults(node_id: u32, callsign: String) -> Arc<Self> {
+        let config = RustHiveMeshConfig::new(
+            HiveNodeId::new(node_id),
+            &callsign,
+            DEFAULT_MESH_ID,
+        );
+
+        Arc::new(HiveMeshWrapper {
+            mesh: RustHiveMesh::new(config),
+        })
+    }
+
+    /// Get local node ID
+    pub fn node_id(&self) -> u32 {
+        self.mesh.node_id().as_u32()
+    }
+
+    /// Get mesh ID
+    pub fn mesh_id(&self) -> String {
+        self.mesh.mesh_id().to_string()
+    }
+
+    /// Get device name for BLE advertising
+    pub fn device_name(&self) -> String {
+        self.mesh.device_name()
+    }
+
+    /// Add an event observer
+    pub fn add_observer(&self, callback: Box<dyn MeshEventCallback>) {
+        let observer = SwiftMeshObserver { callback };
+        self.mesh.add_observer(Arc::new(observer));
+    }
+
+    // ==================== User Actions ====================
+
+    /// Send an emergency event
+    /// Returns the document bytes to broadcast via BLE
+    pub fn send_emergency(&self, timestamp: u64) -> Vec<u8> {
+        self.mesh.send_emergency(timestamp)
+    }
+
+    /// Send an ACK event
+    /// Returns the document bytes to broadcast via BLE
+    pub fn send_ack(&self, timestamp: u64) -> Vec<u8> {
+        self.mesh.send_ack(timestamp)
+    }
+
+    /// Clear the current event
+    pub fn clear_event(&self) {
+        self.mesh.clear_event();
+    }
+
+    /// Build current document for sync
+    pub fn build_document(&self) -> Vec<u8> {
+        self.mesh.build_document()
+    }
+
+    // ==================== BLE Callbacks ====================
+
+    /// Called when a BLE device is discovered
+    /// Returns the peer if it's a valid HIVE peer, None otherwise
+    pub fn on_ble_discovered(
+        &self,
+        identifier: String,
+        name: Option<String>,
+        rssi: i8,
+        mesh_id: Option<String>,
+        now_ms: u64,
+    ) -> Option<MeshPeer> {
+        self.mesh
+            .on_ble_discovered(&identifier, name.as_deref(), rssi, mesh_id.as_deref(), now_ms)
+            .map(|p| p.into())
+    }
+
+    /// Called when a BLE connection is established
+    pub fn on_ble_connected(&self, identifier: String, now_ms: u64) -> Option<u32> {
+        self.mesh
+            .on_ble_connected(&identifier, now_ms)
+            .map(|id| id.as_u32())
+    }
+
+    /// Called when a BLE connection is lost
+    pub fn on_ble_disconnected(
+        &self,
+        identifier: String,
+        reason: MeshDisconnectReason,
+    ) -> Option<u32> {
+        self.mesh
+            .on_ble_disconnected(&identifier, reason.into())
+            .map(|id| id.as_u32())
+    }
+
+    /// Called when a remote device connects to us (incoming connection)
+    pub fn on_incoming_connection(
+        &self,
+        identifier: String,
+        node_id: u32,
+        now_ms: u64,
+    ) -> bool {
+        self.mesh
+            .on_incoming_connection(&identifier, HiveNodeId::new(node_id), now_ms)
+    }
+
+    /// Called when BLE data is received from a peer
+    /// Returns merge result if successful
+    pub fn on_ble_data_received(
+        &self,
+        identifier: String,
+        data: Vec<u8>,
+        now_ms: u64,
+    ) -> Option<DataReceivedResult> {
+        self.mesh
+            .on_ble_data_received(&identifier, &data, now_ms)
+            .map(|result| DataReceivedResult {
+                source_node: result.source_node.as_u32(),
+                is_emergency: result.is_emergency,
+                is_ack: result.is_ack,
+                counter_changed: result.counter_changed,
+                total_count: result.total_count,
+            })
+    }
+
+    // ==================== Periodic Maintenance ====================
+
+    /// Call periodically to perform maintenance tasks
+    /// Returns document bytes if a sync broadcast is needed
+    pub fn tick(&self, now_ms: u64) -> Option<Vec<u8>> {
+        self.mesh.tick(now_ms)
+    }
+
+    // ==================== State Queries ====================
+
+    /// Get all known peers
+    pub fn get_peers(&self) -> Vec<MeshPeer> {
+        self.mesh.get_peers().into_iter().map(|p| p.into()).collect()
+    }
+
+    /// Get connected peers only
+    pub fn get_connected_peers(&self) -> Vec<MeshPeer> {
+        self.mesh
+            .get_connected_peers()
+            .into_iter()
+            .map(|p| p.into())
+            .collect()
+    }
+
+    /// Get peer count
+    pub fn peer_count(&self) -> u32 {
+        self.mesh.peer_count() as u32
+    }
+
+    /// Get connected peer count
+    pub fn connected_count(&self) -> u32 {
+        self.mesh.connected_count() as u32
+    }
+
+    /// Get total counter value
+    pub fn total_count(&self) -> u64 {
+        self.mesh.total_count()
+    }
+
+    /// Check if emergency is currently active
+    pub fn is_emergency_active(&self) -> bool {
+        self.mesh.is_emergency_active()
+    }
+
+    /// Check if ACK is currently active
+    pub fn is_ack_active(&self) -> bool {
+        self.mesh.is_ack_active()
+    }
+
+    /// Check if a device matches our mesh
+    pub fn matches_mesh(&self, device_mesh_id: Option<String>) -> bool {
+        self.mesh.matches_mesh(device_mesh_id.as_deref())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -703,5 +1117,13 @@ mod tests {
         assert_eq!(stats.document_count, 0);
         assert_eq!(stats.bytes_synced, 0);
         assert!(stats.last_sync_timestamp.is_none());
+    }
+
+    #[test]
+    fn test_hive_mesh_wrapper() {
+        let mesh = HiveMeshWrapper::with_defaults(0x12345678, "TEST".to_string());
+        assert_eq!(mesh.node_id(), 0x12345678);
+        assert_eq!(mesh.mesh_id(), "DEMO");
+        assert_eq!(mesh.peer_count(), 0);
     }
 }

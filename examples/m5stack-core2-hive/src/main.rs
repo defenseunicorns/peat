@@ -5,6 +5,8 @@
 //! - Single tap: Acknowledge (silence local buzz, send ACK)
 //! - Long press (3s): Reset counter
 //!
+//! Uses centralized HiveMesh from hive-btle for peer management and document sync.
+//!
 //! ## Building
 //!
 //! ```bash
@@ -36,7 +38,8 @@ use mipidsi::models::ILI9342CRgb565;
 use mipidsi::options::Orientation;
 use mipidsi::Builder;
 
-use hive_btle::sync::{EventType, GCounter, HealthStatus, Peripheral, PeripheralType};
+use hive_btle::hive_mesh::{HiveMesh, HiveMeshConfig};
+use hive_btle::sync::PeripheralType;
 use hive_btle::NodeId;
 
 // NVS storage
@@ -47,199 +50,12 @@ const NVS_KEY_COUNTER: &str = "counter";
 const FT6336U_ADDR: u8 = 0x38;
 const FT6336U_REG_STATUS: u8 = 0x02;
 
-/// CRDT Document with persistence and Peripheral state
-struct HiveDocument {
-    pub counter: GCounter,
-    pub peripheral: Peripheral,
-    node_id: NodeId,
-    version: u32,
+/// Get current timestamp in milliseconds
+fn now_ms() -> u64 {
+    unsafe { esp_idf_svc::sys::esp_timer_get_time() as u64 / 1000 }
 }
 
-impl HiveDocument {
-    fn new(node_id: NodeId) -> Self {
-        let mut peripheral = Peripheral::new(node_id.as_u32(), PeripheralType::SoldierSensor);
-        peripheral.health = HealthStatus::new(100); // Will be updated with real battery
-        Self {
-            counter: GCounter::new(),
-            peripheral,
-            node_id,
-            version: 0,
-        }
-    }
-
-    /// Send EMERGENCY alert (double-tap)
-    fn send_emergency(&mut self) {
-        info!(">>> EMERGENCY from node {:08X}", self.node_id.as_u32());
-        self.debug_dump("BEFORE EMERGENCY");
-        self.counter.increment(&self.node_id, 1);
-        self.version += 1;
-
-        let timestamp = unsafe { esp_idf_svc::sys::esp_timer_get_time() as u64 / 1000 };
-        self.peripheral.set_event(EventType::Emergency, timestamp);
-        self.peripheral.timestamp = timestamp;
-
-        self.debug_dump("AFTER EMERGENCY");
-    }
-
-    /// Send ACK (single-tap when alert is active)
-    fn send_ack(&mut self) {
-        info!(">>> ACK from node {:08X}", self.node_id.as_u32());
-        self.counter.increment(&self.node_id, 1);
-        self.version += 1;
-
-        let timestamp = unsafe { esp_idf_svc::sys::esp_timer_get_time() as u64 / 1000 };
-        self.peripheral.set_event(EventType::Ack, timestamp);
-        self.peripheral.timestamp = timestamp;
-    }
-
-    /// Clear event (after timeout or processing)
-    fn clear_event(&mut self) {
-        self.peripheral.clear_event();
-    }
-
-    fn current_event(&self) -> EventType {
-        self.peripheral.last_event.as_ref()
-            .map(|e| e.event_type)
-            .unwrap_or(EventType::None)
-    }
-
-    fn update_health(&mut self, battery_pct: u8) {
-        self.peripheral.health.battery_percent = battery_pct;
-        if battery_pct < 20 {
-            self.peripheral.health.set_alert(HealthStatus::ALERT_LOW_BATTERY);
-        } else {
-            self.peripheral.health.clear_alert(HealthStatus::ALERT_LOW_BATTERY);
-        }
-    }
-
-    fn total_taps(&self) -> u64 {
-        self.counter.value()
-    }
-
-    fn num_nodes(&self) -> usize {
-        self.counter.node_count_total()
-    }
-
-    /// Debug dump the GCounter state
-    fn debug_dump(&self, prefix: &str) {
-        let encoded = self.counter.encode();
-        if encoded.len() >= 4 {
-            let num_entries = u32::from_le_bytes([encoded[0], encoded[1], encoded[2], encoded[3]]);
-            info!("{}: {} entries, total={}, v{}", prefix, num_entries, self.total_taps(), self.version);
-            let mut offset = 4;
-            for i in 0..num_entries as usize {
-                if offset + 12 <= encoded.len() {
-                    let node = u32::from_le_bytes([
-                        encoded[offset], encoded[offset+1], encoded[offset+2], encoded[offset+3]
-                    ]);
-                    let count = u64::from_le_bytes([
-                        encoded[offset+4], encoded[offset+5], encoded[offset+6], encoded[offset+7],
-                        encoded[offset+8], encoded[offset+9], encoded[offset+10], encoded[offset+11]
-                    ]);
-                    info!("{}:   [{}] node={:08X} count={}", prefix, i, node, count);
-                    offset += 12;
-                }
-            }
-        }
-    }
-
-    /// Merge another document into this one
-    fn merge(&mut self, other: &HiveDocument) -> bool {
-        info!("=== MERGE START ===");
-        self.debug_dump("OURS BEFORE");
-        other.debug_dump("THEIRS");
-
-        let old_value = self.counter.value();
-        self.counter.merge(&other.counter);
-        let changed = self.counter.value() != old_value;
-        if changed {
-            self.version += 1;
-        }
-
-        self.debug_dump("OURS AFTER");
-        info!("=== MERGE END (changed={}) ===", changed);
-        changed
-    }
-
-    fn encode(&self) -> Vec<u8> {
-        let mut buf = Vec::new();
-        // Header: version (4) + node_id (4) = 8 bytes (same as Build 11)
-        buf.extend_from_slice(&self.version.to_le_bytes());
-        buf.extend_from_slice(&self.node_id.as_u32().to_le_bytes());
-
-        // Counter data FIRST (for backwards compatibility with Build 11)
-        let counter_data = self.counter.encode();
-        buf.extend_from_slice(&counter_data);
-
-        // Peripheral data after counter (Build 12+)
-        // Marker byte 0xAB to indicate extended format
-        buf.push(0xAB);
-        buf.push(0); // reserved byte
-        let peripheral_data = self.peripheral.encode();
-        buf.extend_from_slice(&(peripheral_data.len() as u16).to_le_bytes());
-        buf.extend_from_slice(&peripheral_data);
-
-        info!("Encoded doc: {} bytes (header=8, counter={}, peripheral={})",
-              buf.len(), counter_data.len(), peripheral_data.len());
-        buf
-    }
-
-    fn decode(data: &[u8]) -> Option<Self> {
-        if data.len() < 8 {
-            return None;
-        }
-        let version = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-        let node_id = NodeId::new(u32::from_le_bytes([data[4], data[5], data[6], data[7]]));
-
-        // Counter data starts at offset 8 (same as Build 11)
-        let counter = GCounter::decode(&data[8..])?;
-
-        // Calculate where counter data ends
-        let num_entries = u32::from_le_bytes([data[8], data[9], data[10], data[11]]) as usize;
-        let counter_end = 8 + 4 + num_entries * 12;
-
-        // Check for extended format (Build 12+)
-        let peripheral = if data.len() > counter_end && data[counter_end] == 0xAB {
-            // data[counter_end + 1] is reserved byte, skip it
-            let peripheral_len =
-                u16::from_le_bytes([data[counter_end + 2], data[counter_end + 3]]) as usize;
-            let peripheral_start = counter_end + 4;
-            if data.len() >= peripheral_start + peripheral_len {
-                let p = Peripheral::decode(&data[peripheral_start..peripheral_start + peripheral_len]);
-                if p.is_some() {
-                    info!("Decoded Peripheral OK ({} bytes), event={:?}",
-                          peripheral_len, p.as_ref().map(|x| x.last_event.as_ref().map(|e| e.event_type)));
-                } else {
-                    warn!("Peripheral decode FAILED ({} bytes available)", peripheral_len);
-                }
-                p
-            } else {
-                warn!("Peripheral data truncated! need {} bytes at offset {}, have {}",
-                      peripheral_len, peripheral_start, data.len());
-                None
-            }
-        } else {
-            // Old format (Build 11) - no peripheral data
-            info!("No peripheral marker (counter_end={}, data.len={})", counter_end, data.len());
-            None
-        };
-
-        // Create peripheral if not decoded from message
-        let peripheral = peripheral.unwrap_or_else(|| {
-            warn!("Creating default Peripheral (no event data from peer)");
-            Peripheral::new(node_id.as_u32(), PeripheralType::SoldierSensor)
-        });
-
-        Some(Self {
-            counter,
-            peripheral,
-            node_id,
-            version,
-        })
-    }
-}
-
-/// Document store with NVS persistence
+/// NVS persistence for HiveMesh documents
 struct DocumentStore {
     nvs: EspNvs<NvsDefault>,
 }
@@ -250,32 +66,31 @@ impl DocumentStore {
         Ok(Self { nvs })
     }
 
-    fn load(&self, node_id: NodeId) -> HiveDocument {
+    /// Save HiveMesh document to NVS
+    fn save(&mut self, mesh: &HiveMesh) -> anyhow::Result<()> {
+        let data = mesh.build_document();
+        self.nvs.set_raw(NVS_KEY_COUNTER, &data)?;
+        info!("NVS: Saved {} bytes", data.len());
+        Ok(())
+    }
+
+    /// Load document bytes from NVS (for initial merge into HiveMesh)
+    fn load_raw(&self) -> Option<Vec<u8>> {
         let mut buf = [0u8; 256];
         match self.nvs.get_raw(NVS_KEY_COUNTER, &mut buf) {
             Ok(Some(data)) => {
-                info!("NVS: loaded {} raw bytes", data.len());
-                if let Some(mut doc) = HiveDocument::decode(data) {
-                    // Update node_id to our own (in case it was from a merge)
-                    doc.node_id = node_id;
-                    info!("Loaded document:");
-                    doc.debug_dump("  LOADED");
-                    return doc;
-                } else {
-                    warn!("Failed to decode NVS data!");
-                }
+                info!("NVS: Loaded {} raw bytes", data.len());
+                Some(data.to_vec())
             }
-            Ok(None) => info!("No saved document, starting fresh"),
-            Err(e) => warn!("NVS load error: {:?}", e),
+            Ok(None) => {
+                info!("NVS: No saved document");
+                None
+            }
+            Err(e) => {
+                warn!("NVS load error: {:?}", e);
+                None
+            }
         }
-        info!("Creating fresh document for node {:08X}", node_id.as_u32());
-        HiveDocument::new(node_id)
-    }
-
-    fn save(&mut self, doc: &HiveDocument) -> anyhow::Result<()> {
-        let data = doc.encode();
-        self.nvs.set_raw(NVS_KEY_COUNTER, &data)?;
-        Ok(())
     }
 }
 
@@ -340,19 +155,19 @@ fn get_node_id_from_mac() -> NodeId {
     NodeId::new(u32::from_be_bytes([mac[2], mac[3], mac[4], mac[5]]))
 }
 
-fn print_status(doc: &HiveDocument, connected: bool, status: &str) {
+fn print_status(mesh: &HiveMesh, connected: bool, status: &str) {
     let conn_sym = if connected { "●" } else { "○" };
     info!("========================================");
-    info!("  HIVE-Lite BLE Sync Demo");
+    info!("  HIVE-Lite BLE Sync Demo (HiveMesh)");
     info!("----------------------------------------");
     info!(
         "  Node: {:08X}  v{}  BLE:{}",
-        doc.node_id.as_u32(),
-        doc.version,
+        mesh.node_id().as_u32(),
+        mesh.version(),
         conn_sym
     );
     info!("----------------------------------------");
-    info!("  Taps: {}", doc.total_taps());
+    info!("  Taps: {}", mesh.total_count());
     info!("----------------------------------------");
     info!("  {}", status);
     info!("========================================");
@@ -603,115 +418,206 @@ fn axp_set_vibration(i2c: &mut I2cDriver, enable: bool) {
 }
 
 /// Build number for tracking firmware versions
-const BUILD_NUM: u32 = 17;
+const BUILD_NUM: u32 = 30;
+
+/// Mesh ID for this device
+const MESH_ID: &str = "DEMO";
+
+/// Display state for tracking changes (to avoid flickering redraws)
+#[derive(Default, Clone, PartialEq)]
+struct DisplayState {
+    num_connections: usize,
+    battery_pct: u8,
+    alert_active: bool,
+    peer_count: usize,
+    peer_ids: Vec<u32>,      // Node IDs of connected peers
+    acked_peers: Vec<u32>,   // Node IDs that have ACK'd the current emergency
+}
 
 /// Draw initial static UI elements (call once at startup)
-fn draw_static_ui<D>(display: &mut D, node_id: u32)
+fn draw_static_ui<D>(display: &mut D, _node_id: u32)
 where
     D: DrawTarget<Color = Rgb565>,
 {
     let _ = display.clear(Rgb565::BLACK);
 
     let white = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
+    let gray = MonoTextStyle::new(&FONT_10X20, Rgb565::CSS_GRAY);
     let cyan = MonoTextStyle::new(&FONT_10X20, Rgb565::CYAN);
 
-    // Title with build number
-    let title = format!("HIVE Alert/Ack  b{}", BUILD_NUM);
-    let _ = Text::new(&title, Point::new(45, 25), white).draw(display);
+    // Top bar: battery | HIVE:MESH | build
+    let title = format!("HIVE:{}", MESH_ID);
+    let _ = Text::new(&title, Point::new(110, 25), cyan).draw(display);
+    let build_str = format!("b{}", BUILD_NUM);
+    let _ = Text::new(&build_str, Point::new(250, 25), gray).draw(display);
 
-    // Node ID (static)
-    let node_str = format!("Node: {:08X}", node_id);
-    let _ = Text::new(&node_str, Point::new(20, 60), cyan).draw(display);
-
-    // Separators
-    let _ = Rectangle::new(Point::new(10, 75), Size::new(300, 2))
-        .into_styled(PrimitiveStyle::with_fill(Rgb565::CSS_GRAY))
-        .draw(display);
-    let _ = Rectangle::new(Point::new(10, 200), Size::new(300, 2))
-        .into_styled(PrimitiveStyle::with_fill(Rgb565::CSS_GRAY))
+    // Separator below top bar
+    let _ = Rectangle::new(Point::new(0, 35), Size::new(320, 1))
+        .into_styled(PrimitiveStyle::with_fill(Rgb565::CSS_DARK_GRAY))
         .draw(display);
 
-    // Button labels at bottom (for the three touch buttons)
+    // Separator above buttons
+    let _ = Rectangle::new(Point::new(0, 205), Size::new(320, 1))
+        .into_styled(PrimitiveStyle::with_fill(Rgb565::CSS_DARK_GRAY))
+        .draw(display);
+
+    // Button labels drawn by update_button_labels based on alert state
+}
+
+/// Update button labels based on alert state
+fn update_button_labels<D>(display: &mut D, alert_active: bool)
+where
+    D: DrawTarget<Color = Rgb565>,
+{
+    // Clear button area
+    let _ = Rectangle::new(Point::new(0, 210), Size::new(320, 30))
+        .into_styled(PrimitiveStyle::with_fill(Rgb565::BLACK))
+        .draw(display);
+
+    let gray = MonoTextStyle::new(&FONT_10X20, Rgb565::CSS_DARK_GRAY);
     let green = MonoTextStyle::new(&FONT_10X20, Rgb565::GREEN);
+    let cyan = MonoTextStyle::new(&FONT_10X20, Rgb565::CYAN);
     let red = MonoTextStyle::new(&FONT_10X20, Rgb565::RED);
-    let _ = Text::new("[ACK]", Point::new(25, 230), green).draw(display);
-    let _ = Text::new("[RST]", Point::new(130, 230), cyan).draw(display);
-    let _ = Text::new("[EMERG]", Point::new(225, 230), red).draw(display);
+
+    // ACK is green only when alert active, otherwise grey
+    if alert_active {
+        let _ = Text::new("ACK", Point::new(35, 230), green).draw(display);
+    } else {
+        let _ = Text::new("ACK", Point::new(35, 230), gray).draw(display);
+    }
+    let _ = Text::new("RST", Point::new(140, 230), cyan).draw(display);
+    let _ = Text::new("EMERG", Point::new(230, 230), red).draw(display);
 }
 
 
-/// Update only the dynamic parts of the display (no flicker)
+/// Update only changed parts of the display (minimizes flicker)
+/// Returns the new display state for comparison on next update
 fn update_display<D>(
     display: &mut D,
-    doc: &HiveDocument,
+    mesh: &HiveMesh,
     alert_active: bool,
     battery_pct: Option<u8>,
-    status: &str,
-) where
+    _status: &'static str,
+    prev: &DisplayState,
+    acked_peers: &[u32],
+) -> DisplayState
+where
     D: DrawTarget<Color = Rgb565>,
 {
-    let black = PrimitiveStyle::with_fill(Rgb565::BLACK);
-    let white = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
-    let yellow = MonoTextStyle::new(&FONT_10X20, Rgb565::YELLOW);
+    // Get peer IDs
+    let peers = mesh.get_peers();
+    let peer_ids: Vec<u32> = peers.iter().map(|p| p.node_id.as_u32()).collect();
 
-    // Connection indicator (top right) - show number of connections
-    let num_conns = nimble::connection_count();
-    let conn_color = if num_conns > 0 { Rgb565::GREEN } else { Rgb565::RED };
-    let _ = Circle::new(Point::new(280, 10), 20)
-        .into_styled(PrimitiveStyle::with_fill(conn_color))
-        .draw(display);
-    // Show connection count inside circle
-    if num_conns > 0 {
-        let conn_str = format!("{}", num_conns);
-        let black_text = MonoTextStyle::new(&FONT_10X20, Rgb565::BLACK);
-        let _ = Text::new(&conn_str, Point::new(285, 25), black_text).draw(display);
+    // Build current state
+    let current = DisplayState {
+        num_connections: nimble::connection_count(),
+        battery_pct: battery_pct.unwrap_or(0),
+        alert_active,
+        peer_count: peers.len(),
+        peer_ids: peer_ids.clone(),
+        acked_peers: acked_peers.to_vec(),
+    };
+
+    // Skip if nothing changed
+    if current == *prev {
+        return current;
     }
 
-    // Battery indicator (top left)
-    let _ = Rectangle::new(Point::new(5, 5), Size::new(45, 25))
-        .into_styled(black)
-        .draw(display);
-    if let Some(pct) = battery_pct {
-        if pct > 0 {
-            let batt_color = if pct > 20 { Rgb565::GREEN } else { Rgb565::RED };
+    // Battery indicator (top left) - only update if changed
+    if current.battery_pct != prev.battery_pct {
+        let _ = Rectangle::new(Point::new(5, 5), Size::new(50, 28))
+            .into_styled(PrimitiveStyle::with_fill(Rgb565::BLACK))
+            .draw(display);
+        if current.battery_pct > 0 {
+            let batt_color = if current.battery_pct > 20 { Rgb565::GREEN } else { Rgb565::RED };
             let batt_style = MonoTextStyle::new(&FONT_10X20, batt_color);
-            let batt_str = format!("{}%", pct);
+            let batt_str = format!("{}%", current.battery_pct);
             let _ = Text::new(&batt_str, Point::new(10, 25), batt_style).draw(display);
         }
     }
 
-    // Main alert area - large central display
-    let _ = Rectangle::new(Point::new(20, 85), Size::new(280, 100))
-        .into_styled(black)
-        .draw(display);
-
-    if alert_active {
-        // ALERT MODE - big red background with EMERGENCY text
-        let _ = Rectangle::new(Point::new(30, 90), Size::new(260, 80))
-            .into_styled(PrimitiveStyle::with_fill(Rgb565::RED))
+    // Connection indicator (top right, next to build#) - small dot
+    if current.num_connections != prev.num_connections {
+        let conn_color = if current.num_connections > 0 { Rgb565::GREEN } else { Rgb565::CSS_DARK_GRAY };
+        let _ = Circle::new(Point::new(300, 12), 12)
+            .into_styled(PrimitiveStyle::with_fill(conn_color))
             .draw(display);
-        let white_style = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
-        let _ = Text::new("!! EMERGENCY !!", Point::new(65, 125), white_style).draw(display);
-        let _ = Text::new("TAP TO ACK", Point::new(90, 155), white_style).draw(display);
-    } else {
-        // NORMAL MODE - show tap count and ready status
-        let green = MonoTextStyle::new(&FONT_10X20, Rgb565::GREEN);
-        let _ = Text::new("READY", Point::new(120, 110), green).draw(display);
-
-        // Show total taps (smaller, informational)
-        let total_str = format!("taps: {}", doc.total_taps());
-        let _ = Text::new(&total_str, Point::new(105, 140), white).draw(display);
-
-        // Show node count
-        let node_str = format!("peers: {}", doc.num_nodes().saturating_sub(1));
-        let _ = Text::new(&node_str, Point::new(105, 165), white).draw(display);
     }
 
-    // Status line (above button labels)
-    let _ = Rectangle::new(Point::new(10, 185), Size::new(300, 20))
-        .into_styled(black)
-        .draw(display);
-    let _ = Text::new(status, Point::new(20, 198), yellow).draw(display);
+    // Main content area - update if alert state, peers, or acks changed
+    let content_changed = current.alert_active != prev.alert_active
+        || current.peer_ids != prev.peer_ids
+        || current.acked_peers != prev.acked_peers;
+
+    if content_changed {
+        // Clear main content area
+        let _ = Rectangle::new(Point::new(0, 40), Size::new(320, 160))
+            .into_styled(PrimitiveStyle::with_fill(Rgb565::BLACK))
+            .draw(display);
+
+        if current.alert_active {
+            // ALERT MODE - big red box with EMERGENCY and ACK status
+            let _ = Rectangle::new(Point::new(20, 50), Size::new(280, 150))
+                .into_styled(PrimitiveStyle::with_fill(Rgb565::RED))
+                .draw(display);
+            let white_style = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
+            let green_style = MonoTextStyle::new(&FONT_10X20, Rgb565::GREEN);
+            let _ = Text::new("EMERGENCY", Point::new(90, 80), white_style).draw(display);
+
+            // Show ACK status for each peer
+            if !peer_ids.is_empty() {
+                let mut y = 110;
+                for id in peer_ids.iter().take(3) {
+                    let acked = current.acked_peers.contains(id);
+                    let status = if acked {
+                        format!("{:08X} [ACK]", id)
+                    } else {
+                        format!("{:08X} ...", id)
+                    };
+                    let style = if acked { green_style } else { white_style };
+                    let _ = Text::new(&status, Point::new(70, y), style).draw(display);
+                    y += 25;
+                }
+            } else {
+                let _ = Text::new("No peers connected", Point::new(60, 120), white_style).draw(display);
+            }
+
+            let _ = Text::new("Tap ACK to clear", Point::new(70, 185), white_style).draw(display);
+        } else {
+            // READY MODE with peer info
+            let green = MonoTextStyle::new(&FONT_10X20, Rgb565::GREEN);
+            let white = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
+            let gray = MonoTextStyle::new(&FONT_10X20, Rgb565::CSS_GRAY);
+
+            let _ = Text::new("READY", Point::new(125, 80), green).draw(display);
+
+            // Show peer details
+            if !peer_ids.is_empty() {
+                let count_str = if peer_ids.len() == 1 { "1 peer:" } else { &format!("{} peers:", peer_ids.len()) };
+                let _ = Text::new(count_str, Point::new(110, 120), white).draw(display);
+
+                // Show up to 3 peer IDs
+                let y = 145;
+                for (i, id) in peer_ids.iter().take(3).enumerate() {
+                    let id_str = format!("{:08X}", id);
+                    let x = if peer_ids.len() == 1 { 115 } else { 30 + (i as i32 * 100) };
+                    let _ = Text::new(&id_str, Point::new(x, y), gray).draw(display);
+                }
+                if peer_ids.len() > 3 {
+                    let _ = Text::new("...", Point::new(280, y), gray).draw(display);
+                }
+            } else {
+                let _ = Text::new("Scanning...", Point::new(100, 130), gray).draw(display);
+            }
+        }
+    }
+
+    // Update button labels when alert state changes
+    if current.alert_active != prev.alert_active {
+        update_button_labels(display, current.alert_active);
+    }
+
+    current
 }
 
 fn main() -> anyhow::Result<()> {
@@ -810,11 +716,23 @@ fn main() -> anyhow::Result<()> {
     let _ = display.clear(Rgb565::BLUE);
     info!("Display cleared to blue");
 
-    // Initialize document store and load state
-    info!("Initializing document store...");
+    // Initialize HiveMesh for centralized peer management and document sync
+    info!("Initializing HiveMesh...");
+    let config = HiveMeshConfig::new(node_id, "ESP32", "DEMO")
+        .with_peripheral_type(PeripheralType::SoldierSensor);
+    let mesh = HiveMesh::new(config);
+    info!("HiveMesh created for node {:08X}", node_id.as_u32());
+
+    // Initialize NVS store for persistence
     let mut store = DocumentStore::new(nvs_partition)?;
-    let mut doc = store.load(node_id);
-    info!("Loaded document: {} total taps", doc.total_taps());
+
+    // Load any previously saved document and merge into mesh
+    if let Some(saved_data) = store.load_raw() {
+        if let Some(result) = mesh.on_ble_data("nvs", &saved_data, now_ms()) {
+            info!("Loaded saved state: total_count={}", result.total_count);
+        }
+    }
+    info!("HiveMesh initialized: {} total taps", mesh.total_count());
 
     // Initialize BLE
     info!("Initializing BLE...");
@@ -824,7 +742,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     // Update BLE with initial document
-    let encoded = doc.encode();
+    let encoded = mesh.build_document();
     nimble::set_document(&encoded);
 
     info!("All initialization complete!");
@@ -838,8 +756,11 @@ fn main() -> anyhow::Result<()> {
 
     // Draw static UI once, then update dynamic parts
     draw_static_ui(&mut display, node_id.as_u32());
-    update_display(&mut display, &doc, false, battery_pct, "BtnC=EMERG  BtnA=ACK");
-    print_status(&doc, false, "BtnC=EMERG  BtnA=ACK");
+    update_button_labels(&mut display, false);  // Initial state: ACK greyed out
+    let mut display_state = DisplayState::default();
+    let mut acked_peers: Vec<u32> = Vec::new();
+    display_state = update_display(&mut display, &mesh, false, battery_pct, "BtnC=EMERG  BtnA=ACK", &display_state, &acked_peers);
+    print_status(&mesh, false, "BtnC=EMERG  BtnA=ACK");
 
     // Main loop state
     let mut last_button = Button::None;
@@ -855,7 +776,7 @@ fn main() -> anyhow::Result<()> {
     loop {
         let button = read_button(&mut i2c);
         let connected = nimble::is_connected();
-        let now_ms = unsafe { esp_idf_svc::sys::esp_timer_get_time() as u32 / 1000 };
+        let current_time = unsafe { esp_idf_svc::sys::esp_timer_get_time() as u32 / 1000 };
 
         // Check for connection state changes
         if nimble::take_connection_changed() {
@@ -869,11 +790,11 @@ fn main() -> anyhow::Result<()> {
 
         // Handle vibration buzzing when alert is active
         if alert_active {
-            let elapsed = now_ms.saturating_sub(last_vibration_toggle);
+            let elapsed = current_time.saturating_sub(last_vibration_toggle);
             if elapsed >= VIBRATION_INTERVAL_MS {
                 vibration_on = !vibration_on;
                 axp_set_vibration(&mut i2c, vibration_on);
-                last_vibration_toggle = now_ms;
+                last_vibration_toggle = current_time;
             }
         } else if vibration_on {
             // Turn off vibration if alert cleared
@@ -883,63 +804,70 @@ fn main() -> anyhow::Result<()> {
 
         // Handle button releases (action on release)
         if button == Button::None && last_button != Button::None {
+            let now_ms_u64 = now_ms() as u64;
             match last_button {
                 Button::BtnA => {
                     // Button A = ACK (also silences alert)
                     info!(">>> BUTTON A - SENDING ACK");
-                    doc.send_ack();
+                    let encoded = mesh.send_ack(now_ms_u64);
+                    info!("ACK document: {} bytes", encoded.len());
+
+                    // Silence alert after building document (matches EMERGENCY pattern)
                     alert_active = false;
                     axp_set_vibration(&mut i2c, false);
                     vibration_on = false;
 
-                    // Save and gossip
-                    if let Err(e) = store.save(&doc) {
+                    // Save before gossip (matches EMERGENCY pattern)
+                    if let Err(e) = store.save(&mesh) {
                         error!("Failed to save: {:?}", e);
                     }
-                    let encoded = doc.encode();
-                    let sent = nimble::gossip_document(&encoded);
-                    info!(">>> Gossiped ACK to {} peers", sent);
 
-                    needs_redraw = true;
-                    update_display(&mut display, &doc, false, battery_pct, "ACK sent!");
+                    let sent = nimble::gossip_document(&encoded);
+                    info!("Gossiped to {} peers", sent);
+
+                    // Clear alert state after sending ACK
+                    alert_active = false;
+                    acked_peers.clear();
+                    axp_set_vibration(&mut i2c, false);
+                    vibration_on = false;
+                    display_state = update_display(&mut display, &mesh, false, battery_pct, "ACK sent!", &display_state, &acked_peers);
                 }
                 Button::BtnB => {
-                    // Button B = RESET
-                    info!(">>> BUTTON B - RESETTING!");
-                    doc = HiveDocument::new(node_id);
+                    // Button B = RESET (clear event, but counter is CRDT - can't truly reset)
+                    info!(">>> BUTTON B - CLEARING EVENT");
+                    mesh.clear_event();
                     alert_active = false;
+                    acked_peers.clear();
                     axp_set_vibration(&mut i2c, false);
                     vibration_on = false;
 
-                    if let Err(e) = store.save(&doc) {
+                    if let Err(e) = store.save(&mesh) {
                         error!("Failed to save reset: {:?}", e);
                     }
-                    let encoded = doc.encode();
+                    let encoded = mesh.build_document();
                     nimble::set_document(&encoded);
-                    needs_redraw = true;
-                    update_display(&mut display, &doc, false, battery_pct, "RESET!");
+                    display_state = update_display(&mut display, &mesh, false, battery_pct, "CLEARED!", &display_state, &acked_peers);
                 }
                 Button::BtnC => {
                     // Button C = EMERGENCY
                     info!(">>> BUTTON C - SENDING EMERGENCY!");
-                    doc.send_emergency();
+                    let encoded = mesh.send_emergency(now_ms_u64);
 
                     // Enter alert mode locally too (buzz until ACK'd)
                     alert_active = true;
-                    last_vibration_toggle = now_ms;
+                    acked_peers.clear();  // Fresh emergency, clear old ACKs
+                    last_vibration_toggle = current_time;
                     vibration_on = true;
                     axp_set_vibration(&mut i2c, true);
 
                     // Save and gossip
-                    if let Err(e) = store.save(&doc) {
+                    if let Err(e) = store.save(&mesh) {
                         error!("Failed to save: {:?}", e);
                     }
-                    let encoded = doc.encode();
                     let sent = nimble::gossip_document(&encoded);
                     info!(">>> Gossiped EMERGENCY to {} peers", sent);
 
-                    needs_redraw = true;
-                    update_display(&mut display, &doc, true, battery_pct, "EMERGENCY!");
+                    display_state = update_display(&mut display, &mesh, true, battery_pct, "EMERGENCY!", &display_state, &acked_peers);
                 }
                 Button::None => {}
             }
@@ -953,54 +881,70 @@ fn main() -> anyhow::Result<()> {
             info!("!!! RECEIVED {} BYTES FROM BLE !!!", data.len());
             info!("!!! Raw: {:02X?}", &data[..data.len().min(32)]);
             info!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-            if let Some(peer_doc) = HiveDocument::decode(&data) {
-                info!("Decoded peer doc from node {:08X}:", peer_doc.node_id.as_u32());
-                peer_doc.debug_dump("  PEER");
+
+            let now_ms_u64 = now_ms();
+            if let Some(result) = mesh.on_ble_data("ble-peer", &data, now_ms_u64) {
+                info!(
+                    "Received from {:08X}: emergency={}, ack={}, counter_changed={}",
+                    result.source_node.as_u32(),
+                    result.is_emergency,
+                    result.is_ack,
+                    result.counter_changed
+                );
 
                 // Check if peer is sending EMERGENCY
-                let peer_event = peer_doc.current_event();
-                if peer_event == EventType::Emergency && !alert_active {
+                if result.is_emergency && !alert_active {
                     info!(">>> RECEIVED EMERGENCY FROM PEER!");
                     alert_active = true;
-                    last_vibration_toggle = now_ms;
+                    last_vibration_toggle = current_time;
                     vibration_on = true;
                     axp_set_vibration(&mut i2c, true);
                     needs_redraw = true;
                 }
 
-                if doc.merge(&peer_doc) {
-                    info!(">>> MERGED! New total: {}", doc.total_taps());
+                // Check if peer is sending ACK - track it for display
+                if result.is_ack && alert_active {
+                    let ack_node = result.source_node.as_u32();
+                    if !acked_peers.contains(&ack_node) {
+                        info!(">>> RECEIVED ACK FROM {:08X}", ack_node);
+                        acked_peers.push(ack_node);
+                        needs_redraw = true;
+                    }
+                }
+
+                if result.counter_changed {
+                    info!(">>> MERGED! New total: {}", mesh.total_count());
 
                     // Save merged state
-                    if let Err(e) = store.save(&doc) {
+                    if let Err(e) = store.save(&mesh) {
                         error!("Failed to save merged doc: {:?}", e);
                     }
 
                     // GOSSIP: Forward merged state to ALL other peers (multi-hop!)
-                    let encoded = doc.encode();
+                    let encoded = mesh.build_document();
                     let sent = nimble::gossip_document(&encoded);
                     info!(">>> Forwarded merged doc to {} peers (multi-hop)", sent);
 
                     needs_redraw = true;
-                    print_status(&doc, connected, "Merged & forwarded!");
+                    print_status(&mesh, connected, "Merged & forwarded!");
                 } else {
                     info!("No changes from merge (peer had same or less data)");
                 }
             } else {
-                warn!("Failed to decode peer document ({} bytes)", data.len());
+                warn!("Failed to process peer document ({} bytes)", data.len());
             }
         }
 
         // Redraw display when needed
         if needs_redraw {
-            let status = if alert_active {
+            let status: &'static str = if alert_active {
                 "!! ALERT - TAP TO ACK !!"
             } else if connected {
                 "Connected"
             } else {
                 "Advertising..."
             };
-            update_display(&mut display, &doc, alert_active, battery_pct, status);
+            display_state = update_display(&mut display, &mesh, alert_active, battery_pct, status, &display_state, &acked_peers);
             needs_redraw = false;
         }
 
@@ -1013,18 +957,18 @@ fn main() -> anyhow::Result<()> {
             if let Some(mv) = axp_read_battery_voltage(&mut i2c) {
                 let pct = battery_percent_from_voltage(mv);
                 battery_pct = Some(pct);
-                doc.update_health(pct);
+                mesh.update_health(pct);
             }
 
-            let status = if alert_active {
+            let status: &'static str = if alert_active {
                 "!! ALERT - TAP TO ACK !!"
             } else if connected {
                 "Connected"
             } else {
                 "Advertising..."
             };
-            update_display(&mut display, &doc, alert_active, battery_pct, status);
-            print_status(&doc, connected, status);
+            display_state = update_display(&mut display, &mesh, alert_active, battery_pct, status, &display_state, &acked_peers);
+            print_status(&mesh, connected, status);
         }
 
         FreeRtos::delay_ms(50);

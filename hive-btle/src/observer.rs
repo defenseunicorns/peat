@@ -275,9 +275,11 @@ impl ObserverManager {
 
     /// Notify all observers of an event
     pub fn notify(&self, event: HiveEvent) {
-        let observers = self.observers.read().unwrap();
-        for observer in observers.iter() {
-            observer.on_event(event.clone());
+        // Use try_read to avoid panicking on poisoned locks
+        if let Ok(observers) = self.observers.try_read() {
+            for observer in observers.iter() {
+                observer.on_event(event.clone());
+            }
         }
     }
 
