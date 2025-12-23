@@ -39,15 +39,19 @@ RUN cargo build --release -p hive-sim --features automerge-backend && \
 # ============================================================================
 FROM debian:bookworm-slim
 
-# Install only runtime dependencies
+# Install runtime dependencies + tini for proper signal handling
+# tini runs as PID 1 and forwards signals to child processes
+# Without this, SIGTERM is ignored and containers don't stop cleanly
 RUN apt-get update && apt-get install -y \
     iproute2 \
+    iptables \
     iputils-ping \
     tcpdump \
     net-tools \
     curl \
     jq \
     ca-certificates \
+    tini \
     && rm -rf /var/lib/apt/lists/*
 
 # Create runtime directory for Ditto persistence
@@ -73,4 +77,6 @@ ENV NODE_ID="node1" \
 # Expose ports for P2P communication
 EXPOSE 12345
 
-ENTRYPOINT ["/entrypoint.sh"]
+# Use tini as init process to handle signals properly
+# This ensures SIGTERM is forwarded to hive-sim and containers stop cleanly
+ENTRYPOINT ["/usr/bin/tini", "--", "/entrypoint.sh"]
