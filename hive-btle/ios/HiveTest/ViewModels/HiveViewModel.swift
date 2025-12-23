@@ -361,8 +361,8 @@ class HiveViewModel: ObservableObject {
     /// Bluetooth state
     @Published var bluetoothState: LocalBluetoothState = .unknown
 
-    /// Track when we last sent an ACK (to suppress re-triggering emergency)
-    private var lastAckSentTime: Date?
+    /// Track which node's emergency we've ACK'd (to suppress re-triggering from same source)
+    private var ackedEmergencyNodeId: UInt32?
 
     /// Local node ID
     let localNodeId: UInt32 = NODE_ID
@@ -598,9 +598,8 @@ class HiveViewModel: ObservableObject {
 
     /// Handle emergency received (called from mesh event or data parsing)
     private func handleEmergencyReceivedFromNode(_ nodeId: UInt32) {
-        // Suppress re-triggering if we recently sent an ACK (within 5 seconds)
-        if let lastAck = lastAckSentTime, Date().timeIntervalSince(lastAck) < 5.0 {
-            log("[HiveDemo] EMERGENCY from \(String(format: "%08X", nodeId)) - suppressed (recently ACK'd)")
+        // Don't re-trigger if we already ACK'd this node's emergency
+        if ackedEmergencyNodeId == nodeId {
             return
         }
 
@@ -730,8 +729,8 @@ class HiveViewModel: ObservableObject {
             log("[HiveDemo]   Peer \(String(format: "%08X", peer.nodeId)): connected=\(peer.isConnected), id=\(peer.identifier)")
         }
 
-        // Record that we're sending an ACK (to suppress re-triggering emergency)
-        lastAckSentTime = Date()
+        // Record which node's emergency we're ACK'ing (to suppress re-triggering)
+        ackedEmergencyNodeId = ackStatus.emergencySourceNodeId
 
         // Build ACK document via HiveMesh and broadcast
         let timestamp = UInt64(Date().timeIntervalSince1970 * 1000)
@@ -753,6 +752,7 @@ class HiveViewModel: ObservableObject {
 
         hiveMesh?.clearEvent()
         ackStatus.reset()
+        ackedEmergencyNodeId = nil  // Allow new emergencies from same node
         statusMessage = "Mesh active - \(localDisplayName)"
         showToast("Alert reset")
     }

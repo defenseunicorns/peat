@@ -418,123 +418,182 @@ fn axp_set_vibration(i2c: &mut I2cDriver, enable: bool) {
 }
 
 /// Build number for tracking firmware versions
-const BUILD_NUM: u32 = 24;
+const BUILD_NUM: u32 = 29;
+
+/// Mesh ID for this device
+const MESH_ID: &str = "DEMO";
+
+/// Display state for tracking changes (to avoid flickering redraws)
+#[derive(Default, Clone, PartialEq)]
+struct DisplayState {
+    num_connections: usize,
+    battery_pct: u8,
+    alert_active: bool,
+    peer_count: usize,
+    peer_ids: Vec<u32>,  // Node IDs of connected peers
+}
 
 /// Draw initial static UI elements (call once at startup)
-fn draw_static_ui<D>(display: &mut D, node_id: u32)
+fn draw_static_ui<D>(display: &mut D, _node_id: u32)
 where
     D: DrawTarget<Color = Rgb565>,
 {
     let _ = display.clear(Rgb565::BLACK);
 
     let white = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
+    let gray = MonoTextStyle::new(&FONT_10X20, Rgb565::CSS_GRAY);
     let cyan = MonoTextStyle::new(&FONT_10X20, Rgb565::CYAN);
 
-    // Title with build number
-    let title = format!("HIVE Alert/Ack  b{}", BUILD_NUM);
-    let _ = Text::new(&title, Point::new(45, 25), white).draw(display);
+    // Top bar: battery | HIVE:MESH | build
+    let title = format!("HIVE:{}", MESH_ID);
+    let _ = Text::new(&title, Point::new(110, 25), cyan).draw(display);
+    let build_str = format!("b{}", BUILD_NUM);
+    let _ = Text::new(&build_str, Point::new(250, 25), gray).draw(display);
 
-    // Node ID (static)
-    let node_str = format!("Node: {:08X}", node_id);
-    let _ = Text::new(&node_str, Point::new(20, 60), cyan).draw(display);
-
-    // Separators
-    let _ = Rectangle::new(Point::new(10, 75), Size::new(300, 2))
-        .into_styled(PrimitiveStyle::with_fill(Rgb565::CSS_GRAY))
-        .draw(display);
-    let _ = Rectangle::new(Point::new(10, 200), Size::new(300, 2))
-        .into_styled(PrimitiveStyle::with_fill(Rgb565::CSS_GRAY))
+    // Separator below top bar
+    let _ = Rectangle::new(Point::new(0, 35), Size::new(320, 1))
+        .into_styled(PrimitiveStyle::with_fill(Rgb565::CSS_DARK_GRAY))
         .draw(display);
 
-    // Button labels at bottom (for the three touch buttons)
+    // Separator above buttons
+    let _ = Rectangle::new(Point::new(0, 205), Size::new(320, 1))
+        .into_styled(PrimitiveStyle::with_fill(Rgb565::CSS_DARK_GRAY))
+        .draw(display);
+
+    // Button labels drawn by update_button_labels based on alert state
+}
+
+/// Update button labels based on alert state
+fn update_button_labels<D>(display: &mut D, alert_active: bool)
+where
+    D: DrawTarget<Color = Rgb565>,
+{
+    // Clear button area
+    let _ = Rectangle::new(Point::new(0, 210), Size::new(320, 30))
+        .into_styled(PrimitiveStyle::with_fill(Rgb565::BLACK))
+        .draw(display);
+
+    let gray = MonoTextStyle::new(&FONT_10X20, Rgb565::CSS_DARK_GRAY);
     let green = MonoTextStyle::new(&FONT_10X20, Rgb565::GREEN);
+    let cyan = MonoTextStyle::new(&FONT_10X20, Rgb565::CYAN);
     let red = MonoTextStyle::new(&FONT_10X20, Rgb565::RED);
-    let _ = Text::new("[ACK]", Point::new(25, 230), green).draw(display);
-    let _ = Text::new("[RST]", Point::new(130, 230), cyan).draw(display);
-    let _ = Text::new("[EMERG]", Point::new(225, 230), red).draw(display);
+
+    // ACK is green only when alert active, otherwise grey
+    if alert_active {
+        let _ = Text::new("ACK", Point::new(35, 230), green).draw(display);
+    } else {
+        let _ = Text::new("ACK", Point::new(35, 230), gray).draw(display);
+    }
+    let _ = Text::new("RST", Point::new(140, 230), cyan).draw(display);
+    let _ = Text::new("EMERG", Point::new(230, 230), red).draw(display);
 }
 
 
-/// Update only the dynamic parts of the display (no flicker)
+/// Update only changed parts of the display (minimizes flicker)
+/// Returns the new display state for comparison on next update
 fn update_display<D>(
     display: &mut D,
     mesh: &HiveMesh,
     alert_active: bool,
     battery_pct: Option<u8>,
-    status: &str,
-) where
+    _status: &'static str,
+    prev: &DisplayState,
+) -> DisplayState
+where
     D: DrawTarget<Color = Rgb565>,
 {
-    let black = PrimitiveStyle::with_fill(Rgb565::BLACK);
-    let white = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
-    let yellow = MonoTextStyle::new(&FONT_10X20, Rgb565::YELLOW);
+    // Get peer IDs
+    let peers = mesh.get_peers();
+    let peer_ids: Vec<u32> = peers.iter().map(|p| p.node_id.as_u32()).collect();
 
-    // Connection indicator (top right) - show number of connections
-    let num_conns = nimble::connection_count();
-    let conn_color = if num_conns > 0 { Rgb565::GREEN } else { Rgb565::RED };
-    let _ = Circle::new(Point::new(280, 10), 20)
-        .into_styled(PrimitiveStyle::with_fill(conn_color))
-        .draw(display);
-    // Show connection count inside circle
-    if num_conns > 0 {
-        let conn_str = format!("{}", num_conns);
-        let black_text = MonoTextStyle::new(&FONT_10X20, Rgb565::BLACK);
-        let _ = Text::new(&conn_str, Point::new(285, 25), black_text).draw(display);
+    // Build current state
+    let current = DisplayState {
+        num_connections: nimble::connection_count(),
+        battery_pct: battery_pct.unwrap_or(0),
+        alert_active,
+        peer_count: peers.len(),
+        peer_ids: peer_ids.clone(),
+    };
+
+    // Skip if nothing changed
+    if current == *prev {
+        return current;
     }
 
-    // Battery indicator (top left)
-    let _ = Rectangle::new(Point::new(5, 5), Size::new(45, 25))
-        .into_styled(black)
-        .draw(display);
-    if let Some(pct) = battery_pct {
-        if pct > 0 {
-            let batt_color = if pct > 20 { Rgb565::GREEN } else { Rgb565::RED };
+    // Battery indicator (top left) - only update if changed
+    if current.battery_pct != prev.battery_pct {
+        let _ = Rectangle::new(Point::new(5, 5), Size::new(50, 28))
+            .into_styled(PrimitiveStyle::with_fill(Rgb565::BLACK))
+            .draw(display);
+        if current.battery_pct > 0 {
+            let batt_color = if current.battery_pct > 20 { Rgb565::GREEN } else { Rgb565::RED };
             let batt_style = MonoTextStyle::new(&FONT_10X20, batt_color);
-            let batt_str = format!("{}%", pct);
+            let batt_str = format!("{}%", current.battery_pct);
             let _ = Text::new(&batt_str, Point::new(10, 25), batt_style).draw(display);
         }
     }
 
-    // Main alert area - large central display
-    let _ = Rectangle::new(Point::new(20, 85), Size::new(280, 100))
-        .into_styled(black)
-        .draw(display);
-
-    if alert_active {
-        // ALERT MODE - big red background with EMERGENCY text
-        let _ = Rectangle::new(Point::new(30, 90), Size::new(260, 80))
-            .into_styled(PrimitiveStyle::with_fill(Rgb565::RED))
+    // Connection indicator (top right, next to build#) - small dot
+    if current.num_connections != prev.num_connections {
+        let conn_color = if current.num_connections > 0 { Rgb565::GREEN } else { Rgb565::CSS_DARK_GRAY };
+        let _ = Circle::new(Point::new(300, 12), 12)
+            .into_styled(PrimitiveStyle::with_fill(conn_color))
             .draw(display);
-        let white_style = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
-        let _ = Text::new("!! EMERGENCY !!", Point::new(65, 125), white_style).draw(display);
-        let _ = Text::new("TAP TO ACK", Point::new(90, 155), white_style).draw(display);
-    } else {
-        // NORMAL MODE - show tap count and ready status
-        let green = MonoTextStyle::new(&FONT_10X20, Rgb565::GREEN);
-        let _ = Text::new("READY", Point::new(120, 110), green).draw(display);
-
-        // Show total taps (smaller, informational)
-        let total_str = format!("taps: {}", mesh.total_count());
-        let _ = Text::new(&total_str, Point::new(105, 140), white).draw(display);
-
-        // Show peer count (from HiveMesh)
-        let peer_str = format!("peers: {}", mesh.peer_count());
-        let _ = Text::new(&peer_str, Point::new(105, 165), white).draw(display);
-
-        // Debug: wr/st/tk (gatt writes/stored/taken)
-        let debug_str = format!("wr:{} st:{} tk:{}",
-            nimble::gatt_write_count(),
-            nimble::doc_stored_count(),
-            nimble::doc_taken_count());
-        let cyan = MonoTextStyle::new(&FONT_10X20, Rgb565::CYAN);
-        let _ = Text::new(&debug_str, Point::new(30, 175), cyan).draw(display);
     }
 
-    // Status line (above button labels)
-    let _ = Rectangle::new(Point::new(10, 185), Size::new(300, 20))
-        .into_styled(black)
-        .draw(display);
-    let _ = Text::new(status, Point::new(20, 198), yellow).draw(display);
+    // Main content area - update if alert state or peers changed
+    let content_changed = current.alert_active != prev.alert_active
+        || current.peer_ids != prev.peer_ids;
+
+    if content_changed {
+        // Clear main content area
+        let _ = Rectangle::new(Point::new(0, 40), Size::new(320, 160))
+            .into_styled(PrimitiveStyle::with_fill(Rgb565::BLACK))
+            .draw(display);
+
+        if current.alert_active {
+            // ALERT MODE - big red box with EMERGENCY
+            let _ = Rectangle::new(Point::new(20, 60), Size::new(280, 120))
+                .into_styled(PrimitiveStyle::with_fill(Rgb565::RED))
+                .draw(display);
+            let white_style = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
+            let _ = Text::new("EMERGENCY", Point::new(90, 115), white_style).draw(display);
+            let _ = Text::new("Tap ACK to clear", Point::new(70, 150), white_style).draw(display);
+        } else {
+            // READY MODE with peer info
+            let green = MonoTextStyle::new(&FONT_10X20, Rgb565::GREEN);
+            let white = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
+            let gray = MonoTextStyle::new(&FONT_10X20, Rgb565::CSS_GRAY);
+
+            let _ = Text::new("READY", Point::new(125, 80), green).draw(display);
+
+            // Show peer details
+            if !peer_ids.is_empty() {
+                let count_str = if peer_ids.len() == 1 { "1 peer:" } else { &format!("{} peers:", peer_ids.len()) };
+                let _ = Text::new(count_str, Point::new(110, 120), white).draw(display);
+
+                // Show up to 3 peer IDs
+                let y = 145;
+                for (i, id) in peer_ids.iter().take(3).enumerate() {
+                    let id_str = format!("{:08X}", id);
+                    let x = if peer_ids.len() == 1 { 115 } else { 30 + (i as i32 * 100) };
+                    let _ = Text::new(&id_str, Point::new(x, y), gray).draw(display);
+                }
+                if peer_ids.len() > 3 {
+                    let _ = Text::new("...", Point::new(280, y), gray).draw(display);
+                }
+            } else {
+                let _ = Text::new("Scanning...", Point::new(100, 130), gray).draw(display);
+            }
+        }
+    }
+
+    // Update button labels when alert state changes
+    if current.alert_active != prev.alert_active {
+        update_button_labels(display, current.alert_active);
+    }
+
+    current
 }
 
 fn main() -> anyhow::Result<()> {
@@ -673,7 +732,9 @@ fn main() -> anyhow::Result<()> {
 
     // Draw static UI once, then update dynamic parts
     draw_static_ui(&mut display, node_id.as_u32());
-    update_display(&mut display, &mesh, false, battery_pct, "BtnC=EMERG  BtnA=ACK");
+    update_button_labels(&mut display, false);  // Initial state: ACK greyed out
+    let mut display_state = DisplayState::default();
+    display_state = update_display(&mut display, &mesh, false, battery_pct, "BtnC=EMERG  BtnA=ACK", &display_state);
     print_status(&mesh, false, "BtnC=EMERG  BtnA=ACK");
 
     // Main loop state
@@ -739,8 +800,7 @@ fn main() -> anyhow::Result<()> {
                     let sent = nimble::gossip_document(&encoded);
                     info!("Gossiped to {} peers", sent);
 
-                    needs_redraw = true;
-                    update_display(&mut display, &mesh, false, battery_pct, "ACK sent!");
+                    display_state = update_display(&mut display, &mesh, false, battery_pct, "ACK sent!", &display_state);
                 }
                 Button::BtnB => {
                     // Button B = RESET (clear event, but counter is CRDT - can't truly reset)
@@ -755,8 +815,7 @@ fn main() -> anyhow::Result<()> {
                     }
                     let encoded = mesh.build_document();
                     nimble::set_document(&encoded);
-                    needs_redraw = true;
-                    update_display(&mut display, &mesh, false, battery_pct, "CLEARED!");
+                    display_state = update_display(&mut display, &mesh, false, battery_pct, "CLEARED!", &display_state);
                 }
                 Button::BtnC => {
                     // Button C = EMERGENCY
@@ -776,8 +835,7 @@ fn main() -> anyhow::Result<()> {
                     let sent = nimble::gossip_document(&encoded);
                     info!(">>> Gossiped EMERGENCY to {} peers", sent);
 
-                    needs_redraw = true;
-                    update_display(&mut display, &mesh, true, battery_pct, "EMERGENCY!");
+                    display_state = update_display(&mut display, &mesh, true, battery_pct, "EMERGENCY!", &display_state);
                 }
                 Button::None => {}
             }
@@ -846,14 +904,14 @@ fn main() -> anyhow::Result<()> {
 
         // Redraw display when needed
         if needs_redraw {
-            let status = if alert_active {
+            let status: &'static str = if alert_active {
                 "!! ALERT - TAP TO ACK !!"
             } else if connected {
                 "Connected"
             } else {
                 "Advertising..."
             };
-            update_display(&mut display, &mesh, alert_active, battery_pct, status);
+            display_state = update_display(&mut display, &mesh, alert_active, battery_pct, status, &display_state);
             needs_redraw = false;
         }
 
@@ -869,14 +927,14 @@ fn main() -> anyhow::Result<()> {
                 mesh.update_health(pct);
             }
 
-            let status = if alert_active {
+            let status: &'static str = if alert_active {
                 "!! ALERT - TAP TO ACK !!"
             } else if connected {
                 "Connected"
             } else {
                 "Advertising..."
             };
-            update_display(&mut display, &mesh, alert_active, battery_pct, status);
+            display_state = update_display(&mut display, &mesh, alert_active, battery_pct, status, &display_state);
             print_status(&mesh, connected, status);
         }
 
