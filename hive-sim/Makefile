@@ -487,7 +487,11 @@ lab5-knockout: ## Lab 5d: Kill random soldier node (TARGET=soldier)
 	fi; \
 	echo "Killing node: $$VICTIM"; \
 	echo "Time: $$(date +%H:%M:%S.%3N)"; \
+	TS=$$(date +%s%3N); \
+	echo "{\"type\":\"inject\",\"mode\":\"knockout\",\"timestamp_ms\":$$TS,\"details\":{\"node\":\"$$VICTIM\",\"node_type\":\"$$TARGET_TYPE\"}}" >> /tmp/lab5-chaos-events.jsonl; \
 	docker kill --signal=SIGKILL $$VICTIM; \
+	TS=$$(date +%s%3N); \
+	echo "{\"type\":\"recover\",\"mode\":\"knockout\",\"timestamp_ms\":$$TS,\"details\":{\"node\":\"$$VICTIM\",\"status\":\"killed\"}}" >> /tmp/lab5-chaos-events.jsonl; \
 	echo "✓ Node killed. Monitor recovery with: make lab5-status"
 
 lab5-leader-kill: ## Lab 5e: Kill a leader node (LEVEL=squad|platoon|company)
@@ -513,7 +517,11 @@ lab5-leader-kill: ## Lab 5e: Kill a leader node (LEVEL=squad|platoon|company)
 	fi; \
 	echo "Assassinating $$LEVEL leader: $$VICTIM"; \
 	echo "Time: $$(date +%H:%M:%S.%3N)"; \
+	TS=$$(date +%s%3N); \
+	echo "{\"type\":\"inject\",\"mode\":\"leader_kill\",\"timestamp_ms\":$$TS,\"details\":{\"node\":\"$$VICTIM\",\"level\":\"$$LEVEL\"}}" >> /tmp/lab5-chaos-events.jsonl; \
 	docker kill --signal=SIGKILL $$VICTIM; \
+	TS=$$(date +%s%3N); \
+	echo "{\"type\":\"recover\",\"mode\":\"leader_kill\",\"timestamp_ms\":$$TS,\"details\":{\"node\":\"$$VICTIM\",\"status\":\"killed\"}}" >> /tmp/lab5-chaos-events.jsonl; \
 	echo "✓ Leader killed. Monitor hierarchy recovery with: make lab5-status"
 
 lab5-partition: ## Lab 5f: Create network partition (GROUPS=2 splits network in half)
@@ -538,6 +546,8 @@ lab5-blackout: ## Lab 5g: Total network blackout (DURATION=10s)
 		exit 1; \
 	fi
 	@echo "Initiating $${DURATION:-10}s blackout..."
+	@TS=$$(date +%s%3N); \
+	echo "{\"type\":\"inject\",\"mode\":\"blackout\",\"timestamp_ms\":$$TS,\"details\":{\"duration_seconds\":$${DURATION:-10}}}" >> /tmp/lab5-chaos-events.jsonl
 	@echo "Start time: $$(date +%H:%M:%S.%3N)"
 	@for container in $$(docker ps --filter "name=clab-lab4" --format '{{.Names}}'); do \
 		docker exec $$container tc qdisc replace dev eth0 root netem loss 100% 2>/dev/null || \
@@ -549,6 +559,8 @@ lab5-blackout: ## Lab 5g: Total network blackout (DURATION=10s)
 	@for container in $$(docker ps --filter "name=clab-lab4" --format '{{.Names}}'); do \
 		docker exec $$container tc qdisc del dev eth0 root 2>/dev/null || true; \
 	done
+	@TS=$$(date +%s%3N); \
+	echo "{\"type\":\"recover\",\"mode\":\"blackout\",\"timestamp_ms\":$$TS,\"details\":{\"duration_seconds\":$${DURATION:-10}}}" >> /tmp/lab5-chaos-events.jsonl
 	@echo "End time: $$(date +%H:%M:%S.%3N)"
 	@echo "✓ Blackout complete. Monitor recovery with: make lab5-status"
 
