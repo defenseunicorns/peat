@@ -243,7 +243,7 @@ struct ActionButtonsView: View {
             .disabled(!viewModel.isMeshActive)
 
             HStack(spacing: 12) {
-                // ACK button
+                // ACK button - green when alert active, grey when not
                 Button(action: { viewModel.sendAck() }) {
                     HStack {
                         Image(systemName: "checkmark.circle.fill")
@@ -252,7 +252,7 @@ struct ActionButtonsView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.green)
+                    .background(viewModel.ackStatus.isActive ? Color.green : Color.gray.opacity(0.5))
                     .foregroundColor(.white)
                     .cornerRadius(10)
                 }
@@ -267,7 +267,7 @@ struct ActionButtonsView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.gray)
+                    .background(viewModel.ackStatus.isActive ? Color.gray : Color.gray.opacity(0.5))
                     .foregroundColor(.white)
                     .cornerRadius(10)
                 }
