@@ -32,8 +32,8 @@ if [ ! -f "$CHAOS_EVENTS_FILE" ]; then
     exit 1
 fi
 
-# Find the commander container
-COMMANDER=$(docker ps --filter "name=${LAB_FILTER}" --filter "name=commander" --format '{{.Names}}' | head -1)
+# Find the commander container (docker filter with multiple --filter name= is OR, so use grep)
+COMMANDER=$(docker ps --filter "name=${LAB_FILTER}" --format '{{.Names}}' | grep "commander" | head -1)
 if [ -z "$COMMANDER" ]; then
     echo "ERROR: No commander container found"
     exit 1
