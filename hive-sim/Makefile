@@ -2,6 +2,7 @@
 # Simple interface for running network simulations and tests
 
 .PHONY: help build clean deploy destroy lab4-24 lab4-48 lab4-96 lab4-384 lab4-start lab4-status lab4-metrics lab4-results lab4-watch lab4-experiment lab4-single lab4-analyze lab4-save-logs lab4-destroy
+.PHONY: lab5-packet-loss lab5-intermittent lab5-churn lab5-knockout lab5-leader-kill lab5-partition lab5-blackout lab5-all lab5-status lab5-inject lab5-recover lab5-recovery-time lab5-verify-consistency lab5-report
 
 # Default target
 .DEFAULT_GOAL := help
@@ -17,10 +18,16 @@ build: ## Build Docker image for nodes
 	@echo "🔨 Building hive-sim-node Docker image..."
 	docker build -f Dockerfile -t hive-sim-node:latest ..
 
-clean: ## Destroy all deployments and clean up
+clean: ## Destroy all deployments and clean up (use sudo for root processes)
 	@echo "🧹 Cleaning up all deployments..."
-	-docker ps -a --filter "name=clab-" -q | xargs -r docker rm -f 2>/dev/null || true
-	-docker network prune -f
+	-docker ps -a --filter "name=clab-" -q | xargs -r docker rm -f 2>/dev/null
+	-docker network prune -f 2>/dev/null
+	-rm -rf .generated/ clab-*/ /tmp/hive-sim* 2>/dev/null
+	@ORPHANS=$$(pgrep -c -f "hive-sim" 2>/dev/null || echo 0); \
+	if [ "$$ORPHANS" -gt 0 ]; then \
+		echo "⚠️  Found $$ORPHANS orphaned hive-sim processes (root-owned)"; \
+		echo "   Run: sudo pkill -9 -f hive-sim"; \
+	fi
 	@echo "✅ Cleanup complete"
 
 ##@ Traditional Baseline Testing (Single-Battalion)
@@ -416,3 +423,205 @@ lab4-destroy: ## Destroy Lab 4 deployment
 	-containerlab destroy -t topologies/lab4-384n-$${BANDWIDTH:-1gbps}.yaml --cleanup 2>/dev/null || true
 	-docker network prune -f 2>/dev/null || true
 	@echo "✓ Lab 4 destroyed"
+
+##@ Lab 5: Chaos Engineering and Mesh Degradation Testing
+# Requires: Lab 4 deployment running first (make lab4-96 or lab4-384)
+# See: gh issue view 471 for full epic details
+
+lab5-packet-loss: ## Lab 5a: Inject packet loss (LOSS=5, targets 5% loss)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 5a: Packet Loss Injection ($${LOSS:-5}%)               ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@CONTAINERS=$$(docker ps --filter "name=clab-lab4" --format '{{.Names}}' | wc -l); \
+	if [ "$$CONTAINERS" -eq 0 ]; then \
+		echo "ERROR: No Lab 4 deployment found. Run 'make lab4-96' first."; \
+		exit 1; \
+	fi
+	@echo "Applying $${LOSS:-5}% packet loss to all containers..."
+	@for container in $$(docker ps --filter "name=clab-lab4" --format '{{.Names}}'); do \
+		docker exec $$container tc qdisc replace dev eth0 root netem loss $${LOSS:-5}% 2>/dev/null || \
+		docker exec $$container tc qdisc add dev eth0 root netem loss $${LOSS:-5}% 2>/dev/null || true; \
+	done
+	@echo "✓ Packet loss applied. Monitor with: make lab5-status"
+
+lab5-intermittent: ## Lab 5b: Simulate intermittent connectivity (CYCLE=30s on/off)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 5b: Intermittent Connectivity (cycle=$${CYCLE:-30}s)   ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@CONTAINERS=$$(docker ps --filter "name=clab-lab4" --format '{{.Names}}' | wc -l); \
+	if [ "$$CONTAINERS" -eq 0 ]; then \
+		echo "ERROR: No Lab 4 deployment found. Run 'make lab4-96' first."; \
+		exit 1; \
+	fi
+	@echo "Starting intermittent connectivity simulation..."
+	@echo "  - $${CYCLE:-30}s connected, $${CYCLE:-30}s disconnected"
+	@echo "  - Press Ctrl+C to stop"
+	@./chaos-inject.sh intermittent --cycle $${CYCLE:-30}
+
+lab5-churn: ## Lab 5c: Simulate node churn (RATE=1 node every 10s)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 5c: Node Churn Simulation                             ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@CONTAINERS=$$(docker ps --filter "name=clab-lab4" --format '{{.Names}}' | wc -l); \
+	if [ "$$CONTAINERS" -eq 0 ]; then \
+		echo "ERROR: No Lab 4 deployment found. Run 'make lab4-96' first."; \
+		exit 1; \
+	fi
+	@echo "Starting node churn simulation..."
+	@./chaos-inject.sh churn --rate $${RATE:-10}
+
+lab5-knockout: ## Lab 5d: Kill random soldier node (TARGET=soldier)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 5d: Single Node Knockout (type=$${TARGET:-soldier})    ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@CONTAINERS=$$(docker ps --filter "name=clab-lab4" --format '{{.Names}}' | wc -l); \
+	if [ "$$CONTAINERS" -eq 0 ]; then \
+		echo "ERROR: No Lab 4 deployment found. Run 'make lab4-96' first."; \
+		exit 1; \
+	fi
+	@TARGET_TYPE=$${TARGET:-soldier}; \
+	VICTIM=$$(docker ps --filter "name=clab-lab4" --format '{{.Names}}' | grep "$$TARGET_TYPE" | shuf -n 1); \
+	if [ -z "$$VICTIM" ]; then \
+		echo "ERROR: No container matching type '$$TARGET_TYPE' found"; \
+		exit 1; \
+	fi; \
+	echo "Killing node: $$VICTIM"; \
+	echo "Time: $$(date +%H:%M:%S.%3N)"; \
+	docker kill --signal=SIGKILL $$VICTIM; \
+	echo "✓ Node killed. Monitor recovery with: make lab5-status"
+
+lab5-leader-kill: ## Lab 5e: Kill a leader node (LEVEL=squad|platoon|company)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 5e: Leader Assassination ($${LEVEL:-squad} leader)     ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@CONTAINERS=$$(docker ps --filter "name=clab-lab4" --format '{{.Names}}' | wc -l); \
+	if [ "$$CONTAINERS" -eq 0 ]; then \
+		echo "ERROR: No Lab 4 deployment found. Run 'make lab4-96' first."; \
+		exit 1; \
+	fi
+	@LEVEL=$${LEVEL:-squad}; \
+	case "$$LEVEL" in \
+		squad) PATTERN="squad-[0-9]+-leader" ;; \
+		platoon) PATTERN="platoon-[0-9]+-leader" ;; \
+		company) PATTERN="commander" ;; \
+		*) echo "ERROR: LEVEL must be squad, platoon, or company"; exit 1 ;; \
+	esac; \
+	VICTIM=$$(docker ps --filter "name=clab-lab4" --format '{{.Names}}' | grep -E "$$PATTERN" | shuf -n 1); \
+	if [ -z "$$VICTIM" ]; then \
+		echo "ERROR: No $$LEVEL leader found"; \
+		exit 1; \
+	fi; \
+	echo "Assassinating $$LEVEL leader: $$VICTIM"; \
+	echo "Time: $$(date +%H:%M:%S.%3N)"; \
+	docker kill --signal=SIGKILL $$VICTIM; \
+	echo "✓ Leader killed. Monitor hierarchy recovery with: make lab5-status"
+
+lab5-partition: ## Lab 5f: Create network partition (GROUPS=2 splits network in half)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 5f: Network Partition ($${GROUPS:-2}-way split)        ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@CONTAINERS=$$(docker ps --filter "name=clab-lab4" --format '{{.Names}}' | wc -l); \
+	if [ "$$CONTAINERS" -eq 0 ]; then \
+		echo "ERROR: No Lab 4 deployment found. Run 'make lab4-96' first."; \
+		exit 1; \
+	fi
+	@echo "Creating network partition..."
+	@./chaos-inject.sh partition --groups $${GROUPS:-2}
+
+lab5-blackout: ## Lab 5g: Total network blackout (DURATION=10s)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 5g: Burst Jamming / Blackout ($${DURATION:-10}s)       ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@CONTAINERS=$$(docker ps --filter "name=clab-lab4" --format '{{.Names}}' | wc -l); \
+	if [ "$$CONTAINERS" -eq 0 ]; then \
+		echo "ERROR: No Lab 4 deployment found. Run 'make lab4-96' first."; \
+		exit 1; \
+	fi
+	@echo "Initiating $${DURATION:-10}s blackout..."
+	@echo "Start time: $$(date +%H:%M:%S.%3N)"
+	@for container in $$(docker ps --filter "name=clab-lab4" --format '{{.Names}}'); do \
+		docker exec $$container tc qdisc replace dev eth0 root netem loss 100% 2>/dev/null || \
+		docker exec $$container tc qdisc add dev eth0 root netem loss 100% 2>/dev/null || true; \
+	done
+	@echo "Network blacked out. Recovering in $${DURATION:-10}s..."
+	@sleep $${DURATION:-10}
+	@echo "Restoring network..."
+	@for container in $$(docker ps --filter "name=clab-lab4" --format '{{.Names}}'); do \
+		docker exec $$container tc qdisc del dev eth0 root 2>/dev/null || true; \
+	done
+	@echo "End time: $$(date +%H:%M:%S.%3N)"
+	@echo "✓ Blackout complete. Monitor recovery with: make lab5-status"
+
+lab5-recover: ## Remove all chaos injections and restore normal operation
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 5: Removing Chaos Injections                          ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo "Removing tc qdisc rules from all containers..."
+	@for container in $$(docker ps --filter "name=clab-lab4" --format '{{.Names}}'); do \
+		docker exec $$container tc qdisc del dev eth0 root 2>/dev/null || true; \
+	done
+	@echo "✓ Chaos removed. Network restored to normal."
+
+lab5-status: ## Show chaos test status and recovery metrics
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 5: Chaos Status                                       ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@TOTAL=$$(docker ps --filter "name=clab-lab4" -q 2>/dev/null | wc -l); \
+	RUNNING=$$(docker ps --filter "name=clab-lab4" --filter "status=running" -q 2>/dev/null | wc -l); \
+	EXITED=$$(docker ps -a --filter "name=clab-lab4" --filter "status=exited" -q 2>/dev/null | wc -l); \
+	echo "Containers: $$RUNNING running / $$TOTAL total ($$EXITED exited)"
+	@echo ""
+	@echo "=== Active tc qdisc rules (chaos injections) ==="
+	@SAMPLE=$$(docker ps --filter "name=clab-lab4" --format '{{.Names}}' | head -1); \
+	if [ -n "$$SAMPLE" ]; then \
+		docker exec $$SAMPLE tc qdisc show dev eth0 2>/dev/null || echo "  No tc rules (clean)"; \
+	else \
+		echo "  No containers running"; \
+	fi
+	@echo ""
+	@echo "=== Recent Errors (last 5 across all nodes) ==="
+	@docker ps --filter "name=clab-lab4" -q | head -5 | xargs -I{} docker logs --tail 50 {} 2>&1 | \
+		grep -iE "error|panic|fatal|timeout|disconnect" | grep -v "No error" | tail -5 || echo "  None"
+	@echo ""
+	@echo "=== Sync Health (sample from commander) ==="
+	@COMMANDER=$$(docker ps --format '{{.Names}}' | grep "commander" | head -1); \
+	if [ -n "$$COMMANDER" ]; then \
+		LAST_SYNC=$$(docker logs $$COMMANDER 2>&1 | grep "AggregationCompleted" | tail -1); \
+		if [ -n "$$LAST_SYNC" ]; then \
+			echo "  Last aggregation: $$(echo $$LAST_SYNC | grep -oP '"timestamp":"[^"]+"' | head -1)"; \
+		else \
+			echo "  No aggregations yet"; \
+		fi; \
+	else \
+		echo "  No commander found"; \
+	fi
+
+lab5-all: ## Run complete Lab 5 chaos test suite (requires lab4-96 running)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 5: Full Chaos Engineering Suite                       ║"
+	@echo "║  This will run all chaos scenarios sequentially            ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@CONTAINERS=$$(docker ps --filter "name=clab-lab4" --format '{{.Names}}' | wc -l); \
+	if [ "$$CONTAINERS" -eq 0 ]; then \
+		echo "ERROR: No Lab 4 deployment found. Run 'make lab4-96' first."; \
+		exit 1; \
+	fi
+	@./run-lab5-chaos-suite.sh
+
+lab5-recovery-time: ## Measure recovery time after chaos event (TARGET=60000ms)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 5: Recovery Time Measurement                          ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@./measure-recovery.sh --target $${TARGET:-60000}
+
+lab5-verify-consistency: ## Verify CRDT data consistency across all nodes
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 5: Data Consistency Verification                      ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@./verify-consistency.sh
+
+lab5-report: ## Generate Lab 5 results report with pass/fail against targets
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 5: Test Results Report                                ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@./lab5-report.sh
