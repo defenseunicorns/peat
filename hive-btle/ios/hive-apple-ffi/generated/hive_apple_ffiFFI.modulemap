@@ -1,0 +1,4 @@
+module hive_apple_ffiFFI {
+    header "hive_apple_ffiFFI.h"
+    export *
+}
