@@ -460,8 +460,8 @@ class HiveViewModel: ObservableObject {
         isMeshActive = true
         statusMessage = "Scanning for HIVE nodes..."
 
-        // Periodic maintenance timer (peer cleanup, sync)
-        maintenanceTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        // Periodic maintenance timer (peer cleanup, sync) - 1 second for responsive connection tracking
+        maintenanceTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.performMaintenance()
             }
@@ -640,10 +640,12 @@ class HiveViewModel: ObservableObject {
         guard let mesh = hiveMesh else { return }
         let nowMs = UInt64(Date().timeIntervalSince1970 * 1000)
 
-        // tick() handles peer cleanup and returns sync data if needed
-        if let syncData = mesh.tick(nowMs: nowMs) {
-            bleManager?.sendData(Data(syncData))
-        }
+        // tick() handles peer cleanup
+        _ = mesh.tick(nowMs: nowMs)
+
+        // Always send current document as heartbeat (keeps connection alive for peer tracking)
+        let document = mesh.buildDocument()
+        bleManager?.sendData(Data(document))
 
         // Refresh peers from mesh
         syncPeersFromMesh()

@@ -418,7 +418,7 @@ fn axp_set_vibration(i2c: &mut I2cDriver, enable: bool) {
 }
 
 /// Build number for tracking firmware versions
-const BUILD_NUM: u32 = 30;
+const BUILD_NUM: u32 = 33;
 
 /// Mesh ID for this device
 const MESH_ID: &str = "DEMO";
@@ -430,8 +430,9 @@ struct DisplayState {
     battery_pct: u8,
     alert_active: bool,
     peer_count: usize,
-    peer_ids: Vec<u32>,      // Node IDs of connected peers
-    acked_peers: Vec<u32>,   // Node IDs that have ACK'd the current emergency
+    peer_ids: Vec<u32>,           // Node IDs of all known peers
+    connected_peers: Vec<u32>,    // Node IDs of currently connected peers
+    acked_peers: Vec<u32>,        // Node IDs that have ACK'd the current emergency
 }
 
 /// Draw initial static UI elements (call once at startup)
@@ -504,9 +505,11 @@ fn update_display<D>(
 where
     D: DrawTarget<Color = Rgb565>,
 {
-    // Get peer IDs
+    // Get peer IDs and connection status from nimble (not mesh)
     let peers = mesh.get_peers();
     let peer_ids: Vec<u32> = peers.iter().map(|p| p.node_id.as_u32()).collect();
+    // Use nimble's connection tracking for accurate is_connected status
+    let connected_peers: Vec<u32> = nimble::get_connected_node_ids();
 
     // Build current state
     let current = DisplayState {
@@ -515,6 +518,7 @@ where
         alert_active,
         peer_count: peers.len(),
         peer_ids: peer_ids.clone(),
+        connected_peers: connected_peers.clone(),
         acked_peers: acked_peers.to_vec(),
     };
 
@@ -544,9 +548,10 @@ where
             .draw(display);
     }
 
-    // Main content area - update if alert state, peers, or acks changed
+    // Main content area - update if alert state, peers, connections, or acks changed
     let content_changed = current.alert_active != prev.alert_active
         || current.peer_ids != prev.peer_ids
+        || current.connected_peers != prev.connected_peers
         || current.acked_peers != prev.acked_peers;
 
     if content_changed {
@@ -564,22 +569,25 @@ where
             let green_style = MonoTextStyle::new(&FONT_10X20, Rgb565::GREEN);
             let _ = Text::new("EMERGENCY", Point::new(90, 80), white_style).draw(display);
 
-            // Show ACK status for each peer
+            // Show ACK and connection status for each peer
+            let gray_style = MonoTextStyle::new(&FONT_10X20, Rgb565::CSS_GRAY);
             if !peer_ids.is_empty() {
                 let mut y = 110;
                 for id in peer_ids.iter().take(3) {
+                    let is_connected = current.connected_peers.contains(id);
                     let acked = current.acked_peers.contains(id);
-                    let status = if acked {
-                        format!("{:08X} [ACK]", id)
+                    let (status, style) = if !is_connected {
+                        (format!("{:08X} [--]", id), gray_style)  // Disconnected
+                    } else if acked {
+                        (format!("{:08X} [ACK]", id), green_style)  // Connected + ACK'd
                     } else {
-                        format!("{:08X} ...", id)
+                        (format!("{:08X} ...", id), white_style)  // Connected, waiting
                     };
-                    let style = if acked { green_style } else { white_style };
                     let _ = Text::new(&status, Point::new(70, y), style).draw(display);
                     y += 25;
                 }
             } else {
-                let _ = Text::new("No peers connected", Point::new(60, 120), white_style).draw(display);
+                let _ = Text::new("No peers known", Point::new(80, 120), white_style).draw(display);
             }
 
             let _ = Text::new("Tap ACK to clear", Point::new(70, 185), white_style).draw(display);
@@ -589,22 +597,35 @@ where
             let white = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
             let gray = MonoTextStyle::new(&FONT_10X20, Rgb565::CSS_GRAY);
 
+            // Show local node ID above READY
+            let node_id_str = format!("{:08X}", mesh.node_id().as_u32());
+            let _ = Text::new(&node_id_str, Point::new(110, 55), white).draw(display);
             let _ = Text::new("READY", Point::new(125, 80), green).draw(display);
 
             // Show peer details
             if !peer_ids.is_empty() {
-                let count_str = if peer_ids.len() == 1 { "1 peer:" } else { &format!("{} peers:", peer_ids.len()) };
-                let _ = Text::new(count_str, Point::new(110, 120), white).draw(display);
+                // Show connected/total count
+                let connected_count = current.connected_peers.len();
+                let total_count = peer_ids.len();
+                let count_str = format!("{}/{} peers:", connected_count, total_count);
+                let _ = Text::new(&count_str, Point::new(100, 120), white).draw(display);
 
-                // Show up to 3 peer IDs
-                let y = 145;
-                for (i, id) in peer_ids.iter().take(3).enumerate() {
+                // Show up to 3 peer IDs with connection status
+                let mut y = 145;
+                for id in peer_ids.iter().take(3) {
+                    let is_connected = current.connected_peers.contains(id);
                     let id_str = format!("{:08X}", id);
-                    let x = if peer_ids.len() == 1 { 115 } else { 30 + (i as i32 * 100) };
-                    let _ = Text::new(&id_str, Point::new(x, y), gray).draw(display);
+                    let style = if is_connected { green } else { gray };
+                    // Center single peer, spread multiple
+                    let x = if peer_ids.len() == 1 { 115 } else { 60 };
+                    let _ = Text::new(&id_str, Point::new(x, y), style).draw(display);
+                    // Show status indicator
+                    let status = if is_connected { " [OK]" } else { " [--]" };
+                    let _ = Text::new(status, Point::new(x + 85, y), style).draw(display);
+                    y += 25;
                 }
                 if peer_ids.len() > 3 {
-                    let _ = Text::new("...", Point::new(280, y), gray).draw(display);
+                    let _ = Text::new(&format!("+{} more", peer_ids.len() - 3), Point::new(100, y), gray).draw(display);
                 }
             } else {
                 let _ = Text::new("Scanning...", Point::new(100, 130), gray).draw(display);
@@ -788,6 +809,12 @@ fn main() -> anyhow::Result<()> {
             needs_redraw = true;
         }
 
+        // Handle disconnected peers - mark for display update
+        for node_id in nimble::take_disconnected_node_ids() {
+            info!(">>> Peer disconnected: {:08X}", node_id);
+            needs_redraw = true;
+        }
+
         // Handle vibration buzzing when alert is active
         if alert_active {
             let elapsed = current_time.saturating_sub(last_vibration_toggle);
@@ -892,6 +919,9 @@ fn main() -> anyhow::Result<()> {
                     result.counter_changed
                 );
 
+                // Associate node ID with BLE connection for disconnect tracking
+                nimble::set_connection_node_id(result.source_node.as_u32());
+
                 // Check if peer is sending EMERGENCY
                 if result.is_emergency && !alert_active {
                     info!(">>> RECEIVED EMERGENCY FROM PEER!");
@@ -951,8 +981,8 @@ fn main() -> anyhow::Result<()> {
         // Check if we should rotate to find other peers (mesh behavior)
         nimble::check_rotation();
 
-        // Periodic status update (every 5 seconds = 100 * 50ms)
-        if loop_count % 100 == 0 {
+        // Periodic status update (every 1 second = 20 * 50ms)
+        if loop_count % 20 == 0 {
             // Update battery reading and peripheral health
             if let Some(mv) = axp_read_battery_voltage(&mut i2c) {
                 let pct = battery_percent_from_voltage(mv);

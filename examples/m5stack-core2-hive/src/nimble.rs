@@ -47,10 +47,15 @@ struct PeerConnection {
     handle: u16,
     peer_doc_handle: u16,  // Their document characteristic (for writing)
     active: bool,
+    peer_addr: [u8; 6],    // Peer's BLE address (for disconnect tracking)
+    node_id: u32,          // HIVE Node ID (set when first document received)
 }
 
 /// Multi-connection state
-static CONNECTIONS: Mutex<[PeerConnection; MAX_CONNECTIONS]> = Mutex::new([PeerConnection { handle: 0xFFFF, peer_doc_handle: 0, active: false }; MAX_CONNECTIONS]);
+static CONNECTIONS: Mutex<[PeerConnection; MAX_CONNECTIONS]> = Mutex::new([PeerConnection { handle: 0xFFFF, peer_doc_handle: 0, active: false, peer_addr: [0u8; 6], node_id: 0 }; MAX_CONNECTIONS]);
+
+/// Recently disconnected node IDs (for main loop to update display)
+static DISCONNECTED_NODE_IDS: Mutex<Vec<u32>> = Mutex::new(Vec::new());
 static NUM_CONNECTIONS: AtomicU16 = AtomicU16::new(0);
 
 /// Legacy single-connection state (for compatibility)
@@ -201,6 +206,13 @@ unsafe extern "C" fn gap_event_handler(event: *mut ble_gap_event, _arg: *mut c_v
             if connect.status == 0 {
                 info!("BLE: Connected, handle={}", connect.conn_handle);
 
+                // Get peer address from CURRENT_PEER_MAC (stored during discovery)
+                let peer_addr = if let Ok(mac) = CURRENT_PEER_MAC.lock() {
+                    *mac
+                } else {
+                    [0u8; 6]
+                };
+
                 // Add to multi-connection list
                 if let Ok(mut conns) = CONNECTIONS.lock() {
                     for conn in conns.iter_mut() {
@@ -208,6 +220,7 @@ unsafe extern "C" fn gap_event_handler(event: *mut ble_gap_event, _arg: *mut c_v
                             conn.handle = connect.conn_handle;
                             conn.peer_doc_handle = 0;
                             conn.active = true;
+                            conn.peer_addr = peer_addr;
                             NUM_CONNECTIONS.fetch_add(1, Ordering::SeqCst);
                             break;
                         }
@@ -246,13 +259,22 @@ unsafe extern "C" fn gap_event_handler(event: *mut ble_gap_event, _arg: *mut c_v
             let disc_handle = disconnect.conn.conn_handle;
             info!("BLE: Disconnected, handle={}", disc_handle);
 
-            // Remove from multi-connection list
+            // Remove from multi-connection list and track disconnected node ID
             if let Ok(mut conns) = CONNECTIONS.lock() {
                 for conn in conns.iter_mut() {
                     if conn.active && conn.handle == disc_handle {
+                        // Add to disconnected node IDs for main loop to update display
+                        if conn.node_id != 0 {
+                            if let Ok(mut disconnected) = DISCONNECTED_NODE_IDS.lock() {
+                                disconnected.push(conn.node_id);
+                                info!("BLE: Tracking disconnect of node {:08X}", conn.node_id);
+                            }
+                        }
                         conn.active = false;
                         conn.handle = 0xFFFF;
                         conn.peer_doc_handle = 0;
+                        conn.peer_addr = [0u8; 6];
+                        conn.node_id = 0;
                         NUM_CONNECTIONS.fetch_sub(1, Ordering::SeqCst);
                         break;
                     }
@@ -1093,4 +1115,41 @@ pub fn gossip_document(data: &[u8]) -> usize {
 /// Get number of active connections
 pub fn connection_count() -> usize {
     NUM_CONNECTIONS.load(Ordering::SeqCst) as usize
+}
+
+/// Get and clear list of recently disconnected node IDs
+pub fn take_disconnected_node_ids() -> Vec<u32> {
+    if let Ok(mut disconnected) = DISCONNECTED_NODE_IDS.lock() {
+        let ids = disconnected.clone();
+        disconnected.clear();
+        ids
+    } else {
+        Vec::new()
+    }
+}
+
+/// Associate a node ID with a connection (called when first document received)
+pub fn set_connection_node_id(node_id: u32) {
+    // Find the first active connection without a node_id set
+    if let Ok(mut conns) = CONNECTIONS.lock() {
+        for conn in conns.iter_mut() {
+            if conn.active && conn.node_id == 0 {
+                conn.node_id = node_id;
+                info!("BLE: Associated connection with node {:08X}", node_id);
+                break;
+            }
+        }
+    }
+}
+
+/// Get list of currently connected node IDs
+pub fn get_connected_node_ids() -> Vec<u32> {
+    if let Ok(conns) = CONNECTIONS.lock() {
+        conns.iter()
+            .filter(|c| c.active && c.node_id != 0)
+            .map(|c| c.node_id)
+            .collect()
+    } else {
+        Vec::new()
+    }
 }
