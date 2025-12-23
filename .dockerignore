@@ -1,0 +1,11 @@
+target/
+hive-sim-results/
+hive-sim/.generated/
+labs/
+.git/
+*.log
+*.jsonl
+docs/
+*.md
+**/*.backup
+**/.DS_Store
