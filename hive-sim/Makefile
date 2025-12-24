@@ -2,7 +2,7 @@
 # Simple interface for running network simulations and tests
 
 .PHONY: help build clean deploy destroy lab4-24 lab4-48 lab4-96 lab4-384 lab4-start lab4-status lab4-metrics lab4-results lab4-watch lab4-experiment lab4-single lab4-analyze lab4-save-logs lab4-destroy
-.PHONY: lab5-packet-loss lab5a-sweep lab5a-collect-latency lab5a-report lab5-intermittent lab5-churn lab5-knockout lab5-leader-kill lab5-partition lab5-blackout lab5-all lab5-status lab5-inject lab5-recover lab5-recovery-time lab5-verify-consistency lab5-report
+.PHONY: lab5-packet-loss lab5a-sweep lab5a-collect-latency lab5a-report lab5-intermittent lab5b-sweep lab5b-report lab5-churn lab5-knockout lab5-leader-kill lab5-partition lab5-blackout lab5-all lab5-status lab5-inject lab5-recover lab5-recovery-time lab5-verify-consistency lab5-report
 
 # Default target
 .DEFAULT_GOAL := help
@@ -552,15 +552,132 @@ lab5-intermittent: ## Lab 5b: Simulate intermittent connectivity (CYCLE=30s on/o
 	@echo "╔════════════════════════════════════════════════════════════╗"
 	@echo "║  Lab 5b: Intermittent Connectivity (cycle=$${CYCLE:-30}s)   ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
-	@CONTAINERS=$$(docker ps --filter "name=clab-lab4" --format '{{.Names}}' | wc -l); \
+	@CONTAINERS=$$(docker ps --filter "name=clab-" --format '{{.Names}}' | wc -l); \
 	if [ "$$CONTAINERS" -eq 0 ]; then \
-		echo "ERROR: No Lab 4 deployment found. Run 'make lab4-96' first."; \
+		echo "ERROR: No deployment found. Run 'make lab4-96' first."; \
 		exit 1; \
 	fi
 	@echo "Starting intermittent connectivity simulation..."
 	@echo "  - $${CYCLE:-30}s connected, $${CYCLE:-30}s disconnected"
 	@echo "  - Press Ctrl+C to stop"
 	@./chaos-inject.sh intermittent --cycle $${CYCLE:-30}
+
+lab5b-sweep: ## Lab 5b: Run intermittent connectivity sweep (5s, 15s, 30s disconnect durations)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 5b: Intermittent Connectivity Sweep                   ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@CONTAINERS=$$(docker ps --filter "name=clab-" --format '{{.Names}}' | wc -l); \
+	if [ "$$CONTAINERS" -eq 0 ]; then \
+		echo "ERROR: No deployment found. Run 'make lab4-96' first."; \
+		exit 1; \
+	fi
+	@RESULTS_DIR="/tmp/lab5b-sweep-$$(date +%Y%m%d-%H%M%S)"; \
+	mkdir -p "$$RESULTS_DIR"; \
+	echo "Results: $$RESULTS_DIR"; \
+	echo "disconnect_secs,recovery_ms,consistency,status" > "$$RESULTS_DIR/recovery.csv"; \
+	echo ""; \
+	for DISCONNECT in 5 15 30; do \
+		echo "Testing $${DISCONNECT}s disconnect..."; \
+		echo ""; \
+		echo "  Applying 100% packet loss (simulating disconnect)..."; \
+		TS_START=$$(date +%s%3N); \
+		for container in $$(docker ps --filter "name=clab-" --format '{{.Names}}'); do \
+			docker exec $$container tc qdisc replace dev eth0 root netem loss 100% 2>/dev/null || \
+			docker exec $$container tc qdisc add dev eth0 root netem loss 100% 2>/dev/null || true; \
+		done; \
+		echo "{\"type\":\"inject\",\"mode\":\"intermittent\",\"timestamp_ms\":$$TS_START,\"details\":{\"disconnect_secs\":$$DISCONNECT}}" >> /tmp/lab5-chaos-events.jsonl; \
+		sleep $$DISCONNECT; \
+		echo "  Restoring connectivity..."; \
+		for container in $$(docker ps --filter "name=clab-" --format '{{.Names}}'); do \
+			docker exec $$container tc qdisc del dev eth0 root 2>/dev/null || true; \
+		done; \
+		TS_RECONNECT=$$(date +%s%3N); \
+		echo "{\"type\":\"recover\",\"mode\":\"intermittent\",\"timestamp_ms\":$$TS_RECONNECT,\"details\":{\"disconnect_secs\":$$DISCONNECT}}" >> /tmp/lab5-chaos-events.jsonl; \
+		echo "  Monitoring for sync recovery..."; \
+		LEADER=$$(docker ps --filter "name=clab-" --format '{{.Names}}' | grep -E "squad.*leader" | head -1); \
+		BASELINE_COUNT=$$(docker logs "$$LEADER" 2>&1 | grep -c "AggregationCompleted" || echo 0); \
+		RECOVERY_MS=0; \
+		for i in $$(seq 1 60); do \
+			sleep 1; \
+			CURRENT_COUNT=$$(docker logs "$$LEADER" 2>&1 | grep -c "AggregationCompleted" || echo 0); \
+			if [ "$$CURRENT_COUNT" -gt "$$BASELINE_COUNT" ]; then \
+				TS_RECOVERED=$$(date +%s%3N); \
+				RECOVERY_MS=$$((TS_RECOVERED - TS_RECONNECT)); \
+				echo "  Sync resumed after $${RECOVERY_MS}ms"; \
+				break; \
+			fi; \
+		done; \
+		if [ "$$RECOVERY_MS" -eq 0 ]; then \
+			RECOVERY_MS=60000; \
+			echo "  No sync detected within 60s"; \
+		fi; \
+		echo "  Verifying document convergence..."; \
+		sleep 5; \
+		DOC_COUNTS=""; \
+		for leader in $$(docker ps --filter "name=clab-" --format '{{.Names}}' | grep -E "squad.*leader" | head -4); do \
+			COUNT=$$(docker logs "$$leader" 2>&1 | grep "AggregationCompleted" | tail -1 | grep -oP '"input_count":\K[0-9]+' || echo 0); \
+			DOC_COUNTS="$$DOC_COUNTS $$COUNT"; \
+		done; \
+		UNIQUE_COUNTS=$$(echo $$DOC_COUNTS | tr ' ' '\n' | sort -u | grep -v '^$$' | wc -l); \
+		if [ "$$UNIQUE_COUNTS" -le 1 ] && [ -n "$$DOC_COUNTS" ]; then \
+			CONVERGED="CONVERGED"; \
+		else \
+			CONVERGED="DIVERGED"; \
+		fi; \
+		echo "  Squad leader input counts:$$DOC_COUNTS ($$CONVERGED)"; \
+		echo "  $${DISCONNECT}s disconnect: Recovery=$${RECOVERY_MS}ms Consistency=$$CONVERGED"; \
+		if [ $$RECOVERY_MS -lt 30000 ]; then \
+			STATUS="PASS"; \
+		else \
+			STATUS="FAIL"; \
+		fi; \
+		echo "$$DISCONNECT,$$RECOVERY_MS,$${CONVERGED},$$STATUS" >> "$$RESULTS_DIR/recovery.csv"; \
+		echo ""; \
+		sleep 10; \
+	done; \
+	echo "╔════════════════════════════════════════════════════════════╗"; \
+	echo "║  Lab 5b Sweep Complete                                     ║"; \
+	echo "╚════════════════════════════════════════════════════════════╝"; \
+	echo ""; \
+	cat "$$RESULTS_DIR/recovery.csv"; \
+	echo ""; \
+	echo "Results saved to: $$RESULTS_DIR"
+
+lab5b-report: ## Lab 5b: Generate intermittent connectivity analysis report
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 5b: Intermittent Connectivity Analysis                ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@LATEST=$$(ls -td /tmp/lab5b-sweep-* 2>/dev/null | head -1); \
+	if [ -z "$$LATEST" ] || [ ! -f "$$LATEST/recovery.csv" ]; then \
+		echo "ERROR: No Lab 5b results found. Run 'make lab5b-sweep' first."; \
+		exit 1; \
+	fi; \
+	echo ""; \
+	echo "Results from: $$LATEST"; \
+	echo ""; \
+	echo "=== Recovery Time vs Disconnect Duration ==="; \
+	echo ""; \
+	printf "%-15s %-15s %-15s %-10s\n" "Disconnect" "Recovery" "Consistency" "Status"; \
+	echo "------------------------------------------------------------"; \
+	tail -n +2 "$$LATEST/recovery.csv" | while IFS=, read -r disc recov consist status; do \
+		printf "%-15s %-15s %-15s %-10s\n" "$${disc}s" "$${recov}ms" "$$consist" "$$status"; \
+	done; \
+	echo ""; \
+	echo "=== Success Criteria (Epic #471) ==="; \
+	echo ""; \
+	PASSED=$$(tail -n +2 "$$LATEST/recovery.csv" | grep -c ",PASS$$" || echo 0); \
+	TOTAL=$$(tail -n +2 "$$LATEST/recovery.csv" | wc -l); \
+	if [ "$$PASSED" -eq "$$TOTAL" ] && [ "$$TOTAL" -gt 0 ]; then \
+		echo "[PASS] All recovery times < 30s ($$PASSED/$$TOTAL tests)"; \
+	else \
+		echo "[FAIL] Some recovery times >= 30s ($$PASSED/$$TOTAL passed)"; \
+	fi; \
+	CONSISTENT=$$(tail -n +2 "$$LATEST/recovery.csv" | grep -c ",CONVERGED," || echo 0); \
+	if [ "$$CONSISTENT" -eq "$$TOTAL" ] && [ "$$TOTAL" -gt 0 ]; then \
+		echo "[PASS] Documents converged after all tests ($$CONSISTENT/$$TOTAL)"; \
+	else \
+		echo "[WARN] Some convergence issues ($$CONSISTENT/$$TOTAL converged)"; \
+	fi
 
 lab5-churn: ## Lab 5c: Simulate node churn (RATE=1 node every 10s)
 	@echo "╔════════════════════════════════════════════════════════════╗"
