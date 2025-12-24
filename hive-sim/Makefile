@@ -2,7 +2,7 @@
 # Simple interface for running network simulations and tests
 
 .PHONY: help build clean deploy destroy lab4-24 lab4-48 lab4-96 lab4-384 lab4-start lab4-status lab4-metrics lab4-results lab4-watch lab4-experiment lab4-single lab4-analyze lab4-save-logs lab4-destroy
-.PHONY: lab5-packet-loss lab5-intermittent lab5-churn lab5-knockout lab5-leader-kill lab5-partition lab5-blackout lab5-all lab5-status lab5-inject lab5-recover lab5-recovery-time lab5-verify-consistency lab5-report
+.PHONY: lab5-packet-loss lab5a-sweep lab5a-collect-latency lab5a-report lab5-intermittent lab5-churn lab5-knockout lab5-leader-kill lab5-partition lab5-blackout lab5-all lab5-status lab5-inject lab5-recover lab5-recovery-time lab5-verify-consistency lab5-report
 
 # Default target
 .DEFAULT_GOAL := help
@@ -432,17 +432,121 @@ lab5-packet-loss: ## Lab 5a: Inject packet loss (LOSS=5, targets 5% loss)
 	@echo "╔════════════════════════════════════════════════════════════╗"
 	@echo "║  Lab 5a: Packet Loss Injection ($${LOSS:-5}%)               ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
-	@CONTAINERS=$$(docker ps --filter "name=clab-lab4" --format '{{.Names}}' | wc -l); \
+	@CONTAINERS=$$(docker ps --filter "name=clab-" --format '{{.Names}}' | wc -l); \
 	if [ "$$CONTAINERS" -eq 0 ]; then \
-		echo "ERROR: No Lab 4 deployment found. Run 'make lab4-96' first."; \
+		echo "ERROR: No deployment found. Run 'make lab4-96' first."; \
 		exit 1; \
 	fi
 	@echo "Applying $${LOSS:-5}% packet loss to all containers..."
-	@for container in $$(docker ps --filter "name=clab-lab4" --format '{{.Names}}'); do \
+	@TS=$$(date +%s%3N); \
+	echo "{\"type\":\"inject\",\"mode\":\"packet_loss\",\"timestamp_ms\":$$TS,\"details\":{\"loss_pct\":$${LOSS:-5}}}" >> /tmp/lab5-chaos-events.jsonl
+	@for container in $$(docker ps --filter "name=clab-" --format '{{.Names}}'); do \
 		docker exec $$container tc qdisc replace dev eth0 root netem loss $${LOSS:-5}% 2>/dev/null || \
 		docker exec $$container tc qdisc add dev eth0 root netem loss $${LOSS:-5}% 2>/dev/null || true; \
 	done
 	@echo "✓ Packet loss applied. Monitor with: make lab5-status"
+
+lab5a-sweep: ## Lab 5a: Run full packet loss sweep (1%, 5%, 10%, 20%) with metrics collection
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 5a: Packet Loss Sweep (1%, 5%, 10%, 20%)              ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@CONTAINERS=$$(docker ps --filter "name=clab-" --format '{{.Names}}' | wc -l); \
+	if [ "$$CONTAINERS" -eq 0 ]; then \
+		echo "ERROR: No deployment found. Run 'make lab4-96' first."; \
+		exit 1; \
+	fi
+	@RESULTS_DIR="/tmp/lab5a-sweep-$$(date +%Y%m%d-%H%M%S)"; \
+	mkdir -p "$$RESULTS_DIR"; \
+	echo "Results: $$RESULTS_DIR"; \
+	echo "timestamp,loss_pct,p50_ms,p95_ms,p99_ms,sample_count" > "$$RESULTS_DIR/latency.csv"; \
+	echo ""; \
+	echo "Collecting baseline (0% loss)..."; \
+	$(MAKE) lab5-recover > /dev/null 2>&1 || true; \
+	sleep 30; \
+	$(MAKE) lab5a-collect-latency RESULTS_DIR="$$RESULTS_DIR" LOSS_PCT=0; \
+	echo ""; \
+	for LOSS in 1 5 10 20; do \
+		echo "Testing $${LOSS}% packet loss..."; \
+		$(MAKE) lab5-packet-loss LOSS=$$LOSS > /dev/null 2>&1; \
+		sleep 10; \
+		$(MAKE) lab5a-collect-latency RESULTS_DIR="$$RESULTS_DIR" LOSS_PCT=$$LOSS; \
+		$(MAKE) lab5-recover > /dev/null 2>&1; \
+		sleep 15; \
+	done; \
+	echo ""; \
+	echo "╔════════════════════════════════════════════════════════════╗"; \
+	echo "║  Lab 5a Sweep Complete                                     ║"; \
+	echo "╚════════════════════════════════════════════════════════════╝"; \
+	echo ""; \
+	cat "$$RESULTS_DIR/latency.csv"; \
+	echo ""; \
+	echo "Results saved to: $$RESULTS_DIR"
+
+lab5a-collect-latency: ## Collect latency metrics (internal target, use RESULTS_DIR and LOSS_PCT)
+	@RESULTS_DIR=$${RESULTS_DIR:-/tmp/lab5a}; \
+	LOSS_PCT=$${LOSS_PCT:-0}; \
+	DURATION=$${DURATION:-60}; \
+	METRICS_FILE="$$RESULTS_DIR/metrics-$${LOSS_PCT}pct.jsonl"; \
+	echo "  Collecting metrics for $${DURATION}s at $${LOSS_PCT}% loss..."; \
+	sleep $$DURATION; \
+	> "$$METRICS_FILE"; \
+	for container in $$(docker ps --filter "name=clab-" --format '{{.Names}}'); do \
+		timeout 5 docker logs "$$container" 2>&1 | grep 'METRICS:' | sed 's/.*METRICS: //' >> "$$METRICS_FILE" 2>/dev/null || true; \
+	done; \
+	LATENCIES=$$(grep '"event_type":"DocumentReceived"' "$$METRICS_FILE" 2>/dev/null | jq -r '.latency_ms // empty' 2>/dev/null | sort -n || true); \
+	COUNT=$$(echo "$$LATENCIES" | grep -c . 2>/dev/null || echo 0); \
+	if [ "$$COUNT" -gt 0 ]; then \
+		P50_IDX=$$((COUNT * 50 / 100)); \
+		P95_IDX=$$((COUNT * 95 / 100)); \
+		P99_IDX=$$((COUNT * 99 / 100)); \
+		P50=$$(echo "$$LATENCIES" | sed -n "$${P50_IDX}p"); \
+		P95=$$(echo "$$LATENCIES" | sed -n "$${P95_IDX}p"); \
+		P99=$$(echo "$$LATENCIES" | sed -n "$${P99_IDX}p"); \
+		echo "  $${LOSS_PCT}% loss: P50=$${P50}ms P95=$${P95}ms P99=$${P99}ms (n=$$COUNT)"; \
+		echo "$$(date -Iseconds),$${LOSS_PCT},$${P50},$${P95},$${P99},$$COUNT" >> "$$RESULTS_DIR/latency.csv"; \
+	else \
+		echo "  $${LOSS_PCT}% loss: No metrics collected"; \
+		echo "$$(date -Iseconds),$${LOSS_PCT},N/A,N/A,N/A,0" >> "$$RESULTS_DIR/latency.csv"; \
+	fi
+
+lab5a-report: ## Generate Lab 5a degradation curve analysis from sweep results
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 5a: Packet Loss Degradation Analysis                  ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@LATEST=$$(ls -td /tmp/lab5a-sweep-* 2>/dev/null | head -1); \
+	if [ -z "$$LATEST" ] || [ ! -f "$$LATEST/latency.csv" ]; then \
+		echo "ERROR: No Lab 5a results found. Run 'make lab5a-sweep' first."; \
+		exit 1; \
+	fi; \
+	echo ""; \
+	echo "Results from: $$LATEST"; \
+	echo ""; \
+	echo "=== Latency vs Packet Loss ==="; \
+	echo ""; \
+	printf "%-10s %-12s %-12s %-12s %-10s\n" "Loss%" "P50 (ms)" "P95 (ms)" "P99 (ms)" "Samples"; \
+	echo "------------------------------------------------------------"; \
+	tail -n +2 "$$LATEST/latency.csv" | while IFS=, read -r ts loss p50 p95 p99 count; do \
+		printf "%-10s %-12s %-12s %-12s %-10s\n" "$${loss}%" "$$p50" "$$p95" "$$p99" "$$count"; \
+	done; \
+	echo ""; \
+	echo "=== Success Criteria (Epic #471) ==="; \
+	echo ""; \
+	P95_AT_10=$$(tail -n +2 "$$LATEST/latency.csv" | awk -F, '$$2 == 10 {print $$4}'); \
+	if [ -n "$$P95_AT_10" ] && [ "$$P95_AT_10" != "N/A" ]; then \
+		if [ $$(echo "$$P95_AT_10 < 1000" | bc -l 2>/dev/null || echo 0) -eq 1 ]; then \
+			echo "[PASS] System functional at 10% loss (P95=$${P95_AT_10}ms < 1000ms)"; \
+		else \
+			echo "[FAIL] System degraded at 10% loss (P95=$${P95_AT_10}ms >= 1000ms)"; \
+		fi; \
+	else \
+		echo "[SKIP] No data at 10% loss"; \
+	fi; \
+	BASELINE_P95=$$(tail -n +2 "$$LATEST/latency.csv" | awk -F, '$$2 == 0 {print $$4}'); \
+	P95_AT_20=$$(tail -n +2 "$$LATEST/latency.csv" | awk -F, '$$2 == 20 {print $$4}'); \
+	if [ -n "$$BASELINE_P95" ] && [ "$$BASELINE_P95" != "N/A" ] && [ -n "$$P95_AT_20" ] && [ "$$P95_AT_20" != "N/A" ]; then \
+		RATIO=$$(echo "scale=2; $$P95_AT_20 / $$BASELINE_P95" | bc -l 2>/dev/null || echo "N/A"); \
+		echo "Degradation factor at 20% loss: $${RATIO}x baseline"; \
+	fi
 
 lab5-intermittent: ## Lab 5b: Simulate intermittent connectivity (CYCLE=30s on/off)
 	@echo "╔════════════════════════════════════════════════════════════╗"
