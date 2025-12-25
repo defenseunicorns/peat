@@ -11,6 +11,14 @@ import SwiftUI
 struct HiveTestApp: App {
     @StateObject private var viewModel = HiveViewModel()
 
+    init() {
+        #if os(macOS)
+        // Ensure app activates properly when run from command line
+        NSApplication.shared.setActivationPolicy(.regular)
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()

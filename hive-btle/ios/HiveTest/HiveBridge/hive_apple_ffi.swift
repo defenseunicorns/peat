@@ -1126,14 +1126,30 @@ public func FfiConverterTypeHiveAdapter_lower(_ value: HiveAdapter) -> UnsafeMut
 public protocol HiveMeshWrapperProtocol : AnyObject {
     
     /**
+     * Record our ACK for the current emergency
+     * Returns the document bytes to broadcast, or None if no emergency is active
+     */
+    func ackEmergency(timestamp: UInt64)  -> Data?
+    
+    /**
      * Add an event observer
      */
     func addObserver(callback: MeshEventCallback) 
     
     /**
+     * Check if all peers have ACKed the current emergency
+     */
+    func allPeersAcked()  -> Bool
+    
+    /**
      * Build current document for sync
      */
     func buildDocument()  -> Data
+    
+    /**
+     * Clear the current emergency event
+     */
+    func clearEmergency() 
     
     /**
      * Clear the current event
@@ -1156,9 +1172,25 @@ public protocol HiveMeshWrapperProtocol : AnyObject {
     func getConnectedPeers()  -> [MeshPeer]
     
     /**
+     * Get emergency status info
+     * Returns (source_node, timestamp, acked_count, pending_count) if emergency is active
+     */
+    func getEmergencyStatus()  -> EmergencyStatus?
+    
+    /**
      * Get all known peers
      */
     func getPeers()  -> [MeshPeer]
+    
+    /**
+     * Check if there's an active document-based emergency
+     */
+    func hasActiveEmergency()  -> Bool
+    
+    /**
+     * Check if a specific peer has ACKed the current emergency
+     */
+    func hasPeerAcked(peerId: UInt32)  -> Bool
     
     /**
      * Check if ACK is currently active
@@ -1191,6 +1223,15 @@ public protocol HiveMeshWrapperProtocol : AnyObject {
     func onBleConnected(identifier: String, nowMs: UInt64)  -> UInt32?
     
     /**
+     * Called when BLE data is received without a known identifier
+     *
+     * Use this when receiving data from a peripheral (acting as Central)
+     * where the identifier doesn't map to a known peer. This method extracts
+     * the source node ID from the document itself.
+     */
+    func onBleData(identifier: String, data: Data, nowMs: UInt64)  -> DataReceivedResult?
+    
+    /**
      * Called when BLE data is received from a peer
      * Returns merge result if successful
      */
@@ -1218,16 +1259,28 @@ public protocol HiveMeshWrapperProtocol : AnyObject {
     func peerCount()  -> UInt32
     
     /**
-     * Send an ACK event
+     * Send an ACK event (legacy - uses peripheral event only)
      * Returns the document bytes to broadcast via BLE
      */
     func sendAck(timestamp: UInt64)  -> Data
     
     /**
-     * Send an emergency event
+     * Send an emergency event (legacy - uses peripheral event only)
      * Returns the document bytes to broadcast via BLE
      */
     func sendEmergency(timestamp: UInt64)  -> Data
+    
+    /**
+     * Start a new emergency event with ACK tracking for specified peers
+     * Returns the document bytes to broadcast via BLE
+     */
+    func startEmergency(timestamp: UInt64, knownPeers: [UInt32])  -> Data
+    
+    /**
+     * Start a new emergency event with ACK tracking for all known peers
+     * Returns the document bytes to broadcast via BLE
+     */
+    func startEmergencyWithKnownPeers(timestamp: UInt64)  -> Data
     
     /**
      * Call periodically to perform maintenance tasks
@@ -1322,6 +1375,18 @@ public static func withDefaults(nodeId: UInt32, callsign: String) -> HiveMeshWra
 
     
     /**
+     * Record our ACK for the current emergency
+     * Returns the document bytes to broadcast, or None if no emergency is active
+     */
+open func ackEmergency(timestamp: UInt64) -> Data? {
+    return try!  FfiConverterOptionData.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_ack_emergency(self.uniffiClonePointer(),
+        FfiConverterUInt64.lower(timestamp),$0
+    )
+})
+}
+    
+    /**
      * Add an event observer
      */
 open func addObserver(callback: MeshEventCallback) {try! rustCall() {
@@ -1332,6 +1397,16 @@ open func addObserver(callback: MeshEventCallback) {try! rustCall() {
 }
     
     /**
+     * Check if all peers have ACKed the current emergency
+     */
+open func allPeersAcked() -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_all_peers_acked(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
      * Build current document for sync
      */
 open func buildDocument() -> Data {
@@ -1339,6 +1414,15 @@ open func buildDocument() -> Data {
     uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_build_document(self.uniffiClonePointer(),$0
     )
 })
+}
+    
+    /**
+     * Clear the current emergency event
+     */
+open func clearEmergency() {try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_clear_emergency(self.uniffiClonePointer(),$0
+    )
+}
 }
     
     /**
@@ -1381,11 +1465,43 @@ open func getConnectedPeers() -> [MeshPeer] {
 }
     
     /**
+     * Get emergency status info
+     * Returns (source_node, timestamp, acked_count, pending_count) if emergency is active
+     */
+open func getEmergencyStatus() -> EmergencyStatus? {
+    return try!  FfiConverterOptionTypeEmergencyStatus.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_get_emergency_status(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
      * Get all known peers
      */
 open func getPeers() -> [MeshPeer] {
     return try!  FfiConverterSequenceTypeMeshPeer.lift(try! rustCall() {
     uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_get_peers(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Check if there's an active document-based emergency
+     */
+open func hasActiveEmergency() -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_has_active_emergency(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Check if a specific peer has ACKed the current emergency
+     */
+open func hasPeerAcked(peerId: UInt32) -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_has_peer_acked(self.uniffiClonePointer(),
+        FfiConverterUInt32.lower(peerId),$0
     )
 })
 }
@@ -1448,6 +1564,23 @@ open func onBleConnected(identifier: String, nowMs: UInt64) -> UInt32? {
     return try!  FfiConverterOptionUInt32.lift(try! rustCall() {
     uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_on_ble_connected(self.uniffiClonePointer(),
         FfiConverterString.lower(identifier),
+        FfiConverterUInt64.lower(nowMs),$0
+    )
+})
+}
+    
+    /**
+     * Called when BLE data is received without a known identifier
+     *
+     * Use this when receiving data from a peripheral (acting as Central)
+     * where the identifier doesn't map to a known peer. This method extracts
+     * the source node ID from the document itself.
+     */
+open func onBleData(identifier: String, data: Data, nowMs: UInt64) -> DataReceivedResult? {
+    return try!  FfiConverterOptionTypeDataReceivedResult.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_on_ble_data(self.uniffiClonePointer(),
+        FfiConverterString.lower(identifier),
+        FfiConverterData.lower(data),
         FfiConverterUInt64.lower(nowMs),$0
     )
 })
@@ -1519,7 +1652,7 @@ open func peerCount() -> UInt32 {
 }
     
     /**
-     * Send an ACK event
+     * Send an ACK event (legacy - uses peripheral event only)
      * Returns the document bytes to broadcast via BLE
      */
 open func sendAck(timestamp: UInt64) -> Data {
@@ -1531,12 +1664,37 @@ open func sendAck(timestamp: UInt64) -> Data {
 }
     
     /**
-     * Send an emergency event
+     * Send an emergency event (legacy - uses peripheral event only)
      * Returns the document bytes to broadcast via BLE
      */
 open func sendEmergency(timestamp: UInt64) -> Data {
     return try!  FfiConverterData.lift(try! rustCall() {
     uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_send_emergency(self.uniffiClonePointer(),
+        FfiConverterUInt64.lower(timestamp),$0
+    )
+})
+}
+    
+    /**
+     * Start a new emergency event with ACK tracking for specified peers
+     * Returns the document bytes to broadcast via BLE
+     */
+open func startEmergency(timestamp: UInt64, knownPeers: [UInt32]) -> Data {
+    return try!  FfiConverterData.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_start_emergency(self.uniffiClonePointer(),
+        FfiConverterUInt64.lower(timestamp),
+        FfiConverterSequenceUInt32.lower(knownPeers),$0
+    )
+})
+}
+    
+    /**
+     * Start a new emergency event with ACK tracking for all known peers
+     * Returns the document bytes to broadcast via BLE
+     */
+open func startEmergencyWithKnownPeers(timestamp: UInt64) -> Data {
+    return try!  FfiConverterData.lift(try! rustCall() {
+    uniffi_hive_apple_ffi_fn_method_hivemeshwrapper_start_emergency_with_known_peers(self.uniffiClonePointer(),
         FfiConverterUInt64.lower(timestamp),$0
     )
 })
@@ -1741,9 +1899,17 @@ public struct DataReceivedResult {
      */
     public var counterChanged: Bool
     /**
+     * Whether emergency state changed (new emergency or ACK updates)
+     */
+    public var emergencyChanged: Bool
+    /**
      * Total counter value after merge
      */
     public var totalCount: UInt64
+    /**
+     * Event timestamp (0 if no event) - use to detect duplicate events
+     */
+    public var eventTimestamp: UInt64
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -1761,13 +1927,21 @@ public struct DataReceivedResult {
          * Whether counter changed (new data)
          */counterChanged: Bool, 
         /**
+         * Whether emergency state changed (new emergency or ACK updates)
+         */emergencyChanged: Bool, 
+        /**
          * Total counter value after merge
-         */totalCount: UInt64) {
+         */totalCount: UInt64, 
+        /**
+         * Event timestamp (0 if no event) - use to detect duplicate events
+         */eventTimestamp: UInt64) {
         self.sourceNode = sourceNode
         self.isEmergency = isEmergency
         self.isAck = isAck
         self.counterChanged = counterChanged
+        self.emergencyChanged = emergencyChanged
         self.totalCount = totalCount
+        self.eventTimestamp = eventTimestamp
     }
 }
 
@@ -1787,7 +1961,13 @@ extension DataReceivedResult: Equatable, Hashable {
         if lhs.counterChanged != rhs.counterChanged {
             return false
         }
+        if lhs.emergencyChanged != rhs.emergencyChanged {
+            return false
+        }
         if lhs.totalCount != rhs.totalCount {
+            return false
+        }
+        if lhs.eventTimestamp != rhs.eventTimestamp {
             return false
         }
         return true
@@ -1798,7 +1978,9 @@ extension DataReceivedResult: Equatable, Hashable {
         hasher.combine(isEmergency)
         hasher.combine(isAck)
         hasher.combine(counterChanged)
+        hasher.combine(emergencyChanged)
         hasher.combine(totalCount)
+        hasher.combine(eventTimestamp)
     }
 }
 
@@ -1814,7 +1996,9 @@ public struct FfiConverterTypeDataReceivedResult: FfiConverterRustBuffer {
                 isEmergency: FfiConverterBool.read(from: &buf), 
                 isAck: FfiConverterBool.read(from: &buf), 
                 counterChanged: FfiConverterBool.read(from: &buf), 
-                totalCount: FfiConverterUInt64.read(from: &buf)
+                emergencyChanged: FfiConverterBool.read(from: &buf), 
+                totalCount: FfiConverterUInt64.read(from: &buf), 
+                eventTimestamp: FfiConverterUInt64.read(from: &buf)
         )
     }
 
@@ -1823,7 +2007,9 @@ public struct FfiConverterTypeDataReceivedResult: FfiConverterRustBuffer {
         FfiConverterBool.write(value.isEmergency, into: &buf)
         FfiConverterBool.write(value.isAck, into: &buf)
         FfiConverterBool.write(value.counterChanged, into: &buf)
+        FfiConverterBool.write(value.emergencyChanged, into: &buf)
         FfiConverterUInt64.write(value.totalCount, into: &buf)
+        FfiConverterUInt64.write(value.eventTimestamp, into: &buf)
     }
 }
 
@@ -1933,6 +2119,115 @@ public func FfiConverterTypeDiscoveredPeer_lift(_ buf: RustBuffer) throws -> Dis
 #endif
 public func FfiConverterTypeDiscoveredPeer_lower(_ value: DiscoveredPeer) -> RustBuffer {
     return FfiConverterTypeDiscoveredPeer.lower(value)
+}
+
+
+/**
+ * Status of an active emergency event with ACK tracking
+ */
+public struct EmergencyStatus {
+    /**
+     * Node ID that started the emergency
+     */
+    public var sourceNode: UInt32
+    /**
+     * Timestamp when emergency was started
+     */
+    public var timestamp: UInt64
+    /**
+     * Number of peers that have ACKed
+     */
+    public var ackedCount: UInt32
+    /**
+     * Number of peers still pending ACK
+     */
+    public var pendingCount: UInt32
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Node ID that started the emergency
+         */sourceNode: UInt32, 
+        /**
+         * Timestamp when emergency was started
+         */timestamp: UInt64, 
+        /**
+         * Number of peers that have ACKed
+         */ackedCount: UInt32, 
+        /**
+         * Number of peers still pending ACK
+         */pendingCount: UInt32) {
+        self.sourceNode = sourceNode
+        self.timestamp = timestamp
+        self.ackedCount = ackedCount
+        self.pendingCount = pendingCount
+    }
+}
+
+
+
+extension EmergencyStatus: Equatable, Hashable {
+    public static func ==(lhs: EmergencyStatus, rhs: EmergencyStatus) -> Bool {
+        if lhs.sourceNode != rhs.sourceNode {
+            return false
+        }
+        if lhs.timestamp != rhs.timestamp {
+            return false
+        }
+        if lhs.ackedCount != rhs.ackedCount {
+            return false
+        }
+        if lhs.pendingCount != rhs.pendingCount {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(sourceNode)
+        hasher.combine(timestamp)
+        hasher.combine(ackedCount)
+        hasher.combine(pendingCount)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeEmergencyStatus: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EmergencyStatus {
+        return
+            try EmergencyStatus(
+                sourceNode: FfiConverterUInt32.read(from: &buf), 
+                timestamp: FfiConverterUInt64.read(from: &buf), 
+                ackedCount: FfiConverterUInt32.read(from: &buf), 
+                pendingCount: FfiConverterUInt32.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: EmergencyStatus, into buf: inout [UInt8]) {
+        FfiConverterUInt32.write(value.sourceNode, into: &buf)
+        FfiConverterUInt64.write(value.timestamp, into: &buf)
+        FfiConverterUInt32.write(value.ackedCount, into: &buf)
+        FfiConverterUInt32.write(value.pendingCount, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeEmergencyStatus_lift(_ buf: RustBuffer) throws -> EmergencyStatus {
+    return try FfiConverterTypeEmergencyStatus.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeEmergencyStatus_lower(_ value: EmergencyStatus) -> RustBuffer {
+    return FfiConverterTypeEmergencyStatus.lower(value)
 }
 
 
@@ -3629,6 +3924,30 @@ fileprivate struct FfiConverterOptionTypeDataReceivedResult: FfiConverterRustBuf
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeEmergencyStatus: FfiConverterRustBuffer {
+    typealias SwiftType = EmergencyStatus?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeEmergencyStatus.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeEmergencyStatus.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeMeshPeer: FfiConverterRustBuffer {
     typealias SwiftType = MeshPeer?
 
@@ -3671,6 +3990,31 @@ fileprivate struct FfiConverterOptionTypeParsedDeviceName: FfiConverterRustBuffe
         case 1: return try FfiConverterTypeParsedDeviceName.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceUInt32: FfiConverterRustBuffer {
+    typealias SwiftType = [UInt32]
+
+    public static func write(_ value: [UInt32], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterUInt32.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [UInt32] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [UInt32]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterUInt32.read(from: &buf))
+        }
+        return seq
     }
 }
 
@@ -3922,10 +4266,19 @@ private var initializationResult: InitializationResult = {
     if (uniffi_hive_apple_ffi_checksum_method_hiveadapter_trigger_sync() != 21274) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_ack_emergency() != 9227) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_add_observer() != 7641) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_all_peers_acked() != 28880) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_build_document() != 52541) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_clear_emergency() != 13833) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_clear_event() != 65017) {
@@ -3940,7 +4293,16 @@ private var initializationResult: InitializationResult = {
     if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_get_connected_peers() != 62169) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_get_emergency_status() != 9143) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_get_peers() != 61043) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_has_active_emergency() != 46969) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_has_peer_acked() != 49435) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_is_ack_active() != 56292) {
@@ -3961,6 +4323,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_on_ble_connected() != 47658) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_on_ble_data() != 26913) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_on_ble_data_received() != 14592) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -3976,10 +4341,16 @@ private var initializationResult: InitializationResult = {
     if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_peer_count() != 29710) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_send_ack() != 12739) {
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_send_ack() != 50203) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_send_emergency() != 31245) {
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_send_emergency() != 49673) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_start_emergency() != 4070) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_start_emergency_with_known_peers() != 56932) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_hive_apple_ffi_checksum_method_hivemeshwrapper_tick() != 22459) {
