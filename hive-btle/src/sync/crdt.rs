@@ -509,6 +509,223 @@ impl PeripheralEvent {
     }
 }
 
+/// An emergency event with acknowledgment tracking (CRDT)
+///
+/// Represents a single emergency incident with distributed ACK tracking.
+/// Each node in the mesh can acknowledge the emergency, and this state
+/// is replicated across all nodes using CRDT semantics.
+///
+/// ## CRDT Semantics
+///
+/// - **Identity**: Events are uniquely identified by (source_node, timestamp)
+/// - **Merge for same event**: ACK maps merge with OR (once acked, stays acked)
+/// - **Merge for different events**: Higher timestamp wins (newer emergency replaces older)
+/// - **Monotonic**: ACK state only moves from false → true, never back
+///
+/// ## Wire Format
+///
+/// ```text
+/// source_node: 4 bytes (LE)
+/// timestamp:   8 bytes (LE)
+/// num_acks:    4 bytes (LE)
+/// acks[N]:
+///   node_id:   4 bytes (LE)
+///   acked:     1 byte (0 or 1)
+/// ```
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct EmergencyEvent {
+    /// Node that triggered the emergency
+    source_node: u32,
+    /// Timestamp when emergency was triggered (for uniqueness)
+    timestamp: u64,
+    /// ACK status for each known peer: node_id -> has_acked
+    acks: BTreeMap<u32, bool>,
+}
+
+impl EmergencyEvent {
+    /// Create a new emergency event
+    ///
+    /// # Arguments
+    /// * `source_node` - Node ID that triggered the emergency
+    /// * `timestamp` - When the emergency was triggered
+    /// * `known_peers` - List of peer node IDs to track for ACKs
+    ///
+    /// The source node is automatically marked as acknowledged.
+    pub fn new(source_node: u32, timestamp: u64, known_peers: &[u32]) -> Self {
+        let mut acks = BTreeMap::new();
+
+        // Source node implicitly ACKs their own emergency
+        acks.insert(source_node, true);
+
+        // All other known peers start as not-acked
+        for &peer_id in known_peers {
+            if peer_id != source_node {
+                acks.entry(peer_id).or_insert(false);
+            }
+        }
+
+        Self {
+            source_node,
+            timestamp,
+            acks,
+        }
+    }
+
+    /// Get the source node that triggered the emergency
+    pub fn source_node(&self) -> u32 {
+        self.source_node
+    }
+
+    /// Get the timestamp when the emergency was triggered
+    pub fn timestamp(&self) -> u64 {
+        self.timestamp
+    }
+
+    /// Check if a specific node has acknowledged
+    pub fn has_acked(&self, node_id: u32) -> bool {
+        self.acks.get(&node_id).copied().unwrap_or(false)
+    }
+
+    /// Record an acknowledgment from a node
+    ///
+    /// Returns true if this was a new ACK (state changed)
+    pub fn ack(&mut self, node_id: u32) -> bool {
+        let entry = self.acks.entry(node_id).or_insert(false);
+        if !*entry {
+            *entry = true;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Add a peer to track (if not already present)
+    ///
+    /// New peers start as not-acked. This is useful when discovering
+    /// new peers after the emergency was created.
+    pub fn add_peer(&mut self, node_id: u32) {
+        self.acks.entry(node_id).or_insert(false);
+    }
+
+    /// Get list of nodes that have acknowledged
+    pub fn acked_nodes(&self) -> Vec<u32> {
+        self.acks
+            .iter()
+            .filter(|(_, &acked)| acked)
+            .map(|(&node_id, _)| node_id)
+            .collect()
+    }
+
+    /// Get list of nodes that have NOT acknowledged
+    pub fn pending_nodes(&self) -> Vec<u32> {
+        self.acks
+            .iter()
+            .filter(|(_, &acked)| !acked)
+            .map(|(&node_id, _)| node_id)
+            .collect()
+    }
+
+    /// Check if all tracked nodes have acknowledged
+    pub fn all_acked(&self) -> bool {
+        !self.acks.is_empty() && self.acks.values().all(|&acked| acked)
+    }
+
+    /// Get the total number of tracked nodes
+    pub fn peer_count(&self) -> usize {
+        self.acks.len()
+    }
+
+    /// Get the number of nodes that have acknowledged
+    pub fn ack_count(&self) -> usize {
+        self.acks.values().filter(|&&acked| acked).count()
+    }
+
+    /// Merge with another emergency event (CRDT semantics)
+    ///
+    /// # Returns
+    /// `true` if our state changed
+    ///
+    /// # Semantics
+    /// - Same event (source_node, timestamp): merge ACK maps with OR
+    /// - Different event: take the one with higher timestamp
+    pub fn merge(&mut self, other: &EmergencyEvent) -> bool {
+        // Different emergency - take newer one
+        if self.source_node != other.source_node || self.timestamp != other.timestamp {
+            if other.timestamp > self.timestamp {
+                *self = other.clone();
+                return true;
+            }
+            return false;
+        }
+
+        // Same emergency - merge ACK maps with OR
+        let mut changed = false;
+        for (&node_id, &other_acked) in &other.acks {
+            let entry = self.acks.entry(node_id).or_insert(false);
+            if other_acked && !*entry {
+                *entry = true;
+                changed = true;
+            }
+        }
+        changed
+    }
+
+    /// Encode to bytes for transmission
+    ///
+    /// Format: source_node(4) + timestamp(8) + num_acks(4) + acks[N](5 each)
+    pub fn encode(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(16 + self.acks.len() * 5);
+
+        buf.extend_from_slice(&self.source_node.to_le_bytes());
+        buf.extend_from_slice(&self.timestamp.to_le_bytes());
+        buf.extend_from_slice(&(self.acks.len() as u32).to_le_bytes());
+
+        for (&node_id, &acked) in &self.acks {
+            buf.extend_from_slice(&node_id.to_le_bytes());
+            buf.push(if acked { 1 } else { 0 });
+        }
+
+        buf
+    }
+
+    /// Decode from bytes
+    pub fn decode(data: &[u8]) -> Option<Self> {
+        if data.len() < 16 {
+            return None;
+        }
+
+        let source_node = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+        let timestamp = u64::from_le_bytes([
+            data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11],
+        ]);
+        let num_acks = u32::from_le_bytes([data[12], data[13], data[14], data[15]]) as usize;
+
+        if data.len() < 16 + num_acks * 5 {
+            return None;
+        }
+
+        let mut acks = BTreeMap::new();
+        let mut offset = 16;
+        for _ in 0..num_acks {
+            let node_id = u32::from_le_bytes([
+                data[offset],
+                data[offset + 1],
+                data[offset + 2],
+                data[offset + 3],
+            ]);
+            let acked = data[offset + 4] != 0;
+            acks.insert(node_id, acked);
+            offset += 5;
+        }
+
+        Some(Self {
+            source_node,
+            timestamp,
+            acks,
+        })
+    }
+}
+
 /// A peripheral device attached to a Node (soldier)
 ///
 /// Peripherals are sub-tier devices that augment a soldier's capabilities
@@ -1174,5 +1391,156 @@ mod tests {
         // Claims to have event but too short
         data[25] = 1; // has event flag
         assert!(Peripheral::decode(&data).is_none());
+    }
+
+    // ============================================================================
+    // EmergencyEvent Tests
+    // ============================================================================
+
+    #[test]
+    fn test_emergency_event_new() {
+        let peers = vec![0x22222222, 0x33333333];
+        let event = EmergencyEvent::new(0x11111111, 1000, &peers);
+
+        assert_eq!(event.source_node(), 0x11111111);
+        assert_eq!(event.timestamp(), 1000);
+        assert_eq!(event.peer_count(), 3); // source + 2 peers
+
+        // Source is auto-acked
+        assert!(event.has_acked(0x11111111));
+        // Others are not
+        assert!(!event.has_acked(0x22222222));
+        assert!(!event.has_acked(0x33333333));
+    }
+
+    #[test]
+    fn test_emergency_event_ack() {
+        let peers = vec![0x22222222, 0x33333333];
+        let mut event = EmergencyEvent::new(0x11111111, 1000, &peers);
+
+        assert_eq!(event.ack_count(), 1); // just source
+        assert!(!event.all_acked());
+
+        // ACK from first peer
+        assert!(event.ack(0x22222222)); // returns true - new ack
+        assert_eq!(event.ack_count(), 2);
+        assert!(!event.all_acked());
+
+        // Duplicate ACK
+        assert!(!event.ack(0x22222222)); // returns false - already acked
+
+        // ACK from second peer
+        assert!(event.ack(0x33333333));
+        assert_eq!(event.ack_count(), 3);
+        assert!(event.all_acked());
+    }
+
+    #[test]
+    fn test_emergency_event_pending_nodes() {
+        let peers = vec![0x22222222, 0x33333333];
+        let mut event = EmergencyEvent::new(0x11111111, 1000, &peers);
+
+        let pending = event.pending_nodes();
+        assert_eq!(pending.len(), 2);
+        assert!(pending.contains(&0x22222222));
+        assert!(pending.contains(&0x33333333));
+
+        event.ack(0x22222222);
+        let pending = event.pending_nodes();
+        assert_eq!(pending.len(), 1);
+        assert!(pending.contains(&0x33333333));
+    }
+
+    #[test]
+    fn test_emergency_event_encode_decode() {
+        let peers = vec![0x22222222, 0x33333333];
+        let mut event = EmergencyEvent::new(0x11111111, 1234567890, &peers);
+        event.ack(0x22222222);
+
+        let encoded = event.encode();
+        let decoded = EmergencyEvent::decode(&encoded).unwrap();
+
+        assert_eq!(decoded.source_node(), 0x11111111);
+        assert_eq!(decoded.timestamp(), 1234567890);
+        assert!(decoded.has_acked(0x11111111));
+        assert!(decoded.has_acked(0x22222222));
+        assert!(!decoded.has_acked(0x33333333));
+    }
+
+    #[test]
+    fn test_emergency_event_merge_same_event() {
+        // Two nodes have the same emergency, different ack states
+        let peers = vec![0x22222222, 0x33333333];
+        let mut event1 = EmergencyEvent::new(0x11111111, 1000, &peers);
+        let mut event2 = EmergencyEvent::new(0x11111111, 1000, &peers);
+
+        event1.ack(0x22222222);
+        event2.ack(0x33333333);
+
+        // Merge event2 into event1
+        let changed = event1.merge(&event2);
+        assert!(changed);
+        assert!(event1.has_acked(0x22222222));
+        assert!(event1.has_acked(0x33333333));
+        assert!(event1.all_acked());
+    }
+
+    #[test]
+    fn test_emergency_event_merge_different_events() {
+        // Old emergency
+        let mut old_event = EmergencyEvent::new(0x11111111, 1000, &[0x22222222]);
+        old_event.ack(0x22222222);
+
+        // New emergency from different source
+        let new_event = EmergencyEvent::new(0x33333333, 2000, &[0x11111111, 0x22222222]);
+
+        // Merge new into old - should replace
+        let changed = old_event.merge(&new_event);
+        assert!(changed);
+        assert_eq!(old_event.source_node(), 0x33333333);
+        assert_eq!(old_event.timestamp(), 2000);
+        // Old ack state should be gone
+        assert!(!old_event.has_acked(0x22222222));
+    }
+
+    #[test]
+    fn test_emergency_event_merge_older_event_ignored() {
+        // Current emergency
+        let mut current = EmergencyEvent::new(0x11111111, 2000, &[0x22222222]);
+
+        // Older emergency
+        let older = EmergencyEvent::new(0x33333333, 1000, &[0x11111111]);
+
+        // Merge older into current - should NOT replace
+        let changed = current.merge(&older);
+        assert!(!changed);
+        assert_eq!(current.source_node(), 0x11111111);
+        assert_eq!(current.timestamp(), 2000);
+    }
+
+    #[test]
+    fn test_emergency_event_add_peer() {
+        let mut event = EmergencyEvent::new(0x11111111, 1000, &[]);
+
+        // Add a peer discovered after emergency started
+        event.add_peer(0x22222222);
+        assert!(!event.has_acked(0x22222222));
+        assert_eq!(event.peer_count(), 2);
+
+        // Adding same peer again doesn't change ack status
+        event.ack(0x22222222);
+        event.add_peer(0x22222222);
+        assert!(event.has_acked(0x22222222)); // still acked
+    }
+
+    #[test]
+    fn test_emergency_event_decode_invalid() {
+        // Too short
+        assert!(EmergencyEvent::decode(&[0u8; 10]).is_none());
+
+        // Valid header but claims more acks than data
+        let mut data = vec![0u8; 16];
+        data[12] = 5; // claims 5 ack entries
+        assert!(EmergencyEvent::decode(&data).is_none());
     }
 }

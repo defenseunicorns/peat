@@ -361,9 +361,9 @@ class HiveViewModel: ObservableObject {
     /// Bluetooth state
     @Published var bluetoothState: LocalBluetoothState = .unknown
 
-    /// Track which node's emergency we've already ACK'd (to suppress re-triggering)
-    /// Cleared when user presses RESET
-    private var ackedEmergencyNodeId: UInt32?
+    /// Track last processed emergency to avoid duplicate triggers
+    /// Key: (nodeId, timestamp) identifies a unique emergency
+    private var lastProcessedEmergency: (nodeId: UInt32, timestamp: UInt64)?
 
     /// Local node ID
     let localNodeId: UInt32 = NODE_ID
@@ -584,15 +584,59 @@ class HiveViewModel: ObservableObject {
         guard let mesh = hiveMesh else { return }
         let nowMs = UInt64(Date().timeIntervalSince1970 * 1000)
 
-        // Delegate document parsing and merging to HiveMesh
-        if let result = mesh.onBleDataReceived(identifier: identifier, data: data, nowMs: nowMs) {
+        // Use different method based on whether identifier is mapped
+        // "peripheral" is passed when receiving writes from a Central (our peripheral mode)
+        // For this case, use onBleData which extracts source from document
+        let result: DataReceivedResult?
+        if identifier == "peripheral" {
+            result = mesh.onBleData(identifier: identifier, data: data, nowMs: nowMs)
+        } else {
+            result = mesh.onBleDataReceived(identifier: identifier, data: data, nowMs: nowMs)
+        }
+
+        if let result = result {
             syncPeersFromMesh()
 
-            // Handle events
-            if result.isEmergency {
-                handleEmergencyReceivedFromNode(result.sourceNode)
-            } else if result.isAck {
-                handleAckReceivedFromNode(result.sourceNode)
+            // Check document emergency state (CRDT merge already happened)
+            if let status = mesh.getEmergencyStatus() {
+                let emergencyKey = (nodeId: status.sourceNode, timestamp: status.timestamp)
+                let isNew = lastProcessedEmergency == nil ||
+                    lastProcessedEmergency!.nodeId != emergencyKey.nodeId ||
+                    lastProcessedEmergency!.timestamp != emergencyKey.timestamp
+
+                if isNew && !ackStatus.isActive {
+                    log("[DEBUG] Document emergency: source=\(String(format: "%08X", status.sourceNode)) ts=\(status.timestamp) acked=\(status.ackedCount)/\(status.ackedCount + status.pendingCount)")
+                    lastProcessedEmergency = emergencyKey
+                    handleEmergencyReceivedFromNode(status.sourceNode)
+                } else if !isNew {
+                    // Same emergency - sync ACK status from document
+                    for peer in peers {
+                        if mesh.hasPeerAcked(peerId: peer.nodeId) && ackStatus.pendingAcks[peer.nodeId] != true {
+                            log("[DEBUG] Document shows \(String(format: "%08X", peer.nodeId)) has ACKed")
+                            ackStatus.pendingAcks[peer.nodeId] = true
+                        }
+                    }
+                    checkAllAcked()
+                }
+            }
+
+            // Also handle peripheral events for backward compatibility
+            if result.isEmergency && !ackStatus.isActive {
+                log("[DEBUG] Peripheral emergency: node=\(String(format: "%08X", result.sourceNode)) ts=\(result.eventTimestamp)")
+                let isNew = lastProcessedEmergency == nil ||
+                    lastProcessedEmergency!.nodeId != result.sourceNode ||
+                    lastProcessedEmergency!.timestamp != result.eventTimestamp
+
+                if isNew {
+                    lastProcessedEmergency = (result.sourceNode, result.eventTimestamp)
+                    handleEmergencyReceivedFromNode(result.sourceNode)
+                }
+            } else if result.isAck && ackStatus.isActive {
+                // ACK from peripheral event
+                let emergencyTs = lastProcessedEmergency?.timestamp ?? 0
+                if result.eventTimestamp > emergencyTs {
+                    handleAckReceivedFromNode(result.sourceNode)
+                }
             }
         }
     }
@@ -604,19 +648,22 @@ class HiveViewModel: ObservableObject {
             return
         }
 
-        // Don't re-trigger if we already ACK'd this node's emergency
-        // User must press RESET to clear this and allow new emergencies from same node
-        if ackedEmergencyNodeId == nodeId {
-            log("[HiveDemo] Suppressing emergency re-trigger (already ACK'd node \(String(format: "%08X", nodeId)))")
-            return
-        }
-
         log("[HiveDemo] EMERGENCY from \(String(format: "%08X", nodeId))")
 
-        // Initialize ACK tracking
+        // Initialize ACK tracking from document state
         ackStatus.pendingAcks.removeAll()
-        for peer in peers {
-            ackStatus.pendingAcks[peer.nodeId] = false
+        if let mesh = hiveMesh {
+            for peer in peers {
+                ackStatus.pendingAcks[peer.nodeId] = mesh.hasPeerAcked(peerId: peer.nodeId)
+            }
+            // Log document status
+            if let status = mesh.getEmergencyStatus() {
+                log("[DEBUG] Received emergency: source=\(String(format: "%08X", status.sourceNode)) \(status.ackedCount)/\(status.ackedCount + status.pendingCount) acked")
+            }
+        } else {
+            for peer in peers {
+                ackStatus.pendingAcks[peer.nodeId] = false
+            }
         }
         ackStatus.pendingAcks[localNodeId] = false  // We haven't acked yet
         ackStatus.pendingAcks[nodeId] = true  // Source has implicitly acked
@@ -630,7 +677,24 @@ class HiveViewModel: ObservableObject {
     /// Handle ACK received (called from mesh event or data parsing)
     private func handleAckReceivedFromNode(_ nodeId: UInt32) {
         log("[HiveDemo] ACK from \(String(format: "%08X", nodeId))")
+
+        // Update local ACK status (document state is already merged)
         ackStatus.pendingAcks[nodeId] = true
+
+        // Also check document state for other ACKs
+        if let mesh = hiveMesh {
+            for peer in peers {
+                if mesh.hasPeerAcked(peerId: peer.nodeId) {
+                    ackStatus.pendingAcks[peer.nodeId] = true
+                }
+            }
+
+            // Log current status
+            if let status = mesh.getEmergencyStatus() {
+                log("[DEBUG] Emergency status after ACK: \(status.ackedCount)/\(status.ackedCount + status.pendingCount) acked")
+            }
+        }
+
         showToast("✓ ACK from \(String(format: "HIVE-%08X", nodeId))")
         checkAllAcked()
     }
@@ -682,10 +746,12 @@ class HiveViewModel: ObservableObject {
             syncPeersFromMesh()
         case .peerLost(_):
             syncPeersFromMesh()
-        case .emergencyReceived(let fromNode):
-            handleEmergencyReceivedFromNode(fromNode)
-        case .ackReceived(let fromNode):
-            handleAckReceivedFromNode(fromNode)
+        case .emergencyReceived(_):
+            // Handled in handleDataReceived with timestamp deduplication
+            break
+        case .ackReceived(_):
+            // Handled in handleDataReceived
+            break
         case .documentSynced(_, _):
             break
         case .meshStateChanged(_, _):
@@ -695,69 +761,88 @@ class HiveViewModel: ObservableObject {
 
     // MARK: - User Actions (delegate to HiveMesh)
 
-    /// Send an emergency alert to all peers
+    /// Send an emergency alert to all peers (using document-based tracking)
     func sendEmergency() {
         guard isMeshActive, let mesh = hiveMesh else {
             showToast("Mesh not active")
             return
         }
 
-        print("[HiveDemo] >>> SENDING EMERGENCY")
+        print("[HiveDemo] >>> SENDING EMERGENCY (document-based)")
 
-        // Initialize ACK tracking
+        // Build emergency document via HiveMesh (tracks ACKs in document)
+        let timestamp = UInt64(Date().timeIntervalSince1970 * 1000)
+        let document = mesh.startEmergencyWithKnownPeers(timestamp: timestamp)
+        log("[DEBUG] Created emergency document: \(document.count) bytes")
+        bleManager?.sendData(Data(document))
+
+        // Track our own emergency for deduplication
+        lastProcessedEmergency = (localNodeId, timestamp)
+        log("[DEBUG] Sent emergency with ts=\(timestamp)")
+
+        // Initialize local ACK status (syncs with document state)
         ackStatus.pendingAcks.removeAll()
         for peer in peers {
-            ackStatus.pendingAcks[peer.nodeId] = false
+            ackStatus.pendingAcks[peer.nodeId] = mesh.hasPeerAcked(peerId: peer.nodeId)
         }
-        ackStatus.pendingAcks[localNodeId] = true  // We sent it, so we're acked
+        ackStatus.pendingAcks[localNodeId] = true  // We sent it, so we're implicitly acked
         ackStatus.emergencySourceNodeId = localNodeId
-
-        // Build emergency document via HiveMesh and broadcast
-        let timestamp = UInt64(Date().timeIntervalSince1970 * 1000)
-        let document = mesh.sendEmergency(timestamp: timestamp)
-        bleManager?.sendData(Data(document))
 
         showToast("🚨 EMERGENCY SENT!")
         statusMessage = "⚠️ EMERGENCY - TAP ACK"
     }
 
-    /// Send an ACK
+    /// Send an ACK (using document-based tracking)
     func sendAck() {
         guard isMeshActive, let mesh = hiveMesh else {
             showToast("Mesh not active")
             return
         }
 
-        log("[HiveDemo] >>> SENDING ACK")
+        log("[HiveDemo] >>> SENDING ACK (document-based)")
         log("[HiveDemo] Peers: \(peers.count), connected: \(connectedCount)")
-        for peer in peers {
-            log("[HiveDemo]   Peer \(String(format: "%08X", peer.nodeId)): connected=\(peer.isConnected), id=\(peer.identifier)")
+
+        // Build ACK document via HiveMesh (updates document's ACK map)
+        let timestamp = UInt64(Date().timeIntervalSince1970 * 1000)
+        if let document = mesh.ackEmergency(timestamp: timestamp) {
+            log("[HiveDemo] ACK document: \(document.count) bytes")
+            bleManager?.sendData(Data(document))
+
+            // Update local ACK status from document
+            ackStatus.pendingAcks[localNodeId] = true
+            showToast("✓ ACK sent")
+
+            // Check if all peers have ACKed (from document state)
+            if mesh.allPeersAcked() {
+                log("[DEBUG] All peers ACK'd (from document)")
+                ackStatus.reset()
+                statusMessage = "✓ All peers acknowledged"
+            } else {
+                // Keep tracking - other peers still pending
+                if let status = mesh.getEmergencyStatus() {
+                    log("[DEBUG] Emergency status: \(status.ackedCount)/\(status.ackedCount + status.pendingCount) acked")
+                }
+            }
+        } else {
+            log("[HiveDemo] No active emergency to ACK")
+            // Clear local state anyway
+            ackStatus.reset()
+            statusMessage = "Mesh active - \(localDisplayName)"
+            showToast("No emergency to ACK")
         }
 
-        // Record which node's emergency we ACK'd (to suppress re-triggering from CRDT sync)
-        ackedEmergencyNodeId = ackStatus.emergencySourceNodeId
-
-        // Build ACK document via HiveMesh and broadcast
-        let timestamp = UInt64(Date().timeIntervalSince1970 * 1000)
-        let document = mesh.sendAck(timestamp: timestamp)
-        log("[HiveDemo] ACK document: \(document.count) bytes")
-        bleManager?.sendData(Data(document))
-
-        // Clear local alert state and reset ACK tracking
-        hiveMesh?.clearEvent()
-        ackStatus.reset()
-        statusMessage = "Mesh active - \(localDisplayName)"
-
-        showToast("✓ ACK sent")
+        // Keep lastProcessedEmergency so we filter out stale gossip
+        log("[DEBUG] After ACK: isActive=\(ackStatus.isActive) lastProcessedEmergency=\(lastProcessedEmergency?.timestamp ?? 0)")
     }
 
     /// Reset the alert state
     func resetAlert() {
         print("[HiveDemo] >>> RESETTING ALERT")
 
-        hiveMesh?.clearEvent()
+        hiveMesh?.clearEmergency()  // Clear document-based emergency
+        hiveMesh?.clearEvent()      // Clear peripheral event
         ackStatus.reset()
-        ackedEmergencyNodeId = nil  // Clear to allow new emergencies from same node
+        lastProcessedEmergency = nil
         statusMessage = "Mesh active - \(localDisplayName)"
         showToast("Alert reset")
     }
@@ -765,8 +850,15 @@ class HiveViewModel: ObservableObject {
     // MARK: - Private Helpers
 
     private func checkAllAcked() {
-        if ackStatus.allAcked {
+        // Check both local state and document state
+        let localAllAcked = ackStatus.allAcked
+        let docAllAcked = hiveMesh?.allPeersAcked() ?? true
+
+        if localAllAcked || docAllAcked {
             ackStatus.reset()
+            // IMPORTANT: Keep lastProcessedEmergency to filter out stale gossip
+            // A new emergency will have a different timestamp
+            log("[DEBUG] All ACK'd (local=\(localAllAcked), doc=\(docAllAcked)) - keeping lastProcessedEmergency=\(lastProcessedEmergency?.timestamp ?? 0)")
             statusMessage = "✓ All peers acknowledged"
         }
     }

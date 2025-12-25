@@ -27,11 +27,14 @@
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
-use crate::sync::crdt::{EventType, GCounter, Peripheral, PeripheralEvent};
+use crate::sync::crdt::{EmergencyEvent, EventType, GCounter, Peripheral, PeripheralEvent};
 use crate::NodeId;
 
 /// Marker byte indicating extended section with peripheral data
 pub const EXTENDED_MARKER: u8 = 0xAB;
+
+/// Marker byte indicating emergency event section
+pub const EMERGENCY_MARKER: u8 = 0xAC;
 
 /// Minimum document size (header only, no counter entries)
 pub const MIN_DOCUMENT_SIZE: usize = 8;
@@ -39,7 +42,7 @@ pub const MIN_DOCUMENT_SIZE: usize = 8;
 /// A HIVE document for mesh synchronization
 ///
 /// Contains header information, a CRDT G-Counter for tracking mesh activity,
-/// and optional peripheral data for events.
+/// optional peripheral data for events, and optional emergency event with ACK tracking.
 #[derive(Debug, Clone)]
 pub struct HiveDocument {
     /// Document version (incremented on each change)
@@ -53,6 +56,9 @@ pub struct HiveDocument {
 
     /// Optional peripheral data (sensor info, events)
     pub peripheral: Option<Peripheral>,
+
+    /// Optional active emergency event with distributed ACK tracking
+    pub emergency: Option<EmergencyEvent>,
 }
 
 impl Default for HiveDocument {
@@ -62,6 +68,7 @@ impl Default for HiveDocument {
             node_id: NodeId::default(),
             counter: GCounter::new(),
             peripheral: None,
+            emergency: None,
         }
     }
 }
@@ -74,12 +81,19 @@ impl HiveDocument {
             node_id,
             counter: GCounter::new(),
             peripheral: None,
+            emergency: None,
         }
     }
 
     /// Create with an initial peripheral
     pub fn with_peripheral(mut self, peripheral: Peripheral) -> Self {
         self.peripheral = Some(peripheral);
+        self
+    }
+
+    /// Create with an initial emergency event
+    pub fn with_emergency(mut self, emergency: EmergencyEvent) -> Self {
+        self.emergency = Some(emergency);
         self
     }
 
@@ -110,13 +124,74 @@ impl HiveDocument {
         }
     }
 
+    /// Set an emergency event
+    ///
+    /// Creates a new emergency event with the given source node, timestamp,
+    /// and list of known peers to track for ACKs.
+    pub fn set_emergency(&mut self, source_node: u32, timestamp: u64, known_peers: &[u32]) {
+        self.emergency = Some(EmergencyEvent::new(source_node, timestamp, known_peers));
+        self.increment_counter();
+    }
+
+    /// Record an ACK for the current emergency
+    ///
+    /// Returns true if the ACK was new (state changed)
+    pub fn ack_emergency(&mut self, node_id: u32) -> bool {
+        if let Some(ref mut emergency) = self.emergency {
+            if emergency.ack(node_id) {
+                self.increment_version();
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Clear the emergency event
+    pub fn clear_emergency(&mut self) {
+        if self.emergency.is_some() {
+            self.emergency = None;
+            self.increment_version();
+        }
+    }
+
+    /// Get the current emergency event (if any)
+    pub fn get_emergency(&self) -> Option<&EmergencyEvent> {
+        self.emergency.as_ref()
+    }
+
+    /// Check if there's an active emergency
+    pub fn has_emergency(&self) -> bool {
+        self.emergency.is_some()
+    }
+
     /// Merge with another document using CRDT semantics
     ///
     /// Returns true if our state changed (useful for triggering re-broadcast)
     pub fn merge(&mut self, other: &HiveDocument) -> bool {
+        let mut changed = false;
+
+        // Merge counter
         let old_value = self.counter.value();
         self.counter.merge(&other.counter);
-        let changed = self.counter.value() != old_value;
+        if self.counter.value() != old_value {
+            changed = true;
+        }
+
+        // Merge emergency event
+        if let Some(ref other_emergency) = other.emergency {
+            match &mut self.emergency {
+                Some(ref mut our_emergency) => {
+                    if our_emergency.merge(other_emergency) {
+                        changed = true;
+                    }
+                }
+                None => {
+                    self.emergency = Some(other_emergency.clone());
+                    changed = true;
+                }
+            }
+        }
+
         if changed {
             self.increment_version();
         }
@@ -135,11 +210,15 @@ impl HiveDocument {
     pub fn encode(&self) -> Vec<u8> {
         let counter_data = self.counter.encode();
         let peripheral_data = self.peripheral.as_ref().map(|p| p.encode());
+        let emergency_data = self.emergency.as_ref().map(|e| e.encode());
 
         // Calculate total size
         let mut size = 8 + counter_data.len(); // header + counter
         if let Some(ref pdata) = peripheral_data {
             size += 4 + pdata.len(); // marker + reserved + len + peripheral
+        }
+        if let Some(ref edata) = emergency_data {
+            size += 4 + edata.len(); // marker + reserved + len + emergency
         }
 
         let mut buf = Vec::with_capacity(size);
@@ -157,6 +236,14 @@ impl HiveDocument {
             buf.push(0); // reserved
             buf.extend_from_slice(&(pdata.len() as u16).to_le_bytes());
             buf.extend_from_slice(&pdata);
+        }
+
+        // Emergency section (if emergency present)
+        if let Some(edata) = emergency_data {
+            buf.push(EMERGENCY_MARKER);
+            buf.push(0); // reserved
+            buf.extend_from_slice(&(edata.len() as u16).to_le_bytes());
+            buf.extend_from_slice(&edata);
         }
 
         buf
@@ -177,33 +264,58 @@ impl HiveDocument {
 
         // Calculate where counter ends
         let num_entries = u32::from_le_bytes([data[8], data[9], data[10], data[11]]) as usize;
-        let counter_end = 8 + 4 + num_entries * 12;
+        let mut offset = 8 + 4 + num_entries * 12;
 
-        // Check for extended section
-        let peripheral = if data.len() > counter_end && data[counter_end] == EXTENDED_MARKER {
-            // Parse extended header
-            if data.len() < counter_end + 4 {
-                return None;
+        let mut peripheral = None;
+        let mut emergency = None;
+
+        // Parse extended sections (can have peripheral and/or emergency)
+        while offset < data.len() {
+            let marker = data[offset];
+
+            if marker == EXTENDED_MARKER {
+                // Parse peripheral section
+                if data.len() < offset + 4 {
+                    break;
+                }
+                let _reserved = data[offset + 1];
+                let section_len = u16::from_le_bytes([data[offset + 2], data[offset + 3]]) as usize;
+
+                let section_start = offset + 4;
+                if data.len() < section_start + section_len {
+                    break;
+                }
+
+                peripheral = Peripheral::decode(&data[section_start..section_start + section_len]);
+                offset = section_start + section_len;
+            } else if marker == EMERGENCY_MARKER {
+                // Parse emergency section
+                if data.len() < offset + 4 {
+                    break;
+                }
+                let _reserved = data[offset + 1];
+                let section_len = u16::from_le_bytes([data[offset + 2], data[offset + 3]]) as usize;
+
+                let section_start = offset + 4;
+                if data.len() < section_start + section_len {
+                    break;
+                }
+
+                emergency =
+                    EmergencyEvent::decode(&data[section_start..section_start + section_len]);
+                offset = section_start + section_len;
+            } else {
+                // Unknown marker, stop parsing
+                break;
             }
-            let _reserved = data[counter_end + 1];
-            let peripheral_len =
-                u16::from_le_bytes([data[counter_end + 2], data[counter_end + 3]]) as usize;
-
-            let peripheral_start = counter_end + 4;
-            if data.len() < peripheral_start + peripheral_len {
-                return None;
-            }
-
-            Peripheral::decode(&data[peripheral_start..peripheral_start + peripheral_len])
-        } else {
-            None
-        };
+        }
 
         Some(Self {
             version,
             node_id,
             counter,
             peripheral,
+            emergency,
         })
     }
 
@@ -224,6 +336,9 @@ pub struct MergeResult {
 
     /// Whether the counter changed (indicates new data)
     pub counter_changed: bool,
+
+    /// Whether the emergency state changed (new emergency or ACK updates)
+    pub emergency_changed: bool,
 
     /// Updated total count after merge
     pub total_count: u64,
@@ -340,6 +455,7 @@ mod tests {
             source_node: NodeId::new(0x12345678),
             event: Some(emergency_event),
             counter_changed: true,
+            emergency_changed: false,
             total_count: 10,
         };
 
@@ -351,6 +467,7 @@ mod tests {
             source_node: NodeId::new(0x12345678),
             event: Some(ack_event),
             counter_changed: false,
+            emergency_changed: false,
             total_count: 10,
         };
 

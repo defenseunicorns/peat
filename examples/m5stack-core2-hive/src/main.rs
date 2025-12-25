@@ -418,7 +418,7 @@ fn axp_set_vibration(i2c: &mut I2cDriver, enable: bool) {
 }
 
 /// Build number for tracking firmware versions
-const BUILD_NUM: u32 = 33;
+const BUILD_NUM: u32 = 47;
 
 /// Mesh ID for this device
 const MESH_ID: &str = "DEMO";
@@ -505,11 +505,14 @@ fn update_display<D>(
 where
     D: DrawTarget<Color = Rgb565>,
 {
-    // Get peer IDs and connection status from nimble (not mesh)
+    // Get peer IDs and connection status from mesh (simpler, more reliable)
     let peers = mesh.get_peers();
     let peer_ids: Vec<u32> = peers.iter().map(|p| p.node_id.as_u32()).collect();
-    // Use nimble's connection tracking for accurate is_connected status
-    let connected_peers: Vec<u32> = nimble::get_connected_node_ids();
+    // Use mesh's is_connected status (based on recent sync activity)
+    let connected_peers: Vec<u32> = peers.iter()
+        .filter(|p| p.is_connected)
+        .map(|p| p.node_id.as_u32())
+        .collect();
 
     // Build current state
     let current = DisplayState {
@@ -641,6 +644,24 @@ where
     current
 }
 
+/// Get list of peer IDs that have ACKed the current emergency from the document
+/// Excludes the emergency source (they initiated, not ACKed)
+fn get_acked_peers_from_mesh(mesh: &HiveMesh) -> Vec<u32> {
+    // Get the source node so we can exclude it from the "acked" list
+    let source_node = mesh.get_emergency_status().map(|(src, _, _, _)| src);
+
+    let peers = mesh.get_peers();
+    peers
+        .iter()
+        .filter(|p| {
+            let peer_id = p.node_id.as_u32();
+            // Exclude the source - they initiated, not ACKed
+            source_node != Some(peer_id) && mesh.has_peer_acked(peer_id)
+        })
+        .map(|p| p.node_id.as_u32())
+        .collect()
+}
+
 fn main() -> anyhow::Result<()> {
     // Initialize ESP-IDF
     esp_idf_svc::sys::link_patches();
@@ -753,7 +774,11 @@ fn main() -> anyhow::Result<()> {
             info!("Loaded saved state: total_count={}", result.total_count);
         }
     }
-    info!("HiveMesh initialized: {} total taps", mesh.total_count());
+    // Clear any stale emergency/ACK state from previous session
+    // We want to start fresh on boot without old alerts
+    mesh.clear_event();       // Clear peripheral event
+    mesh.clear_emergency();   // Clear document emergency + ACK state
+    info!("HiveMesh initialized: {} total taps (events cleared)", mesh.total_count());
 
     // Initialize BLE
     info!("Initializing BLE...");
@@ -779,8 +804,8 @@ fn main() -> anyhow::Result<()> {
     draw_static_ui(&mut display, node_id.as_u32());
     update_button_labels(&mut display, false);  // Initial state: ACK greyed out
     let mut display_state = DisplayState::default();
-    let mut acked_peers: Vec<u32> = Vec::new();
-    display_state = update_display(&mut display, &mesh, false, battery_pct, "BtnC=EMERG  BtnA=ACK", &display_state, &acked_peers);
+    let acked = get_acked_peers_from_mesh(&mesh);
+    display_state = update_display(&mut display, &mesh, false, battery_pct, "BtnC=EMERG  BtnA=ACK", &display_state, &acked);
     print_status(&mesh, false, "BtnC=EMERG  BtnA=ACK");
 
     // Main loop state
@@ -793,6 +818,9 @@ fn main() -> anyhow::Result<()> {
     let mut vibration_on = false;
     let mut last_vibration_toggle: u32 = 0;
     const VIBRATION_INTERVAL_MS: u32 = 500;  // Buzz on/off every 500ms
+
+    // Track last processed emergency to avoid re-triggers from same emergency
+    let mut last_emergency: Option<(u32, u64)> = None;  // (node_id, timestamp)
 
     loop {
         let button = read_button(&mut i2c);
@@ -834,37 +862,45 @@ fn main() -> anyhow::Result<()> {
             let now_ms_u64 = now_ms() as u64;
             match last_button {
                 Button::BtnA => {
-                    // Button A = ACK (also silences alert)
+                    // Button A = ACK (using document-based tracking)
                     info!(">>> BUTTON A - SENDING ACK");
-                    let encoded = mesh.send_ack(now_ms_u64);
-                    info!("ACK document: {} bytes", encoded.len());
 
-                    // Silence alert after building document (matches EMERGENCY pattern)
-                    alert_active = false;
-                    axp_set_vibration(&mut i2c, false);
-                    vibration_on = false;
+                    // Use document-based ACK - this updates the emergency document's ACK map
+                    if let Some(encoded) = mesh.ack_emergency(now_ms_u64) {
+                        info!("ACK document: {} bytes", encoded.len());
 
-                    // Save before gossip (matches EMERGENCY pattern)
-                    if let Err(e) = store.save(&mesh) {
-                        error!("Failed to save: {:?}", e);
+                        // Silence alert
+                        alert_active = false;
+                        axp_set_vibration(&mut i2c, false);
+                        vibration_on = false;
+
+                        // Save and gossip
+                        if let Err(e) = store.save(&mesh) {
+                            error!("Failed to save: {:?}", e);
+                        }
+
+                        let sent = nimble::gossip_document(&encoded);
+                        info!("Gossiped ACK to {} peers", sent);
+
+                        let acked = get_acked_peers_from_mesh(&mesh);
+                        display_state = update_display(&mut display, &mesh, false, battery_pct, "ACK sent!", &display_state, &acked);
+                    } else {
+                        info!("No active emergency to ACK");
+                        // Still silence any local alert state
+                        alert_active = false;
+                        axp_set_vibration(&mut i2c, false);
+                        vibration_on = false;
+                        let acked = get_acked_peers_from_mesh(&mesh);
+                        display_state = update_display(&mut display, &mesh, false, battery_pct, "No emergency", &display_state, &acked);
                     }
-
-                    let sent = nimble::gossip_document(&encoded);
-                    info!("Gossiped to {} peers", sent);
-
-                    // Clear alert state after sending ACK
-                    alert_active = false;
-                    acked_peers.clear();
-                    axp_set_vibration(&mut i2c, false);
-                    vibration_on = false;
-                    display_state = update_display(&mut display, &mesh, false, battery_pct, "ACK sent!", &display_state, &acked_peers);
                 }
                 Button::BtnB => {
-                    // Button B = RESET (clear event, but counter is CRDT - can't truly reset)
+                    // Button B = RESET (clear emergency and event state)
                     info!(">>> BUTTON B - CLEARING EVENT");
-                    mesh.clear_event();
+                    mesh.clear_emergency();  // Clears document-based emergency
+                    mesh.clear_event();      // Clears peripheral event
                     alert_active = false;
-                    acked_peers.clear();
+                    last_emergency = None;
                     axp_set_vibration(&mut i2c, false);
                     vibration_on = false;
 
@@ -873,16 +909,41 @@ fn main() -> anyhow::Result<()> {
                     }
                     let encoded = mesh.build_document();
                     nimble::set_document(&encoded);
-                    display_state = update_display(&mut display, &mesh, false, battery_pct, "CLEARED!", &display_state, &acked_peers);
+                    let acked = get_acked_peers_from_mesh(&mesh);
+                    display_state = update_display(&mut display, &mesh, false, battery_pct, "CLEARED!", &display_state, &acked);
                 }
                 Button::BtnC => {
-                    // Button C = EMERGENCY
-                    info!(">>> BUTTON C - SENDING EMERGENCY!");
-                    let encoded = mesh.send_emergency(now_ms_u64);
+                    // Button C = EMERGENCY (using document-based tracking)
+                    info!(">>> BUTTON C - SENDING EMERGENCY! (ts={})", now_ms_u64);
 
-                    // Enter alert mode locally too (buzz until ACK'd)
+                    // Log known peers before creating emergency
+                    let peers = mesh.get_peers();
+                    info!("Known peers: {} total", peers.len());
+                    for peer in &peers {
+                        info!("  Peer {:08X}: connected={}", peer.node_id.as_u32(), peer.is_connected);
+                    }
+
+                    // Use document-based emergency with built-in ACK tracking
+                    let encoded = mesh.start_emergency_with_known_peers(now_ms_u64);
+                    info!("Created emergency document: {} bytes", encoded.len());
+
+                    // Log emergency status after creation
+                    if let Some((src, ts, acked, pending)) = mesh.get_emergency_status() {
+                        info!("Emergency status: source={:08X} ts={} acked={} pending={}", src, ts, acked, pending);
+                    }
+
+                    // Debug: log ACK status of each peer RIGHT AFTER creation
+                    info!(">>> Initial ACK status (should all be false except source):");
+                    for peer in mesh.get_peers() {
+                        let has_acked = mesh.has_peer_acked(peer.node_id.as_u32());
+                        info!(">>>   peer {:08X}: has_peer_acked={}", peer.node_id.as_u32(), has_acked);
+                    }
+
+                    // Track for gossip deduplication
+                    last_emergency = Some((node_id.as_u32(), now_ms_u64));
+
+                    // Enter alert mode locally (buzz until ACK'd)
                     alert_active = true;
-                    acked_peers.clear();  // Fresh emergency, clear old ACKs
                     last_vibration_toggle = current_time;
                     vibration_on = true;
                     axp_set_vibration(&mut i2c, true);
@@ -894,15 +955,17 @@ fn main() -> anyhow::Result<()> {
                     let sent = nimble::gossip_document(&encoded);
                     info!(">>> Gossiped EMERGENCY to {} peers", sent);
 
-                    display_state = update_display(&mut display, &mesh, true, battery_pct, "EMERGENCY!", &display_state, &acked_peers);
+                    // Get ACK status from document for display
+                    let acked = get_acked_peers_from_mesh(&mesh);
+                    display_state = update_display(&mut display, &mesh, true, battery_pct, "EMERGENCY!", &display_state, &acked);
                 }
                 Button::None => {}
             }
         }
         last_button = button;
 
-        // Handle pending document from BLE
-        if let Some(data) = nimble::take_pending_document() {
+        // Handle ALL pending documents from BLE (process queue to avoid losing ACKs)
+        while let Some(data) = nimble::take_pending_document() {
             info!("");
             info!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
             info!("!!! RECEIVED {} BYTES FROM BLE !!!", data.len());
@@ -922,28 +985,65 @@ fn main() -> anyhow::Result<()> {
                 // Associate node ID with BLE connection for disconnect tracking
                 nimble::set_connection_node_id(result.source_node.as_u32());
 
-                // Check if peer is sending EMERGENCY
-                if result.is_emergency && !alert_active {
-                    info!(">>> RECEIVED EMERGENCY FROM PEER!");
-                    alert_active = true;
-                    last_vibration_toggle = current_time;
-                    vibration_on = true;
-                    axp_set_vibration(&mut i2c, true);
-                    needs_redraw = true;
-                }
+                // Check document's emergency state (CRDT merge already updated it)
+                // Use document state instead of peripheral event for proper tracking
+                if let Some((source, ts, acked_count, pending_count)) = mesh.get_emergency_status() {
+                    let emergency_key = (source, ts);
+                    let is_new = last_emergency.map_or(true, |prev| prev != emergency_key);
 
-                // Check if peer is sending ACK - track it for display
-                if result.is_ack && alert_active {
-                    let ack_node = result.source_node.as_u32();
-                    if !acked_peers.contains(&ack_node) {
-                        info!(">>> RECEIVED ACK FROM {:08X}", ack_node);
-                        acked_peers.push(ack_node);
+                    if is_new && !alert_active {
+                        info!(">>> RECEIVED EMERGENCY FROM {:08X} (ts={}, {}/{} acked)",
+                              source, ts, acked_count, acked_count + pending_count);
+                        last_emergency = Some(emergency_key);
+                        alert_active = true;
+                        last_vibration_toggle = current_time;
+                        vibration_on = true;
+                        axp_set_vibration(&mut i2c, true);
+                        needs_redraw = true;
+                    } else if !is_new {
+                        // Same emergency - check for ACK updates
+                        info!(">>> ACK update: source={:08X} {}/{} acked",
+                              source, acked_count, acked_count + pending_count);
+                        // Log which peers have acked according to mesh
+                        for peer in mesh.get_peers() {
+                            let has_acked = mesh.has_peer_acked(peer.node_id.as_u32());
+                            info!(">>>   peer {:08X}: has_peer_acked={}", peer.node_id.as_u32(), has_acked);
+                        }
                         needs_redraw = true;
                     }
                 }
 
-                if result.counter_changed {
-                    info!(">>> MERGED! New total: {}", mesh.total_count());
+                // Also check peripheral event for backward compatibility
+                if result.is_emergency && !alert_active {
+                    let emergency_key = (result.source_node.as_u32(), result.event_timestamp);
+                    let is_new = last_emergency.map_or(true, |prev| prev != emergency_key);
+
+                    if is_new {
+                        info!(">>> RECEIVED EMERGENCY (peripheral event) FROM {:08X} (ts={})",
+                              result.source_node.as_u32(), result.event_timestamp);
+                        last_emergency = Some(emergency_key);
+                        alert_active = true;
+                        last_vibration_toggle = current_time;
+                        vibration_on = true;
+                        axp_set_vibration(&mut i2c, true);
+                        needs_redraw = true;
+                    }
+                }
+
+                if result.is_ack && alert_active {
+                    info!(">>> RECEIVED ACK (peripheral event) FROM {:08X}",
+                          result.source_node.as_u32());
+                    needs_redraw = true;
+                }
+
+                // Gossip when counter OR emergency state changes (for ACK propagation)
+                if result.counter_changed || result.emergency_changed {
+                    if result.counter_changed {
+                        info!(">>> MERGED! New total: {}", mesh.total_count());
+                    }
+                    if result.emergency_changed {
+                        info!(">>> EMERGENCY STATE CHANGED (ACK update)");
+                    }
 
                     // Save merged state
                     if let Err(e) = store.save(&mesh) {
@@ -974,7 +1074,8 @@ fn main() -> anyhow::Result<()> {
             } else {
                 "Advertising..."
             };
-            display_state = update_display(&mut display, &mesh, alert_active, battery_pct, status, &display_state, &acked_peers);
+            let acked = get_acked_peers_from_mesh(&mesh);
+            display_state = update_display(&mut display, &mesh, alert_active, battery_pct, status, &display_state, &acked);
             needs_redraw = false;
         }
 
@@ -997,7 +1098,8 @@ fn main() -> anyhow::Result<()> {
             } else {
                 "Advertising..."
             };
-            display_state = update_display(&mut display, &mesh, alert_active, battery_pct, status, &display_state, &acked_peers);
+            let acked = get_acked_peers_from_mesh(&mesh);
+            display_state = update_display(&mut display, &mesh, alert_active, battery_pct, status, &display_state, &acked);
             print_status(&mesh, connected, status);
         }
 

@@ -247,6 +247,76 @@ impl HiveMesh {
         self.document_sync.current_event()
     }
 
+    // ==================== Emergency Management (Document-Based) ====================
+
+    /// Start a new emergency event with ACK tracking
+    ///
+    /// Creates an emergency event that tracks ACKs from all known peers.
+    /// Pass the list of known peer node IDs to track.
+    /// Returns the document bytes to broadcast.
+    pub fn start_emergency(&self, timestamp: u64, known_peers: &[u32]) -> Vec<u8> {
+        let data = self.document_sync.start_emergency(timestamp, known_peers);
+        self.notify(HiveEvent::MeshStateChanged {
+            peer_count: self.peer_manager.peer_count(),
+            connected_count: self.peer_manager.connected_count(),
+        });
+        data
+    }
+
+    /// Start a new emergency using all currently known peers
+    ///
+    /// Convenience method that automatically includes all discovered peers.
+    pub fn start_emergency_with_known_peers(&self, timestamp: u64) -> Vec<u8> {
+        let peers: Vec<u32> = self
+            .peer_manager
+            .get_peers()
+            .iter()
+            .map(|p| p.node_id.as_u32())
+            .collect();
+        self.start_emergency(timestamp, &peers)
+    }
+
+    /// Record our ACK for the current emergency
+    ///
+    /// Returns the document bytes to broadcast, or None if no emergency is active.
+    pub fn ack_emergency(&self, timestamp: u64) -> Option<Vec<u8>> {
+        let result = self.document_sync.ack_emergency(timestamp);
+        if result.is_some() {
+            self.notify(HiveEvent::MeshStateChanged {
+                peer_count: self.peer_manager.peer_count(),
+                connected_count: self.peer_manager.connected_count(),
+            });
+        }
+        result
+    }
+
+    /// Clear the current emergency event
+    pub fn clear_emergency(&self) {
+        self.document_sync.clear_emergency();
+    }
+
+    /// Check if there's an active emergency
+    pub fn has_active_emergency(&self) -> bool {
+        self.document_sync.has_active_emergency()
+    }
+
+    /// Get emergency status info
+    ///
+    /// Returns (source_node, timestamp, acked_count, pending_count) if emergency is active.
+    pub fn get_emergency_status(&self) -> Option<(u32, u64, usize, usize)> {
+        self.document_sync.get_emergency_status()
+    }
+
+    /// Check if a specific peer has ACKed the current emergency
+    pub fn has_peer_acked(&self, peer_id: u32) -> bool {
+        self.document_sync.has_peer_acked(peer_id)
+    }
+
+    /// Check if all peers have ACKed the current emergency
+    pub fn all_peers_acked(&self) -> bool {
+        self.document_sync.all_peers_acked()
+    }
+
     // ==================== BLE Callbacks (Platform -> Mesh) ====================
 
     /// Called when a BLE device is discovered
@@ -358,7 +428,9 @@ impl HiveMesh {
             is_emergency: result.is_emergency(),
             is_ack: result.is_ack(),
             counter_changed: result.counter_changed,
+            emergency_changed: result.emergency_changed,
             total_count: result.total_count,
+            event_timestamp: result.event.as_ref().map(|e| e.timestamp).unwrap_or(0),
         })
     }
 
@@ -400,7 +472,9 @@ impl HiveMesh {
             is_emergency: result.is_emergency(),
             is_ack: result.is_ack(),
             counter_changed: result.counter_changed,
+            emergency_changed: result.emergency_changed,
             total_count: result.total_count,
+            event_timestamp: result.event.as_ref().map(|e| e.timestamp).unwrap_or(0),
         })
     }
 
@@ -448,7 +522,9 @@ impl HiveMesh {
             is_emergency: result.is_emergency(),
             is_ack: result.is_ack(),
             counter_changed: result.counter_changed,
+            emergency_changed: result.emergency_changed,
             total_count: result.total_count,
+            event_timestamp: result.event.as_ref().map(|e| e.timestamp).unwrap_or(0),
         })
     }
 
@@ -586,8 +662,14 @@ pub struct DataReceivedResult {
     /// Whether the counter changed (new data)
     pub counter_changed: bool,
 
+    /// Whether emergency state changed (new emergency or ACK updates)
+    pub emergency_changed: bool,
+
     /// Updated total count
     pub total_count: u64,
+
+    /// Event timestamp (if event present) - use to detect duplicate events
+    pub event_timestamp: u64,
 }
 
 #[cfg(all(test, feature = "std"))]
