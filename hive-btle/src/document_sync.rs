@@ -41,7 +41,7 @@ use spin::RwLock;
 use core::sync::atomic::{AtomicU32, Ordering};
 
 use crate::document::{HiveDocument, MergeResult};
-use crate::sync::crdt::{EventType, GCounter, Peripheral, PeripheralType};
+use crate::sync::crdt::{EmergencyEvent, EventType, GCounter, Peripheral, PeripheralType};
 use crate::NodeId;
 
 /// Document synchronization manager for HIVE-Lite nodes
@@ -66,6 +66,9 @@ pub struct DocumentSync {
     /// Peripheral data (callsign, type, location)
     peripheral: RwLock<Peripheral>,
 
+    /// Active emergency event with ACK tracking (CRDT)
+    emergency: RwLock<Option<EmergencyEvent>>,
+
     /// Document version (monotonically increasing)
     version: AtomicU32,
 }
@@ -80,6 +83,7 @@ impl DocumentSync {
             node_id,
             counter: RwLock::new(GCounter::new()),
             peripheral: RwLock::new(peripheral),
+            emergency: RwLock::new(None),
             version: AtomicU32::new(1),
         }
     }
@@ -92,6 +96,7 @@ impl DocumentSync {
             node_id,
             counter: RwLock::new(GCounter::new()),
             peripheral: RwLock::new(peripheral),
+            emergency: RwLock::new(None),
             version: AtomicU32::new(1),
         }
     }
@@ -192,6 +197,109 @@ impl DocumentSync {
         self.bump_version();
     }
 
+    // ==================== Emergency Management ====================
+
+    /// Start a new emergency event
+    ///
+    /// Creates an emergency event that tracks ACKs from all known peers.
+    /// Returns the document bytes to broadcast.
+    pub fn start_emergency(&self, timestamp: u64, known_peers: &[u32]) -> Vec<u8> {
+        // Create emergency event with our node as source
+        {
+            let mut emergency = self.emergency.write().unwrap();
+            *emergency = Some(EmergencyEvent::new(
+                self.node_id.as_u32(),
+                timestamp,
+                known_peers,
+            ));
+        }
+
+        // Also set peripheral event for backward compatibility
+        {
+            let mut peripheral = self.peripheral.write().unwrap();
+            peripheral.set_event(EventType::Emergency, timestamp);
+        }
+
+        self.increment_counter_internal();
+        self.build_document()
+    }
+
+    /// Record our ACK for the current emergency
+    ///
+    /// Returns the document bytes to broadcast, or None if no emergency is active.
+    pub fn ack_emergency(&self, timestamp: u64) -> Option<Vec<u8>> {
+        let changed = {
+            let mut emergency = self.emergency.write().unwrap();
+            if let Some(ref mut e) = *emergency {
+                e.ack(self.node_id.as_u32())
+            } else {
+                return None;
+            }
+        };
+
+        if changed {
+            // Also set peripheral event for backward compatibility
+            {
+                let mut peripheral = self.peripheral.write().unwrap();
+                peripheral.set_event(EventType::Ack, timestamp);
+            }
+
+            self.increment_counter_internal();
+        }
+
+        Some(self.build_document())
+    }
+
+    /// Clear the current emergency event
+    pub fn clear_emergency(&self) {
+        let mut emergency = self.emergency.write().unwrap();
+        if emergency.is_some() {
+            *emergency = None;
+            drop(emergency);
+
+            // Also clear peripheral event
+            let mut peripheral = self.peripheral.write().unwrap();
+            peripheral.clear_event();
+
+            self.bump_version();
+        }
+    }
+
+    /// Check if there's an active emergency
+    pub fn has_active_emergency(&self) -> bool {
+        self.emergency.read().unwrap().is_some()
+    }
+
+    /// Get emergency status info
+    ///
+    /// Returns (source_node, timestamp, acked_count, pending_count) if emergency is active.
+    pub fn get_emergency_status(&self) -> Option<(u32, u64, usize, usize)> {
+        let emergency = self.emergency.read().unwrap();
+        emergency.as_ref().map(|e| {
+            (
+                e.source_node(),
+                e.timestamp(),
+                e.ack_count(),
+                e.pending_nodes().len(),
+            )
+        })
+    }
+
+    /// Check if a specific peer has ACKed the current emergency
+    pub fn has_peer_acked(&self, peer_id: u32) -> bool {
+        let emergency = self.emergency.read().unwrap();
+        emergency
+            .as_ref()
+            .map(|e| e.has_acked(peer_id))
+            .unwrap_or(false)
+    }
+
+    /// Check if all peers have ACKed the current emergency
+    pub fn all_peers_acked(&self) -> bool {
+        let emergency = self.emergency.read().unwrap();
+        emergency.as_ref().map(|e| e.all_acked()).unwrap_or(true)
+    }
+
     // ==================== Document I/O ====================
 
     /// Build the document for transmission
@@ -200,12 +308,14 @@ impl DocumentSync {
     pub fn build_document(&self) -> Vec<u8> {
         let counter = self.counter.read().unwrap().clone();
         let peripheral = self.peripheral.read().unwrap().clone();
+        let emergency = self.emergency.read().unwrap().clone();
 
         let doc = HiveDocument {
             version: self.version.load(Ordering::Relaxed),
             node_id: self.node_id,
             counter,
             peripheral: Some(peripheral),
+            emergency,
         };
 
         doc.encode()
@@ -231,7 +341,21 @@ impl DocumentSync {
             counter.value() != old_value
         };
 
-        if counter_changed {
+        // Merge emergency event (CRDT merge)
+        let emergency_changed = if let Some(ref received_emergency) = received.emergency {
+            let mut emergency = self.emergency.write().unwrap();
+            match &mut *emergency {
+                Some(ref mut our_emergency) => our_emergency.merge(received_emergency),
+                None => {
+                    *emergency = Some(received_emergency.clone());
+                    true
+                }
+            }
+        } else {
+            false
+        };
+
+        if counter_changed || emergency_changed {
             self.bump_version();
         }
 
@@ -245,6 +369,7 @@ impl DocumentSync {
             source_node: received.node_id,
             event,
             counter_changed,
+            emergency_changed,
             total_count: self.total_count(),
         })
     }

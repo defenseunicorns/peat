@@ -875,8 +875,25 @@ pub struct DataReceivedResult {
     pub is_ack: bool,
     /// Whether counter changed (new data)
     pub counter_changed: bool,
+    /// Whether emergency state changed (new emergency or ACK updates)
+    pub emergency_changed: bool,
     /// Total counter value after merge
     pub total_count: u64,
+    /// Event timestamp (0 if no event) - use to detect duplicate events
+    pub event_timestamp: u64,
+}
+
+/// Status of an active emergency event with ACK tracking
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct EmergencyStatus {
+    /// Node ID that started the emergency
+    pub source_node: u32,
+    /// Timestamp when emergency was started
+    pub timestamp: u64,
+    /// Number of peers that have ACKed
+    pub acked_count: u32,
+    /// Number of peers still pending ACK
+    pub pending_count: u32,
 }
 
 /// Callback interface for mesh events
@@ -957,13 +974,13 @@ impl HiveMeshWrapper {
 
     // ==================== User Actions ====================
 
-    /// Send an emergency event
+    /// Send an emergency event (legacy - uses peripheral event only)
     /// Returns the document bytes to broadcast via BLE
     pub fn send_emergency(&self, timestamp: u64) -> Vec<u8> {
         self.mesh.send_emergency(timestamp)
     }
 
-    /// Send an ACK event
+    /// Send an ACK event (legacy - uses peripheral event only)
     /// Returns the document bytes to broadcast via BLE
     pub fn send_ack(&self, timestamp: u64) -> Vec<u8> {
         self.mesh.send_ack(timestamp)
@@ -977,6 +994,59 @@ impl HiveMeshWrapper {
     /// Build current document for sync
     pub fn build_document(&self) -> Vec<u8> {
         self.mesh.build_document()
+    }
+
+    // ==================== Document-Based Emergency Management ====================
+
+    /// Start a new emergency event with ACK tracking for specified peers
+    /// Returns the document bytes to broadcast via BLE
+    pub fn start_emergency(&self, timestamp: u64, known_peers: Vec<u32>) -> Vec<u8> {
+        self.mesh.start_emergency(timestamp, &known_peers)
+    }
+
+    /// Start a new emergency event with ACK tracking for all known peers
+    /// Returns the document bytes to broadcast via BLE
+    pub fn start_emergency_with_known_peers(&self, timestamp: u64) -> Vec<u8> {
+        self.mesh.start_emergency_with_known_peers(timestamp)
+    }
+
+    /// Record our ACK for the current emergency
+    /// Returns the document bytes to broadcast, or None if no emergency is active
+    pub fn ack_emergency(&self, timestamp: u64) -> Option<Vec<u8>> {
+        self.mesh.ack_emergency(timestamp)
+    }
+
+    /// Clear the current emergency event
+    pub fn clear_emergency(&self) {
+        self.mesh.clear_emergency();
+    }
+
+    /// Check if there's an active document-based emergency
+    pub fn has_active_emergency(&self) -> bool {
+        self.mesh.has_active_emergency()
+    }
+
+    /// Get emergency status info
+    /// Returns (source_node, timestamp, acked_count, pending_count) if emergency is active
+    pub fn get_emergency_status(&self) -> Option<EmergencyStatus> {
+        self.mesh.get_emergency_status().map(|(source, ts, acked, pending)| {
+            EmergencyStatus {
+                source_node: source,
+                timestamp: ts,
+                acked_count: acked as u32,
+                pending_count: pending as u32,
+            }
+        })
+    }
+
+    /// Check if a specific peer has ACKed the current emergency
+    pub fn has_peer_acked(&self, peer_id: u32) -> bool {
+        self.mesh.has_peer_acked(peer_id)
+    }
+
+    /// Check if all peers have ACKed the current emergency
+    pub fn all_peers_acked(&self) -> bool {
+        self.mesh.all_peers_acked()
     }
 
     // ==================== BLE Callbacks ====================
@@ -1040,7 +1110,33 @@ impl HiveMeshWrapper {
                 is_emergency: result.is_emergency,
                 is_ack: result.is_ack,
                 counter_changed: result.counter_changed,
+                emergency_changed: result.emergency_changed,
                 total_count: result.total_count,
+                event_timestamp: result.event_timestamp,
+            })
+    }
+
+    /// Called when BLE data is received without a known identifier
+    ///
+    /// Use this when receiving data from a peripheral (acting as Central)
+    /// where the identifier doesn't map to a known peer. This method extracts
+    /// the source node ID from the document itself.
+    pub fn on_ble_data(
+        &self,
+        identifier: String,
+        data: Vec<u8>,
+        now_ms: u64,
+    ) -> Option<DataReceivedResult> {
+        self.mesh
+            .on_ble_data(&identifier, &data, now_ms)
+            .map(|result| DataReceivedResult {
+                source_node: result.source_node.as_u32(),
+                is_emergency: result.is_emergency,
+                is_ack: result.is_ack,
+                counter_changed: result.counter_changed,
+                emergency_changed: result.emergency_changed,
+                total_count: result.total_count,
+                event_timestamp: result.event_timestamp,
             })
     }
 
