@@ -1,12 +1,12 @@
-# Lab 4: Hierarchical HIVE CRDT - lab4-96n
+# Lab 4: Hierarchical HIVE CRDT - lab4-96n-64kbps
 # Target nodes: 96, Actual: 101
 # Structure: 1 companies × 4 platoons × 3 squads × 7 soldiers
-# Bandwidth: 1gbps
+# Bandwidth: 64kbps
 
-name: lab4-96n
+name: lab4-96n-64kbps
 
 mgmt:
-  network: lab4-96n
+  network: lab4-96n-64kbps
   ipv4-subnet: 172.20.20.0/24
 
 topology:
@@ -21,15 +21,15 @@ topology:
         NODE_ID: company-1-commander
         ROLE: company_commander
         PLATFORM_TYPE: soldier
-        NODE_TYPE: soldier
+        NODE_TYPE: company_commander
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         COMPANY_ID: company-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12345"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -44,15 +44,16 @@ topology:
         NODE_ID: company-1-platoon-1-leader
         ROLE: platoon_leader
         PLATFORM_TYPE: soldier
-        NODE_TYPE: soldier
+        NODE_TYPE: platoon_leader
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         PLATOON_ID: company-1-platoon-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12346"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-commander:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -65,16 +66,17 @@ topology:
         NODE_ID: company-1-platoon-1-squad-1-leader
         ROLE: squad_leader
         PLATFORM_TYPE: soldier
-        NODE_TYPE: soldier
+        NODE_TYPE: squad_leader
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-1
         SQUAD_MEMBERS: "company-1-platoon-1-squad-1-soldier-1,company-1-platoon-1-squad-1-soldier-2,company-1-platoon-1-squad-1-soldier-3,company-1-platoon-1-squad-1-soldier-4,company-1-platoon-1-squad-1-soldier-5,company-1-platoon-1-squad-1-soldier-6,company-1-platoon-1-squad-1-soldier-7"
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12347"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-leader:12346"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -89,13 +91,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12348"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-1-leader:12347"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -110,13 +113,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12349"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-1-leader:12347"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -131,13 +135,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12350"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-1-leader:12347"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -152,13 +157,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12351"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-1-leader:12347"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -173,13 +179,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12352"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-1-leader:12347"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -194,13 +201,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12353"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-1-leader:12347"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -215,13 +223,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12354"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-1-leader:12347"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -234,16 +243,17 @@ topology:
         NODE_ID: company-1-platoon-1-squad-2-leader
         ROLE: squad_leader
         PLATFORM_TYPE: soldier
-        NODE_TYPE: soldier
+        NODE_TYPE: squad_leader
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-2
         SQUAD_MEMBERS: "company-1-platoon-1-squad-2-soldier-1,company-1-platoon-1-squad-2-soldier-2,company-1-platoon-1-squad-2-soldier-3,company-1-platoon-1-squad-2-soldier-4,company-1-platoon-1-squad-2-soldier-5,company-1-platoon-1-squad-2-soldier-6,company-1-platoon-1-squad-2-soldier-7"
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12355"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-leader:12346"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -258,13 +268,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12356"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-2-leader:12355"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -279,13 +290,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12357"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-2-leader:12355"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -300,13 +312,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12358"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-2-leader:12355"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -321,13 +334,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12359"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-2-leader:12355"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -342,13 +356,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12360"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-2-leader:12355"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -363,13 +378,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12361"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-2-leader:12355"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -384,13 +400,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12362"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-2-leader:12355"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -403,16 +420,17 @@ topology:
         NODE_ID: company-1-platoon-1-squad-3-leader
         ROLE: squad_leader
         PLATFORM_TYPE: soldier
-        NODE_TYPE: soldier
+        NODE_TYPE: squad_leader
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-3
         SQUAD_MEMBERS: "company-1-platoon-1-squad-3-soldier-1,company-1-platoon-1-squad-3-soldier-2,company-1-platoon-1-squad-3-soldier-3,company-1-platoon-1-squad-3-soldier-4,company-1-platoon-1-squad-3-soldier-5,company-1-platoon-1-squad-3-soldier-6,company-1-platoon-1-squad-3-soldier-7"
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12363"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-leader:12346"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -427,13 +445,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12364"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-3-leader:12363"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -448,13 +467,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12365"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-3-leader:12363"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -469,13 +489,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12366"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-3-leader:12363"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -490,13 +511,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12367"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-3-leader:12363"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -511,13 +533,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12368"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-3-leader:12363"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -532,13 +555,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12369"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-3-leader:12363"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -553,13 +577,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-1-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12370"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-1-squad-3-leader:12363"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -574,15 +599,16 @@ topology:
         NODE_ID: company-1-platoon-2-leader
         ROLE: platoon_leader
         PLATFORM_TYPE: soldier
-        NODE_TYPE: soldier
+        NODE_TYPE: platoon_leader
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         PLATOON_ID: company-1-platoon-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12371"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-commander:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -595,16 +621,17 @@ topology:
         NODE_ID: company-1-platoon-2-squad-1-leader
         ROLE: squad_leader
         PLATFORM_TYPE: soldier
-        NODE_TYPE: soldier
+        NODE_TYPE: squad_leader
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-1
         SQUAD_MEMBERS: "company-1-platoon-2-squad-1-soldier-1,company-1-platoon-2-squad-1-soldier-2,company-1-platoon-2-squad-1-soldier-3,company-1-platoon-2-squad-1-soldier-4,company-1-platoon-2-squad-1-soldier-5,company-1-platoon-2-squad-1-soldier-6,company-1-platoon-2-squad-1-soldier-7"
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12372"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-leader:12371"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -619,13 +646,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12373"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-1-leader:12372"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -640,13 +668,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12374"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-1-leader:12372"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -661,13 +690,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12375"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-1-leader:12372"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -682,13 +712,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12376"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-1-leader:12372"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -703,13 +734,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12377"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-1-leader:12372"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -724,13 +756,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12378"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-1-leader:12372"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -745,13 +778,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12379"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-1-leader:12372"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -764,16 +798,17 @@ topology:
         NODE_ID: company-1-platoon-2-squad-2-leader
         ROLE: squad_leader
         PLATFORM_TYPE: soldier
-        NODE_TYPE: soldier
+        NODE_TYPE: squad_leader
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-2
         SQUAD_MEMBERS: "company-1-platoon-2-squad-2-soldier-1,company-1-platoon-2-squad-2-soldier-2,company-1-platoon-2-squad-2-soldier-3,company-1-platoon-2-squad-2-soldier-4,company-1-platoon-2-squad-2-soldier-5,company-1-platoon-2-squad-2-soldier-6,company-1-platoon-2-squad-2-soldier-7"
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12380"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-leader:12371"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -788,13 +823,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12381"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-2-leader:12380"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -809,13 +845,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12382"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-2-leader:12380"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -830,13 +867,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12383"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-2-leader:12380"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -851,13 +889,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12384"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-2-leader:12380"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -872,13 +911,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12385"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-2-leader:12380"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -893,13 +933,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12386"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-2-leader:12380"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -914,13 +955,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12387"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-2-leader:12380"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -933,16 +975,17 @@ topology:
         NODE_ID: company-1-platoon-2-squad-3-leader
         ROLE: squad_leader
         PLATFORM_TYPE: soldier
-        NODE_TYPE: soldier
+        NODE_TYPE: squad_leader
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-3
         SQUAD_MEMBERS: "company-1-platoon-2-squad-3-soldier-1,company-1-platoon-2-squad-3-soldier-2,company-1-platoon-2-squad-3-soldier-3,company-1-platoon-2-squad-3-soldier-4,company-1-platoon-2-squad-3-soldier-5,company-1-platoon-2-squad-3-soldier-6,company-1-platoon-2-squad-3-soldier-7"
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12388"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-leader:12371"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -957,13 +1000,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12389"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-3-leader:12388"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -978,13 +1022,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12390"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-3-leader:12388"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -999,13 +1044,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12391"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-3-leader:12388"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1020,13 +1066,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12392"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-3-leader:12388"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1041,13 +1088,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12393"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-3-leader:12388"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1062,13 +1110,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12394"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-3-leader:12388"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1083,13 +1132,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-2-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12395"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-2-squad-3-leader:12388"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1104,15 +1154,16 @@ topology:
         NODE_ID: company-1-platoon-3-leader
         ROLE: platoon_leader
         PLATFORM_TYPE: soldier
-        NODE_TYPE: soldier
+        NODE_TYPE: platoon_leader
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         PLATOON_ID: company-1-platoon-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12396"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-commander:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1125,16 +1176,17 @@ topology:
         NODE_ID: company-1-platoon-3-squad-1-leader
         ROLE: squad_leader
         PLATFORM_TYPE: soldier
-        NODE_TYPE: soldier
+        NODE_TYPE: squad_leader
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-1
         SQUAD_MEMBERS: "company-1-platoon-3-squad-1-soldier-1,company-1-platoon-3-squad-1-soldier-2,company-1-platoon-3-squad-1-soldier-3,company-1-platoon-3-squad-1-soldier-4,company-1-platoon-3-squad-1-soldier-5,company-1-platoon-3-squad-1-soldier-6,company-1-platoon-3-squad-1-soldier-7"
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12397"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-leader:12396"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1149,13 +1201,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12398"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-1-leader:12397"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1170,13 +1223,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12399"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-1-leader:12397"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1191,13 +1245,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12400"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-1-leader:12397"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1212,13 +1267,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12401"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-1-leader:12397"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1233,13 +1289,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12402"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-1-leader:12397"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1254,13 +1311,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12403"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-1-leader:12397"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1275,13 +1333,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12404"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-1-leader:12397"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1294,16 +1353,17 @@ topology:
         NODE_ID: company-1-platoon-3-squad-2-leader
         ROLE: squad_leader
         PLATFORM_TYPE: soldier
-        NODE_TYPE: soldier
+        NODE_TYPE: squad_leader
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-2
         SQUAD_MEMBERS: "company-1-platoon-3-squad-2-soldier-1,company-1-platoon-3-squad-2-soldier-2,company-1-platoon-3-squad-2-soldier-3,company-1-platoon-3-squad-2-soldier-4,company-1-platoon-3-squad-2-soldier-5,company-1-platoon-3-squad-2-soldier-6,company-1-platoon-3-squad-2-soldier-7"
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12405"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-leader:12396"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1318,13 +1378,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12406"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-2-leader:12405"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1339,13 +1400,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12407"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-2-leader:12405"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1360,13 +1422,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12408"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-2-leader:12405"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1381,13 +1444,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12409"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-2-leader:12405"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1402,13 +1466,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12410"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-2-leader:12405"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1423,13 +1488,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12411"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-2-leader:12405"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1444,13 +1510,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12412"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-2-leader:12405"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1463,16 +1530,17 @@ topology:
         NODE_ID: company-1-platoon-3-squad-3-leader
         ROLE: squad_leader
         PLATFORM_TYPE: soldier
-        NODE_TYPE: soldier
+        NODE_TYPE: squad_leader
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-3
         SQUAD_MEMBERS: "company-1-platoon-3-squad-3-soldier-1,company-1-platoon-3-squad-3-soldier-2,company-1-platoon-3-squad-3-soldier-3,company-1-platoon-3-squad-3-soldier-4,company-1-platoon-3-squad-3-soldier-5,company-1-platoon-3-squad-3-soldier-6,company-1-platoon-3-squad-3-soldier-7"
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12413"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-leader:12396"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1487,13 +1555,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12414"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-3-leader:12413"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1508,13 +1577,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12415"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-3-leader:12413"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1529,13 +1599,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12416"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-3-leader:12413"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1550,13 +1621,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12417"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-3-leader:12413"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1571,13 +1643,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12418"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-3-leader:12413"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1592,13 +1665,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12419"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-3-leader:12413"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1613,13 +1687,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-3-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12420"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-3-squad-3-leader:12413"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1634,15 +1709,16 @@ topology:
         NODE_ID: company-1-platoon-4-leader
         ROLE: platoon_leader
         PLATFORM_TYPE: soldier
-        NODE_TYPE: soldier
+        NODE_TYPE: platoon_leader
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         PLATOON_ID: company-1-platoon-4
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12421"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-commander:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1655,16 +1731,17 @@ topology:
         NODE_ID: company-1-platoon-4-squad-1-leader
         ROLE: squad_leader
         PLATFORM_TYPE: soldier
-        NODE_TYPE: soldier
+        NODE_TYPE: squad_leader
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-1
         SQUAD_MEMBERS: "company-1-platoon-4-squad-1-soldier-1,company-1-platoon-4-squad-1-soldier-2,company-1-platoon-4-squad-1-soldier-3,company-1-platoon-4-squad-1-soldier-4,company-1-platoon-4-squad-1-soldier-5,company-1-platoon-4-squad-1-soldier-6,company-1-platoon-4-squad-1-soldier-7"
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12422"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-leader:12421"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1679,13 +1756,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12423"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-1-leader:12422"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1700,13 +1778,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12424"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-1-leader:12422"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1721,13 +1800,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12425"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-1-leader:12422"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1742,13 +1822,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12426"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-1-leader:12422"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1763,13 +1844,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12427"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-1-leader:12422"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1784,13 +1866,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12428"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-1-leader:12422"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1805,13 +1888,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-1
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12429"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-1-leader:12422"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1824,16 +1908,17 @@ topology:
         NODE_ID: company-1-platoon-4-squad-2-leader
         ROLE: squad_leader
         PLATFORM_TYPE: soldier
-        NODE_TYPE: soldier
+        NODE_TYPE: squad_leader
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-2
         SQUAD_MEMBERS: "company-1-platoon-4-squad-2-soldier-1,company-1-platoon-4-squad-2-soldier-2,company-1-platoon-4-squad-2-soldier-3,company-1-platoon-4-squad-2-soldier-4,company-1-platoon-4-squad-2-soldier-5,company-1-platoon-4-squad-2-soldier-6,company-1-platoon-4-squad-2-soldier-7"
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12430"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-leader:12421"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1848,13 +1933,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12431"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-2-leader:12430"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1869,13 +1955,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12432"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-2-leader:12430"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1890,13 +1977,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12433"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-2-leader:12430"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1911,13 +1999,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12434"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-2-leader:12430"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1932,13 +2021,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12435"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-2-leader:12430"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1953,13 +2043,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12436"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-2-leader:12430"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1974,13 +2065,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-2
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12437"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-2-leader:12430"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1993,16 +2085,17 @@ topology:
         NODE_ID: company-1-platoon-4-squad-3-leader
         ROLE: squad_leader
         PLATFORM_TYPE: soldier
-        NODE_TYPE: soldier
+        NODE_TYPE: squad_leader
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-3
         SQUAD_MEMBERS: "company-1-platoon-4-squad-3-soldier-1,company-1-platoon-4-squad-3-soldier-2,company-1-platoon-4-squad-3-soldier-3,company-1-platoon-4-squad-3-soldier-4,company-1-platoon-4-squad-3-soldier-5,company-1-platoon-4-squad-3-soldier-6,company-1-platoon-4-squad-3-soldier-7"
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12438"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-leader:12421"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -2017,13 +2110,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12439"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-3-leader:12438"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -2038,13 +2132,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12440"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-3-leader:12438"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -2059,13 +2154,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12441"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-3-leader:12438"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -2080,13 +2176,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12442"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-3-leader:12438"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -2101,13 +2198,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12443"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-3-leader:12438"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -2122,13 +2220,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12444"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-3-leader:12438"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -2143,13 +2242,14 @@ topology:
         PLATFORM_TYPE: soldier
         NODE_TYPE: soldier
         MODE: hierarchical
-        BACKEND: ditto
+        BACKEND: ${BACKEND}
         SQUAD_ID: company-1-platoon-4-squad-3
         UPDATE_RATE_MS: "5000"
         TCP_LISTEN: "12445"
-        DITTO_APP_ID: ${DITTO_APP_ID}
-        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
-        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+        TCP_CONNECT: "clab-lab4-96n-64kbps-company-1-platoon-4-squad-3-leader:12438"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"

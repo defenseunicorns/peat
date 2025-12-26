@@ -146,8 +146,9 @@ def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
     # MODE controls the simulation behavior (writer/reader/hierarchical/flat_mesh)
     # BACKEND controls which CRDT backend to use (ditto/automerge)
     # For Lab 4, we always use "hierarchical" mode regardless of backend
+    # Use ${BACKEND} variable so containerlab substitutes at deploy time
     mode = "hierarchical"
-    backend_env = backend  # "automerge" or "ditto"
+    backend_env = "${BACKEND}"  # Shell variable - containerlab substitutes at deploy time
 
     # Calculate actual node count
     soldiers = soldiers_per_squad * squads_per_platoon * platoons_per_company * num_companies
