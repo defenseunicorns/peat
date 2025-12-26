@@ -10,7 +10,9 @@ use crate::hierarchy::storage_trait::{DocumentMetrics, SummaryStorage};
 #[cfg(feature = "automerge-backend")]
 use crate::hierarchy::SquadFieldUpdate;
 #[cfg(feature = "automerge-backend")]
-use crate::storage::automerge_conversion::{automerge_to_message, message_to_automerge};
+use crate::storage::automerge_conversion::{
+    automerge_to_message, automerge_to_message_if_complete, message_to_automerge,
+};
 #[cfg(feature = "automerge-backend")]
 use crate::storage::automerge_store::AutomergeStore;
 #[cfg(feature = "automerge-backend")]
@@ -222,14 +224,16 @@ impl SummaryStorage for AutomergeSummaryStorage {
 
         match self.store.get(&key) {
             Ok(Some(doc)) => {
-                let summary = automerge_to_message(&doc).map_err(|e| {
+                // Use automerge_to_message_if_complete to handle partial sync gracefully.
+                // If "squad_id" field is missing, the document is incomplete - return None.
+                let summary = automerge_to_message_if_complete(&doc, "squad_id").map_err(|e| {
                     crate::Error::storage_error(
                         format!("Failed to deserialize SquadSummary: {}", e),
                         "get_squad_summary",
                         Some(key.clone()),
                     )
                 })?;
-                Ok(Some(summary))
+                Ok(summary)
             }
             Ok(None) => Ok(None),
             Err(e) => Err(crate::Error::storage_error(
@@ -351,14 +355,18 @@ impl SummaryStorage for AutomergeSummaryStorage {
 
         match self.store.get(&key) {
             Ok(Some(doc)) => {
-                let summary = automerge_to_message(&doc).map_err(|e| {
-                    crate::Error::storage_error(
-                        format!("Failed to deserialize PlatoonSummary: {}", e),
-                        "get_platoon_summary",
-                        Some(key.clone()),
-                    )
-                })?;
-                Ok(Some(summary))
+                // Use automerge_to_message_if_complete to handle partial sync gracefully.
+                // If "platoon_id" field is missing, the document is incomplete - return None.
+                // This fixes issue #509: Automerge partial sync causes deserialization errors.
+                let summary =
+                    automerge_to_message_if_complete(&doc, "platoon_id").map_err(|e| {
+                        crate::Error::storage_error(
+                            format!("Failed to deserialize PlatoonSummary: {}", e),
+                            "get_platoon_summary",
+                            Some(key.clone()),
+                        )
+                    })?;
+                Ok(summary)
             }
             Ok(None) => Ok(None),
             Err(e) => Err(crate::Error::storage_error(
@@ -479,14 +487,17 @@ impl SummaryStorage for AutomergeSummaryStorage {
 
         match self.store.get(&key) {
             Ok(Some(doc)) => {
-                let summary = automerge_to_message(&doc).map_err(|e| {
-                    crate::Error::storage_error(
-                        format!("Failed to deserialize CompanySummary: {}", e),
-                        "get_company_summary",
-                        Some(key.clone()),
-                    )
-                })?;
-                Ok(Some(summary))
+                // Use automerge_to_message_if_complete to handle partial sync gracefully.
+                // If "company_id" field is missing, the document is incomplete - return None.
+                let summary =
+                    automerge_to_message_if_complete(&doc, "company_id").map_err(|e| {
+                        crate::Error::storage_error(
+                            format!("Failed to deserialize CompanySummary: {}", e),
+                            "get_company_summary",
+                            Some(key.clone()),
+                        )
+                    })?;
+                Ok(summary)
             }
             Ok(None) => Ok(None),
             Err(e) => Err(crate::Error::storage_error(
