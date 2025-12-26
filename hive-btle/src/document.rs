@@ -39,6 +39,23 @@ pub const EMERGENCY_MARKER: u8 = 0xAC;
 /// Minimum document size (header only, no counter entries)
 pub const MIN_DOCUMENT_SIZE: usize = 8;
 
+/// Maximum recommended mesh size for reliable single-packet sync
+///
+/// Beyond this, documents may exceed typical BLE MTU (244 bytes).
+/// Size calculation: 8 (header) + 4 + (N × 12) (GCounter) + 42 (Peripheral)
+///   20 nodes = 8 + 244 + 42 = 294 bytes
+pub const MAX_MESH_SIZE: usize = 20;
+
+/// Target document size for single-packet transmission
+///
+/// Based on typical negotiated BLE MTU (247 bytes - 3 ATT overhead).
+pub const TARGET_DOCUMENT_SIZE: usize = 244;
+
+/// Hard limit before fragmentation would be required
+///
+/// BLE 5.0+ supports up to 517 byte MTU, but 512 is practical max payload.
+pub const MAX_DOCUMENT_SIZE: usize = 512;
+
 /// A HIVE document for mesh synchronization
 ///
 /// Contains header information, a CRDT G-Counter for tracking mesh activity,
@@ -323,6 +340,30 @@ impl HiveDocument {
     pub fn total_count(&self) -> u64 {
         self.counter.value()
     }
+
+    /// Get the encoded size of this document
+    ///
+    /// Use this to check if the document fits within BLE MTU constraints.
+    pub fn encoded_size(&self) -> usize {
+        let counter_size = 4 + self.counter.node_count_total() * 12;
+        let peripheral_size = self.peripheral.as_ref().map_or(0, |p| 4 + p.encode().len());
+        let emergency_size = self.emergency.as_ref().map_or(0, |e| 4 + e.encode().len());
+        8 + counter_size + peripheral_size + emergency_size
+    }
+
+    /// Check if the document exceeds the target size for single-packet transmission
+    ///
+    /// Returns `true` if the document is larger than [`TARGET_DOCUMENT_SIZE`].
+    pub fn exceeds_target_size(&self) -> bool {
+        self.encoded_size() > TARGET_DOCUMENT_SIZE
+    }
+
+    /// Check if the document exceeds the maximum size
+    ///
+    /// Returns `true` if the document is larger than [`MAX_DOCUMENT_SIZE`].
+    pub fn exceeds_max_size(&self) -> bool {
+        self.encoded_size() > MAX_DOCUMENT_SIZE
+    }
 }
 
 /// Result from merging a received document
@@ -473,5 +514,36 @@ mod tests {
 
         assert!(!result.is_emergency());
         assert!(result.is_ack());
+    }
+
+    #[test]
+    fn test_document_size_calculation() {
+        use crate::sync::crdt::PeripheralType;
+
+        let node_id = NodeId::new(0x12345678);
+
+        // Minimal document: 8 header + 4 counter (0 entries) = 12 bytes
+        let doc = HiveDocument::new(node_id);
+        assert_eq!(doc.encoded_size(), 12);
+        assert!(!doc.exceeds_target_size());
+
+        // With one counter entry: 8 + (4 + 12) = 24 bytes
+        let mut doc = HiveDocument::new(node_id);
+        doc.increment_counter();
+        assert_eq!(doc.encoded_size(), 24);
+
+        // With peripheral: adds ~42 bytes (4 marker/len + 38 data)
+        let peripheral = Peripheral::new(0xAABBCCDD, PeripheralType::SoldierSensor);
+        let doc = HiveDocument::new(node_id).with_peripheral(peripheral);
+        let encoded = doc.encode();
+        assert_eq!(doc.encoded_size(), encoded.len());
+
+        // Verify size stays under target for reasonable mesh
+        let mut doc = HiveDocument::new(node_id);
+        for i in 0..10 {
+            doc.counter.increment(&NodeId::new(i), 1);
+        }
+        assert!(doc.encoded_size() < TARGET_DOCUMENT_SIZE);
+        assert!(!doc.exceeds_max_size());
     }
 }
