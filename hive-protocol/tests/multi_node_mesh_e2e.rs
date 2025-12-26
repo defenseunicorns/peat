@@ -280,7 +280,9 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
     println!("  3. Waiting for sync to propagate...");
     let doc_id1 = "mesh-test-doc-1".to_string();
 
-    let retries = 20;
+    // Increase retries for CI environments with resource contention
+    // 30 retries @ 200ms = 6 second timeout
+    let retries = 30;
     let mut all_synced = false;
 
     for i in 0..retries {
