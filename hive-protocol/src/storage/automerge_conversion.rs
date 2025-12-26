@@ -150,6 +150,64 @@ pub fn automerge_to_message<M: DeserializeOwned>(doc: &Automerge) -> Result<M> {
     Ok(message)
 }
 
+/// Check if an Automerge document has a specific field at the root level.
+///
+/// This is useful for checking document completeness during Automerge incremental sync.
+/// When a document is partially synced, required fields may not yet be present.
+///
+/// # Arguments
+/// * `doc` - The Automerge document to check
+/// * `field_name` - The name of the field to check for
+///
+/// # Returns
+/// `true` if the field exists and has a non-empty/non-zero value, `false` otherwise.
+#[cfg(feature = "automerge-backend")]
+pub fn document_has_field(doc: &Automerge, field_name: &str) -> bool {
+    use automerge::Value;
+
+    if let Ok(Some((value, _))) = doc.get(ROOT, field_name) {
+        match value {
+            Value::Scalar(scalar) => match scalar.as_ref() {
+                automerge::ScalarValue::Str(s) => !s.is_empty(),
+                automerge::ScalarValue::Bytes(b) => !b.is_empty(),
+                automerge::ScalarValue::Int(i) => *i != 0,
+                automerge::ScalarValue::Uint(u) => *u != 0,
+                automerge::ScalarValue::F64(f) => *f != 0.0,
+                automerge::ScalarValue::Boolean(b) => *b,
+                automerge::ScalarValue::Null => false,
+                _ => true, // Counter, Timestamp, etc. - consider present
+            },
+            Value::Object(_) => true, // Maps and Lists are considered present
+        }
+    } else {
+        false
+    }
+}
+
+/// Try to convert Automerge document to message, returning None if required field is missing.
+///
+/// This is safer than `automerge_to_message` when dealing with partially synced documents.
+/// Use this for documents fetched from Automerge that may be incomplete due to incremental sync.
+///
+/// # Arguments
+/// * `doc` - The Automerge document
+/// * `required_field` - The field that must be present for the document to be considered complete
+///
+/// # Returns
+/// `Ok(Some(message))` if document is complete and deserializable,
+/// `Ok(None)` if the required field is missing (incomplete sync),
+/// `Err(...)` if the field is present but deserialization fails for other reasons.
+#[cfg(feature = "automerge-backend")]
+pub fn automerge_to_message_if_complete<M: DeserializeOwned>(
+    doc: &Automerge,
+    required_field: &str,
+) -> Result<Option<M>> {
+    if !document_has_field(doc, required_field) {
+        return Ok(None);
+    }
+    automerge_to_message(doc).map(Some)
+}
+
 /// Helper: Populate Automerge object from JSON value
 #[cfg(feature = "automerge-backend")]
 fn populate_from_json<T: Transactable>(
@@ -401,4 +459,58 @@ mod tests {
     // TODO: Re-add test_sync_after_conversion in Phase 4 (Sync Protocol)
     // This test requires InMemorySyncEngine which will be implemented
     // as part of the Automerge sync protocol integration.
+
+    #[test]
+    fn test_document_has_field() {
+        use crate::storage::automerge_conversion::document_has_field;
+
+        // Create a complete document
+        let cell = CellState {
+            leader_id: Some("leader-1".to_string()),
+            members: vec!["node-1".to_string()],
+            ..Default::default()
+        };
+
+        let doc = cell_state_to_automerge(&cell).expect("Failed to create document");
+
+        // Check for existing fields
+        assert!(document_has_field(&doc, "leader_id"));
+        assert!(document_has_field(&doc, "members"));
+
+        // Check for missing/empty fields (protobuf defaults)
+        assert!(!document_has_field(&doc, "nonexistent_field"));
+    }
+
+    #[test]
+    fn test_partial_document_handling() {
+        use crate::storage::automerge_conversion::{
+            automerge_to_message_if_complete, message_to_automerge,
+        };
+        use hive_schema::hierarchy::v1::PlatoonSummary;
+
+        // Create an empty document (simulates partial sync)
+        let empty_doc = Automerge::new();
+
+        // Should return None for incomplete document
+        let result: Result<Option<PlatoonSummary>> =
+            automerge_to_message_if_complete(&empty_doc, "platoon_id");
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+
+        // Create a complete document
+        let summary = PlatoonSummary {
+            platoon_id: "platoon-1".to_string(),
+            leader_id: "leader-1".to_string(),
+            ..Default::default()
+        };
+
+        let complete_doc = message_to_automerge(&summary).expect("Failed to create document");
+
+        // Should return Some for complete document
+        let result: Result<Option<PlatoonSummary>> =
+            automerge_to_message_if_complete(&complete_doc, "platoon_id");
+        assert!(result.is_ok());
+        let restored = result.unwrap().expect("Should have value");
+        assert_eq!(restored.platoon_id, "platoon-1");
+    }
 }
