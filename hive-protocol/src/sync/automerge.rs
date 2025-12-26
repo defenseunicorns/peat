@@ -2153,6 +2153,7 @@ impl PeerDiscovery for IrohPeerDiscovery {
 
             tokio::spawn(async move {
                 use crate::network::formation_handshake::perform_initiator_handshake;
+                use crate::network::iroh_transport::TransportPeerEvent;
                 use crate::network::PeerInfo as NetworkPeerInfo;
 
                 tracing::info!(
@@ -2160,12 +2161,47 @@ impl PeerDiscovery for IrohPeerDiscovery {
                     max_connections
                 );
 
+                // Subscribe to peer events for immediate reconnection on disconnect (Issue #504)
+                let mut peer_events = transport.subscribe_peer_events();
+
                 // Adaptive interval: start fast (1s), slow down once mesh is stable (up to 5s)
                 let mut interval_secs = 1u64;
                 let mut consecutive_no_new_connections = 0u32;
 
                 loop {
-                    tokio::time::sleep(std::time::Duration::from_secs(interval_secs)).await;
+                    // Issue #504: Use select! to react immediately to disconnect events
+                    // instead of waiting up to 5 seconds for the next polling cycle
+                    let sleep_future =
+                        tokio::time::sleep(std::time::Duration::from_secs(interval_secs));
+                    tokio::pin!(sleep_future);
+
+                    tokio::select! {
+                        _ = &mut sleep_future => {
+                            // Normal timeout - continue with connection cycle
+                        }
+                        event = peer_events.recv() => {
+                            match event {
+                                Some(TransportPeerEvent::Disconnected { endpoint_id, reason }) => {
+                                    tracing::debug!(
+                                        peer = %endpoint_id.fmt_short(),
+                                        reason = %reason,
+                                        "Peer disconnected - triggering immediate reconnection attempt"
+                                    );
+                                    // Reset to fast polling for quick recovery
+                                    interval_secs = 1;
+                                    consecutive_no_new_connections = 0;
+                                }
+                                Some(TransportPeerEvent::Connected { .. }) => {
+                                    // New connection - continue normally
+                                }
+                                None => {
+                                    // Channel closed, exit the loop
+                                    tracing::debug!("Peer event channel closed, stopping connection manager");
+                                    break;
+                                }
+                            }
+                        }
+                    }
 
                     // Check current connection count
                     let current_connections = transport.connected_peers().len();
