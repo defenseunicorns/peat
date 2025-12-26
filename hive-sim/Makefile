@@ -2,7 +2,7 @@
 # Simple interface for running network simulations and tests
 
 .PHONY: help build clean deploy destroy lab4-24 lab4-48 lab4-96 lab4-384 lab4-start lab4-status lab4-metrics lab4-results lab4-watch lab4-experiment lab4-single lab4-analyze lab4-save-logs lab4-destroy
-.PHONY: lab5-packet-loss lab5a-sweep lab5a-collect-latency lab5a-report lab5-intermittent lab5b-sweep lab5b-report lab5-churn lab5-knockout lab5-leader-kill lab5-partition lab5-blackout lab5-all lab5-status lab5-inject lab5-recover lab5-recovery-time lab5-verify-consistency lab5-report
+.PHONY: lab5-packet-loss lab5a-sweep lab5a-collect-latency lab5a-report lab5-intermittent lab5b-sweep lab5b-report lab5-churn lab5c-sweep lab5c-report lab5-knockout lab5-leader-kill lab5-partition lab5-blackout lab5-all lab5-status lab5-inject lab5-recover lab5-recovery-time lab5-verify-consistency lab5-report
 
 # Default target
 .DEFAULT_GOAL := help
@@ -262,6 +262,26 @@ lab4-96: ## Deploy Lab 4 with 96 nodes (BACKEND=automerge, BANDWIDTH=1gbps by de
 	@echo ""
 	@echo "✓ Lab 4 (96 nodes) deployed. Monitor with: make lab4-status"
 
+lab4-192: ## Deploy Lab 4 with 192 nodes (BACKEND=automerge, BANDWIDTH=1gbps by default)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 4: 192 nodes (BACKEND=$${BACKEND:-automerge}, BW=$${BANDWIDTH:-1gbps})║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@if [ ! -f ../.env ]; then \
+		echo "ERROR: ../.env file required with HIVE_APP_ID, HIVE_SECRET_KEY"; \
+		exit 1; \
+	fi
+	@TOPO="topologies/lab4-192n-$${BANDWIDTH:-1gbps}.yaml"; \
+	if [ ! -f "$$TOPO" ]; then \
+		echo "Generating topology: $$TOPO"; \
+		python3 generate-lab4-hierarchical-topology.py --nodes 192 --bandwidth $${BANDWIDTH:-1gbps} --output "$$TOPO" --name lab4-192n; \
+	fi; \
+	set -a && . ../.env && set +a && \
+		BACKEND=$${BACKEND:-automerge} \
+		CAP_IN_MEMORY=$${CAP_IN_MEMORY:-true} \
+		containerlab deploy -t "$$TOPO" --reconfigure --timeout 8m
+	@echo ""
+	@echo "✓ Lab 4 (192 nodes) deployed. Monitor with: make lab4-status"
+
 lab4-384: ## Deploy Lab 4 with 384 nodes (BACKEND=automerge, BANDWIDTH=1gbps by default)
 	@echo "╔════════════════════════════════════════════════════════════╗"
 	@echo "║  Lab 4: 384 nodes (BACKEND=$${BACKEND:-automerge}, BW=$${BANDWIDTH:-1gbps})║"
@@ -420,7 +440,10 @@ lab4-destroy: ## Destroy Lab 4 deployment
 	-containerlab destroy -t topologies/lab4-24n-$${BANDWIDTH:-1gbps}.yaml --cleanup 2>/dev/null || true
 	-containerlab destroy -t topologies/lab4-48n-$${BANDWIDTH:-1gbps}.yaml --cleanup 2>/dev/null || true
 	-containerlab destroy -t topologies/lab4-96n-$${BANDWIDTH:-1gbps}.yaml --cleanup 2>/dev/null || true
+	-containerlab destroy -t topologies/lab4-192n-$${BANDWIDTH:-1gbps}.yaml --cleanup 2>/dev/null || true
 	-containerlab destroy -t topologies/lab4-384n-$${BANDWIDTH:-1gbps}.yaml --cleanup 2>/dev/null || true
+	@# Also clean up any orphaned containers
+	-docker ps -a --filter "name=clab-lab4" -q | xargs -r docker rm -f 2>/dev/null || true
 	-docker network prune -f 2>/dev/null || true
 	@echo "✓ Lab 4 destroyed"
 
@@ -683,13 +706,134 @@ lab5-churn: ## Lab 5c: Simulate node churn (RATE=1 node every 10s)
 	@echo "╔════════════════════════════════════════════════════════════╗"
 	@echo "║  Lab 5c: Node Churn Simulation                             ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
-	@CONTAINERS=$$(docker ps --filter "name=clab-lab4" --format '{{.Names}}' | wc -l); \
+	@CONTAINERS=$$(docker ps --filter "name=clab-" --format '{{.Names}}' | wc -l); \
 	if [ "$$CONTAINERS" -eq 0 ]; then \
-		echo "ERROR: No Lab 4 deployment found. Run 'make lab4-96' first."; \
+		echo "ERROR: No deployment found. Run 'make lab4-96' first."; \
 		exit 1; \
 	fi
 	@echo "Starting node churn simulation..."
 	@./chaos-inject.sh churn --rate $${RATE:-10}
+
+lab5c-sweep: ## Lab 5c: Run node churn sweep (5%, 10%, 20% of soldiers killed/restarted)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 5c: Node Churn Sweep (5%, 10%, 20%)                   ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@CONTAINERS=$$(docker ps --filter "name=clab-" --format '{{.Names}}' | wc -l); \
+	if [ "$$CONTAINERS" -eq 0 ]; then \
+		echo "ERROR: No deployment found. Run 'make lab4-96' first."; \
+		exit 1; \
+	fi
+	@RESULTS_DIR="/tmp/lab5c-sweep-$$(date +%Y%m%d-%H%M%S)"; \
+	mkdir -p "$$RESULTS_DIR"; \
+	echo "Results: $$RESULTS_DIR"; \
+	echo "churn_pct,nodes_killed,rejoin_ms,consistency,status" > "$$RESULTS_DIR/churn.csv"; \
+	SOLDIERS=$$(docker ps --filter "name=clab-" --format '{{.Names}}' | grep "soldier" | grep -v "leader"); \
+	TOTAL_SOLDIERS=$$(echo "$$SOLDIERS" | wc -l); \
+	echo "Total soldiers: $$TOTAL_SOLDIERS"; \
+	echo ""; \
+	for PCT in 5 10 20; do \
+		echo "Testing $${PCT}% churn..."; \
+		KILL_COUNT=$$((TOTAL_SOLDIERS * PCT / 100)); \
+		if [ "$$KILL_COUNT" -lt 1 ]; then KILL_COUNT=1; fi; \
+		echo "  Killing $$KILL_COUNT soldiers..."; \
+		VICTIMS=$$(echo "$$SOLDIERS" | shuf -n $$KILL_COUNT); \
+		TS_KILL=$$(date +%s%3N); \
+		echo "{\"type\":\"inject\",\"mode\":\"churn\",\"timestamp_ms\":$$TS_KILL,\"details\":{\"pct\":$$PCT,\"count\":$$KILL_COUNT}}" >> /tmp/lab5-chaos-events.jsonl; \
+		for victim in $$VICTIMS; do \
+			docker kill --signal=SIGKILL "$$victim" 2>/dev/null || true; \
+		done; \
+		echo "  Waiting for containers to restart..."; \
+		sleep 10; \
+		for victim in $$VICTIMS; do \
+			docker start "$$victim" 2>/dev/null || true; \
+		done; \
+		TS_RESTART=$$(date +%s%3N); \
+		echo "  Monitoring for rejoin..."; \
+		REJOIN_MS=0; \
+		LEADER=$$(docker ps --filter "name=clab-" --format '{{.Names}}' | grep -E "squad.*leader" | head -1); \
+		BASELINE=$$(docker logs "$$LEADER" 2>&1 | grep -c "AggregationCompleted" || echo 0); \
+		for i in $$(seq 1 60); do \
+			sleep 1; \
+			CURRENT=$$(docker logs "$$LEADER" 2>&1 | grep -c "AggregationCompleted" || echo 0); \
+			if [ "$$CURRENT" -gt "$$BASELINE" ]; then \
+				TS_REJOIN=$$(date +%s%3N); \
+				REJOIN_MS=$$((TS_REJOIN - TS_RESTART)); \
+				echo "  Nodes rejoined after $${REJOIN_MS}ms"; \
+				break; \
+			fi; \
+		done; \
+		if [ "$$REJOIN_MS" -eq 0 ]; then \
+			REJOIN_MS=60000; \
+			echo "  No rejoin detected within 60s"; \
+		fi; \
+		echo "{\"type\":\"recover\",\"mode\":\"churn\",\"timestamp_ms\":$$(date +%s%3N),\"details\":{\"rejoin_ms\":$$REJOIN_MS}}" >> /tmp/lab5-chaos-events.jsonl; \
+		echo "  Verifying convergence..."; \
+		sleep 5; \
+		DOC_COUNTS=""; \
+		for leader in $$(docker ps --filter "name=clab-" --format '{{.Names}}' | grep -E "squad.*leader" | head -4); do \
+			COUNT=$$(docker logs "$$leader" 2>&1 | grep "AggregationCompleted" | tail -1 | grep -oP '"input_count":\K[0-9]+' || echo 0); \
+			DOC_COUNTS="$$DOC_COUNTS $$COUNT"; \
+		done; \
+		UNIQUE=$$(echo $$DOC_COUNTS | tr ' ' '\n' | sort -u | grep -v '^$$' | wc -l); \
+		if [ "$$UNIQUE" -le 1 ] && [ -n "$$DOC_COUNTS" ]; then \
+			CONVERGED="CONVERGED"; \
+		else \
+			CONVERGED="DIVERGED"; \
+		fi; \
+		echo "  Squad counts:$$DOC_COUNTS ($$CONVERGED)"; \
+		if [ $$REJOIN_MS -lt 30000 ]; then \
+			STATUS="PASS"; \
+		else \
+			STATUS="FAIL"; \
+		fi; \
+		echo "$$PCT,$$KILL_COUNT,$$REJOIN_MS,$$CONVERGED,$$STATUS" >> "$$RESULTS_DIR/churn.csv"; \
+		echo "  $${PCT}% churn: Rejoin=$${REJOIN_MS}ms Consistency=$$CONVERGED $$STATUS"; \
+		echo ""; \
+		sleep 10; \
+	done; \
+	echo "╔════════════════════════════════════════════════════════════╗"; \
+	echo "║  Lab 5c Sweep Complete                                     ║"; \
+	echo "╚════════════════════════════════════════════════════════════╝"; \
+	echo ""; \
+	cat "$$RESULTS_DIR/churn.csv"; \
+	echo ""; \
+	echo "Results saved to: $$RESULTS_DIR"
+
+lab5c-report: ## Lab 5c: Generate node churn analysis report
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Lab 5c: Node Churn Analysis                               ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@LATEST=$$(ls -td /tmp/lab5c-sweep-* 2>/dev/null | head -1); \
+	if [ -z "$$LATEST" ] || [ ! -f "$$LATEST/churn.csv" ]; then \
+		echo "ERROR: No Lab 5c results found. Run 'make lab5c-sweep' first."; \
+		exit 1; \
+	fi; \
+	echo ""; \
+	echo "Results from: $$LATEST"; \
+	echo ""; \
+	echo "=== Rejoin Time vs Churn Rate ==="; \
+	echo ""; \
+	printf "%-10s %-12s %-12s %-12s %-10s\n" "Churn%" "Killed" "Rejoin" "Consistency" "Status"; \
+	echo "------------------------------------------------------------"; \
+	tail -n +2 "$$LATEST/churn.csv" | while IFS=, read -r pct killed rejoin consist status; do \
+		printf "%-10s %-12s %-12s %-12s %-10s\n" "$${pct}%" "$$killed" "$${rejoin}ms" "$$consist" "$$status"; \
+	done; \
+	echo ""; \
+	echo "=== Success Criteria (Epic #471) ==="; \
+	echo ""; \
+	PASSED=$$(tail -n +2 "$$LATEST/churn.csv" | grep -c ",PASS$$" || echo 0); \
+	TOTAL=$$(tail -n +2 "$$LATEST/churn.csv" | wc -l); \
+	if [ "$$PASSED" -eq "$$TOTAL" ] && [ "$$TOTAL" -gt 0 ]; then \
+		echo "[PASS] All rejoin times < 30s ($$PASSED/$$TOTAL tests)"; \
+	else \
+		echo "[FAIL] Some rejoin times >= 30s ($$PASSED/$$TOTAL passed)"; \
+	fi; \
+	CONSISTENT=$$(tail -n +2 "$$LATEST/churn.csv" | grep -c ",CONVERGED," || echo 0); \
+	if [ "$$CONSISTENT" -eq "$$TOTAL" ] && [ "$$TOTAL" -gt 0 ]; then \
+		echo "[PASS] CRDT consistency maintained ($$CONSISTENT/$$TOTAL)"; \
+	else \
+		echo "[WARN] Some consistency issues ($$CONSISTENT/$$TOTAL converged)"; \
+	fi
 
 lab5-knockout: ## Lab 5d: Kill random soldier node (TARGET=soldier)
 	@echo "╔════════════════════════════════════════════════════════════╗"
