@@ -2764,24 +2764,55 @@ async fn connect_to_automerge_peers(
         node_id, tcp_connect
     );
 
-    // Parse: "peer_name|hostname:port,peer_name2|hostname2:port2,..."
+    // Parse TCP_CONNECT in two formats:
+    // 1. Explicit: "peer_name|hostname:port" (Automerge-specific)
+    // 2. Containerlab: "clab-{topo}-{node}:port" (unified topology)
+    // For containerlab format, extract node name from container name
     for peer_spec in tcp_connect.split(',') {
         let peer_spec = peer_spec.trim();
         if peer_spec.is_empty() {
             continue;
         }
 
-        let parts: Vec<&str> = peer_spec.splitn(2, '|').collect();
-        if parts.len() != 2 {
-            eprintln!(
-                "[{}] Invalid peer spec (expected 'name|address'): {}",
-                node_id, peer_spec
-            );
-            continue;
-        }
+        let (peer_name, peer_addr): (String, &str) = if peer_spec.contains('|') {
+            // Explicit format: "peer_name|hostname:port"
+            let parts: Vec<&str> = peer_spec.splitn(2, '|').collect();
+            if parts.len() != 2 {
+                eprintln!(
+                    "[{}] Invalid peer spec (expected 'name|address'): {}",
+                    node_id, peer_spec
+                );
+                continue;
+            }
+            (parts[0].to_string(), parts[1])
+        } else {
+            // Containerlab format: "clab-{topo}-{node}:port"
+            // Extract node name from container hostname
+            let addr_parts: Vec<&str> = peer_spec.splitn(2, ':').collect();
+            if addr_parts.len() != 2 {
+                eprintln!(
+                    "[{}] Invalid peer spec (expected 'hostname:port'): {}",
+                    node_id, peer_spec
+                );
+                continue;
+            }
+            let hostname = addr_parts[0];
+            // Container names: clab-{topology}-{node}
+            // Extract node name by stripping "clab-{topology}-" prefix
+            // The topology name ends before the first occurrence of "company-", "platoon-", "squad-", or "soldier-"
+            let node_name = if let Some(idx) = hostname.find("company-") {
+                &hostname[idx..]
+            } else {
+                eprintln!(
+                    "[{}] Cannot extract node name from containerlab hostname: {}",
+                    node_id, hostname
+                );
+                continue;
+            };
+            (node_name.to_string(), peer_spec)
+        };
 
-        let peer_name = parts[0];
-        let peer_addr = parts[1];
+        let peer_name = peer_name.as_str();
 
         // Skip connecting to self
         if peer_name == node_id {
