@@ -48,6 +48,10 @@ pub mod embedded;
 #[cfg(feature = "esp32")]
 pub mod esp32;
 
+// Mock adapter for testing (always available in std builds)
+#[cfg(feature = "std")]
+pub mod mock;
+
 /// Discovered BLE device
 #[derive(Debug, Clone)]
 pub struct DiscoveredDevice {

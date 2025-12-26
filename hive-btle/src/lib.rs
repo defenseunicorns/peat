@@ -93,11 +93,15 @@ pub mod document;
 pub mod document_sync;
 pub mod error;
 pub mod gatt;
+#[cfg(feature = "std")]
+pub mod gossip;
 pub mod hive_mesh;
 pub mod mesh;
 pub mod observer;
 pub mod peer;
 pub mod peer_manager;
+#[cfg(feature = "std")]
+pub mod persistence;
 pub mod phy;
 pub mod platform;
 pub mod power;
@@ -134,6 +138,12 @@ pub use observer::{CollectingObserver, ObserverManager};
 pub use observer::{DisconnectReason as HiveDisconnectReason, HiveEvent, HiveObserver};
 pub use peer::{HivePeer, PeerManagerConfig, SignalStrength};
 pub use peer_manager::PeerManager;
+
+// Gossip and persistence abstractions
+#[cfg(feature = "std")]
+pub use gossip::{BroadcastAll, EmergencyAware, GossipStrategy, RandomFanout, SignalBasedFanout};
+#[cfg(feature = "std")]
+pub use persistence::{DocumentStore, FileStore, MemoryStore, SharedStore};
 
 /// HIVE BLE Service UUID (128-bit)
 ///
