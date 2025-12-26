@@ -17,7 +17,9 @@ import com.atakmap.android.maps.MapView
 import com.atakmap.coremap.log.Log
 import com.revolveteam.atak.hive.model.HiveCell
 import com.revolveteam.atak.hive.model.HivePlatform
+import com.revolveteam.atak.hive.model.HiveRole
 import com.revolveteam.atak.hive.model.HiveTrack
+import com.revolveteam.atak.hive.model.CommsQuality
 
 /**
  * HIVE DropDown Receiver
@@ -42,6 +44,12 @@ class HiveDropDownReceiver(
     private val handler = Handler(Looper.getMainLooper())
     private var currentScrollView: ScrollView? = null
     private var isDropDownVisible = false
+
+    // Platform detail view state
+    private var selectedPlatform: HivePlatform? = null
+
+    // User's role in the hierarchy (for PoC, using default role)
+    private var userRole: HiveRole = HiveRole.defaultRole()
 
     init {
         // Register for peer events
@@ -121,6 +129,11 @@ class HiveDropDownReceiver(
     }
 
     private fun buildContentContainer(): LinearLayout {
+        // If a platform is selected, show detail view
+        selectedPlatform?.let { platform ->
+            return buildPlatformDetailView(platform)
+        }
+
         val selectedCellId = mapComponent.selectedCellId
         val selectedCellName = mapComponent.selectedCellName
 
@@ -174,6 +187,16 @@ class HiveDropDownReceiver(
         header.addView(status)
         container.addView(header)
 
+        // Role indicator (only in main view)
+        if (selectedCellId == null) {
+            val roleRow = TextView(pluginContext).apply {
+                text = "Role: ${userRole.toDisplayString()} • ${userRole.unitName.ifEmpty { userRole.unitId }}"
+                textSize = 11f
+                setTextColor(Color.parseColor("#666666"))
+            }
+            container.addView(roleRow)
+        }
+
         // Spacer
         container.addView(createSpacer(24))
 
@@ -181,6 +204,13 @@ class HiveDropDownReceiver(
         if (selectedCellId == null) {
             val pliSection = createPliBroadcastSection()
             container.addView(pliSection)
+            container.addView(createSpacer(24))
+        }
+
+        // Squad Leader Summary (only in main view for leaders)
+        if (selectedCellId == null && userRole.isLeader) {
+            val summarySection = createSquadLeaderSummary()
+            container.addView(summarySection)
             container.addView(createSpacer(24))
         }
 
@@ -418,6 +448,13 @@ class HiveDropDownReceiver(
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#2d2d2d"))
             setPadding(24, 16, 24, 16)
+            // Make card clickable
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                selectedPlatform = platform
+                refreshContent()
+            }
         }
 
         val headerRow = LinearLayout(pluginContext).apply {
@@ -462,7 +499,291 @@ class HiveDropDownReceiver(
             card.addView(caps)
         }
 
+        // Tap hint
+        val tapHint = TextView(pluginContext).apply {
+            text = "Tap for details →"
+            textSize = 10f
+            setTextColor(Color.parseColor("#666666"))
+            gravity = Gravity.END
+        }
+        card.addView(tapHint)
+
         return card
+    }
+
+    /**
+     * Build the platform detail view showing comprehensive platform information
+     */
+    private fun buildPlatformDetailView(platform: HivePlatform): LinearLayout {
+        val container = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(32, 32, 32, 32)
+        }
+
+        // Header with back button
+        val header = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val backButton = Button(pluginContext).apply {
+            text = "←"
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#444444"))
+            setPadding(24, 8, 24, 8)
+            setOnClickListener {
+                selectedPlatform = null
+                refreshContent()
+            }
+        }
+        header.addView(backButton)
+        header.addView(createHorizontalSpacer(16))
+
+        val title = TextView(pluginContext).apply {
+            text = platform.callsign
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        header.addView(title)
+
+        val statusColor = when (platform.status) {
+            HivePlatform.Status.OPERATIONAL -> Color.parseColor("#4CAF50")
+            HivePlatform.Status.DEGRADED -> Color.parseColor("#FFC107")
+            else -> Color.parseColor("#F44336")
+        }
+        val statusBadge = TextView(pluginContext).apply {
+            text = platform.status.name
+            textSize = 12f
+            setTextColor(statusColor)
+        }
+        header.addView(statusBadge)
+        container.addView(header)
+
+        // Subtitle: Platform type
+        val subtitle = TextView(pluginContext).apply {
+            text = "${platform.platformType.name} • ${platform.getStalenessString()}"
+            textSize = 14f
+            setTextColor(Color.GRAY)
+        }
+        container.addView(subtitle)
+        container.addView(createSpacer(24))
+
+        // Position Section
+        container.addView(createSectionTitle("Position"))
+        container.addView(createSpacer(8))
+
+        val positionCard = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#2d2d2d"))
+            setPadding(24, 16, 24, 16)
+        }
+
+        positionCard.addView(createDetailRow("Latitude", String.format("%.6f° N", platform.lat)))
+        positionCard.addView(createDetailRow("Longitude", String.format("%.6f° W", kotlin.math.abs(platform.lon))))
+
+        platform.hae?.let {
+            val accuracy = platform.positionAccuracy?.let { acc -> " (±${acc.toInt()}m)" } ?: ""
+            positionCard.addView(createDetailRow("Altitude", "${it.toInt()}m HAE$accuracy"))
+        }
+
+        container.addView(positionCard)
+        container.addView(createSpacer(16))
+
+        // Motion Section (if available)
+        if (platform.heading != null || platform.speed != null) {
+            container.addView(createSectionTitle("Motion"))
+            container.addView(createSpacer(8))
+
+            val motionCard = LinearLayout(pluginContext).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundColor(Color.parseColor("#2d2d2d"))
+                setPadding(24, 16, 24, 16)
+            }
+
+            platform.heading?.let {
+                motionCard.addView(createDetailRow("Heading", "${it.toInt()}°"))
+            }
+            platform.speed?.let {
+                motionCard.addView(createDetailRow("Speed", String.format("%.1f m/s", it)))
+            }
+            platform.course?.let {
+                motionCard.addView(createDetailRow("Course", "${it.toInt()}°"))
+            }
+            platform.verticalSpeed?.let {
+                motionCard.addView(createDetailRow("Vertical Speed", String.format("%.1f m/s", it)))
+            }
+
+            container.addView(motionCard)
+            container.addView(createSpacer(16))
+        }
+
+        // Status Section
+        container.addView(createSectionTitle("Status"))
+        container.addView(createSpacer(8))
+
+        val statusCard = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#2d2d2d"))
+            setPadding(24, 16, 24, 16)
+        }
+
+        // Battery with progress bar
+        platform.batteryPercent?.let { battery ->
+            val batteryRow = LinearLayout(pluginContext).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            val batteryLabel = TextView(pluginContext).apply {
+                text = "Battery: $battery%"
+                textSize = 12f
+                setTextColor(Color.WHITE)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            batteryRow.addView(batteryLabel)
+
+            // Simple text-based progress bar
+            val progressText = TextView(pluginContext).apply {
+                val filled = (battery / 10)
+                val empty = 10 - filled
+                text = "█".repeat(filled) + "░".repeat(empty)
+                textSize = 10f
+                val batteryColor = when {
+                    battery > 50 -> Color.parseColor("#4CAF50")
+                    battery > 20 -> Color.parseColor("#FFC107")
+                    else -> Color.parseColor("#F44336")
+                }
+                setTextColor(batteryColor)
+            }
+            batteryRow.addView(progressText)
+            statusCard.addView(batteryRow)
+        } ?: run {
+            statusCard.addView(createDetailRow("Battery", "N/A"))
+        }
+
+        // Comms quality
+        val commsText = platform.commsQuality?.name ?: "UNKNOWN"
+        val commsColor = when (platform.commsQuality) {
+            CommsQuality.EXCELLENT, CommsQuality.GOOD -> Color.parseColor("#4CAF50")
+            CommsQuality.DEGRADED -> Color.parseColor("#FFC107")
+            CommsQuality.POOR, CommsQuality.LOST -> Color.parseColor("#F44336")
+            null -> Color.GRAY
+        }
+        statusCard.addView(createDetailRow("Comms", commsText, commsColor))
+
+        // Sensors
+        platform.sensorStatus?.forEach { (sensor, status) ->
+            val sensorColor = when (status) {
+                com.revolveteam.atak.hive.model.SensorStatus.ACTIVE -> Color.parseColor("#4CAF50")
+                com.revolveteam.atak.hive.model.SensorStatus.IDLE -> Color.parseColor("#2196F3")
+                com.revolveteam.atak.hive.model.SensorStatus.DEGRADED -> Color.parseColor("#FFC107")
+                com.revolveteam.atak.hive.model.SensorStatus.OFFLINE -> Color.parseColor("#F44336")
+                com.revolveteam.atak.hive.model.SensorStatus.UNKNOWN -> Color.GRAY
+            }
+            statusCard.addView(createDetailRow(sensor, status.name, sensorColor))
+        }
+
+        container.addView(statusCard)
+        container.addView(createSpacer(16))
+
+        // Mission Section (if available)
+        if (platform.currentTask != null || platform.missionId != null) {
+            container.addView(createSectionTitle("Mission"))
+            container.addView(createSpacer(8))
+
+            val missionCard = LinearLayout(pluginContext).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundColor(Color.parseColor("#2d2d2d"))
+                setPadding(24, 16, 24, 16)
+            }
+
+            platform.currentTask?.let {
+                missionCard.addView(createDetailRow("Task", it))
+            }
+            platform.missionId?.let {
+                missionCard.addView(createDetailRow("Mission ID", it))
+            }
+
+            container.addView(missionCard)
+            container.addView(createSpacer(16))
+        }
+
+        // Capabilities Section
+        if (platform.capabilities.isNotEmpty()) {
+            container.addView(createSectionTitle("Capabilities"))
+            container.addView(createSpacer(8))
+
+            val capsCard = LinearLayout(pluginContext).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundColor(Color.parseColor("#2d2d2d"))
+                setPadding(24, 16, 24, 16)
+            }
+
+            val capsText = TextView(pluginContext).apply {
+                text = platform.capabilities.joinToString(" • ")
+                textSize = 12f
+                setTextColor(Color.parseColor("#888888"))
+            }
+            capsCard.addView(capsText)
+
+            container.addView(capsCard)
+            container.addView(createSpacer(16))
+        }
+
+        // Action Buttons
+        container.addView(createSpacer(8))
+        val buttonRow = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+
+        val focusButton = Button(pluginContext).apply {
+            text = "Focus on Map"
+            textSize = 12f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#2196F3"))
+            setPadding(32, 16, 32, 16)
+            setOnClickListener {
+                // TODO: Center map on platform location
+                Log.d(TAG, "Focus on platform: ${platform.callsign} at ${platform.lat}, ${platform.lon}")
+            }
+        }
+        buttonRow.addView(focusButton)
+
+        container.addView(buttonRow)
+
+        return container
+    }
+
+    private fun createSectionTitle(title: String): TextView {
+        return TextView(pluginContext).apply {
+            text = title
+            textSize = 14f
+            setTextColor(Color.WHITE)
+        }
+    }
+
+    private fun createDetailRow(label: String, value: String, valueColor: Int = Color.GRAY): LinearLayout {
+        return LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 4, 0, 4)
+
+            val labelView = TextView(pluginContext).apply {
+                text = "$label:"
+                textSize = 12f
+                setTextColor(Color.parseColor("#888888"))
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            addView(labelView)
+
+            val valueView = TextView(pluginContext).apply {
+                text = value
+                textSize = 12f
+                setTextColor(valueColor)
+            }
+            addView(valueView)
+        }
     }
 
     private fun createInfoCard(): View {
@@ -603,6 +924,156 @@ class HiveDropDownReceiver(
             setTextColor(statusColor)
         }
         card.addView(statusText)
+
+        section.addView(card)
+        return section
+    }
+
+    /**
+     * Create the squad leader summary view showing aggregated squad information
+     */
+    private fun createSquadLeaderSummary(): View {
+        val section = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        // Title with role indicator
+        val titleRow = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val title = TextView(pluginContext).apply {
+            text = "${userRole.unitName.ifEmpty { "Squad" }} Summary"
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        titleRow.addView(title)
+
+        val roleIndicator = TextView(pluginContext).apply {
+            text = userRole.toDisplayString()
+            textSize = 11f
+            setTextColor(Color.parseColor("#2196F3"))
+        }
+        titleRow.addView(roleIndicator)
+        section.addView(titleRow)
+        section.addView(createSpacer(12))
+
+        // Summary card
+        val card = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#2d2d2d"))
+            setPadding(24, 16, 24, 16)
+        }
+
+        // Get platforms in user's unit
+        val unitPlatforms = mapComponent.platforms.filter { platform ->
+            platform.cellId == userRole.unitId || userRole.unitId.isEmpty()
+        }
+
+        // Platform count by status
+        val operational = unitPlatforms.count { it.status == HivePlatform.Status.OPERATIONAL }
+        val degraded = unitPlatforms.count { it.status == HivePlatform.Status.DEGRADED }
+        val offline = unitPlatforms.count {
+            it.status == HivePlatform.Status.OFFLINE ||
+            it.status == HivePlatform.Status.LOST_COMMS
+        }
+
+        val platformsHeader = TextView(pluginContext).apply {
+            text = "Platforms: ${unitPlatforms.size} total"
+            textSize = 13f
+            setTextColor(Color.WHITE)
+        }
+        card.addView(platformsHeader)
+
+        // Status breakdown
+        val statusRow = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 8, 0, 8)
+        }
+
+        if (operational > 0) {
+            val opText = TextView(pluginContext).apply {
+                text = "● $operational Operational  "
+                textSize = 11f
+                setTextColor(Color.parseColor("#4CAF50"))
+            }
+            statusRow.addView(opText)
+        }
+        if (degraded > 0) {
+            val degText = TextView(pluginContext).apply {
+                text = "● $degraded Degraded  "
+                textSize = 11f
+                setTextColor(Color.parseColor("#FFC107"))
+            }
+            statusRow.addView(degText)
+        }
+        if (offline > 0) {
+            val offText = TextView(pluginContext).apply {
+                text = "● $offline Offline"
+                textSize = 11f
+                setTextColor(Color.parseColor("#F44336"))
+            }
+            statusRow.addView(offText)
+        }
+        card.addView(statusRow)
+        card.addView(createSpacer(8))
+
+        // Aggregated capabilities
+        val allCaps = unitPlatforms.flatMap { it.capabilities }.groupingBy { it }.eachCount()
+        if (allCaps.isNotEmpty()) {
+            val capsTitle = TextView(pluginContext).apply {
+                text = "Capabilities"
+                textSize = 12f
+                setTextColor(Color.parseColor("#888888"))
+            }
+            card.addView(capsTitle)
+
+            val capsText = TextView(pluginContext).apply {
+                text = allCaps.entries.joinToString("  ") { (cap, count) -> "✓ $cap ($count)" }
+                textSize = 11f
+                setTextColor(Color.parseColor("#4CAF50"))
+            }
+            card.addView(capsText)
+            card.addView(createSpacer(8))
+        }
+
+        // Geographic spread (if platforms have positions)
+        if (unitPlatforms.size >= 2) {
+            val lats = unitPlatforms.map { it.lat }
+            val lons = unitPlatforms.map { it.lon }
+            val latSpread = (lats.maxOrNull()!! - lats.minOrNull()!!) * 111_000 // meters
+            val lonSpread = (lons.maxOrNull()!! - lons.minOrNull()!!) * 111_000 * kotlin.math.cos(Math.toRadians(lats.average()))
+
+            val spreadText = TextView(pluginContext).apply {
+                text = "Spread: ${latSpread.toInt()}m × ${lonSpread.toInt()}m"
+                textSize = 11f
+                setTextColor(Color.parseColor("#888888"))
+            }
+            card.addView(spreadText)
+            card.addView(createSpacer(8))
+        }
+
+        // Comms health
+        val commsKnown = unitPlatforms.filter { it.commsQuality != null }
+        if (commsKnown.isNotEmpty()) {
+            val goodComms = commsKnown.count {
+                it.commsQuality == CommsQuality.EXCELLENT || it.commsQuality == CommsQuality.GOOD
+            }
+            val healthPercent = (goodComms * 100) / commsKnown.size
+            val healthColor = when {
+                healthPercent >= 80 -> Color.parseColor("#4CAF50")
+                healthPercent >= 50 -> Color.parseColor("#FFC107")
+                else -> Color.parseColor("#F44336")
+            }
+            val healthText = TextView(pluginContext).apply {
+                text = "Comms Health: $healthPercent%"
+                textSize = 11f
+                setTextColor(healthColor)
+            }
+            card.addView(healthText)
+        }
 
         section.addView(card)
         return section
