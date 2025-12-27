@@ -95,10 +95,12 @@ if [ -n "$ARG_BACKEND" ]; then
     BACKENDS=("$ARG_BACKEND")
 fi
 if [ -n "$ARG_NODES" ]; then
-    NODE_COUNTS=("$ARG_NODES")
+    # Support comma-separated values: --nodes 24,48,96,384
+    IFS=',' read -ra NODE_COUNTS <<< "$ARG_NODES"
 fi
 if [ -n "$ARG_BANDWIDTH" ]; then
-    BANDWIDTHS=("$ARG_BANDWIDTH")
+    # Support comma-separated values: --bandwidth 1gbps,100mbps
+    IFS=',' read -ra BANDWIDTHS <<< "$ARG_BANDWIDTH"
 fi
 
 # Cleanup function
@@ -196,8 +198,12 @@ setup_backend_credentials() {
         export HIVE_OFFLINE_TOKEN=""
         export HIVE_SHARED_KEY=""
     else
-        # Ditto uses credentials from .env (already loaded in preflight_checks)
-        # HIVE_APP_ID, HIVE_OFFLINE_TOKEN, HIVE_SHARED_KEY should be set
+        # Ditto: reload credentials from .env (may have been overwritten by automerge)
+        if [ -f "../.env" ]; then
+            set -a
+            source ../.env
+            set +a
+        fi
         # Clear Automerge credential
         export HIVE_SECRET_KEY=""
     fi
