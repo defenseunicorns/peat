@@ -150,12 +150,66 @@ preflight_checks() {
     log_success "Pre-flight checks passed"
 }
 
-# Run a single backend test (deploy, run, cleanup)
-run_backend_test() {
+# Deploy topology once (backend-agnostic)
+deploy_topology() {
+    local NODES="$1"
+    local BANDWIDTH="$2"
+    local RESULTS_DIR="$3"
+
+    # Use cached topology (backend-agnostic - uses ${BACKEND} placeholder)
+    local TOPO_CACHE_DIR="${RESULTS_BASE_DIR}/.topo-cache"
+    mkdir -p "${TOPO_CACHE_DIR}"
+    # Don't use 'local' - needs to be exported for reconfigure_and_run_test
+    TOPO_FILE="${TOPO_CACHE_DIR}/lab4-${NODES}n-${BANDWIDTH}.yaml"
+
+    # Generate topology if not cached (backend-agnostic)
+    if [[ ! -f "${TOPO_FILE}" ]]; then
+        log_info "  Generating topology..."
+        python3 generate-lab4-hierarchical-topology.py \
+            --nodes "${NODES}" \
+            --bandwidth "${BANDWIDTH}" \
+            --output "${TOPO_FILE}" || {
+            log_error "Failed to generate topology"
+            return 1
+        }
+    fi
+
+    # Get lab name and expected nodes
+    LAB_NAME=$(grep '^name:' "$TOPO_FILE" | awk '{print $2}')
+    EXPECTED_NODES=$(grep -c "kind: linux" "$TOPO_FILE")
+    echo "$LAB_NAME" > /tmp/lab4-current-lab-name
+
+    # Export for use by reconfigure function
+    export LAB_NAME EXPECTED_NODES TOPO_FILE
+    return 0
+}
+
+# Set up credentials for the specified backend
+setup_backend_credentials() {
+    local BACKEND="$1"
+
+    if [[ "$BACKEND" == "automerge" ]]; then
+        # Automerge uses simple test credentials
+        export HIVE_APP_ID="test-formation"
+        export HIVE_SECRET_KEY="aGl2ZS10ZXN0LWZvcm1hdGlvbi1zZWNyZXQta2V5LTA="
+        # Clear Ditto credentials to avoid confusion
+        export HIVE_OFFLINE_TOKEN=""
+        export HIVE_SHARED_KEY=""
+    else
+        # Ditto uses credentials from .env (already loaded in preflight_checks)
+        # HIVE_APP_ID, HIVE_OFFLINE_TOKEN, HIVE_SHARED_KEY should be set
+        # Clear Automerge credential
+        export HIVE_SECRET_KEY=""
+    fi
+}
+
+# Reconfigure containers with new backend and run test
+reconfigure_and_run_test() {
     local BACKEND="$1"
     local NODES="$2"
     local BANDWIDTH="$3"
     local TIMESTAMP="$4"
+    local IS_FIRST_BACKEND="$5"
 
     local TEST_NAME="lab4-${BACKEND}-${NODES}n-${BANDWIDTH}"
     local RESULTS_DIR="${RESULTS_BASE_DIR}/${TEST_NAME}-${TIMESTAMP}"
@@ -165,50 +219,42 @@ run_backend_test() {
     # Create results directory
     mkdir -p "${RESULTS_DIR}/logs"
 
-    # Use cached topology (cache key includes backend since it's baked into the file)
-    local TOPO_CACHE_DIR="${RESULTS_BASE_DIR}/.topo-cache"
-    mkdir -p "${TOPO_CACHE_DIR}"
-    local TOPO_FILE="${TOPO_CACHE_DIR}/lab4-${BACKEND}-${NODES}n-${BANDWIDTH}.yaml"
-
-    # Generate topology if not cached
-    if [[ ! -f "${TOPO_FILE}" ]]; then
-        log_info "  Generating topology..."
-        python3 generate-lab4-hierarchical-topology.py \
-            --nodes "${NODES}" \
-            --bandwidth "${BANDWIDTH}" \
-            --backend "${BACKEND}" \
-            --output "${TOPO_FILE}" || {
-            log_error "Failed to generate topology"
-            echo "FAIL" > "${RESULTS_DIR}/status.txt"
-            return 1
-        }
-    fi
-
-    # Get lab name and expected nodes
-    local LAB_NAME=$(grep '^name:' "$TOPO_FILE" | awk '{print $2}')
-    local EXPECTED_NODES=$(grep -c "kind: linux" "$TOPO_FILE")
-    echo "$LAB_NAME" > /tmp/lab4-current-lab-name
-
-    log_info "  Deploying ${EXPECTED_NODES} nodes with BACKEND=${BACKEND}..."
-
-    # Track deployment time
-    local DEPLOY_START=$(date +%s.%N)
+    # Set up credentials for this backend
+    setup_backend_credentials "$BACKEND"
 
     # Substitute environment variables in topology file
+    export BACKEND
     local TOPO_RESOLVED="${RESULTS_DIR}/topology-resolved.yaml"
     envsubst < "$TOPO_FILE" > "$TOPO_RESOLVED"
 
-    # Deploy with resolved topology (no timeout - let it complete)
-    if ! containerlab deploy -t "$TOPO_RESOLVED" --reconfigure > "${RESULTS_DIR}/deploy.log" 2>&1; then
-        local DEPLOY_END=$(date +%s.%N)
-        local DEPLOY_DURATION=$(echo "$DEPLOY_END - $DEPLOY_START" | bc)
-        log_error "Deployment failed after ${DEPLOY_DURATION}s"
-        tail -20 "${RESULTS_DIR}/deploy.log" 2>/dev/null || true
-        echo "FAIL" > "${RESULTS_DIR}/status.txt"
-        echo "deploy_duration_secs=${DEPLOY_DURATION}" > "${RESULTS_DIR}/timing.txt"
-        echo "deploy_status=FAILED" >> "${RESULTS_DIR}/timing.txt"
-        docker ps -aq --filter "name=clab-" | xargs -r docker rm -f > /dev/null 2>&1 || true
-        return 1
+    local DEPLOY_START=$(date +%s.%N)
+
+    if [[ "$IS_FIRST_BACKEND" == "true" ]]; then
+        log_info "  Deploying ${EXPECTED_NODES} nodes with BACKEND=${BACKEND}..."
+        # First backend: full deploy with longer timeout for large deployments
+        if ! containerlab deploy -t "$TOPO_RESOLVED" --reconfigure --timeout 15m --max-workers 10 > "${RESULTS_DIR}/deploy.log" 2>&1; then
+            local DEPLOY_END=$(date +%s.%N)
+            local DEPLOY_DURATION=$(echo "$DEPLOY_END - $DEPLOY_START" | bc)
+            log_error "Deployment failed after ${DEPLOY_DURATION}s"
+            tail -20 "${RESULTS_DIR}/deploy.log" 2>/dev/null || true
+            echo "FAIL" > "${RESULTS_DIR}/status.txt"
+            echo "deploy_duration_secs=${DEPLOY_DURATION}" > "${RESULTS_DIR}/timing.txt"
+            echo "deploy_status=FAILED" >> "${RESULTS_DIR}/timing.txt"
+            return 1
+        fi
+    else
+        log_info "  Reconfiguring containers with BACKEND=${BACKEND}..."
+        # Subsequent backends: just reconfigure (much faster - reuses network/links)
+        if ! containerlab deploy -t "$TOPO_RESOLVED" --reconfigure --timeout 5m --max-workers 20 > "${RESULTS_DIR}/deploy.log" 2>&1; then
+            local DEPLOY_END=$(date +%s.%N)
+            local DEPLOY_DURATION=$(echo "$DEPLOY_END - $DEPLOY_START" | bc)
+            log_error "Reconfigure failed after ${DEPLOY_DURATION}s"
+            tail -20 "${RESULTS_DIR}/deploy.log" 2>/dev/null || true
+            echo "FAIL" > "${RESULTS_DIR}/status.txt"
+            echo "deploy_duration_secs=${DEPLOY_DURATION}" > "${RESULTS_DIR}/timing.txt"
+            echo "deploy_status=FAILED" >> "${RESULTS_DIR}/timing.txt"
+            return 1
+        fi
     fi
 
     local DEPLOY_END=$(date +%s.%N)
@@ -223,7 +269,6 @@ run_backend_test() {
         echo "deploy_status=INCOMPLETE" >> "${RESULTS_DIR}/timing.txt"
         echo "expected_nodes=${EXPECTED_NODES}" >> "${RESULTS_DIR}/timing.txt"
         echo "running_nodes=${RUNNING}" >> "${RESULTS_DIR}/timing.txt"
-        docker ps -aq --filter "name=clab-" | xargs -r docker rm -f > /dev/null 2>&1 || true
         return 1
     fi
 
@@ -251,22 +296,25 @@ run_backend_test() {
     log_info "  Extracting metrics..."
     extract_test_metrics "${RESULTS_DIR}" > "${RESULTS_DIR}/metrics.csv"
 
-    # Track cleanup time
-    log_info "  Cleanup..."
+    # Calculate total time (no cleanup here - done once after all backends)
+    local TOTAL_DURATION=$(echo "$DEPLOY_DURATION + $TEST_DURATION" | bc)
+    echo "total_duration_secs=${TOTAL_DURATION}" >> "${RESULTS_DIR}/timing.txt"
+
+    echo "PASS" > "${RESULTS_DIR}/status.txt"
+    log_success "Completed: ${TEST_NAME} (deploy: ${DEPLOY_DURATION}s, test: ${TEST_DURATION}s)"
+    return 0
+}
+
+# Cleanup after all backends tested for a given nodes+bandwidth
+cleanup_topology() {
+    local LAB_NAME="$1"
+    log_info "  Cleanup topology..."
     local CLEANUP_START=$(date +%s.%N)
     docker ps -aq --filter "name=clab-${LAB_NAME}" | xargs -r docker rm -f > /dev/null 2>&1 || true
     docker network ls --format '{{.Name}}' | grep "${LAB_NAME}" | xargs -r docker network rm 2>/dev/null || true
     local CLEANUP_END=$(date +%s.%N)
     local CLEANUP_DURATION=$(echo "$CLEANUP_END - $CLEANUP_START" | bc)
-    echo "cleanup_duration_secs=${CLEANUP_DURATION}" >> "${RESULTS_DIR}/timing.txt"
-
-    # Calculate total time
-    local TOTAL_DURATION=$(echo "$DEPLOY_DURATION + $TEST_DURATION + $CLEANUP_DURATION" | bc)
-    echo "total_duration_secs=${TOTAL_DURATION}" >> "${RESULTS_DIR}/timing.txt"
-
-    echo "PASS" > "${RESULTS_DIR}/status.txt"
-    log_success "Completed: ${TEST_NAME} (deploy: ${DEPLOY_DURATION}s, test: ${TEST_DURATION}s, cleanup: ${CLEANUP_DURATION}s)"
-    return 0
+    log_success "  Cleanup done in ${CLEANUP_DURATION}s"
 }
 
 # Collect logs from all relevant containers
@@ -367,12 +415,14 @@ main() {
     echo ""
 
     if [ "$DRY_RUN" = true ]; then
-        echo "DRY RUN - Would execute:"
-        for BACKEND in "${BACKENDS[@]}"; do
-            for NODES in "${NODE_COUNTS[@]}"; do
-                for BANDWIDTH in "${BANDWIDTHS[@]}"; do
-                    echo "  BACKEND=${BACKEND} NODES=${NODES} BANDWIDTH=${BANDWIDTH}"
+        echo "DRY RUN - Would execute (deploy once per nodes+bandwidth, reconfigure per backend):"
+        for NODES in "${NODE_COUNTS[@]}"; do
+            for BANDWIDTH in "${BANDWIDTHS[@]}"; do
+                echo "  [Deploy ${NODES}n @ ${BANDWIDTH}]"
+                for BACKEND in "${BACKENDS[@]}"; do
+                    echo "    → BACKEND=${BACKEND}"
                 done
+                echo "  [Cleanup]"
             done
         done
         exit 0
@@ -386,9 +436,24 @@ main() {
     mkdir -p "$(dirname "$SUMMARY_FILE")"
     echo "backend,nodes,bandwidth,status,deploy_secs,s2s_p50,s2s_p95,s2p_p50,s2p_p95,total_ops" > "$SUMMARY_FILE"
 
-    # Run test matrix - each test deploys its own topology (topology files are cached)
+    # Run test matrix - deploy once per nodes+bandwidth, reconfigure for each backend
     for NODES in "${NODE_COUNTS[@]}"; do
         for BANDWIDTH in "${BANDWIDTHS[@]}"; do
+            echo ""
+            echo "════════════════════════════════════════════════════════════════"
+            echo "  Configuration: ${NODES}n @ ${BANDWIDTH}"
+            echo "════════════════════════════════════════════════════════════════"
+
+            # Deploy topology once for this nodes+bandwidth config
+            if ! deploy_topology "$NODES" "$BANDWIDTH" "${RESULTS_BASE_DIR}"; then
+                log_error "Failed to prepare topology for ${NODES}n @ ${BANDWIDTH}"
+                for BACKEND in "${BACKENDS[@]}"; do
+                    echo "${BACKEND},${NODES},${BANDWIDTH},FAIL,0,0,0,0,0,0" >> "$SUMMARY_FILE"
+                done
+                continue
+            fi
+
+            local FIRST_BACKEND="true"
             for BACKEND in "${BACKENDS[@]}"; do
                 CURRENT_TEST=$((CURRENT_TEST + 1))
                 echo ""
@@ -399,7 +464,8 @@ main() {
                 local TEST_NAME="lab4-${BACKEND}-${NODES}n-${BANDWIDTH}"
                 local TEST_RESULTS_DIR="${RESULTS_BASE_DIR}/${TEST_NAME}-${TIMESTAMP}"
 
-                if run_backend_test "$BACKEND" "$NODES" "$BANDWIDTH" "$TIMESTAMP"; then
+                if reconfigure_and_run_test "$BACKEND" "$NODES" "$BANDWIDTH" "$TIMESTAMP" "$FIRST_BACKEND"; then
+                    FIRST_BACKEND="false"
                     # Extract summary metrics and timing
                     local METRICS_FILE="${TEST_RESULTS_DIR}/metrics.csv"
                     local TIMING_FILE="${TEST_RESULTS_DIR}/timing.txt"
@@ -421,17 +487,21 @@ main() {
                     echo "${BACKEND},${NODES},${BANDWIDTH},FAIL,${DEPLOY_SECS:-0},0,0,0,0,0" >> "$SUMMARY_FILE"
                     if [[ "$CONTINUE_ON_ERROR" == "true" ]]; then
                         log_warning "Test failed, continuing (--continue-on-error set)..."
+                        FIRST_BACKEND="false"  # Still mark as not first since we tried
                     else
                         log_error "Test failed! Aborting remaining tests."
                         echo ""
                         echo "Partial results saved to: ${SUMMARY_FILE}"
                         echo "To continue despite failures, use: --continue-on-error"
                         # Cleanup before exit
-                        docker ps -aq --filter "name=clab-" | xargs -r docker rm -f > /dev/null 2>&1 || true
+                        cleanup_topology "$LAB_NAME"
                         exit 1
                     fi
                 fi
             done
+
+            # Cleanup after all backends tested for this config
+            cleanup_topology "$LAB_NAME"
         done
     done
 
