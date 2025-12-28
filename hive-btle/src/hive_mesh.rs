@@ -366,6 +366,19 @@ impl HiveMesh {
         Some(node_id)
     }
 
+    /// Called when a BLE connection is lost, using NodeId directly
+    ///
+    /// Alternative to on_ble_disconnected() when only NodeId is known (e.g., ESP32).
+    pub fn on_peer_disconnected(&self, node_id: NodeId, reason: DisconnectReason) {
+        if self
+            .peer_manager
+            .on_disconnected_by_node_id(node_id, reason)
+        {
+            self.notify(HiveEvent::PeerDisconnected { node_id, reason });
+            self.notify_mesh_state_changed();
+        }
+    }
+
     /// Called when a remote device connects to us (incoming connection)
     ///
     /// Use this when we're acting as a peripheral and a central connects to us.
