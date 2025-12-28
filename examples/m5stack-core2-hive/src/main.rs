@@ -223,6 +223,20 @@ fn axp_init(i2c: &mut I2cDriver) -> anyhow::Result<HardwareVersion> {
     match version {
         HardwareVersion::Core2V10 => {
             info!("Initializing AXP192 for Core2 v1.0");
+
+            // Configure LDO3 voltage for vibration motor (register 0x28)
+            // Upper nibble = LDO2, Lower nibble = LDO3 (per M5Stack library)
+            // Voltage formula: V = 1.8V + (val * 0.1V)
+            // For 2.0V vibration: val = 2 = 0x02
+            // Read current LDO2/3 config to preserve LDO2
+            if i2c.write_read(AXP_ADDR, &[0x28], &mut buf, 100).is_ok() {
+                info!("AXP192: LDO2/3 voltage config=0x{:02X}", buf[0]);
+                // Set LDO3 to 2.0V (0x02 in lower nibble), preserve LDO2 (upper nibble)
+                let new_val = (buf[0] & 0xF0) | 0x02;
+                let _ = i2c.write(AXP_ADDR, &[0x28, new_val], 100);
+                info!("AXP192: LDO3 set to 2.0V for vibration (0x{:02X})", new_val);
+            }
+
             // Read current ADC config
             if i2c.write_read(AXP_ADDR, &[0x82], &mut buf, 100).is_ok() {
                 info!("AXP192: ADC config=0x{:02X} (need bit7 set for battery)", buf[0]);
@@ -263,20 +277,19 @@ fn axp_init(i2c: &mut I2cDriver) -> anyhow::Result<HardwareVersion> {
             let _ = i2c.write(AXP_ADDR, &[0x96, 0x17], 100);
             info!("AXP2101: BLDO1 set to 2.8V for backlight");
 
-            // Set DLDO1 voltage for vibration (0.5V base + 0.1V * val)
-            // val=0x0A gives 1.5V - good for vibration motor
-            let _ = i2c.write(AXP_ADDR, &[0x99, 0x0A], 100);
-            info!("AXP2101: DLDO1 set to 1.5V for vibration motor");
+            // Set DLDO1 voltage for vibration (3.0V)
+            // Per M5Unified: Formula: V = 500 + val*100 mV, so for 3000mV: val = (3000-500)/100 = 25 = 0x19
+            let _ = i2c.write(AXP_ADDR, &[0x99, 0x19], 100);
+            info!("AXP2101: DLDO1 voltage set to 3.0V for vibration motor");
 
             // Read LDO control register
             if i2c.write_read(AXP_ADDR, &[0x90], &mut buf, 100).is_ok() {
                 info!("AXP2101: LDO control (0x90) = 0x{:02X}", buf[0]);
-                // Enable ALDO2 (bit 1), BLDO1 (bit 4)
-                // Bit 0: ALDO1, Bit 1: ALDO2, Bit 2: ALDO3, Bit 3: ALDO4
-                // Bit 4: BLDO1, Bit 5: BLDO2, Bit 6: DLDO1, Bit 7: DLDO2
-                let new_val = buf[0] | 0x12; // Enable ALDO2 + BLDO1
+                // Enable ALDO2 (bit 1), BLDO1 (bit 4), but NOT DLDO1 yet
+                // Per M5Unified: DLDO1 is bit 7 (0x80), DLDO2 is bit 6 (0x40)
+                let new_val = (buf[0] | 0x12) & !0x80; // Enable ALDO2 + BLDO1, disable DLDO1
                 let _ = i2c.write(AXP_ADDR, &[0x90, new_val], 100);
-                info!("AXP2101: LDO control enabled: 0x{:02X}", new_val);
+                info!("AXP2101: LDO control: 0x{:02X} (DLDO1 off)", new_val);
             }
 
             FreeRtos::delay_ms(100); // Let power stabilize
@@ -400,25 +413,24 @@ fn axp_set_vibration(i2c: &mut I2cDriver, enable: bool) {
             }
         }
         HardwareVersion::Core2V11 => {
-            // AXP2101: Register 0x90, Bit 6 = DLDO1 enable
+            // AXP2101: DLDO1 uses bit 0x80 (bit 7) in register 0x90, NOT bit 6!
+            // Per M5Unified AXP2101_Class.cpp implementation
             if i2c.write_read(AXP_ADDR, &[0x90], &mut buf, 100).is_ok() {
                 let new_val = if enable {
-                    buf[0] | 0x40  // Set bit 6 (DLDO1)
+                    buf[0] | 0x80  // Set bit 7 (enable DLDO1)
                 } else {
-                    buf[0] & !0x40  // Clear bit 6
+                    buf[0] & !0x80  // Clear bit 7 (disable DLDO1)
                 };
-                if new_val != buf[0] {
-                    let _ = i2c.write(AXP_ADDR, &[0x90, new_val], 100);
-                    info!("Vibration (AXP2101): {} (0x{:02X} -> 0x{:02X})",
-                          if enable { "ON" } else { "OFF" }, buf[0], new_val);
-                }
+                let _ = i2c.write(AXP_ADDR, &[0x90, new_val], 100);
+                info!("Vibration (AXP2101): {} (0x90: 0x{:02X} -> 0x{:02X})",
+                      if enable { "ON" } else { "OFF" }, buf[0], new_val);
             }
         }
     }
 }
 
 /// Build number for tracking firmware versions
-const BUILD_NUM: u32 = 47;
+const BUILD_NUM: u32 = 62;
 
 /// Mesh ID for this device
 const MESH_ID: &str = "DEMO";
@@ -442,15 +454,22 @@ where
 {
     let _ = display.clear(Rgb565::BLACK);
 
-    let white = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
+    let _white = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
     let gray = MonoTextStyle::new(&FONT_10X20, Rgb565::CSS_GRAY);
     let cyan = MonoTextStyle::new(&FONT_10X20, Rgb565::CYAN);
 
-    // Top bar: battery | HIVE:MESH | build
+    // Top bar: battery | HIVE:MESH | build + hw version
     let title = format!("HIVE:{}", MESH_ID);
     let _ = Text::new(&title, Point::new(110, 25), cyan).draw(display);
-    let build_str = format!("b{}", BUILD_NUM);
-    let _ = Text::new(&build_str, Point::new(250, 25), gray).draw(display);
+    // Show build number and detected hardware version
+    let hw_str = unsafe {
+        match HARDWARE_VERSION {
+            HardwareVersion::Core2V10 => "192",
+            HardwareVersion::Core2V11 => "2101",
+        }
+    };
+    let build_str = format!("b{}/{}", BUILD_NUM, hw_str);
+    let _ = Text::new(&build_str, Point::new(220, 25), gray).draw(display);
 
     // Separator below top bar
     let _ = Rectangle::new(Point::new(0, 35), Size::new(320, 1))
@@ -793,6 +812,13 @@ fn main() -> anyhow::Result<()> {
 
     info!("All initialization complete!");
 
+    // Test vibration motor at startup (AXP2101: voltage-based control)
+    info!("Testing vibration motor...");
+    axp_set_vibration(&mut i2c, true);
+    FreeRtos::delay_ms(300);
+    axp_set_vibration(&mut i2c, false);
+    info!("Vibration test complete");
+
     // Read initial battery status
     let battery_mv = axp_read_battery_voltage(&mut i2c);
     let mut battery_pct = battery_mv.map(battery_percent_from_voltage);
@@ -817,6 +843,7 @@ fn main() -> anyhow::Result<()> {
     let mut alert_active = false;
     let mut vibration_on = false;
     let mut last_vibration_toggle: u32 = 0;
+    let mut we_are_emergency_source = false;  // Don't buzz if we sent the emergency
     const VIBRATION_INTERVAL_MS: u32 = 500;  // Buzz on/off every 500ms
 
     // Track last processed emergency to avoid re-triggers from same emergency
@@ -843,8 +870,8 @@ fn main() -> anyhow::Result<()> {
             needs_redraw = true;
         }
 
-        // Handle vibration buzzing when alert is active
-        if alert_active {
+        // Handle vibration buzzing when alert is active (but not if we sent it)
+        if alert_active && !we_are_emergency_source {
             let elapsed = current_time.saturating_sub(last_vibration_toggle);
             if elapsed >= VIBRATION_INTERVAL_MS {
                 vibration_on = !vibration_on;
@@ -942,11 +969,9 @@ fn main() -> anyhow::Result<()> {
                     // Track for gossip deduplication
                     last_emergency = Some((node_id.as_u32(), now_ms_u64));
 
-                    // Enter alert mode locally (buzz until ACK'd)
+                    // Enter alert mode locally (no buzz - we sent it)
                     alert_active = true;
-                    last_vibration_toggle = current_time;
-                    vibration_on = true;
-                    axp_set_vibration(&mut i2c, true);
+                    we_are_emergency_source = true;  // Don't buzz for our own emergency
 
                     // Save and gossip
                     if let Err(e) = store.save(&mesh) {
@@ -973,6 +998,14 @@ fn main() -> anyhow::Result<()> {
             info!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 
             let now_ms_u64 = now_ms();
+            // Try to decode document for debugging before processing
+            if let Some(decoded_doc) = hive_btle::document::HiveDocument::decode(&data) {
+                info!("Decoded doc: version={} node_id={:08X} counter_value={}",
+                      decoded_doc.version, decoded_doc.node_id.as_u32(), decoded_doc.total_count());
+            } else {
+                warn!("!!! Failed to decode document ({} bytes)", data.len());
+            }
+
             if let Some(result) = mesh.on_ble_data("ble-peer", &data, now_ms_u64) {
                 info!(
                     "Received from {:08X}: emergency={}, ack={}, counter_changed={}",
@@ -981,6 +1014,9 @@ fn main() -> anyhow::Result<()> {
                     result.is_ack,
                     result.counter_changed
                 );
+                // Log peer count after receiving
+                info!("Mesh now has {} peers, {} connected",
+                      mesh.get_peers().len(), mesh.get_connected_peers().len());
 
                 // Associate node ID with BLE connection for disconnect tracking
                 nimble::set_connection_node_id(result.source_node.as_u32());
@@ -996,6 +1032,7 @@ fn main() -> anyhow::Result<()> {
                               source, ts, acked_count, acked_count + pending_count);
                         last_emergency = Some(emergency_key);
                         alert_active = true;
+                        we_are_emergency_source = false;  // We received it, so buzz
                         last_vibration_toggle = current_time;
                         vibration_on = true;
                         axp_set_vibration(&mut i2c, true);
@@ -1023,6 +1060,7 @@ fn main() -> anyhow::Result<()> {
                               result.source_node.as_u32(), result.event_timestamp);
                         last_emergency = Some(emergency_key);
                         alert_active = true;
+                        we_are_emergency_source = false;  // We received it, so buzz
                         last_vibration_toggle = current_time;
                         vibration_on = true;
                         axp_set_vibration(&mut i2c, true);
@@ -1061,7 +1099,20 @@ fn main() -> anyhow::Result<()> {
                     info!("No changes from merge (peer had same or less data)");
                 }
             } else {
-                warn!("Failed to process peer document ({} bytes)", data.len());
+                // on_ble_data returned None - could be:
+                // 1. Document decode failed
+                // 2. Document was from ourselves (filtered out)
+                let our_node_id = mesh.node_id().as_u32();
+                if let Some(decoded) = hive_btle::document::HiveDocument::decode(&data) {
+                    if decoded.node_id.as_u32() == our_node_id {
+                        info!("Ignored own document (node {:08X})", our_node_id);
+                    } else {
+                        warn!("on_ble_data returned None for document from {:08X} (our node: {:08X})",
+                              decoded.node_id.as_u32(), our_node_id);
+                    }
+                } else {
+                    warn!("Failed to decode document ({} bytes)", data.len());
+                }
             }
         }
 
@@ -1101,6 +1152,17 @@ fn main() -> anyhow::Result<()> {
             let acked = get_acked_peers_from_mesh(&mesh);
             display_state = update_display(&mut display, &mesh, alert_active, battery_pct, status, &display_state, &acked);
             print_status(&mesh, connected, status);
+        }
+
+        // Periodic gossip (every 5 seconds = 100 * 50ms) to ensure peer discovery
+        // This ensures both sides exchange documents even if initial sync was incomplete
+        if loop_count % 100 == 0 && connected {
+            let conn_count = nimble::connection_count();
+            if conn_count > 0 {
+                let encoded = mesh.build_document();
+                let sent = nimble::gossip_document(&encoded);
+                info!("Periodic gossip: sent to {} of {} connections", sent, conn_count);
+            }
         }
 
         FreeRtos::delay_ms(50);

@@ -56,10 +56,11 @@ struct PeerConnection {
     active: bool,
     peer_addr: [u8; 6],    // Peer's BLE address (for disconnect tracking)
     node_id: u32,          // HIVE Node ID (set when first document received)
+    we_are_central: bool,  // True if we initiated the connection
 }
 
 /// Multi-connection state
-static CONNECTIONS: Mutex<[PeerConnection; MAX_CONNECTIONS]> = Mutex::new([PeerConnection { handle: 0xFFFF, peer_doc_handle: 0, active: false, peer_addr: [0u8; 6], node_id: 0 }; MAX_CONNECTIONS]);
+static CONNECTIONS: Mutex<[PeerConnection; MAX_CONNECTIONS]> = Mutex::new([PeerConnection { handle: 0xFFFF, peer_doc_handle: 0, active: false, peer_addr: [0u8; 6], node_id: 0, we_are_central: false }; MAX_CONNECTIONS]);
 
 /// Recently disconnected node IDs (for main loop to update display)
 static DISCONNECTED_NODE_IDS: Mutex<Vec<u32>> = Mutex::new(Vec::new());
@@ -214,12 +215,30 @@ unsafe extern "C" fn gap_event_handler(event: *mut ble_gap_event, _arg: *mut c_v
             if connect.status == 0 {
                 info!("BLE: Connected, handle={}", connect.conn_handle);
 
-                // Get peer address from CURRENT_PEER_MAC (stored during discovery)
-                let peer_addr = if let Ok(mac) = CURRENT_PEER_MAC.lock() {
-                    *mac
+                // Get peer address from connection descriptor (works for both central and peripheral)
+                let mut conn_desc: ble_gap_conn_desc = core::mem::zeroed();
+                let peer_addr = if ble_gap_conn_find(connect.conn_handle, &mut conn_desc) == 0 {
+                    let addr = conn_desc.peer_ota_addr.val;
+                    info!("BLE: Peer addr from conn_desc: {:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+                          addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
+                    addr
                 } else {
-                    [0u8; 6]
+                    // Fallback to CURRENT_PEER_MAC (only valid if we initiated)
+                    if let Ok(mac) = CURRENT_PEER_MAC.lock() {
+                        *mac
+                    } else {
+                        [0u8; 6]
+                    }
                 };
+
+                // Determine if we initiated this connection (central) or received it (peripheral)
+                // When we call ble_gap_connect, we set CONNECTING to true. If it's true when we
+                // get the connect event, we were the central. Otherwise we're the peripheral.
+                // Note: CONNECTING was just set to false above, so we need a different method.
+                // Use conn_desc.role: 0 = BLE_GAP_ROLE_MASTER (central), 1 = BLE_GAP_ROLE_SLAVE (peripheral)
+                let we_are_central = conn_desc.role == 0;  // BLE_GAP_ROLE_MASTER
+                let role_str = if we_are_central { "CENTRAL" } else { "PERIPHERAL" };
+                info!("BLE: Connection role = {} (conn_desc.role={})", role_str, conn_desc.role);
 
                 // Add to multi-connection list
                 if let Ok(mut conns) = CONNECTIONS.lock() {
@@ -229,7 +248,10 @@ unsafe extern "C" fn gap_event_handler(event: *mut ble_gap_event, _arg: *mut c_v
                             conn.peer_doc_handle = 0;
                             conn.active = true;
                             conn.peer_addr = peer_addr;
+                            conn.we_are_central = we_are_central;
                             NUM_CONNECTIONS.fetch_add(1, Ordering::SeqCst);
+                            info!("BLE: Added connection slot, now {} active connections",
+                                  NUM_CONNECTIONS.load(Ordering::SeqCst));
                             break;
                         }
                     }
