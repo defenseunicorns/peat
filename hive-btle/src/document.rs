@@ -36,7 +36,7 @@ pub const EXTENDED_MARKER: u8 = 0xAB;
 /// Marker byte indicating emergency event section
 pub const EMERGENCY_MARKER: u8 = 0xAC;
 
-/// Marker byte indicating encrypted document
+/// Marker byte indicating encrypted document (mesh-wide)
 ///
 /// When present, the entire document payload following the marker is encrypted
 /// using ChaCha20-Poly1305. The marker format is:
@@ -50,6 +50,34 @@ pub const EMERGENCY_MARKER: u8 = 0xAC;
 /// Encryption happens at the HiveMesh layer before transmission, and decryption
 /// happens upon receipt before document parsing.
 pub const ENCRYPTED_MARKER: u8 = 0xAE;
+
+/// Marker byte indicating per-peer E2EE message
+///
+/// Used for end-to-end encrypted messages between specific peer pairs.
+/// Only the sender and recipient (who share a session key) can decrypt.
+///
+/// ```text
+/// marker:     1 byte (0xAF)
+/// flags:      1 byte (bit 0: key_exchange, bit 1: forward_secrecy)
+/// recipient:  4 bytes (LE) - recipient node ID
+/// sender:     4 bytes (LE) - sender node ID
+/// counter:    8 bytes (LE) - message counter for replay protection
+/// nonce:      12 bytes
+/// ciphertext: variable (includes 16-byte auth tag)
+/// ```
+pub const PEER_E2EE_MARKER: u8 = 0xAF;
+
+/// Marker byte indicating key exchange message for per-peer E2EE
+///
+/// Used to establish E2EE sessions between peers via X25519 key exchange.
+///
+/// ```text
+/// marker:     1 byte (0xB0)
+/// sender:     4 bytes (LE) - sender node ID
+/// flags:      1 byte (bit 0: is_ephemeral)
+/// public_key: 32 bytes - X25519 public key
+/// ```
+pub const KEY_EXCHANGE_MARKER: u8 = 0xB0;
 
 /// Minimum document size (header only, no counter entries)
 pub const MIN_DOCUMENT_SIZE: usize = 8;
