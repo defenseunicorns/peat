@@ -36,6 +36,21 @@ pub const EXTENDED_MARKER: u8 = 0xAB;
 /// Marker byte indicating emergency event section
 pub const EMERGENCY_MARKER: u8 = 0xAC;
 
+/// Marker byte indicating encrypted document
+///
+/// When present, the entire document payload following the marker is encrypted
+/// using ChaCha20-Poly1305. The marker format is:
+///
+/// ```text
+/// marker:   1 byte (0xAE)
+/// reserved: 1 byte (0x00)
+/// payload:  12 bytes nonce + variable ciphertext (includes 16-byte auth tag)
+/// ```
+///
+/// Encryption happens at the HiveMesh layer before transmission, and decryption
+/// happens upon receipt before document parsing.
+pub const ENCRYPTED_MARKER: u8 = 0xAE;
+
 /// Minimum document size (header only, no counter entries)
 pub const MIN_DOCUMENT_SIZE: usize = 8;
 
