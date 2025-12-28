@@ -28,6 +28,15 @@ data class HivePlatform(
     /** Current speed in m/s */
     val speed: Double? = null,
 
+    /** Course over ground in degrees */
+    val course: Double? = null,
+
+    /** Vertical speed in m/s */
+    val verticalSpeed: Double? = null,
+
+    /** Position accuracy (CEP) in meters */
+    val positionAccuracy: Double? = null,
+
     /** Cell membership */
     val cellId: String? = null,
 
@@ -36,6 +45,21 @@ data class HivePlatform(
 
     /** Operational status */
     val status: Status = Status.OPERATIONAL,
+
+    /** Battery/fuel percentage (0-100) */
+    val batteryPercent: Int? = null,
+
+    /** Communications quality */
+    val commsQuality: CommsQuality? = null,
+
+    /** Sensor status by sensor name */
+    val sensorStatus: Map<String, SensorStatus>? = null,
+
+    /** Current task assignment */
+    val currentTask: String? = null,
+
+    /** Mission identifier */
+    val missionId: String? = null,
 
     /** Last update timestamp (epoch millis) */
     val lastUpdate: Long = System.currentTimeMillis()
@@ -110,4 +134,55 @@ data class HivePlatform(
         PlatformType.SENSOR -> "a-f-G-E-S"     // Friendly Ground Equipment - Sensor
         PlatformType.UNKNOWN -> "a-u-G"        // Unknown Ground
     }
+
+    /**
+     * Check if this platform has stale data (older than threshold)
+     */
+    fun isStale(thresholdMs: Long = 60_000): Boolean =
+        System.currentTimeMillis() - lastUpdate > thresholdMs
+
+    /**
+     * Get staleness as human-readable string
+     */
+    fun getStalenessString(): String {
+        val ageMs = System.currentTimeMillis() - lastUpdate
+        return when {
+            ageMs < 5_000 -> "Just now"
+            ageMs < 60_000 -> "${ageMs / 1000}s ago"
+            ageMs < 3_600_000 -> "${ageMs / 60_000}m ago"
+            else -> "${ageMs / 3_600_000}h ago"
+        }
+    }
+}
+
+/**
+ * Communications quality levels
+ */
+enum class CommsQuality {
+    /** Excellent signal/connectivity */
+    EXCELLENT,
+    /** Good signal/connectivity */
+    GOOD,
+    /** Degraded but usable */
+    DEGRADED,
+    /** Poor connectivity */
+    POOR,
+    /** Connection lost */
+    LOST
+}
+
+/**
+ * Sensor operational status
+ */
+enum class SensorStatus {
+    /** Sensor active and reporting */
+    ACTIVE,
+    /** Sensor available but idle */
+    IDLE,
+    /** Sensor degraded performance */
+    DEGRADED,
+    /** Sensor offline/failed */
+    OFFLINE,
+    /** Sensor status unknown */
+    UNKNOWN
 }
