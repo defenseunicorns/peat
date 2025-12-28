@@ -43,12 +43,14 @@ use alloc::{string::String, sync::Arc, vec::Vec};
 #[cfg(feature = "std")]
 use std::sync::Arc;
 
-use crate::document::ENCRYPTED_MARKER;
+use crate::document::{ENCRYPTED_MARKER, KEY_EXCHANGE_MARKER, PEER_E2EE_MARKER};
 use crate::document_sync::DocumentSync;
 use crate::observer::{DisconnectReason, HiveEvent, HiveObserver};
 use crate::peer::{HivePeer, PeerManagerConfig};
 use crate::peer_manager::PeerManager;
-use crate::security::MeshEncryptionKey;
+use crate::security::{
+    KeyExchangeMessage, MeshEncryptionKey, PeerEncryptedMessage, PeerSessionManager, SessionState,
+};
 use crate::sync::crdt::{EventType, PeripheralType};
 use crate::NodeId;
 
@@ -162,6 +164,9 @@ pub struct HiveMesh {
 
     /// Optional mesh-wide encryption key (derived from shared secret)
     encryption_key: Option<MeshEncryptionKey>,
+
+    /// Optional per-peer E2EE session manager
+    peer_sessions: std::sync::Mutex<Option<PeerSessionManager>>,
 }
 
 #[cfg(feature = "std")]
@@ -188,6 +193,7 @@ impl HiveMesh {
             last_sync_ms: std::sync::atomic::AtomicU32::new(0),
             last_cleanup_ms: std::sync::atomic::AtomicU32::new(0),
             encryption_key,
+            peer_sessions: std::sync::Mutex::new(None),
         }
     }
 
@@ -270,6 +276,224 @@ impl HiveMesh {
             // If we have encryption enabled, we could optionally reject unencrypted
             // documents for stricter security. For now, accept for backward compat.
             Some(std::borrow::Cow::Borrowed(data))
+        }
+    }
+
+    // ==================== Per-Peer E2EE ====================
+
+    /// Enable per-peer E2EE capability
+    ///
+    /// Creates a new identity key for this node. This allows establishing
+    /// encrypted sessions with specific peers where only the sender and
+    /// recipient can read messages (other mesh members cannot).
+    pub fn enable_peer_e2ee(&self) {
+        let mut sessions = self.peer_sessions.lock().unwrap();
+        if sessions.is_none() {
+            *sessions = Some(PeerSessionManager::new(self.config.node_id));
+            log::info!(
+                "Per-peer E2EE enabled for node {:08X}",
+                self.config.node_id.as_u32()
+            );
+        }
+    }
+
+    /// Disable per-peer E2EE capability
+    ///
+    /// Clears all peer sessions and disables E2EE.
+    pub fn disable_peer_e2ee(&self) {
+        let mut sessions = self.peer_sessions.lock().unwrap();
+        *sessions = None;
+        log::info!("Per-peer E2EE disabled");
+    }
+
+    /// Check if per-peer E2EE is enabled
+    pub fn is_peer_e2ee_enabled(&self) -> bool {
+        self.peer_sessions.lock().unwrap().is_some()
+    }
+
+    /// Get our E2EE public key (for sharing with peers)
+    ///
+    /// Returns None if per-peer E2EE is not enabled.
+    pub fn peer_e2ee_public_key(&self) -> Option<[u8; 32]> {
+        self.peer_sessions
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|s| s.our_public_key())
+    }
+
+    /// Initiate E2EE session with a specific peer
+    ///
+    /// Returns the key exchange message bytes to send to the peer.
+    /// The message should be broadcast/sent to the peer.
+    /// Returns None if per-peer E2EE is not enabled.
+    pub fn initiate_peer_e2ee(&self, peer_node_id: NodeId, now_ms: u64) -> Option<Vec<u8>> {
+        let mut sessions = self.peer_sessions.lock().unwrap();
+        let session_mgr = sessions.as_mut()?;
+
+        let key_exchange = session_mgr.initiate_session(peer_node_id, now_ms);
+        let mut buf = Vec::with_capacity(2 + 37);
+        buf.push(KEY_EXCHANGE_MARKER);
+        buf.push(0x00); // reserved
+        buf.extend_from_slice(&key_exchange.encode());
+
+        log::info!(
+            "Initiated E2EE session with peer {:08X}",
+            peer_node_id.as_u32()
+        );
+        Some(buf)
+    }
+
+    /// Check if we have an established E2EE session with a peer
+    pub fn has_peer_e2ee_session(&self, peer_node_id: NodeId) -> bool {
+        self.peer_sessions
+            .lock()
+            .unwrap()
+            .as_ref()
+            .is_some_and(|s| s.has_session(peer_node_id))
+    }
+
+    /// Get E2EE session state with a peer
+    pub fn peer_e2ee_session_state(&self, peer_node_id: NodeId) -> Option<SessionState> {
+        self.peer_sessions
+            .lock()
+            .unwrap()
+            .as_ref()
+            .and_then(|s| s.session_state(peer_node_id))
+    }
+
+    /// Send an E2EE encrypted message to a specific peer
+    ///
+    /// Returns the encrypted message bytes to send, or None if no session exists.
+    /// The message should be sent directly to the peer (not broadcast).
+    pub fn send_peer_e2ee(
+        &self,
+        peer_node_id: NodeId,
+        plaintext: &[u8],
+        now_ms: u64,
+    ) -> Option<Vec<u8>> {
+        let mut sessions = self.peer_sessions.lock().unwrap();
+        let session_mgr = sessions.as_mut()?;
+
+        match session_mgr.encrypt_for_peer(peer_node_id, plaintext, now_ms) {
+            Ok(encrypted) => {
+                let mut buf = Vec::with_capacity(2 + encrypted.encode().len());
+                buf.push(PEER_E2EE_MARKER);
+                buf.push(0x00); // reserved
+                buf.extend_from_slice(&encrypted.encode());
+                Some(buf)
+            }
+            Err(e) => {
+                log::warn!(
+                    "Failed to encrypt for peer {:08X}: {:?}",
+                    peer_node_id.as_u32(),
+                    e
+                );
+                None
+            }
+        }
+    }
+
+    /// Close E2EE session with a peer
+    pub fn close_peer_e2ee(&self, peer_node_id: NodeId) {
+        let mut sessions = self.peer_sessions.lock().unwrap();
+        if let Some(session_mgr) = sessions.as_mut() {
+            session_mgr.close_session(peer_node_id);
+            self.notify(HiveEvent::PeerE2eeClosed { peer_node_id });
+            log::info!(
+                "Closed E2EE session with peer {:08X}",
+                peer_node_id.as_u32()
+            );
+        }
+    }
+
+    /// Get count of active E2EE sessions
+    pub fn peer_e2ee_session_count(&self) -> usize {
+        self.peer_sessions
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|s| s.session_count())
+            .unwrap_or(0)
+    }
+
+    /// Get count of established E2EE sessions
+    pub fn peer_e2ee_established_count(&self) -> usize {
+        self.peer_sessions
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|s| s.established_count())
+            .unwrap_or(0)
+    }
+
+    /// Handle incoming key exchange message
+    ///
+    /// Called internally when we receive a KEY_EXCHANGE_MARKER message.
+    /// Returns the response key exchange bytes to send back, or None if invalid.
+    fn handle_key_exchange(&self, data: &[u8], now_ms: u64) -> Option<Vec<u8>> {
+        if data.len() < 2 || data[0] != KEY_EXCHANGE_MARKER {
+            return None;
+        }
+
+        let payload = &data[2..];
+        let msg = KeyExchangeMessage::decode(payload)?;
+
+        let mut sessions = self.peer_sessions.lock().unwrap();
+        let session_mgr = sessions.as_mut()?;
+
+        let (response, established) = session_mgr.handle_key_exchange(&msg, now_ms)?;
+
+        if established {
+            self.notify(HiveEvent::PeerE2eeEstablished {
+                peer_node_id: msg.sender_node_id,
+            });
+            log::info!(
+                "E2EE session established with peer {:08X}",
+                msg.sender_node_id.as_u32()
+            );
+        }
+
+        // Return response key exchange
+        let mut buf = Vec::with_capacity(2 + 37);
+        buf.push(KEY_EXCHANGE_MARKER);
+        buf.push(0x00);
+        buf.extend_from_slice(&response.encode());
+        Some(buf)
+    }
+
+    /// Handle incoming E2EE encrypted message
+    ///
+    /// Called internally when we receive a PEER_E2EE_MARKER message.
+    /// Decrypts and notifies observers of the received message.
+    fn handle_peer_e2ee_message(&self, data: &[u8], now_ms: u64) -> Option<Vec<u8>> {
+        if data.len() < 2 || data[0] != PEER_E2EE_MARKER {
+            return None;
+        }
+
+        let payload = &data[2..];
+        let msg = PeerEncryptedMessage::decode(payload)?;
+
+        let mut sessions = self.peer_sessions.lock().unwrap();
+        let session_mgr = sessions.as_mut()?;
+
+        match session_mgr.decrypt_from_peer(&msg, now_ms) {
+            Ok(plaintext) => {
+                // Notify observers of the decrypted message
+                self.notify(HiveEvent::PeerE2eeMessageReceived {
+                    from_node: msg.sender_node_id,
+                    data: plaintext.clone(),
+                });
+                Some(plaintext)
+            }
+            Err(e) => {
+                log::warn!(
+                    "Failed to decrypt E2EE message from {:08X}: {:?}",
+                    msg.sender_node_id.as_u32(),
+                    e
+                );
+                None
+            }
         }
     }
 
@@ -517,6 +741,7 @@ impl HiveMesh {
     ///
     /// Parses the document, merges it, and generates appropriate events.
     /// If encryption is enabled, decrypts the document first.
+    /// Handles per-peer E2EE messages (KEY_EXCHANGE and PEER_E2EE markers).
     /// Returns the source NodeId and whether the document contained an event.
     pub fn on_ble_data_received(
         &self,
@@ -527,7 +752,26 @@ impl HiveMesh {
         // Get node ID from identifier
         let node_id = self.peer_manager.get_node_id(identifier)?;
 
-        // Decrypt if encrypted
+        // Check for per-peer E2EE messages first
+        if data.len() >= 2 {
+            match data[0] {
+                KEY_EXCHANGE_MARKER => {
+                    // Handle key exchange - returns response to send back
+                    let _response = self.handle_key_exchange(data, now_ms);
+                    // Return None as this isn't a document sync
+                    return None;
+                }
+                PEER_E2EE_MARKER => {
+                    // Handle encrypted peer message
+                    let _plaintext = self.handle_peer_e2ee_message(data, now_ms);
+                    // Return None as this isn't a document sync
+                    return None;
+                }
+                _ => {}
+            }
+        }
+
+        // Decrypt if encrypted (mesh-wide encryption)
         let decrypted = self.decrypt_document(data)?;
 
         // Merge the document
@@ -569,13 +813,29 @@ impl HiveMesh {
     ///
     /// Use this when receiving data from a peripheral we discovered.
     /// If encryption is enabled, decrypts the document first.
+    /// Handles per-peer E2EE messages (KEY_EXCHANGE and PEER_E2EE markers).
     pub fn on_ble_data_received_from_node(
         &self,
         node_id: NodeId,
         data: &[u8],
         now_ms: u64,
     ) -> Option<DataReceivedResult> {
-        // Decrypt if encrypted
+        // Check for per-peer E2EE messages first
+        if data.len() >= 2 {
+            match data[0] {
+                KEY_EXCHANGE_MARKER => {
+                    let _response = self.handle_key_exchange(data, now_ms);
+                    return None;
+                }
+                PEER_E2EE_MARKER => {
+                    let _plaintext = self.handle_peer_e2ee_message(data, now_ms);
+                    return None;
+                }
+                _ => {}
+            }
+        }
+
+        // Decrypt if encrypted (mesh-wide encryption)
         let decrypted = self.decrypt_document(data)?;
 
         // Merge the document
@@ -619,13 +879,29 @@ impl HiveMesh {
     /// from the document itself. Use this when you don't track identifiers
     /// (e.g., ESP32 NimBLE).
     /// If encryption is enabled, decrypts the document first.
+    /// Handles per-peer E2EE messages (KEY_EXCHANGE and PEER_E2EE markers).
     pub fn on_ble_data(
         &self,
         identifier: &str,
         data: &[u8],
         now_ms: u64,
     ) -> Option<DataReceivedResult> {
-        // Decrypt if encrypted
+        // Check for per-peer E2EE messages first
+        if data.len() >= 2 {
+            match data[0] {
+                KEY_EXCHANGE_MARKER => {
+                    let _response = self.handle_key_exchange(data, now_ms);
+                    return None;
+                }
+                PEER_E2EE_MARKER => {
+                    let _plaintext = self.handle_peer_e2ee_message(data, now_ms);
+                    return None;
+                }
+                _ => {}
+            }
+        }
+
+        // Decrypt if encrypted (mesh-wide encryption)
         let decrypted = self.decrypt_document(data)?;
 
         // Merge the document (extracts node_id internally)
@@ -1243,5 +1519,223 @@ mod tests {
         // Total: 30 bytes overhead
         let overhead = doc_encrypted.len() - doc_unencrypted.len();
         assert_eq!(overhead, 30); // 2 (marker) + 12 (nonce) + 16 (tag)
+    }
+
+    // ==================== Per-Peer E2EE Tests ====================
+
+    #[test]
+    fn test_peer_e2ee_enable_disable() {
+        let mesh = create_mesh(0x11111111, "ALPHA-1");
+
+        assert!(!mesh.is_peer_e2ee_enabled());
+        assert!(mesh.peer_e2ee_public_key().is_none());
+
+        mesh.enable_peer_e2ee();
+        assert!(mesh.is_peer_e2ee_enabled());
+        assert!(mesh.peer_e2ee_public_key().is_some());
+
+        mesh.disable_peer_e2ee();
+        assert!(!mesh.is_peer_e2ee_enabled());
+    }
+
+    #[test]
+    fn test_peer_e2ee_initiate_session() {
+        let mesh = create_mesh(0x11111111, "ALPHA-1");
+        mesh.enable_peer_e2ee();
+
+        let key_exchange = mesh.initiate_peer_e2ee(NodeId::new(0x22222222), 1000);
+        assert!(key_exchange.is_some());
+
+        let key_exchange = key_exchange.unwrap();
+        // Should start with KEY_EXCHANGE_MARKER
+        assert_eq!(key_exchange[0], crate::document::KEY_EXCHANGE_MARKER);
+
+        // Should have a pending session
+        assert_eq!(mesh.peer_e2ee_session_count(), 1);
+        assert_eq!(mesh.peer_e2ee_established_count(), 0);
+    }
+
+    #[test]
+    fn test_peer_e2ee_full_handshake() {
+        let mesh1 = create_mesh(0x11111111, "ALPHA-1");
+        let mesh2 = create_mesh(0x22222222, "BRAVO-1");
+
+        mesh1.enable_peer_e2ee();
+        mesh2.enable_peer_e2ee();
+
+        let observer1 = Arc::new(CollectingObserver::new());
+        let observer2 = Arc::new(CollectingObserver::new());
+        mesh1.add_observer(observer1.clone());
+        mesh2.add_observer(observer2.clone());
+
+        // mesh1 initiates to mesh2
+        let key_exchange1 = mesh1
+            .initiate_peer_e2ee(NodeId::new(0x22222222), 1000)
+            .unwrap();
+
+        // mesh2 receives and responds
+        let response = mesh2.handle_key_exchange(&key_exchange1, 1000);
+        assert!(response.is_some());
+
+        // Check mesh2 has established session
+        assert!(mesh2.has_peer_e2ee_session(NodeId::new(0x11111111)));
+
+        // mesh1 receives mesh2's response
+        let key_exchange2 = response.unwrap();
+        let _ = mesh1.handle_key_exchange(&key_exchange2, 1000);
+
+        // Check mesh1 has established session
+        assert!(mesh1.has_peer_e2ee_session(NodeId::new(0x22222222)));
+
+        // Both should have E2EE established events
+        let events1 = observer1.events();
+        assert!(events1
+            .iter()
+            .any(|e| matches!(e, HiveEvent::PeerE2eeEstablished { .. })));
+
+        let events2 = observer2.events();
+        assert!(events2
+            .iter()
+            .any(|e| matches!(e, HiveEvent::PeerE2eeEstablished { .. })));
+    }
+
+    #[test]
+    fn test_peer_e2ee_encrypt_decrypt() {
+        let mesh1 = create_mesh(0x11111111, "ALPHA-1");
+        let mesh2 = create_mesh(0x22222222, "BRAVO-1");
+
+        mesh1.enable_peer_e2ee();
+        mesh2.enable_peer_e2ee();
+
+        // Establish session via key exchange
+        let key_exchange1 = mesh1
+            .initiate_peer_e2ee(NodeId::new(0x22222222), 1000)
+            .unwrap();
+        let key_exchange2 = mesh2.handle_key_exchange(&key_exchange1, 1000).unwrap();
+        mesh1.handle_key_exchange(&key_exchange2, 1000);
+
+        // mesh1 sends encrypted message to mesh2
+        let plaintext = b"Secret message from mesh1";
+        let encrypted = mesh1.send_peer_e2ee(NodeId::new(0x22222222), plaintext, 2000);
+        assert!(encrypted.is_some());
+
+        let encrypted = encrypted.unwrap();
+        // Should start with PEER_E2EE_MARKER
+        assert_eq!(encrypted[0], crate::document::PEER_E2EE_MARKER);
+
+        // mesh2 receives and decrypts
+        let observer2 = Arc::new(CollectingObserver::new());
+        mesh2.add_observer(observer2.clone());
+
+        let decrypted = mesh2.handle_peer_e2ee_message(&encrypted, 2000);
+        assert!(decrypted.is_some());
+        assert_eq!(decrypted.unwrap(), plaintext);
+
+        // Should have received message event
+        let events = observer2.events();
+        assert!(events.iter().any(|e| matches!(
+            e,
+            HiveEvent::PeerE2eeMessageReceived { from_node, data }
+            if from_node.as_u32() == 0x11111111 && data == plaintext
+        )));
+    }
+
+    #[test]
+    fn test_peer_e2ee_bidirectional() {
+        let mesh1 = create_mesh(0x11111111, "ALPHA-1");
+        let mesh2 = create_mesh(0x22222222, "BRAVO-1");
+
+        mesh1.enable_peer_e2ee();
+        mesh2.enable_peer_e2ee();
+
+        // Establish session
+        let key_exchange1 = mesh1
+            .initiate_peer_e2ee(NodeId::new(0x22222222), 1000)
+            .unwrap();
+        let key_exchange2 = mesh2.handle_key_exchange(&key_exchange1, 1000).unwrap();
+        mesh1.handle_key_exchange(&key_exchange2, 1000);
+
+        // mesh1 -> mesh2
+        let msg1 = mesh1
+            .send_peer_e2ee(NodeId::new(0x22222222), b"Hello from mesh1", 2000)
+            .unwrap();
+        let dec1 = mesh2.handle_peer_e2ee_message(&msg1, 2000).unwrap();
+        assert_eq!(dec1, b"Hello from mesh1");
+
+        // mesh2 -> mesh1
+        let msg2 = mesh2
+            .send_peer_e2ee(NodeId::new(0x11111111), b"Hello from mesh2", 2000)
+            .unwrap();
+        let dec2 = mesh1.handle_peer_e2ee_message(&msg2, 2000).unwrap();
+        assert_eq!(dec2, b"Hello from mesh2");
+    }
+
+    #[test]
+    fn test_peer_e2ee_close_session() {
+        let mesh = create_mesh(0x11111111, "ALPHA-1");
+        mesh.enable_peer_e2ee();
+
+        let observer = Arc::new(CollectingObserver::new());
+        mesh.add_observer(observer.clone());
+
+        // Initiate a session
+        mesh.initiate_peer_e2ee(NodeId::new(0x22222222), 1000);
+        assert_eq!(mesh.peer_e2ee_session_count(), 1);
+
+        // Close session
+        mesh.close_peer_e2ee(NodeId::new(0x22222222));
+
+        // Check close event
+        let events = observer.events();
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, HiveEvent::PeerE2eeClosed { .. })));
+    }
+
+    #[test]
+    fn test_peer_e2ee_without_enabling() {
+        let mesh = create_mesh(0x11111111, "ALPHA-1");
+
+        // E2EE not enabled - should return None
+        let result = mesh.initiate_peer_e2ee(NodeId::new(0x22222222), 1000);
+        assert!(result.is_none());
+
+        let result = mesh.send_peer_e2ee(NodeId::new(0x22222222), b"test", 1000);
+        assert!(result.is_none());
+
+        assert!(!mesh.has_peer_e2ee_session(NodeId::new(0x22222222)));
+    }
+
+    #[test]
+    fn test_peer_e2ee_overhead() {
+        let mesh1 = create_mesh(0x11111111, "ALPHA-1");
+        let mesh2 = create_mesh(0x22222222, "BRAVO-1");
+
+        mesh1.enable_peer_e2ee();
+        mesh2.enable_peer_e2ee();
+
+        // Establish session
+        let key_exchange1 = mesh1
+            .initiate_peer_e2ee(NodeId::new(0x22222222), 1000)
+            .unwrap();
+        let key_exchange2 = mesh2.handle_key_exchange(&key_exchange1, 1000).unwrap();
+        mesh1.handle_key_exchange(&key_exchange2, 1000);
+
+        // Encrypt a message
+        let plaintext = b"Test message";
+        let encrypted = mesh1
+            .send_peer_e2ee(NodeId::new(0x22222222), plaintext, 2000)
+            .unwrap();
+
+        // Overhead should be:
+        // - 2 bytes marker header
+        // - 4 bytes recipient node ID
+        // - 4 bytes sender node ID
+        // - 8 bytes counter
+        // - 12 bytes nonce
+        // - 16 bytes auth tag
+        // Total: 46 bytes overhead
+        let overhead = encrypted.len() - plaintext.len();
+        assert_eq!(overhead, 46);
     }
 }

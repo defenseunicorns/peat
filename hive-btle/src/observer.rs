@@ -28,9 +28,15 @@
 //! ```
 
 #[cfg(not(feature = "std"))]
-use alloc::{boxed::Box, sync::Arc, vec::Vec};
+use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
 #[cfg(feature = "std")]
 use std::sync::Arc;
+
+// Re-import Vec for HiveEvent variants
+#[cfg(feature = "std")]
+use std::string::String;
+#[cfg(feature = "std")]
+use std::vec::Vec;
 
 use crate::peer::HivePeer;
 use crate::sync::crdt::EventType;
@@ -112,6 +118,35 @@ pub enum HiveEvent {
         /// Number of peers that acknowledged
         ack_count: usize,
     },
+
+    // ==================== Per-Peer E2EE Events ====================
+    /// E2EE session established with a peer
+    PeerE2eeEstablished {
+        /// Node ID of the peer we established E2EE with
+        peer_node_id: NodeId,
+    },
+
+    /// E2EE session closed with a peer
+    PeerE2eeClosed {
+        /// Node ID of the peer whose E2EE session closed
+        peer_node_id: NodeId,
+    },
+
+    /// Received an E2EE encrypted message from a peer
+    PeerE2eeMessageReceived {
+        /// Node ID of the sender
+        from_node: NodeId,
+        /// Decrypted message data
+        data: Vec<u8>,
+    },
+
+    /// E2EE session failed to establish
+    PeerE2eeFailed {
+        /// Node ID of the peer
+        peer_node_id: NodeId,
+        /// Error description
+        error: String,
+    },
 }
 
 impl HiveEvent {
@@ -158,6 +193,29 @@ impl HiveEvent {
         Self::DocumentSynced {
             from_node,
             total_count,
+        }
+    }
+
+    /// Create a peer E2EE established event
+    pub fn peer_e2ee_established(peer_node_id: NodeId) -> Self {
+        Self::PeerE2eeEstablished { peer_node_id }
+    }
+
+    /// Create a peer E2EE closed event
+    pub fn peer_e2ee_closed(peer_node_id: NodeId) -> Self {
+        Self::PeerE2eeClosed { peer_node_id }
+    }
+
+    /// Create a peer E2EE message received event
+    pub fn peer_e2ee_message_received(from_node: NodeId, data: Vec<u8>) -> Self {
+        Self::PeerE2eeMessageReceived { from_node, data }
+    }
+
+    /// Create a peer E2EE failed event
+    pub fn peer_e2ee_failed(peer_node_id: NodeId, error: String) -> Self {
+        Self::PeerE2eeFailed {
+            peer_node_id,
+            error,
         }
     }
 }

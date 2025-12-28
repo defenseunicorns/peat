@@ -130,9 +130,12 @@ pub use sync::{GattSyncProtocol, SyncConfig, SyncState};
 pub use transport::{BleConnection, BluetoothLETransport, MeshTransport, TransportCapabilities};
 
 // New centralized mesh management types
-pub use document::{HiveDocument, MergeResult, ENCRYPTED_MARKER, EXTENDED_MARKER};
+pub use document::{
+    HiveDocument, MergeResult, ENCRYPTED_MARKER, EXTENDED_MARKER, KEY_EXCHANGE_MARKER,
+    PEER_E2EE_MARKER,
+};
 
-// Security (mesh-wide encryption)
+// Security (mesh-wide and per-peer encryption)
 pub use document_sync::{DocumentCheck, DocumentSync};
 #[cfg(feature = "std")]
 pub use hive_mesh::{DataReceivedResult, HiveMesh, HiveMeshConfig};
@@ -141,7 +144,14 @@ pub use observer::{CollectingObserver, ObserverManager};
 pub use observer::{DisconnectReason as HiveDisconnectReason, HiveEvent, HiveObserver};
 pub use peer::{HivePeer, PeerManagerConfig, SignalStrength};
 pub use peer_manager::PeerManager;
+// Phase 1: Mesh-wide encryption
 pub use security::{EncryptedDocument, EncryptionError, MeshEncryptionKey};
+// Phase 2: Per-peer E2EE
+#[cfg(feature = "std")]
+pub use security::{
+    KeyExchangeMessage, PeerEncryptedMessage, PeerIdentityKey, PeerSession, PeerSessionKey,
+    PeerSessionManager, SessionState,
+};
 
 // Gossip and persistence abstractions
 #[cfg(feature = "std")]

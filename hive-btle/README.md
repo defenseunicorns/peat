@@ -239,6 +239,98 @@ Nodes without the shared secret can relay encrypted documents but cannot read th
 - Encrypted nodes can receive unencrypted documents (for gradual rollout)
 - Unencrypted nodes will reject encrypted documents they can't decrypt
 
+## Per-Peer E2EE (End-to-End Encryption)
+
+For sensitive communications, hive-btle supports per-peer end-to-end encryption using X25519 key exchange and ChaCha20-Poly1305. Unlike mesh-wide encryption where all formation members share a key, per-peer E2EE ensures only the sender and recipient can decrypt messages—even other mesh members cannot read them.
+
+### Enabling Per-Peer E2EE
+
+```rust
+use hive_btle::{HiveMesh, HiveMeshConfig, NodeId};
+
+// Create mesh instances
+let config1 = HiveMeshConfig::new(NodeId::new(0x11111111), "ALPHA-1", "DEMO");
+let mesh1 = HiveMesh::new(config1);
+
+let config2 = HiveMeshConfig::new(NodeId::new(0x22222222), "BRAVO-1", "DEMO");
+let mesh2 = HiveMesh::new(config2);
+
+// Enable E2EE on both nodes (generates identity keys)
+mesh1.enable_peer_e2ee();
+mesh2.enable_peer_e2ee();
+
+// Initiate E2EE session from mesh1 to mesh2
+let key_exchange1 = mesh1.initiate_peer_e2ee(NodeId::new(0x22222222), now_ms).unwrap();
+// Send key_exchange1 to mesh2 over BLE...
+
+// mesh2 handles incoming key exchange and responds
+let key_exchange2 = mesh2.handle_key_exchange(&key_exchange1, now_ms).unwrap();
+// Send key_exchange2 back to mesh1...
+
+// mesh1 completes the handshake
+mesh1.handle_key_exchange(&key_exchange2, now_ms);
+
+// Session established! Now send encrypted messages
+let encrypted = mesh1.send_peer_e2ee(NodeId::new(0x22222222), b"Secret message", now_ms).unwrap();
+// Send encrypted to mesh2...
+
+// mesh2 decrypts
+let plaintext = mesh2.handle_peer_e2ee_message(&encrypted, now_ms).unwrap();
+assert_eq!(plaintext, b"Secret message");
+```
+
+### How It Works
+
+1. **Key Exchange**: X25519 Diffie-Hellman to establish a shared secret
+2. **Key Derivation**: HKDF-SHA256 binds the session key to both node IDs
+3. **Encryption**: ChaCha20-Poly1305 AEAD with replay protection
+4. **Wire Format**: `PEER_E2EE_MARKER (0xAF) | reserved | recipient | sender | counter | nonce | ciphertext`
+
+### Security Properties
+
+| Property | Description |
+|----------|-------------|
+| **Forward Secrecy** | Ephemeral keys can be used for session establishment |
+| **Replay Protection** | Monotonic counters prevent message replay attacks |
+| **Authentication** | Poly1305 MAC ensures message integrity |
+| **Confidentiality** | Only sender and recipient can decrypt |
+
+### Overhead
+
+Per-peer E2EE adds 46 bytes overhead per message:
+- 2 bytes: Marker header
+- 4 bytes: Recipient node ID
+- 4 bytes: Sender node ID
+- 8 bytes: Counter (replay protection)
+- 12 bytes: Nonce
+- 16 bytes: Authentication tag
+
+### Use Cases
+
+- **Sensitive Commands**: Squad leader → specific soldier
+- **Private Messages**: Point-to-point communication within formation
+- **Credential Exchange**: Secure key material distribution
+
+### Encryption Layers
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Phase 1: Mesh-Wide (Formation Key)                             │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  All formation members can decrypt                       │    │
+│  │  Protects: External eavesdroppers                        │    │
+│  │  Overhead: 30 bytes                                      │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                  │
+│  Phase 2: Per-Peer E2EE (Session Key)                           │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  Only sender + recipient can decrypt                     │    │
+│  │  Protects: Other mesh members, compromised relays        │    │
+│  │  Overhead: 46 bytes                                      │    │
+│  └─────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ## Platform Requirements
 
 ### Linux
@@ -306,8 +398,7 @@ Contributions are welcome! Priority areas:
 
 1. **Android Implementation** (#410) - JNI bindings to Android Bluetooth API
 2. **Windows Implementation** (#412) - WinRT Bluetooth APIs
-3. **Per-Peer E2EE** (#413) - Phase 2 of security: per-peer encryption for sensitive formations
-4. **Hardware Testing** - Real-world validation on various devices
+3. **Hardware Testing** - Real-world validation on various devices
 
 Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
