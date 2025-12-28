@@ -24,19 +24,21 @@ import sys
 import math
 
 
-def get_credential_env_vars(backend):
-    """Return the credential environment variables based on backend."""
-    if backend == "automerge":
-        return [
-            "        HIVE_APP_ID: test-formation",
-            "        HIVE_SECRET_KEY: aGl2ZS10ZXN0LWZvcm1hdGlvbi1zZWNyZXQta2V5LTA=",  # base64 of "hive-test-formation-secret-key-0" (32 bytes)
-        ]
-    else:
-        return [
-            "        HIVE_APP_ID: ${HIVE_APP_ID}",
-            "        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}",
-            "        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}",
-        ]
+def get_credential_env_vars():
+    """Return backend-agnostic credential environment variables.
+
+    All credentials use env var substitution so the same topology works for both backends.
+    The comparison script sets the appropriate env vars before each deploy/reconfigure.
+    """
+    return [
+        # Common credential (app identifier)
+        "        HIVE_APP_ID: ${HIVE_APP_ID}",
+        # Automerge uses HIVE_SECRET_KEY
+        "        HIVE_SECRET_KEY: ${HIVE_SECRET_KEY}",
+        # Ditto uses HIVE_OFFLINE_TOKEN and HIVE_SHARED_KEY
+        "        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}",
+        "        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}",
+    ]
 
 
 def get_circuit_breaker_env_vars(failure_threshold=3, failure_window_secs=2, open_timeout_secs=2, success_threshold=2):
@@ -87,42 +89,34 @@ def calculate_hierarchy(total_nodes):
         return (8, 4, 4, 6)
 
 
-def get_tcp_connect_list(peers, topology_name, backend):
+def get_tcp_connect_list(peers, topology_name):
     """Generate TCP_CONNECT env var for mesh connectivity.
 
-    Docker's embedded DNS resolves container names on user-defined networks.
-    Containerlab container names are: clab-{topology-name}-{node-name}
-    Format for automerge: "peer_name|hostname:port,peer_name2|hostname2:port2,..."
-    Format for ditto: "hostname:port,hostname2:port2,..."
+    Uses unified format: "hostname:port" which both backends can parse.
+    (PR #511 fixed parsing to support containerlab format for both backends)
 
     Args:
         peers: List of (peer_name, port) tuples
         topology_name: Name of the containerlab topology
-        backend: Backend type ("automerge" or "ditto")
     """
     if not peers:
         return []
 
-    # Build connection string for all peers
+    # Build connection string - unified format works for both backends
     connections = []
     for peer_name, port in peers:
         container_name = f"clab-{topology_name}-{peer_name}"
-        if backend == "automerge":
-            connections.append(f"{peer_name}|{container_name}:{port}")
-        else:
-            # Ditto uses simple hostname:port format
-            connections.append(f"{container_name}:{port}")
+        connections.append(f"{container_name}:{port}")
 
     return [f"        TCP_CONNECT: \"{','.join(connections)}\""]
 
 
-def get_tcp_connect(node_name, parent_name, parent_port, name, backend):
+def get_tcp_connect(node_name, parent_name, parent_port, name):
     """Generate TCP_CONNECT env var for single peer connection.
 
     Docker's embedded DNS resolves container names on user-defined networks.
     Containerlab container names are: clab-{topology-name}-{node-name}
-    Format for automerge: "peer_name|hostname:port"
-    Format for ditto: "hostname:port"
+    Uses unified format: "hostname:port" which both backends can parse.
     """
     # Company commander has no parent
     if parent_name is None:
@@ -130,15 +124,15 @@ def get_tcp_connect(node_name, parent_name, parent_port, name, backend):
 
     # Use full container name as hostname (Docker DNS resolves this)
     container_name = f"clab-{name}-{parent_name}"
-    if backend == "automerge":
-        return [f"        TCP_CONNECT: \"{parent_name}|{container_name}:{parent_port}\""]
-    else:
-        # Ditto uses simple hostname:port format
-        return [f"        TCP_CONNECT: \"{container_name}:{parent_port}\""]
+    return [f"        TCP_CONNECT: \"{container_name}:{parent_port}\""]
 
 
-def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
-    """Generate hierarchical topology for Lab 4."""
+def generate_lab4_topology(name, total_nodes, bandwidth):
+    """Generate backend-agnostic hierarchical topology for Lab 4.
+
+    The topology uses ${BACKEND} env var substitution so the same topology
+    can be used for both ditto and automerge backends.
+    """
 
     soldiers_per_squad, squads_per_platoon, platoons_per_company, num_companies = calculate_hierarchy(total_nodes)
 
@@ -247,7 +241,7 @@ def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
 
         # Company commander: top of hierarchy, accepts incoming connections only
         # (platoon leaders connect UP to commander, not the other way around)
-        cred_vars = get_credential_env_vars(backend)
+        cred_vars = get_credential_env_vars()
         circuit_vars = get_circuit_breaker_env_vars()  # Lab defaults: aggressive (2s windows)
         tcp_connect = []  # No outgoing connections - commander accepts incoming only
         lines.extend([
@@ -281,8 +275,9 @@ def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
             # Also collect squad IDs for SQUAD_IDS env var
             squad_ids = [f"{platoon_id}-squad-{i}" for i in range(1, squads_per_platoon + 1)]
 
-            tcp_connect = get_tcp_connect_list(platoon_peers, name, backend)
-            squad_ids_env = [f"        SQUAD_IDS: \"{','.join(squad_ids)}\""] if backend == "automerge" else []
+            tcp_connect = get_tcp_connect_list(platoon_peers, name)
+            # Always include SQUAD_IDS - backend will use it if needed
+            squad_ids_env = [f"        SQUAD_IDS: \"{','.join(squad_ids)}\""]
             lines.extend([
                 f"    {leader_id}:",
                 "      kind: linux",
@@ -312,7 +307,7 @@ def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
                     squad_members.append(soldier_id)
 
                 # Squad leader connects to platoon leader
-                tcp_connect = get_tcp_connect(squad_leader_id, leader_id, node_ports[leader_id], name, backend)
+                tcp_connect = get_tcp_connect(squad_leader_id, leader_id, node_ports[leader_id], name)
                 lines.extend([
                     f"    {squad_leader_id}:",
                     "      kind: linux",
@@ -336,7 +331,7 @@ def generate_lab4_topology(name, total_nodes, bandwidth, backend="ditto"):
                     soldier_id = f"{squad_id}-soldier-{soldier_idx}"
 
                     # Soldiers connect to squad leader
-                    tcp_connect = get_tcp_connect(soldier_id, squad_leader_id, node_ports[squad_leader_id], name, backend)
+                    tcp_connect = get_tcp_connect(soldier_id, squad_leader_id, node_ports[squad_leader_id], name)
                     lines.extend([
                         f"    {soldier_id}:",
                         "      kind: linux",
@@ -378,14 +373,7 @@ def main():
     parser.add_argument(
         "--output",
         type=str,
-        help="Output file path (default: topologies/lab4-hierarchical-{nodes}n-{bandwidth}.yaml)"
-    )
-    parser.add_argument(
-        "--backend",
-        type=str,
-        choices=["ditto", "automerge"],
-        default="ditto",
-        help="Backend type: ditto (default) or automerge"
+        help="Output file path (default: topologies/lab4-{nodes}n-{bandwidth}.yaml)"
     )
     parser.add_argument(
         "--name",
@@ -395,19 +383,17 @@ def main():
 
     args = parser.parse_args()
 
-    # Generate name based on backend - keep short for DNS label limit (63 chars)
+    # Generate name - keep short for DNS label limit (63 chars)
     # Container names will be: clab-{name}-{node-id}
     # Longest node-id is ~40 chars: company-1-platoon-1-squad-1-soldier-1
     # So name should be ~18 chars max to stay under 63
     if args.name:
         name = args.name
-    elif args.backend == "automerge":
-        name = f"am{args.nodes}n"  # e.g. "am24n" instead of "lab4-automerge-24n-1gbps"
     else:
-        name = f"d{args.nodes}n"  # e.g. "d24n" for ditto
+        name = f"lab4-{args.nodes}n"  # e.g. "lab4-24n" - backend-agnostic
 
-    # Generate topology
-    topology = generate_lab4_topology(name, args.nodes, args.bandwidth, args.backend)
+    # Generate topology (backend-agnostic - uses ${BACKEND} substitution)
+    topology = generate_lab4_topology(name, args.nodes, args.bandwidth)
 
     # Determine output path
     if args.output:
