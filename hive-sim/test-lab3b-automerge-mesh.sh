@@ -70,7 +70,7 @@ for NODE_COUNT in "${NODE_COUNTS[@]}"; do
         echo "  [${CURRENT_TEST}/${TOTAL_TESTS}] ${TEST_NAME}"
 
         TOPO_FILE="${RESULTS_DIR}/${TEST_NAME}.yaml"
-        python3 generate-flat-mesh-automerge-topology.py "${NODE_COUNT}" "${BANDWIDTH}" "${TOPO_FILE}"
+        python3 generate-flat-mesh-topology.py --nodes "${NODE_COUNT}" --bandwidth "${BANDWIDTH}" --backend automerge --output "${TOPO_FILE}"
 
         containerlab deploy -t "$TOPO_FILE" --reconfigure > /dev/null 2>&1
         echo "    Running for ${TEST_DURATION_SECS}s..."
