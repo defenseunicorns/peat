@@ -205,6 +205,20 @@ impl PeerManager {
         Some((node_id, reason))
     }
 
+    /// Handle a peer disconnection by NodeId
+    ///
+    /// Alternative to on_disconnected() when only NodeId is known (e.g., ESP32).
+    /// Returns true if the peer was found and marked disconnected.
+    pub fn on_disconnected_by_node_id(&self, node_id: NodeId, _reason: DisconnectReason) -> bool {
+        let mut peers = self.peers.write().unwrap();
+        if let Some(peer) = peers.get_mut(&node_id) {
+            peer.is_connected = false;
+            true
+        } else {
+            false
+        }
+    }
+
     /// Register a peer from an incoming BLE connection
     ///
     /// Called when a remote device connects to us as a peripheral.

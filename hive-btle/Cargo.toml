@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["(r)evolve - Revolve Team LLC"]
 license = "Apache-2.0"
 description = "Bluetooth Low Energy mesh transport for HIVE Protocol"
-repository = "https://github.com/revolveteam/hive"
+repository = "https://github.com/r-evolve/hive-btle"
 keywords = ["bluetooth", "ble", "mesh", "hive", "tactical"]
 categories = ["network-programming", "embedded"]
 
