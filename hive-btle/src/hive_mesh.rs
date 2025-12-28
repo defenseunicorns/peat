@@ -43,10 +43,12 @@ use alloc::{string::String, sync::Arc, vec::Vec};
 #[cfg(feature = "std")]
 use std::sync::Arc;
 
+use crate::document::ENCRYPTED_MARKER;
 use crate::document_sync::DocumentSync;
 use crate::observer::{DisconnectReason, HiveEvent, HiveObserver};
 use crate::peer::{HivePeer, PeerManagerConfig};
 use crate::peer_manager::PeerManager;
+use crate::security::MeshEncryptionKey;
 use crate::sync::crdt::{EventType, PeripheralType};
 use crate::NodeId;
 
@@ -76,6 +78,13 @@ pub struct HiveMeshConfig {
 
     /// Whether to auto-broadcast on emergency/ack
     pub auto_broadcast_events: bool,
+
+    /// Optional shared secret for mesh-wide encryption (32 bytes)
+    ///
+    /// When set, all documents are encrypted using ChaCha20-Poly1305 before
+    /// transmission and decrypted upon receipt. All nodes in the mesh must
+    /// share the same secret to communicate.
+    pub encryption_secret: Option<[u8; 32]>,
 }
 
 impl HiveMeshConfig {
@@ -89,7 +98,17 @@ impl HiveMeshConfig {
             peer_config: PeerManagerConfig::with_mesh_id(mesh_id),
             sync_interval_ms: 5000,
             auto_broadcast_events: true,
+            encryption_secret: None,
         }
+    }
+
+    /// Enable mesh-wide encryption with a shared secret
+    ///
+    /// All documents will be encrypted using ChaCha20-Poly1305 before
+    /// transmission. All mesh participants must use the same secret.
+    pub fn with_encryption(mut self, secret: [u8; 32]) -> Self {
+        self.encryption_secret = Some(secret);
+        self
     }
 
     /// Set peripheral type
@@ -140,6 +159,9 @@ pub struct HiveMesh {
 
     /// Last cleanup time
     last_cleanup_ms: std::sync::atomic::AtomicU32,
+
+    /// Optional mesh-wide encryption key (derived from shared secret)
+    encryption_key: Option<MeshEncryptionKey>,
 }
 
 #[cfg(feature = "std")]
@@ -153,6 +175,11 @@ impl HiveMesh {
             config.peripheral_type,
         );
 
+        // Derive encryption key from shared secret if configured
+        let encryption_key = config
+            .encryption_secret
+            .map(|secret| MeshEncryptionKey::from_shared_secret(&config.mesh_id, &secret));
+
         Self {
             config,
             peer_manager,
@@ -160,6 +187,89 @@ impl HiveMesh {
             observers: ObserverManager::new(),
             last_sync_ms: std::sync::atomic::AtomicU32::new(0),
             last_cleanup_ms: std::sync::atomic::AtomicU32::new(0),
+            encryption_key,
+        }
+    }
+
+    // ==================== Encryption ====================
+
+    /// Check if mesh-wide encryption is enabled
+    pub fn is_encryption_enabled(&self) -> bool {
+        self.encryption_key.is_some()
+    }
+
+    /// Enable mesh-wide encryption with a shared secret
+    ///
+    /// Derives a ChaCha20-Poly1305 key from the secret using HKDF-SHA256.
+    /// All mesh participants must use the same secret to communicate.
+    pub fn enable_encryption(&mut self, secret: &[u8; 32]) {
+        self.encryption_key = Some(MeshEncryptionKey::from_shared_secret(
+            &self.config.mesh_id,
+            secret,
+        ));
+    }
+
+    /// Disable mesh-wide encryption
+    pub fn disable_encryption(&mut self) {
+        self.encryption_key = None;
+    }
+
+    /// Encrypt document bytes for transmission
+    ///
+    /// Returns the encrypted bytes with ENCRYPTED_MARKER prefix, or the
+    /// original bytes if encryption is disabled.
+    fn encrypt_document(&self, plaintext: &[u8]) -> Vec<u8> {
+        match &self.encryption_key {
+            Some(key) => {
+                // Encrypt and prepend marker
+                match key.encrypt_to_bytes(plaintext) {
+                    Ok(ciphertext) => {
+                        let mut buf = Vec::with_capacity(2 + ciphertext.len());
+                        buf.push(ENCRYPTED_MARKER);
+                        buf.push(0x00); // reserved
+                        buf.extend_from_slice(&ciphertext);
+                        buf
+                    }
+                    Err(e) => {
+                        log::error!("Encryption failed: {}", e);
+                        // Fall back to unencrypted on error (shouldn't happen)
+                        plaintext.to_vec()
+                    }
+                }
+            }
+            None => plaintext.to_vec(),
+        }
+    }
+
+    /// Decrypt document bytes received from peer
+    ///
+    /// Returns the decrypted bytes if encrypted and valid, or the original
+    /// bytes if not encrypted. Returns None if decryption fails.
+    fn decrypt_document<'a>(&self, data: &'a [u8]) -> Option<std::borrow::Cow<'a, [u8]>> {
+        // Check for encrypted marker
+        if data.len() >= 2 && data[0] == ENCRYPTED_MARKER {
+            // Encrypted document
+            let _reserved = data[1];
+            let encrypted_payload = &data[2..];
+
+            match &self.encryption_key {
+                Some(key) => match key.decrypt_from_bytes(encrypted_payload) {
+                    Ok(plaintext) => Some(std::borrow::Cow::Owned(plaintext)),
+                    Err(e) => {
+                        log::warn!("Decryption failed (wrong key or corrupted): {}", e);
+                        None
+                    }
+                },
+                None => {
+                    log::warn!("Received encrypted document but encryption not enabled");
+                    None
+                }
+            }
+        } else {
+            // Unencrypted document - pass through
+            // If we have encryption enabled, we could optionally reject unencrypted
+            // documents for stricter security. For now, accept for backward compat.
+            Some(std::borrow::Cow::Borrowed(data))
         }
     }
 
@@ -206,25 +316,27 @@ impl HiveMesh {
     /// Send an emergency alert
     ///
     /// Returns the document bytes to broadcast to all peers.
+    /// If encryption is enabled, the document is encrypted.
     pub fn send_emergency(&self, timestamp: u64) -> Vec<u8> {
         let data = self.document_sync.send_emergency(timestamp);
         self.notify(HiveEvent::MeshStateChanged {
             peer_count: self.peer_manager.peer_count(),
             connected_count: self.peer_manager.connected_count(),
         });
-        data
+        self.encrypt_document(&data)
     }
 
     /// Send an ACK response
     ///
     /// Returns the document bytes to broadcast to all peers.
+    /// If encryption is enabled, the document is encrypted.
     pub fn send_ack(&self, timestamp: u64) -> Vec<u8> {
         let data = self.document_sync.send_ack(timestamp);
         self.notify(HiveEvent::MeshStateChanged {
             peer_count: self.peer_manager.peer_count(),
             connected_count: self.peer_manager.connected_count(),
         });
-        data
+        self.encrypt_document(&data)
     }
 
     /// Clear the current event (emergency or ack)
@@ -254,13 +366,14 @@ impl HiveMesh {
     /// Creates an emergency event that tracks ACKs from all known peers.
     /// Pass the list of known peer node IDs to track.
     /// Returns the document bytes to broadcast.
+    /// If encryption is enabled, the document is encrypted.
     pub fn start_emergency(&self, timestamp: u64, known_peers: &[u32]) -> Vec<u8> {
         let data = self.document_sync.start_emergency(timestamp, known_peers);
         self.notify(HiveEvent::MeshStateChanged {
             peer_count: self.peer_manager.peer_count(),
             connected_count: self.peer_manager.connected_count(),
         });
-        data
+        self.encrypt_document(&data)
     }
 
     /// Start a new emergency using all currently known peers
@@ -279,6 +392,7 @@ impl HiveMesh {
     /// Record our ACK for the current emergency
     ///
     /// Returns the document bytes to broadcast, or None if no emergency is active.
+    /// If encryption is enabled, the document is encrypted.
     pub fn ack_emergency(&self, timestamp: u64) -> Option<Vec<u8>> {
         let result = self.document_sync.ack_emergency(timestamp);
         if result.is_some() {
@@ -287,7 +401,7 @@ impl HiveMesh {
                 connected_count: self.peer_manager.connected_count(),
             });
         }
-        result
+        result.map(|data| self.encrypt_document(&data))
     }
 
     /// Clear the current emergency event
@@ -402,6 +516,7 @@ impl HiveMesh {
     /// Called when data is received from a peer
     ///
     /// Parses the document, merges it, and generates appropriate events.
+    /// If encryption is enabled, decrypts the document first.
     /// Returns the source NodeId and whether the document contained an event.
     pub fn on_ble_data_received(
         &self,
@@ -412,8 +527,11 @@ impl HiveMesh {
         // Get node ID from identifier
         let node_id = self.peer_manager.get_node_id(identifier)?;
 
+        // Decrypt if encrypted
+        let decrypted = self.decrypt_document(data)?;
+
         // Merge the document
-        let result = self.document_sync.merge_document(data)?;
+        let result = self.document_sync.merge_document(&decrypted)?;
 
         // Record sync
         self.peer_manager.record_sync(node_id, now_ms);
@@ -450,14 +568,18 @@ impl HiveMesh {
     /// Called when data is received but we don't have the identifier mapped
     ///
     /// Use this when receiving data from a peripheral we discovered.
+    /// If encryption is enabled, decrypts the document first.
     pub fn on_ble_data_received_from_node(
         &self,
         node_id: NodeId,
         data: &[u8],
         now_ms: u64,
     ) -> Option<DataReceivedResult> {
+        // Decrypt if encrypted
+        let decrypted = self.decrypt_document(data)?;
+
         // Merge the document
-        let result = self.document_sync.merge_document(data)?;
+        let result = self.document_sync.merge_document(&decrypted)?;
 
         // Record sync
         self.peer_manager.record_sync(node_id, now_ms);
@@ -496,14 +618,18 @@ impl HiveMesh {
     /// This is the simplest data receive method - it extracts the source node_id
     /// from the document itself. Use this when you don't track identifiers
     /// (e.g., ESP32 NimBLE).
+    /// If encryption is enabled, decrypts the document first.
     pub fn on_ble_data(
         &self,
         identifier: &str,
         data: &[u8],
         now_ms: u64,
     ) -> Option<DataReceivedResult> {
+        // Decrypt if encrypted
+        let decrypted = self.decrypt_document(data)?;
+
         // Merge the document (extracts node_id internally)
-        let result = self.document_sync.merge_document(data)?;
+        let result = self.document_sync.merge_document(&decrypted)?;
 
         // Record sync using the source_node from the merged document
         self.peer_manager.record_sync(result.source_node, now_ms);
@@ -577,7 +703,8 @@ impl HiveMesh {
             self.last_sync_ms.store(now_ms_32, Ordering::Relaxed);
             // Only broadcast if we have connected peers
             if self.peer_manager.connected_count() > 0 {
-                return Some(self.document_sync.build_document());
+                let doc = self.document_sync.build_document();
+                return Some(self.encrypt_document(&doc));
             }
         }
 
@@ -637,8 +764,11 @@ impl HiveMesh {
     }
 
     /// Build current document for transmission
+    ///
+    /// If encryption is enabled, the document is encrypted.
     pub fn build_document(&self) -> Vec<u8> {
-        self.document_sync.build_document()
+        let doc = self.document_sync.build_document();
+        self.encrypt_document(&doc)
     }
 
     /// Get peers that should be synced with
@@ -940,5 +1070,178 @@ mod tests {
         );
         assert!(peer.is_some());
         assert_eq!(mesh.peer_count(), 1);
+    }
+
+    // ==================== Encryption Tests ====================
+
+    fn create_encrypted_mesh(node_id: u32, callsign: &str, secret: [u8; 32]) -> HiveMesh {
+        let config =
+            HiveMeshConfig::new(NodeId::new(node_id), callsign, "TEST").with_encryption(secret);
+        HiveMesh::new(config)
+    }
+
+    #[test]
+    fn test_encryption_enabled() {
+        let secret = [0x42u8; 32];
+        let mesh = create_encrypted_mesh(0x11111111, "ALPHA-1", secret);
+
+        assert!(mesh.is_encryption_enabled());
+    }
+
+    #[test]
+    fn test_encryption_disabled_by_default() {
+        let mesh = create_mesh(0x11111111, "ALPHA-1");
+
+        assert!(!mesh.is_encryption_enabled());
+    }
+
+    #[test]
+    fn test_encrypted_document_exchange() {
+        let secret = [0x42u8; 32];
+        let mesh1 = create_encrypted_mesh(0x11111111, "ALPHA-1", secret);
+        let mesh2 = create_encrypted_mesh(0x22222222, "BRAVO-1", secret);
+
+        // mesh1 sends document
+        let doc = mesh1.build_document();
+
+        // Document should be encrypted (starts with ENCRYPTED_MARKER)
+        assert!(doc.len() >= 2);
+        assert_eq!(doc[0], crate::document::ENCRYPTED_MARKER);
+
+        // mesh2 receives and decrypts
+        let result = mesh2.on_ble_data_received_from_node(NodeId::new(0x11111111), &doc, 1000);
+
+        assert!(result.is_some());
+        let result = result.unwrap();
+        assert_eq!(result.source_node.as_u32(), 0x11111111);
+    }
+
+    #[test]
+    fn test_encrypted_emergency_exchange() {
+        let secret = [0x42u8; 32];
+        let mesh1 = create_encrypted_mesh(0x11111111, "ALPHA-1", secret);
+        let mesh2 = create_encrypted_mesh(0x22222222, "BRAVO-1", secret);
+
+        let observer = Arc::new(CollectingObserver::new());
+        mesh2.add_observer(observer.clone());
+
+        // mesh1 sends emergency
+        let doc = mesh1.send_emergency(1000);
+
+        // mesh2 receives and decrypts
+        let result = mesh2.on_ble_data_received_from_node(NodeId::new(0x11111111), &doc, 1000);
+
+        assert!(result.is_some());
+        let result = result.unwrap();
+        assert!(result.is_emergency);
+
+        // Check EmergencyReceived event was fired
+        let events = observer.events();
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, HiveEvent::EmergencyReceived { .. })));
+    }
+
+    #[test]
+    fn test_wrong_key_fails_decrypt() {
+        let secret1 = [0x42u8; 32];
+        let secret2 = [0x43u8; 32]; // Different key
+        let mesh1 = create_encrypted_mesh(0x11111111, "ALPHA-1", secret1);
+        let mesh2 = create_encrypted_mesh(0x22222222, "BRAVO-1", secret2);
+
+        // mesh1 sends document
+        let doc = mesh1.build_document();
+
+        // mesh2 cannot decrypt (wrong key)
+        let result = mesh2.on_ble_data_received_from_node(NodeId::new(0x11111111), &doc, 1000);
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_unencrypted_mesh_can_read_unencrypted() {
+        let mesh1 = create_mesh(0x11111111, "ALPHA-1");
+        let mesh2 = create_mesh(0x22222222, "BRAVO-1");
+
+        // mesh1 sends document (unencrypted)
+        let doc = mesh1.build_document();
+
+        // mesh2 receives (also unencrypted)
+        let result = mesh2.on_ble_data_received_from_node(NodeId::new(0x11111111), &doc, 1000);
+
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_encrypted_mesh_can_receive_unencrypted() {
+        // Backward compatibility: encrypted mesh can receive unencrypted docs
+        let secret = [0x42u8; 32];
+        let mesh1 = create_mesh(0x11111111, "ALPHA-1"); // unencrypted
+        let mesh2 = create_encrypted_mesh(0x22222222, "BRAVO-1", secret); // encrypted
+
+        // mesh1 sends unencrypted document
+        let doc = mesh1.build_document();
+
+        // mesh2 can receive unencrypted (backward compat)
+        let result = mesh2.on_ble_data_received_from_node(NodeId::new(0x11111111), &doc, 1000);
+
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_unencrypted_mesh_cannot_receive_encrypted() {
+        let secret = [0x42u8; 32];
+        let mesh1 = create_encrypted_mesh(0x11111111, "ALPHA-1", secret); // encrypted
+        let mesh2 = create_mesh(0x22222222, "BRAVO-1"); // unencrypted
+
+        // mesh1 sends encrypted document
+        let doc = mesh1.build_document();
+
+        // mesh2 cannot decrypt (no key)
+        let result = mesh2.on_ble_data_received_from_node(NodeId::new(0x11111111), &doc, 1000);
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_enable_disable_encryption() {
+        let mut mesh = create_mesh(0x11111111, "ALPHA-1");
+
+        assert!(!mesh.is_encryption_enabled());
+
+        // Enable encryption
+        let secret = [0x42u8; 32];
+        mesh.enable_encryption(&secret);
+        assert!(mesh.is_encryption_enabled());
+
+        // Build document should now be encrypted
+        let doc = mesh.build_document();
+        assert_eq!(doc[0], crate::document::ENCRYPTED_MARKER);
+
+        // Disable encryption
+        mesh.disable_encryption();
+        assert!(!mesh.is_encryption_enabled());
+
+        // Build document should now be unencrypted
+        let doc = mesh.build_document();
+        assert_ne!(doc[0], crate::document::ENCRYPTED_MARKER);
+    }
+
+    #[test]
+    fn test_encryption_overhead() {
+        let secret = [0x42u8; 32];
+        let mesh_encrypted = create_encrypted_mesh(0x11111111, "ALPHA-1", secret);
+        let mesh_unencrypted = create_mesh(0x22222222, "BRAVO-1");
+
+        let doc_encrypted = mesh_encrypted.build_document();
+        let doc_unencrypted = mesh_unencrypted.build_document();
+
+        // Encrypted doc should be larger by:
+        // - 2 bytes marker header (0xAE + reserved)
+        // - 12 bytes nonce
+        // - 16 bytes auth tag
+        // Total: 30 bytes overhead
+        let overhead = doc_encrypted.len() - doc_unencrypted.len();
+        assert_eq!(overhead, 30); // 2 (marker) + 12 (nonce) + 16 (tag)
     }
 }

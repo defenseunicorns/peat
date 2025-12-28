@@ -105,6 +105,7 @@ pub mod persistence;
 pub mod phy;
 pub mod platform;
 pub mod power;
+pub mod security;
 pub mod sync;
 pub mod transport;
 
@@ -129,7 +130,9 @@ pub use sync::{GattSyncProtocol, SyncConfig, SyncState};
 pub use transport::{BleConnection, BluetoothLETransport, MeshTransport, TransportCapabilities};
 
 // New centralized mesh management types
-pub use document::{HiveDocument, MergeResult, EXTENDED_MARKER};
+pub use document::{HiveDocument, MergeResult, ENCRYPTED_MARKER, EXTENDED_MARKER};
+
+// Security (mesh-wide encryption)
 pub use document_sync::{DocumentCheck, DocumentSync};
 #[cfg(feature = "std")]
 pub use hive_mesh::{DataReceivedResult, HiveMesh, HiveMeshConfig};
@@ -138,6 +141,7 @@ pub use observer::{CollectingObserver, ObserverManager};
 pub use observer::{DisconnectReason as HiveDisconnectReason, HiveEvent, HiveObserver};
 pub use peer::{HivePeer, PeerManagerConfig, SignalStrength};
 pub use peer_manager::PeerManager;
+pub use security::{EncryptedDocument, EncryptionError, MeshEncryptionKey};
 
 // Gossip and persistence abstractions
 #[cfg(feature = "std")]
