@@ -193,6 +193,52 @@ hive-btle defines a custom GATT service for mesh communication:
 | `0x0004` | Command | Control commands (connect, disconnect, etc.) |
 | `0x0005` | Status | Connection status and errors |
 
+## Mesh-Wide Encryption
+
+hive-btle supports optional mesh-wide encryption using ChaCha20-Poly1305 AEAD. When enabled, all documents are encrypted before transmission, providing confidentiality across multi-hop BLE relay.
+
+### Enabling Encryption
+
+```rust
+use hive_btle::{HiveMesh, HiveMeshConfig, NodeId};
+
+// Create a 32-byte shared secret (distribute securely to all mesh nodes)
+let secret: [u8; 32] = [0x42; 32]; // Use a real secret in production!
+
+// Configure mesh with encryption
+let config = HiveMeshConfig::new(NodeId::new(0x12345678), "ALPHA-1", "DEMO")
+    .with_encryption(secret);
+
+let mesh = HiveMesh::new(config);
+
+// All documents sent through this mesh are now encrypted
+let encrypted_doc = mesh.build_document();
+```
+
+### How It Works
+
+- **Algorithm**: ChaCha20-Poly1305 authenticated encryption
+- **Key Derivation**: HKDF-SHA256 from shared secret + mesh ID
+- **Overhead**: 30 bytes per document (2 marker + 12 nonce + 16 auth tag)
+- **Wire Format**: `ENCRYPTED_MARKER (0xAE) | reserved | nonce | ciphertext`
+
+### Multi-Hop Security
+
+```
+Node A ──encrypted──> Node B (relay) ──encrypted──> Node C
+                           │
+                    Can forward but
+                    only decrypts if
+                    has formation key
+```
+
+Nodes without the shared secret can relay encrypted documents but cannot read their contents. This provides end-to-end confidentiality even across untrusted relay nodes.
+
+### Backward Compatibility
+
+- Encrypted nodes can receive unencrypted documents (for gradual rollout)
+- Unencrypted nodes will reject encrypted documents they can't decrypt
+
 ## Platform Requirements
 
 ### Linux
@@ -259,8 +305,8 @@ cargo test sync::
 Contributions are welcome! Priority areas:
 
 1. **Android Implementation** (#410) - JNI bindings to Android Bluetooth API
-2. **Security Integration** (#413) - BLE pairing + application-layer encryption
-3. **Windows Implementation** (#412) - WinRT Bluetooth APIs
+2. **Windows Implementation** (#412) - WinRT Bluetooth APIs
+3. **Per-Peer E2EE** (#413) - Phase 2 of security: per-peer encryption for sensitive formations
 4. **Hardware Testing** - Real-world validation on various devices
 
 Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
