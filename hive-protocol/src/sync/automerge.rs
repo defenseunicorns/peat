@@ -97,7 +97,7 @@ impl AutomergeBackend {
 
     /// Helper: Convert Automerge document to our Document type
     ///
-    /// For Phase 1, we read directly from the Automerge document using map_range.
+    /// Issue #518: Now supports nested objects and proper Counter extraction.
     fn automerge_to_document(doc: &Automerge, doc_id: DocumentId) -> Result<Document> {
         use automerge::ReadDoc;
 
@@ -110,9 +110,10 @@ impl AutomergeBackend {
             // Iterate over the map entries
             for item in doc.map_range(&obj_id, ..) {
                 let key_str = item.key.to_string();
-                if let Ok(Some((value, _))) = doc.get(&obj_id, &item.key as &str) {
+                if let Ok(Some((value, nested_id))) = doc.get(&obj_id, &item.key as &str) {
                     // Convert the Automerge value to serde_json::Value
-                    if let Some(json_val) = Self::automerge_scalar_to_json(&value) {
+                    // Pass the nested_id for recursive object traversal
+                    if let Some(json_val) = Self::automerge_value_to_json(doc, &value, &nested_id) {
                         fields.insert(key_str, json_val);
                     }
                 }
@@ -126,46 +127,106 @@ impl AutomergeBackend {
         })
     }
 
-    /// Helper: Convert Automerge scalar value to serde_json::Value
-    fn automerge_scalar_to_json(value: &automerge::Value) -> Option<Value> {
+    /// Helper: Convert Automerge value to serde_json::Value with nested object support.
+    ///
+    /// Issue #518: This function properly handles:
+    /// - Counter values (extracts actual i64 value)
+    /// - Nested objects (recursively traverses Maps and Lists)
+    /// - All scalar types
+    ///
+    /// # Arguments
+    /// * `doc` - The Automerge document for nested object traversal
+    /// * `value` - The Automerge value to convert
+    /// * `obj_id` - The object ID (used when value is an Object type)
+    fn automerge_value_to_json(
+        doc: &Automerge,
+        value: &automerge::Value,
+        obj_id: &automerge::ObjId,
+    ) -> Option<Value> {
+        use automerge::ReadDoc;
+
         match value {
-            automerge::Value::Scalar(scalar) => {
-                let json_val = match scalar.as_ref() {
-                    automerge::ScalarValue::Str(s) => Value::String(s.to_string()),
-                    automerge::ScalarValue::Int(i) => Value::Number(serde_json::Number::from(*i)),
-                    automerge::ScalarValue::Uint(u) => Value::Number(serde_json::Number::from(*u)),
-                    automerge::ScalarValue::F64(f) => serde_json::Number::from_f64(*f)
-                        .map(Value::Number)
-                        .unwrap_or(Value::Null),
-                    automerge::ScalarValue::Boolean(b) => Value::Bool(*b),
-                    automerge::ScalarValue::Null => Value::Null,
-                    automerge::ScalarValue::Bytes(bytes) => {
-                        // Encode bytes as array of numbers
-                        let byte_array: Vec<serde_json::Value> = bytes
-                            .iter()
-                            .map(|b| Value::Number(serde_json::Number::from(*b)))
-                            .collect();
-                        Value::Array(byte_array)
+            automerge::Value::Scalar(scalar) => Self::automerge_scalar_to_json(scalar.as_ref()),
+            automerge::Value::Object(obj_type) => {
+                // Issue #518: Recursively convert nested objects
+                match obj_type {
+                    automerge::ObjType::Map | automerge::ObjType::Table => {
+                        // Convert map to JSON object
+                        let mut map = serde_json::Map::new();
+                        for item in doc.map_range(obj_id, ..) {
+                            let key = item.key.to_string();
+                            if let Ok(Some((nested_value, nested_obj_id))) =
+                                doc.get(obj_id, &item.key as &str)
+                            {
+                                if let Some(json_val) = Self::automerge_value_to_json(
+                                    doc,
+                                    &nested_value,
+                                    &nested_obj_id,
+                                ) {
+                                    map.insert(key, json_val);
+                                }
+                            }
+                        }
+                        Some(Value::Object(map))
                     }
-                    automerge::ScalarValue::Counter(_c) => {
-                        // Counters don't have a simple get method, just convert to i64
-                        // The Counter type doesn't expose the value directly in 0.7.1
-                        // So we'll just return 0 as a placeholder
-                        Value::Number(serde_json::Number::from(0))
+                    automerge::ObjType::List => {
+                        // Convert list to JSON array
+                        let length = doc.length(obj_id);
+                        let mut arr = Vec::with_capacity(length);
+                        for idx in 0..length {
+                            if let Ok(Some((nested_value, nested_obj_id))) = doc.get(obj_id, idx) {
+                                if let Some(json_val) = Self::automerge_value_to_json(
+                                    doc,
+                                    &nested_value,
+                                    &nested_obj_id,
+                                ) {
+                                    arr.push(json_val);
+                                }
+                            }
+                        }
+                        Some(Value::Array(arr))
                     }
-                    automerge::ScalarValue::Timestamp(ts) => {
-                        Value::Number(serde_json::Number::from(*ts))
+                    automerge::ObjType::Text => {
+                        // Convert text to string
+                        let text = doc.text(obj_id).ok()?;
+                        Some(Value::String(text))
                     }
-                    automerge::ScalarValue::Unknown { .. } => Value::Null,
-                };
-                Some(json_val)
-            }
-            automerge::Value::Object(_) => {
-                // For nested objects, return null for Phase 1
-                // In production, you'd recursively convert
-                Some(Value::Null)
+                }
             }
         }
+    }
+
+    /// Helper: Convert Automerge scalar value to serde_json::Value
+    ///
+    /// Issue #518: Counter values now properly extract the i64 value.
+    fn automerge_scalar_to_json(scalar: &automerge::ScalarValue) -> Option<Value> {
+        let json_val = match scalar {
+            automerge::ScalarValue::Str(s) => Value::String(s.to_string()),
+            automerge::ScalarValue::Int(i) => Value::Number(serde_json::Number::from(*i)),
+            automerge::ScalarValue::Uint(u) => Value::Number(serde_json::Number::from(*u)),
+            automerge::ScalarValue::F64(f) => serde_json::Number::from_f64(*f)
+                .map(Value::Number)
+                .unwrap_or(Value::Null),
+            automerge::ScalarValue::Boolean(b) => Value::Bool(*b),
+            automerge::ScalarValue::Null => Value::Null,
+            automerge::ScalarValue::Bytes(bytes) => {
+                // Encode bytes as array of numbers
+                let byte_array: Vec<serde_json::Value> = bytes
+                    .iter()
+                    .map(|b| Value::Number(serde_json::Number::from(*b)))
+                    .collect();
+                Value::Array(byte_array)
+            }
+            automerge::ScalarValue::Counter(c) => {
+                // Issue #518: Extract actual counter value using From<&Counter> for i64
+                // The Counter type implements From trait to convert to i64
+                let counter_value: i64 = i64::from(c);
+                Value::Number(serde_json::Number::from(counter_value))
+            }
+            automerge::ScalarValue::Timestamp(ts) => Value::Number(serde_json::Number::from(*ts)),
+            automerge::ScalarValue::Unknown { .. } => Value::Null,
+        };
+        Some(json_val)
     }
 
     /// Helper: Apply Document fields to Automerge doc
@@ -318,10 +379,9 @@ impl AutomergeBackend {
             // === Negation query (Issue #357) ===
             Query::Not(inner) => Ok(!self.matches_query(document, inner)?),
 
-            Query::Custom(_) => {
-                // Custom queries not supported in initial implementation
-                Err(Error::Internal("Custom queries not yet supported".into()))
-            }
+            // === Custom query support (Issue #517) ===
+            // Evaluate DQL-like custom queries using pattern-based parser
+            Query::Custom(query_str) => Ok(evaluate_custom_query(document, query_str)),
 
             // === Spatial queries (Issue #356) ===
             Query::WithinRadius {
@@ -2855,6 +2915,246 @@ impl crate::storage::HierarchicalStorageCapable for AutomergeIrohBackend {
     }
 }
 
+// ============================================================================
+// Custom Query Parser (Issue #517)
+// ============================================================================
+//
+// This module provides a simple pattern-based query evaluator for DQL-like
+// custom queries. Instead of implementing a full SQL parser, we handle the
+// specific patterns used in HIVE Protocol.
+//
+// Supported patterns:
+// - `field == 'value'` / `field == true/false`
+// - `field STARTS WITH 'prefix'`
+// - `field ENDS WITH 'suffix'`
+// - `CONTAINS(field, 'value')`
+// - `A AND B` / `A OR B` (compound expressions)
+//
+// For unrecognized patterns, we return `true` (match all) as a conservative
+// fallback - this ensures we never hide documents that should match.
+// ============================================================================
+
+/// Evaluate a custom DQL-like query string against a document.
+///
+/// This is a pattern-based evaluator that handles the specific query patterns
+/// used in HIVE Protocol. For unrecognized patterns, returns `true` (conservative).
+///
+/// # Arguments
+/// * `doc` - The document to match against
+/// * `query_str` - The DQL-like query string (e.g., "collection_name == 'squad_summaries'")
+///
+/// # Returns
+/// * `true` if the document matches the query (or query is unrecognized)
+/// * `false` if the document definitely doesn't match
+fn evaluate_custom_query(doc: &Document, query_str: &str) -> bool {
+    let trimmed = query_str.trim();
+
+    // Handle compound OR expressions (lowest precedence)
+    // Split on " OR " but be careful not to split inside quotes
+    if let Some((left, right)) = split_compound(trimmed, " OR ") {
+        return evaluate_custom_query(doc, left) || evaluate_custom_query(doc, right);
+    }
+
+    // Handle compound AND expressions
+    if let Some((left, right)) = split_compound(trimmed, " AND ") {
+        return evaluate_custom_query(doc, left) && evaluate_custom_query(doc, right);
+    }
+
+    // Strip outer parentheses if present
+    let expr = if trimmed.starts_with('(') && trimmed.ends_with(')') {
+        &trimmed[1..trimmed.len() - 1]
+    } else {
+        trimmed
+    };
+
+    // Pattern: CONTAINS(field, 'value')
+    if expr.starts_with("CONTAINS(") && expr.ends_with(')') {
+        return evaluate_contains(doc, expr);
+    }
+
+    // Pattern: field == 'value' or field == true/false
+    if let Some((field, value)) = parse_equality(expr) {
+        return evaluate_equality(doc, field, value);
+    }
+
+    // Pattern: field STARTS WITH 'prefix'
+    if let Some((field, prefix)) = parse_starts_with(expr) {
+        return evaluate_starts_with(doc, field, prefix);
+    }
+
+    // Pattern: field ENDS WITH 'suffix'
+    if let Some((field, suffix)) = parse_ends_with(expr) {
+        return evaluate_ends_with(doc, field, suffix);
+    }
+
+    // Unrecognized pattern: return true (conservative fallback)
+    // This ensures we never hide documents that should match
+    true
+}
+
+/// Split a compound expression on a delimiter, respecting parentheses and quotes.
+fn split_compound<'a>(expr: &'a str, delimiter: &str) -> Option<(&'a str, &'a str)> {
+    let mut depth = 0;
+    let mut in_quote = false;
+    let bytes = expr.as_bytes();
+
+    for i in 0..expr.len() {
+        match bytes[i] {
+            b'\'' => in_quote = !in_quote,
+            b'(' if !in_quote => depth += 1,
+            b')' if !in_quote => depth -= 1,
+            _ if !in_quote && depth == 0 && expr[i..].starts_with(delimiter) => {
+                return Some((&expr[..i], &expr[i + delimiter.len()..]));
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Parse equality expression: `field == 'value'` or `field == true/false`
+fn parse_equality(expr: &str) -> Option<(&str, &str)> {
+    let parts: Vec<&str> = expr.splitn(2, "==").collect();
+    if parts.len() == 2 {
+        let field = parts[0].trim();
+        let value = parts[1].trim();
+        Some((field, value))
+    } else {
+        None
+    }
+}
+
+/// Parse STARTS WITH expression: `field STARTS WITH 'prefix'`
+fn parse_starts_with(expr: &str) -> Option<(&str, &str)> {
+    let upper = expr.to_uppercase();
+    if let Some(idx) = upper.find(" STARTS WITH ") {
+        let field = expr[..idx].trim();
+        let value = expr[idx + 13..].trim(); // " STARTS WITH " is 13 chars
+        Some((field, value))
+    } else {
+        None
+    }
+}
+
+/// Parse ENDS WITH expression: `field ENDS WITH 'suffix'`
+fn parse_ends_with(expr: &str) -> Option<(&str, &str)> {
+    let upper = expr.to_uppercase();
+    if let Some(idx) = upper.find(" ENDS WITH ") {
+        let field = expr[..idx].trim();
+        let value = expr[idx + 11..].trim(); // " ENDS WITH " is 11 chars
+        Some((field, value))
+    } else {
+        None
+    }
+}
+
+/// Extract string literal from quoted value: 'value' -> value
+fn extract_string_literal(value: &str) -> Option<&str> {
+    let trimmed = value.trim();
+    if trimmed.starts_with('\'') && trimmed.ends_with('\'') && trimmed.len() >= 2 {
+        Some(&trimmed[1..trimmed.len() - 1])
+    } else {
+        None
+    }
+}
+
+/// Evaluate CONTAINS(field, 'value') pattern
+fn evaluate_contains(doc: &Document, expr: &str) -> bool {
+    // Parse CONTAINS(field, 'value')
+    let inner = &expr[9..expr.len() - 1]; // Strip "CONTAINS(" and ")"
+    let parts: Vec<&str> = inner.splitn(2, ',').collect();
+
+    if parts.len() != 2 {
+        return true; // Conservative fallback
+    }
+
+    let field = parts[0].trim();
+    let value = parts[1].trim();
+
+    let search_value = match extract_string_literal(value) {
+        Some(v) => v,
+        None => return true, // Conservative fallback
+    };
+
+    // Check if field value contains the search value
+    match doc.get(field) {
+        Some(serde_json::Value::Array(arr)) => arr.iter().any(|item| {
+            if let Some(s) = item.as_str() {
+                s == search_value
+            } else {
+                false
+            }
+        }),
+        Some(serde_json::Value::String(s)) => s.contains(search_value),
+        _ => false,
+    }
+}
+
+/// Evaluate field == value pattern
+fn evaluate_equality(doc: &Document, field: &str, value: &str) -> bool {
+    // Handle boolean values
+    if value == "true" {
+        return doc.get(field).and_then(|v| v.as_bool()).unwrap_or(false);
+    }
+    if value == "false" {
+        return !doc.get(field).and_then(|v| v.as_bool()).unwrap_or(true);
+    }
+
+    // Handle string literals
+    if let Some(string_value) = extract_string_literal(value) {
+        return match doc.get(field) {
+            Some(serde_json::Value::String(s)) => s == string_value,
+            _ => false,
+        };
+    }
+
+    // Handle numeric values (try to parse as number)
+    if let Ok(num) = value.parse::<i64>() {
+        return match doc.get(field) {
+            Some(serde_json::Value::Number(n)) => n.as_i64() == Some(num),
+            _ => false,
+        };
+    }
+    if let Ok(num) = value.parse::<f64>() {
+        return match doc.get(field) {
+            Some(serde_json::Value::Number(n)) => n
+                .as_f64()
+                .map(|f| (f - num).abs() < f64::EPSILON)
+                .unwrap_or(false),
+            _ => false,
+        };
+    }
+
+    // Unknown value format, conservative fallback
+    true
+}
+
+/// Evaluate field STARTS WITH 'prefix' pattern
+fn evaluate_starts_with(doc: &Document, field: &str, value: &str) -> bool {
+    let prefix = match extract_string_literal(value) {
+        Some(v) => v,
+        None => return true, // Conservative fallback
+    };
+
+    match doc.get(field) {
+        Some(serde_json::Value::String(s)) => s.starts_with(prefix),
+        _ => false,
+    }
+}
+
+/// Evaluate field ENDS WITH 'suffix' pattern
+fn evaluate_ends_with(doc: &Document, field: &str, value: &str) -> bool {
+    let suffix = match extract_string_literal(value) {
+        Some(v) => v,
+        None => return true, // Conservative fallback
+    };
+
+    match doc.get(field) {
+        Some(serde_json::Value::String(s)) => s.ends_with(suffix),
+        _ => false,
+    }
+}
+
 // Helper function for query matching
 fn matches_query(doc: &Document, query: &Query) -> bool {
     match query {
@@ -2887,7 +3187,10 @@ fn matches_query(doc: &Document, query: &Query) -> bool {
         }
         Query::And(queries) => queries.iter().all(|q| matches_query(doc, q)),
         Query::Or(queries) => queries.iter().any(|q| matches_query(doc, q)),
-        Query::Custom(_) => false,
+
+        // === Custom query support (Issue #517) ===
+        // Evaluate DQL-like custom queries using pattern-based parser
+        Query::Custom(query_str) => evaluate_custom_query(doc, query_str),
 
         // === Spatial queries (Issue #356) ===
         Query::WithinRadius {
@@ -3591,5 +3894,400 @@ mod issue_271_clone_tests {
             .await
             .unwrap();
         assert!(removed_doc.is_none());
+    }
+
+    // ============================================================================
+    // Issue #517: Query::Custom Parser Tests
+    // ============================================================================
+
+    /// Helper: Create a test document with given fields
+    fn create_test_doc(fields: Vec<(&str, serde_json::Value)>) -> Document {
+        let mut field_map = HashMap::new();
+        for (key, value) in fields {
+            field_map.insert(key.to_string(), value);
+        }
+        Document::new(field_map)
+    }
+
+    #[test]
+    fn test_custom_query_equality_string() {
+        // Test: collection_name == 'squad_summaries'
+        let doc = create_test_doc(vec![(
+            "collection_name",
+            serde_json::json!("squad_summaries"),
+        )]);
+
+        assert!(evaluate_custom_query(
+            &doc,
+            "collection_name == 'squad_summaries'"
+        ));
+        assert!(!evaluate_custom_query(&doc, "collection_name == 'other'"));
+    }
+
+    #[test]
+    fn test_custom_query_equality_boolean() {
+        // Test: public == true / public == false
+        let doc_public = create_test_doc(vec![("public", serde_json::json!(true))]);
+        let doc_private = create_test_doc(vec![("public", serde_json::json!(false))]);
+
+        assert!(evaluate_custom_query(&doc_public, "public == true"));
+        assert!(!evaluate_custom_query(&doc_public, "public == false"));
+        assert!(evaluate_custom_query(&doc_private, "public == false"));
+        assert!(!evaluate_custom_query(&doc_private, "public == true"));
+    }
+
+    #[test]
+    fn test_custom_query_starts_with() {
+        // Test: collection_name STARTS WITH 'squad-'
+        let doc = create_test_doc(vec![("collection_name", serde_json::json!("squad-alpha"))]);
+
+        assert!(evaluate_custom_query(
+            &doc,
+            "collection_name STARTS WITH 'squad-'"
+        ));
+        assert!(evaluate_custom_query(
+            &doc,
+            "collection_name starts with 'squad-'"
+        )); // Case insensitive
+        assert!(!evaluate_custom_query(
+            &doc,
+            "collection_name STARTS WITH 'platoon-'"
+        ));
+    }
+
+    #[test]
+    fn test_custom_query_ends_with() {
+        // Test: collection_name ENDS WITH '.summaries'
+        let doc = create_test_doc(vec![(
+            "collection_name",
+            serde_json::json!("squad.summaries"),
+        )]);
+
+        assert!(evaluate_custom_query(
+            &doc,
+            "collection_name ENDS WITH '.summaries'"
+        ));
+        assert!(evaluate_custom_query(
+            &doc,
+            "collection_name ends with '.summaries'"
+        )); // Case insensitive
+        assert!(!evaluate_custom_query(
+            &doc,
+            "collection_name ENDS WITH '.reports'"
+        ));
+    }
+
+    #[test]
+    fn test_custom_query_contains_array() {
+        // Test: CONTAINS(authorized_roles, 'soldier')
+        let doc = create_test_doc(vec![(
+            "authorized_roles",
+            serde_json::json!(["soldier", "squad_leader"]),
+        )]);
+
+        assert!(evaluate_custom_query(
+            &doc,
+            "CONTAINS(authorized_roles, 'soldier')"
+        ));
+        assert!(evaluate_custom_query(
+            &doc,
+            "CONTAINS(authorized_roles, 'squad_leader')"
+        ));
+        assert!(!evaluate_custom_query(
+            &doc,
+            "CONTAINS(authorized_roles, 'general')"
+        ));
+    }
+
+    #[test]
+    fn test_custom_query_contains_string() {
+        // Test: CONTAINS on string field (substring search)
+        let doc = create_test_doc(vec![(
+            "description",
+            serde_json::json!("This is a squad summary document"),
+        )]);
+
+        assert!(evaluate_custom_query(
+            &doc,
+            "CONTAINS(description, 'squad')"
+        ));
+        assert!(evaluate_custom_query(
+            &doc,
+            "CONTAINS(description, 'summary')"
+        ));
+        assert!(!evaluate_custom_query(
+            &doc,
+            "CONTAINS(description, 'platoon')"
+        ));
+    }
+
+    #[test]
+    fn test_custom_query_or_compound() {
+        // Test: type == 'node_state' OR type == 'squad_summary'
+        let doc_node = create_test_doc(vec![("type", serde_json::json!("node_state"))]);
+        let doc_squad = create_test_doc(vec![("type", serde_json::json!("squad_summary"))]);
+        let doc_other = create_test_doc(vec![("type", serde_json::json!("other"))]);
+
+        let query = "type == 'node_state' OR type == 'squad_summary'";
+        assert!(evaluate_custom_query(&doc_node, query));
+        assert!(evaluate_custom_query(&doc_squad, query));
+        assert!(!evaluate_custom_query(&doc_other, query));
+    }
+
+    #[test]
+    fn test_custom_query_and_compound() {
+        // Test: public == true AND type == 'node_state'
+        let doc_match = create_test_doc(vec![
+            ("public", serde_json::json!(true)),
+            ("type", serde_json::json!("node_state")),
+        ]);
+        let doc_partial = create_test_doc(vec![
+            ("public", serde_json::json!(true)),
+            ("type", serde_json::json!("other")),
+        ]);
+
+        let query = "public == true AND type == 'node_state'";
+        assert!(evaluate_custom_query(&doc_match, query));
+        assert!(!evaluate_custom_query(&doc_partial, query));
+    }
+
+    #[test]
+    fn test_custom_query_complex_compound() {
+        // Test: (public == true OR CONTAINS(authorized_roles, 'soldier'))
+        let doc_public = create_test_doc(vec![
+            ("public", serde_json::json!(true)),
+            ("authorized_roles", serde_json::json!([])),
+        ]);
+        let doc_soldier = create_test_doc(vec![
+            ("public", serde_json::json!(false)),
+            ("authorized_roles", serde_json::json!(["soldier"])),
+        ]);
+        let doc_neither = create_test_doc(vec![
+            ("public", serde_json::json!(false)),
+            ("authorized_roles", serde_json::json!(["general"])),
+        ]);
+
+        let query = "public == true OR CONTAINS(authorized_roles, 'soldier')";
+        assert!(evaluate_custom_query(&doc_public, query));
+        assert!(evaluate_custom_query(&doc_soldier, query));
+        assert!(!evaluate_custom_query(&doc_neither, query));
+    }
+
+    #[test]
+    fn test_custom_query_with_parentheses() {
+        // Test: queries with parentheses are handled
+        let doc = create_test_doc(vec![(
+            "collection_name",
+            serde_json::json!("squad_summaries"),
+        )]);
+
+        assert!(evaluate_custom_query(
+            &doc,
+            "(collection_name == 'squad_summaries')"
+        ));
+    }
+
+    #[test]
+    fn test_custom_query_unknown_pattern_returns_true() {
+        // Test: Unknown patterns return true (conservative fallback)
+        let doc = create_test_doc(vec![("field", serde_json::json!("value"))]);
+
+        // These are patterns we don't recognize - should return true
+        assert!(evaluate_custom_query(&doc, "SOME_UNKNOWN_FUNCTION(x, y)"));
+        assert!(evaluate_custom_query(&doc, "field LIKE '%pattern%'"));
+    }
+
+    #[test]
+    fn test_custom_query_matches_query_integration() {
+        // Test that Query::Custom works through matches_query
+        let doc = create_test_doc(vec![(
+            "collection_name",
+            serde_json::json!("squad_summaries"),
+        )]);
+
+        let query = Query::Custom("collection_name == 'squad_summaries'".to_string());
+        assert!(matches_query(&doc, &query));
+
+        let query_no_match = Query::Custom("collection_name == 'other'".to_string());
+        assert!(!matches_query(&doc, &query_no_match));
+    }
+
+    #[test]
+    fn test_custom_query_real_world_patterns() {
+        // Test actual patterns from the HIVE codebase
+
+        // Pattern 1: collection_name == 'squad_summaries' (from hive-sim)
+        let doc_summaries = create_test_doc(vec![(
+            "collection_name",
+            serde_json::json!("squad_summaries"),
+        )]);
+        assert!(evaluate_custom_query(
+            &doc_summaries,
+            "collection_name == 'squad_summaries'"
+        ));
+
+        // Pattern 2: collection_name STARTS WITH 'squad-1' OR type == 'node_state'
+        let doc_squad = create_test_doc(vec![
+            ("collection_name", serde_json::json!("squad-1-alpha")),
+            ("type", serde_json::json!("other")),
+        ]);
+        let doc_node = create_test_doc(vec![
+            ("collection_name", serde_json::json!("other")),
+            ("type", serde_json::json!("node_state")),
+        ]);
+        let query = "collection_name STARTS WITH 'squad-1' OR type == 'node_state'";
+        assert!(evaluate_custom_query(&doc_squad, query));
+        assert!(evaluate_custom_query(&doc_node, query));
+
+        // Pattern 3: collection_name ENDS WITH '.summaries' OR type == 'squad_summary'
+        let doc_suffix = create_test_doc(vec![
+            ("collection_name", serde_json::json!("platoon.summaries")),
+            ("type", serde_json::json!("other")),
+        ]);
+        let query2 = "collection_name ENDS WITH '.summaries' OR type == 'squad_summary'";
+        assert!(evaluate_custom_query(&doc_suffix, query2));
+
+        // Pattern 4: public == true OR CONTAINS(authorized_roles, 'soldier')
+        let doc_with_role = create_test_doc(vec![
+            ("public", serde_json::json!(false)),
+            ("authorized_roles", serde_json::json!(["soldier", "medic"])),
+        ]);
+        let query3 = "public == true OR CONTAINS(authorized_roles, 'soldier')";
+        assert!(evaluate_custom_query(&doc_with_role, query3));
+    }
+
+    // ============================================================================
+    // Issue #518: Counter and Nested Object Tests
+    // ============================================================================
+
+    #[test]
+    fn test_automerge_scalar_counter_extraction() {
+        // Test that Counter values are properly extracted
+        use automerge::ScalarValue;
+
+        // Create a counter with value 42
+        let counter = ScalarValue::counter(42);
+
+        // Extract it using our function
+        if let ScalarValue::Counter(c) = &counter {
+            let value: i64 = i64::from(c);
+            assert_eq!(value, 42, "Counter value should be 42");
+        } else {
+            panic!("Expected Counter variant");
+        }
+    }
+
+    #[test]
+    fn test_automerge_scalar_to_json_all_types() {
+        // Test all scalar types convert correctly
+        use automerge::ScalarValue;
+
+        // String
+        let result = AutomergeBackend::automerge_scalar_to_json(&ScalarValue::Str("hello".into()));
+        assert_eq!(result, Some(serde_json::json!("hello")));
+
+        // Integer
+        let result = AutomergeBackend::automerge_scalar_to_json(&ScalarValue::Int(-42));
+        assert_eq!(result, Some(serde_json::json!(-42)));
+
+        // Unsigned integer
+        let result = AutomergeBackend::automerge_scalar_to_json(&ScalarValue::Uint(42));
+        assert_eq!(result, Some(serde_json::json!(42)));
+
+        // Float (use arbitrary value to avoid clippy::approx_constant)
+        let result = AutomergeBackend::automerge_scalar_to_json(&ScalarValue::F64(1.234));
+        assert!(result.is_some());
+        if let Some(serde_json::Value::Number(n)) = result {
+            assert!((n.as_f64().unwrap() - 1.234).abs() < 0.001);
+        }
+
+        // Boolean
+        let result = AutomergeBackend::automerge_scalar_to_json(&ScalarValue::Boolean(true));
+        assert_eq!(result, Some(serde_json::json!(true)));
+
+        // Null
+        let result = AutomergeBackend::automerge_scalar_to_json(&ScalarValue::Null);
+        assert_eq!(result, Some(serde_json::Value::Null));
+
+        // Timestamp
+        let result =
+            AutomergeBackend::automerge_scalar_to_json(&ScalarValue::Timestamp(1234567890));
+        assert_eq!(result, Some(serde_json::json!(1234567890)));
+
+        // Counter (Issue #518)
+        let counter = ScalarValue::counter(100);
+        if let ScalarValue::Counter(c) = &counter {
+            let result =
+                AutomergeBackend::automerge_scalar_to_json(&ScalarValue::Counter(c.clone()));
+            assert_eq!(
+                result,
+                Some(serde_json::json!(100)),
+                "Counter should return actual value, not 0"
+            );
+        }
+
+        // Bytes
+        let result = AutomergeBackend::automerge_scalar_to_json(&ScalarValue::Bytes(vec![1, 2, 3]));
+        assert_eq!(result, Some(serde_json::json!([1, 2, 3])));
+    }
+
+    #[tokio::test]
+    async fn test_nested_object_roundtrip() {
+        // Test that nested objects survive the roundtrip through Automerge
+        let backend = AutomergeBackend::new();
+        backend.initialize(deletion_test_config()).await.unwrap();
+
+        // Create a document with nested structure
+        let nested_doc = Document::new(
+            vec![
+                ("name".to_string(), serde_json::json!("test")),
+                (
+                    "metadata".to_string(),
+                    serde_json::json!({
+                        "version": 1,
+                        "author": "test_user"
+                    }),
+                ),
+                ("items".to_string(), serde_json::json!([1, 2, 3])),
+            ]
+            .into_iter()
+            .collect(),
+        );
+
+        let doc_id = backend
+            .document_store()
+            .upsert("nested_test", nested_doc)
+            .await
+            .unwrap();
+
+        // Retrieve and verify
+        let retrieved = backend
+            .document_store()
+            .get("nested_test", &doc_id)
+            .await
+            .unwrap()
+            .expect("Document should exist");
+
+        assert_eq!(
+            retrieved.fields.get("name"),
+            Some(&serde_json::json!("test"))
+        );
+
+        // Verify nested object (Issue #518)
+        if let Some(metadata) = retrieved.fields.get("metadata") {
+            assert!(metadata.is_object(), "metadata should be an object");
+            if let Some(version) = metadata.get("version") {
+                assert_eq!(version, &serde_json::json!(1));
+            }
+            if let Some(author) = metadata.get("author") {
+                assert_eq!(author, &serde_json::json!("test_user"));
+            }
+        }
+
+        // Verify array
+        if let Some(items) = retrieved.fields.get("items") {
+            assert!(items.is_array(), "items should be an array");
+            assert_eq!(items, &serde_json::json!([1, 2, 3]));
+        }
     }
 }
