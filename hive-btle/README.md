@@ -37,11 +37,11 @@ Traditional BLE mesh implementations (like those in commercial sync SDKs) often 
 | Platform | Status | Notes |
 |----------|--------|-------|
 | Linux (BlueZ) | ✅ Complete | BlueZ 5.48+ required |
+| macOS | ✅ Complete | CoreBluetooth, tested with ESP32 devices |
+| iOS | ✅ Complete | CoreBluetooth (shared with macOS) |
+| ESP32 | ✅ Complete | ESP-IDF NimBLE integration |
 | Android | 🔄 In Progress | JNI bindings to Android Bluetooth API |
-| iOS | 🔄 In Progress | CoreBluetooth bindings |
-| macOS | 🔄 Planned | CoreBluetooth (shared with iOS) |
 | Windows | 📋 Planned | WinRT Bluetooth APIs |
-| ESP32 | 📋 Planned | ESP-IDF NimBLE |
 
 ## Installation
 
@@ -250,24 +250,24 @@ cargo test sync::
 
 ## Related Documentation
 
-- [ADR-039: HIVE-BTLE Mesh Transport](../docs/adr/039-hive-btle-mesh-transport.md) - Full architecture design
-- [ADR-041: Multi-Transport Integration](../docs/adr/041-multi-transport-embedded-integration.md) - HIVE integration architecture
-- [ADR-035: HIVE-Lite Embedded Nodes](../docs/adr/035-hive-lite-embedded-nodes.md) - Embedded node design
+- [ADR-039: HIVE-BTLE Mesh Transport](https://github.com/revolveteam/hive/blob/main/docs/adr/039-hive-btle-mesh-transport.md) - Full architecture design
+- [ADR-041: Multi-Transport Integration](https://github.com/revolveteam/hive/blob/main/docs/adr/041-multi-transport-embedded-integration.md) - HIVE integration architecture
+- [ADR-035: HIVE-Lite Embedded Nodes](https://github.com/revolveteam/hive/blob/main/docs/adr/035-hive-lite-embedded-nodes.md) - Embedded node design
 
 ## Contributing
 
 Contributions are welcome! Priority areas:
 
 1. **Android Implementation** (#410) - JNI bindings to Android Bluetooth API
-2. **iOS Implementation** (#411) - CoreBluetooth bindings
-3. **Security Integration** (#413) - BLE pairing + application-layer encryption
+2. **Security Integration** (#413) - BLE pairing + application-layer encryption
+3. **Windows Implementation** (#412) - WinRT Bluetooth APIs
 4. **Hardware Testing** - Real-world validation on various devices
 
-Please see [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
+Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-Licensed under the Apache License, Version 2.0. See [LICENSE](../LICENSE) for details.
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
