@@ -24,7 +24,7 @@ linux = ["dep:bluer", "dep:tokio"]
 android = ["dep:jni", "dep:ndk", "dep:tokio"]
 macos = ["dep:objc2", "dep:block2", "dep:tokio", "dep:objc2-foundation", "dep:objc2-core-bluetooth"]
 ios = ["dep:objc2", "dep:block2", "dep:tokio", "dep:objc2-foundation", "dep:objc2-core-bluetooth"]
-windows = ["dep:windows"]
+windows = ["dep:windows", "dep:tokio"]
 
 # Embedded/no_std support
 embedded = []
@@ -80,6 +80,8 @@ windows = { version = "0.58", features = [
     "Devices_Bluetooth_GenericAttributeProfile",
     "Foundation",
     "Foundation_Collections",
+    "Storage_Streams",
+    "implement",
 ], optional = true }
 
 # ESP32/ESP-IDF (optional)
