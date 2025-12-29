@@ -27,8 +27,8 @@ display-interface-spi = "0.5"
 mipidsi = "0.8"
 embedded-graphics = "0.8"
 
-# HIVE libraries (local)
-hive-btle = { path = "../../hive-btle", default-features = false, features = ["esp32"] }
+# HIVE libraries (external repo)
+hive-btle = { path = "../../../hive-btle", default-features = false, features = ["esp32"] }
 
 [build-dependencies]
 embuild = "0.33"

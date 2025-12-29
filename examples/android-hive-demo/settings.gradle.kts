@@ -17,6 +17,6 @@ dependencyResolutionManagement {
 rootProject.name = "HiveBtleDemo"
 include(":app")
 
-// Include hive-btle Android library from parent project
+// Include hive-btle Android library from external repo
 include(":hive-btle")
-project(":hive-btle").projectDir = file("../../hive-btle/android")
+project(":hive-btle").projectDir = file("../../../hive-btle/android")
