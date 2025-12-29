@@ -1,4 +1,4 @@
-.PHONY: help build-android build-android-demo deploy-android clean check-android
+.PHONY: help build-android build-android-demo deploy-android clean check-android check-rust check
 
 # ============================================
 # HIVE BLE Android Build & Deploy
@@ -18,7 +18,9 @@ help:
 	@echo "  build-android-demo - Build the Android demo APK"
 	@echo "  deploy-android     - Deploy demo APK to connected device"
 	@echo "  android            - Build everything and deploy to device"
+	@echo "  check-rust         - Check Rust library compiles for Android"
 	@echo "  check-android      - Check for Kotlin compilation errors"
+	@echo "  check              - Check both Rust and Kotlin"
 	@echo "  clean              - Clean build artifacts"
 	@echo ""
 	@echo "Configuration (override with make VAR=value):"
@@ -49,10 +51,19 @@ deploy-android:
 android: build-android-demo deploy-android
 	@echo "✓ Build and deploy complete"
 
+# Check Rust library for Android (requires Android target)
+check-rust:
+	@echo "Checking hive-btle Rust library for Android..."
+	CXXFLAGS="-include cstdint" cargo ndk -t arm64-v8a check -p hive-btle --features android
+
 # Check for Kotlin compilation errors
 check-android:
 	@echo "Checking Android demo for compilation errors..."
 	JAVA_HOME=$(JAVA_HOME) ../examples/android-hive-demo/gradlew -p ../examples/android-hive-demo compileDebugKotlin 2>&1 | grep -E "e:|error:|Error:" || true
+
+# Check both Rust and Kotlin
+check: check-rust check-android
+	@echo "✓ All checks complete"
 
 # Clean build artifacts
 clean:
