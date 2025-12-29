@@ -34,6 +34,8 @@ ARG_BANDWIDTH=""
 DRY_RUN=false
 CLEANUP_ONLY=false
 CONTINUE_ON_ERROR=false
+RUN_PARITY_CHECK=false
+SKIP_PARITY_CHECK=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -66,6 +68,14 @@ while [[ $# -gt 0 ]]; do
             TEST_DURATION_SECS="$2"
             shift 2
             ;;
+        --parity-check)
+            RUN_PARITY_CHECK=true
+            shift
+            ;;
+        --skip-parity)
+            SKIP_PARITY_CHECK=true
+            shift
+            ;;
         --help|-h)
             echo "Lab 4 Backend Comparison Framework"
             echo ""
@@ -80,6 +90,8 @@ while [[ $# -gt 0 ]]; do
             echo "  --dry-run                    Show what would run without executing"
             echo "  --cleanup-only               Clean up environment and exit"
             echo "  --continue-on-error          Continue running tests even if one fails"
+            echo "  --parity-check               Run parity validation before full matrix (Issue #519)"
+            echo "  --skip-parity                Skip parity check even if recommended"
             echo "  --help                       Show this help"
             exit 0
             ;;
@@ -405,6 +417,46 @@ main() {
 
     # Run pre-flight checks
     preflight_checks
+
+    # Run parity check if requested or if running large-scale experiments (Issue #519)
+    local NEEDS_PARITY=false
+    if [ "$RUN_PARITY_CHECK" = true ]; then
+        NEEDS_PARITY=true
+    elif [ "$SKIP_PARITY_CHECK" = false ]; then
+        # Auto-recommend parity check for large scale or multi-backend runs
+        for n in "${NODE_COUNTS[@]}"; do
+            if [ "$n" -ge 96 ] && [ "${#BACKENDS[@]}" -gt 1 ]; then
+                NEEDS_PARITY=true
+                log_info "Large-scale multi-backend test detected (${n}+ nodes)"
+                log_info "Recommend running parity check first (use --skip-parity to skip)"
+                break
+            fi
+        done
+    fi
+
+    if [ "$NEEDS_PARITY" = true ]; then
+        echo ""
+        log_info "Running backend parity validation (Issue #519)..."
+        echo ""
+
+        if [ -x "${SCRIPT_DIR}/test-lab4-parity.sh" ]; then
+            if "${SCRIPT_DIR}/test-lab4-parity.sh" --quick; then
+                log_success "Parity check passed - backends produce comparable results"
+                echo ""
+            else
+                log_error "Parity check failed - backends show significant variance"
+                echo ""
+                echo "Options:"
+                echo "  1. Investigate parity results in /work/hive-sim-results/parity-tests/"
+                echo "  2. Use --skip-parity to proceed anyway (not recommended)"
+                echo "  3. Fix backend issues before running large-scale experiments"
+                echo ""
+                exit 1
+            fi
+        else
+            log_warning "test-lab4-parity.sh not found, skipping parity check"
+        fi
+    fi
 
     # Calculate total tests
     local TOTAL_TESTS=$((${#BACKENDS[@]} * ${#NODE_COUNTS[@]} * ${#BANDWIDTHS[@]}))
