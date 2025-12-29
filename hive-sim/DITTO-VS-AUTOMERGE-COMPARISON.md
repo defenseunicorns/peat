@@ -116,3 +116,64 @@ The 100-200x latency improvement makes AutomergeIroh suitable for time-critical 
 - **Topology:** Hierarchical (soldiers → squad leader → platoon leader)
 - **Bandwidths Tested:** 1gbps, 100mbps, 1mbps, 256kbps
 - **Node Counts:** 24, 48, 96 (384n had deployment issues)
+
+---
+
+## Backend Parity Validation (Issue #519)
+
+Before running large-scale experiments, use `test-lab4-parity.sh` to validate that both backends produce comparable functional results.
+
+### Expected Variance Between Backends
+
+| Metric | Expected Variance | Notes |
+|--------|-------------------|-------|
+| **Total CRDT Operations** | ±15% | Automerge typically higher throughput |
+| **Squad Summaries Created** | ±10% | Should match number of squads |
+| **Platoon Summaries Created** | ±10% | Should match number of platoons |
+| **Aggregation Event Count** | ±20% | Timing-dependent |
+| **Document Counts** | ±5% | Should be nearly identical |
+
+### Metrics That WILL Differ (Not Parity Failures)
+
+| Metric | Expected Difference | Reason |
+|--------|---------------------|--------|
+| **Latency P50/P95** | 100-300x | Automerge is fundamentally faster |
+| **Operations Per Second** | 50-120x | Different sync protocols |
+| **Memory Usage** | 2-5x | Different storage strategies |
+| **Wire Protocol Size** | 30-50% | Columnar vs CBOR encoding |
+
+### Running Parity Validation
+
+```bash
+# Quick 30-second validation
+./test-lab4-parity.sh --quick
+
+# Standard 60-second validation
+./test-lab4-parity.sh
+
+# Custom configuration
+./test-lab4-parity.sh --nodes 48 --duration 90 --threshold 20
+
+# Integrate with full test suite
+./run-lab4-comparison.sh --parity-check
+```
+
+### Parity Check Pass Criteria
+
+1. **Operation Count Variance** < 15%
+2. **Aggregation Event Variance** < 15%
+3. **ADR-021 Compliance**: Squad summaries created ≈ squad count (not 10x+)
+4. Both backends deploy successfully
+5. Both backends produce non-zero metrics
+
+### When Parity Fails
+
+If parity validation fails:
+
+1. Check `/work/hive-sim-results/parity-tests/` for detailed logs
+2. Compare `summary.txt` files between backends
+3. Look for:
+   - Missing aggregation events (sync issue)
+   - Excessive document creation (ADR-021 violation)
+   - Zero operations (deployment issue)
+4. Resolve issues before running large-scale experiments
