@@ -139,7 +139,7 @@ class HiveBtle(
          * Derive a short mesh ID from an app ID string.
          *
          * The mesh ID is used in BLE device names and should be short (4-8 chars).
-         * This function takes a potentially long app_id (e.g., "default-atak-formation")
+         * This function takes a potentially long app_id (e.g., "my-app-formation-alpha")
          * and derives a short mesh ID from it.
          *
          * Strategy:
