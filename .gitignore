@@ -38,6 +38,13 @@ dist/
 build/
 .embuild/
 
+# Android build artifacts
+**/jniLibs/
+**/.gradle/
+*.apk
+*.aab
+local.properties
+
 # Shadow simulator
 shadow.data/
 
