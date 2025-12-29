@@ -52,12 +52,9 @@ jobs:
 
       # Exclude hive-ffi: its cdylib conflicts with dittoffi symbols during linking
       # Exclude hive-inference: has platform-specific features (GStreamer, CUDA) requiring system libs
-      # Exclude hive-btle: has platform-specific features (objc2 for macOS/iOS) that require Apple platforms
-      - run: cargo clippy --all-targets --all-features --workspace --exclude hive-ffi --exclude hive-inference --exclude hive-btle -- -D warnings
+      - run: cargo clippy --all-targets --all-features --workspace --exclude hive-ffi --exclude hive-inference -- -D warnings
       # Run clippy on hive-inference without optional features (no GStreamer/CUDA deps)
       - run: cargo clippy -p hive-inference --all-targets -- -D warnings
-      # Run clippy on hive-btle with default features (platform features need OS-specific deps)
-      - run: cargo clippy -p hive-btle --all-targets -- -D warnings
 
   # ============================================
   # Unit & Integration Tests (excludes E2E, ~5 min)
@@ -92,9 +89,8 @@ jobs:
           HIVE_SHARED_KEY: ${{ secrets.HIVE_SHARED_KEY }}
           HIVE_OFFLINE_TOKEN: ${{ secrets.HIVE_OFFLINE_TOKEN }}
         run: |
-          cargo nextest run --all-features --workspace --exclude hive-ffi --exclude hive-inference --exclude hive-btle -E 'not test(e2e)'
+          cargo nextest run --all-features --workspace --exclude hive-ffi --exclude hive-inference -E 'not test(e2e)'
           cargo nextest run -p hive-inference -E 'not test(e2e)'
-          cargo nextest run -p hive-btle -E 'not test(e2e)'
 
   # ============================================
   # E2E Tests (parallel job, ~3 min)
@@ -129,4 +125,4 @@ jobs:
           HIVE_SHARED_KEY: ${{ secrets.HIVE_SHARED_KEY }}
           HIVE_OFFLINE_TOKEN: ${{ secrets.HIVE_OFFLINE_TOKEN }}
         run: |
-          cargo nextest run --all-features --workspace --exclude hive-ffi --exclude hive-inference --exclude hive-btle -E 'test(e2e)'
+          cargo nextest run --all-features --workspace --exclude hive-ffi --exclude hive-inference -E 'test(e2e)'

@@ -12,7 +12,6 @@ members = [
     "hive-commander",
     "hive-inference",
     "hive-tak-bridge",
-    "hive-btle",
 ]
 # hive-lite and ESP32 examples are excluded because they require ESP32 toolchain
 exclude = ["hive-lite", "examples/m5stack-core2-hive"]
@@ -25,6 +24,9 @@ license = "MIT"
 repository = "https://github.com/kitplummer/hive"
 
 [workspace.dependencies]
+# BLE mesh transport (external repo until published)
+hive-btle = { path = "../hive-btle" }
+
 # CRDT synchronization
 dittolive-ditto = "=4.11.5"
 
