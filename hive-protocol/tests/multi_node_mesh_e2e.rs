@@ -117,19 +117,18 @@ async fn test_automerge_three_node_mesh() {
     // Get transports, formation keys, and endpoint IDs
     let transport1 = backend1.transport();
     let transport2 = backend2.transport();
-    let _transport3 = backend3.transport();
+    let transport3 = backend3.transport();
     let formation_key1 = backend1.formation_key().expect("Should have formation key");
     let formation_key2 = backend2.formation_key().expect("Should have formation key");
-    let _formation_key3 = backend3.formation_key().expect("Should have formation key");
+    let formation_key3 = backend3.formation_key().expect("Should have formation key");
 
     let endpoint1_id = backend1.endpoint_id();
     let endpoint2_id = backend2.endpoint_id();
     let endpoint3_id = backend3.endpoint_id();
 
     // Create PeerInfo for ALL backends (needed for bidirectional connection attempts)
-    // Due to tie-breaking (Issue #229), only the side with LOWER endpoint ID initiates.
-    // We must attempt connections in BOTH directions so that one side succeeds.
-    let _peer1_info = hive_protocol::network::PeerInfo {
+    // For sync to work bidirectionally, we need connections in BOTH directions.
+    let peer1_info = hive_protocol::network::PeerInfo {
         name: "backend1".to_string(),
         node_id: hex::encode(endpoint1_id.as_bytes()),
         addresses: vec![addr1.to_string()],
@@ -150,11 +149,11 @@ async fn test_automerge_three_node_mesh() {
         relay_url: None,
     };
 
-    // Full mesh: Each pair attempts connection in BOTH directions.
-    // Connect all pairs - conflict resolution is handled by transport layer
+    // Full mesh: Connect ALL pairs in BOTH directions for bidirectional sync.
+    // This ensures sync works from any node to any other node.
     use hive_protocol::network::formation_handshake::perform_initiator_handshake;
 
-    // Pair 1-2
+    // Node1 → Node2
     if let Some(conn) = transport1
         .connect_peer(&peer2_info)
         .await
@@ -166,7 +165,7 @@ async fn test_automerge_three_node_mesh() {
         println!("    Node1 → Node2 connected");
     }
 
-    // Pair 1-3
+    // Node1 → Node3
     if let Some(conn) = transport1
         .connect_peer(&peer3_info)
         .await
@@ -178,7 +177,19 @@ async fn test_automerge_three_node_mesh() {
         println!("    Node1 → Node3 connected");
     }
 
-    // Pair 2-3
+    // Node2 → Node1 (reverse direction for bidirectional sync)
+    if let Some(conn) = transport2
+        .connect_peer(&peer1_info)
+        .await
+        .expect("Should connect node2 to node1")
+    {
+        perform_initiator_handshake(&conn, &formation_key2)
+            .await
+            .expect("Should authenticate node2 to node1");
+        println!("    Node2 → Node1 connected");
+    }
+
+    // Node2 → Node3
     if let Some(conn) = transport2
         .connect_peer(&peer3_info)
         .await
@@ -190,7 +201,31 @@ async fn test_automerge_three_node_mesh() {
         println!("    Node2 → Node3 connected");
     }
 
-    println!("  ✓ Full mesh connected with authentication (3 bidirectional pairs)");
+    // Node3 → Node1 (reverse direction for bidirectional sync)
+    if let Some(conn) = transport3
+        .connect_peer(&peer1_info)
+        .await
+        .expect("Should connect node3 to node1")
+    {
+        perform_initiator_handshake(&conn, &formation_key3)
+            .await
+            .expect("Should authenticate node3 to node1");
+        println!("    Node3 → Node1 connected");
+    }
+
+    // Node3 → Node2 (reverse direction for bidirectional sync)
+    if let Some(conn) = transport3
+        .connect_peer(&peer2_info)
+        .await
+        .expect("Should connect node3 to node2")
+    {
+        perform_initiator_handshake(&conn, &formation_key3)
+            .await
+            .expect("Should authenticate node3 to node2");
+        println!("    Node3 → Node2 connected");
+    }
+
+    println!("  ✓ Full mesh connected with authentication (6 connections, 3 bidirectional pairs)");
 
     run_three_node_mesh_test(backend1, backend2, backend3, "Automerge+Iroh").await;
 }
