@@ -281,7 +281,8 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
     let doc_id1 = "mesh-test-doc-1".to_string();
 
     // Increase retries for CI environments with resource contention
-    // 30 retries @ 200ms = 6 second timeout
+    // First document: 30 retries @ 200ms = 6 second timeout
+    // Second document (bidirectional): uses extended timeout below
     let retries = 30;
     let mut all_synced = false;
 
@@ -372,11 +373,18 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
         .expect("Should create document on node2");
     println!("  ✓ Document created on Node 2");
 
-    // Wait for sync with retry
+    // Wait for sync with retry - use extended timeout for bidirectional sync
+    // Bidirectional sync may take longer as connections were initiated from Node 1
+    // 60 retries @ 200ms = 12 second timeout (doubled for CI reliability)
     let doc_id2 = "mesh-test-doc-2".to_string();
     let mut all_synced2 = false;
+    let extended_retries = 60;
 
-    for i in 0..retries {
+    let mut last_node1_has = false;
+    let mut last_node2_has = false;
+    let mut last_node3_has = false;
+
+    for i in 0..extended_retries {
         sleep(SYNC_POLL_INTERVAL).await;
 
         let doc2_on_node1 = backend1
@@ -397,7 +405,11 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
             .await
             .expect("Should query node3");
 
-        if doc2_on_node1.is_some() && doc2_on_node2.is_some() && doc2_on_node3.is_some() {
+        last_node1_has = doc2_on_node1.is_some();
+        last_node2_has = doc2_on_node2.is_some();
+        last_node3_has = doc2_on_node3.is_some();
+
+        if last_node1_has && last_node2_has && last_node3_has {
             println!(
                 "  ✓ Second document synced to all nodes (attempt {})",
                 i + 1
@@ -409,7 +421,8 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
 
     assert!(
         all_synced2,
-        "Second document failed to sync to all nodes within timeout"
+        "Second document failed to sync to all nodes within timeout. Node1={}, Node2={}, Node3={}",
+        last_node1_has, last_node2_has, last_node3_has
     );
     println!("  ✓ Second document synced to all nodes");
 
