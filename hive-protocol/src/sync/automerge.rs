@@ -2916,19 +2916,27 @@ impl crate::storage::HierarchicalStorageCapable for AutomergeIrohBackend {
 }
 
 // ============================================================================
-// Custom Query Parser (Issue #517)
+// Custom Query Parser (Issue #517, #520)
 // ============================================================================
 //
 // This module provides a simple pattern-based query evaluator for DQL-like
 // custom queries. Instead of implementing a full SQL parser, we handle the
 // specific patterns used in HIVE Protocol.
 //
-// Supported patterns:
+// Supported patterns (Issue #517 - original):
 // - `field == 'value'` / `field == true/false`
 // - `field STARTS WITH 'prefix'`
 // - `field ENDS WITH 'suffix'`
 // - `CONTAINS(field, 'value')`
 // - `A AND B` / `A OR B` (compound expressions)
+//
+// Extended patterns (Issue #520 - full syntactic parity):
+// - `field != 'value'` / `field != true/false` (inequality)
+// - `field LIKE '%pattern%'` (wildcard matching)
+// - `field IN ['a', 'b', 'c']` (set membership)
+// - `field.nested.path` (nested field access)
+// - `NOT (expr)` (negation wrapper)
+// - `field IS NULL` / `field IS NOT NULL` (null checks)
 //
 // For unrecognized patterns, we return `true` (match all) as a conservative
 // fallback - this ensures we never hide documents that should match.
@@ -2967,14 +2975,40 @@ fn evaluate_custom_query(doc: &Document, query_str: &str) -> bool {
         trimmed
     };
 
+    // Pattern: NOT (expr) - negation wrapper (Issue #520)
+    if let Some(inner) = parse_not_expression(expr) {
+        return !evaluate_custom_query(doc, inner);
+    }
+
     // Pattern: CONTAINS(field, 'value')
     if expr.starts_with("CONTAINS(") && expr.ends_with(')') {
         return evaluate_contains(doc, expr);
     }
 
+    // Pattern: field IS NULL / field IS NOT NULL (Issue #520)
+    if let Some((field, is_null)) = parse_is_null(expr) {
+        return evaluate_is_null(doc, field, is_null);
+    }
+
+    // Pattern: field != 'value' or field != true/false (Issue #520)
+    // Must check before equality since != contains =
+    if let Some((field, value)) = parse_inequality(expr) {
+        return !evaluate_equality(doc, field, value);
+    }
+
     // Pattern: field == 'value' or field == true/false
     if let Some((field, value)) = parse_equality(expr) {
         return evaluate_equality(doc, field, value);
+    }
+
+    // Pattern: field LIKE '%pattern%' (Issue #520)
+    if let Some((field, pattern)) = parse_like(expr) {
+        return evaluate_like(doc, field, pattern);
+    }
+
+    // Pattern: field IN ['a', 'b', 'c'] (Issue #520)
+    if let Some((field, values)) = parse_in(expr) {
+        return evaluate_in(doc, field, &values);
     }
 
     // Pattern: field STARTS WITH 'prefix'
@@ -3091,18 +3125,23 @@ fn evaluate_contains(doc: &Document, expr: &str) -> bool {
 }
 
 /// Evaluate field == value pattern
+/// Supports nested field access via get_nested_field (Issue #520)
 fn evaluate_equality(doc: &Document, field: &str, value: &str) -> bool {
     // Handle boolean values
     if value == "true" {
-        return doc.get(field).and_then(|v| v.as_bool()).unwrap_or(false);
+        return get_nested_field(doc, field)
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
     }
     if value == "false" {
-        return !doc.get(field).and_then(|v| v.as_bool()).unwrap_or(true);
+        return !get_nested_field(doc, field)
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
     }
 
     // Handle string literals
     if let Some(string_value) = extract_string_literal(value) {
-        return match doc.get(field) {
+        return match get_nested_field(doc, field) {
             Some(serde_json::Value::String(s)) => s == string_value,
             _ => false,
         };
@@ -3110,13 +3149,13 @@ fn evaluate_equality(doc: &Document, field: &str, value: &str) -> bool {
 
     // Handle numeric values (try to parse as number)
     if let Ok(num) = value.parse::<i64>() {
-        return match doc.get(field) {
+        return match get_nested_field(doc, field) {
             Some(serde_json::Value::Number(n)) => n.as_i64() == Some(num),
             _ => false,
         };
     }
     if let Ok(num) = value.parse::<f64>() {
-        return match doc.get(field) {
+        return match get_nested_field(doc, field) {
             Some(serde_json::Value::Number(n)) => n
                 .as_f64()
                 .map(|f| (f - num).abs() < f64::EPSILON)
@@ -3153,6 +3192,225 @@ fn evaluate_ends_with(doc: &Document, field: &str, value: &str) -> bool {
         Some(serde_json::Value::String(s)) => s.ends_with(suffix),
         _ => false,
     }
+}
+
+// ============================================================================
+// Issue #520: Extended DQL patterns for full syntactic parity
+// ============================================================================
+
+/// Parse inequality expression: `field != 'value'` or `field != true/false`
+fn parse_inequality(expr: &str) -> Option<(&str, &str)> {
+    // Look for != operator
+    if let Some(idx) = expr.find("!=") {
+        let field = expr[..idx].trim();
+        let value = expr[idx + 2..].trim();
+        // Make sure this isn't part of == (shouldn't happen, but be safe)
+        if !field.is_empty() && !value.is_empty() {
+            return Some((field, value));
+        }
+    }
+    None
+}
+
+/// Parse NOT expression: `NOT (expr)` or `NOT expr`
+fn parse_not_expression(expr: &str) -> Option<&str> {
+    let upper = expr.to_uppercase();
+    if upper.starts_with("NOT ") {
+        let rest = expr[4..].trim();
+        // If wrapped in parens, strip them
+        if rest.starts_with('(') && rest.ends_with(')') {
+            Some(&rest[1..rest.len() - 1])
+        } else {
+            Some(rest)
+        }
+    } else {
+        None
+    }
+}
+
+/// Parse IS NULL / IS NOT NULL expression
+fn parse_is_null(expr: &str) -> Option<(&str, bool)> {
+    let upper = expr.to_uppercase();
+    if let Some(idx) = upper.find(" IS NOT NULL") {
+        let field = expr[..idx].trim();
+        return Some((field, false)); // is_null = false means IS NOT NULL
+    }
+    if let Some(idx) = upper.find(" IS NULL") {
+        let field = expr[..idx].trim();
+        return Some((field, true)); // is_null = true means IS NULL
+    }
+    None
+}
+
+/// Evaluate IS NULL / IS NOT NULL pattern
+fn evaluate_is_null(doc: &Document, field: &str, is_null: bool) -> bool {
+    let field_value = get_nested_field(doc, field);
+    let value_is_null = field_value.is_none() || field_value == Some(&serde_json::Value::Null);
+    if is_null {
+        value_is_null
+    } else {
+        !value_is_null
+    }
+}
+
+/// Parse LIKE expression: `field LIKE '%pattern%'`
+fn parse_like(expr: &str) -> Option<(&str, &str)> {
+    let upper = expr.to_uppercase();
+    if let Some(idx) = upper.find(" LIKE ") {
+        let field = expr[..idx].trim();
+        let pattern = expr[idx + 6..].trim(); // " LIKE " is 6 chars
+        Some((field, pattern))
+    } else {
+        None
+    }
+}
+
+/// Evaluate LIKE pattern with % wildcards
+fn evaluate_like(doc: &Document, field: &str, pattern: &str) -> bool {
+    let pattern_str = match extract_string_literal(pattern) {
+        Some(v) => v,
+        None => return true, // Conservative fallback
+    };
+
+    let field_value = match get_nested_field(doc, field) {
+        Some(serde_json::Value::String(s)) => s.as_str(),
+        _ => return false,
+    };
+
+    // Convert SQL LIKE pattern to simple matching
+    // % matches any sequence of characters
+    // _ matches any single character (not implemented for simplicity)
+    match_like_pattern(field_value, pattern_str)
+}
+
+/// Match a value against a SQL LIKE pattern with % wildcards
+fn match_like_pattern(value: &str, pattern: &str) -> bool {
+    // Split pattern by % and match segments
+    let segments: Vec<&str> = pattern.split('%').collect();
+
+    if segments.is_empty() {
+        return true;
+    }
+
+    // Handle patterns like '%', '%%', etc.
+    if segments.iter().all(|s| s.is_empty()) {
+        return true;
+    }
+
+    let mut pos = 0;
+    let starts_with_wildcard = pattern.starts_with('%');
+    let ends_with_wildcard = pattern.ends_with('%');
+
+    for (i, segment) in segments.iter().enumerate() {
+        if segment.is_empty() {
+            continue;
+        }
+
+        if i == 0 && !starts_with_wildcard {
+            // First segment must match at start
+            if !value.starts_with(segment) {
+                return false;
+            }
+            pos = segment.len();
+        } else if i == segments.len() - 1 && !ends_with_wildcard {
+            // Last segment must match at end
+            if !value.ends_with(segment) {
+                return false;
+            }
+        } else {
+            // Middle segment - find it anywhere after current position
+            if let Some(found_pos) = value[pos..].find(segment) {
+                pos += found_pos + segment.len();
+            } else {
+                return false;
+            }
+        }
+    }
+
+    true
+}
+
+/// Parse IN expression: `field IN ['a', 'b', 'c']`
+fn parse_in(expr: &str) -> Option<(&str, Vec<String>)> {
+    let upper = expr.to_uppercase();
+    if let Some(idx) = upper.find(" IN ") {
+        let field = expr[..idx].trim();
+        let values_str = expr[idx + 4..].trim(); // " IN " is 4 chars
+
+        // Parse the array: ['a', 'b', 'c'] or [1, 2, 3]
+        if values_str.starts_with('[') && values_str.ends_with(']') {
+            let inner = &values_str[1..values_str.len() - 1];
+            let values: Vec<String> = inner
+                .split(',')
+                .map(|v| {
+                    let trimmed = v.trim();
+                    // Extract string literal or use as-is for numbers
+                    if let Some(s) = extract_string_literal(trimmed) {
+                        s.to_string()
+                    } else {
+                        trimmed.to_string()
+                    }
+                })
+                .collect();
+            return Some((field, values));
+        }
+    }
+    None
+}
+
+/// Evaluate IN pattern for set membership
+fn evaluate_in(doc: &Document, field: &str, values: &[String]) -> bool {
+    let field_value = match get_nested_field(doc, field) {
+        Some(v) => v,
+        None => return false,
+    };
+
+    match field_value {
+        serde_json::Value::String(s) => values.iter().any(|v| v == s),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                values.iter().any(|v| v.parse::<i64>().ok() == Some(i))
+            } else if let Some(f) = n.as_f64() {
+                values.iter().any(|v| {
+                    v.parse::<f64>()
+                        .ok()
+                        .map(|vf| (vf - f).abs() < f64::EPSILON)
+                        == Some(true)
+                })
+            } else {
+                false
+            }
+        }
+        serde_json::Value::Bool(b) => {
+            let bool_str = if *b { "true" } else { "false" };
+            values.iter().any(|v| v == bool_str)
+        }
+        _ => false,
+    }
+}
+
+/// Get a potentially nested field value from a document
+/// Supports both simple fields ("name") and nested paths ("address.city")
+fn get_nested_field<'a>(doc: &'a Document, field: &str) -> Option<&'a serde_json::Value> {
+    if !field.contains('.') {
+        // Simple field access
+        return doc.get(field);
+    }
+
+    // Nested field access: field.subfield.subsubfield
+    let parts: Vec<&str> = field.split('.').collect();
+    let mut current = doc.get(parts[0])?;
+
+    for part in &parts[1..] {
+        match current {
+            serde_json::Value::Object(obj) => {
+                current = obj.get(*part)?;
+            }
+            _ => return None,
+        }
+    }
+
+    Some(current)
 }
 
 // Helper function for query matching
@@ -4094,7 +4352,8 @@ mod issue_271_clone_tests {
 
         // These are patterns we don't recognize - should return true
         assert!(evaluate_custom_query(&doc, "SOME_UNKNOWN_FUNCTION(x, y)"));
-        assert!(evaluate_custom_query(&doc, "field LIKE '%pattern%'"));
+        assert!(evaluate_custom_query(&doc, "field BETWEEN 1 AND 10")); // BETWEEN not implemented
+        assert!(evaluate_custom_query(&doc, "field REGEXP '^test'")); // REGEXP not implemented
     }
 
     #[test]
@@ -4154,6 +4413,303 @@ mod issue_271_clone_tests {
         ]);
         let query3 = "public == true OR CONTAINS(authorized_roles, 'soldier')";
         assert!(evaluate_custom_query(&doc_with_role, query3));
+    }
+
+    // ============================================================================
+    // Issue #520: Extended DQL patterns for full syntactic parity
+    // ============================================================================
+
+    #[test]
+    fn test_custom_query_inequality_string() {
+        // Test: field != 'value'
+        let doc = create_test_doc(vec![("status", serde_json::json!("active"))]);
+
+        assert!(evaluate_custom_query(&doc, "status != 'inactive'"));
+        assert!(!evaluate_custom_query(&doc, "status != 'active'"));
+    }
+
+    #[test]
+    fn test_custom_query_inequality_boolean() {
+        // Test: field != true/false
+        let doc_active = create_test_doc(vec![("enabled", serde_json::json!(true))]);
+        let doc_inactive = create_test_doc(vec![("enabled", serde_json::json!(false))]);
+
+        assert!(evaluate_custom_query(&doc_active, "enabled != false"));
+        assert!(!evaluate_custom_query(&doc_active, "enabled != true"));
+        assert!(evaluate_custom_query(&doc_inactive, "enabled != true"));
+        assert!(!evaluate_custom_query(&doc_inactive, "enabled != false"));
+    }
+
+    #[test]
+    fn test_custom_query_inequality_numeric() {
+        // Test: field != number
+        let doc = create_test_doc(vec![("count", serde_json::json!(42))]);
+
+        assert!(evaluate_custom_query(&doc, "count != 0"));
+        assert!(evaluate_custom_query(&doc, "count != 100"));
+        assert!(!evaluate_custom_query(&doc, "count != 42"));
+    }
+
+    #[test]
+    fn test_custom_query_like_prefix() {
+        // Test: field LIKE 'prefix%'
+        let doc = create_test_doc(vec![("name", serde_json::json!("squad-alpha-1"))]);
+
+        assert!(evaluate_custom_query(&doc, "name LIKE 'squad%'"));
+        assert!(evaluate_custom_query(&doc, "name like 'squad%'")); // Case insensitive
+        assert!(!evaluate_custom_query(&doc, "name LIKE 'platoon%'"));
+    }
+
+    #[test]
+    fn test_custom_query_like_suffix() {
+        // Test: field LIKE '%suffix'
+        let doc = create_test_doc(vec![("filename", serde_json::json!("report.pdf"))]);
+
+        assert!(evaluate_custom_query(&doc, "filename LIKE '%.pdf'"));
+        assert!(!evaluate_custom_query(&doc, "filename LIKE '%.doc'"));
+    }
+
+    #[test]
+    fn test_custom_query_like_contains() {
+        // Test: field LIKE '%middle%'
+        let doc = create_test_doc(vec![(
+            "description",
+            serde_json::json!("This is a tactical mission report"),
+        )]);
+
+        assert!(evaluate_custom_query(&doc, "description LIKE '%tactical%'"));
+        assert!(evaluate_custom_query(&doc, "description LIKE '%mission%'"));
+        assert!(!evaluate_custom_query(
+            &doc,
+            "description LIKE '%strategic%'"
+        ));
+    }
+
+    #[test]
+    fn test_custom_query_like_complex() {
+        // Test: field LIKE 'prefix%middle%suffix'
+        let doc = create_test_doc(vec![("path", serde_json::json!("squad-alpha-report.json"))]);
+
+        assert!(evaluate_custom_query(&doc, "path LIKE 'squad%report%'")); // prefix and middle
+        assert!(evaluate_custom_query(&doc, "path LIKE '%alpha%json'")); // middle and suffix
+        assert!(evaluate_custom_query(&doc, "path LIKE 'squad%.json'")); // prefix and suffix
+    }
+
+    #[test]
+    fn test_custom_query_in_strings() {
+        // Test: field IN ['a', 'b', 'c']
+        let doc = create_test_doc(vec![("role", serde_json::json!("soldier"))]);
+
+        assert!(evaluate_custom_query(
+            &doc,
+            "role IN ['soldier', 'medic', 'engineer']"
+        ));
+        assert!(!evaluate_custom_query(
+            &doc,
+            "role IN ['general', 'colonel']"
+        ));
+    }
+
+    #[test]
+    fn test_custom_query_in_numbers() {
+        // Test: field IN [1, 2, 3]
+        let doc = create_test_doc(vec![("priority", serde_json::json!(2))]);
+
+        assert!(evaluate_custom_query(&doc, "priority IN [1, 2, 3]"));
+        assert!(!evaluate_custom_query(&doc, "priority IN [4, 5, 6]"));
+    }
+
+    #[test]
+    fn test_custom_query_in_case_insensitive() {
+        // Test: IN keyword is case insensitive
+        let doc = create_test_doc(vec![("status", serde_json::json!("active"))]);
+
+        assert!(evaluate_custom_query(
+            &doc,
+            "status in ['active', 'pending']"
+        ));
+        assert!(evaluate_custom_query(
+            &doc,
+            "status IN ['active', 'pending']"
+        ));
+    }
+
+    #[test]
+    fn test_custom_query_not_expression() {
+        // Test: NOT (expr)
+        let doc = create_test_doc(vec![("enabled", serde_json::json!(false))]);
+
+        assert!(evaluate_custom_query(&doc, "NOT (enabled == true)"));
+        assert!(!evaluate_custom_query(&doc, "NOT (enabled == false)"));
+    }
+
+    #[test]
+    fn test_custom_query_not_without_parens() {
+        // Test: NOT expr (without parentheses)
+        let doc = create_test_doc(vec![("status", serde_json::json!("inactive"))]);
+
+        assert!(evaluate_custom_query(&doc, "NOT status == 'active'"));
+        assert!(!evaluate_custom_query(&doc, "NOT status == 'inactive'"));
+    }
+
+    #[test]
+    fn test_custom_query_not_case_insensitive() {
+        // Test: not is case insensitive
+        let doc = create_test_doc(vec![("flag", serde_json::json!(true))]);
+
+        assert!(evaluate_custom_query(&doc, "not (flag == false)"));
+        assert!(evaluate_custom_query(&doc, "NOT (flag == false)"));
+    }
+
+    #[test]
+    fn test_custom_query_is_null() {
+        // Test: field IS NULL
+        let doc_with_null = create_test_doc(vec![("optional", serde_json::Value::Null)]);
+        let doc_without_field = create_test_doc(vec![("other", serde_json::json!("value"))]);
+        let doc_with_value = create_test_doc(vec![("optional", serde_json::json!("present"))]);
+
+        assert!(evaluate_custom_query(&doc_with_null, "optional IS NULL"));
+        assert!(evaluate_custom_query(
+            &doc_without_field,
+            "optional IS NULL"
+        ));
+        assert!(!evaluate_custom_query(&doc_with_value, "optional IS NULL"));
+    }
+
+    #[test]
+    fn test_custom_query_is_not_null() {
+        // Test: field IS NOT NULL
+        let doc_with_value = create_test_doc(vec![("required", serde_json::json!("value"))]);
+        let doc_with_null = create_test_doc(vec![("required", serde_json::Value::Null)]);
+        let doc_missing = create_test_doc(vec![("other", serde_json::json!("x"))]);
+
+        assert!(evaluate_custom_query(
+            &doc_with_value,
+            "required IS NOT NULL"
+        ));
+        assert!(!evaluate_custom_query(
+            &doc_with_null,
+            "required IS NOT NULL"
+        ));
+        assert!(!evaluate_custom_query(&doc_missing, "required IS NOT NULL"));
+    }
+
+    #[test]
+    fn test_custom_query_is_null_case_insensitive() {
+        // Test: IS NULL is case insensitive
+        let doc = create_test_doc(vec![("field", serde_json::Value::Null)]);
+
+        assert!(evaluate_custom_query(&doc, "field is null"));
+        assert!(evaluate_custom_query(&doc, "field IS NULL"));
+        assert!(evaluate_custom_query(&doc, "field Is Null"));
+    }
+
+    #[test]
+    fn test_custom_query_nested_field_equality() {
+        // Test: nested.field == 'value'
+        let doc = create_test_doc(vec![(
+            "address",
+            serde_json::json!({"city": "San Francisco", "state": "CA"}),
+        )]);
+
+        assert!(evaluate_custom_query(
+            &doc,
+            "address.city == 'San Francisco'"
+        ));
+        assert!(evaluate_custom_query(&doc, "address.state == 'CA'"));
+        assert!(!evaluate_custom_query(&doc, "address.city == 'New York'"));
+    }
+
+    #[test]
+    fn test_custom_query_nested_field_deep() {
+        // Test: deeply nested field access
+        let doc = create_test_doc(vec![(
+            "data",
+            serde_json::json!({"level1": {"level2": {"value": "deep"}}}),
+        )]);
+
+        assert!(evaluate_custom_query(
+            &doc,
+            "data.level1.level2.value == 'deep'"
+        ));
+        assert!(!evaluate_custom_query(
+            &doc,
+            "data.level1.level2.value == 'shallow'"
+        ));
+    }
+
+    #[test]
+    fn test_custom_query_nested_field_is_null() {
+        // Test: nested.field IS NULL
+        let doc = create_test_doc(vec![(
+            "config",
+            serde_json::json!({"enabled": true, "optional": null}),
+        )]);
+
+        assert!(evaluate_custom_query(&doc, "config.optional IS NULL"));
+        assert!(evaluate_custom_query(&doc, "config.missing IS NULL"));
+        assert!(!evaluate_custom_query(&doc, "config.enabled IS NULL"));
+    }
+
+    #[test]
+    fn test_custom_query_nested_field_in() {
+        // Test: nested.field IN [...]
+        let doc = create_test_doc(vec![(
+            "user",
+            serde_json::json!({"role": "admin", "level": 5}),
+        )]);
+
+        assert!(evaluate_custom_query(
+            &doc,
+            "user.role IN ['admin', 'superuser']"
+        ));
+        assert!(evaluate_custom_query(&doc, "user.level IN [1, 5, 10]"));
+        assert!(!evaluate_custom_query(
+            &doc,
+            "user.role IN ['guest', 'user']"
+        ));
+    }
+
+    #[test]
+    fn test_custom_query_compound_with_new_patterns() {
+        // Test: combining new patterns with AND/OR
+        let doc = create_test_doc(vec![
+            ("status", serde_json::json!("active")),
+            ("priority", serde_json::json!(1)),
+            ("optional", serde_json::Value::Null),
+        ]);
+
+        // status != 'deleted' AND priority IN [1, 2, 3]
+        assert!(evaluate_custom_query(
+            &doc,
+            "status != 'deleted' AND priority IN [1, 2, 3]"
+        ));
+
+        // optional IS NULL OR status LIKE 'act%'
+        assert!(evaluate_custom_query(
+            &doc,
+            "optional IS NULL OR status LIKE 'act%'"
+        ));
+
+        // NOT (status == 'inactive') AND priority != 0
+        assert!(evaluate_custom_query(
+            &doc,
+            "NOT (status == 'inactive') AND priority != 0"
+        ));
+    }
+
+    #[test]
+    fn test_match_like_pattern_unit() {
+        // Unit tests for match_like_pattern helper function
+        assert!(match_like_pattern("hello world", "%world"));
+        assert!(match_like_pattern("hello world", "hello%"));
+        assert!(match_like_pattern("hello world", "%lo wo%"));
+        assert!(match_like_pattern("hello world", "%"));
+        assert!(match_like_pattern("hello world", "%%"));
+        assert!(match_like_pattern("hello world", "hello world"));
+        assert!(!match_like_pattern("hello world", "goodbye%"));
+        assert!(!match_like_pattern("hello world", "%goodbye"));
+        assert!(!match_like_pattern("hello", "hello world"));
     }
 
     // ============================================================================
