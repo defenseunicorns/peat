@@ -117,19 +117,18 @@ async fn test_automerge_three_node_mesh() {
     // Get transports, formation keys, and endpoint IDs
     let transport1 = backend1.transport();
     let transport2 = backend2.transport();
-    let _transport3 = backend3.transport();
+    let transport3 = backend3.transport();
     let formation_key1 = backend1.formation_key().expect("Should have formation key");
     let formation_key2 = backend2.formation_key().expect("Should have formation key");
-    let _formation_key3 = backend3.formation_key().expect("Should have formation key");
+    let formation_key3 = backend3.formation_key().expect("Should have formation key");
 
     let endpoint1_id = backend1.endpoint_id();
     let endpoint2_id = backend2.endpoint_id();
     let endpoint3_id = backend3.endpoint_id();
 
     // Create PeerInfo for ALL backends (needed for bidirectional connection attempts)
-    // Due to tie-breaking (Issue #229), only the side with LOWER endpoint ID initiates.
-    // We must attempt connections in BOTH directions so that one side succeeds.
-    let _peer1_info = hive_protocol::network::PeerInfo {
+    // For sync to work bidirectionally, we need connections in BOTH directions.
+    let peer1_info = hive_protocol::network::PeerInfo {
         name: "backend1".to_string(),
         node_id: hex::encode(endpoint1_id.as_bytes()),
         addresses: vec![addr1.to_string()],
@@ -150,11 +149,11 @@ async fn test_automerge_three_node_mesh() {
         relay_url: None,
     };
 
-    // Full mesh: Each pair attempts connection in BOTH directions.
-    // Connect all pairs - conflict resolution is handled by transport layer
+    // Full mesh: Connect ALL pairs in BOTH directions for bidirectional sync.
+    // This ensures sync works from any node to any other node.
     use hive_protocol::network::formation_handshake::perform_initiator_handshake;
 
-    // Pair 1-2
+    // Node1 → Node2
     if let Some(conn) = transport1
         .connect_peer(&peer2_info)
         .await
@@ -166,7 +165,7 @@ async fn test_automerge_three_node_mesh() {
         println!("    Node1 → Node2 connected");
     }
 
-    // Pair 1-3
+    // Node1 → Node3
     if let Some(conn) = transport1
         .connect_peer(&peer3_info)
         .await
@@ -178,7 +177,19 @@ async fn test_automerge_three_node_mesh() {
         println!("    Node1 → Node3 connected");
     }
 
-    // Pair 2-3
+    // Node2 → Node1 (reverse direction for bidirectional sync)
+    if let Some(conn) = transport2
+        .connect_peer(&peer1_info)
+        .await
+        .expect("Should connect node2 to node1")
+    {
+        perform_initiator_handshake(&conn, &formation_key2)
+            .await
+            .expect("Should authenticate node2 to node1");
+        println!("    Node2 → Node1 connected");
+    }
+
+    // Node2 → Node3
     if let Some(conn) = transport2
         .connect_peer(&peer3_info)
         .await
@@ -190,7 +201,31 @@ async fn test_automerge_three_node_mesh() {
         println!("    Node2 → Node3 connected");
     }
 
-    println!("  ✓ Full mesh connected with authentication (3 bidirectional pairs)");
+    // Node3 → Node1 (reverse direction for bidirectional sync)
+    if let Some(conn) = transport3
+        .connect_peer(&peer1_info)
+        .await
+        .expect("Should connect node3 to node1")
+    {
+        perform_initiator_handshake(&conn, &formation_key3)
+            .await
+            .expect("Should authenticate node3 to node1");
+        println!("    Node3 → Node1 connected");
+    }
+
+    // Node3 → Node2 (reverse direction for bidirectional sync)
+    if let Some(conn) = transport3
+        .connect_peer(&peer2_info)
+        .await
+        .expect("Should connect node3 to node2")
+    {
+        perform_initiator_handshake(&conn, &formation_key3)
+            .await
+            .expect("Should authenticate node3 to node2");
+        println!("    Node3 → Node2 connected");
+    }
+
+    println!("  ✓ Full mesh connected with authentication (6 connections, 3 bidirectional pairs)");
 
     run_three_node_mesh_test(backend1, backend2, backend3, "Automerge+Iroh").await;
 }
@@ -281,7 +316,8 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
     let doc_id1 = "mesh-test-doc-1".to_string();
 
     // Increase retries for CI environments with resource contention
-    // 30 retries @ 200ms = 6 second timeout
+    // First document: 30 retries @ 200ms = 6 second timeout
+    // Second document (bidirectional): uses extended timeout below
     let retries = 30;
     let mut all_synced = false;
 
@@ -372,11 +408,18 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
         .expect("Should create document on node2");
     println!("  ✓ Document created on Node 2");
 
-    // Wait for sync with retry
+    // Wait for sync with retry - use extended timeout for bidirectional sync
+    // Bidirectional sync may take longer as connections were initiated from Node 1
+    // 60 retries @ 200ms = 12 second timeout (doubled for CI reliability)
     let doc_id2 = "mesh-test-doc-2".to_string();
     let mut all_synced2 = false;
+    let extended_retries = 60;
 
-    for i in 0..retries {
+    let mut last_node1_has = false;
+    let mut last_node2_has = false;
+    let mut last_node3_has = false;
+
+    for i in 0..extended_retries {
         sleep(SYNC_POLL_INTERVAL).await;
 
         let doc2_on_node1 = backend1
@@ -397,7 +440,11 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
             .await
             .expect("Should query node3");
 
-        if doc2_on_node1.is_some() && doc2_on_node2.is_some() && doc2_on_node3.is_some() {
+        last_node1_has = doc2_on_node1.is_some();
+        last_node2_has = doc2_on_node2.is_some();
+        last_node3_has = doc2_on_node3.is_some();
+
+        if last_node1_has && last_node2_has && last_node3_has {
             println!(
                 "  ✓ Second document synced to all nodes (attempt {})",
                 i + 1
@@ -409,7 +456,8 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
 
     assert!(
         all_synced2,
-        "Second document failed to sync to all nodes within timeout"
+        "Second document failed to sync to all nodes within timeout. Node1={}, Node2={}, Node3={}",
+        last_node1_has, last_node2_has, last_node3_has
     );
     println!("  ✓ Second document synced to all nodes");
 
