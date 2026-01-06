@@ -62,11 +62,17 @@ pub mod ditto;
 #[cfg(feature = "lite-transport")]
 pub mod lite;
 
+pub mod bypass;
 pub mod capabilities;
 pub mod health;
 pub mod manager;
 pub mod reconnection;
 
+pub use bypass::{
+    BypassChannelConfig, BypassCollectionConfig, BypassError, BypassHeader, BypassMessage,
+    BypassMetrics, BypassMetricsSnapshot, BypassTarget, BypassTransport, MessageEncoding,
+    UdpBypassChannel, UdpConfig,
+};
 pub use capabilities::{
     ConfigurableTransport, DistanceSource, MessagePriority, MessageRequirements, PeerDistance,
     RangeMode, RangeModeConfig, Transport, TransportCapabilities, TransportType,

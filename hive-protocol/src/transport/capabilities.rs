@@ -263,7 +263,20 @@ impl Default for TransportCapabilities {
 /// Priority level for message delivery
 ///
 /// Higher priority messages will be routed via faster/more reliable transports.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Default,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[serde(rename_all = "snake_case")]
 pub enum MessagePriority {
     /// Background sync, can use any available transport
     Background = 0,
