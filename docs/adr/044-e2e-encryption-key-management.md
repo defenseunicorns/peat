@@ -357,12 +357,101 @@ openmls_traits = "0.2"
 4. **Chaos tests**: Network partitions during key rotation
 5. **Performance tests**: Measure overhead vs. unencrypted baseline
 
+## Configuration
+
+All security parameters are runtime-configurable with sensible defaults:
+
+### Cell Key Configuration
+
+```rust
+/// Configuration for cell-level key management
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CellKeyConfig {
+    /// Key rotation interval (default: 1 hour)
+    #[serde(default = "default_rotation_interval")]
+    pub rotation_interval: Duration,
+
+    /// Previous epoch key retention for decrypting in-flight messages (default: 24 hours)
+    #[serde(default = "default_retention_window")]
+    pub key_retention_window: Duration,
+
+    /// Automatically rotate key when member is removed (default: true)
+    #[serde(default = "default_true")]
+    pub rotate_on_remove: bool,
+
+    /// Maximum epochs to retain (default: 48, roughly 2 days at hourly rotation)
+    #[serde(default = "default_max_epochs")]
+    pub max_retained_epochs: usize,
+}
+```
+
+### Per-Collection Bypass Authentication
+
+Extends existing `BypassCollectionConfig`:
+
+```rust
+pub struct BypassCollectionConfig {
+    pub collection: String,
+    pub transport: BypassTransport,
+    pub encoding: MessageEncoding,
+    pub ttl_ms: u64,
+    pub priority: MessagePriority,
+
+    /// Authentication mode for this collection (default: None for backward compat)
+    #[serde(default)]
+    pub auth_mode: BypassAuthMode,
+}
+
+/// Authentication mode for bypass messages
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub enum BypassAuthMode {
+    /// No authentication (backward compatible, fastest)
+    #[default]
+    None,
+    /// Ed25519 signature only (authenticity, no confidentiality)
+    /// +64 bytes overhead, ~50μs signing cost
+    Signed,
+    /// Signed + encrypted with cell key (full protection)
+    /// +64 bytes sig + 16 bytes auth tag, ~100μs total cost
+    SignedEncrypted,
+}
+```
+
+**Guidance**: Use `Signed` for high-frequency telemetry (position updates), `SignedEncrypted` for commands and sensitive data.
+
+## Credential Strategy: Ed25519 vs X.509
+
+| Aspect | Ed25519-Only | X.509 Certificates |
+|--------|--------------|-------------------|
+| **Simplicity** | Just a keypair | Certificate chains, CAs, validity periods |
+| **Key size** | 32 bytes public | ~1-2KB per cert |
+| **Revocation** | Manual tracking | CRL/OCSP infrastructure |
+| **Interop** | HIVE-specific | DoD PKI, NATO systems |
+| **Metadata** | None built-in | Org unit, clearance, role in cert |
+| **Offline validation** | Always works | Needs cached CRLs |
+
+**Decision**: Start with **Ed25519-only** for simplicity. Design credential abstraction to allow X.509 integration later if DoD PKI requirements emerge. OpenMLS supports both via its credential trait.
+
+```rust
+/// Abstraction over credential types
+pub enum HiveCredential {
+    /// Simple Ed25519 public key (current implementation)
+    Ed25519(DeviceKeypair),
+    /// X.509 certificate chain (future, if needed)
+    X509(Vec<Certificate>),
+}
+```
+
 ## Open Questions
 
-1. **Key rotation frequency**: How often should cells rotate keys? (Hourly? On mission change?)
-2. **Partition recovery**: How long to retain old epoch keys? (24 hours? Configurable?)
-3. **Bypass encryption overhead**: Is encryption acceptable for high-frequency position data? (May need symmetric-only fast path)
-4. **X.509 integration**: Should we use X.509 credentials (mls-rs) or keep Ed25519-only (OpenMLS)?
+1. ~~Key rotation frequency~~ → **Resolved**: Configurable via `CellKeyConfig::rotation_interval`
+2. ~~Partition recovery~~ → **Resolved**: Configurable via `CellKeyConfig::key_retention_window`
+3. ~~Bypass encryption overhead~~ → **Resolved**: Per-collection `BypassAuthMode` configuration
+4. ~~X.509 integration~~ → **Resolved**: Ed25519 first, X.509 via abstraction later
+
+**Remaining questions for team:**
+- Default rotation interval: 1 hour reasonable for tactical ops?
+- Should `rotate_on_remove` be default true (more secure) or false (less churn)?
 
 ## References
 
