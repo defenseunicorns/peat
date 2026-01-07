@@ -442,6 +442,177 @@ pub enum HiveCredential {
 }
 ```
 
+## Hardware Root of Trust
+
+For tactical deployment, software-only keys are insufficient. Captured devices could have keys extracted. HIVE should support hardware-backed identity where available.
+
+### Physical Unclonable Functions (PUFs)
+
+PUFs exploit manufacturing variations in silicon to create unique, unclonable device fingerprints. Keys are derived at runtime from physics, not stored in flash.
+
+**Properties:**
+- **Unclonable**: Manufacturing variations can't be reproduced
+- **No key storage**: Keys derived on-demand (nothing to extract)
+- **Tamper-evident**: Physical probing changes PUF response
+- **Cost-effective**: ~$0.50 vs $2-5 for discrete TPM
+
+**Enrollment vs Runtime:**
+
+```
+Enrollment (provisioning):
+  PUF Challenge → Response → Helper Data (stored) + Public Key (registered)
+
+Runtime (each boot):
+  PUF Challenge → Noisy Response + Helper Data → Clean Response → Derive Keys
+```
+
+**Why it matters for tactical:**
+
+| Threat | Without PUF | With PUF |
+|--------|-------------|----------|
+| Enemy captures UAV | Extract keys from flash | No keys stored |
+| Clone device identity | Copy key material | Can't clone silicon |
+| Firmware dump | Reveals secrets | Secrets derived at runtime |
+
+### Key Storage Abstraction
+
+```rust
+/// Hardware-backed key storage options
+pub enum KeyStorage {
+    /// Software-only (works everywhere, least secure)
+    Software(SoftwareKey),
+
+    /// PUF-derived keys (no storage, unclonable)
+    /// Supported: NXP i.MX RT, Microchip ATECC608, Infineon OPTIGA
+    Puf(PufDerivedKey),
+
+    /// TPM 2.0 backed (hardware-bound, attestation capable)
+    /// Supported: Most x86 platforms, some ARM
+    Tpm(TpmKey),
+
+    /// Secure enclave (ARM TrustZone, Apple Secure Enclave)
+    SecureEnclave(EnclaveKey),
+}
+
+/// PUF provider abstraction
+pub trait PufProvider: Send + Sync {
+    /// Get PUF response for challenge
+    fn get_response(&self, challenge: &[u8]) -> Result<[u8; 32]>;
+
+    /// Get helper data for error correction
+    fn get_helper_data(&self) -> Result<Vec<u8>>;
+
+    /// Reconstruct stable response using helper data
+    fn reconstruct(&self, challenge: &[u8], helper: &[u8]) -> Result<[u8; 32]>;
+}
+
+/// PUF-derived device identity
+pub struct PufDeviceIdentity {
+    /// Signing keypair (derived from PUF at boot)
+    signing_key: DeviceKeypair,
+
+    /// Encryption keypair (derived from PUF at boot)
+    encryption_key: EncryptionKeypair,
+}
+
+impl PufDeviceIdentity {
+    pub fn from_puf(puf: &dyn PufProvider) -> Result<Self> {
+        let response = puf.reconstruct(
+            HIVE_PUF_CHALLENGE,
+            &puf.get_helper_data()?
+        )?;
+
+        // Derive separate keys for signing and encryption
+        let signing_seed = hkdf_expand(&response, b"hive-signing-v1");
+        let encryption_seed = hkdf_expand(&response, b"hive-encryption-v1");
+
+        Ok(Self {
+            signing_key: DeviceKeypair::from_seed(&signing_seed),
+            encryption_key: EncryptionKeypair::from_seed(&encryption_seed),
+        })
+    }
+}
+```
+
+### Platform Attestation
+
+For high-security deployments, nodes can prove their hardware/software integrity before joining a cell:
+
+```rust
+/// Platform attestation for cell join
+pub struct PlatformAttestation {
+    /// Hardware identity (PUF response hash or TPM EK)
+    pub hardware_id: [u8; 32],
+
+    /// Firmware measurement (hash of boot chain)
+    pub firmware_hash: [u8; 32],
+
+    /// TPM quote or PUF challenge-response
+    pub attestation_proof: AttestationProof,
+
+    /// Timestamp (prevents replay)
+    pub timestamp: u64,
+
+    /// Signature over all fields
+    pub signature: [u8; 64],
+}
+
+pub enum AttestationProof {
+    /// TPM 2.0 quote (signed PCR values)
+    TpmQuote { pcrs: Vec<u8>, signature: Vec<u8> },
+
+    /// PUF challenge-response
+    PufResponse { challenge: [u8; 32], response: [u8; 32] },
+
+    /// Software-only (hash of known binary)
+    SoftwareOnly { binary_hash: [u8; 32] },
+}
+```
+
+### Hardware Support Matrix
+
+| Platform | PUF | TPM | Secure Enclave | HIVE Target |
+|----------|-----|-----|----------------|-------------|
+| NXP i.MX RT | ✅ SRAM PUF | ❌ | ✅ TrustZone | UAVs, edge |
+| Microchip ATECC608 | ✅ Built-in | ❌ | ✅ Secure element | Small UAS, sensors |
+| Infineon OPTIGA | ✅ Hardware | ❌ | ✅ | High-security nodes |
+| Raspberry Pi | ❌ | ❌ | ❌ | Dev/test only |
+| x86 (Intel/AMD) | ❌ | ✅ | ✅ SGX/SEV | Ground vehicles, C2 |
+| ESP32-S3 | ⚠️ eFuse HMAC | ❌ | ❌ | Constrained sensors |
+
+### Implementation Priority
+
+| Capability | Priority | Rationale |
+|------------|----------|-----------|
+| `KeyStorage` abstraction | **High** | Enables all hardware options |
+| PUF support (NXP/Microchip) | **High** | Primary UAV platforms |
+| Software fallback | **High** | Dev/test, legacy hardware |
+| TPM support | **Medium** | Ground vehicles, C2 |
+| Platform attestation | **Medium** | High-security cells |
+| SGX enclaves | **Low** | Server-side only |
+
+### Zero-Knowledge Extensions (Future)
+
+For scenarios requiring anonymous cell membership:
+
+```rust
+/// ZK proof of cell membership without revealing device identity
+pub struct ZkMembershipProof {
+    /// Proof that prover knows a valid credential
+    pub proof: Vec<u8>,
+
+    /// Public inputs (cell ID, epoch)
+    pub public_inputs: ZkPublicInputs,
+}
+```
+
+Use cases:
+- Prove "I'm authorized for this cell" without revealing which device
+- Prove "I have required clearance" without revealing exact level
+- Prove "I'm within operational area" without exact position
+
+**Status**: Research/future. ZK proof generation overhead (~100ms+) limits real-time applicability. Consider for cell join authorization, not per-message auth.
+
 ## Open Questions
 
 1. ~~Key rotation frequency~~ → **Resolved**: Configurable via `CellKeyConfig::rotation_interval`
