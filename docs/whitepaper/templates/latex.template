@@ -11,6 +11,7 @@
 \usepackage{hyperref}
 \usepackage{xcolor}
 \usepackage{booktabs}
+\usepackage{caption}
 \usepackage{longtable}
 \usepackage{graphicx}
 \usepackage{float}
@@ -18,6 +19,7 @@
 \usepackage{etoolbox}
 \usepackage{tikz}
 \usepackage{pagecolor}
+\usepackage{calc}
 
 % Geometry
 $if(geometry)$
@@ -183,6 +185,49 @@ $endif$
 % Table styling
 \usepackage{array}
 \renewcommand{\arraystretch}{1.3}
+
+% Fix for pandoc's uncaptioned longtables (defines 'none' counter)
+\makeatletter
+\newcounter{none}
+\makeatother
+
+% Code block styling (Shaded environment for pandoc)
+\usepackage{fancyvrb}
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{240,240,240}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\KeywordTok}[1]{\textcolor{PrimaryBlue}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor{AccentBlue}{#1}}
+\newcommand{\DecValTok}[1]{#1}
+\newcommand{\BaseNTok}[1]{#1}
+\newcommand{\FloatTok}[1]{#1}
+\newcommand{\ConstantTok}[1]{#1}
+\newcommand{\CharTok}[1]{\textcolor{HighlightBlue}{#1}}
+\newcommand{\SpecialCharTok}[1]{\textcolor{HighlightBlue}{#1}}
+\newcommand{\StringTok}[1]{\textcolor{HighlightBlue}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor{HighlightBlue}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor{HighlightBlue}{#1}}
+\newcommand{\ImportTok}[1]{#1}
+\newcommand{\CommentTok}[1]{\textcolor{TextMuted}{\textit{#1}}}
+\newcommand{\DocumentationTok}[1]{\textcolor{TextMuted}{\textit{#1}}}
+\newcommand{\AnnotationTok}[1]{\textcolor{TextMuted}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor{TextMuted}{\textit{#1}}}
+\newcommand{\OtherTok}[1]{#1}
+\newcommand{\FunctionTok}[1]{#1}
+\newcommand{\VariableTok}[1]{#1}
+\newcommand{\ControlFlowTok}[1]{\textcolor{PrimaryBlue}{\textbf{#1}}}
+\newcommand{\OperatorTok}[1]{#1}
+\newcommand{\BuiltInTok}[1]{#1}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\PreprocessorTok}[1]{\textcolor{AccentBlue}{#1}}
+\newcommand{\AttributeTok}[1]{#1}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\InformationTok}[1]{\textcolor{TextMuted}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor{red}{#1}}
+\newcommand{\AlertTok}[1]{\textcolor{red}{\textbf{#1}}}
+\newcommand{\ErrorTok}[1]{\textcolor{red}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\},fontsize=\small}
 
 \begin{document}
 
