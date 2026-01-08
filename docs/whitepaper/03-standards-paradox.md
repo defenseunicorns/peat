@@ -1,63 +1,91 @@
 ## II. THE STANDARDS PARADOX
 
-**Thesis:** Existing interoperability standards address platform control, not coordination at scale. The layer is missing, not broken.
+**Thesis:** Existing interoperability standards address device control and messaging, not coordination at scale. The layer is missing, not broken.
 
 ---
 
 ### 2.1 What Exists—and What It Does Well
 
-<!-- Target: ~0.75 page -->
+The technology industry has built extensive interoperability infrastructure.
 
-The defense community has built extensive interoperability infrastructure.
+**Messaging and Middleware**:
+- MQTT, AMQP: Pub/sub messaging
+- DDS: Real-time data distribution
+- gRPC, REST: API interoperability
+- ROS2: Robotics middleware
 
-<!-- TODO: Content to develop:
-- STANAG 4586/4817: UAV/UGV control standards (successful at their purpose)
-- JAUS: Service-oriented platform architecture
-- FACE: Software portability
-- ROS2/DDS: Messaging and middleware
-- Link 16: Tactical data exchange
--->
+**Device and Protocol Standards**:
+- Modbus, OPC-UA: Industrial automation
+- STANAG 4586/4817: UAV control (defense)
+- Matter, Thread: Smart home devices
+- CAN bus, J1939: Automotive
 
-These standards work. The problem is what they don't address.
+**Data Exchange Formats**:
+- JSON, Protobuf, CBOR: Serialization
+- CoT (Cursor on Target): Situational awareness
+- SensorThings: IoT observations
+
+These standards work. They enable device control, message passing, and data exchange. The problem is what they don't address.
 
 ---
 
 ### 2.2 The Missing Layer
 
-<!-- Target: ~0.75 page -->
-
 Control is not coordination.
 
-<!-- TODO: Content to develop:
-- Controlling one platform ≠ orchestrating many
-- All existing standards assume coordination happens "somewhere else"
-- The gap: hierarchical coordination at scale
-- Integration tax: more standards, more complexity, no scaling solution
-- Each standard solves its problem; none solve THE problem
--->
+**Every existing standard assumes coordination happens "somewhere else"**:
+- ROS2 nodes publish and subscribe, but who decides which node does what?
+- DDS distributes data, but who aggregates and summarizes for scale?
+- Device standards control individual platforms, but who orchestrates the fleet?
 
-<!-- TODO: Placeholder for diagram: Standards stack showing missing coordination layer -->
+The answer is always: "your application handles that."
+
+But coordination at scale isn't an application concern—it's infrastructure. It requires:
+- Hierarchical aggregation of state
+- Dynamic formation of coordinating groups
+- Authority delegation and constraint propagation
+- Emergent capability composition
+
+No existing standard addresses these. The gap isn't in the standards we have—it's a layer that doesn't exist.
+
+```
+┌────────────────────────────────────────────────────┐
+│  Application: Domain-specific logic                │
+├────────────────────────────────────────────────────┤
+│  ??? COORDINATION: Hierarchical orchestration ???  │  ← Missing
+├────────────────────────────────────────────────────┤
+│  Messaging: MQTT, DDS, gRPC, ROS2                  │
+├────────────────────────────────────────────────────┤
+│  Device Control: Modbus, CAN, proprietary APIs     │
+├────────────────────────────────────────────────────┤
+│  Network: TCP/IP, UDP, BLE, LoRA                   │
+└────────────────────────────────────────────────────┘
+```
 
 ---
 
 ### 2.3 The Proprietary Trap
 
-<!-- Target: ~0.5 page -->
-
 In the absence of open standards, proprietary solutions fill the gap.
 
-<!-- TODO: Content to develop:
-- Current coordination approaches are vendor-specific
-- Coalition interoperability impossible across proprietary protocols
-- Lock-in creates acquisition complexity
+**Current Reality**:
+- Fleet management platforms are vendor-specific
+- Cross-vendor coordination requires custom integration
+- Each deployment creates switching costs
 - Innovation constrained by vertical integration
-- Each program's choice compounds the fragmentation
--->
+
+**Consequences**:
+- Multi-vendor deployments face coordination barriers
+- Cross-organization collaboration is legally and technically complex
+- Market fragmentation limits ecosystem growth
+- Early architectural choices lock in suboptimal solutions
+
+The coordination layer will be filled. The question is whether it's filled by open infrastructure that enables an ecosystem, or proprietary solutions that constrain it.
 
 ---
 
 ### Key Finding: Section II
 
-> "Existing standards solve platform-level interoperability. None address hierarchical coordination at scale—they assume that layer exists. It doesn't. HIVE fills this gap."
+> "Existing standards solve device-level interoperability and messaging. None address hierarchical coordination at scale—they assume that layer exists. It doesn't. HIVE fills this gap."
 
 ---

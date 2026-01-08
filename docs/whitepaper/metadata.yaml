@@ -1,43 +1,44 @@
 # Whitepaper Metadata
 # Used by pandoc for document generation
 
-title: "HIVE Protocol: Breaking the 20-Platform Wall"
-subtitle: "Open Coordination Architecture for Human-Machine Teams at Scale"
+title: "HIVE Protocol: Breaking the 20-Node Wall"
+subtitle: "Open Coordination Architecture for Distributed Multi-Agent Systems"
 author:
-  - name: Kit Plummer
-    affiliation: "(r)evolve — Revolve Team LLC"
-    email: kit@revolveteam.com
-date: December 2025
-version: "Draft 0.1"
+  - name: HIVE Protocol Contributors
+    affiliation: "HIVE Protocol Project"
+date: January 2026
+version: "1.0"
 
 # Document metadata
 abstract: |
-  Military autonomous systems programs consistently plateau at approximately
-  20 platforms—not due to technology gaps, but architectural constraints rooted
+  Distributed multi-agent systems consistently plateau at approximately
+  20 nodes—not due to technology gaps, but architectural constraints rooted
   in O(n²) scaling mathematics. HIVE Protocol breaks this barrier through
   hierarchical CRDT-based coordination that achieves O(n log n) scaling,
-  enabling 1,000+ platform operations on bandwidth-constrained tactical networks.
+  enabling 1,000+ node operations on bandwidth-constrained networks.
   Laboratory validation confirms 95-99% bandwidth reduction. This whitepaper
   presents the scaling crisis, the hierarchy insight, technical architecture,
-  and the case for open standards.
+  and the case for open coordination infrastructure.
 
 keywords:
-  - autonomous systems
-  - human-machine teaming
   - distributed coordination
+  - multi-agent systems
   - CRDT
-  - military hierarchy
-  - swarm coordination
+  - hierarchical aggregation
+  - autonomous systems
   - edge computing
-  - tactical networks
+  - IoT
+  - robotics
+  - open source
 
 # Classification
-classification: UNCLASSIFIED
-distribution: Public Release
+classification: PUBLIC
+distribution: Open Source
 
 # Publisher info
-publisher: "(r)evolve — Revolve Team LLC"
-website: https://revolveteam.com
+publisher: "HIVE Protocol Project"
+website: https://github.com/kitplummer/hive
+license: Apache 2.0
 
 # PDF-specific settings
 documentclass: article
@@ -45,15 +46,11 @@ fontsize: 11pt
 geometry: margin=1in
 linestretch: 1.15
 colorlinks: true
-# Colors now defined in template using (r)evolve palette
-# linkcolor, urlcolor, toccolor handled by template
 
 # HTML-specific settings
 lang: en-US
-# Design: (r)evolve color scheme + Space Grotesk font
-# Dark theme default, respects prefers-color-scheme
 
 # Citation
 citation: |
-  Plummer, K. (2025). "HIVE Protocol: Breaking the 20-Platform Wall."
-  (r)evolve - Revolve Team LLC.
+  HIVE Protocol Contributors. (2026). "HIVE Protocol: Breaking the 20-Node Wall."
+  HIVE Protocol Project. https://github.com/kitplummer/hive

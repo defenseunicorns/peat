@@ -6,121 +6,139 @@
 
 ### 7.1 Current State
 
-<!-- Target: ~0.5 page -->
-
 HIVE is ready for integration pilots.
 
-<!-- TODO: Content to develop:
-- TRL 4-5: Laboratory validated
-- Reference implementation: Rust + Automerge + Iroh
-- Three-layer architecture enables flexible integration
-- Apache 2.0 licensing: no barriers to government or allied use
-- Integration pathways proven: TAK/CoT, ROS2, STANAG 4586 bridging
--->
+**Technology Readiness**: TRL 4-5 (laboratory validated, integration demonstrated)
+
+**Reference Implementation**:
+- Core: Rust + Automerge + Iroh
+- Bindings: C FFI, Swift, Kotlin (in progress)
+- Embedded: hive-lite for resource-constrained devices
+
+**Architecture**:
+- Five-layer design enables flexible integration depth
+- Protocol-transport separation supports diverse network environments
+- Schema extensibility accommodates domain-specific needs
+
+**Licensing**: Apache 2.0—no barriers to evaluation, integration, or deployment
+
+**Documentation**:
+- IETF-style protocol specifications
+- Architecture decision records (ADRs)
+- Integration guides and API documentation
 
 ---
 
 ### 7.2 Integration Strategy
 
-<!-- Target: ~0.5 page -->
-
-Programs choose integration depth based on requirements.
+Organizations choose integration depth based on requirements.
 
 #### Shallow Integration
 
-<!-- TODO: Content to develop:
-- Protocol adapters
-- HIVE coordinates existing C2 outputs
-- Minimal changes to current systems
--->
+Minimal changes to existing systems:
+- Protocol adapters translate existing data formats to HIVE schema
+- HIVE coordinates outputs from existing control systems
+- Legacy systems participate via bridge components
+- Suitable for: Evaluation, hybrid deployments, legacy integration
 
 #### Medium Integration
 
-<!-- TODO: Content to develop:
-- Capability translation layer
-- Legacy platforms participate via gateway
-- Incremental adoption
--->
+Native capability with backward compatibility:
+- Capability advertisement from existing platforms
+- Direct participation in HIVE hierarchy
+- Gradual migration path from legacy coordination
+- Suitable for: New deployments with legacy components, incremental adoption
 
 #### Deep Integration
 
-<!-- TODO: Content to develop:
-- Native HIVE implementation
-- Full capability advertisement
-- New platforms designed for HIVE
--->
+Full native HIVE implementation:
+- Native hive-ffi or hive-lite integration
+- Complete capability and authority model
+- Designed from ground up for HIVE coordination
+- Suitable for: New platform development, maximum coordination capability
 
 ---
 
 ### 7.3 Standardization Trajectory
 
-<!-- Target: ~0.5 page -->
-
 Multiple paths reinforce each other.
 
-#### Near-term (12-24 months)
+#### Near-term (Year 1)
 
-<!-- TODO: Content to develop:
-- Open consortium formation
-- Technical specification publication
+- Open development community formation
+- Technical specification refinement based on integration feedback
 - Reference implementation maturation
-- IETF draft RFC
--->
+- Initial IETF internet-draft submission
 
-#### Medium-term (2-3 years)
+#### Medium-term (Years 2-3)
 
-<!-- TODO: Content to develop:
-- SAE standard via AS4 Unmanned Systems Committee
+- IETF working group formation
+- Multiple independent implementations
+- Interoperability testing and certification
 - Industry adoption and conformance testing
-- Commercial implementations
--->
 
-#### Long-term (4-5 years)
+#### Long-term (Years 4-5)
 
-<!-- TODO: Content to develop:
-- NATO STANAG pathway
-- Allied nation adoption
-- Full coalition interoperability
--->
+- IETF RFC publication
+- Industry standard recognition (IEEE, SAE as applicable)
+- International adoption
+- Multi-vendor ecosystem maturity
 
 ---
 
 ### 7.4 Recommendations
 
-<!-- Target: ~0.75 page -->
-
-#### For Program Managers
-
-- Evaluate HIVE integration for multi-platform coordination requirements
-- Assess current architectures against O(n²) scaling limits
-- Identify pilot opportunities for operational validation
-- Engage with consortium development
-
-#### For Acquisition Professionals
-
-- Recognize coordination architecture as distinct requirement from platform control
-- Apply MOSA preference to coordination layer procurement
-- Consider GOTS benefits for coalition programs
-- Evaluate proprietary dependencies for long-term risk
-
 #### For Technical Evaluators
 
-- Assess current program coordination scaling assumptions
-- Evaluate proprietary dependencies for coalition interoperability risk
-- Review HIVE technical specifications for integration feasibility
-- Consider three-layer architecture for incremental adoption
+- Assess current coordination architectures against O(n²) scaling limits
+- Evaluate HIVE integration feasibility for multi-agent coordination requirements
+- Review IETF-style specifications for protocol completeness
+- Consider five-layer architecture for incremental adoption strategy
 
-#### For Strategic Decision-Makers
+#### For System Architects
 
-- Prioritize open coordination standard development in autonomous systems roadmaps
-- Engage NATO partners on coordination architecture interoperability
-- Resource standardization participation through appropriate channels
-- Recognize 12-24 month decision window
+- Identify pilot opportunities where scale limits current capability
+- Evaluate shallow integration as low-risk entry point
+- Plan migration path from proprietary coordination protocols
+- Consider HIVE for new platform coordination architecture
+
+#### For Decision Makers
+
+- Recognize coordination architecture as infrastructure investment
+- Prioritize open standards for long-term interoperability
+- Consider total cost including vendor lock-in risk
+- Engage with HIVE community development
+
+#### For Developers
+
+- Explore reference implementation on GitHub
+- Join development community for contribution opportunities
+- Provide integration feedback to specification process
+- Consider HIVE for multi-agent coordination projects
+
+---
+
+### 7.5 Getting Started
+
+**Evaluate**: Clone the repository, run examples, review specifications
+
+```bash
+git clone https://github.com/[org]/hive
+cd hive
+cargo build --all
+cargo test --all
+```
+
+**Integrate**: Start with hive-ffi for native integration or hive-lite for embedded
+
+**Engage**: Join community discussions, file issues, propose improvements
+
+**Pilot**: Deploy in controlled environment, measure against requirements
 
 ---
 
 ### Key Finding: Section VII
 
-> "HIVE is validated and integration-ready. The path from current state to NATO STANAG is clear. What's required is engagement: pilot programs, consortium participation, and strategic prioritization of open coordination infrastructure."
+> "HIVE is validated and integration-ready. The path from current state to industry standard is clear. What's required is engagement: pilot programs, community participation, and commitment to open coordination infrastructure."
 
 ---

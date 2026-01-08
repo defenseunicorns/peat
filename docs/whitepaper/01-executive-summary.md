@@ -1,39 +1,38 @@
 ## EXECUTIVE SUMMARY
 
-<!-- Target: ~1.5 pages — This is the expanded one-pager. Should work standalone as a briefing document. -->
-
-Military autonomous systems programs consistently plateau at approximately 20 platforms. This isn't a technology gap—it's an architecture gap rooted in fundamental mathematics.
+Distributed multi-agent systems consistently plateau at approximately 20 nodes. Whether the domain is autonomous vehicles, industrial IoT, robotic fleets, or emergency response coordination, the same ceiling appears. This isn't a technology gap—it's an architecture gap rooted in fundamental mathematics.
 
 ### The Problem
 
-<!-- TODO: 2-3 sentences: O(n²) scaling, tactical bandwidth constraints, physical impossibility at scale -->
+Every node communicating with every other node creates O(n²) message complexity. At 20 nodes, that's 400 messages per synchronization cycle—manageable. At 100 nodes, it's 10,000 messages—network saturation. At 1,000 nodes, it's 1,000,000 messages—physically impossible on constrained networks. No amount of optimization within mesh topologies escapes this mathematical reality.
 
 ### The Insight
 
-<!-- TODO: 2-3 sentences: Military hierarchy as evolved communication optimization, O(n log n), hiding in plain sight -->
+Hierarchical organizations—from biological systems to human institutions—evolved to solve exactly this problem. A team leader tracking 3 group summaries instead of 24 individual states isn't bureaucratic overhead; it's communication optimization. Hierarchy compresses O(n²) to O(n log n). This pattern scales because it was designed to scale.
 
 ### The Solution
 
-<!-- TODO: 2-3 sentences: HIVE Protocol, hierarchical CRDT coordination, key validation results -->
+HIVE Protocol implements hierarchy as technical architecture. Using CRDTs (Conflict-free Replicated Data Types), nodes synchronize without consensus—critical for intermittent connectivity. Hierarchical aggregation reduces bandwidth by 95-99%. Cells form dynamically, elect leaders, and compose emergent capabilities greater than the sum of their parts. The protocol is domain-agnostic: the same architecture coordinates autonomous vehicles, sensor networks, robotic fleets, or disaster response teams.
 
 ### The Imperative
 
-<!-- TODO: 2-3 sentences: Open architecture, coalition interoperability, 12-24 month window -->
+Coordination infrastructure must be open. Proprietary protocols create vendor lock-in, limit interoperability, and slow innovation. HIVE is Apache 2.0 licensed with IETF-style specifications. The architecture decision window is now—systems being designed today will operate for decades.
 
 ### Key Findings
 
-- The ~20 platform ceiling is architectural, not technological
-- Military hierarchy is the coordination primitive that enables scale
+- The ~20 node ceiling is architectural, not technological
+- Hierarchy is the coordination primitive that enables scale
 - HIVE achieves 95-99% bandwidth reduction through hierarchical aggregation
+- CRDTs enable coordination without consensus—essential for constrained networks
 - Open standards are strategic necessity, not preference
-- The architecture decision window is 12-24 months
 
 ### Document Navigation
 
 | Audience | Recommended Section |
 |----------|---------------------|
-| Autonomy program managers | Section I: The Scaling Crisis |
-| C2 and doctrine community | Section III: The Hierarchy Insight |
-| Data architecture and AI community | Section IV: Technical Architecture |
+| System architects | Section I: The Scaling Crisis |
+| Distributed systems engineers | Section III: The Hierarchy Insight |
+| Technical evaluators | Section IV: Technical Architecture |
+| Decision makers | Section V: Open Architecture Imperative |
 
 ---

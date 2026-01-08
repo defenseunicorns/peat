@@ -1,11 +1,11 @@
-# HIVE PROTOCOL: BREAKING THE 20-PLATFORM WALL
+# HIVE PROTOCOL: BREAKING THE 20-NODE WALL
 
-**Open Coordination Architecture for Human-Machine Teams at Scale**
+**Open Coordination Architecture for Distributed Multi-Agent Systems**
 
 ---
 
-**(r)evolve** — Revolve Team LLC
-https://revolveteam.com
-December 2025
+**HIVE Protocol Project**
+https://github.com/kitplummer/hive
+January 2026
 
 ---
