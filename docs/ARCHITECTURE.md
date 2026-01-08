@@ -94,7 +94,7 @@ HIVE is organized into five distinct layers, each with clear responsibilities:
 |--------|---------|
 | `beacon.proto` | Track updates, position reports, node identity |
 | `mission.proto` | Mission tasking, objectives, phases |
-| `capability.proto` | Device capabilities, sensor/effector advertisements |
+| `capability.proto` | Device capabilities, sensor/actuator advertisements |
 | `security.proto` | Authentication challenges, device identity, signatures |
 | `cot.proto` | Cursor-on-Target (TAK interoperability) |
 | `ai.proto` | ML model metadata, inference requests/responses |
@@ -252,8 +252,50 @@ A **cell** is a dynamic group of nodes that coordinate together. Cells are the f
 
 - **Formation**: Nodes discover each other and negotiate cell membership
 - **Leadership**: Cells elect leaders based on capabilities and authority
-- **Hierarchy**: Cells can form parent-child relationships (squad → platoon → company)
+- **Hierarchy**: Cells can form parent-child relationships (team → group → formation)
 - **Autonomy**: Cells operate independently when disconnected from higher echelons
+
+### Capability Aggregation and Emergent Behavior
+
+A core principle of HIVE is that **cells exhibit emergent capabilities** greater than the sum of their individual members:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    CLUSTER COORDINATOR                       │
+│   Sees: "Full-spectrum Sensing + Action + Signal package"   │
+│   Can task based on COMBINED capabilities                    │
+└─────────────────────────────────────────────────────────────┘
+                              ▲
+              Aggregated + Emergent capabilities
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        ▼                     ▼                     ▼
+  ┌───────────┐         ┌───────────┐         ┌───────────┐
+  │FORMATION 1│         │FORMATION 2│         │FORMATION 3│
+  │Sense+Relay│         │Action+Sens│         │Action+Sig │
+  │ Emergent: │         │ Emergent: │         │ Emergent: │
+  │ Wide-area │         │ Sense-and-│         │ Coordinated│
+  │ coverage  │         │ act loop  │         │ response  │
+  └───────────┘         └───────────┘         └───────────┘
+        ▲                     ▲                     ▲
+   Group caps            Group caps            Group caps
+```
+
+**How it works**:
+1. **Platforms** advertise individual capabilities (sensors, actuators, compute)
+2. **Cells** aggregate member capabilities and detect **emergent patterns**
+3. **Parents** receive aggregated summaries, enabling capability-based tasking
+
+**Emergent capability examples**:
+- **Sensing + Action** in same cell → **Sense-and-act loop**
+- **Signal + Action** → **Coordinated response**
+- **Multiple sensors** → **Wide-area observation**
+- **Compute + sensors** → **Edge AI processing**
+
+**Bidirectional flow**:
+- **Upward**: Capabilities, tracks, status → aggregate at each level
+- **Downward**: Commands, missions, constraints, AI models → disseminate to leaves
+- **Horizontal**: Handoffs, deconfliction, mutual support between peers
 
 ### Documents and CRDTs
 
@@ -284,7 +326,7 @@ For latency-critical data (sensor readings, control commands), HIVE provides a *
 │                           TRACK UPDATE FLOW                                │
 └───────────────────────────────────────────────────────────────────────────┘
 
-  Sensor (ESP32)              Squad Node                 Platoon Node
+  Sensor (ESP32)              Group Node                 Formation Node
        │                          │                           │
        │  ┌──────────────────┐    │                           │
        │  │ 1. Position data │    │                           │
@@ -326,7 +368,7 @@ See [ADR-006](adr/006-security-authentication-authorization.md) and [ADR-044](ad
 ### Layers
 
 1. **Device Identity**: Ed25519 keypairs, challenge-response authentication
-2. **User Authentication**: RBAC, military rank/clearance integration
+2. **User Authentication**: RBAC, authority level integration
 3. **Encryption**: ChaCha20-Poly1305 AEAD, X25519 key exchange
 4. **Cell Key Management**: MLS-based group key agreement (planned)
 5. **Hardware Root of Trust**: PUF/TPM integration (future)

@@ -63,7 +63,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 | **Group Key** | Symmetric key for cell broadcast encryption |
 | **Secure Channel** | Encrypted peer-to-peer connection |
 | **Principal** | Entity (device or user) with permissions |
-| **Clearance** | Security classification level |
+| **Access Level** | Data sensitivity classification |
 
 ---
 
@@ -304,8 +304,8 @@ pub enum Permission {
     ModifyMembership,
     /// Issue commands
     IssueCommands,
-    /// Access classified data
-    AccessClassified { level: ClearanceLevel },
+    /// Access sensitive data
+    AccessSensitive { level: AccessLevel },
 }
 ```
 
@@ -319,20 +319,20 @@ pub enum Permission {
 | Leader | Yes | Yes | Yes | Yes | Yes | Cell level |
 | Supervisor | Yes | Yes | Yes | Yes | Yes | Parent level |
 
-### 6.3 Clearance Levels
+### 6.3 Access Levels
 
 ```rust
-pub enum ClearanceLevel {
-    /// Unclassified
-    Unclassified = 0,
-    /// Controlled Unclassified Information
-    CUI = 1,
-    /// Confidential
-    Confidential = 2,
-    /// Secret
-    Secret = 3,
-    /// Top Secret
-    TopSecret = 4,
+pub enum AccessLevel {
+    /// Public - no restrictions
+    Public = 0,
+    /// Internal - cell members only
+    Internal = 1,
+    /// Restricted - requires role
+    Restricted = 2,
+    /// Sensitive - leader approval
+    Sensitive = 3,
+    /// Critical - root approval
+    Critical = 4,
 }
 ```
 
@@ -350,9 +350,9 @@ pub fn check_authorization(
         return Err(AuthorizationError::InsufficientRole);
     }
 
-    // Check clearance level
-    if principal.clearance < resource.classification {
-        return Err(AuthorizationError::InsufficientClearance);
+    // Check access level
+    if principal.access_level < resource.required_level {
+        return Err(AuthorizationError::InsufficientAccess);
     }
 
     // Check cell membership
@@ -626,7 +626,7 @@ Entry[n].signature = Sign(Entry[n] - signature field)
 | Impersonation | Ed25519 device authentication |
 | Replay attacks | Timestamp + nonce + sequence numbers |
 | Man-in-the-middle | Public key verification, challenge-response |
-| Unauthorized access | RBAC, clearance levels |
+| Unauthorized access | RBAC, access levels |
 | Data tampering | Cryptographic signatures |
 | Key compromise | Key rotation, forward secrecy |
 | Denial of service | Rate limiting, connection limits |
@@ -663,7 +663,7 @@ Entry[n].signature = Sign(Entry[n] - signature field)
 - Hardware attestation (TPM, Secure Enclave)
 - PUF-derived device identity
 - Zero-knowledge membership proofs
-- Security clearance enforcement
+- Access level enforcement
 
 ### 11.4 Cryptographic Library Requirements
 

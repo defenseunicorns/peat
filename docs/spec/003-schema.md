@@ -38,10 +38,10 @@ HIVE schemas define the structure of all data exchanged between nodes. Using Pro
 
 ### 1.2 Design Principles
 
-- **Military Standards**: Align with MIL-STD-6016 (Link-16), CoT, STANAG 4586
+- **Standards Alignment**: Optional compatibility with tactical standards (CoT, STANAG 4586)
 - **Extensibility**: Unknown fields are preserved
 - **Efficiency**: Optimize for constrained networks
-- **Interoperability**: Support TAK ecosystem integration
+- **Interoperability**: Support external system integration
 
 ### 1.3 Requirements Language
 
@@ -162,11 +162,11 @@ message TimeRange {
 ### 3.2 Entity Types
 
 ```protobuf
-// Entity affiliation (friend/foe/neutral/unknown)
+// Entity affiliation (member/external/neutral/unknown)
 enum Affiliation {
     AFFILIATION_UNKNOWN = 0;
-    AFFILIATION_FRIENDLY = 1;
-    AFFILIATION_HOSTILE = 2;
+    AFFILIATION_MEMBER = 1;
+    AFFILIATION_EXTERNAL = 2;
     AFFILIATION_NEUTRAL = 3;
     AFFILIATION_PENDING = 4;
 }
@@ -185,15 +185,15 @@ enum Dimension {
 enum PlatformType {
     PLATFORM_UNKNOWN = 0;
     PLATFORM_GROUND_VEHICLE = 1;
-    PLATFORM_DISMOUNTED = 2;
+    PLATFORM_PORTABLE = 2;
     PLATFORM_FIXED_WING = 3;
     PLATFORM_ROTARY_WING = 4;
-    PLATFORM_UAS = 5;
+    PLATFORM_UAV = 5;
     PLATFORM_UGV = 6;
     PLATFORM_USV = 7;
     PLATFORM_UUV = 8;
     PLATFORM_SENSOR = 9;
-    PLATFORM_EFFECTOR = 10;
+    PLATFORM_ACTUATOR = 10;
 }
 ```
 
@@ -343,8 +343,8 @@ message Mission {
     // Current status
     MissionStatus status = 10;
 
-    // Rules of engagement reference
-    optional string roe_reference = 11;
+    // Operational constraints reference
+    optional string constraints_reference = 11;
 
     // Free-form instructions
     optional string instructions = 12;
@@ -352,13 +352,13 @@ message Mission {
 
 enum MissionType {
     MISSION_TYPE_UNSPECIFIED = 0;
-    MISSION_TYPE_ISR = 1;           // Intelligence, Surveillance, Recon
-    MISSION_TYPE_STRIKE = 2;
-    MISSION_TYPE_TRANSPORT = 3;
-    MISSION_TYPE_ESCORT = 4;
-    MISSION_TYPE_PATROL = 5;
-    MISSION_TYPE_SAR = 6;           // Search and Rescue
-    MISSION_TYPE_RESUPPLY = 7;
+    MISSION_TYPE_OBSERVATION = 1;   // Observe, monitor, survey
+    MISSION_TYPE_ACTION = 2;        // Perform coordinated action
+    MISSION_TYPE_TRANSPORT = 3;     // Move payload or resources
+    MISSION_TYPE_ESCORT = 4;        // Accompany and protect
+    MISSION_TYPE_PATROL = 5;        // Monitor area over time
+    MISSION_TYPE_SEARCH = 6;        // Search and locate
+    MISSION_TYPE_RESUPPLY = 7;      // Deliver resources
 }
 
 enum Priority {
@@ -463,8 +463,8 @@ message CapabilityAdvertisement {
     // Sensor capabilities
     repeated SensorCapability sensors = 4;
 
-    // Effector capabilities
-    repeated EffectorCapability effectors = 5;
+    // Actuator capabilities
+    repeated ActuatorCapability actuators = 5;
 
     // Communication capabilities
     CommunicationCapability comms = 6;
@@ -514,30 +514,30 @@ message SensorSpec {
     optional double update_rate_hz = 4;
 }
 
-// Effector capability
-message EffectorCapability {
-    string effector_id = 1;
-    EffectorType type = 2;
-    EffectorSpec spec = 3;
+// Actuator capability
+message ActuatorCapability {
+    string actuator_id = 1;
+    ActuatorType type = 2;
+    ActuatorSpec spec = 3;
     OperationalStatus status = 4;
 }
 
-enum EffectorType {
-    EFFECTOR_TYPE_UNSPECIFIED = 0;
-    EFFECTOR_TYPE_KINETIC = 1;
-    EFFECTOR_TYPE_EW = 2;       // Electronic warfare
-    EFFECTOR_TYPE_CYBER = 3;
-    EFFECTOR_TYPE_CARGO = 4;    // Payload delivery
-    EFFECTOR_TYPE_MANIPULATOR = 5;
+enum ActuatorType {
+    ACTUATOR_TYPE_UNSPECIFIED = 0;
+    ACTUATOR_TYPE_PHYSICAL = 1;     // Physical actuation
+    ACTUATOR_TYPE_SIGNAL = 2;       // Signal/RF emission
+    ACTUATOR_TYPE_DIGITAL = 3;      // Digital/cyber action
+    ACTUATOR_TYPE_CARGO = 4;        // Payload delivery
+    ACTUATOR_TYPE_MANIPULATOR = 5;  // Robotic arm/gripper
 }
 
-message EffectorSpec {
+message ActuatorSpec {
     // Range in meters
     optional double range_meters = 1;
     // Payload capacity in kg
     optional double payload_kg = 2;
-    // Rounds/uses remaining
-    optional uint32 ammunition = 3;
+    // Uses/resources remaining
+    optional uint32 resources_remaining = 3;
 }
 
 // Communication capability
@@ -788,9 +788,9 @@ HIVE beacons map to CoT events:
 ```
 HIVE Affiliation + Dimension → CoT Type
 
-FRIENDLY + GROUND   → a-f-G
-FRIENDLY + AIR      → a-f-A
-HOSTILE + GROUND    → a-h-G
+MEMBER + GROUND     → a-f-G
+MEMBER + AIR        → a-f-A
+EXTERNAL + GROUND   → a-h-G
 NEUTRAL + SURFACE   → a-n-S
 UNKNOWN + AIR       → a-u-A
 ```

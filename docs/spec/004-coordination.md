@@ -33,7 +33,7 @@ This document specifies the coordination protocol for HIVE. It defines cell form
 The HIVE coordination protocol enables autonomous and semi-autonomous systems to form dynamic teams ("cells") that operate effectively without centralized control. It provides mechanisms for:
 - Discovering and joining cells
 - Electing leaders based on capabilities and authority
-- Organizing hierarchically (squad → platoon → company)
+- Organizing hierarchically (team → group → formation)
 - Handling node failures and network partitions
 
 ### 1.2 Design Goals
@@ -57,7 +57,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 | **Formation** | The process of establishing a cell |
 | **Leader** | Node responsible for cell coordination |
 | **Member** | Any node in a cell (including leader) |
-| **Parent Cell** | Higher echelon cell (e.g., platoon to squad) |
+| **Parent Cell** | Higher echelon cell (e.g., group to team) |
 | **Child Cell** | Lower echelon cell |
 | **Hierarchy Level** | Position in command structure (0=root) |
 | **Capability Score** | Numeric rating of node capabilities |
@@ -326,12 +326,12 @@ If no consensus in timeout, the node with highest score self-declares.
 
 | Level | Name | Typical Size | Parent |
 |-------|------|--------------|--------|
-| 0 | Command | 1 | None |
-| 1 | Company | 100-200 | Command |
-| 2 | Platoon | 30-50 | Company |
-| 3 | Squad | 8-12 | Platoon |
-| 4 | Team | 2-4 | Squad |
-| 5 | Individual | 1 | Team |
+| 0 | Root | 1 | None |
+| 1 | Cluster | 100-200 | Root |
+| 2 | Formation | 30-50 | Cluster |
+| 3 | Group | 8-12 | Formation |
+| 4 | Team | 2-4 | Group |
+| 5 | Node | 1 | Team |
 
 ### 6.2 Parent-Child Relationship
 
@@ -358,35 +358,341 @@ enum BindingStatus {
 }
 ```
 
-### 6.3 Upward Aggregation
+### 6.3 Capability Aggregation and Emergent Behavior
 
-Lower cells aggregate data before sending upward:
+A core principle of HIVE is that **cells exhibit emergent capabilities** greater than the sum of their individual members. Capability aggregation flows upward through the hierarchy, enabling higher echelons to understand and task based on collective capabilities.
+
+#### 6.3.1 Capability Flow Model
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           CLUSTER COORDINATOR                                │
+│  Sees: "3 formations with combined Sensing, Action, and Relay capabilities" │
+│  Emergent: Full-spectrum observation and coordinated action package          │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    ▲
+                    Aggregated capability summaries
+                                    │
+        ┌───────────────────────────┼───────────────────────────┐
+        │                           │                           │
+        ▼                           ▼                           ▼
+┌───────────────────┐     ┌───────────────────┐     ┌───────────────────┐
+│   FORMATION 1     │     │   FORMATION 2     │     │   FORMATION 3     │
+│  Sensing + Relay  │     │  Action + Sensing │     │  Action + Signal  │
+│  Emergent: Wide   │     │  Emergent: Sense- │     │  Emergent: Coord- │
+│  area coverage    │     │  and-act          │     │  inated response  │
+└─────────┬─────────┘     └─────────┬─────────┘     └─────────┬─────────┘
+          │                         │                         │
+    ┌─────┴─────┐             ┌─────┴─────┐             ┌─────┴─────┐
+    ▼           ▼             ▼           ▼             ▼           ▼
+┌───────┐   ┌───────┐     ┌───────┐   ┌───────┐     ┌───────┐   ┌───────┐
+│Group 1│   │Group 2│     │Group 3│   │Group 4│     │Group 5│   │Group 6│
+│EO+IR  │   │COMMS  │     │Action │   │EO     │     │Action │   │Signal │
+└───┬───┘   └───┬───┘     └───┬───┘   └───┬───┘     └───┬───┘   └───┬───┘
+    │           │             │           │             │           │
+┌───┴───┐   ┌───┴───┐     ┌───┴───┐   ┌───┴───┐     ┌───┴───┐   ┌───┴───┐
+│4 UAV  │   │2 Relay│     │2 Auton│   │4 UAV  │     │2 Auton│   │2 Signal│
+│sensors│   │nodes  │     │actors │   │sensors│     │actors │   │ nodes  │
+└───────┘   └───────┘     └───────┘   └───────┘     └───────┘   └───────┘
+
+Individual platforms → Group capabilities → Formation emergent → Cluster emergent
+```
+
+#### 6.3.2 Emergent Capability Discovery
+
+Emergent capabilities arise from the **composition** of individual platform capabilities:
 
 ```rust
-pub struct AggregationPolicy {
-    /// Aggregate tracks by area (reduce count)
-    pub track_aggregation: TrackAggregation,
-    /// Capability summary mode
-    pub capability_mode: CapabilitySummaryMode,
-    /// Status report interval
-    pub status_interval: Duration,
-    /// Priority threshold for immediate escalation
-    pub escalation_priority: Priority,
+/// Emergent capability patterns recognized by HIVE
+pub enum EmergentCapability {
+    /// Multiple sensors with overlapping coverage → Wide-area observation
+    WideAreaObservation {
+        sensor_count: usize,
+        coverage_area_km2: f64,
+    },
+
+    /// Sensing + Actuation in same cell → Sense-and-act loop
+    SenseAndAct {
+        sensing_platforms: Vec<DeviceId>,
+        actuation_platforms: Vec<DeviceId>,
+    },
+
+    /// Signal + Actuation → Coordinated response
+    CoordinatedResponse {
+        signal_nodes: Vec<DeviceId>,
+        actuators: Vec<DeviceId>,
+    },
+
+    /// Multiple relay nodes → Extended mesh range
+    ExtendedRange {
+        relay_chain: Vec<DeviceId>,
+        range_extension_km: f64,
+    },
+
+    /// Heterogeneous sensors → Multi-spectral fusion
+    MultiSpectralFusion {
+        eo_sensors: Vec<DeviceId>,
+        ir_sensors: Vec<DeviceId>,
+        radar_sensors: Vec<DeviceId>,
+    },
+
+    /// Compute + sensors → Edge AI processing
+    EdgeIntelligence {
+        compute_nodes: Vec<DeviceId>,
+        sensor_feeds: Vec<DeviceId>,
+        models_available: Vec<String>,
+    },
 }
 
-pub enum TrackAggregation {
-    /// Send all tracks
-    Full,
-    /// Send summary counts by type
-    CountOnly,
-    /// Send priority tracks + counts
-    PriorityPlusCounts { max_tracks: usize },
-    /// Spatial clustering
-    Clustered { cluster_radius_m: f64 },
+/// Detect emergent capabilities from member capabilities
+pub fn discover_emergent_capabilities(
+    members: &[CapabilityAdvertisement],
+) -> Vec<EmergentCapability> {
+    let mut emergent = Vec::new();
+
+    // Collect capability types across all members
+    let all_sensors: Vec<_> = members.iter()
+        .flat_map(|m| &m.sensors)
+        .collect();
+    let all_actuators: Vec<_> = members.iter()
+        .flat_map(|m| &m.actuators)
+        .collect();
+    let total_compute: f64 = members.iter()
+        .filter_map(|m| m.compute.as_ref())
+        .map(|c| c.compute_tflops.unwrap_or(0.0))
+        .sum();
+
+    // Pattern: Sensing + Actuation = Sense-and-Act Loop
+    let sensing_capable: Vec<_> = members.iter()
+        .filter(|m| has_sensing_capability(m))
+        .map(|m| m.device_id)
+        .collect();
+    let actuation_capable: Vec<_> = members.iter()
+        .filter(|m| has_actuation_capability(m))
+        .map(|m| m.device_id)
+        .collect();
+
+    if !sensing_capable.is_empty() && !actuation_capable.is_empty() {
+        emergent.push(EmergentCapability::SenseAndAct {
+            sensing_platforms: sensing_capable,
+            actuation_platforms: actuation_capable,
+        });
+    }
+
+    // Pattern: Multiple overlapping sensors = Wide Area Observation
+    if all_sensors.len() >= 3 {
+        let coverage = calculate_combined_coverage(&all_sensors);
+        emergent.push(EmergentCapability::WideAreaObservation {
+            sensor_count: all_sensors.len(),
+            coverage_area_km2: coverage,
+        });
+    }
+
+    // Pattern: Compute + Sensors = Edge Intelligence
+    if total_compute > 1.0 && !all_sensors.is_empty() {
+        emergent.push(EmergentCapability::EdgeIntelligence {
+            compute_nodes: members.iter()
+                .filter(|m| m.compute.as_ref()
+                    .map(|c| c.compute_tflops.unwrap_or(0.0) > 0.5)
+                    .unwrap_or(false))
+                .map(|m| m.device_id)
+                .collect(),
+            sensor_feeds: members.iter()
+                .filter(|m| !m.sensors.is_empty())
+                .map(|m| m.device_id)
+                .collect(),
+            models_available: collect_available_models(members),
+        });
+    }
+
+    emergent
 }
 ```
 
-### 6.4 Downward Command Flow
+#### 6.3.3 Capability Aggregation Protocol
+
+Each cell leader periodically computes and advertises aggregated capabilities:
+
+```protobuf
+message CellCapabilitySummary {
+    // Cell identifier
+    bytes cell_id = 1;
+    // Hierarchy level
+    uint32 level = 2;
+    // Timestamp of this summary
+    Timestamp timestamp = 3;
+
+    // Member count by type
+    map<int32, uint32> member_counts = 4;  // PlatformType -> count
+
+    // Aggregated sensor capabilities
+    AggregatedSensors sensors = 5;
+
+    // Aggregated actuator capabilities
+    AggregatedActuators actuators = 6;
+
+    // Total compute available
+    double total_compute_tflops = 7;
+
+    // Communication reach
+    CommunicationSummary comms = 8;
+
+    // Average power/endurance
+    PowerSummary power = 9;
+
+    // Discovered emergent capabilities
+    repeated EmergentCapability emergent = 10;
+
+    // Geographic coverage
+    BoundingBox coverage_area = 11;
+
+    // Operational readiness (0.0 - 1.0)
+    float readiness = 12;
+}
+
+message AggregatedSensors {
+    // Count by sensor type
+    map<int32, uint32> type_counts = 1;
+    // Combined detection range (best case)
+    double max_detection_range_m = 2;
+    // Combined coverage area
+    double coverage_area_km2 = 3;
+    // Available sensor modalities
+    repeated SensorType modalities = 4;
+}
+
+message AggregatedActuators {
+    // Count by actuator type
+    map<int32, uint32> type_counts = 1;
+    // Total available resources/uses
+    uint32 total_resources = 2;
+    // Combined action range
+    double max_action_range_m = 3;
+    // Total payload capacity
+    double total_payload_kg = 4;
+}
+```
+
+#### 6.3.4 Aggregation Policies
+
+Different data types require different aggregation strategies:
+
+```rust
+pub struct AggregationPolicy {
+    /// How to aggregate track data
+    pub track_aggregation: TrackAggregation,
+    /// How to summarize capabilities
+    pub capability_mode: CapabilitySummaryMode,
+    /// Status report interval to parent
+    pub status_interval: Duration,
+    /// Priority threshold for immediate escalation
+    pub escalation_priority: Priority,
+    /// Whether to include individual member details
+    pub include_member_details: bool,
+    /// Emergent capability detection enabled
+    pub detect_emergent: bool,
+}
+
+pub enum TrackAggregation {
+    /// Send all tracks (high bandwidth)
+    Full,
+    /// Send summary counts by type (minimal bandwidth)
+    CountOnly,
+    /// Send priority tracks + counts (balanced)
+    PriorityPlusCounts { max_tracks: usize },
+    /// Spatial clustering (geographic compression)
+    Clustered { cluster_radius_m: f64 },
+}
+
+pub enum CapabilitySummaryMode {
+    /// Full capability details per member
+    Detailed,
+    /// Aggregated totals only
+    Totals,
+    /// Totals + emergent capabilities
+    TotalsWithEmergent,
+    /// Only report capability changes
+    DeltaOnly,
+}
+```
+
+### 6.4 Bidirectional Flow Model
+
+HIVE operates as a **full-duplex hierarchical synchronization system**:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            UPWARD FLOW                                       │
+│  (Edge → Coordinator)                                                        │
+│                                                                              │
+│  • Capability advertisements (what can I do?)                                │
+│  • Track/detection reports (what do I see?)                                  │
+│  • Status updates (how am I doing?)                                          │
+│  • Emergent capability discovery (what can WE do together?)                  │
+│                                                                              │
+│  Characteristics: High volume, compressible, tolerates staleness             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                            DOWNWARD FLOW                                     │
+│  (Coordinator → Edge)                                                        │
+│                                                                              │
+│  • Mission tasking (what should I do?)                                       │
+│  • Operational constraints (what am I allowed to do?)                        │
+│  • AI model distribution (how should I process data?)                        │
+│  • Configuration changes (how should I operate?)                             │
+│  • Coordinator intent (what is the goal?)                                    │
+│                                                                              │
+│  Characteristics: Low volume, high priority, cannot tolerate loss            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                           HORIZONTAL FLOW                                    │
+│  (Peer → Peer)                                                               │
+│                                                                              │
+│  • Track handoffs (transferring responsibility)                              │
+│  • Deconfliction (avoiding collisions/interference)                          │
+│  • Mutual support requests (need sensor/actuator coverage)                   │
+│  • Boundary coordination (adjacent cell awareness)                           │
+│                                                                              │
+│  Characteristics: Time-critical, requires peer authentication                │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 6.4.1 Policy-Based Routing
+
+Events carry routing policies that HIVE enforces:
+
+```rust
+pub struct EventRoutingPolicy {
+    /// How far up the hierarchy to propagate
+    pub propagation: PropagationMode,
+    /// Priority for bandwidth allocation
+    pub priority: Priority,
+    /// What to do on network partition
+    pub partition_handling: PartitionPolicy,
+    /// Time-to-live before expiration
+    pub ttl: Duration,
+}
+
+pub enum PropagationMode {
+    /// Store locally, respond to queries only
+    Local,
+    /// Propagate to immediate parent only
+    Parent,
+    /// Propagate to all ancestors
+    AllAncestors,
+    /// Immediate propagation, preempt other traffic
+    Critical,
+}
+
+pub enum PartitionPolicy {
+    /// Buffer and retry when connection restored
+    BufferAndRetry,
+    /// Drop if cannot deliver immediately
+    DropOnPartition,
+    /// Require immediate delivery or fail
+    RequireImmediate,
+}
+```
+
+### 6.5 Downward Command Flow
 
 Commands flow from parent to child:
 
@@ -427,11 +733,11 @@ enum Role {
     ROLE_UNSPECIFIED = 0;
     ROLE_LEADER = 1;      // Cell leader
     ROLE_DEPUTY = 2;      // Backup leader
-    ROLE_SCOUT = 3;       // Forward reconnaissance
+    ROLE_SCOUT = 3;       // Forward observer
     ROLE_RELAY = 4;       // Communications relay
     ROLE_SENSOR = 5;      // Primary sensor platform
-    ROLE_EFFECTOR = 6;    // Primary effector
-    ROLE_LOGISTICS = 7;   // Supply/support
+    ROLE_ACTUATOR = 6;    // Primary actuator
+    ROLE_SUPPORT = 7;     // Supply/support
     ROLE_OBSERVER = 8;    // Passive observer
 }
 ```
@@ -665,7 +971,7 @@ enum SupportType {
     SUPPORT_TYPE_UNSPECIFIED = 0;
     SUPPORT_TYPE_SENSOR = 1;      // Need sensor coverage
     SUPPORT_TYPE_RELAY = 2;       // Need comm relay
-    SUPPORT_TYPE_EFFECTOR = 3;    // Need strike capability
+    SUPPORT_TYPE_ACTUATOR = 3;    // Need actuation capability
     SUPPORT_TYPE_LOGISTICS = 4;   // Need resupply
 }
 ```
