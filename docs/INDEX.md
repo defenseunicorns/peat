@@ -4,26 +4,25 @@
 
 ---
 
-## 📚 User Guides (Start Here)
+## Getting Started
 
-| Guide | Audience | Description |
-|-------|----------|-------------|
-| [**Operator Guide**](guides/operator/OPERATOR_GUIDE.md) | System Admins, DevOps, Mission Operators | Installation, configuration, deployment, monitoring, troubleshooting |
-| [**Developer Guide**](guides/developer/DEVELOPER_GUIDE.md) | Software Engineers, Contributors | Architecture, API reference, extending HIVE, testing, contributing |
+| Document | Purpose | Audience |
+|----------|---------|----------|
+| [**ARCHITECTURE.md**](ARCHITECTURE.md) | System architecture overview | New developers |
+| [**spec/**](spec/README.md) | Protocol specifications (IETF RFC style) | Protocol implementers |
+| [README.md](../README.md) | Project overview and getting started | All users |
+| [DEVELOPMENT.md](../DEVELOPMENT.md) | Development setup and workflow | Contributors |
 
 ### Quick Links by Task
 
 | I want to... | Go to... |
 |--------------|----------|
-| Deploy HIVE in production | [Operator Guide: Deployment](guides/operator/OPERATOR_GUIDE.md#5-deployment-patterns) |
-| Set up a development environment | [Developer Guide: Getting Started](guides/developer/DEVELOPER_GUIDE.md#2-getting-started) |
-| Understand the architecture | [Developer Guide: Architecture](guides/developer/DEVELOPER_GUIDE.md#3-architecture) |
-| Configure HIVE | [Operator Guide: Configuration](guides/operator/OPERATOR_GUIDE.md#4-configuration) |
-| Write tests | [Developer Guide: Testing](guides/developer/DEVELOPER_GUIDE.md#8-testing) |
-| Troubleshoot issues | [Operator Guide: Troubleshooting](guides/operator/OPERATOR_GUIDE.md#11-troubleshooting) |
-| Integrate with TAK/ATAK | [Operator Guide: TAK Integration](guides/operator/OPERATOR_GUIDE.md#9-takatak-integration) |
-| Extend HIVE with custom capabilities | [Developer Guide: Extending HIVE](guides/developer/DEVELOPER_GUIDE.md#7-extending-hive) |
-| Contribute to HIVE | [Developer Guide: Contributing](guides/developer/DEVELOPER_GUIDE.md#12-contributing) |
+| Understand the architecture | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| Read the protocol specs | [spec/](spec/README.md) |
+| Set up a development environment | [DEVELOPMENT.md](../DEVELOPMENT.md) |
+| See why decisions were made | [ADRs](adr/) |
+| Write tests | [TESTING_STRATEGY.md](TESTING_STRATEGY.md) |
+| Understand IP strategy | [IP_OVERVIEW.md](IP_OVERVIEW.md) |
 
 ---
 
@@ -65,24 +64,29 @@ ADRs document significant architectural decisions and their rationale.
 
 **Summary**: [ARCHITECTURE-DECISION-SUMMARY.md](ARCHITECTURE-DECISION-SUMMARY.md)
 
-## Technical Design Documents
+## Protocol Specifications
 
-In-depth technical analysis and design explorations.
+IETF RFC-style specifications for protocol implementers. See [spec/README.md](spec/README.md) for full index.
 
-| Document | Topic | Purpose |
-|----------|-------|---------|
-| [CAP_Architecture_EventStreaming_vs_DeltaSync.md](CAP_Architecture_EventStreaming_vs_DeltaSync.md) | Event Streaming vs Delta Sync | Evaluates synchronization approaches for distributed state |
-| [human-machine-teaming-design.md](human-machine-teaming-design.md) | Human-Machine Teaming | Design for human-in-the-loop authority and cell composition |
-| [Ditto-SDK-Integration-Notes.md](Ditto-SDK-Integration-Notes.md) | Ditto SDK Integration | Integration notes and patterns for Ditto CRDT mesh |
-| [TTL_AND_DATA_LIFECYCLE_DESIGN.md](TTL_AND_DATA_LIFECYCLE_DESIGN.md) | TTL and Data Lifecycle (Ditto) | Ditto-specific implementation of ADR-016 lifecycle management |
-| [POLICY_ENGINE_CRDT_INTEGRATION.md](POLICY_ENGINE_CRDT_INTEGRATION.md) | Policy Engine & CRDT Integration | Optimistic Concurrency Control for policy enforcement with Ditto LWW semantics |
-| [PROTOBUF_MIGRATION_GUIDE.md](PROTOBUF_MIGRATION_GUIDE.md) | Protobuf Migration Guide | Technical guide for ADR-012 protobuf migration |
+| Spec | Topic |
+|------|-------|
+| [001-transport.md](spec/001-transport.md) | Wire formats, QUIC/Iroh, UDP bypass, HIVE-Lite |
+| [002-sync.md](spec/002-sync.md) | CRDT semantics, Automerge, Negentropy |
+| [003-schema.md](spec/003-schema.md) | Protobuf definitions, CoT mapping |
+| [004-coordination.md](spec/004-coordination.md) | Cell formation, leader election, hierarchy |
+| [005-security.md](spec/005-security.md) | Authentication, encryption, key management |
 
-## Project Planning
+## Reference Documents
 
 | Document | Purpose |
 |----------|---------|
-| [CAP-POC-Project-Plan.md](CAP-POC-Project-Plan.md) | POC project plan, epics, and milestones |
+| [TTL_AND_DATA_LIFECYCLE_DESIGN.md](TTL_AND_DATA_LIFECYCLE_DESIGN.md) | Data lifecycle management design |
+| [PROTOBUF_MIGRATION_GUIDE.md](PROTOBUF_MIGRATION_GUIDE.md) | Protobuf migration guide |
+| [STORAGE_PERSISTENCE_DUE_DILIGENCE.md](STORAGE_PERSISTENCE_DUE_DILIGENCE.md) | Storage layer evaluation |
+
+## Planning Documents
+
+Active planning documents are in [planning/](planning/). Historical design explorations that informed ADRs.
 
 ## Testing Documentation
 
@@ -123,35 +127,39 @@ Comprehensive testing strategy and implementation guides.
 ### By Topic
 
 - **IP & Patents**: IP_OVERVIEW.md, patents/, VALIDATION_RESULTS.md
-- **Architecture**: ADR-001, ADR-002, ADR-004, ADR-011, ADR-012, ADR-016, ARCHITECTURE-DECISION-SUMMARY.md
+- **Architecture**: ARCHITECTURE.md, ADRs, ARCHITECTURE-DECISION-SUMMARY.md
+- **Protocol Specs**: spec/001-transport.md through spec/005-security.md
 - **Validation**: VALIDATION_RESULTS.md, ADR-015
-- **Synchronization**: CAP_Architecture_EventStreaming_vs_DeltaSync.md, Ditto-SDK-Integration-Notes.md
 - **Data Lifecycle & TTL**: ADR-016, TTL_AND_DATA_LIFECYCLE_DESIGN.md
-- **Policy Engine & Conflict Resolution**: POLICY_ENGINE_CRDT_INTEGRATION.md, POLICY_ENGINE_DESIGN.md, EXTENSIBLE_POLICY_ENGINE_DESIGN.md
-- **Human-Machine Teaming**: ADR-004, human-machine-teaming-design.md
-- **Testing**: TESTING_STRATEGY.md, e2e-cell-formation.md
-- **Simulation**: NETWORK_SIMULATOR_EVALUATION.md, NETWORK_TOPOLOGY_MODES.md, SQUAD_TOPOLOGY_VALIDATION.md
+- **Human-Machine Teaming**: ADR-004
+- **Testing**: TESTING_STRATEGY.md
+- **Simulation**: NETWORK_SIMULATOR_EVALUATION.md
 
 ## Documentation Conventions
 
 ### File Organization
 
 ```
-cap/
+hive/
 ├── README.md                    # Project overview
 ├── DEVELOPMENT.md              # Dev setup
 ├── Codex.md                   # AI context
 ├── docs/
 │   ├── INDEX.md               # This file
+│   ├── ARCHITECTURE.md        # System architecture
 │   ├── TESTING_STRATEGY.md    # Testing philosophy
 │   ├── adr/                   # Architecture Decision Records
-│   │   ├── 001-*.md
-│   │   ├── 002-*.md
-│   │   └── 004-*.md
-│   └── [technical docs]       # Design documents, plans
-└── hive-protocol/
-    └── docs/
-        └── testing/           # Module-specific test docs
+│   ├── spec/                  # Protocol specifications (IETF style)
+│   │   ├── 001-transport.md
+│   │   ├── 002-sync.md
+│   │   ├── 003-schema.md
+│   │   ├── 004-coordination.md
+│   │   └── 005-security.md
+│   ├── planning/              # Active planning documents
+│   ├── patents/               # IP documentation
+│   └── [reference docs]       # Design documents
+└── crates/
+    └── [crate]/docs/          # Module-specific docs
 ```
 
 ### Naming Conventions
@@ -174,17 +182,15 @@ cap/
 
 ### "I need to understand..."
 
-- **...the intellectual property and innovations**: Start with [IP_OVERVIEW.md](IP_OVERVIEW.md)
+- **...the system architecture**: Start with [ARCHITECTURE.md](ARCHITECTURE.md)
+- **...the protocol specifications**: Read [spec/](spec/README.md)
+- **...the intellectual property**: Start with [IP_OVERVIEW.md](IP_OVERVIEW.md)
 - **...validation and testing results**: Read [VALIDATION_RESULTS.md](VALIDATION_RESULTS.md)
 - **...patent strategy**: See [patents/](patents/) directory
-- **...the overall architecture**: Start with [ARCHITECTURE-DECISION-SUMMARY.md](ARCHITECTURE-DECISION-SUMMARY.md)
 - **...why we made a specific decision**: Check [ADRs](adr/)
 - **...how to test**: Read [TESTING_STRATEGY.md](TESTING_STRATEGY.md)
-- **...how Ditto integration works**: See [Ditto-SDK-Integration-Notes.md](Ditto-SDK-Integration-Notes.md)
-- **...TTL and data lifecycle**: Start with [ADR-016](adr/016-ttl-and-data-lifecycle-abstraction.md) for abstraction, then [TTL_AND_DATA_LIFECYCLE_DESIGN.md](TTL_AND_DATA_LIFECYCLE_DESIGN.md) for Ditto specifics
-- **...policy engine and conflict resolution**: See [POLICY_ENGINE_CRDT_INTEGRATION.md](POLICY_ENGINE_CRDT_INTEGRATION.md) for OCC approach with Ditto
+- **...TTL and data lifecycle**: See [ADR-016](adr/016-ttl-and-data-lifecycle-abstraction.md) and [TTL_AND_DATA_LIFECYCLE_DESIGN.md](TTL_AND_DATA_LIFECYCLE_DESIGN.md)
 - **...human-machine teaming**: Read [ADR-004](adr/004-human-machine-cell-composition.md)
-- **...cell formation E2E tests**: See [e2e-cell-formation.md](../hive-protocol/docs/testing/e2e-cell-formation.md)
 - **...protobuf migration**: See [PROTOBUF_MIGRATION_GUIDE.md](PROTOBUF_MIGRATION_GUIDE.md)
 
 ### "I'm working on..."
@@ -215,15 +221,6 @@ When making significant changes:
 
 ---
 
-## Documentation Planning & Maintenance
-
-| Document | Purpose |
-|----------|---------|
-| [DOCUMENTATION_PLAN.md](DOCUMENTATION_PLAN.md) | Documentation strategy, requirements, and standards |
-| [DOCUMENTATION_ISSUES.md](DOCUMENTATION_ISSUES.md) | GitHub issue templates for documentation work |
-
----
-
-**Last Updated**: 2025-12-08
+**Last Updated**: 2025-01-08
 **Maintained By**: HIVE Protocol Team
 **Questions?**: Check DEVELOPMENT.md for contribution guidelines

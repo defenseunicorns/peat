@@ -1,83 +1,84 @@
 ## VI. WHY NOW
 
-**Thesis:** A 12-24 month window exists to establish open coordination standards before proprietary fragmentation locks in suboptimal architectures for a generation.
+**Thesis:** Converging technology trends and market forces create a window to establish open coordination standards before proprietary fragmentation locks in suboptimal architectures.
 
 ---
 
 ### 6.1 Converging Forces
 
-<!-- Target: ~0.75 page -->
-
 Multiple trends create urgency simultaneously.
 
-#### Replicator Initiative
+#### Autonomous Systems Deployment
 
-<!-- TODO: Content to develop:
-- DoD explicitly prioritizing mass autonomous deployment
-- Thousands of platforms, near-term timelines
-- Coordination infrastructure is implicit requirement
--->
+The deployment of autonomous systems at scale is accelerating across domains:
+- **Logistics**: Warehouse robotics, autonomous delivery, drone fleets
+- **Agriculture**: Autonomous tractors, drone crop monitoring, precision agriculture
+- **Infrastructure**: Pipeline inspection, power grid monitoring, building automation
+- **Defense**: Autonomous vehicles, sensor networks, coordinated operations
 
-#### Ukraine Lessons
+Each domain hits the same scaling wall. Each is currently solving it independently—with proprietary, incompatible approaches.
 
-<!-- TODO: Content to develop:
-- Adaptable, attritable systems beating exquisite platforms
-- Rapid iteration over long development cycles
-- Commercial technology integration at speed
--->
+#### Edge AI Maturation
 
-#### AI Maturation
+Edge inference is now capable and deployable:
+- Foundation models run on edge devices
+- AI enables coordination, not just perception
+- Multi-agent AI systems require multi-agent coordination infrastructure
+- The AI capability exists; the coordination infrastructure lags
 
-<!-- TODO: Content to develop:
-- Edge inference capable and deployable
-- Foundation models enable AI coordination, not just perception
-- The capability exists; the infrastructure doesn't
--->
+#### Network Connectivity Reality
 
-#### Indo-Pacific Reality
+The dream of ubiquitous, reliable connectivity hasn't materialized:
+- Remote operations: Mining, agriculture, offshore
+- Disaster response: Infrastructure-down scenarios
+- Urban canyons: Connectivity gaps in dense environments
+- Scale limitations: Even good networks saturate at scale
 
-<!-- TODO: Content to develop:
-- AUKUS coordination across vast operational distances
-- Allied interoperability as strategic necessity
-- Tyranny of distance demands distributed coordination
--->
+Systems designed for always-on connectivity fail in the real world. Coordination must work in disconnected, intermittent, limited (DIL) environments.
+
+#### Multi-Organization Coordination
+
+Cross-organizational coordination is increasingly required:
+- Emergency response: Multiple agencies, multiple jurisdictions
+- Supply chain: Multiple vendors, multiple platforms
+- Defense coalitions: Multinational coordination requirements
+- Smart cities: Multiple stakeholders, integrated infrastructure
+
+Proprietary coordination protocols make cross-organization integration impossible without bespoke engineering.
 
 ---
 
 ### 6.2 The Standardization Race
 
-<!-- Target: ~0.5 page -->
-
 The architecture is being decided now.
 
-<!-- TODO: Content to develop:
-- Multiple proprietary approaches competing for adoption
-- First adequate solution gets network effects
-- Switching costs compound with each program decision
-- NATO STANAG process: 4-5 years from concept to ratification
-- Open standard foundation must be laid now to be ready in time
--->
+**First adequate solution gets network effects**. Once organizations adopt a coordination approach, switching costs accumulate:
+- Integration investments
+- Training and tooling
+- Dependent systems and processes
+
+**Standards processes take time**. IETF RFCs, IEEE standards, and industry specifications require years of development. The foundation must be laid now to be ready when adoption accelerates.
+
+**Multiple proprietary approaches are competing**. Fleet management platforms, robotics middleware extensions, and cloud coordination services are all vying for position. Each adoption fragments the ecosystem further.
 
 ---
 
 ### 6.3 The Cost of Waiting
 
-<!-- Target: ~0.5 page -->
-
 Delay has compounding consequences.
 
-<!-- TODO: Content to develop:
-- Each proprietary adoption creates switching costs
-- Integration complexity multiplies with incompatible approaches
-- Coalition interoperability gaps widen
-- Adversaries not waiting for Western consensus
-- Architecture decisions made in 2025-2026 constrain options for a decade
--->
+**Each proprietary adoption creates switching costs**. Organizations that choose proprietary coordination today face painful migrations later—or, more likely, don't migrate at all.
+
+**Integration complexity multiplies**. With N incompatible coordination approaches, cross-system integration requires O(N²) adapters. The fragmentation tax grows with each new entrant.
+
+**Interoperability gaps widen**. Cross-organization coordination—the most valuable coordination—becomes harder as each organization optimizes for their internal ecosystem.
+
+**Architectural decisions persist**. Systems being designed now will operate for decades. The coordination architecture chosen in 2025-2026 constrains options for a generation.
 
 ---
 
 ### Key Finding: Section VI
 
-> "The architecture decision is being made now. Open infrastructure that enables coalition coordination, or proprietary fragmentation that prevents it. The window for deliberate choice is 12-24 months."
+> "The architecture decision is being made now. Open infrastructure that enables ecosystem coordination, or proprietary fragmentation that prevents it. The window for deliberate choice is closing."
 
 ---

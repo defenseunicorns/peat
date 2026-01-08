@@ -15,6 +15,8 @@
 //! espflash flash --monitor target/xtensa-esp32-espidf/release/m5stack-core2-hive
 //! ```
 
+mod audio;
+mod imu;
 mod nimble;
 
 use esp_idf_hal::delay::FreeRtos;
@@ -445,6 +447,7 @@ struct DisplayState {
     peer_ids: Vec<u32>,           // Node IDs of all known peers
     connected_peers: Vec<u32>,    // Node IDs of currently connected peers
     acked_peers: Vec<u32>,        // Node IDs that have ACK'd the current emergency
+    activity: u8,                 // Activity state (0=Stationary, 1=Walking, 2=Running, 3=Fall)
 }
 
 /// Draw initial static UI elements (call once at startup)
@@ -520,6 +523,7 @@ fn update_display<D>(
     _status: &'static str,
     prev: &DisplayState,
     acked_peers: &[u32],
+    activity: imu::Activity,
 ) -> DisplayState
 where
     D: DrawTarget<Color = Rgb565>,
@@ -533,6 +537,14 @@ where
         .map(|p| p.node_id.as_u32())
         .collect();
 
+    // Convert activity to u8 for comparison
+    let activity_u8 = match activity {
+        imu::Activity::Stationary => 0,
+        imu::Activity::Walking => 1,
+        imu::Activity::Running => 2,
+        imu::Activity::PossibleFall => 3,
+    };
+
     // Build current state
     let current = DisplayState {
         num_connections: nimble::connection_count(),
@@ -542,6 +554,7 @@ where
         peer_ids: peer_ids.clone(),
         connected_peers: connected_peers.clone(),
         acked_peers: acked_peers.to_vec(),
+        activity: activity_u8,
     };
 
     // Skip if nothing changed
@@ -570,11 +583,12 @@ where
             .draw(display);
     }
 
-    // Main content area - update if alert state, peers, connections, or acks changed
+    // Main content area - update if alert state, peers, connections, acks, or activity changed
     let content_changed = current.alert_active != prev.alert_active
         || current.peer_ids != prev.peer_ids
         || current.connected_peers != prev.connected_peers
-        || current.acked_peers != prev.acked_peers;
+        || current.acked_peers != prev.acked_peers
+        || current.activity != prev.activity;
 
     if content_changed {
         // Clear main content area
@@ -618,11 +632,21 @@ where
             let green = MonoTextStyle::new(&FONT_10X20, Rgb565::GREEN);
             let white = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
             let gray = MonoTextStyle::new(&FONT_10X20, Rgb565::CSS_GRAY);
+            let yellow = MonoTextStyle::new(&FONT_10X20, Rgb565::YELLOW);
 
             // Show local node ID above READY
             let node_id_str = format!("{:08X}", mesh.node_id().as_u32());
             let _ = Text::new(&node_id_str, Point::new(110, 55), white).draw(display);
             let _ = Text::new("READY", Point::new(125, 80), green).draw(display);
+
+            // Show activity status with color-coded text
+            let (activity_str, activity_style) = match activity {
+                imu::Activity::Stationary => ("STILL", gray),
+                imu::Activity::Walking => ("WALK", green),
+                imu::Activity::Running => ("RUN", yellow),
+                imu::Activity::PossibleFall => ("FALL!", MonoTextStyle::new(&FONT_10X20, Rgb565::RED)),
+            };
+            let _ = Text::new(activity_str, Point::new(230, 80), activity_style).draw(display);
 
             // Show peer details
             if !peer_ids.is_empty() {
@@ -720,6 +744,16 @@ fn main() -> anyhow::Result<()> {
         &i2c_config,
     )?;
     info!("I2C initialized");
+
+    // Initialize MPU6886 IMU for activity/fall detection
+    info!("Initializing IMU...");
+    let imu_ok = imu::init(&mut i2c);
+    let mut imu_state = imu::ImuState::default();
+    if imu_ok {
+        info!("IMU initialized successfully");
+    } else {
+        warn!("IMU initialization failed - activity detection disabled");
+    }
 
     // Initialize AXP (detect hardware version and enable LCD power/backlight)
     info!("Initializing AXP...");
@@ -831,13 +865,19 @@ fn main() -> anyhow::Result<()> {
     update_button_labels(&mut display, false);  // Initial state: ACK greyed out
     let mut display_state = DisplayState::default();
     let acked = get_acked_peers_from_mesh(&mesh);
-    display_state = update_display(&mut display, &mesh, false, battery_pct, "BtnC=EMERG  BtnA=ACK", &display_state, &acked);
+    display_state = update_display(&mut display, &mesh, false, battery_pct, "BtnC=EMERG  BtnA=ACK", &display_state, &acked, imu::Activity::Stationary);
     print_status(&mesh, false, "BtnC=EMERG  BtnA=ACK");
 
     // Main loop state
     let mut last_button = Button::None;
     let mut loop_count: u32 = 0;
     let mut needs_redraw = false;
+
+    // IMU state
+    let mut last_imu_read: u32 = 0;
+    const IMU_READ_INTERVAL_MS: u32 = 100;  // Read IMU at 10Hz
+    let mut current_activity = imu::Activity::Stationary;
+    let mut fall_detected = false;
 
     // Alert state
     let mut alert_active = false;
@@ -868,6 +908,53 @@ fn main() -> anyhow::Result<()> {
         for node_id in nimble::take_disconnected_node_ids() {
             info!(">>> Peer disconnected: {:08X}", node_id);
             needs_redraw = true;
+        }
+
+        // Read IMU and detect activity/falls (every 100ms)
+        if imu_ok && current_time.saturating_sub(last_imu_read) >= IMU_READ_INTERVAL_MS {
+            last_imu_read = current_time;
+
+            if let Some(accel) = imu::read_accel(&mut i2c) {
+                let activity = imu_state.update(&accel, now_ms());
+
+                // Check for activity change
+                if activity != current_activity {
+                    info!("Activity: {:?} -> {:?} (accel: x={} y={} z={} mag={})",
+                          current_activity, activity,
+                          accel.x, accel.y, accel.z, accel.magnitude());
+                    current_activity = activity;
+                    needs_redraw = true;
+
+                    // Fall detection - trigger emergency automatically!
+                    if activity == imu::Activity::PossibleFall && !fall_detected && !alert_active {
+                        fall_detected = true;
+                        info!("!!! FALL DETECTED - AUTO-TRIGGERING EMERGENCY !!!");
+
+                        let now_ms_u64 = now_ms();
+                        let encoded = mesh.start_emergency_with_known_peers(now_ms_u64);
+                        info!("Fall emergency document: {} bytes", encoded.len());
+
+                        // Enter alert mode (no buzz - we triggered it)
+                        alert_active = true;
+                        we_are_emergency_source = true;
+
+                        // Save and gossip
+                        if let Err(e) = store.save(&mesh) {
+                            error!("Failed to save fall emergency: {:?}", e);
+                        }
+                        let sent = nimble::gossip_document(&encoded);
+                        info!("Gossiped FALL EMERGENCY to {} peers", sent);
+
+                        let acked = get_acked_peers_from_mesh(&mesh);
+                        display_state = update_display(&mut display, &mesh, true, battery_pct, "FALL DETECTED!", &display_state, &acked, current_activity);
+                    }
+                }
+
+                // Reset fall detection when activity returns to normal
+                if fall_detected && activity != imu::Activity::PossibleFall {
+                    fall_detected = false;
+                }
+            }
         }
 
         // Handle vibration buzzing when alert is active (but not if we sent it)
@@ -910,7 +997,7 @@ fn main() -> anyhow::Result<()> {
                         info!("Gossiped ACK to {} peers", sent);
 
                         let acked = get_acked_peers_from_mesh(&mesh);
-                        display_state = update_display(&mut display, &mesh, false, battery_pct, "ACK sent!", &display_state, &acked);
+                        display_state = update_display(&mut display, &mesh, false, battery_pct, "ACK sent!", &display_state, &acked, current_activity);
                     } else {
                         info!("No active emergency to ACK");
                         // Still silence any local alert state
@@ -918,7 +1005,7 @@ fn main() -> anyhow::Result<()> {
                         axp_set_vibration(&mut i2c, false);
                         vibration_on = false;
                         let acked = get_acked_peers_from_mesh(&mesh);
-                        display_state = update_display(&mut display, &mesh, false, battery_pct, "No emergency", &display_state, &acked);
+                        display_state = update_display(&mut display, &mesh, false, battery_pct, "No emergency", &display_state, &acked, current_activity);
                     }
                 }
                 Button::BtnB => {
@@ -937,7 +1024,7 @@ fn main() -> anyhow::Result<()> {
                     let encoded = mesh.build_document();
                     nimble::set_document(&encoded);
                     let acked = get_acked_peers_from_mesh(&mesh);
-                    display_state = update_display(&mut display, &mesh, false, battery_pct, "CLEARED!", &display_state, &acked);
+                    display_state = update_display(&mut display, &mesh, false, battery_pct, "CLEARED!", &display_state, &acked, current_activity);
                 }
                 Button::BtnC => {
                     // Button C = EMERGENCY (using document-based tracking)
@@ -982,7 +1069,7 @@ fn main() -> anyhow::Result<()> {
 
                     // Get ACK status from document for display
                     let acked = get_acked_peers_from_mesh(&mesh);
-                    display_state = update_display(&mut display, &mesh, true, battery_pct, "EMERGENCY!", &display_state, &acked);
+                    display_state = update_display(&mut display, &mesh, true, battery_pct, "EMERGENCY!", &display_state, &acked, current_activity);
                 }
                 Button::None => {}
             }
@@ -1126,7 +1213,7 @@ fn main() -> anyhow::Result<()> {
                 "Advertising..."
             };
             let acked = get_acked_peers_from_mesh(&mesh);
-            display_state = update_display(&mut display, &mesh, alert_active, battery_pct, status, &display_state, &acked);
+            display_state = update_display(&mut display, &mesh, alert_active, battery_pct, status, &display_state, &acked, current_activity);
             needs_redraw = false;
         }
 
@@ -1139,7 +1226,14 @@ fn main() -> anyhow::Result<()> {
             if let Some(mv) = axp_read_battery_voltage(&mut i2c) {
                 let pct = battery_percent_from_voltage(mv);
                 battery_pct = Some(pct);
-                mesh.update_health(pct);
+                // Convert activity to u8: 0=still, 1=walking, 2=running, 3=fall
+                let activity_u8 = match current_activity {
+                    imu::Activity::Stationary => 0,
+                    imu::Activity::Walking => 1,
+                    imu::Activity::Running => 2,
+                    imu::Activity::PossibleFall => 3,
+                };
+                mesh.update_health_full(pct, activity_u8);
             }
 
             let status: &'static str = if alert_active {
@@ -1150,7 +1244,7 @@ fn main() -> anyhow::Result<()> {
                 "Advertising..."
             };
             let acked = get_acked_peers_from_mesh(&mesh);
-            display_state = update_display(&mut display, &mesh, alert_active, battery_pct, status, &display_state, &acked);
+            display_state = update_display(&mut display, &mesh, alert_active, battery_pct, status, &display_state, &acked, current_activity);
             print_status(&mesh, connected, status);
         }
 
