@@ -61,6 +61,9 @@ quick-xml = { version = "0.37", features = ["serialize"] }  # CoT XML encoding/d
 # HIVE-Lite transport (ADR-035)
 log = { version = "0.4", optional = true }  # Logging for lite transport
 
+# Bluetooth LE transport (ADR-032, ADR-039)
+hive-btle = { workspace = true, optional = true }
+
 [features]
 default = ["ditto-backend"]
 # Ditto backend - requires dittolive-ditto SDK (not available on Android)
@@ -69,6 +72,8 @@ ditto-backend = ["dittolive-ditto"]
 automerge-backend = ["automerge", "iroh", "iroh-blobs", "redb", "lru", "toml", "mdns-sd", "rand", "futures-lite", "negentropy"]
 # HIVE-Lite transport - UDP-based communication with embedded devices (ADR-035)
 lite-transport = ["log"]
+# Bluetooth LE transport - BLE mesh networking (ADR-032, ADR-039)
+bluetooth = ["hive-btle"]
 
 [dev-dependencies]
 proptest = { workspace = true }
