@@ -55,7 +55,181 @@ Nodes subscribe only to their inbox. This works but:
 4. **Configuration**: Per-collection defaults, per-write overrides
 5. **Resource efficiency**: Don't burden constrained devices with irrelevant data
 
+### The Naming Problem
+
+Targeting by `PeerId` (cryptographic identity) is stable but opaque. Autonomy algorithms and operators need human-readable names:
+
+```
+Algorithm says: "flanker-1 go left, flanker-2 go right"
+But which PeerId is flanker-1?
+```
+
+**Challenges with static naming (learned from COD):**
+- Names hard-coded in autonomy software → tight coupling to specific devices
+- Device replacement requires config changes
+- No runtime rebinding of roles
+
+**Requirements for naming:**
+1. **Alias registry**: Human-readable names → PeerId mapping
+2. **APP_ID scoping**: Different apps can use same alias names independently
+3. **Dynamic binding**: Roles can be rebound at runtime
+4. **Query and subscribe**: Both pull (resolve) and push (watch) access patterns
+5. **Beacon integration**: Nodes advertise their aliases
+
 ## Decision
+
+### 0. Naming and Identity
+
+#### Identity Layers
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Layer 3: Aliases (human-readable, app-scoped)               │
+│   "zarf.deployer-1", "swarm.flanker-1", "c2.viper-3"       │
+└─────────────────────────────────────────────────────────────┘
+                            │ resolves to
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Layer 2: Labels (key-value metadata)                        │
+│   { platform: "vehicle", role: "flanker", grid: "7" }      │
+└─────────────────────────────────────────────────────────────┘
+                            │ attached to
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Layer 1: PeerId (cryptographic, immutable)                  │
+│   SHA256(Ed25519 public key) = "abc123..."                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Alias Namespace Convention
+
+Aliases are scoped by APP_ID using dot notation:
+
+```
+{app_id}.{alias}
+```
+
+Examples:
+- `zarf.deployer-1` - Zarf app's deployer role
+- `swarm.flanker-1` - Swarm autonomy's flanker role
+- `swarm.flanker-2` - Same app, different role
+- `c2.viper-3` - C2 app's callsign
+
+**Rules:**
+- APP_ID: lowercase alphanumeric + hyphens, max 32 chars
+- Alias: lowercase alphanumeric + hyphens, max 64 chars
+- Full name: `{app_id}.{alias}`, max 97 chars
+- Reserved APP_IDs: `hive`, `system`
+
+#### Alias Registry Collection
+
+```protobuf
+// Collection: _aliases/{app_id}.{alias}
+message AliasBinding {
+  string app_id = 1;           // Namespace
+  string alias = 2;            // Human-readable name
+  string peer_id = 3;          // Resolved identity
+  AliasType type = 4;          // How this binding was created
+  string bound_by = 5;         // PeerId of binder
+  google.protobuf.Timestamp bound_at = 6;
+  google.protobuf.Duration ttl = 7;  // Optional expiry
+}
+
+enum AliasType {
+  ROLE = 0;       // Assigned role (flanker-1)
+  CALLSIGN = 1;   // Operator-assigned (viper-3)
+  SLOT = 2;       // Formation position
+  CLAIMED = 3;    // Self-claimed by node
+}
+```
+
+#### Binding Authority (per APP_ID)
+
+```protobuf
+// Collection: _alias_config/{app_id}
+message AliasAppConfig {
+  string app_id = 1;
+  BindAuthority authority = 2;
+  ConflictPolicy conflict_policy = 3;
+  google.protobuf.Duration default_ttl = 4;
+}
+
+enum BindAuthority {
+  LEADER_ONLY = 0;    // Only cell leader can bind
+  OPEN = 1;           // Any node can bind/claim
+  ROLES = 2;          // Specific roles can bind (see allowed_roles)
+  CONSENSUS = 3;      // Requires threshold agreement
+}
+
+enum ConflictPolicy {
+  REJECT_DUPLICATE = 0;  // First binding wins
+  LAST_WRITE_WINS = 1;   // Latest binding wins
+  LEADER_RESOLVES = 2;   // Leader adjudicates conflicts
+}
+```
+
+#### Name Resolution API
+
+```rust
+/// Resolve human-readable names to PeerIds
+pub trait NameResolver: Send + Sync {
+    /// Resolve fully-qualified alias to PeerId
+    /// e.g., "swarm.flanker-1" → PeerId
+    async fn resolve(&self, alias: &str) -> Result<Option<PeerId>>;
+
+    /// Resolve selector to matching PeerIds
+    /// e.g., "role=flanker" → [PeerId, PeerId, ...]
+    async fn resolve_selector(&self, selector: &str) -> Result<Vec<PeerId>>;
+
+    /// Watch for alias binding changes
+    async fn watch_alias(&self, alias: &str) -> Result<impl Stream<Item = AliasChange>>;
+
+    /// Watch for nodes matching selector
+    async fn watch_selector(&self, selector: &str) -> Result<impl Stream<Item = SelectorMatch>>;
+}
+
+/// Bind aliases to PeerIds
+pub trait NameBinder: Send + Sync {
+    /// Bind alias to peer (requires authority)
+    async fn bind(
+        &self,
+        app_id: &str,
+        alias: &str,
+        peer_id: &PeerId,
+        alias_type: AliasType,
+    ) -> Result<()>;
+
+    /// Unbind alias
+    async fn unbind(&self, app_id: &str, alias: &str) -> Result<()>;
+
+    /// Claim alias for self (if policy allows)
+    async fn claim(&self, app_id: &str, alias: &str) -> Result<()>;
+
+    /// Release own claim
+    async fn release(&self, app_id: &str, alias: &str) -> Result<()>;
+}
+```
+
+#### Beacon Integration
+
+Nodes advertise their aliases in beacon:
+
+```protobuf
+message Beacon {
+  // ... existing fields ...
+
+  // Aliases this node is bound to (for discovery)
+  repeated string aliases = 25;  // ["swarm.flanker-1", "c2.viper-3"]
+
+  // Labels for selector matching
+  map<string, string> labels = 26;
+}
+```
+
+This enables:
+- Alias discovery without querying registry
+- Selector matching against beacon labels
+- Implicit confirmation (alias appears in beacon = binding active)
 
 ### 1. Extend WriteOptions with Targeting
 
@@ -71,7 +245,11 @@ pub struct WriteOptions {
     pub priority: MessagePriority,
 
     // === New: Targeted delivery ===
-    /// Specific node IDs that should persist this document
+    /// Target by alias (resolved to PeerId at write time)
+    /// e.g., "swarm.flanker-1" or ["swarm.flanker-1", "swarm.flanker-2"]
+    pub target_aliases: Option<Vec<String>>,
+
+    /// Target by PeerId directly (for low-level use)
     /// None = broadcast to all (current behavior)
     pub target_nodes: Option<Vec<NodeId>>,
 
@@ -81,6 +259,35 @@ pub struct WriteOptions {
 
     /// Behavior for non-target nodes
     pub transit_behavior: TransitBehavior,
+}
+
+impl WriteOptions {
+    /// Target a single alias
+    pub fn to_alias(alias: impl Into<String>) -> Self {
+        Self {
+            target_aliases: Some(vec![alias.into()]),
+            transit_behavior: TransitBehavior::RelayOnly,
+            ..Default::default()
+        }
+    }
+
+    /// Target multiple aliases
+    pub fn to_aliases(aliases: Vec<String>) -> Self {
+        Self {
+            target_aliases: Some(aliases),
+            transit_behavior: TransitBehavior::RelayOnly,
+            ..Default::default()
+        }
+    }
+
+    /// Target by selector
+    pub fn to_selector(selector: impl Into<String>) -> Self {
+        Self {
+            target_selector: Some(selector.into()),
+            transit_behavior: TransitBehavior::RelayOnly,
+            ..Default::default()
+        }
+    }
 }
 
 /// How non-target nodes handle targeted documents
@@ -329,31 +536,43 @@ impl LabelSelector {
 ### 7. API Usage Examples
 
 ```rust
-// Example 1: Deploy to specific nodes
+// Example 1: Target by alias (recommended for human-readable addressing)
+store.write_with_options(
+    "deployment_intents",
+    &intent,
+    WriteOptions::to_alias("zarf.deployer-1"),
+).await?;
+
+// Example 2: Target multiple aliases
+store.write_with_options(
+    "swarm_commands",
+    &formation_command,
+    WriteOptions::to_aliases(vec![
+        "swarm.flanker-1".into(),
+        "swarm.flanker-2".into(),
+    ]),
+).await?;
+
+// Example 3: Deploy to specific PeerIds (low-level)
 store.write_with_options(
     "deployment_intents",
     &intent,
     WriteOptions {
-        target_nodes: Some(vec!["vehicle-1".into(), "vehicle-2".into()]),
+        target_nodes: Some(vec!["abc123...".into(), "def456...".into()]),
         transit_behavior: TransitBehavior::RelayOnly,
         ttl: Some(Duration::from_secs(300)),
         ..Default::default()
     },
 ).await?;
 
-// Example 2: Deploy to all vehicles in a region
+// Example 4: Deploy to all vehicles in a region (selector)
 store.write_with_options(
     "deployment_intents",
     &intent,
-    WriteOptions {
-        target_selector: Some("platform=vehicle,region=grid7".into()),
-        transit_behavior: TransitBehavior::RelayOnly,
-        ttl: Some(Duration::from_secs(300)),
-        ..Default::default()
-    },
+    WriteOptions::to_selector("platform=vehicle,region=grid7"),
 ).await?;
 
-// Example 3: Broadcast (current behavior, explicit)
+// Example 5: Broadcast (current behavior, explicit)
 store.write_with_options(
     "positions",
     &position,
@@ -365,10 +584,33 @@ store.write_with_options(
     },
 ).await?;
 
-// Example 4: Collection configured for inbox pattern
+// Example 6: Collection configured for inbox pattern
 // Config: DeliveryMode::InboxPattern { node_id_position: 1 }
 store.write("commands/vehicle-1", &command).await?;
 // Only vehicle-1 persists, others relay
+
+// Example 7: Alias binding (leader binding flanker role)
+let name_binder = hive.name_binder();
+name_binder.bind("swarm", "flanker-1", &vehicle_peer_id, AliasType::ROLE).await?;
+
+// Example 8: Self-claiming an alias
+let name_binder = hive.name_binder();
+name_binder.claim("c2", "viper-3").await?;  // Claims for local node
+
+// Example 9: Resolving alias before send (manual)
+let name_resolver = hive.name_resolver();
+if let Some(peer_id) = name_resolver.resolve("swarm.flanker-1").await? {
+    // Use peer_id directly
+}
+
+// Example 10: Watch for alias changes (reactive)
+let mut alias_stream = name_resolver.watch_alias("swarm.flanker-1").await?;
+while let Some(change) = alias_stream.next().await {
+    match change {
+        AliasChange::Bound { peer_id, .. } => println!("flanker-1 is now {}", peer_id),
+        AliasChange::Unbound { .. } => println!("flanker-1 unbound"),
+    }
+}
 ```
 
 ### 8. Configuration Examples
@@ -432,26 +674,41 @@ collections:
 ## Implementation Plan
 
 ### Phase 1: Core Infrastructure
-- [ ] Add targeting fields to `WriteOptions`
+- [ ] Add targeting fields to `WriteOptions` (target_nodes, target_selector, target_aliases)
 - [ ] Add `TransitBehavior` enum
 - [ ] Extend document metadata schema
 - [ ] Add `CollectionConfig` delivery mode
 
-### Phase 2: Sync Layer Integration
+### Phase 2: Naming & Identity
+- [ ] Define `AliasBinding` and `AliasAppConfig` protobuf schemas
+- [ ] Create `_aliases/` and `_alias_config/` system collections
+- [ ] Implement `NameResolver` trait and default implementation
+- [ ] Implement `NameBinder` trait and default implementation
+- [ ] Add alias fields to Beacon schema
+- [ ] Alias resolution in WriteOptions (target_aliases → target_nodes)
+
+### Phase 3: Sync Layer Integration
 - [ ] Implement `is_target()` check
 - [ ] Implement `SyncDecision` logic
 - [ ] Add relay-without-persist behavior
 - [ ] Garbage collection for relayed docs
 
-### Phase 3: Selector Support
+### Phase 4: Selector Support
 - [ ] Implement `LabelSelector` parser
 - [ ] Add node label configuration
 - [ ] Selector matching in sync layer
+- [ ] Beacon labels for selector matching
 
-### Phase 4: Implicit Confirmation
+### Phase 5: Implicit Confirmation
 - [ ] Extend beacon schema with version/status fields
 - [ ] Document confirmation patterns
 - [ ] Add confirmation query helpers
+
+### Phase 6: Integration & Testing
+- [ ] End-to-end tests for alias-based targeting
+- [ ] Integration tests with Zarf deployment flow (ADR-045)
+- [ ] Performance benchmarks for selector evaluation
+- [ ] Documentation and examples
 
 ## Alternatives Considered
 
