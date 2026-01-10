@@ -64,6 +64,11 @@ use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
+use chacha20poly1305::{
+    aead::{Aead, KeyInit},
+    ChaCha20Poly1305, Nonce,
+};
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use tokio::net::UdpSocket;
 use tokio::sync::broadcast;
@@ -94,6 +99,16 @@ pub enum BypassError {
     InvalidHeader,
     /// Message is stale (past TTL)
     StaleMessage,
+    /// Signature verification failed
+    InvalidSignature,
+    /// Decryption failed
+    DecryptionFailed,
+    /// Source IP not in allowlist
+    UnauthorizedSource(IpAddr),
+    /// Replay attack detected (duplicate sequence)
+    ReplayDetected { sequence: u8 },
+    /// Missing security credential (key not configured)
+    MissingCredential(String),
 }
 
 impl std::fmt::Display for BypassError {
@@ -109,6 +124,17 @@ impl std::fmt::Display for BypassError {
             }
             BypassError::InvalidHeader => write!(f, "Invalid bypass header"),
             BypassError::StaleMessage => write!(f, "Message is stale (past TTL)"),
+            BypassError::InvalidSignature => write!(f, "Invalid message signature"),
+            BypassError::DecryptionFailed => write!(f, "Message decryption failed"),
+            BypassError::UnauthorizedSource(ip) => {
+                write!(f, "Unauthorized source IP: {}", ip)
+            }
+            BypassError::ReplayDetected { sequence } => {
+                write!(f, "Replay attack detected (sequence {})", sequence)
+            }
+            BypassError::MissingCredential(what) => {
+                write!(f, "Missing security credential: {}", what)
+            }
         }
     }
 }
@@ -277,6 +303,360 @@ impl BypassChannelConfig {
     /// Check if a collection uses bypass
     pub fn is_bypass_collection(&self, name: &str) -> bool {
         self.collections.iter().any(|c| c.collection == name)
+    }
+}
+
+// =============================================================================
+// Security Configuration (ADR-042 Phase 5)
+// =============================================================================
+
+/// Security configuration for bypass channel
+///
+/// Since bypass messages don't go through Iroh's authenticated QUIC transport,
+/// optional security features can be enabled to protect against:
+/// - Message forgery (signing)
+/// - Eavesdropping (encryption)
+/// - Unauthorized sources (allowlisting)
+/// - Replay attacks (sequence window)
+///
+/// ## Security Tradeoffs
+///
+/// | Feature | Overhead | Latency Impact | Protection |
+/// |---------|----------|----------------|------------|
+/// | Signing | +64 bytes | +0.1-0.5ms | Authenticity |
+/// | Encryption | +16 bytes | +0.1-0.3ms | Confidentiality |
+/// | Allowlist | 0 bytes | ~0ms | Source filtering |
+/// | Replay | 0 bytes | ~0ms | Freshness |
+///
+/// ## When to Use
+///
+/// - **High-frequency telemetry**: Signing only (authenticity without encryption overhead)
+/// - **Sensitive commands**: Full encryption + signing
+/// - **Trusted network**: Allowlist only (minimal overhead)
+/// - **Untrusted network**: All features enabled
+///
+/// ## Example
+///
+/// ```rust
+/// use hive_protocol::transport::bypass::BypassSecurityConfig;
+///
+/// // Minimal security for high-frequency telemetry
+/// let config = BypassSecurityConfig {
+///     require_signature: true,
+///     encrypt_payload: false,
+///     ..Default::default()
+/// };
+///
+/// // Full security for sensitive commands
+/// let config = BypassSecurityConfig::full_security();
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct BypassSecurityConfig {
+    /// Require Ed25519 signature on all messages
+    ///
+    /// When enabled:
+    /// - Outgoing messages are signed with the node's signing key
+    /// - Incoming messages without valid signatures are rejected
+    /// - Adds ~64 bytes overhead per message
+    pub require_signature: bool,
+
+    /// Encrypt payload with formation key (ChaCha20-Poly1305)
+    ///
+    /// When enabled:
+    /// - Payload is encrypted before sending
+    /// - Header remains unencrypted for routing
+    /// - Adds ~16 bytes overhead (Poly1305 auth tag)
+    pub encrypt_payload: bool,
+
+    /// Filter sources by known peer addresses
+    ///
+    /// When Some:
+    /// - Only accept messages from listed IP addresses
+    /// - Messages from unknown IPs are rejected
+    /// - Useful for trusted network segments
+    pub source_allowlist: Option<Vec<IpAddr>>,
+
+    /// Enable replay protection
+    ///
+    /// When enabled:
+    /// - Track seen sequence numbers per source
+    /// - Reject duplicate sequence numbers within window
+    /// - Window size: 64 sequences (covers ~1 minute at 1 Hz)
+    pub replay_protection: bool,
+
+    /// Replay window size (default: 64)
+    ///
+    /// Number of sequence numbers to track per source.
+    /// Larger windows use more memory but handle more reordering.
+    pub replay_window_size: usize,
+}
+
+impl BypassSecurityConfig {
+    /// Create configuration with no security (fastest)
+    pub fn none() -> Self {
+        Self::default()
+    }
+
+    /// Create configuration with signature only (authenticity)
+    pub fn signed() -> Self {
+        Self {
+            require_signature: true,
+            ..Default::default()
+        }
+    }
+
+    /// Create configuration with full security (all features)
+    pub fn full_security() -> Self {
+        Self {
+            require_signature: true,
+            encrypt_payload: true,
+            source_allowlist: None, // Set separately based on known peers
+            replay_protection: true,
+            replay_window_size: 64,
+        }
+    }
+
+    /// Check if any security features are enabled
+    pub fn is_enabled(&self) -> bool {
+        self.require_signature
+            || self.encrypt_payload
+            || self.source_allowlist.is_some()
+            || self.replay_protection
+    }
+
+    /// Check if source IP is allowed
+    pub fn is_source_allowed(&self, ip: &IpAddr) -> bool {
+        match &self.source_allowlist {
+            Some(list) => list.contains(ip),
+            None => true, // No allowlist = all sources allowed
+        }
+    }
+}
+
+/// Security credentials for bypass channel
+///
+/// Contains the cryptographic keys needed for signing and encryption.
+#[derive(Clone, Default)]
+pub struct BypassSecurityCredentials {
+    /// Ed25519 signing key (private)
+    signing_key: Option<SigningKey>,
+
+    /// Ed25519 verifying keys for known peers (public)
+    /// Maps peer ID or IP to their public key
+    peer_keys: HashMap<String, VerifyingKey>,
+
+    /// ChaCha20-Poly1305 encryption key (shared formation key)
+    /// 256-bit key shared among formation members
+    encryption_key: Option<[u8; 32]>,
+}
+
+impl std::fmt::Debug for BypassSecurityCredentials {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BypassSecurityCredentials")
+            .field("has_signing_key", &self.signing_key.is_some())
+            .field("peer_keys_count", &self.peer_keys.len())
+            .field("has_encryption_key", &self.encryption_key.is_some())
+            .finish()
+    }
+}
+
+impl BypassSecurityCredentials {
+    /// Create new empty credentials
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the signing key
+    pub fn with_signing_key(mut self, key: SigningKey) -> Self {
+        self.signing_key = Some(key);
+        self
+    }
+
+    /// Add a peer's verifying key
+    pub fn with_peer_key(mut self, peer_id: impl Into<String>, key: VerifyingKey) -> Self {
+        self.peer_keys.insert(peer_id.into(), key);
+        self
+    }
+
+    /// Set the encryption key
+    pub fn with_encryption_key(mut self, key: [u8; 32]) -> Self {
+        self.encryption_key = Some(key);
+        self
+    }
+
+    /// Get the verifying key for our signing key
+    pub fn verifying_key(&self) -> Option<VerifyingKey> {
+        self.signing_key.as_ref().map(|k| k.verifying_key())
+    }
+
+    /// Sign a message
+    pub fn sign(&self, message: &[u8]) -> Result<Signature> {
+        let key = self
+            .signing_key
+            .as_ref()
+            .ok_or_else(|| BypassError::MissingCredential("signing key".into()))?;
+        Ok(key.sign(message))
+    }
+
+    /// Verify a signature from a known peer
+    pub fn verify(&self, peer_id: &str, message: &[u8], signature: &Signature) -> Result<()> {
+        let key = self
+            .peer_keys
+            .get(peer_id)
+            .ok_or_else(|| BypassError::MissingCredential(format!("peer key for {}", peer_id)))?;
+        key.verify(message, signature)
+            .map_err(|_| BypassError::InvalidSignature)
+    }
+
+    /// Verify a signature using IP address as peer identifier
+    pub fn verify_by_ip(&self, ip: &IpAddr, message: &[u8], signature: &Signature) -> Result<()> {
+        self.verify(&ip.to_string(), message, signature)
+    }
+
+    /// Encrypt payload
+    pub fn encrypt(&self, plaintext: &[u8], nonce: &[u8; 12]) -> Result<Vec<u8>> {
+        let key = self
+            .encryption_key
+            .as_ref()
+            .ok_or_else(|| BypassError::MissingCredential("encryption key".into()))?;
+
+        let cipher = ChaCha20Poly1305::new_from_slice(key)
+            .map_err(|_| BypassError::Config("Invalid encryption key".into()))?;
+
+        let nonce = Nonce::from_slice(nonce);
+        cipher
+            .encrypt(nonce, plaintext)
+            .map_err(|_| BypassError::Encode("Encryption failed".into()))
+    }
+
+    /// Decrypt payload
+    pub fn decrypt(&self, ciphertext: &[u8], nonce: &[u8; 12]) -> Result<Vec<u8>> {
+        let key = self
+            .encryption_key
+            .as_ref()
+            .ok_or_else(|| BypassError::MissingCredential("encryption key".into()))?;
+
+        let cipher = ChaCha20Poly1305::new_from_slice(key)
+            .map_err(|_| BypassError::Config("Invalid encryption key".into()))?;
+
+        let nonce = Nonce::from_slice(nonce);
+        cipher
+            .decrypt(nonce, ciphertext)
+            .map_err(|_| BypassError::DecryptionFailed)
+    }
+}
+
+/// Replay protection tracker
+///
+/// Tracks seen sequence numbers per source to detect replay attacks.
+/// Uses a sliding window to handle out-of-order delivery.
+#[derive(Debug, Default)]
+pub struct ReplayTracker {
+    /// Seen sequences per source IP
+    /// Each entry is a bitset representing seen sequences
+    windows: RwLock<HashMap<IpAddr, ReplayWindow>>,
+
+    /// Window size
+    window_size: usize,
+}
+
+/// Sliding window for replay detection
+#[derive(Debug)]
+struct ReplayWindow {
+    /// Highest sequence seen
+    highest_seq: u8,
+    /// Bitmap of seen sequences (relative to highest)
+    seen: u64,
+}
+
+impl ReplayWindow {
+    fn new() -> Self {
+        Self {
+            highest_seq: 0,
+            seen: 0,
+        }
+    }
+
+    /// Check if sequence is valid (not a replay)
+    /// Returns true if valid, false if replay
+    fn check_and_update(&mut self, seq: u8, window_size: usize) -> bool {
+        let window_size = window_size.min(64) as u8;
+
+        // Calculate distance from highest seen
+        let diff = self.highest_seq.wrapping_sub(seq);
+
+        if diff == 0 && self.seen == 0 {
+            // First packet
+            self.highest_seq = seq;
+            self.seen = 1;
+            return true;
+        }
+
+        if seq == self.highest_seq {
+            // Exact replay of highest
+            return false;
+        }
+
+        // Check if seq is ahead of highest
+        let ahead = seq.wrapping_sub(self.highest_seq);
+        if ahead > 0 && ahead < 128 {
+            // New highest sequence
+            let shift = ahead as u32;
+            if shift < 64 {
+                self.seen = (self.seen << shift) | 1;
+            } else {
+                self.seen = 1;
+            }
+            self.highest_seq = seq;
+            return true;
+        }
+
+        // Check if seq is within window
+        if diff < window_size && diff < 64 {
+            let bit = 1u64 << diff;
+            if self.seen & bit != 0 {
+                // Already seen
+                return false;
+            }
+            self.seen |= bit;
+            return true;
+        }
+
+        // Too old
+        false
+    }
+}
+
+impl ReplayTracker {
+    /// Create new replay tracker
+    pub fn new(window_size: usize) -> Self {
+        Self {
+            windows: RwLock::new(HashMap::new()),
+            window_size: window_size.min(64),
+        }
+    }
+
+    /// Check if message is valid (not a replay)
+    /// Returns Ok(()) if valid, Err if replay detected
+    pub fn check(&self, source: &IpAddr, sequence: u8) -> Result<()> {
+        let mut windows = self.windows.write().unwrap();
+        let window = windows.entry(*source).or_insert_with(ReplayWindow::new);
+
+        if window.check_and_update(sequence, self.window_size) {
+            Ok(())
+        } else {
+            Err(BypassError::ReplayDetected { sequence })
+        }
+    }
+
+    /// Clear tracking for a source
+    pub fn clear_source(&self, source: &IpAddr) {
+        self.windows.write().unwrap().remove(source);
+    }
+
+    /// Clear all tracking
+    pub fn clear_all(&self) {
+        self.windows.write().unwrap().clear();
     }
 }
 
@@ -476,6 +856,16 @@ pub struct BypassMetrics {
     pub send_errors: AtomicU64,
     /// Receive errors
     pub receive_errors: AtomicU64,
+
+    // Security metrics (ADR-042 Phase 5)
+    /// Messages rejected due to invalid signature
+    pub signature_rejected: AtomicU64,
+    /// Messages rejected due to decryption failure
+    pub decryption_failed: AtomicU64,
+    /// Messages rejected due to unauthorized source
+    pub unauthorized_source: AtomicU64,
+    /// Messages rejected due to replay detection
+    pub replay_rejected: AtomicU64,
 }
 
 impl BypassMetrics {
@@ -490,6 +880,10 @@ impl BypassMetrics {
             invalid_dropped: self.invalid_dropped.load(Ordering::Relaxed),
             send_errors: self.send_errors.load(Ordering::Relaxed),
             receive_errors: self.receive_errors.load(Ordering::Relaxed),
+            signature_rejected: self.signature_rejected.load(Ordering::Relaxed),
+            decryption_failed: self.decryption_failed.load(Ordering::Relaxed),
+            unauthorized_source: self.unauthorized_source.load(Ordering::Relaxed),
+            replay_rejected: self.replay_rejected.load(Ordering::Relaxed),
         }
     }
 }
@@ -505,6 +899,16 @@ pub struct BypassMetricsSnapshot {
     pub invalid_dropped: u64,
     pub send_errors: u64,
     pub receive_errors: u64,
+
+    // Security metrics (ADR-042 Phase 5)
+    /// Messages rejected due to invalid signature
+    pub signature_rejected: u64,
+    /// Messages rejected due to decryption failure
+    pub decryption_failed: u64,
+    /// Messages rejected due to unauthorized source
+    pub unauthorized_source: u64,
+    /// Messages rejected due to replay detection
+    pub replay_rejected: u64,
 }
 
 // =============================================================================
@@ -1047,5 +1451,330 @@ mod tests {
         };
         assert!(err.to_string().contains("200"));
         assert!(err.to_string().contains("100"));
+    }
+
+    // =========================================================================
+    // Security Tests (ADR-042 Phase 5)
+    // =========================================================================
+
+    #[test]
+    fn test_security_config_none() {
+        let config = BypassSecurityConfig::none();
+        assert!(!config.require_signature);
+        assert!(!config.encrypt_payload);
+        assert!(config.source_allowlist.is_none());
+        assert!(!config.replay_protection);
+        assert!(!config.is_enabled());
+    }
+
+    #[test]
+    fn test_security_config_signed() {
+        let config = BypassSecurityConfig::signed();
+        assert!(config.require_signature);
+        assert!(!config.encrypt_payload);
+        assert!(config.is_enabled());
+    }
+
+    #[test]
+    fn test_security_config_full() {
+        let config = BypassSecurityConfig::full_security();
+        assert!(config.require_signature);
+        assert!(config.encrypt_payload);
+        assert!(config.replay_protection);
+        assert_eq!(config.replay_window_size, 64);
+        assert!(config.is_enabled());
+    }
+
+    #[test]
+    fn test_security_config_allowlist() {
+        let ip1: IpAddr = "192.168.1.1".parse().unwrap();
+        let ip2: IpAddr = "192.168.1.2".parse().unwrap();
+        let ip3: IpAddr = "10.0.0.1".parse().unwrap();
+
+        // No allowlist - all allowed
+        let config = BypassSecurityConfig::none();
+        assert!(config.is_source_allowed(&ip1));
+        assert!(config.is_source_allowed(&ip2));
+        assert!(config.is_source_allowed(&ip3));
+
+        // With allowlist - only listed IPs allowed
+        let config = BypassSecurityConfig {
+            source_allowlist: Some(vec![ip1, ip2]),
+            ..Default::default()
+        };
+        assert!(config.is_source_allowed(&ip1));
+        assert!(config.is_source_allowed(&ip2));
+        assert!(!config.is_source_allowed(&ip3));
+    }
+
+    #[test]
+    fn test_credentials_signing() {
+        use ed25519_dalek::SigningKey;
+
+        // Use fixed seed for deterministic testing
+        let seed: [u8; 32] = [1u8; 32];
+        let signing_key = SigningKey::from_bytes(&seed);
+        let verifying_key = signing_key.verifying_key();
+
+        // Create credentials
+        let peer_ip: IpAddr = "192.168.1.1".parse().unwrap();
+        let creds = BypassSecurityCredentials::new()
+            .with_signing_key(signing_key)
+            .with_peer_key(peer_ip.to_string(), verifying_key);
+
+        // Sign a message
+        let message = b"test message for signing";
+        let signature = creds.sign(message).expect("signing should succeed");
+
+        // Verify the signature
+        creds
+            .verify_by_ip(&peer_ip, message, &signature)
+            .expect("verification should succeed");
+    }
+
+    #[test]
+    fn test_credentials_invalid_signature() {
+        use ed25519_dalek::SigningKey;
+
+        // Use different fixed seeds for two key pairs
+        let seed1: [u8; 32] = [1u8; 32];
+        let seed2: [u8; 32] = [2u8; 32];
+        let signing_key1 = SigningKey::from_bytes(&seed1);
+        let signing_key2 = SigningKey::from_bytes(&seed2);
+        let verifying_key2 = signing_key2.verifying_key();
+
+        // Create credentials with mismatched keys
+        let peer_ip: IpAddr = "192.168.1.1".parse().unwrap();
+        let creds = BypassSecurityCredentials::new()
+            .with_signing_key(signing_key1)
+            .with_peer_key(peer_ip.to_string(), verifying_key2);
+
+        // Sign with key1
+        let message = b"test message";
+        let signature = creds.sign(message).expect("signing should succeed");
+
+        // Verification with key2 should fail
+        let result = creds.verify_by_ip(&peer_ip, message, &signature);
+        assert!(matches!(result, Err(BypassError::InvalidSignature)));
+    }
+
+    #[test]
+    fn test_credentials_encryption() {
+        let encryption_key = [42u8; 32];
+        let creds = BypassSecurityCredentials::new().with_encryption_key(encryption_key);
+
+        let plaintext = b"secret message for encryption";
+        let nonce = [0u8; 12];
+
+        // Encrypt
+        let ciphertext = creds
+            .encrypt(plaintext, &nonce)
+            .expect("encryption should succeed");
+        assert_ne!(ciphertext.as_slice(), plaintext);
+        // Ciphertext should be plaintext + 16 bytes (Poly1305 tag)
+        assert_eq!(ciphertext.len(), plaintext.len() + 16);
+
+        // Decrypt
+        let decrypted = creds
+            .decrypt(&ciphertext, &nonce)
+            .expect("decryption should succeed");
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn test_credentials_decryption_wrong_key() {
+        let key1 = [1u8; 32];
+        let key2 = [2u8; 32];
+
+        let creds1 = BypassSecurityCredentials::new().with_encryption_key(key1);
+        let creds2 = BypassSecurityCredentials::new().with_encryption_key(key2);
+
+        let plaintext = b"secret message";
+        let nonce = [0u8; 12];
+
+        // Encrypt with key1
+        let ciphertext = creds1
+            .encrypt(plaintext, &nonce)
+            .expect("encryption should succeed");
+
+        // Decrypt with key2 should fail
+        let result = creds2.decrypt(&ciphertext, &nonce);
+        assert!(matches!(result, Err(BypassError::DecryptionFailed)));
+    }
+
+    #[test]
+    fn test_credentials_missing_signing_key() {
+        let creds = BypassSecurityCredentials::new();
+        let result = creds.sign(b"message");
+        assert!(matches!(result, Err(BypassError::MissingCredential(_))));
+    }
+
+    #[test]
+    fn test_credentials_missing_encryption_key() {
+        let creds = BypassSecurityCredentials::new();
+        let result = creds.encrypt(b"message", &[0u8; 12]);
+        assert!(matches!(result, Err(BypassError::MissingCredential(_))));
+    }
+
+    #[test]
+    fn test_replay_tracker_first_message() {
+        let tracker = ReplayTracker::new(64);
+        let source: IpAddr = "192.168.1.1".parse().unwrap();
+
+        // First message should always succeed
+        tracker
+            .check(&source, 0)
+            .expect("first message should succeed");
+    }
+
+    #[test]
+    fn test_replay_tracker_sequential() {
+        let tracker = ReplayTracker::new(64);
+        let source: IpAddr = "192.168.1.1".parse().unwrap();
+
+        // Sequential messages should all succeed
+        for seq in 0..10u8 {
+            tracker
+                .check(&source, seq)
+                .unwrap_or_else(|_| panic!("sequence {} should succeed", seq));
+        }
+    }
+
+    #[test]
+    fn test_replay_tracker_replay_detected() {
+        let tracker = ReplayTracker::new(64);
+        let source: IpAddr = "192.168.1.1".parse().unwrap();
+
+        // First message succeeds
+        tracker.check(&source, 5).expect("first should succeed");
+
+        // Replay should be detected
+        let result = tracker.check(&source, 5);
+        assert!(matches!(
+            result,
+            Err(BypassError::ReplayDetected { sequence: 5 })
+        ));
+    }
+
+    #[test]
+    fn test_replay_tracker_out_of_order() {
+        let tracker = ReplayTracker::new(64);
+        let source: IpAddr = "192.168.1.1".parse().unwrap();
+
+        // Messages can arrive out of order within window
+        tracker.check(&source, 10).expect("10 should succeed");
+        tracker
+            .check(&source, 8)
+            .expect("8 should succeed (within window)");
+        tracker.check(&source, 12).expect("12 should succeed");
+        tracker
+            .check(&source, 9)
+            .expect("9 should succeed (within window)");
+
+        // But not replayed
+        let result = tracker.check(&source, 8);
+        assert!(matches!(
+            result,
+            Err(BypassError::ReplayDetected { sequence: 8 })
+        ));
+    }
+
+    #[test]
+    fn test_replay_tracker_multiple_sources() {
+        let tracker = ReplayTracker::new(64);
+        let source1: IpAddr = "192.168.1.1".parse().unwrap();
+        let source2: IpAddr = "192.168.1.2".parse().unwrap();
+
+        // Same sequence from different sources should both succeed
+        tracker
+            .check(&source1, 5)
+            .expect("source1 seq 5 should succeed");
+        tracker
+            .check(&source2, 5)
+            .expect("source2 seq 5 should succeed");
+
+        // Replay from same source should fail
+        let result = tracker.check(&source1, 5);
+        assert!(matches!(result, Err(BypassError::ReplayDetected { .. })));
+
+        // But different sequence should work
+        tracker
+            .check(&source1, 6)
+            .expect("source1 seq 6 should succeed");
+    }
+
+    #[test]
+    fn test_replay_tracker_window_advance() {
+        let tracker = ReplayTracker::new(64);
+        let source: IpAddr = "192.168.1.1".parse().unwrap();
+
+        // Start with a sequence in the middle of the range
+        tracker.check(&source, 100).expect("100 should succeed");
+        tracker.check(&source, 110).expect("110 should succeed");
+        tracker.check(&source, 120).expect("120 should succeed");
+
+        // Much later sequence should succeed and advance the window
+        tracker.check(&source, 200).expect("200 should succeed");
+
+        // Sequence 100 is now outside the window (more than 64 behind)
+        // But we already marked it, so this tests window advancement
+        tracker.check(&source, 201).expect("201 should succeed");
+    }
+
+    #[test]
+    fn test_replay_tracker_clear() {
+        let tracker = ReplayTracker::new(64);
+        let source: IpAddr = "192.168.1.1".parse().unwrap();
+
+        tracker.check(&source, 5).expect("initial should succeed");
+
+        // Clear and replay should now succeed
+        tracker.clear_source(&source);
+        tracker
+            .check(&source, 5)
+            .expect("after clear should succeed");
+    }
+
+    #[test]
+    fn test_metrics_snapshot_includes_security() {
+        let metrics = BypassMetrics::default();
+
+        // Increment security metrics
+        metrics.signature_rejected.fetch_add(1, Ordering::Relaxed);
+        metrics.decryption_failed.fetch_add(2, Ordering::Relaxed);
+        metrics.unauthorized_source.fetch_add(3, Ordering::Relaxed);
+        metrics.replay_rejected.fetch_add(4, Ordering::Relaxed);
+
+        // Snapshot should include them
+        let snapshot = metrics.snapshot();
+        assert_eq!(snapshot.signature_rejected, 1);
+        assert_eq!(snapshot.decryption_failed, 2);
+        assert_eq!(snapshot.unauthorized_source, 3);
+        assert_eq!(snapshot.replay_rejected, 4);
+    }
+
+    #[test]
+    fn test_bypass_header_flags() {
+        let mut header = BypassHeader::new("test", Duration::from_millis(1000), 0);
+
+        // No flags by default
+        assert_eq!(header.flags, 0);
+        assert_eq!(header.flags & BypassHeader::FLAG_SIGNED, 0);
+        assert_eq!(header.flags & BypassHeader::FLAG_ENCRYPTED, 0);
+
+        // Set signed flag
+        header.flags |= BypassHeader::FLAG_SIGNED;
+        assert_ne!(header.flags & BypassHeader::FLAG_SIGNED, 0);
+        assert_eq!(header.flags & BypassHeader::FLAG_ENCRYPTED, 0);
+
+        // Set encrypted flag
+        header.flags |= BypassHeader::FLAG_ENCRYPTED;
+        assert_ne!(header.flags & BypassHeader::FLAG_SIGNED, 0);
+        assert_ne!(header.flags & BypassHeader::FLAG_ENCRYPTED, 0);
+
+        // Encode/decode preserves flags
+        let encoded = header.encode();
+        let decoded = BypassHeader::decode(&encoded).unwrap();
+        assert_eq!(decoded.flags, header.flags);
     }
 }
