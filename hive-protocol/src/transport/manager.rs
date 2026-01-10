@@ -61,10 +61,17 @@ use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 
 use super::bypass::{BypassMessage, BypassTarget, UdpBypassChannel};
-use super::capabilities::{MessageRequirements, PeerDistance, RangeMode, Transport, TransportType};
+use super::capabilities::{
+    MessageRequirements, PaceLevel, PeerDistance, RangeMode, Transport, TransportId,
+    TransportInstance, TransportMode, TransportPolicy, TransportType,
+};
 use super::{NodeId, Result, TransportError};
+use std::collections::HashSet;
 use tokio::sync::broadcast;
 use tokio::sync::RwLock as TokioRwLock;
+
+/// Storage type for registered transport instances
+type TransportInstanceMap = HashMap<TransportId, (TransportInstance, Arc<dyn Transport>)>;
 
 // =============================================================================
 // Transport Manager Configuration
@@ -74,6 +81,7 @@ use tokio::sync::RwLock as TokioRwLock;
 #[derive(Debug, Clone)]
 pub struct TransportManagerConfig {
     /// Transport preference order (first = highest preference)
+    /// Used for legacy TransportType-based selection
     pub preference_order: Vec<TransportType>,
 
     /// Enable automatic transport fallback on failure
@@ -84,6 +92,13 @@ pub struct TransportManagerConfig {
 
     /// Minimum score difference to switch transports
     pub switch_threshold: i32,
+
+    /// Default PACE policy for transport selection (ADR-032)
+    /// If set, takes precedence over preference_order
+    pub default_policy: Option<TransportPolicy>,
+
+    /// Transport mode (Single, Redundant, Bonded, LoadBalanced)
+    pub transport_mode: TransportMode,
 }
 
 impl Default for TransportManagerConfig {
@@ -98,7 +113,25 @@ impl Default for TransportManagerConfig {
             enable_fallback: true,
             cache_peer_transport: true,
             switch_threshold: 10,
+            default_policy: None,
+            transport_mode: TransportMode::Single,
         }
+    }
+}
+
+impl TransportManagerConfig {
+    /// Create config with a PACE policy
+    pub fn with_policy(policy: TransportPolicy) -> Self {
+        Self {
+            default_policy: Some(policy),
+            ..Default::default()
+        }
+    }
+
+    /// Set the transport mode
+    pub fn with_mode(mut self, mode: TransportMode) -> Self {
+        self.transport_mode = mode;
+        self
     }
 }
 
@@ -113,17 +146,42 @@ impl Default for TransportManagerConfig {
 /// - Message requirements (reliability, latency, size)
 /// - Transport capabilities
 /// - Current availability and signal quality
-/// - User preference order
+/// - PACE policy (Primary, Alternate, Contingency, Emergency)
 /// - Historical success with peer
 ///
 /// Also manages the UDP bypass channel (ADR-042) for low-latency,
 /// high-frequency data that bypasses CRDT synchronization.
+///
+/// ## PACE Policy (ADR-032)
+///
+/// When a PACE policy is configured, transport selection follows:
+/// 1. Try primary transports first
+/// 2. Fall back to alternate if no primary available
+/// 3. Use contingency for degraded operation
+/// 4. Emergency as last resort
+///
+/// ```ignore
+/// let policy = TransportPolicy::new("tactical")
+///     .primary(vec!["iroh-eth0", "iroh-wlan0"])
+///     .alternate(vec!["iroh-starlink"])
+///     .contingency(vec!["lora-primary"])
+///     .emergency(vec!["ble-mesh"]);
+///
+/// let config = TransportManagerConfig::with_policy(policy);
+/// let manager = TransportManager::new(config);
+/// ```
 pub struct TransportManager {
-    /// Registered transports by type
+    /// Registered transports by type (legacy API)
     transports: HashMap<TransportType, Arc<dyn Transport>>,
+
+    /// Registered transports by ID (ADR-032 PACE API)
+    transport_instances: RwLock<TransportInstanceMap>,
 
     /// Active transport per peer (learned from successful deliveries)
     peer_transports: RwLock<HashMap<NodeId, TransportType>>,
+
+    /// Active transport ID per peer (PACE-based)
+    peer_transport_ids: RwLock<HashMap<NodeId, TransportId>>,
 
     /// Peer distance estimates
     peer_distances: RwLock<HashMap<NodeId, PeerDistance>>,
@@ -143,7 +201,9 @@ impl TransportManager {
     pub fn new(config: TransportManagerConfig) -> Self {
         Self {
             transports: HashMap::new(),
+            transport_instances: RwLock::new(HashMap::new()),
             peer_transports: RwLock::new(HashMap::new()),
+            peer_transport_ids: RwLock::new(HashMap::new()),
             peer_distances: RwLock::new(HashMap::new()),
             config,
             bypass_channel: None,
@@ -154,7 +214,9 @@ impl TransportManager {
     pub fn with_bypass(config: TransportManagerConfig, bypass: UdpBypassChannel) -> Self {
         Self {
             transports: HashMap::new(),
+            transport_instances: RwLock::new(HashMap::new()),
             peer_transports: RwLock::new(HashMap::new()),
+            peer_transport_ids: RwLock::new(HashMap::new()),
             peer_distances: RwLock::new(HashMap::new()),
             config,
             bypass_channel: Some(Arc::new(TokioRwLock::new(bypass))),
@@ -212,6 +274,191 @@ impl TransportManager {
             .filter(|(_, t)| t.is_available() && t.can_reach(peer_id))
             .map(|(tt, _)| *tt)
             .collect()
+    }
+
+    // =========================================================================
+    // PACE Transport Instance API (ADR-032)
+    // =========================================================================
+
+    /// Register a transport instance by ID
+    ///
+    /// This is the preferred API for multi-instance transports (e.g., multiple NICs).
+    ///
+    /// # Arguments
+    ///
+    /// * `instance` - Transport instance metadata
+    /// * `transport` - The transport implementation
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let instance = TransportInstance::new("iroh-eth0", TransportType::Quic, caps)
+    ///     .with_interface("eth0");
+    /// manager.register_instance(instance, Arc::new(transport));
+    /// ```
+    pub fn register_instance(&self, instance: TransportInstance, transport: Arc<dyn Transport>) {
+        let id = instance.id.clone();
+        self.transport_instances
+            .write()
+            .unwrap()
+            .insert(id, (instance, transport));
+    }
+
+    /// Unregister a transport instance by ID
+    pub fn unregister_instance(
+        &self,
+        id: &TransportId,
+    ) -> Option<(TransportInstance, Arc<dyn Transport>)> {
+        self.transport_instances.write().unwrap().remove(id)
+    }
+
+    /// Get a transport instance by ID
+    pub fn get_instance(&self, id: &TransportId) -> Option<Arc<dyn Transport>> {
+        self.transport_instances
+            .read()
+            .unwrap()
+            .get(id)
+            .map(|(_, t)| Arc::clone(t))
+    }
+
+    /// Get all registered instance IDs
+    pub fn registered_instance_ids(&self) -> Vec<TransportId> {
+        self.transport_instances
+            .read()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect()
+    }
+
+    /// Get IDs of available transport instances
+    pub fn available_instance_ids(&self) -> HashSet<TransportId> {
+        self.transport_instances
+            .read()
+            .unwrap()
+            .iter()
+            .filter(|(_, (inst, transport))| inst.available && transport.is_available())
+            .map(|(id, _)| id.clone())
+            .collect()
+    }
+
+    /// Get IDs of available transports that can reach a peer
+    pub fn available_instances_for_peer(&self, peer_id: &NodeId) -> Vec<TransportId> {
+        self.transport_instances
+            .read()
+            .unwrap()
+            .iter()
+            .filter(|(_, (inst, transport))| {
+                inst.available && transport.is_available() && transport.can_reach(peer_id)
+            })
+            .map(|(id, _)| id.clone())
+            .collect()
+    }
+
+    /// Get the current PACE level based on available transports
+    ///
+    /// Returns the best PACE level for which at least one transport is available.
+    pub fn current_pace_level(&self) -> PaceLevel {
+        match &self.config.default_policy {
+            Some(policy) => policy.current_level(&self.available_instance_ids()),
+            None => {
+                // No policy - if any transport available, consider it "Primary"
+                if !self.available_instance_ids().is_empty() {
+                    PaceLevel::Primary
+                } else {
+                    PaceLevel::None
+                }
+            }
+        }
+    }
+
+    /// Select transport(s) using PACE policy
+    ///
+    /// Returns transport IDs in priority order based on PACE policy and availability.
+    /// The number of transports returned depends on the configured TransportMode:
+    /// - Single: Returns at most one transport
+    /// - Redundant: Returns multiple for simultaneous send
+    /// - LoadBalanced: Returns all available for distribution
+    ///
+    /// # Arguments
+    ///
+    /// * `peer_id` - Target peer
+    /// * `requirements` - Message requirements
+    ///
+    /// # Returns
+    ///
+    /// Vector of transport IDs in priority order
+    pub fn select_transports_pace(
+        &self,
+        peer_id: &NodeId,
+        requirements: &MessageRequirements,
+    ) -> Vec<TransportId> {
+        let policy = match &self.config.default_policy {
+            Some(p) => p,
+            None => return Vec::new(), // No PACE policy configured
+        };
+
+        let instances = self.transport_instances.read().unwrap();
+        let available_for_peer: HashSet<_> = instances
+            .iter()
+            .filter(|(_, (inst, transport))| {
+                inst.available
+                    && transport.is_available()
+                    && transport.can_reach(peer_id)
+                    && transport.capabilities().meets_requirements(requirements)
+            })
+            .map(|(id, _)| id.clone())
+            .collect();
+
+        // Get candidates in PACE order
+        let candidates: Vec<TransportId> = policy
+            .ordered()
+            .filter(|id| available_for_peer.contains(*id))
+            .cloned()
+            .collect();
+
+        // Apply transport mode
+        match &self.config.transport_mode {
+            TransportMode::Single => candidates.into_iter().take(1).collect(),
+            TransportMode::Redundant {
+                min_paths,
+                max_paths,
+            } => {
+                let min = *min_paths as usize;
+                let max = max_paths.map(|m| m as usize).unwrap_or(candidates.len());
+                candidates.into_iter().take(max.max(min)).collect()
+            }
+            TransportMode::Bonded => candidates, // All for bandwidth aggregation
+            TransportMode::LoadBalanced { .. } => candidates, // All for distribution
+        }
+    }
+
+    /// Select the best single transport using PACE policy
+    ///
+    /// Convenience wrapper that returns just the first (best) transport.
+    pub fn select_transport_pace(
+        &self,
+        peer_id: &NodeId,
+        requirements: &MessageRequirements,
+    ) -> Option<TransportId> {
+        self.select_transports_pace(peer_id, requirements)
+            .into_iter()
+            .next()
+    }
+
+    /// Record successful transport use for a peer (PACE version)
+    pub fn record_success_pace(&self, peer_id: &NodeId, transport_id: TransportId) {
+        if self.config.cache_peer_transport {
+            self.peer_transport_ids
+                .write()
+                .unwrap()
+                .insert(peer_id.clone(), transport_id);
+        }
+    }
+
+    /// Clear cached transport for a peer (PACE version)
+    pub fn clear_cache_pace(&self, peer_id: &NodeId) {
+        self.peer_transport_ids.write().unwrap().remove(peer_id);
     }
 
     /// Select the best transport for a peer and message requirements
