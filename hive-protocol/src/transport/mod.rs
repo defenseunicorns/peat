@@ -62,6 +62,9 @@ pub mod ditto;
 #[cfg(feature = "lite-transport")]
 pub mod lite;
 
+#[cfg(feature = "bluetooth")]
+pub mod btle;
+
 pub mod bypass;
 pub mod capabilities;
 pub mod health;
@@ -79,6 +82,9 @@ pub use capabilities::{
 };
 pub use health::{HealthMonitor, HeartbeatConfig};
 pub use manager::{RouteDecision, TransportManager, TransportManagerConfig};
+
+#[cfg(feature = "bluetooth")]
+pub use btle::HiveBleTransport;
 
 /// Node identifier in the mesh network
 ///

@@ -25,7 +25,8 @@ repository = "https://github.com/kitplummer/hive"
 
 [workspace.dependencies]
 # BLE mesh transport (external repo until published)
-hive-btle = { path = "../hive-btle" }
+# Path relative to workspace root - adjust if hive-btle is in a different location
+hive-btle = { path = "../revolve/hive-btle" }
 
 # CRDT synchronization
 dittolive-ditto = "=4.11.5"

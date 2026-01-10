@@ -2539,6 +2539,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "hive-btle"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bitflags 2.10.0",
+ "chacha20poly1305",
+ "hkdf",
+ "log",
+ "rand_core 0.6.4",
+ "sha2 0.10.9",
+ "spin 0.9.8",
+ "thiserror 2.0.17",
+ "uuid",
+ "x25519-dalek",
+]
+
+[[package]]
 name = "hive-commander"
 version = "0.1.0"
 dependencies = [
@@ -2681,6 +2698,7 @@ dependencies = [
  "futures-lite",
  "geohash",
  "hex",
+ "hive-btle",
  "hive-schema",
  "hkdf",
  "hmac",
