@@ -2,9 +2,10 @@
 
 **Status**: Proposed
 **Date**: 2025-12-07
+**Updated**: 2025-01-09
 **Authors**: Kit Plummer, Claude
-**Relates to**: ADR-011 (Automerge + Iroh), ADR-017 (P2P Mesh Management), ADR-030 (Multi-Interface Transport)
-**Implements**: Issue #255
+**Relates to**: ADR-011 (Automerge + Iroh), ADR-017 (P2P Mesh Management), ADR-030 (Multi-Interface Transport), ADR-019 (QoS), ADR-046 (Targeted Delivery)
+**Implements**: Issue #548
 
 ---
 
@@ -23,7 +24,29 @@ Tactical edge environments operate across diverse communication channels simulta
 | Tactical Radio | 9.6-2000 kbps | 50-500ms | Variable | High | Secure MANET |
 | Starlink | 50-200 Mbps | 20-40ms | Global | High | Backhaul to C2 |
 
-**Critical Requirement**: A single HIVE node must be able to use multiple transports simultaneously, selecting the optimal one based on message requirements and current network conditions.
+### Three Dimensions of Multi-Transport
+
+This ADR addresses three distinct but related requirements:
+
+#### 1. Multiple Transport Types (Heterogeneous)
+Different transport technologies with different characteristics:
+- QUIC for IP networks
+- BLE for close-range device mesh
+- LoRa for long-range low-bandwidth
+- Tactical radio for secure MANET
+
+#### 2. Multiple Instances of Same Type (Homogeneous)
+Multiple physical interfaces using the same transport protocol:
+- Multiple NICs (eth0, wlan0, starlink0) all running QUIC/Iroh
+- Multiple LoRa radios on different frequencies
+- Multiple BLE adapters for different peer groups
+
+#### 3. Simultaneous vs Failover Use
+How multiple transports are used together:
+- **PACE Failover**: Primary → Alternate → Contingency → Emergency
+- **Simultaneous Redundant**: Send on multiple transports for reliability
+- **Bonded/Aggregated**: Combine bandwidth across transports
+- **Load Balanced**: Distribute traffic across transports
 
 ### Current Implementation Gap
 
@@ -34,19 +57,23 @@ Tactical edge environments operate across diverse communication channels simulta
 - `HealthMonitor` for connection quality tracking
 
 **What's missing:**
+- Transport instance identification (multiple of same type)
 - Transport capability declaration (bandwidth, latency, range, power)
-- Transport selection based on message requirements
+- PACE-style transport policies
+- Simultaneous transport modes (redundant, bonded)
+- Collection ↔ transport binding
 - Multi-transport coordination (TransportManager)
-- Pluggable transport implementations for non-IP networks
-- Fallback and handoff between transports
 
 ### ADR-030 vs ADR-032
 
-**ADR-030** solved: "How do we use multiple network interfaces (NICs) with the same transport protocol?"
-- Answer: Iroh automatically binds to all interfaces
+**ADR-030** answered: "Does Iroh support multiple NICs?"
+- Yes, Iroh automatically binds to all interfaces
 
-**ADR-032** solves: "How do we use fundamentally different transport protocols simultaneously?"
-- Bluetooth vs QUIC vs LoRa are not just different interfaces - they have different APIs, semantics, and capabilities
+**ADR-032** answers: "How does HIVE manage multiple transports holistically?"
+- Transport registration with unique IDs
+- PACE-style failover policies
+- Simultaneous use modes
+- Collection-level transport preferences
 
 ---
 
@@ -73,7 +100,255 @@ Tactical edge environments operate across diverse communication channels simulta
 
 ## Decision
 
-### 1. Enhanced Transport Trait Hierarchy
+### 1. Transport Instance Identification
+
+Each transport instance has a unique string ID, allowing multiple instances of the same type:
+
+```rust
+/// Unique identifier for a transport instance
+/// Format: "{type}-{interface}" or custom string
+/// Examples: "iroh-eth0", "iroh-wlan0", "iroh-starlink0", "lora-915mhz", "ble-hci0"
+pub type TransportId = String;
+
+/// Transport instance registration
+#[derive(Debug, Clone)]
+pub struct TransportInstance {
+    /// Unique instance identifier
+    pub id: TransportId,
+
+    /// Transport type (for capability grouping)
+    pub transport_type: TransportType,
+
+    /// Human-readable description
+    pub description: String,
+
+    /// Physical interface name (if applicable)
+    pub interface: Option<String>,
+
+    /// Current capabilities (may change with range mode)
+    pub capabilities: TransportCapabilities,
+
+    /// Is this transport currently available?
+    pub available: bool,
+}
+```
+
+**Example configuration:**
+```yaml
+transports:
+  - id: "iroh-eth0"
+    type: quic
+    interface: eth0
+    description: "Wired LAN"
+
+  - id: "iroh-wlan0"
+    type: quic
+    interface: wlan0
+    description: "WiFi mesh"
+
+  - id: "iroh-starlink"
+    type: quic
+    interface: starlink0
+    description: "Starlink backhaul"
+
+  - id: "lora-primary"
+    type: lora
+    interface: /dev/ttyUSB0
+    description: "LoRa 915MHz primary"
+
+  - id: "lora-backup"
+    type: lora
+    interface: /dev/ttyUSB1
+    description: "LoRa 868MHz backup"
+
+  - id: "ble-mesh"
+    type: bluetooth_le
+    interface: hci0
+    description: "BLE peripheral mesh"
+```
+
+### 2. PACE Transport Policy
+
+Military PACE planning (Primary, Alternate, Contingency, Emergency) applied to transport selection:
+
+```rust
+/// PACE-style transport policy
+#[derive(Debug, Clone)]
+pub struct TransportPolicy {
+    /// Policy name for reference
+    pub name: String,
+
+    /// Primary transports - use when available
+    /// Multiple entries = load balance or redundant (based on mode)
+    pub primary: Vec<TransportId>,
+
+    /// Alternate - if all primary unavailable
+    pub alternate: Vec<TransportId>,
+
+    /// Contingency - degraded but functional
+    pub contingency: Vec<TransportId>,
+
+    /// Emergency - last resort, may have significant limitations
+    pub emergency: Vec<TransportId>,
+}
+
+impl TransportPolicy {
+    /// Standard PACE policy for tactical operations
+    pub fn tactical_standard() -> Self {
+        Self {
+            name: "tactical-standard".into(),
+            primary: vec!["iroh-eth0".into(), "iroh-wlan0".into()],
+            alternate: vec!["iroh-starlink".into()],
+            contingency: vec!["lora-primary".into()],
+            emergency: vec!["ble-mesh".into()],
+        }
+    }
+
+    /// Get transports in PACE order
+    pub fn ordered(&self) -> impl Iterator<Item = &TransportId> {
+        self.primary.iter()
+            .chain(self.alternate.iter())
+            .chain(self.contingency.iter())
+            .chain(self.emergency.iter())
+    }
+
+    /// Get current PACE level based on what's available
+    pub fn current_level(&self, available: &HashSet<TransportId>) -> PaceLevel {
+        if self.primary.iter().any(|t| available.contains(t)) {
+            PaceLevel::Primary
+        } else if self.alternate.iter().any(|t| available.contains(t)) {
+            PaceLevel::Alternate
+        } else if self.contingency.iter().any(|t| available.contains(t)) {
+            PaceLevel::Contingency
+        } else if self.emergency.iter().any(|t| available.contains(t)) {
+            PaceLevel::Emergency
+        } else {
+            PaceLevel::None
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PaceLevel {
+    Primary = 0,
+    Alternate = 1,
+    Contingency = 2,
+    Emergency = 3,
+    None = 4,
+}
+```
+
+### 3. Simultaneous Transport Modes
+
+How multiple transports are used together:
+
+```rust
+/// How to use multiple available transports
+#[derive(Debug, Clone, Copy, Default)]
+pub enum TransportMode {
+    /// Use single best transport from policy (PACE failover)
+    #[default]
+    Single,
+
+    /// Send on multiple transports simultaneously for reliability
+    /// Receiver deduplicates by message ID
+    Redundant {
+        /// Minimum transports to send on (default: 2)
+        min_paths: u8,
+        /// Maximum transports to send on (default: all available)
+        max_paths: Option<u8>,
+    },
+
+    /// Aggregate bandwidth across transports (for large transfers)
+    /// Splits message across transports, receiver reassembles
+    Bonded,
+
+    /// Distribute messages across transports (round-robin or weighted)
+    LoadBalanced {
+        /// Weight per transport (higher = more traffic)
+        weights: Option<HashMap<TransportId, u8>>,
+    },
+}
+
+impl TransportMode {
+    pub fn redundant(min: u8) -> Self {
+        Self::Redundant { min_paths: min, max_paths: None }
+    }
+}
+```
+
+### 4. Collection ↔ Transport Binding
+
+Collections can specify transport preferences:
+
+```rust
+/// Collection configuration with transport preferences
+pub struct CollectionConfig {
+    /// Collection name
+    pub name: String,
+
+    /// Default delivery mode (from ADR-046)
+    pub delivery_mode: DeliveryMode,
+
+    /// Default TTL for documents
+    pub default_ttl: Option<Duration>,
+
+    // === NEW: Transport preferences ===
+
+    /// Transport policy for this collection
+    /// None = use node default policy
+    pub transport_policy: Option<TransportPolicy>,
+
+    /// How to use multiple transports
+    pub transport_mode: TransportMode,
+
+    /// Minimum PACE level required
+    /// Documents won't send if below this level
+    pub min_pace_level: Option<PaceLevel>,
+}
+```
+
+**Example configurations:**
+
+```yaml
+collections:
+  # Critical commands - redundant delivery
+  commands:
+    delivery_mode: targeted
+    transport_mode:
+      redundant:
+        min_paths: 2
+    min_pace_level: alternate  # Don't send if only contingency/emergency
+
+  # Position updates - single best transport, tolerant of degradation
+  positions:
+    delivery_mode: broadcast
+    transport_mode: single
+    min_pace_level: emergency  # Send even on emergency transport
+
+  # Large file transfers - bond transports for bandwidth
+  blob_transfers:
+    delivery_mode: targeted
+    transport_mode: bonded
+    transport_policy:
+      name: "high-bandwidth-only"
+      primary: ["iroh-eth0", "iroh-starlink"]
+      alternate: []
+      contingency: []
+      emergency: []
+
+  # Telemetry - load balance across available
+  telemetry:
+    delivery_mode: broadcast
+    transport_mode:
+      load_balanced:
+        weights:
+          iroh-eth0: 3
+          iroh-wlan0: 2
+          lora-primary: 1
+```
+
+### 5. Enhanced Transport Trait Hierarchy
 
 ```rust
 /// Transport capability declaration
@@ -199,138 +474,197 @@ pub enum MessagePriority {
 }
 ```
 
-### 3. Transport Manager
+### 7. Transport Manager (Updated)
 
 ```rust
-/// Manages multiple transports and handles transport selection
+/// Manages multiple transports with PACE policies and simultaneous modes
 pub struct TransportManager {
-    /// Registered transports by type
-    transports: HashMap<TransportType, Arc<dyn Transport>>,
+    /// Registered transports by unique ID
+    transports: HashMap<TransportId, Arc<dyn Transport>>,
 
-    /// Transport preference order (user-configured)
-    preference_order: Vec<TransportType>,
+    /// Transport instances metadata
+    instances: HashMap<TransportId, TransportInstance>,
 
-    /// Active transport per peer (learned from successful deliveries)
-    peer_transports: RwLock<HashMap<NodeId, TransportType>>,
+    /// Default PACE policy for the node
+    default_policy: TransportPolicy,
+
+    /// Per-collection policy overrides
+    collection_policies: HashMap<String, TransportPolicy>,
+
+    /// Active transports per peer (learned from successful deliveries)
+    peer_transports: RwLock<HashMap<NodeId, Vec<TransportId>>>,
 
     /// Health monitor for transport quality tracking
     health_monitor: Arc<HealthMonitor>,
 
-    /// Configuration
-    config: TransportManagerConfig,
+    /// Message deduplication for redundant mode
+    seen_messages: RwLock<LruCache<MessageId, Instant>>,
 }
 
 impl TransportManager {
-    /// Register a transport
-    pub fn register(&mut self, transport: Arc<dyn Transport>) {
-        let transport_type = transport.capabilities().transport_type;
-        self.transports.insert(transport_type, transport);
+    /// Register a transport instance
+    pub fn register(&mut self, id: TransportId, transport: Arc<dyn Transport>) {
+        let instance = TransportInstance {
+            id: id.clone(),
+            transport_type: transport.capabilities().transport_type,
+            description: String::new(),
+            interface: None,
+            capabilities: transport.capabilities().clone(),
+            available: transport.is_available(),
+        };
+        self.instances.insert(id.clone(), instance);
+        self.transports.insert(id, transport);
     }
 
-    /// Remove a transport
-    pub fn unregister(&mut self, transport_type: TransportType) -> Option<Arc<dyn Transport>> {
-        self.transports.remove(&transport_type)
-    }
-
-    /// Get available transports for a peer
-    pub fn available_transports(&self, peer_id: &NodeId) -> Vec<TransportType> {
+    /// Get available transport IDs for a peer
+    pub fn available_for_peer(&self, peer_id: &NodeId) -> HashSet<TransportId> {
         self.transports
             .iter()
             .filter(|(_, t)| t.is_available() && t.can_reach(peer_id))
-            .map(|(tt, _)| *tt)
+            .map(|(id, _)| id.clone())
             .collect()
     }
 
-    /// Select best transport for message
-    pub fn select_transport(
+    /// Get current PACE level for a peer
+    pub fn pace_level_for_peer(
         &self,
         peer_id: &NodeId,
-        requirements: &MessageRequirements,
-    ) -> Option<TransportType> {
-        let available = self.available_transports(peer_id);
-
-        // Filter by requirements
-        let candidates: Vec<_> = available
-            .into_iter()
-            .filter_map(|tt| {
-                let transport = self.transports.get(&tt)?;
-                let caps = transport.capabilities();
-
-                // Check hard requirements
-                if requirements.reliable && !caps.reliable {
-                    return None;
-                }
-                if caps.max_bandwidth_bps > 0 && caps.max_bandwidth_bps < requirements.min_bandwidth_bps {
-                    return None;
-                }
-                if caps.max_message_size > 0 && caps.max_message_size < requirements.message_size {
-                    return None;
-                }
-
-                // Calculate score (higher = better)
-                let mut score = 100i32;
-
-                // Prefer faster transports for high-priority messages
-                if requirements.priority >= MessagePriority::High {
-                    score += 50 - (caps.typical_latency_ms.min(50) as i32);
-                }
-
-                // Penalize high power consumption if power-sensitive
-                if requirements.power_sensitive {
-                    score -= caps.battery_impact as i32;
-                }
-
-                // Check latency requirement
-                let est_delivery = transport.estimate_delivery_ms(requirements.message_size);
-                if let Some(max_latency) = requirements.max_latency_ms {
-                    if est_delivery > max_latency {
-                        return None; // Can't meet latency requirement
-                    }
-                }
-
-                // Bonus for user preference order
-                if let Some(pref_idx) = self.preference_order.iter().position(|&t| t == tt) {
-                    score += 20 - (pref_idx as i32 * 5);
-                }
-
-                Some((tt, score))
-            })
-            .collect();
-
-        // Return highest-scoring transport
-        candidates
-            .into_iter()
-            .max_by_key(|(_, score)| *score)
-            .map(|(tt, _)| tt)
+        policy: &TransportPolicy,
+    ) -> PaceLevel {
+        let available = self.available_for_peer(peer_id);
+        policy.current_level(&available)
     }
 
-    /// Send message via appropriate transport
+    /// Select transports based on policy and mode
+    pub fn select_transports(
+        &self,
+        peer_id: &NodeId,
+        policy: &TransportPolicy,
+        mode: TransportMode,
+        requirements: &MessageRequirements,
+    ) -> Vec<TransportId> {
+        let available = self.available_for_peer(peer_id);
+
+        // Filter by requirements first
+        let candidates: Vec<_> = policy.ordered()
+            .filter(|id| available.contains(*id))
+            .filter(|id| {
+                if let Some(transport) = self.transports.get(*id) {
+                    self.meets_requirements(transport.as_ref(), requirements)
+                } else {
+                    false
+                }
+            })
+            .cloned()
+            .collect();
+
+        match mode {
+            TransportMode::Single => {
+                // Return first available in PACE order
+                candidates.into_iter().take(1).collect()
+            }
+            TransportMode::Redundant { min_paths, max_paths } => {
+                let max = max_paths.unwrap_or(u8::MAX) as usize;
+                let selected: Vec<_> = candidates.into_iter().take(max).collect();
+                if selected.len() >= min_paths as usize {
+                    selected
+                } else {
+                    vec![] // Can't meet minimum redundancy
+                }
+            }
+            TransportMode::LoadBalanced { .. } => {
+                // Return all candidates for load balancing
+                candidates
+            }
+            TransportMode::Bonded => {
+                // Return all high-bandwidth candidates
+                candidates.into_iter()
+                    .filter(|id| {
+                        self.instances.get(id)
+                            .map(|i| i.capabilities.max_bandwidth_bps > 1_000_000)
+                            .unwrap_or(false)
+                    })
+                    .collect()
+            }
+        }
+    }
+
+    /// Send message with policy and mode
     pub async fn send(
         &self,
         peer_id: &NodeId,
+        message_id: MessageId,
         data: &[u8],
+        collection: &str,
         requirements: MessageRequirements,
-    ) -> Result<(), TransportError> {
-        let transport_type = self
-            .select_transport(peer_id, &requirements)
-            .ok_or_else(|| TransportError::PeerNotFound(peer_id.to_string()))?;
+    ) -> Result<SendResult, TransportError> {
+        // Get policy (collection override or default)
+        let policy = self.collection_policies
+            .get(collection)
+            .unwrap_or(&self.default_policy);
 
-        let transport = self.transports.get(&transport_type)
-            .ok_or_else(|| TransportError::NotStarted)?;
+        // Get mode from collection config (simplified here)
+        let mode = TransportMode::Single; // Would come from CollectionConfig
 
-        // Connect and send
-        let conn = transport.connect(peer_id).await?;
-        // Note: Actual send implementation depends on MeshConnection extension
+        let transports = self.select_transports(peer_id, policy, mode, &requirements);
 
-        // Remember successful transport for this peer
-        self.peer_transports.write().unwrap().insert(peer_id.clone(), transport_type);
+        if transports.is_empty() {
+            return Err(TransportError::NoTransportAvailable);
+        }
 
-        Ok(())
+        let mut results = Vec::new();
+        for transport_id in &transports {
+            if let Some(transport) = self.transports.get(transport_id) {
+                match transport.connect(peer_id).await {
+                    Ok(conn) => {
+                        // Send via this transport
+                        results.push((transport_id.clone(), Ok(())));
+                    }
+                    Err(e) => {
+                        results.push((transport_id.clone(), Err(e)));
+                    }
+                }
+            }
+        }
+
+        Ok(SendResult {
+            message_id,
+            transports_used: results,
+            pace_level: policy.current_level(&self.available_for_peer(peer_id)),
+        })
     }
+
+    fn meets_requirements(&self, transport: &dyn Transport, req: &MessageRequirements) -> bool {
+        let caps = transport.capabilities();
+
+        if req.reliable && !caps.reliable {
+            return false;
+        }
+        if caps.max_bandwidth_bps > 0 && caps.max_bandwidth_bps < req.min_bandwidth_bps {
+            return false;
+        }
+        if caps.max_message_size > 0 && caps.max_message_size < req.message_size {
+            return false;
+        }
+        if let Some(max_latency) = req.max_latency_ms {
+            let est = transport.estimate_delivery_ms(req.message_size);
+            if est > max_latency {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+#[derive(Debug)]
+pub struct SendResult {
+    pub message_id: MessageId,
+    pub transports_used: Vec<(TransportId, Result<(), TransportError>)>,
+    pub pace_level: PaceLevel,
 }
 ```
 
-### 4. Transport Implementation Examples
+### 8. Transport Implementation Examples
 
 #### Bluetooth LE Transport (Conceptual)
 
@@ -896,6 +1230,65 @@ FUNCTION calculate_score(transport, requirements):
 
 ## Open Questions
 
+### Critical: Policy Scope (Team Discussion Required)
+
+**⚠️ This decision has significant architectural implications and should be discussed by the full team before implementation.**
+
+Where does PACE transport policy live, and how do the layers interact?
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Policy Scope Options                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   Option A: Node Default Only                                    │
+│   ┌─────────────┐                                               │
+│   │ Node Policy │ ──────────────────────────────► All traffic   │
+│   └─────────────┘                                               │
+│   Simple, but no flexibility for different data types            │
+│                                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   Option B: Collection Override                                  │
+│   ┌─────────────┐     ┌───────────────────┐                     │
+│   │ Node Policy │ ◄── │ Collection Policy │ (optional override) │
+│   └─────────────┘     └───────────────────┘                     │
+│   Collections like "commands" can require redundant delivery     │
+│   while "telemetry" uses single/load-balanced                   │
+│                                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   Option C: Full Cascade (Node → Collection → Message)           │
+│   ┌─────────────┐     ┌───────────────────┐     ┌─────────────┐ │
+│   │ Node Policy │ ◄── │ Collection Policy │ ◄── │ WriteOptions│ │
+│   └─────────────┘     └───────────────────┘     └─────────────┘ │
+│   Maximum flexibility, but complex precedence rules              │
+│   WriteOptions could specify: "use redundant for this message"   │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Considerations:**
+
+| Aspect | Node Only (A) | + Collection (B) | + Message (C) |
+|--------|---------------|------------------|---------------|
+| Simplicity | ✅ Simple | 🔶 Moderate | ❌ Complex |
+| Flexibility | ❌ None | ✅ Good | ✅✅ Maximum |
+| Predictability | ✅ Easy to reason | ✅ Per-collection | ❌ Per-message variance |
+| Config burden | ✅ One place | 🔶 Per collection | ❌ Throughout code |
+| Runtime overhead | ✅ Minimal | 🔶 Lookup per collection | ❌ Evaluate per message |
+
+**Recommendation for discussion**: Option B (Node + Collection) provides good balance. Per-message override (Option C) adds complexity that may not be worth it.
+
+**Questions to resolve:**
+1. If collection policy is stricter than node policy, which wins?
+2. Should policy be validated at config time or runtime?
+3. How do subscriptions interact? (subscriber specifies preference vs publisher decides)
+
+---
+
+### Other Open Questions
+
 1. **Message Fragmentation**: How to handle large messages on limited transports (LoRa 255-byte limit)?
    - Option A: Transport-layer fragmentation
    - Option B: Application-layer chunking (recommended)
@@ -903,30 +1296,49 @@ FUNCTION calculate_score(transport, requirements):
 2. **Discovery Protocol**: How do peers advertise which transports they support?
    - Option A: Extended beacon with transport capabilities
    - Option B: Separate discovery protocol per transport
+   - **Note**: Beacon should include available `TransportId` list
 
 3. **Connection Handoff**: How to migrate active streams between transports?
    - Option A: Don't migrate - just use best for new messages
    - Option B: QUIC connection migration (only works for IP-based)
 
-4. **Ditto Integration**: How does this work with DittoMeshTransport?
-   - Ditto manages its own transport internally
-   - May need to expose Ditto as a "black box" transport
+4. **Redundant Mode Deduplication**: When sending on multiple transports:
+   - Who deduplicates? Receiver must track message IDs
+   - How long to keep dedup cache? (TTL-based)
+   - Does this interact with CRDT deduplication?
 
-5. **Range Mode Coordination**: When should range mode changes be synchronized across peers?
+5. **Bonded Mode Reassembly**: For bandwidth aggregation:
+   - How are chunks distributed across transports?
+   - What if one transport fails mid-transfer?
+   - Is this even needed given CRDT sync handles large docs?
+
+6. **Range Mode Coordination**: When should range mode changes be synchronized across peers?
    - Option A: Sender-driven - sender sets mode based on estimated distance
    - Option B: Negotiated - both peers agree on mode before communication
    - Option C: Asymmetric - each direction can use different modes
 
-6. **Range Mode Latency**: Changing PHY/modulation takes time. How to minimize disruption?
-   - Cache mode per peer to avoid frequent changes
-   - Use hysteresis (don't change mode for small distance changes)
-   - Pre-configure mode based on expected operational radius
+7. **Subscription Transport Preference**: Can a subscriber specify transport preferences?
+   ```rust
+   // Does this make sense?
+   store.subscribe_with_options(
+       "positions",
+       SubscribeOptions {
+           preferred_transports: vec!["lora-primary"], // Only receive via LoRa
+           ..Default::default()
+       }
+   )
+   ```
+   - Or is transport purely a sender/publisher concern?
 
-7. **Distance Accuracy**: GPS may be unavailable or inaccurate. How to get reliable distance estimates?
-   - RSSI-based estimation (noisy but always available)
-   - Time-of-flight (requires hardware support)
-   - Manual configuration for static deployments
-   - Fallback to maximum range mode when unknown
+8. **PACE Level Notifications**: Should the application be notified when PACE level degrades?
+   ```rust
+   // Event when dropping from Primary to Alternate?
+   transport_manager.on_pace_change(|old, new| {
+       if new > PaceLevel::Alternate {
+           warn!("Operating on contingency/emergency comms");
+       }
+   });
+   ```
 
 ---
 
