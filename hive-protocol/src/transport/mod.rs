@@ -78,7 +78,7 @@ pub use capabilities::{
     RangeMode, RangeModeConfig, Transport, TransportCapabilities, TransportType,
 };
 pub use health::{HealthMonitor, HeartbeatConfig};
-pub use manager::{TransportManager, TransportManagerConfig};
+pub use manager::{RouteDecision, TransportManager, TransportManagerConfig};
 
 /// Node identifier in the mesh network
 ///
