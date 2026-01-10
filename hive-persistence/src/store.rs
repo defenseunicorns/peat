@@ -1,7 +1,7 @@
 //! Core DataStore trait for persistence abstraction
 
 use crate::error::Result;
-use crate::types::{Document, DocumentId, Query};
+use crate::types::{Document, DocumentId, Query, SubscribeOptions, WriteOptions};
 use async_trait::async_trait;
 use serde_json::Value;
 use tokio::sync::mpsc;
@@ -112,6 +112,123 @@ pub trait DataStore: Send + Sync {
 
     /// Get store information
     fn store_info(&self) -> StoreInfo;
+
+    // =========================================================================
+    // Bypass Integration Methods (ADR-042)
+    // =========================================================================
+
+    /// Save or update a document with options
+    ///
+    /// Extended version of `save()` that supports bypass mode and other options.
+    /// When `options.bypass_sync` is `true`, the document is sent via UDP bypass
+    /// channel instead of CRDT sync for low-latency delivery.
+    ///
+    /// # Arguments
+    ///
+    /// * `collection` - Collection name
+    /// * `document` - Document to save as JSON Value
+    /// * `options` - Write options (bypass mode, TTL, priority, etc.)
+    ///
+    /// # Returns
+    ///
+    /// Document ID (may be empty for bypass-only writes that aren't persisted)
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use hive_persistence::{DataStore, WriteOptions};
+    /// use serde_json::json;
+    ///
+    /// async fn example(store: &dyn DataStore) -> Result<(), Box<dyn std::error::Error>> {
+    ///     // High-frequency position update via bypass
+    ///     let position = json!({
+    ///         "node_id": "node-1",
+    ///         "lat": 37.7749,
+    ///         "lon": -122.4194,
+    ///         "timestamp": 1234567890
+    ///     });
+    ///     store.save_with_options(
+    ///         "position_updates",
+    ///         &position,
+    ///         WriteOptions::bypass(),
+    ///     ).await?;
+    ///     Ok(())
+    /// }
+    /// ```
+    async fn save_with_options(
+        &self,
+        collection: &str,
+        document: &Value,
+        options: WriteOptions,
+    ) -> Result<DocumentId> {
+        // Default implementation: ignore bypass flag and use normal save
+        // Implementations with bypass channel support should override this
+        let _ = options;
+        self.save(collection, document).await
+    }
+
+    /// Subscribe to live updates with options
+    ///
+    /// Extended version of `observe()` that supports merging bypass and sync streams.
+    ///
+    /// # Arguments
+    ///
+    /// * `collection` - Collection name
+    /// * `query` - Query to watch for changes (applies to CRDT sync only)
+    /// * `options` - Subscribe options (include_bypass, include_sync, etc.)
+    ///
+    /// # Returns
+    ///
+    /// Channel receiver for change events from selected sources
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use hive_persistence::{DataStore, Query, SubscribeOptions};
+    ///
+    /// async fn example(store: &dyn DataStore) -> Result<(), Box<dyn std::error::Error>> {
+    ///     // Subscribe to high-frequency position updates via bypass only
+    ///     let mut stream = store.observe_with_options(
+    ///         "position_updates",
+    ///         Query::all(),
+    ///         SubscribeOptions::bypass_only(),
+    ///     ).await?;
+    ///
+    ///     while let Some(event) = stream.recv().await {
+    ///         println!("Position update: {:?}", event);
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    async fn observe_with_options(
+        &self,
+        collection: &str,
+        query: Query,
+        options: SubscribeOptions,
+    ) -> Result<mpsc::UnboundedReceiver<ChangeEvent>> {
+        // Default implementation: ignore options and use normal observe
+        // Implementations with bypass channel support should override this
+        let _ = options;
+        self.observe(collection, query).await
+    }
+
+    /// Check if a collection is configured for bypass
+    ///
+    /// Returns `true` if the collection is configured to use the UDP bypass
+    /// channel for writes with `bypass_sync: true`.
+    ///
+    /// # Arguments
+    ///
+    /// * `collection` - Collection name to check
+    ///
+    /// # Returns
+    ///
+    /// `true` if bypass is configured for this collection
+    fn is_bypass_enabled(&self, _collection: &str) -> bool {
+        // Default: bypass not enabled
+        // Implementations should override if they support bypass
+        false
+    }
 }
 
 /// Change event for document subscriptions

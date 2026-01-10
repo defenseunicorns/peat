@@ -317,6 +317,14 @@ impl std::fmt::Display for MessagePriority {
 ///     message_size: 1024,
 ///     ..Default::default()
 /// };
+///
+/// // Bypass message for low-latency delivery
+/// let bypass_req = MessageRequirements {
+///     bypass_sync: true,
+///     reliable: false,  // UDP is unreliable
+///     max_latency_ms: Some(5),
+///     ..Default::default()
+/// };
 /// ```
 #[derive(Debug, Clone, Default)]
 pub struct MessageRequirements {
@@ -337,6 +345,64 @@ pub struct MessageRequirements {
 
     /// Prefer low power consumption
     pub power_sensitive: bool,
+
+    /// Use UDP bypass channel instead of CRDT sync (ADR-042)
+    ///
+    /// When `true`, the message should be sent via the low-latency UDP
+    /// bypass channel instead of the normal CRDT synchronization path.
+    /// This bypasses:
+    /// - Automerge encoding/decoding
+    /// - CRDT conflict resolution
+    /// - Iroh/QUIC transport overhead
+    ///
+    /// Use for ephemeral data like position updates, sensor telemetry,
+    /// and time-critical commands.
+    pub bypass_sync: bool,
+
+    /// Time-to-live for bypass messages
+    ///
+    /// Messages older than this will be dropped by receivers.
+    /// Only applies when `bypass_sync` is `true`.
+    /// Default: None (use collection config or 5 seconds)
+    pub ttl: Option<std::time::Duration>,
+}
+
+impl MessageRequirements {
+    /// Create requirements for bypass mode with specified latency
+    pub fn bypass(max_latency_ms: u32) -> Self {
+        Self {
+            bypass_sync: true,
+            reliable: false,
+            max_latency_ms: Some(max_latency_ms),
+            ..Default::default()
+        }
+    }
+
+    /// Create requirements for bypass mode with TTL
+    pub fn bypass_with_ttl(max_latency_ms: u32, ttl: std::time::Duration) -> Self {
+        Self {
+            bypass_sync: true,
+            reliable: false,
+            max_latency_ms: Some(max_latency_ms),
+            ttl: Some(ttl),
+            ..Default::default()
+        }
+    }
+
+    /// Set bypass_sync flag
+    pub fn with_bypass(mut self, bypass: bool) -> Self {
+        self.bypass_sync = bypass;
+        if bypass {
+            self.reliable = false; // UDP bypass is unreliable
+        }
+        self
+    }
+
+    /// Set TTL for bypass messages
+    pub fn with_ttl(mut self, ttl: std::time::Duration) -> Self {
+        self.ttl = Some(ttl);
+        self
+    }
 }
 
 // =============================================================================
@@ -721,5 +787,44 @@ mod tests {
         // Just ensure these compile and can be debugged
         let _ = format!("{:?}", gps);
         let _ = format!("{:?}", rssi);
+    }
+
+    #[test]
+    fn test_message_requirements_bypass() {
+        let req = MessageRequirements::bypass(5);
+        assert!(req.bypass_sync);
+        assert!(!req.reliable);
+        assert_eq!(req.max_latency_ms, Some(5));
+    }
+
+    #[test]
+    fn test_message_requirements_bypass_with_ttl() {
+        use std::time::Duration;
+
+        let req = MessageRequirements::bypass_with_ttl(5, Duration::from_millis(200));
+        assert!(req.bypass_sync);
+        assert!(!req.reliable);
+        assert_eq!(req.max_latency_ms, Some(5));
+        assert_eq!(req.ttl, Some(Duration::from_millis(200)));
+    }
+
+    #[test]
+    fn test_message_requirements_builder() {
+        use std::time::Duration;
+
+        let req = MessageRequirements::default()
+            .with_bypass(true)
+            .with_ttl(Duration::from_secs(1));
+
+        assert!(req.bypass_sync);
+        assert!(!req.reliable); // auto-set to false when bypass=true
+        assert_eq!(req.ttl, Some(Duration::from_secs(1)));
+    }
+
+    #[test]
+    fn test_message_requirements_default() {
+        let req = MessageRequirements::default();
+        assert!(!req.bypass_sync);
+        assert!(req.ttl.is_none());
     }
 }

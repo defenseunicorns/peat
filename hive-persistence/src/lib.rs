@@ -115,7 +115,7 @@ pub mod types;
 pub use adapters::PersistentBeaconStorage;
 pub use error::{Error, Result};
 pub use store::{ChangeEvent, DataStore, StoreInfo};
-pub use types::{Document, DocumentId, Query};
+pub use types::{Document, DocumentId, MessagePriority, Query, SubscribeOptions, WriteOptions};
 
 // External API (optional feature)
 #[cfg(feature = "external-api")]

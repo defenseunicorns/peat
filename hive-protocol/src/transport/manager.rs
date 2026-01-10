@@ -4,7 +4,7 @@
 //! transport implementations, selecting the best one for each message
 //! based on requirements and current conditions.
 //!
-//! ## Architecture (ADR-032)
+//! ## Architecture (ADR-032 + ADR-042)
 //!
 //! ```text
 //! ┌─────────────────────────────────────────────────────────────────────────┐
@@ -14,12 +14,13 @@
 //! │         │   (Multi-Transport Coordinator)    │     Message Requirements  │
 //! │         └──────────────┬─────────────────────┘                           │
 //! │                        │                                                 │
-//! │         ┌──────────────┴──────────────┐                                  │
-//! │         ▼              ▼              ▼              ▼                   │
-//! │  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐            │
-//! │  │   QUIC     │ │ Bluetooth  │ │   LoRa     │ │ WiFi Direct│            │
-//! │  │  (Iroh)    │ │    LE      │ │            │ │            │            │
-//! │  └────────────┘ └────────────┘ └────────────┘ └────────────┘            │
+//! │    ┌───────────────────┼───────────────────────┐                         │
+//! │    ▼                   ▼              ▼        ▼                          │
+//! │ ┌──────────┐    ┌────────────┐ ┌──────────┐ ┌────────────┐               │
+//! │ │  UDP     │    │   QUIC     │ │ Bluetooth│ │   LoRa     │               │
+//! │ │ Bypass   │    │  (Iroh)    │ │    LE    │ │            │               │
+//! │ │(ADR-042) │    └────────────┘ └──────────┘ └────────────┘               │
+//! │ └──────────┘                                                              │
 //! └─────────────────────────────────────────────────────────────────────────┘
 //! ```
 //!
@@ -49,13 +50,21 @@
 //! if let Some(transport_type) = manager.select_transport(&peer_id, &requirements) {
 //!     println!("Selected transport: {}", transport_type);
 //! }
+//!
+//! // Send via bypass for low-latency delivery (ADR-042)
+//! let bypass_req = MessageRequirements::bypass(5);
+//! manager.send_bypass("position_updates", &position_bytes, None).await?;
 //! ```
 
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 
+use super::bypass::{BypassMessage, BypassTarget, UdpBypassChannel};
 use super::capabilities::{MessageRequirements, PeerDistance, RangeMode, Transport, TransportType};
 use super::{NodeId, Result, TransportError};
+use tokio::sync::broadcast;
+use tokio::sync::RwLock as TokioRwLock;
 
 // =============================================================================
 // Transport Manager Configuration
@@ -106,6 +115,9 @@ impl Default for TransportManagerConfig {
 /// - Current availability and signal quality
 /// - User preference order
 /// - Historical success with peer
+///
+/// Also manages the UDP bypass channel (ADR-042) for low-latency,
+/// high-frequency data that bypasses CRDT synchronization.
 pub struct TransportManager {
     /// Registered transports by type
     transports: HashMap<TransportType, Arc<dyn Transport>>,
@@ -118,6 +130,12 @@ pub struct TransportManager {
 
     /// Configuration
     config: TransportManagerConfig,
+
+    /// UDP bypass channel for low-latency ephemeral data (ADR-042)
+    ///
+    /// When set, the manager can route messages with `bypass_sync: true`
+    /// through this channel instead of CRDT transports.
+    bypass_channel: Option<Arc<TokioRwLock<UdpBypassChannel>>>,
 }
 
 impl TransportManager {
@@ -128,6 +146,37 @@ impl TransportManager {
             peer_transports: RwLock::new(HashMap::new()),
             peer_distances: RwLock::new(HashMap::new()),
             config,
+            bypass_channel: None,
+        }
+    }
+
+    /// Create a new TransportManager with bypass channel support (ADR-042)
+    pub fn with_bypass(config: TransportManagerConfig, bypass: UdpBypassChannel) -> Self {
+        Self {
+            transports: HashMap::new(),
+            peer_transports: RwLock::new(HashMap::new()),
+            peer_distances: RwLock::new(HashMap::new()),
+            config,
+            bypass_channel: Some(Arc::new(TokioRwLock::new(bypass))),
+        }
+    }
+
+    /// Set the bypass channel after construction
+    pub fn set_bypass_channel(&mut self, bypass: UdpBypassChannel) {
+        self.bypass_channel = Some(Arc::new(TokioRwLock::new(bypass)));
+    }
+
+    /// Check if bypass channel is available
+    pub fn has_bypass_channel(&self) -> bool {
+        self.bypass_channel.is_some()
+    }
+
+    /// Check if a collection is configured for bypass
+    pub async fn is_bypass_collection(&self, collection: &str) -> bool {
+        if let Some(ref bypass) = self.bypass_channel {
+            bypass.read().await.is_bypass_collection(collection)
+        } else {
+            false
         }
     }
 
@@ -398,6 +447,177 @@ impl TransportManager {
             TransportError::PeerNotFound(format!("All transports failed for {}", peer_id))
         }))
     }
+
+    // =========================================================================
+    // Bypass Channel Methods (ADR-042)
+    // =========================================================================
+
+    /// Send data via the UDP bypass channel
+    ///
+    /// Sends data directly via UDP, bypassing CRDT synchronization.
+    /// Use for high-frequency, low-latency, or ephemeral data.
+    ///
+    /// # Arguments
+    ///
+    /// * `collection` - Collection name (must be configured for bypass)
+    /// * `data` - Raw data to send (already serialized)
+    /// * `target` - Optional target for unicast; uses collection config if None
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(())` - Data sent successfully
+    /// * `Err(TransportError)` - Send failed or bypass not available
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Send position update via bypass
+    /// manager.send_bypass("position_updates", &position_bytes, None).await?;
+    ///
+    /// // Send to specific peer via unicast
+    /// let target = "192.168.1.100:5150".parse().unwrap();
+    /// manager.send_bypass("commands", &cmd_bytes, Some(target)).await?;
+    /// ```
+    pub async fn send_bypass(
+        &self,
+        collection: &str,
+        data: &[u8],
+        target: Option<SocketAddr>,
+    ) -> Result<()> {
+        let bypass = self
+            .bypass_channel
+            .as_ref()
+            .ok_or_else(|| TransportError::Other("Bypass channel not configured".into()))?;
+
+        bypass
+            .read()
+            .await
+            .send_to_collection(collection, target, data)
+            .await
+            .map_err(|e| TransportError::Other(e.to_string().into()))
+    }
+
+    /// Send data via bypass channel with explicit target
+    ///
+    /// Lower-level method for sending to a specific target.
+    ///
+    /// # Arguments
+    ///
+    /// * `target` - Target address (unicast, multicast, or broadcast)
+    /// * `collection` - Collection name for header
+    /// * `data` - Raw data to send
+    pub async fn send_bypass_to(
+        &self,
+        target: BypassTarget,
+        collection: &str,
+        data: &[u8],
+    ) -> Result<()> {
+        let bypass = self
+            .bypass_channel
+            .as_ref()
+            .ok_or_else(|| TransportError::Other("Bypass channel not configured".into()))?;
+
+        bypass
+            .read()
+            .await
+            .send(target, collection, data)
+            .await
+            .map_err(|e| TransportError::Other(e.to_string().into()))
+    }
+
+    /// Subscribe to incoming bypass messages
+    ///
+    /// Returns a broadcast receiver for all incoming bypass channel messages.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Receiver)` - Subscription successful
+    /// * `Err(TransportError)` - Bypass not available
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let mut rx = manager.subscribe_bypass().await?;
+    /// while let Ok(msg) = rx.recv().await {
+    ///     println!("Bypass message from {}: {} bytes",
+    ///         msg.source, msg.data.len());
+    /// }
+    /// ```
+    pub async fn subscribe_bypass(&self) -> Result<broadcast::Receiver<BypassMessage>> {
+        let bypass = self
+            .bypass_channel
+            .as_ref()
+            .ok_or_else(|| TransportError::Other("Bypass channel not configured".into()))?;
+
+        Ok(bypass.read().await.subscribe())
+    }
+
+    /// Subscribe to bypass messages for a specific collection
+    ///
+    /// Returns the collection hash and a receiver. Filter received messages
+    /// by comparing `msg.collection_hash == hash`.
+    ///
+    /// # Arguments
+    ///
+    /// * `collection` - Collection name to subscribe to
+    ///
+    /// # Returns
+    ///
+    /// * `Ok((hash, Receiver))` - Subscription successful with collection hash
+    /// * `Err(TransportError)` - Bypass not available
+    pub async fn subscribe_bypass_collection(
+        &self,
+        collection: &str,
+    ) -> Result<(u32, broadcast::Receiver<BypassMessage>)> {
+        let bypass = self
+            .bypass_channel
+            .as_ref()
+            .ok_or_else(|| TransportError::Other("Bypass channel not configured".into()))?;
+
+        Ok(bypass.read().await.subscribe_collection(collection))
+    }
+
+    /// Route a message based on requirements
+    ///
+    /// If `requirements.bypass_sync` is `true` and bypass channel is available,
+    /// returns `RouteDecision::Bypass`. Otherwise returns the selected transport.
+    ///
+    /// # Arguments
+    ///
+    /// * `peer_id` - Target peer (ignored for bypass)
+    /// * `requirements` - Message requirements
+    ///
+    /// # Returns
+    ///
+    /// Decision on how to route the message
+    pub fn route_message(
+        &self,
+        peer_id: &NodeId,
+        requirements: &MessageRequirements,
+    ) -> RouteDecision {
+        // Check if bypass is requested and available
+        if requirements.bypass_sync && self.bypass_channel.is_some() {
+            return RouteDecision::Bypass;
+        }
+        // Fall back to normal transport if bypass not available or not requested
+
+        // Select normal transport
+        match self.select_transport(peer_id, requirements) {
+            Some(transport_type) => RouteDecision::Transport(transport_type),
+            None => RouteDecision::NoRoute,
+        }
+    }
+}
+
+/// Routing decision for a message
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RouteDecision {
+    /// Use UDP bypass channel
+    Bypass,
+    /// Use specified transport
+    Transport(TransportType),
+    /// No suitable route available
+    NoRoute,
 }
 
 impl std::fmt::Debug for TransportManager {
@@ -863,5 +1083,69 @@ mod tests {
         let retrieved = manager.get_peer_distance(&peer);
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().distance_meters, 500);
+    }
+
+    // =========================================================================
+    // Bypass Integration Tests (ADR-042)
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_no_bypass_channel_by_default() {
+        let config = TransportManagerConfig::default();
+        let manager = TransportManager::new(config);
+
+        assert!(!manager.has_bypass_channel());
+        assert!(!manager.is_bypass_collection("test").await);
+    }
+
+    #[test]
+    fn test_route_message_without_bypass() {
+        let config = TransportManagerConfig::default();
+        let mut manager = TransportManager::new(config);
+
+        let peer = NodeId::new("peer-1".to_string());
+
+        let quic =
+            Arc::new(MockTransport::new(TransportCapabilities::quic()).with_peer(peer.clone()));
+        manager.register(quic);
+
+        // Normal requirements - should select transport
+        let requirements = MessageRequirements::default();
+        let decision = manager.route_message(&peer, &requirements);
+        assert_eq!(decision, RouteDecision::Transport(TransportType::Quic));
+
+        // Bypass requested but not available - should fall back to transport
+        // Note: We use a generous latency (100ms) so QUIC (10ms) can be selected
+        let bypass_req = MessageRequirements {
+            bypass_sync: true,
+            max_latency_ms: Some(100), // QUIC has 10ms typical latency
+            ..Default::default()
+        };
+        let decision = manager.route_message(&peer, &bypass_req);
+        // Falls back to QUIC since bypass not available
+        assert_eq!(decision, RouteDecision::Transport(TransportType::Quic));
+    }
+
+    #[tokio::test]
+    async fn test_subscribe_bypass_not_configured() {
+        let config = TransportManagerConfig::default();
+        let manager = TransportManager::new(config);
+
+        let result = manager.subscribe_bypass().await;
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_route_decision_equality() {
+        assert_eq!(RouteDecision::Bypass, RouteDecision::Bypass);
+        assert_eq!(
+            RouteDecision::Transport(TransportType::Quic),
+            RouteDecision::Transport(TransportType::Quic)
+        );
+        assert_ne!(RouteDecision::Bypass, RouteDecision::NoRoute);
+        assert_ne!(
+            RouteDecision::Transport(TransportType::Quic),
+            RouteDecision::Transport(TransportType::LoRa)
+        );
     }
 }
