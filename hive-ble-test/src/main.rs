@@ -39,9 +39,9 @@ use hive_protocol::transport::{
 #[command(name = "hive-ble-test")]
 #[command(about = "HIVE BLE mesh transport test application")]
 struct Cli {
-    /// Node ID (hex, e.g., "12345678")
-    #[arg(short, long, default_value = "00000000")]
-    node_id: String,
+    /// Node ID (hex, e.g., "12345678"). If not provided, generates a random ID.
+    #[arg(short, long)]
+    node_id: Option<String>,
 
     /// Log level (trace, debug, info, warn, error)
     #[arg(short, long, default_value = "info")]
@@ -90,11 +90,25 @@ async fn main() -> Result<()> {
         .init();
 
     info!("HIVE BLE Test Application");
-    info!("Node ID: {}", cli.node_id);
 
-    // Parse node ID
-    let node_id_u32 = u32::from_str_radix(cli.node_id.trim_start_matches("0x"), 16)
-        .context("Invalid node ID format (expected hex)")?;
+    // Parse or generate node ID
+    let node_id_u32 = match &cli.node_id {
+        Some(id) => {
+            u32::from_str_radix(id.trim_start_matches("0x"), 16)
+                .context("Invalid node ID format (expected hex)")?
+        }
+        None => {
+            // Generate random node ID
+            let id = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos() as u32)
+                .unwrap_or(0)
+                ^ std::process::id();
+            info!("Generated random node ID: {:08X}", id);
+            id
+        }
+    };
+    info!("Node ID: {:08X}", node_id_u32);
 
     // Create transport using platform-specific adapter
     let transport = create_transport(node_id_u32).await?;
