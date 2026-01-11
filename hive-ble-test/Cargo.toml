@@ -12,8 +12,7 @@ path = "src/main.rs"
 
 [dependencies]
 # HIVE dependencies
-hive-protocol = { path = "../hive-protocol", features = ["bluetooth"] }
-hive-btle = { workspace = true }
+hive-protocol = { path = "../hive-protocol", default-features = false, features = ["bluetooth", "automerge-backend"] }
 
 # Async runtime
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal"] }
@@ -28,11 +27,14 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 # Error handling
 anyhow = { workspace = true }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+hive-btle = { version = "0.0.4", features = ["linux"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+hive-btle = { version = "0.0.4", features = ["macos"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+hive-btle = { version = "0.0.4", features = ["windows"] }
+
 [features]
 default = []
-
-# Platform-specific BLE adapters (requires hive-btle to export them)
-# These will be enabled in future hive-btle releases
-# linux = ["hive-btle/linux"]
-# macos = ["hive-btle/macos"]
-# windows = ["hive-btle/windows"]
