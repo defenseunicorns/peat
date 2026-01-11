@@ -93,10 +93,8 @@ async fn main() -> Result<()> {
 
     // Parse or generate node ID
     let node_id_u32 = match &cli.node_id {
-        Some(id) => {
-            u32::from_str_radix(id.trim_start_matches("0x"), 16)
-                .context("Invalid node ID format (expected hex)")?
-        }
+        Some(id) => u32::from_str_radix(id.trim_start_matches("0x"), 16)
+            .context("Invalid node ID format (expected hex)")?,
         None => {
             // Generate random node ID
             let id = std::time::SystemTime::now()
