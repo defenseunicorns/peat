@@ -2646,7 +2646,9 @@ dependencies = [
 
 [[package]]
 name = "hive-btle"
-version = "0.1.0"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2294b1cc5e4e28cf768a0f8a8d0817fd0b674616f0bef9de2d1319f23ca4e87b"
 dependencies = [
  "async-trait",
  "bitflags 2.10.0",
