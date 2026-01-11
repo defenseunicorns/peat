@@ -1,0 +1,38 @@
+[package]
+name = "hive-ble-test"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "BLE mesh transport test application for HIVE Protocol"
+
+[[bin]]
+name = "hive-ble-test"
+path = "src/main.rs"
+
+[dependencies]
+# HIVE dependencies
+hive-protocol = { path = "../hive-protocol", features = ["bluetooth"] }
+hive-btle = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal"] }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+
+# Error handling
+anyhow = { workspace = true }
+
+[features]
+default = []
+
+# Platform-specific BLE adapters (requires hive-btle to export them)
+# These will be enabled in future hive-btle releases
+# linux = ["hive-btle/linux"]
+# macos = ["hive-btle/macos"]
+# windows = ["hive-btle/windows"]
