@@ -31,8 +31,7 @@ anyhow = { workspace = true }
 [features]
 default = []
 
-# Platform-specific BLE adapters (requires hive-btle to export them)
-# These will be enabled in future hive-btle releases
-# linux = ["hive-btle/linux"]
-# macos = ["hive-btle/macos"]
-# windows = ["hive-btle/windows"]
+# Platform-specific BLE adapters
+linux = ["hive-btle/linux"]
+macos = ["hive-btle/macos"]
+windows = ["hive-btle/windows"]
