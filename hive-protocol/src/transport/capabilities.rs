@@ -527,6 +527,250 @@ pub struct PeerDistance {
 }
 
 // =============================================================================
+// PACE Transport Policy (ADR-032)
+// =============================================================================
+
+/// Unique identifier for a transport instance
+///
+/// Format: "{type}-{interface}" or custom string
+/// Examples: "iroh-eth0", "iroh-wlan0", "lora-915mhz", "ble-hci0"
+pub type TransportId = String;
+
+/// Transport instance metadata
+///
+/// Represents a registered transport with its unique ID and current state.
+#[derive(Debug, Clone)]
+pub struct TransportInstance {
+    /// Unique instance identifier
+    pub id: TransportId,
+    /// Transport type (for capability grouping)
+    pub transport_type: TransportType,
+    /// Human-readable description
+    pub description: String,
+    /// Physical interface name (if applicable)
+    pub interface: Option<String>,
+    /// Current capabilities (may change with range mode)
+    pub capabilities: TransportCapabilities,
+    /// Is this transport currently available?
+    pub available: bool,
+}
+
+impl TransportInstance {
+    /// Create a new transport instance
+    pub fn new(
+        id: impl Into<String>,
+        transport_type: TransportType,
+        capabilities: TransportCapabilities,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            transport_type,
+            description: String::new(),
+            interface: None,
+            capabilities,
+            available: true,
+        }
+    }
+
+    /// Set the description
+    pub fn with_description(mut self, desc: impl Into<String>) -> Self {
+        self.description = desc.into();
+        self
+    }
+
+    /// Set the interface name
+    pub fn with_interface(mut self, iface: impl Into<String>) -> Self {
+        self.interface = Some(iface.into());
+        self
+    }
+}
+
+/// PACE level for transport availability
+///
+/// Military PACE planning: Primary, Alternate, Contingency, Emergency
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub enum PaceLevel {
+    /// Primary transports available
+    #[default]
+    Primary = 0,
+    /// Alternate transports (primary unavailable)
+    Alternate = 1,
+    /// Contingency transports (degraded operation)
+    Contingency = 2,
+    /// Emergency transports (last resort)
+    Emergency = 3,
+    /// No transports available
+    None = 4,
+}
+
+impl std::fmt::Display for PaceLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PaceLevel::Primary => write!(f, "PRIMARY"),
+            PaceLevel::Alternate => write!(f, "ALTERNATE"),
+            PaceLevel::Contingency => write!(f, "CONTINGENCY"),
+            PaceLevel::Emergency => write!(f, "EMERGENCY"),
+            PaceLevel::None => write!(f, "NONE"),
+        }
+    }
+}
+
+/// PACE-style transport policy
+///
+/// Defines transport selection order following military PACE planning:
+/// Primary → Alternate → Contingency → Emergency
+///
+/// # Example
+///
+/// ```
+/// use hive_protocol::transport::TransportPolicy;
+///
+/// let policy = TransportPolicy::new("tactical-standard")
+///     .primary(vec!["iroh-eth0", "iroh-wlan0"])
+///     .alternate(vec!["iroh-starlink"])
+///     .contingency(vec!["lora-primary"])
+///     .emergency(vec!["ble-mesh"]);
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct TransportPolicy {
+    /// Policy name for reference
+    pub name: String,
+    /// Primary transports - use when available
+    pub primary: Vec<TransportId>,
+    /// Alternate - if all primary unavailable
+    pub alternate: Vec<TransportId>,
+    /// Contingency - degraded but functional
+    pub contingency: Vec<TransportId>,
+    /// Emergency - last resort
+    pub emergency: Vec<TransportId>,
+}
+
+impl TransportPolicy {
+    /// Create a new transport policy
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            ..Default::default()
+        }
+    }
+
+    /// Set primary transports
+    pub fn primary(mut self, transports: Vec<impl Into<TransportId>>) -> Self {
+        self.primary = transports.into_iter().map(Into::into).collect();
+        self
+    }
+
+    /// Set alternate transports
+    pub fn alternate(mut self, transports: Vec<impl Into<TransportId>>) -> Self {
+        self.alternate = transports.into_iter().map(Into::into).collect();
+        self
+    }
+
+    /// Set contingency transports
+    pub fn contingency(mut self, transports: Vec<impl Into<TransportId>>) -> Self {
+        self.contingency = transports.into_iter().map(Into::into).collect();
+        self
+    }
+
+    /// Set emergency transports
+    pub fn emergency(mut self, transports: Vec<impl Into<TransportId>>) -> Self {
+        self.emergency = transports.into_iter().map(Into::into).collect();
+        self
+    }
+
+    /// Get transports in PACE order (primary first, then alternate, etc.)
+    pub fn ordered(&self) -> impl Iterator<Item = &TransportId> {
+        self.primary
+            .iter()
+            .chain(self.alternate.iter())
+            .chain(self.contingency.iter())
+            .chain(self.emergency.iter())
+    }
+
+    /// Get current PACE level based on available transports
+    pub fn current_level(&self, available: &std::collections::HashSet<TransportId>) -> PaceLevel {
+        if self.primary.iter().any(|t| available.contains(t)) {
+            PaceLevel::Primary
+        } else if self.alternate.iter().any(|t| available.contains(t)) {
+            PaceLevel::Alternate
+        } else if self.contingency.iter().any(|t| available.contains(t)) {
+            PaceLevel::Contingency
+        } else if self.emergency.iter().any(|t| available.contains(t)) {
+            PaceLevel::Emergency
+        } else {
+            PaceLevel::None
+        }
+    }
+
+    /// Get available transports at or above a minimum PACE level
+    pub fn at_level(&self, level: PaceLevel) -> Vec<&TransportId> {
+        match level {
+            PaceLevel::Primary => self.primary.iter().collect(),
+            PaceLevel::Alternate => self.primary.iter().chain(self.alternate.iter()).collect(),
+            PaceLevel::Contingency => self
+                .primary
+                .iter()
+                .chain(self.alternate.iter())
+                .chain(self.contingency.iter())
+                .collect(),
+            PaceLevel::Emergency | PaceLevel::None => self.ordered().collect(),
+        }
+    }
+}
+
+/// How to use multiple available transports
+#[derive(Debug, Clone, Default)]
+pub enum TransportMode {
+    /// Use single best transport from policy (PACE failover)
+    #[default]
+    Single,
+
+    /// Send on multiple transports simultaneously for reliability
+    /// Receiver deduplicates by message ID
+    Redundant {
+        /// Minimum transports to send on (default: 2)
+        min_paths: u8,
+        /// Maximum transports to send on (None = all available)
+        max_paths: Option<u8>,
+    },
+
+    /// Aggregate bandwidth across transports (for large transfers)
+    /// Splits message across transports, receiver reassembles
+    Bonded,
+
+    /// Distribute messages across transports (round-robin or weighted)
+    LoadBalanced {
+        /// Weight per transport (higher = more traffic)
+        weights: Option<HashMap<TransportId, u8>>,
+    },
+}
+
+impl TransportMode {
+    /// Create redundant mode with minimum paths
+    pub fn redundant(min_paths: u8) -> Self {
+        Self::Redundant {
+            min_paths,
+            max_paths: None,
+        }
+    }
+
+    /// Create redundant mode with min and max paths
+    pub fn redundant_bounded(min_paths: u8, max_paths: u8) -> Self {
+        Self::Redundant {
+            min_paths,
+            max_paths: Some(max_paths),
+        }
+    }
+
+    /// Create load balanced mode with weights
+    pub fn load_balanced_weighted(weights: HashMap<TransportId, u8>) -> Self {
+        Self::LoadBalanced {
+            weights: Some(weights),
+        }
+    }
+}
+
+// =============================================================================
 // Transport Trait (Extended)
 // =============================================================================
 
@@ -826,5 +1070,166 @@ mod tests {
         let req = MessageRequirements::default();
         assert!(!req.bypass_sync);
         assert!(req.ttl.is_none());
+    }
+
+    // =========================================================================
+    // PACE Policy Tests (ADR-032)
+    // =========================================================================
+
+    #[test]
+    fn test_transport_instance_creation() {
+        let instance = TransportInstance::new(
+            "iroh-eth0",
+            TransportType::Quic,
+            TransportCapabilities::quic(),
+        )
+        .with_description("Primary ethernet")
+        .with_interface("eth0");
+
+        assert_eq!(instance.id, "iroh-eth0");
+        assert_eq!(instance.transport_type, TransportType::Quic);
+        assert_eq!(instance.description, "Primary ethernet");
+        assert_eq!(instance.interface, Some("eth0".to_string()));
+        assert!(instance.available);
+    }
+
+    #[test]
+    fn test_pace_level_ordering() {
+        assert!(PaceLevel::Primary < PaceLevel::Alternate);
+        assert!(PaceLevel::Alternate < PaceLevel::Contingency);
+        assert!(PaceLevel::Contingency < PaceLevel::Emergency);
+        assert!(PaceLevel::Emergency < PaceLevel::None);
+    }
+
+    #[test]
+    fn test_pace_level_display() {
+        assert_eq!(PaceLevel::Primary.to_string(), "PRIMARY");
+        assert_eq!(PaceLevel::Alternate.to_string(), "ALTERNATE");
+        assert_eq!(PaceLevel::Contingency.to_string(), "CONTINGENCY");
+        assert_eq!(PaceLevel::Emergency.to_string(), "EMERGENCY");
+        assert_eq!(PaceLevel::None.to_string(), "NONE");
+    }
+
+    #[test]
+    fn test_transport_policy_builder() {
+        let policy = TransportPolicy::new("tactical-standard")
+            .primary(vec!["iroh-eth0", "iroh-wlan0"])
+            .alternate(vec!["iroh-starlink"])
+            .contingency(vec!["lora-primary"])
+            .emergency(vec!["ble-mesh"]);
+
+        assert_eq!(policy.name, "tactical-standard");
+        assert_eq!(policy.primary.len(), 2);
+        assert_eq!(policy.alternate.len(), 1);
+        assert_eq!(policy.contingency.len(), 1);
+        assert_eq!(policy.emergency.len(), 1);
+    }
+
+    #[test]
+    fn test_transport_policy_ordered() {
+        let policy = TransportPolicy::new("test")
+            .primary(vec!["p1", "p2"])
+            .alternate(vec!["a1"])
+            .contingency(vec!["c1"])
+            .emergency(vec!["e1"]);
+
+        let ordered: Vec<_> = policy.ordered().collect();
+        assert_eq!(ordered, vec!["p1", "p2", "a1", "c1", "e1"]);
+    }
+
+    #[test]
+    fn test_transport_policy_current_level() {
+        let policy = TransportPolicy::new("test")
+            .primary(vec!["p1", "p2"])
+            .alternate(vec!["a1"])
+            .contingency(vec!["c1"])
+            .emergency(vec!["e1"]);
+
+        // Primary available
+        let mut available = std::collections::HashSet::new();
+        available.insert("p1".to_string());
+        assert_eq!(policy.current_level(&available), PaceLevel::Primary);
+
+        // Only alternate available
+        available.clear();
+        available.insert("a1".to_string());
+        assert_eq!(policy.current_level(&available), PaceLevel::Alternate);
+
+        // Only contingency available
+        available.clear();
+        available.insert("c1".to_string());
+        assert_eq!(policy.current_level(&available), PaceLevel::Contingency);
+
+        // Only emergency available
+        available.clear();
+        available.insert("e1".to_string());
+        assert_eq!(policy.current_level(&available), PaceLevel::Emergency);
+
+        // Nothing available
+        available.clear();
+        assert_eq!(policy.current_level(&available), PaceLevel::None);
+    }
+
+    #[test]
+    fn test_transport_policy_at_level() {
+        let policy = TransportPolicy::new("test")
+            .primary(vec!["p1"])
+            .alternate(vec!["a1"])
+            .contingency(vec!["c1"])
+            .emergency(vec!["e1"]);
+
+        // At Primary level - only primary
+        assert_eq!(policy.at_level(PaceLevel::Primary).len(), 1);
+
+        // At Alternate level - primary + alternate
+        assert_eq!(policy.at_level(PaceLevel::Alternate).len(), 2);
+
+        // At Contingency level - primary + alternate + contingency
+        assert_eq!(policy.at_level(PaceLevel::Contingency).len(), 3);
+
+        // At Emergency level - all
+        assert_eq!(policy.at_level(PaceLevel::Emergency).len(), 4);
+    }
+
+    #[test]
+    fn test_transport_mode_single() {
+        let mode = TransportMode::Single;
+        assert!(matches!(mode, TransportMode::Single));
+    }
+
+    #[test]
+    fn test_transport_mode_redundant() {
+        let mode = TransportMode::redundant(2);
+        assert!(matches!(
+            mode,
+            TransportMode::Redundant {
+                min_paths: 2,
+                max_paths: None
+            }
+        ));
+
+        let bounded = TransportMode::redundant_bounded(2, 4);
+        assert!(matches!(
+            bounded,
+            TransportMode::Redundant {
+                min_paths: 2,
+                max_paths: Some(4)
+            }
+        ));
+    }
+
+    #[test]
+    fn test_transport_mode_load_balanced() {
+        let mut weights = std::collections::HashMap::new();
+        weights.insert("t1".to_string(), 3);
+        weights.insert("t2".to_string(), 1);
+
+        let mode = TransportMode::load_balanced_weighted(weights.clone());
+        if let TransportMode::LoadBalanced { weights: Some(w) } = mode {
+            assert_eq!(w.get("t1"), Some(&3));
+            assert_eq!(w.get("t2"), Some(&1));
+        } else {
+            panic!("Expected LoadBalanced with weights");
+        }
     }
 }
