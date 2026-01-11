@@ -77,8 +77,9 @@ pub use bypass::{
     UdpBypassChannel, UdpConfig,
 };
 pub use capabilities::{
-    ConfigurableTransport, DistanceSource, MessagePriority, MessageRequirements, PeerDistance,
-    RangeMode, RangeModeConfig, Transport, TransportCapabilities, TransportType,
+    ConfigurableTransport, DistanceSource, MessagePriority, MessageRequirements, PaceLevel,
+    PeerDistance, RangeMode, RangeModeConfig, Transport, TransportCapabilities, TransportId,
+    TransportInstance, TransportMode, TransportPolicy, TransportType,
 };
 pub use health::{HealthMonitor, HeartbeatConfig};
 pub use manager::{RouteDecision, TransportManager, TransportManagerConfig};
