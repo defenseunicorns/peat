@@ -2,24 +2,18 @@
 //!
 //! Tests the hive-btle integration with hive-protocol's transport abstraction.
 //!
-//! ## Current Status
+//! ## Building & Running
 //!
-//! This app currently uses the StubAdapter (no real BLE) to demonstrate the
-//! integration between hive-protocol and hive-btle. Platform-specific adapters
-//! will be enabled once hive-btle exports them properly.
-//!
-//! ## Building
-//!
+//! Platform is auto-detected:
 //! ```bash
-//! cargo run -p hive-ble-test
+//! cargo run -p hive-ble-test -- --node-id DEADBEEF mesh
 //! ```
 //!
-//! ## Future Platform Support
+//! ## Platform Support
 //!
-//! Once hive-btle exposes platform adapters:
-//! - macOS: `cargo run -p hive-ble-test --features macos`
-//! - Linux: `cargo run -p hive-ble-test --features linux`
-//! - Windows: `cargo run -p hive-ble-test --features windows`
+//! - Linux: BluerAdapter (BlueZ via D-Bus)
+//! - macOS: CoreBluetoothAdapter
+//! - Windows: Coming soon (currently uses StubAdapter)
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -102,8 +96,7 @@ async fn main() -> Result<()> {
     let node_id_u32 = u32::from_str_radix(cli.node_id.trim_start_matches("0x"), 16)
         .context("Invalid node ID format (expected hex)")?;
 
-    // Create transport using stub adapter
-    // TODO: Use platform-specific adapter when hive-btle exports them
+    // Create transport using platform-specific adapter
     let transport = create_transport(node_id_u32).await?;
 
     // Create TransportManager with PACE policy
@@ -121,7 +114,7 @@ async fn main() -> Result<()> {
         TransportType::BluetoothLE,
         TransportCapabilities::bluetooth_le(),
     )
-    .with_description("Primary BLE adapter (stub)");
+    .with_description("Primary BLE adapter");
 
     manager.register_instance(instance, Arc::new(transport));
 
@@ -231,7 +224,7 @@ async fn run_scan(manager: &TransportManager, duration: Duration) -> Result<()> 
         // Report discovered peers
         let peers = transport.connected_peers();
         if peers.is_empty() {
-            info!("No peers discovered (expected with stub adapter)");
+            info!("No peers discovered");
         } else {
             info!("Discovered {} peers:", peers.len());
             for peer in peers {
@@ -360,8 +353,8 @@ async fn test_pace_selection(manager: &TransportManager) -> Result<()> {
             info!("  Selected: {}", transport_id);
         }
         None => {
-            info!("  No transport selected (peer not reachable via stub adapter)");
-            info!("  With real BLE, this would select from available transports");
+            info!("  No transport selected (peer not reachable)");
+            info!("  With real BLE discovery, this would select from available transports");
         }
     }
 
