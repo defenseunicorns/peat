@@ -12,7 +12,7 @@ path = "src/main.rs"
 
 [dependencies]
 # HIVE dependencies
-hive-protocol = { path = "../hive-protocol", features = ["bluetooth"] }
+hive-protocol = { path = "../hive-protocol", default-features = false, features = ["bluetooth", "automerge-backend"] }
 hive-btle = { workspace = true }
 
 # Async runtime
