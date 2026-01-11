@@ -25,9 +25,17 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{info, warn};
+use tracing::info;
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+use tracing::warn;
 
-use hive_btle::{BleConfig, BluetoothLETransport, StubAdapter};
+#[cfg(target_os = "macos")]
+use hive_btle::platform::apple::CoreBluetoothAdapter;
+#[cfg(target_os = "linux")]
+use hive_btle::platform::linux::BluerAdapter;
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+use hive_btle::StubAdapter;
+use hive_btle::{BleConfig, BluetoothLETransport};
 use hive_protocol::transport::{
     HiveBleTransport, MessageRequirements, NodeId, TransportCapabilities, TransportInstance,
     TransportManager, TransportManagerConfig, TransportPolicy, TransportType,
@@ -150,10 +158,36 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// Create BLE transport with stub adapter
+/// Create BLE transport with platform-specific adapter
+#[cfg(target_os = "macos")]
+async fn create_transport(node_id: u32) -> Result<HiveBleTransport<CoreBluetoothAdapter>> {
+    info!("Using CoreBluetoothAdapter for macOS");
+
+    let config = BleConfig::hive_lite(hive_btle::NodeId::new(node_id));
+    let adapter = CoreBluetoothAdapter::new().context("Failed to create CoreBluetooth adapter")?;
+    let btle = BluetoothLETransport::new(config, adapter);
+    let transport = HiveBleTransport::new(btle);
+
+    Ok(transport)
+}
+
+#[cfg(target_os = "linux")]
+async fn create_transport(node_id: u32) -> Result<HiveBleTransport<BluerAdapter>> {
+    info!("Using BluerAdapter for Linux");
+
+    let config = BleConfig::hive_lite(hive_btle::NodeId::new(node_id));
+    let adapter = BluerAdapter::new()
+        .await
+        .context("Failed to create BlueZ adapter")?;
+    let btle = BluetoothLETransport::new(config, adapter);
+    let transport = HiveBleTransport::new(btle);
+
+    Ok(transport)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 async fn create_transport(node_id: u32) -> Result<HiveBleTransport<StubAdapter>> {
-    warn!("Using StubAdapter - no real BLE hardware");
-    warn!("Platform adapters will be available in future hive-btle releases");
+    warn!("Using StubAdapter - no real BLE hardware on this platform");
 
     let config = BleConfig::hive_lite(hive_btle::NodeId::new(node_id));
     let adapter = StubAdapter::default();
