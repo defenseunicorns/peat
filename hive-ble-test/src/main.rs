@@ -2,32 +2,34 @@
 //!
 //! Tests the hive-btle integration with hive-protocol's transport abstraction.
 //!
-//! ## Current Status
+//! ## Building & Running
 //!
-//! This app currently uses the StubAdapter (no real BLE) to demonstrate the
-//! integration between hive-protocol and hive-btle. Platform-specific adapters
-//! will be enabled once hive-btle exports them properly.
-//!
-//! ## Building
-//!
+//! Platform is auto-detected:
 //! ```bash
-//! cargo run -p hive-ble-test
+//! cargo run -p hive-ble-test -- --node-id DEADBEEF mesh
 //! ```
 //!
-//! ## Future Platform Support
+//! ## Platform Support
 //!
-//! Once hive-btle exposes platform adapters:
-//! - macOS: `cargo run -p hive-ble-test --features macos`
-//! - Linux: `cargo run -p hive-ble-test --features linux`
-//! - Windows: `cargo run -p hive-ble-test --features windows`
+//! - Linux: BluerAdapter (BlueZ via D-Bus)
+//! - macOS: CoreBluetoothAdapter
+//! - Windows: Coming soon (currently uses StubAdapter)
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{info, warn};
+use tracing::info;
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+use tracing::warn;
 
-use hive_btle::{BleConfig, BluetoothLETransport, StubAdapter};
+#[cfg(target_os = "macos")]
+use hive_btle::platform::apple::CoreBluetoothAdapter;
+#[cfg(target_os = "linux")]
+use hive_btle::platform::linux::BluerAdapter;
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+use hive_btle::StubAdapter;
+use hive_btle::{BleConfig, BluetoothLETransport};
 use hive_protocol::transport::{
     HiveBleTransport, MessageRequirements, NodeId, TransportCapabilities, TransportInstance,
     TransportManager, TransportManagerConfig, TransportPolicy, TransportType,
@@ -94,8 +96,7 @@ async fn main() -> Result<()> {
     let node_id_u32 = u32::from_str_radix(cli.node_id.trim_start_matches("0x"), 16)
         .context("Invalid node ID format (expected hex)")?;
 
-    // Create transport using stub adapter
-    // TODO: Use platform-specific adapter when hive-btle exports them
+    // Create transport using platform-specific adapter
     let transport = create_transport(node_id_u32).await?;
 
     // Create TransportManager with PACE policy
@@ -113,7 +114,7 @@ async fn main() -> Result<()> {
         TransportType::BluetoothLE,
         TransportCapabilities::bluetooth_le(),
     )
-    .with_description("Primary BLE adapter (stub)");
+    .with_description("Primary BLE adapter");
 
     manager.register_instance(instance, Arc::new(transport));
 
@@ -150,13 +151,58 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// Create BLE transport with stub adapter
-async fn create_transport(node_id: u32) -> Result<HiveBleTransport<StubAdapter>> {
-    warn!("Using StubAdapter - no real BLE hardware");
-    warn!("Platform adapters will be available in future hive-btle releases");
+/// Create BLE transport with platform-specific adapter
+#[cfg(target_os = "macos")]
+async fn create_transport(node_id: u32) -> Result<HiveBleTransport<CoreBluetoothAdapter>> {
+    use hive_btle::platform::BleAdapter;
+
+    info!("Using CoreBluetoothAdapter for macOS");
 
     let config = BleConfig::hive_lite(hive_btle::NodeId::new(node_id));
-    let adapter = StubAdapter::default();
+    let mut adapter =
+        CoreBluetoothAdapter::new().context("Failed to create CoreBluetooth adapter")?;
+    adapter
+        .init(&config)
+        .await
+        .context("Failed to initialize CoreBluetooth adapter")?;
+    let btle = BluetoothLETransport::new(config, adapter);
+    let transport = HiveBleTransport::new(btle);
+
+    Ok(transport)
+}
+
+#[cfg(target_os = "linux")]
+async fn create_transport(node_id: u32) -> Result<HiveBleTransport<BluerAdapter>> {
+    use hive_btle::platform::BleAdapter;
+
+    info!("Using BluerAdapter for Linux");
+
+    let config = BleConfig::hive_lite(hive_btle::NodeId::new(node_id));
+    let mut adapter = BluerAdapter::new()
+        .await
+        .context("Failed to create BlueZ adapter")?;
+    adapter
+        .init(&config)
+        .await
+        .context("Failed to initialize BlueZ adapter")?;
+    let btle = BluetoothLETransport::new(config, adapter);
+    let transport = HiveBleTransport::new(btle);
+
+    Ok(transport)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+async fn create_transport(node_id: u32) -> Result<HiveBleTransport<StubAdapter>> {
+    use hive_btle::platform::BleAdapter;
+
+    warn!("Using StubAdapter - no real BLE hardware on this platform");
+
+    let config = BleConfig::hive_lite(hive_btle::NodeId::new(node_id));
+    let mut adapter = StubAdapter::default();
+    adapter
+        .init(&config)
+        .await
+        .context("Failed to initialize stub adapter")?;
     let btle = BluetoothLETransport::new(config, adapter);
     let transport = HiveBleTransport::new(btle);
 
@@ -178,7 +224,7 @@ async fn run_scan(manager: &TransportManager, duration: Duration) -> Result<()> 
         // Report discovered peers
         let peers = transport.connected_peers();
         if peers.is_empty() {
-            info!("No peers discovered (expected with stub adapter)");
+            info!("No peers discovered");
         } else {
             info!("Discovered {} peers:", peers.len());
             for peer in peers {
@@ -307,8 +353,8 @@ async fn test_pace_selection(manager: &TransportManager) -> Result<()> {
             info!("  Selected: {}", transport_id);
         }
         None => {
-            info!("  No transport selected (peer not reachable via stub adapter)");
-            info!("  With real BLE, this would select from available transports");
+            info!("  No transport selected (peer not reachable)");
+            info!("  With real BLE discovery, this would select from available transports");
         }
     }
 
