@@ -161,10 +161,17 @@ async fn main() -> Result<()> {
 /// Create BLE transport with platform-specific adapter
 #[cfg(target_os = "macos")]
 async fn create_transport(node_id: u32) -> Result<HiveBleTransport<CoreBluetoothAdapter>> {
+    use hive_btle::platform::BleAdapter;
+
     info!("Using CoreBluetoothAdapter for macOS");
 
     let config = BleConfig::hive_lite(hive_btle::NodeId::new(node_id));
-    let adapter = CoreBluetoothAdapter::new().context("Failed to create CoreBluetooth adapter")?;
+    let mut adapter =
+        CoreBluetoothAdapter::new().context("Failed to create CoreBluetooth adapter")?;
+    adapter
+        .init(&config)
+        .await
+        .context("Failed to initialize CoreBluetooth adapter")?;
     let btle = BluetoothLETransport::new(config, adapter);
     let transport = HiveBleTransport::new(btle);
 
@@ -173,12 +180,18 @@ async fn create_transport(node_id: u32) -> Result<HiveBleTransport<CoreBluetooth
 
 #[cfg(target_os = "linux")]
 async fn create_transport(node_id: u32) -> Result<HiveBleTransport<BluerAdapter>> {
+    use hive_btle::platform::BleAdapter;
+
     info!("Using BluerAdapter for Linux");
 
     let config = BleConfig::hive_lite(hive_btle::NodeId::new(node_id));
-    let adapter = BluerAdapter::new()
+    let mut adapter = BluerAdapter::new()
         .await
         .context("Failed to create BlueZ adapter")?;
+    adapter
+        .init(&config)
+        .await
+        .context("Failed to initialize BlueZ adapter")?;
     let btle = BluetoothLETransport::new(config, adapter);
     let transport = HiveBleTransport::new(btle);
 
@@ -187,10 +200,16 @@ async fn create_transport(node_id: u32) -> Result<HiveBleTransport<BluerAdapter>
 
 #[cfg(not(any(target_os = "macos", target_os = "linux")))]
 async fn create_transport(node_id: u32) -> Result<HiveBleTransport<StubAdapter>> {
+    use hive_btle::platform::BleAdapter;
+
     warn!("Using StubAdapter - no real BLE hardware on this platform");
 
     let config = BleConfig::hive_lite(hive_btle::NodeId::new(node_id));
-    let adapter = StubAdapter::default();
+    let mut adapter = StubAdapter::default();
+    adapter
+        .init(&config)
+        .await
+        .context("Failed to initialize stub adapter")?;
     let btle = BluetoothLETransport::new(config, adapter);
     let transport = HiveBleTransport::new(btle);
 
