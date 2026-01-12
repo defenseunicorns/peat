@@ -81,6 +81,10 @@ pub mod automerge; // Automerge CRDT backend (E8 evaluation)
 #[cfg(feature = "ditto-backend")]
 pub mod ditto; // Wraps existing Ditto SDK
 
+// BLE translation layer (ADR-041, #557)
+#[cfg(feature = "bluetooth")]
+pub mod ble_translation;
+
 // Re-export core types and traits for convenience
 pub use traits::*;
 pub use types::*;

@@ -27,7 +27,25 @@ import com.revolveteam.hive.HivePeer
  *
  * Note: Uses simple callbacks instead of coroutines to avoid dependency
  * conflicts with ATAK's bundled kotlinx.coroutines.
+ *
+ * @deprecated This class is deprecated and will be removed in a future release.
+ *             Use [HiveNodeJni.createWithConfig] with `enableBle=true` instead for
+ *             unified multi-transport operation. The unified approach (ADR-039, #558)
+ *             integrates BLE as a transport within hive-ffi rather than running
+ *             parallel BLE and Iroh meshes.
+ *
+ *             Migration path:
+ *             1. Replace `HiveBleManager` usage with `HiveNodeJni.createWithConfig(enableBle=true)`
+ *             2. BLE peer events will flow through the unified transport manager
+ *             3. Document sync happens automatically via Automerge ↔ hive-btle translation
+ *
+ *             Current status: HiveBleManager continues to work during the transition
+ *             period while Android BLE adapter integration is completed in hive-btle.
  */
+@Deprecated(
+    message = "Use HiveNodeJni.createWithConfig(enableBle=true) for unified BLE transport (ADR-039)",
+    replaceWith = ReplaceWith("HiveNodeJni.createWithConfig(appId, sharedKey, storagePath, enableBle = true)")
+)
 class HiveBleManager(
     private val context: Context,
     val meshId: String = "WEARTAK"
