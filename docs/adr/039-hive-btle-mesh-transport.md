@@ -1156,6 +1156,243 @@ Per ADR-006, BLE transport security is layered:
 
 ---
 
+## hive-ffi Integration
+
+### Dual-Mode Operation
+
+hive-btle is designed to operate in two modes:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              Full HIVE (ATAK, CLI, etc.)                │
+│                                                         │
+│  TransportManager (PACE policy)                         │
+│  ├── IrohTransport (QUIC/WiFi) - Primary                │
+│  ├── HiveBleTransport ────────┐  - Alternate            │
+│  └── ...                      │                         │
+└───────────────────────────────│─────────────────────────┘
+                                │ wraps
+                                ▼
+┌─────────────────────────────────────────────────────────┐
+│                      hive-btle                          │
+│         (Standalone OR as transport plugin)             │
+│         Same protocol - devices interoperate            │
+└─────────────────────────────────────────────────────────┘
+                                ▲
+                                │ uses directly
+┌───────────────────────────────┴─────────────────────────┐
+│              WearTAK (Samsung Watch)                    │
+│         Can't run full HIVE - standalone hive-btle      │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Mode 1: Standalone** - For resource-constrained devices (WearTAK on Samsung watches, ESP32 sensors) that cannot run full HIVE. The device uses hive-btle directly with its lightweight CRDT sync.
+
+**Mode 2: Transport Plugin** - For full HIVE nodes (ATAK, CLI, servers), hive-btle is wrapped by `HiveBleTransport` and registered with `TransportManager` alongside other transports (Iroh/QUIC, future LoRa, etc.).
+
+**Interoperability**: Both modes use the same BLE protocol (GATT service, beacon format, sync protocol), so a Samsung Watch running standalone hive-btle can sync with ATAK running full HIVE with BLE as a transport.
+
+### hive-ffi Transport Abstraction
+
+#### Feature Flags
+
+```toml
+# hive-ffi/Cargo.toml
+[features]
+default = ["sync"]
+sync = ["hive-protocol/automerge-backend"]
+bluetooth = ["hive-protocol/bluetooth"]
+```
+
+#### Extended NodeConfig
+
+```rust
+// hive-ffi/src/lib.rs
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct NodeConfig {
+    pub app_id: String,
+    pub shared_key: String,
+    pub bind_address: Option<String>,
+    pub storage_path: String,
+    pub transport_config: Option<TransportConfigFFI>,  // NEW
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct TransportConfigFFI {
+    /// Enable BLE transport (requires bluetooth feature)
+    pub enable_ble: bool,
+    /// BLE mesh ID for WearTAK interoperability (e.g., "WEARTAK")
+    pub ble_mesh_id: Option<String>,
+    /// Power profile: "aggressive", "balanced", "low_power"
+    pub ble_power_profile: Option<String>,
+    /// PACE transport preference order (e.g., ["quic", "bluetooth_le"])
+    pub transport_preference: Option<Vec<String>>,
+}
+```
+
+#### HiveNode with TransportManager
+
+```rust
+// hive-ffi/src/lib.rs
+
+pub struct HiveNode {
+    sync_backend: Arc<AutomergeIrohBackend>,
+    storage_backend: Arc<AutomergeBackend>,
+    transport_manager: Arc<TransportManager>,  // Replaces: transport: Arc<IrohTransport>
+    iroh_transport: Arc<IrohTransport>,
+    #[cfg(feature = "bluetooth")]
+    ble_transport: Option<Arc<HiveBleTransport>>,
+    store: Arc<AutomergeStore>,
+    storage_path: PathBuf,
+    runtime: Arc<tokio::runtime::Runtime>,
+    cleanup_running: Arc<AtomicBool>,
+}
+```
+
+#### Platform Adapters
+
+hive-btle provides platform-specific adapters that hive-ffi uses via feature flags:
+
+| Platform | hive-btle Feature | Adapter |
+|----------|-------------------|---------|
+| Linux | `linux` | BlueZ via `bluer` crate |
+| Android | `android` | JNI to Android Bluetooth API |
+| macOS | `macos` | CoreBluetooth |
+| iOS | `ios` | CoreBluetooth |
+| Windows | `windows` | WinRT Bluetooth API |
+
+hive-ffi doesn't implement its own adapters - it uses hive-btle's existing adapters:
+
+```rust
+// hive-ffi/src/lib.rs
+
+#[cfg(all(feature = "bluetooth", target_os = "linux"))]
+use hive_btle::platform::linux::LinuxAdapter;
+
+#[cfg(all(feature = "bluetooth", target_os = "android"))]
+use hive_btle::platform::android::AndroidAdapter;
+
+#[cfg(all(feature = "bluetooth", any(target_os = "macos", target_os = "ios")))]
+use hive_btle::platform::apple::AppleAdapter;
+
+// Create transport with platform-appropriate adapter
+#[cfg(feature = "bluetooth")]
+fn create_ble_transport(config: &BleConfig) -> Result<HiveBleTransport<impl BleAdapter>> {
+    #[cfg(target_os = "linux")]
+    let adapter = LinuxAdapter::new()?;
+
+    #[cfg(target_os = "android")]
+    let adapter = AndroidAdapter::new()?;
+
+    // ... etc
+
+    Ok(HiveBleTransport::new(config, adapter))
+}
+```
+
+For Android, hive-ffi exposes JNI functions to control the transport:
+
+```kotlin
+// HiveJni.kt
+external fun enableBleTransport(nodeHandle: Long, meshId: String): Boolean
+external fun disableBleTransport(nodeHandle: Long): Boolean
+external fun getBleStatus(nodeHandle: Long): BleStatus
+```
+
+### Translation Layer (ADR-041 Integration)
+
+Full HIVE nodes act as gateways between Automerge documents and hive-btle's lightweight CRDTs:
+
+```rust
+// hive-protocol/src/sync/ble_translation.rs
+
+pub struct BleTranslationLayer {
+    node_mapping: HashMap<u32, String>,
+}
+
+impl BleTranslationLayer {
+    /// Receive HiveDocument from BLE, update Automerge
+    pub fn on_ble_document(
+        &mut self,
+        doc: &HiveDocument,
+        am_doc: &mut Automerge
+    ) -> Result<()> {
+        let node_id = format!("{:08X}", doc.node_id());
+
+        // Map hive-btle fields to Automerge document structure
+        am_doc.put(&format!("/devices/{}/counter", node_id), doc.counter())?;
+
+        if let Some(peripheral) = doc.peripheral() {
+            if let Some(loc) = peripheral.location() {
+                am_doc.put(&format!("/devices/{}/lat", node_id), loc.lat)?;
+                am_doc.put(&format!("/devices/{}/lon", node_id), loc.lon)?;
+            }
+            if let Some(event) = peripheral.last_event() {
+                match event.event_type {
+                    EventType::Emergency => {
+                        am_doc.put(&format!("/alerts/{}/emergency", node_id), true)?;
+                    }
+                    EventType::Ack => {
+                        am_doc.put(&format!("/alerts/{}/ack", node_id), true)?;
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Build HiveDocument from Automerge for BLE broadcast
+    pub fn build_ble_document(&self, node_id: u32, am_doc: &Automerge) -> Vec<u8> {
+        let mut doc = HiveDocument::new(node_id);
+        // Extract relevant fields from Automerge, populate lightweight doc
+        doc.encode()
+    }
+}
+```
+
+### ATAK Plugin Migration
+
+The ATAK plugin currently runs two parallel systems:
+
+- `HiveNodeJni` → hive-ffi → IrohTransport (PLI broadcast)
+- `HiveBleManager` → hive-btle AAR → BLE mesh (WearTAK sync)
+
+**Problem**: Data doesn't flow between them. PLI broadcasts only go over Iroh; WearTAK devices on BLE never receive them.
+
+**Solution**: Unified transport via hive-ffi:
+
+```kotlin
+// HivePluginLifecycle.kt - BEFORE (dual system)
+val hiveNode = HiveJni.createNode(config)
+val bleManager = HiveBleManager(context, meshId)  // Separate!
+
+// HivePluginLifecycle.kt - AFTER (unified)
+val config = NodeConfig(
+    appId = "...",
+    sharedKey = "...",
+    transportConfig = TransportConfigFFI(
+        enableBle = true,
+        bleMeshId = "WEARTAK",
+        blePowerProfile = "balanced"
+    )
+)
+val hiveNode = HiveJni.createNode(config)
+// BLE is now managed by TransportManager inside hive-ffi
+```
+
+**Migration Steps**:
+
+1. Add `bluetooth` feature to hive-ffi, expose `TransportConfigFFI` via UniFFI
+2. Add JNI bindings for BLE control (`enableBleTransport`, `onBleDiscovered`, etc.)
+3. Update `HivePluginLifecycle` to use `TransportConfigFFI` with `enable_ble=true`
+4. Deprecate `HiveBleManager` (keep working during transition)
+5. Validate WearTAK sync works via unified path
+6. Remove `HiveBleManager` once stable
+
+---
+
 ## Alternatives Considered
 
 ### 1. Use btleplug Directly
@@ -1208,11 +1445,61 @@ ESP-NOW is Espressif's proprietary peer-to-peer protocol.
 | 2025-12-13 | GATT-based sync over SIG Mesh | HIVE needs CRDT sync semantics, not broadcast mesh |
 | 2025-12-13 | Platform abstraction with native implementations | Each platform has different BLE APIs and capabilities |
 | 2025-12-13 | Coded PHY support as feature | Enables range/throughput tradeoffs, requires BLE 5.0 |
+| 2025-01-12 | Dual-mode operation (standalone + transport plugin) | hive-btle must work standalone for constrained devices (WearTAK) AND as transport within full HIVE |
+| 2025-01-12 | Integrate via TransportManager in hive-ffi | Unifies transport selection with PACE policy; avoids dual-system architecture in ATAK plugin |
+| 2025-01-12 | Translation layer for Automerge ↔ hive-btle | Per ADR-041, full HIVE nodes act as gateways translating between document formats |
 
 ---
 
 **Next Steps:**
-1. Review with stakeholders
-2. Create GitHub issues for implementation phases
-3. Begin Phase 1 development on Linux reference platform
-4. Coordinate with Ascent for WearTAK integration testing
+1. ~~Review with stakeholders~~ (ongoing)
+2. GitHub issues created for hive-ffi integration (see below)
+3. Radicle issues for hive-btle API exposure
+4. Begin Phase 1: Add bluetooth feature flag to hive-ffi
+5. Coordinate with Ascent for WearTAK integration testing
+
+**GitHub Issues (hive repo):**
+- [#554](https://github.com/kitplummer/hive/issues/554) - Add `bluetooth` feature flag to hive-ffi
+- [#555](https://github.com/kitplummer/hive/issues/555) - Refactor HiveNode to use TransportManager
+- [#556](https://github.com/kitplummer/hive/issues/556) - Add BLE transport option to NodeConfig/create_node
+- [#557](https://github.com/kitplummer/hive/issues/557) - Implement Automerge ↔ hive-btle translation layer
+- [#558](https://github.com/kitplummer/hive/issues/558) - ATAK plugin: migrate to unified transport
+
+**Radicle Issues (hive-btle repo):** *(create manually in Radicle)*
+
+### Issue: Ensure platform adapters are usable from external crates (hive-ffi)
+
+**Summary**: hive-btle has platform adapters for Linux (BlueZ), macOS/iOS (CoreBluetooth), Android (JNI), and Windows (WinRT). Ensure these can be used by hive-ffi via feature flags without hive-ffi needing to implement its own adapters.
+
+**Implementation**:
+- Verify platform feature flags work correctly when hive-btle is a dependency
+- Ensure `BluetoothLETransport::new()` can be called with platform-appropriate adapter
+- Export configuration types (`BleConfig`, `HiveMeshConfig`, `PowerProfile`) for external use
+- Ensure observer/callback pattern works across crate boundary
+- Document feature flag combinations for each target platform
+
+**Acceptance Criteria**:
+- [ ] hive-ffi can use `linux` feature → gets BlueZ adapter
+- [ ] hive-ffi can use `android` feature → gets JNI adapter
+- [ ] hive-ffi can use `macos`/`ios` feature → gets CoreBluetooth adapter
+- [ ] Configuration types are public and documented
+- [ ] `HiveObserver` works across crate boundary
+- [ ] Example of external crate usage
+
+---
+
+### Issue: Add transport-agnostic document encoding helpers
+
+**Summary**: Ensure `HiveDocument` encoding/decoding is public and transport-agnostic for use in the translation layer.
+
+**Implementation**:
+- Make `HiveDocument::from_bytes()` public
+- Make `HiveDocument::to_bytes()` / `encode()` public
+- Allow external construction with arbitrary node IDs
+- Document the binary format for interoperability
+
+**Acceptance Criteria**:
+- [ ] `HiveDocument::from_bytes()` is public
+- [ ] `HiveDocument::to_bytes()` is public
+- [ ] External node ID assignment works
+- [ ] Binary format documented

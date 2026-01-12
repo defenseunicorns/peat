@@ -73,6 +73,7 @@ fn main() {
         shared_key: shared_key.clone(),
         bind_address: Some("0.0.0.0:42008".into()), // Fixed port for testing
         storage_path: storage_path.clone(),
+        transport: None, // Use default Iroh transport only
     };
 
     let node: Arc<hive_ffi::HiveNode> = match create_node(config) {
