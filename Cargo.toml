@@ -26,8 +26,7 @@ repository = "https://github.com/kitplummer/hive"
 
 [workspace.dependencies]
 # BLE mesh transport (ADR-039)
-# Using local path for development/testing - switch back to version for release
-hive-btle = { path = "../hive-btle" }
+hive-btle = "0.0.6"
 
 # CRDT synchronization
 dittolive-ditto = "=4.11.5"
