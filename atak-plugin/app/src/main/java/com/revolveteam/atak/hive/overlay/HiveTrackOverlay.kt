@@ -104,7 +104,9 @@ class HiveTrackOverlay(private val mapView: MapView) {
 
             val marker = Marker(point, uid)
             marker.type = track.toCotType()
-            marker.title = "Track ${track.id.takeLast(6)}"
+            // Use callsign from attributes, fallback to track ID
+            val callsign = track.attributes["callsign"] ?: track.id.takeLast(8)
+            marker.title = callsign
 
             // Set marker style based on classification
             applyMarkerStyle(marker, track)
@@ -137,8 +139,9 @@ class HiveTrackOverlay(private val mapView: MapView) {
             val point = GeoPoint(track.lat, track.lon, track.hae ?: 0.0)
             marker.point = point
 
-            // Update title with confidence
-            marker.title = "Track ${track.id.takeLast(6)} (${(track.confidence * 100).toInt()}%)"
+            // Update title with callsign
+            val callsign = track.attributes["callsign"] ?: track.id.takeLast(8)
+            marker.title = callsign
 
             // Update style if classification changed
             applyMarkerStyle(marker, track)

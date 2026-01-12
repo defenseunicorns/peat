@@ -25,6 +25,7 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
 ) {
     companion object {
         private const val TAG = "HivePluginLifecycle"
+        const val DEFAULT_MESH_ID = "WEARTAK"
 
         @Volatile
         private var instance: HivePluginLifecycle? = null
@@ -34,6 +35,9 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
 
     private var hiveFfiInitialized = false
     private var hiveNodeJni: HiveNodeJni? = null
+
+    // BLE mesh manager for WearTAK sync
+    private var hiveBleManager: HiveBleManager? = null
 
     init {
         instance = this
@@ -74,6 +78,32 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
         }
 
         Log.i(TAG, "HIVE Plugin initialized (FFI: $hiveFfiInitialized)")
+
+        // Initialize BLE mesh for WearTAK sync
+        initBleManager(pluginContext)
+    }
+
+    private fun initBleManager(context: Context) {
+        try {
+            // Get mesh ID from preferences, system properties, or use default
+            val prefs = context.getSharedPreferences("hive_prefs", Context.MODE_PRIVATE)
+            val meshId = prefs.getString("mesh_id", null)
+                ?: System.getProperty("hive.mesh_id")
+                ?: System.getenv("HIVE_MESH_ID")
+                ?: DEFAULT_MESH_ID
+
+            hiveBleManager = HiveBleManager(context, meshId)
+
+            if (hiveBleManager?.hasPermissions() == true) {
+                val started = hiveBleManager?.start() ?: false
+                Log.i(TAG, "HIVE BLE mesh started: $started")
+            } else {
+                Log.w(TAG, "BLE permissions not granted - mesh not started. " +
+                    "Required: ${hiveBleManager?.getRequiredPermissions()?.joinToString()}")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to initialize BLE manager: ${e.message}", e)
+        }
     }
 
     private fun createHiveNodeJni(context: Context) {
@@ -142,10 +172,18 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
             return hiveNodeJni
         }
         // Try to recover from global singleton (survives APK replacement)
-        val recovered = HiveNodeJni.getInstance()
-        if (recovered != null) {
-            Log.i(TAG, "Recovered HIVE node from global singleton")
-            hiveNodeJni = recovered
+        // Wrapped in try-catch because native library may not be loaded
+        try {
+            val recovered = HiveNodeJni.getInstance()
+            if (recovered != null) {
+                Log.i(TAG, "Recovered HIVE node from global singleton")
+                hiveNodeJni = recovered
+            }
+        } catch (e: UnsatisfiedLinkError) {
+            // Native library not loaded - hive-ffi not available
+            Log.d(TAG, "HIVE FFI native library not available")
+        } catch (e: Exception) {
+            Log.w(TAG, "Error recovering HIVE node: ${e.message}")
         }
         return hiveNodeJni
     }
@@ -155,4 +193,47 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
     fun getNodeId(): String? = getHiveNodeJni()?.nodeId()
 
     fun getConnectedPeers(): String = getHiveNodeJni()?.connectedPeers() ?: "[]"
+
+    // ========================================================================
+    // BLE Mesh Accessors
+    // ========================================================================
+
+    fun getHiveBleManager(): HiveBleManager? = hiveBleManager
+
+    fun isBleAvailable(): Boolean = hiveBleManager?.isRunning?.value == true
+
+    fun getBlePeerCount(): Int = hiveBleManager?.connectedPeerCount?.value ?: 0
+
+    fun startBleMesh(): Boolean {
+        return hiveBleManager?.start() ?: false
+    }
+
+    fun stopBleMesh() {
+        hiveBleManager?.stop()
+    }
+
+    fun getCurrentMeshId(): String {
+        return hiveBleManager?.meshId ?: DEFAULT_MESH_ID
+    }
+
+    fun setMeshId(context: Context, meshId: String) {
+        // Save to preferences
+        val prefs = context.getSharedPreferences("hive_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putString("mesh_id", meshId).apply()
+
+        // Fully destroy old BLE mesh before creating new one
+        Log.i(TAG, "Changing mesh ID from ${hiveBleManager?.meshId} to: $meshId")
+        hiveBleManager?.destroy()  // Use destroy() not stop() to fully clean up
+        hiveBleManager = null
+
+        // Small delay to ensure BLE stack cleans up
+        Thread.sleep(500)
+
+        // Create and start new mesh with new ID
+        hiveBleManager = HiveBleManager(context, meshId)
+        if (hiveBleManager?.hasPermissions() == true) {
+            val started = hiveBleManager?.start() ?: false
+            Log.i(TAG, "New BLE mesh started: $started with meshId: $meshId")
+        }
+    }
 }
