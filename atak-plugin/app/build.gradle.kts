@@ -157,6 +157,9 @@ dependencies {
     // The bindings and native .so files will be copied to this module
     // implementation(project(":hive-bindings"))
 
+    // HIVE BLE mesh transport (for WearTAK sync)
+    implementation("com.revolveteam:hive:0.0.5")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

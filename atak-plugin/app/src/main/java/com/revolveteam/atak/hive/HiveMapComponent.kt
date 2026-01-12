@@ -15,6 +15,7 @@ import com.revolveteam.atak.hive.model.HiveTrack
 import com.revolveteam.atak.hive.overlay.HiveCellOverlay
 import com.revolveteam.atak.hive.overlay.HivePlatformOverlay
 import com.revolveteam.atak.hive.overlay.HiveTrackOverlay
+import com.revolveteam.hive.HiveDocument
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -59,6 +60,9 @@ class HiveMapComponent : DropDownMapComponent() {
 
     private val _tracks = mutableListOf<HiveTrack>()
     val tracks: List<HiveTrack> get() = _tracks.toList()
+
+    // BLE peer tracks from hive-btle mesh (nodeId -> track)
+    private val _blePeerTracks = mutableMapOf<Long, HiveTrack>()
 
     private var _connectionStatus = ConnectionStatus.DISCONNECTED
     val connectionStatus: ConnectionStatus get() = _connectionStatus
@@ -117,6 +121,9 @@ class HiveMapComponent : DropDownMapComponent() {
         ddFilter.addAction(HiveDropDownReceiver.SHOW_PLUGIN)
         registerDropDownReceiver(dropDownReceiver, ddFilter)
 
+        // Register BLE document sync callback to display peer locations on map
+        registerBleDocumentCallback()
+
         // Update connection status based on HIVE node availability
         updateConnectionStatus()
 
@@ -138,6 +145,85 @@ class HiveMapComponent : DropDownMapComponent() {
         platformOverlay?.dispose()
         platformOverlay = null
         super.onDestroyImpl(context, view)
+    }
+
+    /**
+     * Register callback for BLE document sync to display peer locations.
+     */
+    private fun registerBleDocumentCallback() {
+        try {
+            val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
+            if (bleManager != null) {
+                bleManager.setDocumentSyncCallback { document ->
+                    onBleDocumentSynced(document)
+                }
+                Log.i(TAG, "BLE document sync callback registered")
+            } else {
+                Log.w(TAG, "BLE manager not available for document callback")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error registering BLE document callback: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Handle synced document from BLE mesh peer - create/update track marker.
+     */
+    private fun onBleDocumentSynced(document: HiveDocument) {
+        // Access peripheral data directly (more compatible with different AAR versions)
+        val peripheral = document.peripheral ?: return
+        val location = peripheral.location ?: return  // No location, nothing to display
+
+        val nodeId = document.nodeId
+        val callsign = peripheral.callsign.takeIf { it.isNotEmpty() }
+            ?: "BLE-${String.format("%08X", nodeId).takeLast(4)}"
+        val battery = peripheral.health.batteryPercent
+        val heartRate = peripheral.health.heartRate
+
+        Log.i(TAG, "BLE document synced: nodeId=${String.format("%08X", nodeId)}, " +
+                "callsign=$callsign, location=(${location.latitude}, ${location.longitude}), " +
+                "battery=$battery%, heartRate=$heartRate")
+
+        // Create/update track for this BLE peer
+        val track = HiveTrack(
+            id = "ble-${String.format("%08X", nodeId)}",
+            sourcePlatform = "hive-btle",
+            cellId = null,
+            formationId = null,
+            lat = location.latitude.toDouble(),
+            lon = location.longitude.toDouble(),
+            hae = location.altitude.toDouble().takeIf { it != 0.0 },
+            cep = null,
+            heading = null,
+            speed = null,
+            classification = "a-f-G-U-C",  // Friendly ground unit - combat
+            confidence = 1.0,
+            category = HiveTrack.Category.PERSON,
+            attributes = mapOf(
+                "callsign" to callsign,
+                "battery" to "$battery%",
+                "source" to "BLE Mesh"
+            ) + (heartRate?.let { mapOf("heartRate" to "$it bpm") } ?: emptyMap()),
+            createdAt = System.currentTimeMillis(),
+            lastUpdate = System.currentTimeMillis()
+        )
+
+        // Update the BLE peer track map and refresh overlay
+        refreshHandler.post {
+            _blePeerTracks[nodeId] = track
+            updateBlePeerOverlay()
+        }
+    }
+
+    /**
+     * Update the track overlay with BLE peer tracks.
+     */
+    private fun updateBlePeerOverlay() {
+        // Combine FFI tracks with BLE peer tracks
+        val allTracks = _tracks.toMutableList()
+        allTracks.addAll(_blePeerTracks.values)
+        trackOverlay?.updateTracks(allTracks)
+        Log.d(TAG, "Updated overlay with ${_tracks.size} FFI tracks + ${_blePeerTracks.size} BLE tracks")
     }
 
     /**
@@ -165,8 +251,10 @@ class HiveMapComponent : DropDownMapComponent() {
 
             try {
                 refreshData()
-                // Update map overlays
-                trackOverlay?.updateTracks(_tracks)
+                // Update map overlays - combine FFI tracks with BLE peer tracks
+                val allTracks = _tracks.toMutableList()
+                allTracks.addAll(_blePeerTracks.values)
+                trackOverlay?.updateTracks(allTracks)
                 // Update cell bounding circles based on platform positions
                 cellOverlay?.updateCellBounds(_cells, _platforms)
                 platformOverlay?.updatePlatforms(_platforms, _cells)
