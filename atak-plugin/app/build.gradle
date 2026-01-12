@@ -210,6 +210,10 @@ android {
 dependencies {
     implementation fileTree(dir: 'libs', include: '*.jar')
 
+    // ATAK SDK - manually add main.jar for compilation (provided by ATAK at runtime)
+    // The atak-takdev-plugin should add this but may not work without remote TAK repo access
+    compileOnly files("/home/kit/Code/revolve/ATAK-CIV-5.6.0-SDK/main.jar")
+
     // Compose DISABLED - causes lifecycle conflicts with ATAK SDK
     // The plugin uses traditional Android Views instead
 
@@ -217,13 +221,22 @@ dependencies {
     implementation('net.java.dev.jna:jna:5.13.0@aar') {
         exclude group: 'org.jetbrains', module: 'annotations'
     }
+
+    // HIVE BLE mesh transport (for WearTAK sync)
+    implementation 'com.revolveteam:hive:0.0.5'
+
+    // CompileOnly dependencies - needed for compilation but provided by ATAK at runtime
+    // These are excluded from packaging to avoid conflicts with ATAK's bundled versions
+    compileOnly 'org.jetbrains.kotlin:kotlin-stdlib:1.9.24'
+    compileOnly 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3'
+    compileOnly 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
 }
 
 configurations.implementation {
-   // Exclude kotlin-stdlib (bundled in ATAK's main.jar)
-   exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib'
-   exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
-   exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+   // NOTE: kotlin-stdlib is now allowed through (not excluded) to ensure
+   // it's available at compile time. R8/ProGuard should handle any duplicates
+   // with ATAK's bundled version at runtime.
+
    // Exclude kotlinx.coroutines - conflicts with ATAK's bundled version in main.jar
    exclude group: 'org.jetbrains.kotlinx', module: 'kotlinx-coroutines-core'
    exclude group: 'org.jetbrains.kotlinx', module: 'kotlinx-coroutines-core-jvm'

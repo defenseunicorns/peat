@@ -3,6 +3,22 @@
     xmlns:tools="http://schemas.android.com/tools"
     tools:ignore="GoogleAppIndexingWarning">
 
+    <!-- BLE Permissions (Android 12+) -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="s" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+
+    <!-- BLE Permissions (Android 8-11 fallback) -->
+    <uses-permission android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+
+    <!-- BLE feature (optional - plugin works without BLE) -->
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+
     <application
         android:allowBackup="false"
         android:icon="@drawable/ic_launcher"

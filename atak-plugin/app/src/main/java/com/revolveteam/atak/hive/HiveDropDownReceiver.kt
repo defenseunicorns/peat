@@ -20,6 +20,7 @@ import com.revolveteam.atak.hive.model.HivePlatform
 import com.revolveteam.atak.hive.model.HiveRole
 import com.revolveteam.atak.hive.model.HiveTrack
 import com.revolveteam.atak.hive.model.CommsQuality
+import com.revolveteam.hive.HivePeer as BlePeer
 
 /**
  * HIVE DropDown Receiver
@@ -51,6 +52,10 @@ class HiveDropDownReceiver(
     // User's role in the hierarchy (for PoC, using default role)
     private var userRole: HiveRole = HiveRole.defaultRole()
 
+    // Periodic refresh for BLE mesh updates
+    private var bleRefreshRunnable: Runnable? = null
+    private val BLE_REFRESH_INTERVAL = 2000L // 2 seconds
+
     init {
         // Register for peer events
         PeerEventManager.addListener(this)
@@ -59,6 +64,13 @@ class HiveDropDownReceiver(
         mapComponent.onCellSelectionChanged = { _, _ ->
             refreshContentOnMainThread()
         }
+
+        // Register for BLE mesh updates
+        HivePluginLifecycle.getInstance()?.getHiveBleManager()?.let { bleManager ->
+            bleManager.connectedPeerCount.observe { _ ->
+                refreshContentOnMainThread()
+            }
+        }
     }
 
     override fun disposeImpl() {
@@ -66,11 +78,27 @@ class HiveDropDownReceiver(
         Log.d(TAG, "HiveDropDownReceiver disposed")
     }
 
+    private var bleObserverRegistered = false
+
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
 
         if (action == SHOW_PLUGIN) {
             Log.d(TAG, "Showing HIVE plugin dropdown")
+
+            // Register BLE observer if not already done
+            if (!bleObserverRegistered) {
+                HivePluginLifecycle.getInstance()?.getHiveBleManager()?.let { bleManager ->
+                    bleManager.connectedPeerCount.observe { _ ->
+                        refreshContentOnMainThread()
+                    }
+                    bleManager.peers.observe { _ ->
+                        refreshContentOnMainThread()
+                    }
+                    bleObserverRegistered = true
+                    Log.d(TAG, "Registered BLE mesh observer")
+                }
+            }
 
             val view = createContentView()
             currentScrollView = view as ScrollView
@@ -204,6 +232,13 @@ class HiveDropDownReceiver(
         if (selectedCellId == null) {
             val pliSection = createPliBroadcastSection()
             container.addView(pliSection)
+            container.addView(createSpacer(24))
+        }
+
+        // BLE Mesh section (only in main view)
+        if (selectedCellId == null) {
+            val bleSection = createBleMeshSection()
+            container.addView(bleSection)
             container.addView(createSpacer(24))
         }
 
@@ -924,6 +959,201 @@ class HiveDropDownReceiver(
             setTextColor(statusColor)
         }
         card.addView(statusText)
+
+        section.addView(card)
+        return section
+    }
+
+    /**
+     * Create the BLE mesh section showing WearTAK peer connectivity
+     */
+    private fun createBleMeshSection(): View {
+        val section = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        // Title
+        val title = TextView(pluginContext).apply {
+            text = "BLE Mesh (WearTAK)"
+            textSize = 16f
+            setTextColor(Color.WHITE)
+        }
+        section.addView(title)
+        section.addView(createSpacer(12))
+
+        // Card with status and peers
+        val card = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#2d2d2d"))
+            setPadding(24, 16, 24, 16)
+        }
+
+        val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
+        val isRunning = bleManager?.isRunning?.value ?: false
+        val blePeers = bleManager?.peers?.value ?: emptyList<BlePeer>()
+        val connectedCount = blePeers.count { it.isConnected }
+
+        Log.i(TAG, "BLE UI: bleManager=${System.identityHashCode(bleManager)}, isRunning=$isRunning, " +
+                "peers=${blePeers.size}, connected=$connectedCount, " +
+                "_peers=${bleManager?.let { System.identityHashCode(it.peers) }}")
+        blePeers.forEach { peer ->
+            Log.d(TAG, "  BLE peer: ${peer.displayName()} connected=${peer.isConnected}")
+        }
+
+        // Status row
+        val statusRow = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val statusColor = if (isRunning) Color.parseColor("#4CAF50") else Color.parseColor("#F44336")
+        val statusIndicator = TextView(pluginContext).apply {
+            text = "●"
+            textSize = 14f
+            setTextColor(statusColor)
+        }
+        statusRow.addView(statusIndicator)
+        statusRow.addView(createHorizontalSpacer(8))
+
+        val statusText = TextView(pluginContext).apply {
+            text = if (isRunning) {
+                "Active • $connectedCount connected, ${blePeers.size} discovered"
+            } else {
+                "Inactive"
+            }
+            textSize = 12f
+            setTextColor(Color.WHITE)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        statusRow.addView(statusText)
+        card.addView(statusRow)
+
+        // Mesh ID configuration row
+        card.addView(createSpacer(12))
+        val meshIdRow = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val meshIdLabel = TextView(pluginContext).apply {
+            text = "Mesh ID: "
+            textSize = 12f
+            setTextColor(Color.WHITE)
+        }
+        meshIdRow.addView(meshIdLabel)
+
+        val currentMeshId = HivePluginLifecycle.getInstance()?.getCurrentMeshId() ?: HivePluginLifecycle.DEFAULT_MESH_ID
+        val meshIdInput = android.widget.EditText(pluginContext).apply {
+            setText(currentMeshId)
+            textSize = 12f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#3d3d3d"))
+            setPadding(16, 8, 16, 8)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setSingleLine(true)
+        }
+        meshIdRow.addView(meshIdInput)
+        meshIdRow.addView(createHorizontalSpacer(8))
+
+        val applyButton = Button(pluginContext).apply {
+            text = "Apply"
+            textSize = 10f
+            setBackgroundColor(Color.parseColor("#2196F3"))
+            setTextColor(Color.WHITE)
+            setPadding(16, 8, 16, 8)
+
+            setOnClickListener {
+                val newMeshId = meshIdInput.text.toString().trim()
+                if (newMeshId.isNotEmpty()) {
+                    HivePluginLifecycle.getInstance()?.setMeshId(pluginContext, newMeshId)
+                    handler.postDelayed({ refreshContent() }, 200)
+                }
+            }
+        }
+        meshIdRow.addView(applyButton)
+        card.addView(meshIdRow)
+
+        // Toggle button
+        card.addView(createSpacer(12))
+        val toggleButton = Button(pluginContext).apply {
+            text = if (isRunning) "Stop BLE Mesh" else "Start BLE Mesh"
+            setBackgroundColor(if (isRunning) Color.parseColor("#F44336") else Color.parseColor("#4CAF50"))
+            setTextColor(Color.WHITE)
+            textSize = 12f
+            setPadding(32, 16, 32, 16)
+
+            setOnClickListener {
+                if (isRunning) {
+                    HivePluginLifecycle.getInstance()?.stopBleMesh()
+                } else {
+                    HivePluginLifecycle.getInstance()?.startBleMesh()
+                }
+                handler.postDelayed({ refreshContent() }, 100)
+            }
+        }
+        card.addView(toggleButton)
+
+        // Peer list (if running and has peers)
+        if (isRunning && blePeers.isNotEmpty()) {
+            card.addView(createSpacer(16))
+
+            val peersTitle = TextView(pluginContext).apply {
+                text = "Discovered Peers"
+                textSize = 12f
+                setTextColor(Color.parseColor("#888888"))
+            }
+            card.addView(peersTitle)
+            card.addView(createSpacer(8))
+
+            blePeers.forEach { peer ->
+                val peerRow = LinearLayout(pluginContext).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(0, 4, 0, 4)
+                }
+
+                val connIndicator = TextView(pluginContext).apply {
+                    text = if (peer.isConnected) "●" else "○"
+                    textSize = 12f
+                    setTextColor(if (peer.isConnected) Color.parseColor("#4CAF50") else Color.GRAY)
+                }
+                peerRow.addView(connIndicator)
+                peerRow.addView(createHorizontalSpacer(8))
+
+                val peerName = TextView(pluginContext).apply {
+                    text = peer.displayName()
+                    textSize = 11f
+                    setTextColor(Color.WHITE)
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+                peerRow.addView(peerName)
+
+                val rssiText = TextView(pluginContext).apply {
+                    text = "${peer.rssi} dBm"
+                    textSize = 10f
+                    val rssiColor = when {
+                        peer.rssi > -60 -> Color.parseColor("#4CAF50")  // Strong
+                        peer.rssi > -80 -> Color.parseColor("#FFC107")  // Medium
+                        else -> Color.parseColor("#F44336")             // Weak
+                    }
+                    setTextColor(rssiColor)
+                }
+                peerRow.addView(rssiText)
+
+                card.addView(peerRow)
+            }
+        }
+
+        // Permission warning if needed
+        if (bleManager != null && !bleManager.hasPermissions()) {
+            card.addView(createSpacer(12))
+            val permWarning = TextView(pluginContext).apply {
+                text = "⚠ BLE permissions required. Grant in Android Settings."
+                textSize = 11f
+                setTextColor(Color.parseColor("#FFC107"))
+            }
+            card.addView(permWarning)
+        }
 
         section.addView(card)
         return section
