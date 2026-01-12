@@ -52,6 +52,8 @@ use hive_protocol::cot::{
 };
 
 #[cfg(feature = "sync")]
+use hive_protocol::network::PeerConfig;
+#[cfg(feature = "sync")]
 use hive_protocol::network::{IrohTransport, PeerInfo as HivePeerInfo, TransportPeerEvent};
 #[cfg(feature = "sync")]
 use hive_protocol::storage::{AutomergeBackend, AutomergeStore, StorageBackend, SyncCapable};
@@ -59,6 +61,12 @@ use hive_protocol::storage::{AutomergeBackend, AutomergeStore, StorageBackend, S
 use hive_protocol::sync::automerge::AutomergeIrohBackend;
 #[cfg(feature = "sync")]
 use hive_protocol::sync::{BackendConfig, DataSyncBackend, TransportConfig};
+#[cfg(all(feature = "sync", feature = "bluetooth"))]
+use hive_protocol::transport::btle::HiveBleTransport;
+#[cfg(feature = "sync")]
+use hive_protocol::transport::{
+    iroh::IrohMeshTransport, Transport, TransportManager, TransportManagerConfig,
+};
 #[cfg(feature = "sync")]
 use std::net::SocketAddr;
 #[cfg(feature = "sync")]
@@ -196,6 +204,30 @@ pub fn create_velocity(bearing: f64, speed_mps: f64) -> Velocity {
 // HiveNode - P2P Sync Support (requires "sync" feature)
 // =============================================================================
 
+/// Transport configuration for BLE and other transports (ADR-039, #556)
+///
+/// Controls which transports are enabled and their settings.
+/// Used by `NodeConfig` to configure multi-transport support.
+#[cfg(feature = "sync")]
+#[derive(Debug, Clone, Default, uniffi::Record)]
+pub struct TransportConfigFFI {
+    /// Enable Bluetooth LE transport (requires "bluetooth" feature)
+    /// When enabled, BLE mesh networking is available alongside Iroh/QUIC
+    pub enable_ble: bool,
+    /// BLE mesh ID (optional, defaults to app_id if not specified)
+    /// Used to identify the BLE mesh network for peer discovery
+    pub ble_mesh_id: Option<String>,
+    /// BLE power profile: "aggressive", "balanced", or "low_power"
+    /// - aggressive: Maximum range/speed, higher battery usage
+    /// - balanced: Default, moderate power usage
+    /// - low_power: Minimal battery impact, reduced range/speed
+    pub ble_power_profile: Option<String>,
+    /// Transport preference order (optional)
+    /// List of transport names in order of preference, e.g., ["iroh", "ble", "lora"]
+    /// Used by TransportManager's PACE policy for transport selection
+    pub transport_preference: Option<Vec<String>>,
+}
+
 /// Configuration for creating a HiveNode
 #[cfg(feature = "sync")]
 #[derive(Debug, Clone, uniffi::Record)]
@@ -211,6 +243,9 @@ pub struct NodeConfig {
     pub bind_address: Option<String>,
     /// Storage path for Automerge documents
     pub storage_path: String,
+    /// Transport configuration (optional, defaults to Iroh-only)
+    /// Use this to enable BLE and configure multi-transport behavior
+    pub transport: Option<TransportConfigFFI>,
 }
 
 /// Information about a peer node for connection
@@ -327,7 +362,12 @@ pub struct HiveNode {
     /// Note: This is the SAME backend instance used by sync_backend to ensure
     /// sync coordinator state is shared. Do NOT create a separate backend.
     storage_backend: Arc<AutomergeBackend>,
-    transport: Arc<IrohTransport>,
+    /// Transport manager for multi-transport coordination (ADR-032)
+    /// Enables PACE policy-based transport selection and future BLE integration
+    transport_manager: TransportManager,
+    /// Direct reference to Iroh transport for backward-compatible methods
+    /// (peer_count, connected_peers, etc.)
+    iroh_transport: Arc<IrohTransport>,
     /// Store reference for subscriptions
     store: Arc<AutomergeStore>,
     #[allow(dead_code)] // Kept for potential future use (e.g., storage cleanup)
@@ -344,22 +384,22 @@ pub struct HiveNode {
 impl HiveNode {
     /// Get this node's unique identifier (hex-encoded)
     pub fn node_id(&self) -> String {
-        hex::encode(self.transport.endpoint_id().as_bytes())
+        hex::encode(self.iroh_transport.endpoint_id().as_bytes())
     }
 
     /// Get this node's endpoint address for peer connections
     pub fn endpoint_addr(&self) -> String {
-        format!("{:?}", self.transport.endpoint_addr())
+        format!("{:?}", self.iroh_transport.endpoint_addr())
     }
 
     /// Get the number of connected peers
     pub fn peer_count(&self) -> u32 {
-        self.transport.peer_count() as u32
+        self.iroh_transport.peer_count() as u32
     }
 
     /// Get list of connected peer IDs
     pub fn connected_peers(&self) -> Vec<String> {
-        self.transport
+        self.iroh_transport
             .connected_peers()
             .iter()
             .map(|id| hex::encode(id.as_bytes()))
@@ -425,7 +465,7 @@ impl HiveNode {
 
         Ok(SyncStats {
             sync_active: stats.peer_count > 0, // Infer from peer count
-            connected_peers: self.transport.peer_count() as u32,
+            connected_peers: self.iroh_transport.peer_count() as u32,
             bytes_sent: stats.bytes_sent,
             bytes_received: stats.bytes_received,
         })
@@ -441,7 +481,7 @@ impl HiveNode {
         };
 
         self.runtime.block_on(async {
-            self.transport
+            self.iroh_transport
                 .connect_peer(&hive_peer)
                 .await
                 .map_err(|e| HiveError::ConnectionError { msg: e.to_string() })?;
@@ -455,11 +495,11 @@ impl HiveNode {
     /// Note: Currently disconnects matching peer from internal connection map.
     pub fn disconnect_peer(&self, node_id: &str) -> Result<(), HiveError> {
         // Find the matching endpoint ID from connected peers
-        let connected = self.transport.connected_peers();
+        let connected = self.iroh_transport.connected_peers();
         for endpoint_id in connected {
             if hex::encode(endpoint_id.as_bytes()) == node_id {
                 return self
-                    .transport
+                    .iroh_transport
                     .disconnect(&endpoint_id)
                     .map_err(|e| HiveError::ConnectionError { msg: e.to_string() });
             }
@@ -915,6 +955,74 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
     // resulting in data not being received from peers.
     let storage_backend = sync_backend.storage_backend();
 
+    // Create TransportManager for multi-transport coordination (ADR-032, #555)
+    // This enables future BLE transport integration via the same manager
+    let mut transport_manager = TransportManager::new(TransportManagerConfig::default());
+
+    // Create IrohMeshTransport wrapper and register with TransportManager
+    // This allows the transport to be selected via PACE policy alongside future transports
+    let peer_config = PeerConfig {
+        local: hive_protocol::network::LocalConfig {
+            bind_address: bind_addr.to_string(),
+            node_id: None,
+        },
+        formation: None,
+        peers: Vec::new(),
+    };
+    let iroh_mesh_transport = Arc::new(IrohMeshTransport::new(Arc::clone(&transport), peer_config));
+    transport_manager.register(iroh_mesh_transport as Arc<dyn Transport>);
+
+    // Initialize BLE transport if enabled (ADR-039, #556)
+    #[cfg(feature = "bluetooth")]
+    if let Some(ref transport_config) = config.transport {
+        if transport_config.enable_ble {
+            #[cfg(target_os = "android")]
+            android_log(
+                "BLE transport requested - Android adapter initialization deferred to JNI callback",
+            );
+
+            #[cfg(not(target_os = "android"))]
+            {
+                // On non-Android platforms, we can initialize BLE directly
+                // Linux uses BluerAdapter, macOS uses CoreBluetoothAdapter
+                #[cfg(target_os = "linux")]
+                {
+                    use hive_btle::platform::linux::BluerAdapter;
+                    use hive_btle::{BleConfig, BluetoothLETransport, PowerProfile};
+
+                    // Parse power profile from config
+                    let power_profile = match transport_config.ble_power_profile.as_deref() {
+                        Some("aggressive") => PowerProfile::Aggressive,
+                        Some("low_power") => PowerProfile::LowPower,
+                        _ => PowerProfile::Balanced,
+                    };
+
+                    // Create BLE config with power profile
+                    let mut ble_config = BleConfig::default();
+                    ble_config.power_profile = power_profile;
+
+                    // Create BLE transport with BluerAdapter
+                    match runtime_arc.block_on(async { BluerAdapter::new().await }) {
+                        Ok(adapter) => {
+                            let btle = BluetoothLETransport::new(ble_config, adapter);
+                            let ble_transport = Arc::new(HiveBleTransport::new(btle));
+                            transport_manager.register(ble_transport as Arc<dyn Transport>);
+                            eprintln!("[HIVE] BLE transport initialized (Linux/BlueZ)");
+                        }
+                        Err(e) => {
+                            eprintln!("[HIVE] Failed to initialize BLE adapter: {} (continuing without BLE)", e);
+                        }
+                    }
+                }
+
+                #[cfg(not(target_os = "linux"))]
+                eprintln!(
+                    "[HIVE] BLE transport requested but not yet implemented for this platform"
+                );
+            }
+        }
+    }
+
     // TIMING: Total startup time
     let total_ms = total_start.elapsed().as_millis();
     #[cfg(target_os = "android")]
@@ -928,7 +1036,8 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
     Ok(Arc::new(HiveNode {
         sync_backend,
         storage_backend,
-        transport,
+        transport_manager,
+        iroh_transport: transport,
         store,
         storage_path,
         runtime: runtime_arc,
@@ -1766,6 +1875,7 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_createNodeJni(
         shared_key,
         bind_address: None,
         storage_path,
+        transport: None,
     };
 
     match create_node(config) {
