@@ -75,6 +75,33 @@ object HiveJni {
     external fun createNodeJni(appId: String, sharedKey: String, storagePath: String): Long
 
     /**
+     * Create a HIVE node with transport configuration (ADR-039, #558).
+     *
+     * This extended version supports BLE transport configuration for unified
+     * multi-transport operation. When enableBle is true, the node will attempt
+     * to initialize BLE transport alongside the default Iroh transport.
+     *
+     * Note: Full BLE support on Android requires the Android BLE adapter integration
+     * in hive-btle. Currently, BLE transport is deferred on Android until the
+     * adapter callbacks are implemented.
+     *
+     * @param appId Formation/app identifier
+     * @param sharedKey Base64-encoded shared key
+     * @param storagePath Path for persistent storage
+     * @param enableBle Whether to enable BLE transport
+     * @param blePowerProfile BLE power profile: "aggressive", "balanced", or "low_power" (null for default)
+     * @return Handle (pointer) to the HiveNode, or 0 on failure
+     */
+    @JvmStatic
+    external fun createNodeWithConfigJni(
+        appId: String,
+        sharedKey: String,
+        storagePath: String,
+        enableBle: Boolean,
+        blePowerProfile: String?
+    ): Long
+
+    /**
      * Get the node ID (hex-encoded public key) for a node handle.
      * @param handle Node handle from createNodeJni
      * @return Node ID string, or error message
@@ -205,7 +232,30 @@ class HiveNodeJni private constructor(private val handle: Long) : AutoCloseable 
          * @param storagePath Path for persistent storage
          * @return HiveNodeJni instance, or null on failure
          */
-        fun create(appId: String, sharedKey: String, storagePath: String): HiveNodeJni? {
+        fun create(appId: String, sharedKey: String, storagePath: String): HiveNodeJni? =
+            createWithConfig(appId, sharedKey, storagePath, enableBle = false, blePowerProfile = null)
+
+        /**
+         * Create a new HIVE node with transport configuration (ADR-039, #558).
+         *
+         * This is the preferred method for creating nodes with BLE transport support.
+         * When enableBle is true, the node will be configured for unified multi-transport
+         * operation, though full BLE support requires Android adapter integration.
+         *
+         * @param appId Formation/app identifier
+         * @param sharedKey Base64-encoded shared key
+         * @param storagePath Path for persistent storage
+         * @param enableBle Whether to enable BLE transport (default: false)
+         * @param blePowerProfile BLE power profile: "aggressive", "balanced", or "low_power"
+         * @return HiveNodeJni instance, or null on failure
+         */
+        fun createWithConfig(
+            appId: String,
+            sharedKey: String,
+            storagePath: String,
+            enableBle: Boolean = false,
+            blePowerProfile: String? = null
+        ): HiveNodeJni? {
             // Check if we have an existing valid handle
             if (globalHandle != 0L) {
                 try {
@@ -226,9 +276,15 @@ class HiveNodeJni private constructor(private val handle: Long) : AutoCloseable 
             }
 
             return try {
-                val handle = HiveJni.createNodeJni(appId, sharedKey, storagePath)
+                val handle = HiveJni.createNodeWithConfigJni(
+                    appId,
+                    sharedKey,
+                    storagePath,
+                    enableBle,
+                    blePowerProfile
+                )
                 if (handle != 0L) {
-                    Log.i(TAG, "Created HIVE node with handle: $handle")
+                    Log.i(TAG, "Created HIVE node with handle: $handle (BLE: $enableBle)")
                     globalHandle = handle
                     globalInstance = HiveNodeJni(handle)
                     globalInstance

@@ -28,13 +28,13 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 anyhow = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-hive-btle = { version = "0.0.4", features = ["linux"] }
+hive-btle = { workspace = true, features = ["linux"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-hive-btle = { version = "0.0.4", features = ["macos"] }
+hive-btle = { workspace = true, features = ["macos"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-hive-btle = { version = "0.0.4", features = ["windows"] }
+hive-btle = { workspace = true, features = ["windows"] }
 
 [features]
 default = []

@@ -21,6 +21,9 @@ required-features = ["sync"]
 [features]
 default = ["sync"]
 sync = ["hive-protocol/automerge-backend"]
+# Bluetooth LE transport - BLE mesh networking (ADR-039)
+# Enables hive-btle integration via TransportManager
+bluetooth = ["hive-protocol/bluetooth", "dep:hive-btle"]
 
 [dependencies]
 # UniFFI for cross-language bindings (proc-macro only mode)
@@ -50,6 +53,20 @@ hex = "0.4"
 
 # Temporary directory for testing
 tempfile = "3"
+
+# BLE transport (optional, enabled by bluetooth feature)
+# Platform-specific adapter selected via target cfg in dependencies below
+hive-btle = { workspace = true, optional = true }
+
+# Platform-specific BLE adapter features
+[target.'cfg(target_os = "linux")'.dependencies]
+hive-btle = { workspace = true, features = ["linux"], optional = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+hive-btle = { workspace = true, features = ["macos"], optional = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+hive-btle = { workspace = true, features = ["windows"], optional = true }
 
 [build-dependencies]
 uniffi = { version = "0.28", features = ["build"] }
