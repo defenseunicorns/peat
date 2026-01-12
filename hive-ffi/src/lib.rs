@@ -1900,6 +1900,115 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_createNodeJni(
     }
 }
 
+/// JNI: Create a HiveNode with transport configuration (ADR-039, #558)
+///
+/// This extended version supports BLE transport configuration for unified
+/// multi-transport operation. When enable_ble is true, the node will attempt
+/// to initialize BLE transport alongside the default Iroh transport.
+///
+/// Note: On Android, BLE transport requires the Android BLE adapter to be
+/// initialized via JNI callbacks. Full BLE support is pending Android adapter
+/// integration in hive-btle.
+///
+/// Kotlin signature:
+/// ```kotlin
+/// external fun createNodeWithConfigJni(
+///     appId: String,
+///     sharedKey: String,
+///     storagePath: String,
+///     enableBle: Boolean,
+///     blePowerProfile: String?  // "aggressive", "balanced", or "low_power"
+/// ): Long
+/// ```
+#[cfg(feature = "sync")]
+#[no_mangle]
+pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_createNodeWithConfigJni(
+    mut env: JNIEnv,
+    _class: JClass,
+    app_id: JString,
+    shared_key: JString,
+    storage_path: JString,
+    enable_ble: jboolean,
+    ble_power_profile: JString,
+) -> i64 {
+    let app_id: String = match env.get_string(&app_id) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+    let shared_key: String = match env.get_string(&shared_key) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+    let storage_path: String = match env.get_string(&storage_path) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+
+    // Parse BLE power profile (null/empty string means use default)
+    let power_profile: Option<String> = env.get_string(&ble_power_profile).ok().and_then(|s| {
+        let s: String = s.into();
+        if s.is_empty() {
+            None
+        } else {
+            Some(s)
+        }
+    });
+
+    #[cfg(target_os = "android")]
+    android_log(&format!(
+        "createNodeWithConfigJni: app_id={}, storage_path={}, enable_ble={}, power_profile={:?}",
+        app_id,
+        storage_path,
+        enable_ble != 0,
+        power_profile
+    ));
+
+    // Build transport configuration
+    let transport_config = if enable_ble != 0 {
+        Some(TransportConfigFFI {
+            enable_ble: true,
+            ble_mesh_id: None, // Use app_id as mesh ID
+            ble_power_profile: power_profile,
+            transport_preference: None,
+        })
+    } else {
+        None
+    };
+
+    let config = NodeConfig {
+        app_id,
+        shared_key,
+        bind_address: None,
+        storage_path,
+        transport: transport_config,
+    };
+
+    match create_node(config) {
+        Ok(node) => {
+            #[cfg(target_os = "android")]
+            android_log("createNodeWithConfigJni: Node created successfully");
+            let handle = Arc::into_raw(node) as i64;
+            if let Ok(mut global) = GLOBAL_NODE_HANDLE.lock() {
+                *global = handle;
+                #[cfg(target_os = "android")]
+                android_log(&format!(
+                    "createNodeWithConfigJni: Stored global handle: {}",
+                    handle
+                ));
+            }
+            handle
+        }
+        Err(e) => {
+            #[cfg(target_os = "android")]
+            android_log(&format!(
+                "createNodeWithConfigJni: Error creating node: {:?}",
+                e
+            ));
+            0
+        }
+    }
+}
+
 /// JNI: Get the global node handle (survives APK replacement)
 ///
 /// Kotlin signature: external fun getGlobalNodeHandleJni(): Long
