@@ -15,8 +15,17 @@
 //! 2. Publishes moving tracks that fly patterns over Atlanta
 //! 3. Starts P2P sync and waits for peers to discover via mDNS
 //!
-//! The ATAK plugin running with the same formation credentials
-//! should discover this node via mDNS and sync data.
+//! # IMPORTANT: Test Isolation
+//!
+//! By default, this uses a TEST-ONLY formation ID (`hive-test-tak-client`) that is
+//! isolated from production ATAK deployments. To test with the ATAK plugin, you must
+//! explicitly set the same formation ID:
+//!
+//! ```bash
+//! HIVE_APP_ID=default-atak-formation cargo run --example hive_tak_client ...
+//! ```
+//!
+//! This prevents test data from accidentally polluting production deployments.
 
 use hive_ffi::{create_node, NodeConfig};
 use std::f64::consts::PI;
@@ -51,8 +60,9 @@ enum PatternType {
 fn main() {
     println!("=== HIVE TAK Test Client - Atlanta Flight Patterns ===\n");
 
-    // Use same credentials as ATAK plugin defaults
-    let app_id = std::env::var("HIVE_APP_ID").unwrap_or_else(|_| "default-atak-formation".into());
+    // Use TEST-ONLY formation by default to avoid polluting production deployments
+    // Set HIVE_APP_ID=default-atak-formation to test with real ATAK plugin
+    let app_id = std::env::var("HIVE_APP_ID").unwrap_or_else(|_| "hive-test-tak-client".into());
     let shared_key = std::env::var("HIVE_SHARED_KEY")
         .unwrap_or_else(|_| "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".into());
 

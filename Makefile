@@ -51,6 +51,13 @@ help:
 	@echo "  build                    - Build all Rust crates"
 	@echo "  build-docker             - Build Docker image (run once before tests)"
 	@echo ""
+	@echo "Android (ATAK Plugin):"
+	@echo "  build-android            - Cross-compile hive-ffi for Android"
+	@echo "  build-atak-plugin        - Build ATAK plugin APK (includes native libs)"
+	@echo "  deploy-atak-plugin       - Deploy APK to connected device"
+	@echo "  android                  - Build and deploy ATAK plugin"
+	@echo "  clean-android            - Clean Android build artifacts"
+	@echo ""
 	@echo "Legacy E-Series Tests (for reference):"
 	@echo "  e11-modes                - Test HIVE modes (legacy)"
 	@echo "  e12-comprehensive        - Full validation suite (legacy)"
@@ -376,6 +383,45 @@ matrix-analyze:
 	fi
 	@echo "Generating comparative analysis for $(DIR)..."
 	@cd hive-sim && python3 analyze-matrix-results.py $(DIR)
+
+# ============================================
+# Android Cross-Compilation
+# ============================================
+
+# Build hive-ffi native library for Android
+# Requires: cargo-ndk (cargo install cargo-ndk)
+# Outputs to: atak-plugin/app/libs/{arm64-v8a,armeabi-v7a}/libhive_ffi.so
+build-android:
+	@echo "Building hive-ffi for Android..."
+	@command -v cargo-ndk >/dev/null 2>&1 || { echo "Error: cargo-ndk not found. Install with: cargo install cargo-ndk"; exit 1; }
+	@export PATH="$$HOME/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin:$$PATH" && \
+		cargo ndk -t arm64-v8a -t armeabi-v7a -o atak-plugin/app/libs build --release -p hive-ffi
+	@echo "✓ Native libraries built:"
+	@ls -la atak-plugin/app/libs/arm64-v8a/libhive_ffi.so atak-plugin/app/libs/armeabi-v7a/libhive_ffi.so
+
+# Build ATAK plugin with native libs
+build-atak-plugin: build-android
+	@echo "Building ATAK plugin..."
+	@cd atak-plugin && ./gradlew assembleCivDebug
+	@echo "✓ ATAK plugin built"
+
+# Deploy ATAK plugin to connected device
+deploy-atak-plugin:
+	@echo "Deploying ATAK plugin..."
+	@adb install -r atak-plugin/app/build/outputs/apk/civ/debug/ATAK-Plugin-HIVE-*.apk
+	@echo "✓ Deployed to device"
+
+# Full Android build and deploy
+android: build-atak-plugin deploy-atak-plugin
+	@echo "✓ Android build and deploy complete"
+
+# Clean Android build artifacts
+clean-android:
+	@echo "Cleaning Android build artifacts..."
+	@rm -rf atak-plugin/app/libs/arm64-v8a/libhive_ffi.so
+	@rm -rf atak-plugin/app/libs/armeabi-v7a/libhive_ffi.so
+	@rm -rf atak-plugin/app/build
+	@echo "✓ Android artifacts cleaned"
 
 # ============================================
 # Legacy E-Series Tests (kept for compatibility)
