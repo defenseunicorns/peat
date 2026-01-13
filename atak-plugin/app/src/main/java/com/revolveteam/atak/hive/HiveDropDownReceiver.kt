@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ */
+
 package com.revolveteam.atak.hive
 
 import android.content.Context
@@ -258,14 +262,6 @@ class HiveDropDownReceiver(
                 setTextColor(Color.WHITE)
             }
             container.addView(cellsTitle)
-            container.addView(createSpacer(8))
-
-            val cellsHint = TextView(pluginContext).apply {
-                text = "Tap a cell on the map to view its platforms"
-                textSize = 11f
-                setTextColor(Color.parseColor("#888888"))
-            }
-            container.addView(cellsHint)
             container.addView(createSpacer(12))
 
             if (mapComponent.cells.isEmpty()) {
@@ -409,20 +405,26 @@ class HiveDropDownReceiver(
         headerRow.addView(statusText)
         card.addView(headerRow)
 
-        val platforms = TextView(pluginContext).apply {
-            text = "${cell.platformCount} platforms"
+        // Get actual platforms in this cell
+        val cellPlatforms = mapComponent.platforms.filter { it.cellId == cell.id }
+
+        val platformsHeader = TextView(pluginContext).apply {
+            text = "${cellPlatforms.size} platforms"
             textSize = 12f
             setTextColor(Color.GRAY)
         }
-        card.addView(platforms)
+        card.addView(platformsHeader)
 
-        if (cell.capabilities.isNotEmpty()) {
-            val caps = TextView(pluginContext).apply {
-                text = cell.capabilities.joinToString(", ")
-                textSize = 11f
-                setTextColor(Color.parseColor("#888888"))
+        // List platform names
+        if (cellPlatforms.isNotEmpty()) {
+            cellPlatforms.forEach { platform ->
+                val platformRow = TextView(pluginContext).apply {
+                    text = "  • ${platform.callsign} (${platform.platformType.name})"
+                    textSize = 11f
+                    setTextColor(Color.parseColor("#AAAAAA"))
+                }
+                card.addView(platformRow)
             }
-            card.addView(caps)
         }
 
         return card
@@ -1399,9 +1401,10 @@ class HiveDropDownReceiver(
             setPadding(24, 16, 24, 16)
         }
 
-        // Get platforms in user's unit
+        // Get platforms in current mesh/cell (mesh_id == cell_id)
+        val meshId = HivePluginLifecycle.getInstance()?.getCurrentMeshId()
         val unitPlatforms = mapComponent.platforms.filter { platform ->
-            platform.cellId == userRole.unitId || userRole.unitId.isEmpty()
+            platform.cellId == meshId || meshId.isNullOrEmpty()
         }
 
         // Platform count by status

@@ -1,3 +1,5 @@
+<!-- Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved. -->
+
 # HIVE ATAK Plugin
 
 ATAK plugin for managing HIVE (Hierarchical Intelligence for Versatile Entities) autonomous systems via the TAK ecosystem.

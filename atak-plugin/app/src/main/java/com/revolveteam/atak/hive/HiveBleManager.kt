@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ */
+
 package com.revolveteam.atak.hive
 
 import android.Manifest

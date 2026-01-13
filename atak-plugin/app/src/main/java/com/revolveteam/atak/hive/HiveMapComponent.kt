@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ */
+
 package com.revolveteam.atak.hive
 
 import android.content.Context
@@ -33,6 +37,7 @@ class HiveMapComponent : DropDownMapComponent() {
     companion object {
         private const val TAG = "HiveMapComponent"
         private const val REFRESH_INTERVAL_MS = 2000L // Refresh every 2 seconds
+        private const val BLE_STALE_TIMEOUT_MS = 30_000L  // 30 seconds - remove platforms with no updates
     }
 
     private lateinit var pluginContext: Context
@@ -56,13 +61,13 @@ class HiveMapComponent : DropDownMapComponent() {
     val cells: List<HiveCell> get() = _cells.toList()
 
     private val _platforms = mutableListOf<HivePlatform>()
-    val platforms: List<HivePlatform> get() = _platforms.toList()
+    val platforms: List<HivePlatform> get() = _platforms.toList() + _blePeerPlatforms.values
 
     private val _tracks = mutableListOf<HiveTrack>()
     val tracks: List<HiveTrack> get() = _tracks.toList()
 
-    // BLE peer tracks from hive-btle mesh (nodeId -> track)
-    private val _blePeerTracks = mutableMapOf<Long, HiveTrack>()
+    // BLE peer platforms for cell membership (nodeId -> platform)
+    private val _blePeerPlatforms = mutableMapOf<Long, HivePlatform>()
 
     private var _connectionStatus = ConnectionStatus.DISCONNECTED
     val connectionStatus: ConnectionStatus get() = _connectionStatus
@@ -175,8 +180,12 @@ class HiveMapComponent : DropDownMapComponent() {
         val location = peripheral.location ?: return  // No location, nothing to display
 
         val nodeId = document.nodeId
-        val callsign = peripheral.callsign.takeIf { it.isNotEmpty() }
+        // Get callsign, trim whitespace, fallback to node ID if empty/blank
+        val rawCallsign = peripheral.callsign?.trim() ?: ""
+        val callsign = rawCallsign.takeIf { it.isNotBlank() }
             ?: "BLE-${String.format("%08X", nodeId).takeLast(4)}"
+
+        Log.d(TAG, "BLE peer callsign: raw='$rawCallsign', resolved='$callsign'")
         val battery = peripheral.health.batteryPercent
         val heartRate = peripheral.health.heartRate
 
@@ -187,46 +196,89 @@ class HiveMapComponent : DropDownMapComponent() {
                 "callsign=$callsign, cell=$meshId, location=(${location.latitude}, ${location.longitude}), " +
                 "battery=$battery%, heartRate=$heartRate")
 
-        // Create/update track for this BLE peer (mesh_id == cell_id mapping per ADR-041)
-        val track = HiveTrack(
+        // Create/update platform for cell membership, Squad Summary, and map display
+        // Note: BLE peers are shown as platforms only (not tracks) - tracks are for detected entities
+        val platform = HivePlatform(
             id = "ble-${String.format("%08X", nodeId)}",
-            sourcePlatform = "hive-btle",
-            cellId = meshId,
-            formationId = null,
+            callsign = callsign,
+            platformType = HivePlatform.PlatformType.SOLDIER,
             lat = location.latitude.toDouble(),
             lon = location.longitude.toDouble(),
             hae = location.altitude.toDouble().takeIf { it != 0.0 },
-            cep = null,
-            heading = null,
-            speed = null,
-            classification = "a-f-G-U-C",  // Friendly ground unit - combat
-            confidence = 1.0,
-            category = HiveTrack.Category.PERSON,
-            attributes = mapOf(
-                "callsign" to callsign,
-                "battery" to "$battery%",
-                "source" to "BLE Mesh"
-            ) + (heartRate?.let { mapOf("heartRate" to "$it bpm") } ?: emptyMap()),
-            createdAt = System.currentTimeMillis(),
+            cellId = meshId,
+            status = HivePlatform.Status.OPERATIONAL,
+            batteryPercent = battery,
             lastUpdate = System.currentTimeMillis()
         )
 
-        // Update the BLE peer track map and refresh overlay
+        // Update the BLE peer platform map and refresh overlay
         refreshHandler.post {
-            _blePeerTracks[nodeId] = track
+            _blePeerPlatforms[nodeId] = platform
+            // Ensure cell exists for this mesh_id
+            meshId?.let { ensureCellExists(it) }
             updateBlePeerOverlay()
         }
+    }
+
+    /**
+     * Ensure a cell exists for the given cell_id (mesh_id).
+     * Creates a synthetic cell if one doesn't exist.
+     * The tablet (full HIVE node) auto-assigns itself as cell leader.
+     */
+    private fun ensureCellExists(cellId: String) {
+        if (_cells.any { it.id == cellId }) return
+
+        // Get self marker to set as leader (tablet running full HIVE is the leader)
+        val selfMarker = mapView.selfMarker
+        val selfUid = selfMarker?.uid
+        val selfCallsign = selfMarker?.getMetaString("callsign", null)
+            ?: selfMarker?.title
+            ?: "Tablet"
+        val selfPoint = selfMarker?.point
+
+        // Create synthetic cell for BLE mesh
+        val bleCell = HiveCell(
+            id = cellId,
+            name = cellId,  // Use mesh_id as name
+            status = HiveCell.Status.ACTIVE,
+            platformCount = _blePeerPlatforms.size + 1,  // +1 for tablet
+            centerLat = selfPoint?.latitude ?: _blePeerPlatforms.values.firstOrNull()?.lat ?: 0.0,
+            centerLon = selfPoint?.longitude ?: _blePeerPlatforms.values.firstOrNull()?.lon ?: 0.0,
+            capabilities = listOf("BLE_MESH", "GATEWAY"),
+            formationId = null,
+            leaderId = selfUid,  // Tablet is cell leader
+            lastUpdate = System.currentTimeMillis()
+        )
+        _cells.add(bleCell)
+
+        // Add tablet itself as a platform in this cell
+        if (selfUid != null && selfPoint != null) {
+            val tabletPlatform = HivePlatform(
+                id = selfUid,
+                callsign = selfCallsign,
+                platformType = HivePlatform.PlatformType.SOLDIER,
+                lat = selfPoint.latitude,
+                lon = selfPoint.longitude,
+                hae = if (selfPoint.isAltitudeValid) selfPoint.altitude else null,
+                cellId = cellId,
+                status = HivePlatform.Status.OPERATIONAL,
+                batteryPercent = null,
+                lastUpdate = System.currentTimeMillis()
+            )
+            _blePeerPlatforms[selfUid.hashCode().toLong()] = tabletPlatform
+        }
+
+        Log.i(TAG, "Created synthetic cell for BLE mesh: $cellId, leader=$selfCallsign ($selfUid)")
     }
 
     /**
      * Update the track overlay with BLE peer tracks.
      */
     private fun updateBlePeerOverlay() {
-        // Combine FFI tracks with BLE peer tracks
-        val allTracks = _tracks.toMutableList()
-        allTracks.addAll(_blePeerTracks.values)
-        trackOverlay?.updateTracks(allTracks)
-        Log.d(TAG, "Updated overlay with ${_tracks.size} FFI tracks + ${_blePeerTracks.size} BLE tracks")
+        // Use combined tracks/platforms (includes BLE peers via getters)
+        trackOverlay?.updateTracks(tracks)
+        platformOverlay?.updatePlatforms(platforms, _cells)
+        Log.d(TAG, "Updated overlay with ${_tracks.size} FFI tracks, ${_blePeerPlatforms.size} BLE platforms")
     }
 
     /**
@@ -254,13 +306,25 @@ class HiveMapComponent : DropDownMapComponent() {
 
             try {
                 refreshData()
-                // Update map overlays - combine FFI tracks with BLE peer tracks
-                val allTracks = _tracks.toMutableList()
-                allTracks.addAll(_blePeerTracks.values)
-                trackOverlay?.updateTracks(allTracks)
+
+                // Clean up stale BLE platforms (based on timestamp, not unreliable connection state)
+                cleanupStalePlatforms()
+
+                // Ensure cell exists for current mesh if BLE platforms exist
+                if (_blePeerPlatforms.isNotEmpty()) {
+                    val meshId = HivePluginLifecycle.getInstance()?.getCurrentMeshId()
+                    meshId?.let { ensureCellExists(it) }
+                } else {
+                    // No BLE peers - remove synthetic BLE cell
+                    val meshId = HivePluginLifecycle.getInstance()?.getCurrentMeshId()
+                    meshId?.let { removeCellIfEmpty(it) }
+                }
+
+                // Update map overlays - use combined tracks and platforms (includes BLE peers)
+                trackOverlay?.updateTracks(tracks)
                 // Update cell bounding circles based on platform positions
-                cellOverlay?.updateCellBounds(_cells, _platforms)
-                platformOverlay?.updatePlatforms(_platforms, _cells)
+                cellOverlay?.updateCellBounds(_cells, platforms)
+                platformOverlay?.updatePlatforms(platforms, _cells)
             } catch (e: Exception) {
                 Log.e(TAG, "Error in periodic refresh: ${e.message}", e)
             }
@@ -273,17 +337,71 @@ class HiveMapComponent : DropDownMapComponent() {
     }
 
     /**
+     * Remove BLE peer platforms that are stale (no recent document sync).
+     * Uses ONLY timestamp-based staleness since BLE disconnect detection is unreliable.
+     */
+    private fun cleanupStalePlatforms() {
+        val now = System.currentTimeMillis()
+        val selfUidHash = mapView.selfMarker?.uid?.hashCode()?.toLong()
+
+        // Find BLE platforms that are stale (no update in timeout period)
+        val toRemove = _blePeerPlatforms.entries.filter { (nodeId, platform) ->
+            if (nodeId == selfUidHash) return@filter false  // Never remove tablet itself
+
+            val ageMs = now - platform.lastUpdate
+            val isStale = ageMs > BLE_STALE_TIMEOUT_MS
+
+            if (isStale) {
+                Log.d(TAG, "Platform ${platform.callsign} is stale (${ageMs / 1000}s since update)")
+            }
+
+            isStale
+        }.map { it.key }
+
+        if (toRemove.isNotEmpty()) {
+            toRemove.forEach { nodeId ->
+                val platform = _blePeerPlatforms.remove(nodeId)
+                Log.i(TAG, "Removed stale BLE peer: ${platform?.callsign} (${String.format("%08X", nodeId)})")
+            }
+        }
+    }
+
+    /**
+     * Remove a cell if it has no platforms (except maybe the tablet itself).
+     */
+    private fun removeCellIfEmpty(cellId: String) {
+        val cellPlatforms = platforms.filter { it.cellId == cellId }
+        // Keep cell if tablet is still in it, otherwise remove
+        val selfUid = mapView.selfMarker?.uid
+        val hasOnlyTablet = cellPlatforms.size <= 1 && cellPlatforms.firstOrNull()?.id == selfUid
+
+        if (cellPlatforms.isEmpty() || hasOnlyTablet) {
+            _cells.removeAll { it.id == cellId }
+            // Also remove tablet from BLE platforms if no other peers
+            if (hasOnlyTablet) {
+                val selfUidHash = selfUid?.hashCode()?.toLong()
+                selfUidHash?.let { _blePeerPlatforms.remove(it) }
+            }
+            Log.i(TAG, "Removed empty cell: $cellId")
+        }
+    }
+
+    /**
      * Update connection status based on HIVE node availability and peer count
      */
     private fun updateConnectionStatus() {
         val node = HivePluginLifecycle.getInstance()?.getHiveNodeJni()
-        val currentPeerCount = peerCount  // Use the property which gets live peer count
+        val ffiPeerCount = peerCount  // FFI mesh peers
+        val blePeerCount = HivePluginLifecycle.getInstance()?.getHiveBleManager()
+            ?.peers?.value?.count { it.isConnected } ?: 0
+        val totalPeerCount = ffiPeerCount + blePeerCount
+
         _connectionStatus = when {
             node == null -> ConnectionStatus.DISCONNECTED
-            currentPeerCount > 0 -> ConnectionStatus.CONNECTED
+            totalPeerCount > 0 -> ConnectionStatus.CONNECTED
             else -> ConnectionStatus.CONNECTING  // Node exists but no peers
         }
-        Log.d(TAG, "Connection status: $_connectionStatus (peers: $currentPeerCount)")
+        Log.d(TAG, "Connection status: $_connectionStatus (ffi=$ffiPeerCount, ble=$blePeerCount)")
     }
 
     /**
@@ -540,8 +658,9 @@ class HiveMapComponent : DropDownMapComponent() {
      * @return All platforms if no cell selected, otherwise only platforms in selected cell
      */
     fun getFilteredPlatforms(): List<HivePlatform> {
-        val selectedId = _selectedCellId ?: return _platforms.toList()
-        return _platforms.filter { it.cellId == selectedId }
+        val allPlatforms = platforms  // Uses the getter which includes BLE platforms
+        val selectedId = _selectedCellId ?: return allPlatforms
+        return allPlatforms.filter { it.cellId == selectedId }
     }
 
     /**
