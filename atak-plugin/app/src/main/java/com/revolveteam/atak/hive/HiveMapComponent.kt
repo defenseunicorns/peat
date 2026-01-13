@@ -180,15 +180,18 @@ class HiveMapComponent : DropDownMapComponent() {
         val battery = peripheral.health.batteryPercent
         val heartRate = peripheral.health.heartRate
 
+        // Get mesh_id early for logging (mesh_id == cell_id mapping per ADR-041)
+        val meshId = HivePluginLifecycle.getInstance()?.getCurrentMeshId()
+
         Log.i(TAG, "BLE document synced: nodeId=${String.format("%08X", nodeId)}, " +
-                "callsign=$callsign, location=(${location.latitude}, ${location.longitude}), " +
+                "callsign=$callsign, cell=$meshId, location=(${location.latitude}, ${location.longitude}), " +
                 "battery=$battery%, heartRate=$heartRate")
 
-        // Create/update track for this BLE peer
+        // Create/update track for this BLE peer (mesh_id == cell_id mapping per ADR-041)
         val track = HiveTrack(
             id = "ble-${String.format("%08X", nodeId)}",
             sourcePlatform = "hive-btle",
-            cellId = null,
+            cellId = meshId,
             formationId = null,
             lat = location.latitude.toDouble(),
             lon = location.longitude.toDouble(),
