@@ -50,8 +50,8 @@ class HiveDropDownReceiver(
     private var currentScrollView: ScrollView? = null
     private var isDropDownVisible = false
 
-    // Platform detail view state
-    private var selectedPlatform: HivePlatform? = null
+    // Platform detail view state - store ID to allow refresh with updated data
+    private var selectedPlatformId: String? = null
 
     // User's role in the hierarchy (for PoC, using default role)
     private var userRole: HiveRole = HiveRole.defaultRole()
@@ -161,9 +161,15 @@ class HiveDropDownReceiver(
     }
 
     private fun buildContentContainer(): LinearLayout {
-        // If a platform is selected, show detail view
-        selectedPlatform?.let { platform ->
-            return buildPlatformDetailView(platform)
+        // If a platform is selected, look up fresh data and show detail view
+        selectedPlatformId?.let { platformId ->
+            val platform = mapComponent.platforms.find { it.id == platformId }
+            if (platform != null) {
+                return buildPlatformDetailView(platform)
+            } else {
+                // Platform no longer exists, clear selection
+                selectedPlatformId = null
+            }
         }
 
         val selectedCellId = mapComponent.selectedCellId
@@ -490,7 +496,7 @@ class HiveDropDownReceiver(
             isClickable = true
             isFocusable = true
             setOnClickListener {
-                selectedPlatform = platform
+                selectedPlatformId = platform.id
                 refreshContent()
             }
         }
@@ -571,7 +577,7 @@ class HiveDropDownReceiver(
             setBackgroundColor(Color.parseColor("#444444"))
             setPadding(24, 8, 24, 8)
             setOnClickListener {
-                selectedPlatform = null
+                selectedPlatformId = null
                 refreshContent()
             }
         }
@@ -1286,11 +1292,13 @@ class HiveDropDownReceiver(
         }
         card.addView(toggleButton)
 
-        // Note about PLI sync
+        // Note about PLI sync and unified transport migration status
         if (isRunning) {
             card.addView(createSpacer(8))
             val pliNote = TextView(pluginContext).apply {
-                text = "Note: PLI broadcast not yet synced over BLE"
+                // ADR-039, #558: Unified transport configured but using fallback BLE manager
+                // until Android BLE adapter integration in hive-btle is complete
+                text = "Unified transport: pending Android adapter (#558)"
                 textSize = 10f
                 setTextColor(Color.parseColor("#666666"))
             }

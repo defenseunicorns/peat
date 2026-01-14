@@ -88,19 +88,30 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
     }
 
     private fun initBleManager(context: Context) {
+        // ADR-039 Migration: Check if unified transport handles BLE
+        // If the hive-ffi node was created with enableBle=true, we don't need
+        // the deprecated HiveBleManager. However, during the transition period,
+        // we keep HiveBleManager as a fallback for Android BLE adapter integration.
+        val prefs = context.getSharedPreferences("hive_prefs", Context.MODE_PRIVATE)
+        val unifiedBleEnabled = prefs.getBoolean("enable_ble", true)
+
+        // For now, still initialize HiveBleManager as fallback since Android
+        // BLE adapter callbacks in hive-btle are not yet complete.
+        // TODO(#558): Remove this once Android BLE adapter integration is complete
+        // and unified transport fully handles BLE on Android.
         try {
             // Get mesh ID from preferences, system properties, or use default
-            val prefs = context.getSharedPreferences("hive_prefs", Context.MODE_PRIVATE)
             val meshId = prefs.getString("mesh_id", null)
                 ?: System.getProperty("hive.mesh_id")
                 ?: System.getenv("HIVE_MESH_ID")
                 ?: DEFAULT_MESH_ID
 
+            @Suppress("DEPRECATION")
             hiveBleManager = HiveBleManager(context, meshId)
 
             if (hiveBleManager?.hasPermissions() == true) {
                 val started = hiveBleManager?.start() ?: false
-                Log.i(TAG, "HIVE BLE mesh started: $started")
+                Log.i(TAG, "HIVE BLE mesh started (fallback): $started [unified BLE requested: $unifiedBleEnabled]")
             } else {
                 Log.w(TAG, "BLE permissions not granted - mesh not started. " +
                     "Required: ${hiveBleManager?.getRequiredPermissions()?.joinToString()}")
@@ -148,14 +159,28 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
                 ?: System.getenv("HIVE_SHARED_KEY")
                 ?: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" // 32 zero bytes base64
 
-            Log.d(TAG, "Using HIVE formation: $appId")
-            Log.d(TAG, "Creating HIVE node with storage: ${hiveDir.absolutePath}")
+            // Get BLE configuration from preferences
+            val prefs = context.getSharedPreferences("hive_prefs", Context.MODE_PRIVATE)
+            val enableBle = prefs.getBoolean("enable_ble", true) // Enable BLE by default (ADR-039)
+            val blePowerProfile = prefs.getString("ble_power_profile", "balanced")
 
-            hiveNodeJni = HiveNodeJni.create(appId, sharedKey, hiveDir.absolutePath)
+            Log.d(TAG, "Using HIVE formation: $appId")
+            Log.d(TAG, "Creating HIVE node with storage: ${hiveDir.absolutePath}, BLE: $enableBle")
+
+            // Use unified transport with BLE enabled (ADR-039, #558)
+            // This integrates BLE as a transport within hive-ffi rather than running
+            // parallel BLE and Iroh meshes.
+            hiveNodeJni = HiveNodeJni.createWithConfig(
+                appId,
+                sharedKey,
+                hiveDir.absolutePath,
+                enableBle = enableBle,
+                blePowerProfile = blePowerProfile
+            )
 
             if (hiveNodeJni != null) {
                 val nodeId = hiveNodeJni?.nodeId() ?: "unknown"
-                Log.i(TAG, "HIVE node created - ID: ${nodeId.take(16)}...")
+                Log.i(TAG, "HIVE node created - ID: ${nodeId.take(16)}... (unified transport, BLE: $enableBle)")
 
                 // Start sync
                 val syncStarted = hiveNodeJni?.startSync() ?: false
