@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ */
+
 package com.revolveteam.atak.hive
 
 import android.content.Context
@@ -46,8 +50,8 @@ class HiveDropDownReceiver(
     private var currentScrollView: ScrollView? = null
     private var isDropDownVisible = false
 
-    // Platform detail view state
-    private var selectedPlatform: HivePlatform? = null
+    // Platform detail view state - store ID to allow refresh with updated data
+    private var selectedPlatformId: String? = null
 
     // User's role in the hierarchy (for PoC, using default role)
     private var userRole: HiveRole = HiveRole.defaultRole()
@@ -157,9 +161,15 @@ class HiveDropDownReceiver(
     }
 
     private fun buildContentContainer(): LinearLayout {
-        // If a platform is selected, show detail view
-        selectedPlatform?.let { platform ->
-            return buildPlatformDetailView(platform)
+        // If a platform is selected, look up fresh data and show detail view
+        selectedPlatformId?.let { platformId ->
+            val platform = mapComponent.platforms.find { it.id == platformId }
+            if (platform != null) {
+                return buildPlatformDetailView(platform)
+            } else {
+                // Platform no longer exists, clear selection
+                selectedPlatformId = null
+            }
         }
 
         val selectedCellId = mapComponent.selectedCellId
@@ -258,14 +268,6 @@ class HiveDropDownReceiver(
                 setTextColor(Color.WHITE)
             }
             container.addView(cellsTitle)
-            container.addView(createSpacer(8))
-
-            val cellsHint = TextView(pluginContext).apply {
-                text = "Tap a cell on the map to view its platforms"
-                textSize = 11f
-                setTextColor(Color.parseColor("#888888"))
-            }
-            container.addView(cellsHint)
             container.addView(createSpacer(12))
 
             if (mapComponent.cells.isEmpty()) {
@@ -409,20 +411,26 @@ class HiveDropDownReceiver(
         headerRow.addView(statusText)
         card.addView(headerRow)
 
-        val platforms = TextView(pluginContext).apply {
-            text = "${cell.platformCount} platforms"
+        // Get actual platforms in this cell
+        val cellPlatforms = mapComponent.platforms.filter { it.cellId == cell.id }
+
+        val platformsHeader = TextView(pluginContext).apply {
+            text = "${cellPlatforms.size} platforms"
             textSize = 12f
             setTextColor(Color.GRAY)
         }
-        card.addView(platforms)
+        card.addView(platformsHeader)
 
-        if (cell.capabilities.isNotEmpty()) {
-            val caps = TextView(pluginContext).apply {
-                text = cell.capabilities.joinToString(", ")
-                textSize = 11f
-                setTextColor(Color.parseColor("#888888"))
+        // List platform names
+        if (cellPlatforms.isNotEmpty()) {
+            cellPlatforms.forEach { platform ->
+                val platformRow = TextView(pluginContext).apply {
+                    text = "  • ${platform.callsign} (${platform.platformType.name})"
+                    textSize = 11f
+                    setTextColor(Color.parseColor("#AAAAAA"))
+                }
+                card.addView(platformRow)
             }
-            card.addView(caps)
         }
 
         return card
@@ -488,7 +496,7 @@ class HiveDropDownReceiver(
             isClickable = true
             isFocusable = true
             setOnClickListener {
-                selectedPlatform = platform
+                selectedPlatformId = platform.id
                 refreshContent()
             }
         }
@@ -569,7 +577,7 @@ class HiveDropDownReceiver(
             setBackgroundColor(Color.parseColor("#444444"))
             setPadding(24, 8, 24, 8)
             setOnClickListener {
-                selectedPlatform = null
+                selectedPlatformId = null
                 refreshContent()
             }
         }
@@ -1284,11 +1292,13 @@ class HiveDropDownReceiver(
         }
         card.addView(toggleButton)
 
-        // Note about PLI sync
+        // Note about PLI sync and unified transport migration status
         if (isRunning) {
             card.addView(createSpacer(8))
             val pliNote = TextView(pluginContext).apply {
-                text = "Note: PLI broadcast not yet synced over BLE"
+                // ADR-039, #558: Unified transport configured but using fallback BLE manager
+                // until Android BLE adapter integration in hive-btle is complete
+                text = "Unified transport: pending Android adapter (#558)"
                 textSize = 10f
                 setTextColor(Color.parseColor("#666666"))
             }
@@ -1399,9 +1409,10 @@ class HiveDropDownReceiver(
             setPadding(24, 16, 24, 16)
         }
 
-        // Get platforms in user's unit
+        // Get platforms in current mesh/cell (mesh_id == cell_id)
+        val meshId = HivePluginLifecycle.getInstance()?.getCurrentMeshId()
         val unitPlatforms = mapComponent.platforms.filter { platform ->
-            platform.cellId == userRole.unitId || userRole.unitId.isEmpty()
+            platform.cellId == meshId || meshId.isNullOrEmpty()
         }
 
         // Platform count by status

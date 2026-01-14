@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ */
+
 package com.revolveteam.atak.hive
 
 import android.os.Handler
@@ -125,6 +129,9 @@ class SelfPositionBroadcaster(private val mapView: MapView) {
 
         Log.d(TAG, "Broadcasting PLI: uid=$uid, callsign=$callsign, lat=$lat, lon=$lon")
 
+        // Get current mesh_id as cell_id (mesh_id == cell_id mapping per ADR-041)
+        val cellId = HivePluginLifecycle.getInstance()?.getCurrentMeshId()
+
         // Build platform JSON
         val platformJson = JSONObject().apply {
             put("id", uid)
@@ -138,7 +145,7 @@ class SelfPositionBroadcaster(private val mapView: MapView) {
             put("status", "ACTIVE")
             put("capabilities", JSONArray().put("PLI"))
             put("readiness", 1.0)
-            // cell_id is null for now - could be set if user joins a cell
+            if (cellId != null) put("cell_id", cellId)
         }
 
         // Get HIVE node and publish

@@ -1,2 +1,6 @@
 rootProject.name = 'hive-atak-plugin'
 include ':app'
+
+// Include hive-btle for local development
+include ':hive-btle'
+project(':hive-btle').projectDir = new File(settingsDir, '../../hive-btle/android')
