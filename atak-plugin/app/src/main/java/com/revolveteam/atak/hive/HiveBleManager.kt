@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ */
+
 package com.revolveteam.atak.hive
 
 import android.Manifest
@@ -12,6 +16,8 @@ import com.revolveteam.hive.HiveDocument
 import com.revolveteam.hive.HiveEventType
 import com.revolveteam.hive.HiveMeshListener
 import com.revolveteam.hive.HivePeer
+import com.revolveteam.hive.PeerConnectionState
+import com.revolveteam.hive.StateCountSummary
 
 /**
  * Manages HIVE BLE mesh connectivity for the ATAK plugin.
@@ -194,6 +200,45 @@ class HiveBleManager(
      * Get the local node ID.
      */
     fun getNodeId(): Long? = hiveBtle?.nodeId
+
+    /**
+     * Get the internal HiveMesh instance for direct access.
+     */
+    fun getMesh() = hiveBtle?.mesh
+
+    // ========================================================================
+    // Connection State Graph API (via HiveMesh)
+    // ========================================================================
+
+    /**
+     * Get all peers currently in Connected state.
+     */
+    fun getConnectedPeers(): List<PeerConnectionState> =
+        hiveBtle?.mesh?.getConnectedPeers() ?: emptyList()
+
+    /**
+     * Get all peers in Degraded state (low RSSI).
+     */
+    fun getDegradedPeers(): List<PeerConnectionState> =
+        hiveBtle?.mesh?.getDegradedPeers() ?: emptyList()
+
+    /**
+     * Get all peers in Lost state (disconnected and not seen for timeout period).
+     */
+    fun getLostPeers(): List<PeerConnectionState> =
+        hiveBtle?.mesh?.getLostPeers() ?: emptyList()
+
+    /**
+     * Get connection state for a specific peer.
+     */
+    fun getPeerConnectionState(nodeId: Long): PeerConnectionState? =
+        hiveBtle?.mesh?.getPeerConnectionState(nodeId)
+
+    /**
+     * Get summary counts of peers in each connection state (for UI badges).
+     */
+    fun getConnectionStateCounts(): StateCountSummary? =
+        hiveBtle?.mesh?.getConnectionStateCounts()
 
     /**
      * Send an event to all peers.
