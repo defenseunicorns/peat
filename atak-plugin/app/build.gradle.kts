@@ -158,7 +158,8 @@ dependencies {
     // implementation(project(":hive-bindings"))
 
     // HIVE BLE mesh transport (for WearTAK sync)
-    implementation("com.revolveteam:hive:0.0.5")
+    // 0.0.10 adds field-level delta sync for bandwidth efficiency
+    implementation("com.revolveteam:hive:0.0.10")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

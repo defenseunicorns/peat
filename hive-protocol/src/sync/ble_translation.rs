@@ -197,11 +197,33 @@ impl BleTranslator {
     /// Convert BLE position to track document JSON
     ///
     /// Creates a track document suitable for storage in the tracks collection.
+    /// Note: This version does not set cell_id. Use `position_to_track_in_cell`
+    /// to include cell membership based on BLE mesh_id.
     pub fn position_to_track(
         &self,
         position: &BlePosition,
         peripheral_id: u32,
         callsign: Option<&str>,
+    ) -> Value {
+        self.position_to_track_in_cell(position, peripheral_id, callsign, None)
+    }
+
+    /// Convert BLE position to track document JSON with cell membership
+    ///
+    /// The `mesh_id` parameter (from BLE mesh configuration) is used as the cell_id,
+    /// allowing BLE-originated tracks to be associated with HIVE cells.
+    ///
+    /// # Arguments
+    /// * `position` - The BLE position data
+    /// * `peripheral_id` - The BLE peripheral ID
+    /// * `callsign` - Optional callsign for the track
+    /// * `mesh_id` - Optional BLE mesh ID to use as cell_id
+    pub fn position_to_track_in_cell(
+        &self,
+        position: &BlePosition,
+        peripheral_id: u32,
+        callsign: Option<&str>,
+        mesh_id: Option<&str>,
     ) -> Value {
         let now_ms = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -211,7 +233,7 @@ impl BleTranslator {
         let track_id = format!("{}{:08X}", self.config.ble_id_prefix, peripheral_id);
         let source = callsign.unwrap_or(&track_id);
 
-        json!({
+        let mut track = json!({
             "id": track_id,
             "source_platform": format!("ble-{:08X}", peripheral_id),
             "lat": position.latitude as f64,
@@ -225,7 +247,14 @@ impl BleTranslator {
             "created_at": now_ms,
             "last_update": now_ms,
             "ble_origin": true
-        })
+        });
+
+        // Set cell_id from BLE mesh_id (mesh_id == cell_id mapping)
+        if let Some(cell_id) = mesh_id {
+            track["cell_id"] = json!(cell_id);
+        }
+
+        track
     }
 
     /// Extract BLE position from track document JSON
@@ -248,7 +277,26 @@ impl BleTranslator {
     // =========================================================================
 
     /// Convert BLE peripheral to platform document JSON
+    ///
+    /// Note: This version does not set cell_id. Use `peripheral_to_platform_in_cell`
+    /// to include cell membership based on BLE mesh_id.
     pub fn peripheral_to_platform(&self, peripheral: &BlePeripheral) -> Value {
+        self.peripheral_to_platform_in_cell(peripheral, None)
+    }
+
+    /// Convert BLE peripheral to platform document JSON with cell membership
+    ///
+    /// The `mesh_id` parameter (from BLE mesh configuration) is used as the cell_id,
+    /// allowing BLE peripherals to be associated with HIVE cells.
+    ///
+    /// # Arguments
+    /// * `peripheral` - The BLE peripheral data
+    /// * `mesh_id` - Optional BLE mesh ID to use as cell_id
+    pub fn peripheral_to_platform_in_cell(
+        &self,
+        peripheral: &BlePeripheral,
+        mesh_id: Option<&str>,
+    ) -> Value {
         let platform_id = format!("{}{:08X}", self.config.ble_id_prefix, peripheral.id);
 
         let mut platform = json!({
@@ -273,6 +321,11 @@ impl BleTranslator {
             "ble_origin": true,
             "parent_node": format!("{:08X}", peripheral.parent_node),
         });
+
+        // Set cell_id from BLE mesh_id (mesh_id == cell_id mapping)
+        if let Some(cell_id) = mesh_id {
+            platform["cell_id"] = json!(cell_id);
+        }
 
         // Add optional health data
         if let Some(hr) = peripheral.health.heart_rate {
@@ -652,5 +705,59 @@ mod tests {
         assert_eq!(translator.parse_ble_id("0x12345678"), Some(0x12345678));
         assert_eq!(translator.parse_ble_id("ABCDEF00"), Some(0xABCDEF00));
         assert_eq!(translator.parse_ble_id("not_hex"), None);
+    }
+
+    #[test]
+    fn test_position_to_track_with_cell_id() {
+        let translator = test_translator();
+
+        let position = BlePosition {
+            latitude: 33.7490,
+            longitude: -84.3880,
+            altitude: None,
+            accuracy: None,
+        };
+
+        // Without mesh_id - no cell_id
+        let track = translator.position_to_track(&position, 0xAABBCCDD, Some("ALPHA-1"));
+        assert!(track.get("cell_id").is_none());
+
+        // With mesh_id - cell_id set
+        let track = translator.position_to_track_in_cell(
+            &position,
+            0xAABBCCDD,
+            Some("ALPHA-1"),
+            Some("SQUAD-A"),
+        );
+        assert_eq!(track["cell_id"], "SQUAD-A");
+    }
+
+    #[test]
+    fn test_peripheral_to_platform_with_cell_id() {
+        let translator = test_translator();
+
+        let peripheral = BlePeripheral {
+            id: 0x11223344,
+            parent_node: 0xAABBCCDD,
+            peripheral_type: BlePeripheralType::SoldierSensor,
+            callsign: "BRAVO-2".to_string(),
+            health: BleHealthStatus {
+                battery_percent: 85,
+                heart_rate: None,
+                activity: 0,
+                alerts: 0,
+            },
+            timestamp: 1700000000000,
+            position: None,
+        };
+
+        // Without mesh_id - no cell_id
+        let platform = translator.peripheral_to_platform(&peripheral);
+        assert!(platform.get("cell_id").is_none());
+
+        // With mesh_id - cell_id set (mesh_id == cell_id mapping)
+        let platform = translator.peripheral_to_platform_in_cell(&peripheral, Some("ALPHA-SQUAD"));
+        assert_eq!(platform["cell_id"], "ALPHA-SQUAD");
+        assert_eq!(platform["ble_origin"], true);
     }
 }
