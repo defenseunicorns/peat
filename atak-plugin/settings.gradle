@@ -1,9 +1,9 @@
 rootProject.name = 'hive-atak-plugin'
 include ':app'
 
-// Use local hive-btle repo for development (comment out for released versions)
-includeBuild('../../hive-btle/android') {
-    dependencySubstitution {
-        substitute(module('com.revolveteam:hive')).using(project(':'))
-    }
-}
+// Use local hive-btle repo for development (uncomment for local builds)
+// includeBuild('../../hive-btle/android') {
+//     dependencySubstitution {
+//         substitute(module('com.revolveteam:hive')).using(project(':'))
+//     }
+// }
