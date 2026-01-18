@@ -12,6 +12,7 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -24,7 +25,12 @@ import com.revolveteam.atak.hive.model.HivePlatform
 import com.revolveteam.atak.hive.model.HiveRole
 import com.revolveteam.atak.hive.model.HiveTrack
 import com.revolveteam.atak.hive.model.CommsQuality
+import com.revolveteam.hive.HiveChat
+import com.revolveteam.hive.HiveMarker
 import com.revolveteam.hive.HivePeer as BlePeer
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * HIVE DropDown Receiver
@@ -53,6 +59,9 @@ class HiveDropDownReceiver(
     // Platform detail view state - store ID to allow refresh with updated data
     private var selectedPlatformId: String? = null
 
+    // Marker detail view state - store UID to allow refresh with updated data
+    private var selectedMarkerUid: String? = null
+
     // User's role in the hierarchy (for PoC, using default role)
     private var userRole: HiveRole = HiveRole.defaultRole()
 
@@ -66,6 +75,26 @@ class HiveDropDownReceiver(
 
         // Register for cell selection changes
         mapComponent.onCellSelectionChanged = { _, _ ->
+            refreshContentOnMainThread()
+        }
+
+        // Register for platform changes (including SOS state changes)
+        mapComponent.onPlatformsChanged = {
+            refreshContentOnMainThread()
+        }
+
+        // Register for emergency cleared events
+        mapComponent.onEmergencyCleared = { _ ->
+            refreshContentOnMainThread()
+        }
+
+        // Register for marker received events
+        mapComponent.onMarkerReceived = { _, _ ->
+            refreshContentOnMainThread()
+        }
+
+        // Register for chat received events
+        mapComponent.onChatReceived = { _, _ ->
             refreshContentOnMainThread()
         }
 
@@ -161,6 +190,17 @@ class HiveDropDownReceiver(
     }
 
     private fun buildContentContainer(): LinearLayout {
+        // If a marker is selected, show marker detail view
+        selectedMarkerUid?.let { markerUid ->
+            val cachedMarker = mapComponent.markers[markerUid]
+            if (cachedMarker != null) {
+                return buildMarkerDetailView(cachedMarker)
+            } else {
+                // Marker no longer exists, clear selection
+                selectedMarkerUid = null
+            }
+        }
+
         // If a platform is selected, look up fresh data and show detail view
         selectedPlatformId?.let { platformId ->
             val platform = mapComponent.platforms.find { it.id == platformId }
@@ -315,6 +355,105 @@ class HiveDropDownReceiver(
             container.addView(createSpacer(24))
         }
 
+        // HIVE Markers section (only in main view)
+        if (selectedCellId == null) {
+            val meshMarkers = mapComponent.markers.values.toList()
+            val markersTitle = TextView(pluginContext).apply {
+                text = "HIVE Markers (${meshMarkers.size})"
+                textSize = 16f
+                setTextColor(Color.WHITE)
+            }
+            container.addView(markersTitle)
+            container.addView(createSpacer(12))
+
+            if (meshMarkers.isEmpty()) {
+                val noMarkers = TextView(pluginContext).apply {
+                    text = "No mesh markers received"
+                    textSize = 14f
+                    setTextColor(Color.GRAY)
+                }
+                container.addView(noMarkers)
+            } else {
+                // Sort by received time, most recent first
+                meshMarkers.sortedByDescending { it.receivedAt }.forEach { cachedMarker ->
+                    container.addView(createMarkerCard(cachedMarker))
+                    container.addView(createSpacer(8))
+                }
+            }
+
+            container.addView(createSpacer(24))
+        }
+
+        // HIVE Chat section (only in cell detail view)
+        if (selectedCellId != null) {
+            val chatMessages = mapComponent.chatMessages
+            val chatTitle = TextView(pluginContext).apply {
+                text = "Cell Chat (${chatMessages.size})"
+                textSize = 16f
+                setTextColor(Color.WHITE)
+            }
+            container.addView(chatTitle)
+            container.addView(createSpacer(12))
+
+            // Chat input row
+            val inputRow = LinearLayout(pluginContext).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+
+            val chatInput = EditText(pluginContext).apply {
+                hint = "Type message..."
+                textSize = 14f
+                setTextColor(Color.WHITE)
+                setHintTextColor(Color.GRAY)
+                setBackgroundColor(Color.parseColor("#2d2d2d"))
+                setPadding(16, 12, 16, 12)
+                maxLines = 2
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            inputRow.addView(chatInput)
+
+            inputRow.addView(createHorizontalSpacer(8))
+
+            val sendButton = Button(pluginContext).apply {
+                text = "Send"
+                textSize = 12f
+                setTextColor(Color.WHITE)
+                setBackgroundColor(Color.parseColor("#4CAF50"))
+                setPadding(24, 12, 24, 12)
+                setOnClickListener {
+                    val message = chatInput.text.toString().trim()
+                    if (message.isNotEmpty()) {
+                        mapComponent.sendChat(message)
+                        chatInput.setText("")
+                        refreshContent()
+                    }
+                }
+            }
+            inputRow.addView(sendButton)
+
+            container.addView(inputRow)
+            container.addView(createSpacer(12))
+
+            // Chat messages (most recent at top)
+            if (chatMessages.isEmpty()) {
+                val noChat = TextView(pluginContext).apply {
+                    text = "No messages yet"
+                    textSize = 14f
+                    setTextColor(Color.GRAY)
+                }
+                container.addView(noChat)
+            } else {
+                // Show most recent first (reversed)
+                chatMessages.reversed().take(20).forEach { cachedChat ->
+                    container.addView(createChatMessageCard(cachedChat))
+                    container.addView(createSpacer(4))
+                }
+            }
+
+            container.addView(createSpacer(24))
+        }
+
         // Platforms section - filtered when cell is selected
         val filteredPlatforms = mapComponent.getFilteredPlatforms()
         val platformsTitle = TextView(pluginContext).apply {
@@ -379,10 +518,47 @@ class HiveDropDownReceiver(
     }
 
     private fun createCellCard(cell: HiveCell): View {
+        // Get actual platforms in this cell
+        val cellPlatforms = mapComponent.platforms.filter { it.cellId == cell.id }
+        val emergencyPlatforms = cellPlatforms.filter { it.status == HivePlatform.Status.EMERGENCY }
+        val hasEmergency = emergencyPlatforms.isNotEmpty()
+
         val card = LinearLayout(pluginContext).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#2d2d2d"))
+            // Red border/background tint for cells with SOS
+            setBackgroundColor(if (hasEmergency) Color.parseColor("#4d2d2d") else Color.parseColor("#2d2d2d"))
             setPadding(24, 16, 24, 16)
+            // Make card tappable to view cell details + chat
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                mapComponent.selectCell(cell.id, cell.name)
+                refreshContent()
+            }
+        }
+
+        // SOS Alert banner at top of cell card
+        if (hasEmergency) {
+            val sosBanner = LinearLayout(pluginContext).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, 0, 0, 8)
+            }
+            val sosIcon = TextView(pluginContext).apply {
+                text = "⚠ SOS"
+                textSize = 12f
+                setTextColor(Color.parseColor("#FF0000"))
+                setTypeface(null, android.graphics.Typeface.BOLD)
+            }
+            sosBanner.addView(sosIcon)
+            sosBanner.addView(createHorizontalSpacer(8))
+            val sosNames = TextView(pluginContext).apply {
+                text = emergencyPlatforms.joinToString(", ") { it.callsign }
+                textSize = 11f
+                setTextColor(Color.parseColor("#FF6666"))
+            }
+            sosBanner.addView(sosNames)
+            card.addView(sosBanner)
         }
 
         val headerRow = LinearLayout(pluginContext).apply {
@@ -411,9 +587,6 @@ class HiveDropDownReceiver(
         headerRow.addView(statusText)
         card.addView(headerRow)
 
-        // Get actual platforms in this cell
-        val cellPlatforms = mapComponent.platforms.filter { it.cellId == cell.id }
-
         val platformsHeader = TextView(pluginContext).apply {
             text = "${cellPlatforms.size} platforms"
             textSize = 12f
@@ -421,17 +594,33 @@ class HiveDropDownReceiver(
         }
         card.addView(platformsHeader)
 
-        // List platform names
+        // List platform names with SOS indicator
         if (cellPlatforms.isNotEmpty()) {
             cellPlatforms.forEach { platform ->
+                val isEmergency = platform.status == HivePlatform.Status.EMERGENCY
                 val platformRow = TextView(pluginContext).apply {
-                    text = "  • ${platform.callsign} (${platform.platformType.name})"
+                    text = if (isEmergency) {
+                        "  ⚠ ${platform.callsign} - SOS"
+                    } else {
+                        "  • ${platform.callsign} (${platform.platformType.name})"
+                    }
                     textSize = 11f
-                    setTextColor(Color.parseColor("#AAAAAA"))
+                    setTextColor(if (isEmergency) Color.parseColor("#FF0000") else Color.parseColor("#AAAAAA"))
+                    if (isEmergency) setTypeface(null, android.graphics.Typeface.BOLD)
                 }
                 card.addView(platformRow)
             }
         }
+
+        // Tap hint
+        val tapHint = TextView(pluginContext).apply {
+            text = "Tap for chat + details →"
+            textSize = 10f
+            setTextColor(Color.parseColor("#666666"))
+            gravity = Gravity.END
+            setPadding(0, 8, 0, 0)
+        }
+        card.addView(tapHint)
 
         return card
     }
@@ -487,10 +676,187 @@ class HiveDropDownReceiver(
         return card
     }
 
-    private fun createPlatformCard(platform: HivePlatform): View {
+    private fun createMarkerCard(cachedMarker: HiveMapComponent.CachedMarker): View {
+        val marker = cachedMarker.marker
+
         val card = LinearLayout(pluginContext).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#2d2d2d"))
+            setPadding(24, 16, 24, 16)
+            // Make card clickable
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                selectedMarkerUid = marker.uid
+                refreshContent()
+            }
+        }
+
+        val headerRow = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val callsign = TextView(pluginContext).apply {
+            text = marker.callsign.ifEmpty { "Marker" }
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        headerRow.addView(callsign)
+
+        // Color based on CoT type
+        val typeColor = when {
+            marker.type.contains("-h-") -> Color.parseColor("#F44336")  // Hostile
+            marker.type.contains("-f-") -> Color.parseColor("#4CAF50")  // Friendly
+            marker.type.contains("-n-") -> Color.parseColor("#2196F3")  // Neutral
+            else -> Color.parseColor("#FFC107")  // Unknown
+        }
+        val typeText = TextView(pluginContext).apply {
+            text = getMarkerTypeLabel(marker.type)
+            textSize = 12f
+            setTextColor(typeColor)
+        }
+        headerRow.addView(typeText)
+        card.addView(headerRow)
+
+        val location = TextView(pluginContext).apply {
+            text = String.format("%.4f, %.4f", marker.lat, marker.lon)
+            textSize = 12f
+            setTextColor(Color.GRAY)
+        }
+        card.addView(location)
+
+        val sourceRow = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val sourceLabel = TextView(pluginContext).apply {
+            text = "From: ${cachedMarker.sourcePeerName}"
+            textSize = 11f
+            setTextColor(Color.parseColor("#888888"))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        sourceRow.addView(sourceLabel)
+
+        val ageText = TextView(pluginContext).apply {
+            val ageSec = (System.currentTimeMillis() - cachedMarker.receivedAt) / 1000
+            text = when {
+                ageSec < 60 -> "${ageSec}s ago"
+                ageSec < 3600 -> "${ageSec / 60}m ago"
+                else -> "${ageSec / 3600}h ago"
+            }
+            textSize = 10f
+            setTextColor(Color.parseColor("#666666"))
+        }
+        sourceRow.addView(ageText)
+        card.addView(sourceRow)
+
+        // Tap hint
+        val tapHint = TextView(pluginContext).apply {
+            text = "Tap for details →"
+            textSize = 10f
+            setTextColor(Color.parseColor("#666666"))
+            gravity = Gravity.END
+        }
+        card.addView(tapHint)
+
+        return card
+    }
+
+    /**
+     * Get a human-readable label for CoT marker type.
+     */
+    private fun getMarkerTypeLabel(cotType: String): String {
+        return when {
+            cotType.startsWith("a-f-G") -> "Friendly Ground"
+            cotType.startsWith("a-f-A") -> "Friendly Air"
+            cotType.startsWith("a-f-S") -> "Friendly Sea"
+            cotType.startsWith("a-h-G") -> "Hostile Ground"
+            cotType.startsWith("a-h-A") -> "Hostile Air"
+            cotType.startsWith("a-h-S") -> "Hostile Sea"
+            cotType.startsWith("a-n-G") -> "Neutral Ground"
+            cotType.startsWith("a-u-G") -> "Unknown Ground"
+            cotType.startsWith("b-m-p-w") -> "Waypoint"
+            cotType.startsWith("b-m-p-c") -> "Checkpoint"
+            cotType.startsWith("b-m-r") -> "Route"
+            else -> cotType.take(10)
+        }
+    }
+
+    private fun createChatMessageCard(cachedChat: HiveMapComponent.CachedChat): View {
+        val chat = cachedChat.chat
+        val isSelf = cachedChat.isSelf
+
+        val card = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(if (isSelf) Color.parseColor("#1a3d1a") else Color.parseColor("#2d2d2d"))
+            setPadding(16, 12, 16, 12)
+        }
+
+        // Header row: sender + time
+        val headerRow = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val senderText = TextView(pluginContext).apply {
+            text = chat.sender
+            textSize = 12f
+            setTextColor(if (isSelf) Color.parseColor("#8BC34A") else Color.parseColor("#64B5F6"))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        headerRow.addView(senderText)
+
+        val ageSec = (System.currentTimeMillis() - chat.timestamp) / 1000
+        val timeText = TextView(pluginContext).apply {
+            text = when {
+                ageSec < 60 -> "${ageSec}s"
+                ageSec < 3600 -> "${ageSec / 60}m"
+                else -> "${ageSec / 3600}h"
+            }
+            textSize = 10f
+            setTextColor(Color.parseColor("#666666"))
+        }
+        headerRow.addView(timeText)
+        card.addView(headerRow)
+
+        // Message text
+        val msgTextView = TextView(pluginContext).apply {
+            text = chat.message
+            textSize = 14f
+            setTextColor(Color.WHITE)
+        }
+        card.addView(msgTextView)
+
+        // ACK status row (for sent messages)
+        if (isSelf && cachedChat.acks.isNotEmpty()) {
+            val ackRow = LinearLayout(pluginContext).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.END or Gravity.CENTER_VERTICAL
+                setPadding(0, 4, 0, 0)
+            }
+
+            val ackNames = cachedChat.acks.joinToString(", ") { it.sender }
+            val ackText = TextView(pluginContext).apply {
+                text = "ACK: $ackNames"
+                textSize = 10f
+                setTextColor(Color.parseColor("#4CAF50"))  // Green for ACKs
+            }
+            ackRow.addView(ackText)
+            card.addView(ackRow)
+        }
+
+        return card
+    }
+
+    private fun createPlatformCard(platform: HivePlatform): View {
+        val isEmergency = platform.status == HivePlatform.Status.EMERGENCY
+
+        val card = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+            // Red background for emergency platforms
+            setBackgroundColor(if (isEmergency) Color.parseColor("#5d1a1a") else Color.parseColor("#2d2d2d"))
             setPadding(24, 16, 24, 16)
             // Make card clickable
             isClickable = true
@@ -501,6 +867,25 @@ class HiveDropDownReceiver(
             }
         }
 
+        // SOS Banner for emergency platforms
+        if (isEmergency) {
+            val sosBanner = LinearLayout(pluginContext).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setBackgroundColor(Color.parseColor("#D32F2F"))
+                setPadding(12, 8, 12, 8)
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            val sosIcon = TextView(pluginContext).apply {
+                text = "⚠ SOS EMERGENCY"
+                textSize = 12f
+                setTextColor(Color.WHITE)
+                setTypeface(null, android.graphics.Typeface.BOLD)
+            }
+            sosBanner.addView(sosIcon)
+            card.addView(sosBanner)
+            card.addView(createSpacer(8))
+        }
+
         val headerRow = LinearLayout(pluginContext).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -509,7 +894,8 @@ class HiveDropDownReceiver(
         val name = TextView(pluginContext).apply {
             text = platform.callsign
             textSize = 14f
-            setTextColor(Color.WHITE)
+            setTextColor(if (isEmergency) Color.WHITE else Color.WHITE)
+            setTypeface(null, if (isEmergency) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
         headerRow.addView(name)
@@ -517,12 +903,14 @@ class HiveDropDownReceiver(
         val statusColor = when (platform.status) {
             HivePlatform.Status.OPERATIONAL -> Color.parseColor("#4CAF50")
             HivePlatform.Status.DEGRADED -> Color.parseColor("#FFC107")
+            HivePlatform.Status.EMERGENCY -> Color.parseColor("#FF0000")  // Bright red for SOS
             else -> Color.parseColor("#F44336")
         }
         val statusText = TextView(pluginContext).apply {
             text = platform.status.name
             textSize = 12f
             setTextColor(statusColor)
+            setTypeface(null, if (isEmergency) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
         }
         headerRow.addView(statusText)
         card.addView(headerRow)
@@ -530,7 +918,7 @@ class HiveDropDownReceiver(
         val typeInfo = TextView(pluginContext).apply {
             text = "${platform.platformType.name} • ${String.format("%.4f, %.4f", platform.lat, platform.lon)}"
             textSize = 12f
-            setTextColor(Color.GRAY)
+            setTextColor(if (isEmergency) Color.parseColor("#CCCCCC") else Color.GRAY)
         }
         card.addView(typeInfo)
 
@@ -545,9 +933,9 @@ class HiveDropDownReceiver(
 
         // Tap hint
         val tapHint = TextView(pluginContext).apply {
-            text = "Tap for details →"
+            text = if (isEmergency) "Tap for SOS details →" else "Tap for details →"
             textSize = 10f
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(if (isEmergency) Color.parseColor("#FF6666") else Color.parseColor("#666666"))
             gravity = Gravity.END
         }
         card.addView(tapHint)
@@ -595,6 +983,7 @@ class HiveDropDownReceiver(
         val statusColor = when (platform.status) {
             HivePlatform.Status.OPERATIONAL -> Color.parseColor("#4CAF50")
             HivePlatform.Status.DEGRADED -> Color.parseColor("#FFC107")
+            HivePlatform.Status.EMERGENCY -> Color.parseColor("#FF0000")  // Bright red for SOS
             else -> Color.parseColor("#F44336")
         }
         val statusBadge = TextView(pluginContext).apply {
@@ -604,6 +993,37 @@ class HiveDropDownReceiver(
         }
         header.addView(statusBadge)
         container.addView(header)
+
+        // Emergency SOS Banner - displays when peer has triggered SOS
+        // Note: ACK button deferred for MVP - SOS clears when peer cancels it
+        if (platform.status == HivePlatform.Status.EMERGENCY) {
+            container.addView(createSpacer(16))
+            val emergencyBanner = LinearLayout(pluginContext).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setBackgroundColor(Color.parseColor("#D32F2F"))  // Red background
+                setPadding(24, 16, 24, 16)
+                gravity = Gravity.CENTER_VERTICAL
+            }
+
+            val alertIcon = TextView(pluginContext).apply {
+                text = "⚠"
+                textSize = 24f
+                setTextColor(Color.WHITE)
+            }
+            emergencyBanner.addView(alertIcon)
+            emergencyBanner.addView(createHorizontalSpacer(12))
+
+            val alertText = TextView(pluginContext).apply {
+                text = "SOS EMERGENCY ACTIVE"
+                textSize = 16f
+                setTextColor(Color.WHITE)
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            emergencyBanner.addView(alertText)
+
+            container.addView(emergencyBanner)
+        }
 
         // Subtitle: Platform type
         val subtitle = TextView(pluginContext).apply {
@@ -789,8 +1209,150 @@ class HiveDropDownReceiver(
             setBackgroundColor(Color.parseColor("#2196F3"))
             setPadding(32, 16, 32, 16)
             setOnClickListener {
-                // TODO: Center map on platform location
                 Log.d(TAG, "Focus on platform: ${platform.callsign} at ${platform.lat}, ${platform.lon}")
+                mapComponent.zoomToLocation(platform.lat, platform.lon)
+                // Close dropdown to show map
+                closeDropDown()
+            }
+        }
+        buttonRow.addView(focusButton)
+
+        container.addView(buttonRow)
+
+        return container
+    }
+
+    /**
+     * Build the marker detail view showing comprehensive marker information
+     */
+    private fun buildMarkerDetailView(cachedMarker: HiveMapComponent.CachedMarker): LinearLayout {
+        val marker = cachedMarker.marker
+
+        val container = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(32, 32, 32, 32)
+        }
+
+        // Header with back button
+        val header = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val backButton = Button(pluginContext).apply {
+            text = "←"
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#444444"))
+            setPadding(24, 8, 24, 8)
+            setOnClickListener {
+                selectedMarkerUid = null
+                refreshContent()
+            }
+        }
+        header.addView(backButton)
+        header.addView(createHorizontalSpacer(16))
+
+        val title = TextView(pluginContext).apply {
+            text = marker.callsign.ifEmpty { "Marker" }
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        header.addView(title)
+
+        // Type badge with color
+        val typeColor = when {
+            marker.type.contains("-h-") -> Color.parseColor("#F44336")  // Hostile
+            marker.type.contains("-f-") -> Color.parseColor("#4CAF50")  // Friendly
+            marker.type.contains("-n-") -> Color.parseColor("#2196F3")  // Neutral
+            else -> Color.parseColor("#FFC107")  // Unknown
+        }
+        val typeBadge = TextView(pluginContext).apply {
+            text = getMarkerTypeLabel(marker.type)
+            textSize = 12f
+            setTextColor(typeColor)
+        }
+        header.addView(typeBadge)
+        container.addView(header)
+
+        // Subtitle: Source peer and age
+        val ageSec = (System.currentTimeMillis() - cachedMarker.receivedAt) / 1000
+        val ageStr = when {
+            ageSec < 60 -> "${ageSec}s ago"
+            ageSec < 3600 -> "${ageSec / 60}m ago"
+            else -> "${ageSec / 3600}h ago"
+        }
+        val subtitle = TextView(pluginContext).apply {
+            text = "From ${cachedMarker.sourcePeerName} • $ageStr"
+            textSize = 14f
+            setTextColor(Color.GRAY)
+        }
+        container.addView(subtitle)
+        container.addView(createSpacer(24))
+
+        // Position Section
+        container.addView(createSectionTitle("Position"))
+        container.addView(createSpacer(8))
+
+        val positionCard = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#2d2d2d"))
+            setPadding(24, 16, 24, 16)
+        }
+
+        positionCard.addView(createDetailRow("Latitude", String.format("%.6f°", marker.lat)))
+        positionCard.addView(createDetailRow("Longitude", String.format("%.6f°", marker.lon)))
+        if (marker.hae != 0f) {
+            positionCard.addView(createDetailRow("Altitude", "${marker.hae.toInt()}m HAE"))
+        }
+
+        container.addView(positionCard)
+        container.addView(createSpacer(16))
+
+        // Details Section
+        container.addView(createSectionTitle("Details"))
+        container.addView(createSpacer(8))
+
+        val detailsCard = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#2d2d2d"))
+            setPadding(24, 16, 24, 16)
+        }
+
+        detailsCard.addView(createDetailRow("CoT Type", marker.type))
+        detailsCard.addView(createDetailRow("UID", marker.uid.takeLast(12) + "..."))
+
+        // Format marker timestamp
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        val markerTimeStr = dateFormat.format(Date(marker.time))
+        detailsCard.addView(createDetailRow("Marker Time", markerTimeStr))
+
+        // Received time
+        val receivedTimeStr = dateFormat.format(Date(cachedMarker.receivedAt))
+        detailsCard.addView(createDetailRow("Received", receivedTimeStr))
+
+        container.addView(detailsCard)
+        container.addView(createSpacer(16))
+
+        // Action Buttons
+        container.addView(createSpacer(8))
+        val buttonRow = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+
+        val focusButton = Button(pluginContext).apply {
+            text = "Focus on Map"
+            textSize = 12f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#2196F3"))
+            setPadding(32, 16, 32, 16)
+            setOnClickListener {
+                Log.d(TAG, "Focus on marker: ${marker.callsign} at ${marker.lat}, ${marker.lon}")
+                mapComponent.zoomToMarker(marker.uid)
+                // Close dropdown to show map
+                closeDropDown()
             }
         }
         buttonRow.addView(focusButton)
@@ -873,14 +1435,18 @@ class HiveDropDownReceiver(
 
         card.addView(createSpacer(12))
 
-        // Unified peer list header
+        // Unified peer list header with multi-hop support
         val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
+        val hiveMesh = bleManager?.getMesh()
         val blePeers = if (bleManager?.isRunning?.value == true) {
             bleManager.peers.value ?: emptyList()
         } else emptyList<BlePeer>()
         val meshPeerCount = HivePluginLifecycle.getInstance()?.getPeerCount() ?: 0
-        val blePeerCount = blePeers.count { it.isConnected }
-        val totalPeers = meshPeerCount + blePeerCount
+        val directBlePeers = blePeers.filter { it.isConnected }
+        val indirectBlePeers = if (hiveMesh != null) {
+            hiveMesh.getIndirectPeers()
+        } else emptyList()
+        val totalPeers = meshPeerCount + directBlePeers.size + indirectBlePeers.size
 
         val peersHeader = TextView(pluginContext).apply {
             text = "Connected Peers ($totalPeers)"
@@ -888,6 +1454,26 @@ class HiveDropDownReceiver(
             setTextColor(Color.WHITE)
         }
         card.addView(peersHeader)
+
+        // Show full state counts summary if BLE mesh is running
+        if (hiveMesh != null) {
+            val stateCounts = hiveMesh.getFullStateCounts()
+            if (stateCounts != null) {
+                val directCount = stateCounts.direct.connected + stateCounts.direct.degraded
+                val indirectCount = stateCounts.totalIndirect
+                val summaryParts = mutableListOf<String>()
+                summaryParts.add("Direct: $directCount")
+                if (stateCounts.oneHop > 0) summaryParts.add("1-hop: ${stateCounts.oneHop}")
+                if (stateCounts.twoHop > 0) summaryParts.add("2-hop: ${stateCounts.twoHop}")
+                if (stateCounts.threeHop > 0) summaryParts.add("3-hop: ${stateCounts.threeHop}")
+                val summaryText = TextView(pluginContext).apply {
+                    text = summaryParts.joinToString(" • ")
+                    textSize = 10f
+                    setTextColor(Color.parseColor("#888888"))
+                }
+                card.addView(summaryText)
+            }
+        }
         card.addView(createSpacer(8))
 
         // Mesh peers (full HIVE)
@@ -934,8 +1520,8 @@ class HiveDropDownReceiver(
             }
         }
 
-        // BLE peers (HIVE-lite)
-        blePeers.filter { it.isConnected }.forEach { peer ->
+        // BLE direct peers (HIVE-lite, degree 0)
+        directBlePeers.forEach { peer ->
             val peerRow = LinearLayout(pluginContext).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -971,14 +1557,74 @@ class HiveDropDownReceiver(
             peerRow.addView(rssiText)
             peerRow.addView(createHorizontalSpacer(8))
 
-            val transportLabel = TextView(pluginContext).apply {
-                text = "lite"
-                textSize = 10f
-                setTextColor(Color.parseColor("#9C27B0"))
+            val hopLabel = TextView(pluginContext).apply {
+                text = "direct"
+                textSize = 9f
+                setTextColor(Color.parseColor("#4CAF50"))
             }
-            peerRow.addView(transportLabel)
+            peerRow.addView(hopLabel)
 
             card.addView(peerRow)
+        }
+
+        // BLE indirect peers (multi-hop, degree 1-3)
+        if (indirectBlePeers.isNotEmpty()) {
+            card.addView(createSpacer(8))
+            val indirectHeader = TextView(pluginContext).apply {
+                text = "Multi-hop Peers (${indirectBlePeers.size})"
+                textSize = 11f
+                setTextColor(Color.parseColor("#888888"))
+            }
+            card.addView(indirectHeader)
+
+            indirectBlePeers.forEach { peer ->
+                val peerRow = LinearLayout(pluginContext).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(0, 4, 0, 4)
+                }
+
+                val indicator = TextView(pluginContext).apply {
+                    text = "◐"  // Half-filled circle for indirect
+                    textSize = 12f
+                    setTextColor(Color.parseColor("#2196F3"))
+                }
+                peerRow.addView(indicator)
+                peerRow.addView(createHorizontalSpacer(8))
+
+                // IndirectPeer has nodeId and degree properties
+                val peerName = TextView(pluginContext).apply {
+                    text = String.format("%08X", peer.nodeId)
+                    textSize = 11f
+                    setTextColor(Color.WHITE)
+                    setTypeface(android.graphics.Typeface.MONOSPACE)
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+                peerRow.addView(peerName)
+
+                // Use minHops from IndirectPeer directly
+                val hops = peer.minHops
+                val hopText = when (hops) {
+                    1 -> "1-hop"
+                    2 -> "2-hop"
+                    3 -> "3-hop"
+                    else -> "${hops}-hop"
+                }
+                val hopColor = when (hops) {
+                    1 -> Color.parseColor("#4CAF50")  // Green - close
+                    2 -> Color.parseColor("#FFC107")  // Yellow - medium
+                    3 -> Color.parseColor("#FF9800")  // Orange - far
+                    else -> Color.parseColor("#2196F3")  // Blue - unknown
+                }
+                val hopLabel = TextView(pluginContext).apply {
+                    text = hopText
+                    textSize = 9f
+                    setTextColor(hopColor)
+                }
+                peerRow.addView(hopLabel)
+
+                card.addView(peerRow)
+            }
         }
 
         // Show discovered (not connected) BLE peers

@@ -19,9 +19,14 @@ import com.revolveteam.atak.hive.model.HiveTrack
 import com.revolveteam.atak.hive.overlay.HiveCellOverlay
 import com.revolveteam.atak.hive.overlay.HivePlatformOverlay
 import com.revolveteam.atak.hive.overlay.HiveTrackOverlay
+import com.revolveteam.hive.HiveChat
 import com.revolveteam.hive.HiveDocument
+import com.revolveteam.hive.HiveEventType
+import com.revolveteam.hive.HiveMarker
+import com.revolveteam.hive.HivePeer
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * HIVE Map Component
@@ -85,6 +90,109 @@ class HiveMapComponent : DropDownMapComponent() {
     )
     private val _peerStateCache = mutableMapOf<Long, PeerState>()
 
+    /**
+     * Active emergencies - maps nodeId to timestamp when emergency was received.
+     * Used to show emergency status on platforms and trigger alerts.
+     */
+    private val _activeEmergencies = mutableMapOf<Long, Long>()
+    val activeEmergencies: Map<Long, Long> get() = _activeEmergencies.toMap()
+
+    /** Callback for emergency events (for UI alerts) */
+    var onEmergencyReceived: ((nodeId: Long, callsign: String, lat: Double, lon: Double) -> Unit)? = null
+
+    /** Callback for when emergency is cleared (for UI refresh) */
+    var onEmergencyCleared: ((nodeId: Long) -> Unit)? = null
+
+    /** Callback for when platform data changes (for UI refresh) */
+    var onPlatformsChanged: (() -> Unit)? = null
+
+    /**
+     * Cached marker with source peer information for UI display.
+     */
+    data class CachedMarker(
+        val marker: HiveMarker,
+        val sourcePeerName: String,
+        val receivedAt: Long = System.currentTimeMillis()
+    )
+
+    /**
+     * Marker cache for mesh-synced map markers (deduplication by UID).
+     * Maps marker UID -> CachedMarker with source peer info for UI display.
+     */
+    private val _markerCache = ConcurrentHashMap<String, CachedMarker>()
+    val markers: Map<String, CachedMarker> get() = _markerCache.toMap()
+
+    /** Callback for when a marker is received (for UI/map display) */
+    var onMarkerReceived: ((marker: HiveMarker, sourcePeer: HivePeer) -> Unit)? = null
+
+    /**
+     * ACK info for tracking who acknowledged a message.
+     */
+    data class ChatAck(
+        val sender: String,         // Callsign of the acker
+        val timestamp: Long         // When the ACK was sent
+    )
+
+    /**
+     * Chat message with ACK associations for UI display.
+     */
+    data class CachedChat(
+        val chat: HiveChat,
+        val isSelf: Boolean,        // True if sent by this device
+        val acks: List<ChatAck> = emptyList()
+    ) {
+        /** Get the message ID string for correlation (format: "XXXXXXXX:timestamp") */
+        fun messageId(): String = chat.messageIdString()
+    }
+
+    /**
+     * Get chat messages from the mesh CRDT with ACK associations.
+     * Returns messages sorted by timestamp, with ACKs associated to their parent messages.
+     */
+    val chatMessages: List<CachedChat>
+        get() {
+            val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager() ?: return emptyList()
+            val myNodeId = bleManager.getNodeId() ?: 0L
+
+            // Get all messages from CRDT
+            val allMessages = bleManager.getChatMessagesSince(0)
+
+            // Separate regular messages from ACK replies
+            val regularMessages = mutableListOf<HiveChat>()
+            val ackMessages = mutableListOf<HiveChat>()
+
+            for (msg in allMessages) {
+                val isAckReply = msg.isReply() && msg.message.equals("ACK", ignoreCase = true)
+                if (isAckReply) {
+                    ackMessages.add(msg)
+                } else {
+                    regularMessages.add(msg)
+                }
+            }
+
+            // Build ACK associations
+            val acksByMessageId = ackMessages.groupBy { it.replyToIdString() }
+
+            // Build CachedChat list with ACKs
+            return regularMessages
+                .sortedBy { it.timestamp }
+                .map { msg ->
+                    val messageId = msg.messageIdString()
+                    val acks = acksByMessageId[messageId]?.map { ack ->
+                        ChatAck(sender = ack.sender, timestamp = ack.timestamp)
+                    } ?: emptyList()
+
+                    CachedChat(
+                        chat = msg,
+                        isSelf = msg.originNode == myNodeId,
+                        acks = acks
+                    )
+                }
+        }
+
+    /** Callback for when a chat message is received (for UI refresh) */
+    var onChatReceived: ((chat: HiveChat, fromPeer: HivePeer) -> Unit)? = null
+
     private var _connectionStatus = ConnectionStatus.DISCONNECTED
     val connectionStatus: ConnectionStatus get() = _connectionStatus
 
@@ -145,6 +253,15 @@ class HiveMapComponent : DropDownMapComponent() {
         // Register BLE document sync callback to display peer locations on map
         registerBleDocumentCallback()
 
+        // Register BLE peer event callback for emergency/ack events
+        registerBlePeerEventCallback()
+
+        // Register BLE marker callback for mesh-synced map markers
+        registerBleMarkerCallback()
+
+        // Register BLE chat callback for mesh chat messages
+        registerBleChatCallback()
+
         // Update connection status based on HIVE node availability
         updateConnectionStatus()
 
@@ -188,6 +305,272 @@ class HiveMapComponent : DropDownMapComponent() {
     }
 
     /**
+     * Register callback for BLE peer events (emergency, ack, etc).
+     */
+    private fun registerBlePeerEventCallback() {
+        try {
+            val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
+            if (bleManager != null) {
+                bleManager.setPeerEventCallback { peer, eventType ->
+                    onBlePeerEvent(peer.nodeId ?: 0L, eventType)
+                }
+                Log.i(TAG, "BLE peer event callback registered")
+            } else {
+                Log.w(TAG, "BLE manager not available for peer event callback")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error registering BLE peer event callback: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Handle peer events from BLE mesh (emergency, cancellation).
+     *
+     * SOS lifecycle:
+     * - EMERGENCY: Peer triggered SOS -> show red marker + alert
+     * - NONE: Peer cancelled SOS -> clear emergency state
+     * - ACK: (Deferred for MVP) Acknowledgment from other peer
+     */
+    private fun onBlePeerEvent(nodeId: Long, eventType: HiveEventType) {
+        refreshHandler.post {
+            val wasInEmergency = _activeEmergencies.containsKey(nodeId)
+
+            when (eventType) {
+                HiveEventType.EMERGENCY -> {
+                    Log.w(TAG, "SOS EMERGENCY from peer ${String.format("%08X", nodeId)}")
+                    Log.d(TAG, "Current platforms: ${_blePeerPlatforms.keys.map { String.format("%08X", it) }}")
+                    _activeEmergencies[nodeId] = System.currentTimeMillis()
+
+                    // Get platform info for alert callback
+                    val platform = _blePeerPlatforms[nodeId]
+                    Log.d(TAG, "Platform lookup for nodeId=$nodeId (${String.format("%08X", nodeId)}): ${if (platform != null) "FOUND ${platform.callsign}" else "NOT FOUND"}")
+                    if (platform != null) {
+                        // Update platform status to EMERGENCY and refresh overlay
+                        val emergencyPlatform = platform.copy(status = HivePlatform.Status.EMERGENCY)
+                        _blePeerPlatforms[nodeId] = emergencyPlatform
+                        Log.i(TAG, "Updated ${platform.callsign} to EMERGENCY status")
+                        updateBlePeerOverlay()
+
+                        // Notify UI for alert display (only on new emergency)
+                        if (!wasInEmergency) {
+                            onEmergencyReceived?.invoke(nodeId, platform.callsign, platform.lat, platform.lon)
+                        }
+                    } else {
+                        Log.w(TAG, "Cannot update emergency status - platform not yet synced")
+                    }
+                }
+                HiveEventType.NONE -> {
+                    // SOS cancellation - peer cleared their emergency
+                    if (wasInEmergency) {
+                        Log.i(TAG, "SOS CANCELLED by peer ${String.format("%08X", nodeId)}")
+                        clearEmergencyState(nodeId)
+                    }
+                }
+                HiveEventType.ACK -> {
+                    // ACK handling deferred for MVP - just log it
+                    Log.i(TAG, "ACK received from peer ${String.format("%08X", nodeId)}")
+                }
+                else -> {
+                    Log.d(TAG, "Peer event: ${String.format("%08X", nodeId)} -> $eventType")
+                }
+            }
+        }
+    }
+
+    /**
+     * Register callback for BLE marker sync events.
+     */
+    private fun registerBleMarkerCallback() {
+        try {
+            val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
+            if (bleManager != null) {
+                bleManager.setMarkerSyncCallback { peer, marker ->
+                    onBleMarkerSynced(peer, marker)
+                }
+                Log.i(TAG, "BLE marker sync callback registered")
+            } else {
+                Log.w(TAG, "BLE manager not available for marker callback")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error registering BLE marker callback: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Handle marker received from BLE mesh peer.
+     * Creates/updates ATAK map markers for mesh-synced waypoints and POIs.
+     */
+    private fun onBleMarkerSynced(peer: HivePeer, marker: HiveMarker) {
+        refreshHandler.post {
+            // Check for duplicate/outdated marker
+            val existing = _markerCache[marker.uid]
+            if (existing != null && existing.marker.time >= marker.time) {
+                Log.v(TAG, "Ignoring older marker: ${marker.uid} (existing=${existing.marker.time}, received=${marker.time})")
+                return@post
+            }
+
+            // Cache the marker with source peer info
+            _markerCache[marker.uid] = CachedMarker(
+                marker = marker,
+                sourcePeerName = peer.displayName()
+            )
+            Log.i(TAG, "Marker synced from ${peer.displayName()}: ${marker.uid} " +
+                    "type=${marker.type} callsign=${marker.callsign} at (${marker.lat}, ${marker.lon})")
+
+            // Create ATAK map marker
+            createAtakMarkerFromHive(marker, peer)
+
+            // Notify UI of new marker
+            onMarkerReceived?.invoke(marker, peer)
+        }
+    }
+
+    /**
+     * Register callback for BLE chat messages.
+     */
+    private fun registerBleChatCallback() {
+        try {
+            val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
+            if (bleManager != null) {
+                bleManager.setChatSyncCallback { chat, fromPeer ->
+                    onBleChatReceived(chat, fromPeer)
+                }
+                Log.i(TAG, "BLE chat callback registered")
+            } else {
+                Log.w(TAG, "BLE manager not available for chat callback")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error registering BLE chat callback: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Handle chat message received from BLE mesh peer.
+     * The CRDT handles storage and deduplication - we just notify the UI.
+     */
+    private fun onBleChatReceived(chat: HiveChat, fromPeer: HivePeer) {
+        refreshHandler.post {
+            Log.i(TAG, "Chat from ${fromPeer.displayName()}: '${chat.sender}' says '${chat.message}'")
+
+            // Notify UI to refresh (CRDT handles storage)
+            onChatReceived?.invoke(chat, fromPeer)
+        }
+    }
+
+    /**
+     * Send a chat message to all connected BLE mesh peers.
+     * The CRDT handles storage - message will appear in chatMessages after sync.
+     * @param message Message text (max 140 chars)
+     */
+    fun sendChat(message: String) {
+        val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
+        if (bleManager == null) {
+            Log.w(TAG, "Cannot send chat - BLE manager not available")
+            return
+        }
+
+        val nodeId = bleManager.getNodeId()
+        if (nodeId == null || nodeId == 0L) {
+            Log.e(TAG, "Cannot send chat - mesh not initialized")
+            return
+        }
+
+        if (!bleManager.isRunning.value) {
+            Log.e(TAG, "Cannot send chat - mesh not running")
+            return
+        }
+
+        // Get callsign from self marker
+        val selfCallsign = mapView.selfMarker?.getMetaString("callsign", null)
+            ?: mapView.selfMarker?.title
+            ?: "ATAK"
+
+        // Create and send chat - CRDT handles storage and sync
+        val chat = HiveChat(
+            sender = selfCallsign,
+            message = message,
+            timestamp = System.currentTimeMillis(),
+            originNode = nodeId,
+            isBroadcast = true,
+            requiresAck = false
+        )
+
+        bleManager.sendChat(chat)
+        Log.i(TAG, "Sent chat: '$selfCallsign' says '$message'")
+    }
+
+    /**
+     * Create an ATAK map marker from a HiveMarker.
+     */
+    private fun createAtakMarkerFromHive(marker: HiveMarker, sourcePeer: HivePeer) {
+        try {
+            val point = GeoPoint(marker.lat.toDouble(), marker.lon.toDouble(), marker.hae.toDouble())
+
+            // Create marker using ATAK API
+            val atakMarker = com.atakmap.android.maps.Marker(point, marker.uid)
+            atakMarker.type = marker.type
+            atakMarker.title = marker.callsign
+            atakMarker.setMetaString("callsign", marker.callsign)
+            atakMarker.setMetaString("hiveSource", sourcePeer.displayName())
+            atakMarker.setMetaString("hiveMeshMarker", "true")
+            atakMarker.setMetaLong("hiveTime", marker.time)
+
+            // Add to map group
+            val rootGroup = mapView.rootGroup
+            val hiveGroup = rootGroup?.findMapGroup("HIVE Markers")
+                ?: rootGroup?.addGroup("HIVE Markers")
+
+            // Remove existing marker with same UID if present
+            hiveGroup?.items?.filterIsInstance<com.atakmap.android.maps.Marker>()
+                ?.find { it.uid == marker.uid }
+                ?.let { hiveGroup.removeItem(it) }
+
+            hiveGroup?.addItem(atakMarker)
+            Log.d(TAG, "Created ATAK marker: ${marker.uid} (${marker.callsign}) at ${point}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create ATAK marker from HiveMarker: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Clear emergency state for a peer (called on SOS cancellation or ACK).
+     */
+    private fun clearEmergencyState(nodeId: Long) {
+        _activeEmergencies.remove(nodeId)
+
+        // Reset platform status from EMERGENCY to OPERATIONAL
+        val platform = _blePeerPlatforms[nodeId]
+        if (platform != null && platform.status == HivePlatform.Status.EMERGENCY) {
+            val normalPlatform = platform.copy(status = HivePlatform.Status.OPERATIONAL)
+            _blePeerPlatforms[nodeId] = normalPlatform
+            updateBlePeerOverlay()
+        }
+    }
+
+    /**
+     * Acknowledge an emergency - broadcasts ACK to all peers.
+     * Also clears local emergency state for the specified peer.
+     */
+    fun acknowledgeEmergency(nodeId: Long) {
+        try {
+            val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
+            bleManager?.acknowledgeEmergency()  // Broadcasts ACK to all peers
+            Log.i(TAG, "Sent ACK broadcast for emergency from ${String.format("%08X", nodeId)}")
+
+            // Clear local emergency state
+            _activeEmergencies.remove(nodeId)
+            val platform = _blePeerPlatforms[nodeId]
+            if (platform != null && platform.status == HivePlatform.Status.EMERGENCY) {
+                val normalPlatform = platform.copy(status = HivePlatform.Status.OPERATIONAL)
+                _blePeerPlatforms[nodeId] = normalPlatform
+                updateBlePeerOverlay()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to send emergency ACK: ${e.message}", e)
+        }
+    }
+
+    /**
      * Handle synced document from BLE mesh peer - create/update track marker.
      *
      * With hive-btle 0.0.10+ delta sync, documents may contain only changed fields.
@@ -197,14 +580,19 @@ class HiveMapComponent : DropDownMapComponent() {
         val nodeId = document.nodeId
         val peripheral = document.peripheral
 
+        Log.d(TAG, "Document synced: nodeId=${String.format("%08X", nodeId)}, callsign=${peripheral?.callsign}")
+
         // Get or create cached state for this peer
         val cachedState = _peerStateCache.getOrPut(nodeId) { PeerState() }
         cachedState.lastSeen = System.currentTimeMillis()
 
         // Merge incoming data into cached state (delta sync: only non-null fields are updated)
         if (peripheral != null) {
-            // Merge callsign if present
-            peripheral.callsign?.trim()?.takeIf { it.isNotBlank() }?.let {
+            // Merge callsign if present - but ignore generic "ANDROID" callsign
+            // (watches may send "ANDROID" during SOS mode, we want to keep original callsign)
+            peripheral.callsign?.trim()?.takeIf {
+                it.isNotBlank() && !it.equals("ANDROID", ignoreCase = true)
+            }?.let {
                 cachedState.callsign = it
             }
 
@@ -228,6 +616,32 @@ class HiveMapComponent : DropDownMapComponent() {
             }
         }
 
+        // Check event type from document - handles SOS state transitions
+        // onPeerEvent callback only fires for non-NONE events, so we detect cancellation here
+        val documentEventType = document.currentEventType()
+        val wasInEmergency = _activeEmergencies.containsKey(nodeId)
+
+        when (documentEventType) {
+            HiveEventType.EMERGENCY -> {
+                if (!wasInEmergency) {
+                    Log.w(TAG, "SOS EMERGENCY detected in document from peer ${String.format("%08X", nodeId)}")
+                    _activeEmergencies[nodeId] = System.currentTimeMillis()
+                    // Notify UI of emergency (will be called again in onBlePeerEvent if that fires too)
+                    onPlatformsChanged?.invoke()
+                }
+            }
+            HiveEventType.NONE -> {
+                if (wasInEmergency) {
+                    Log.i(TAG, "SOS CANCELLED detected in document from peer ${String.format("%08X", nodeId)}")
+                    _activeEmergencies.remove(nodeId)
+                    // Notify UI that emergency cleared
+                    onEmergencyCleared?.invoke(nodeId)
+                    onPlatformsChanged?.invoke()
+                }
+            }
+            else -> { /* ACK or other events handled elsewhere */ }
+        }
+
         // Skip display if we still don't have any location (cached or incoming)
         val lat = cachedState.latitude
         val lon = cachedState.longitude
@@ -245,7 +659,15 @@ class HiveMapComponent : DropDownMapComponent() {
 
         Log.i(TAG, "BLE document synced: nodeId=${String.format("%08X", nodeId)}, " +
                 "callsign=$callsign, cell=$meshId, location=($lat, $lon), " +
-                "battery=${cachedState.batteryPercent}%, heartRate=${cachedState.heartRate}")
+                "battery=${cachedState.batteryPercent}%, heartRate=${cachedState.heartRate}, " +
+                "event=$documentEventType")
+
+        // Determine status - check if peer has active emergency
+        val status = if (_activeEmergencies.containsKey(nodeId)) {
+            HivePlatform.Status.EMERGENCY
+        } else {
+            HivePlatform.Status.OPERATIONAL
+        }
 
         // Create/update platform from merged cached state
         // Note: BLE peers are shown as platforms only (not tracks) - tracks are for detected entities
@@ -257,7 +679,7 @@ class HiveMapComponent : DropDownMapComponent() {
             lon = lon.toDouble(),
             hae = cachedState.altitude?.toDouble()?.takeIf { it != 0.0 },
             cellId = meshId,
-            status = HivePlatform.Status.OPERATIONAL,
+            status = status,
             batteryPercent = cachedState.batteryPercent ?: 0,
             lastUpdate = cachedState.lastSeen
         )
@@ -388,34 +810,42 @@ class HiveMapComponent : DropDownMapComponent() {
     }
 
     /**
-     * Remove BLE peer platforms that are Lost according to hive-btle's
-     * ConnectionStateGraph via HiveMesh. Uses the library's heartbeat-based presence detection.
+     * Remove BLE peer platforms that are no longer known to the mesh.
+     * Uses isPeerKnown() from hive-btle for accurate multi-hop awareness,
+     * with fallback to staleness check for robustness.
      */
     private fun cleanupLostPlatforms() {
-        val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager() ?: return
+        val hiveMesh = HivePluginLifecycle.getInstance()?.getHiveBleManager()?.getMesh()
         val selfUidHash = mapView.selfMarker?.uid?.hashCode()?.toLong()
+        val now = System.currentTimeMillis()
+        val staleThresholdMs = 5 * 60 * 1000L // 5 minutes - same as overlay
 
-        // Get peer state from hive-btle mesh
-        val connectedPeers = bleManager.getConnectedPeers()
-        val lostPeers = bleManager.getLostPeers()
-        val lostNodeIds = lostPeers.mapNotNull { it.nodeId }.toSet()
+        // Find platforms that are either:
+        // 1. Not known to the mesh (isPeerKnown returns false), OR
+        // 2. Stale (haven't sent a document in 5 minutes) as fallback
+        val toRemove = _blePeerPlatforms.entries.filter { (nodeId, platform) ->
+            if (nodeId == selfUidHash) return@filter false
 
-        Log.d(TAG, "Mesh state: ${connectedPeers.size} connected, ${lostPeers.size} lost. Platforms: ${_blePeerPlatforms.keys.map { String.format("%08X", it) }}")
+            // Check if peer is known to mesh (direct or indirect)
+            val isKnown = hiveMesh?.isPeerKnown(nodeId) ?: true
+            val isStale = (now - platform.lastUpdate > staleThresholdMs)
 
-        // Find platforms to remove (Lost state from library)
-        val toRemove = _blePeerPlatforms.keys.filter { nodeId ->
-            nodeId != selfUidHash && nodeId in lostNodeIds
+            // Remove if not known to mesh AND stale (belt and suspenders)
+            !isKnown && isStale
         }
 
+        Log.d(TAG, "Cleanup check: ${_blePeerPlatforms.size} platforms, ${toRemove.size} to remove")
+
         if (toRemove.isNotEmpty()) {
-            toRemove.forEach { nodeId ->
-                val platform = _blePeerPlatforms.remove(nodeId)
+            toRemove.forEach { (nodeId, platform) ->
+                _blePeerPlatforms.remove(nodeId)
                 // Also clear cached state for delta sync
                 _peerStateCache.remove(nodeId)
-                val lostPeer = lostPeers.find { it.nodeId == nodeId }
-                val lastSeenSec = lostPeer?.lastSeenMs?.let { (System.currentTimeMillis() - it) / 1000 }
-                Log.i(TAG, "Removed lost BLE peer: ${platform?.callsign} " +
-                        "(${String.format("%08X", nodeId)}, last seen ${lastSeenSec}s ago)")
+                // Clear any emergency state
+                _activeEmergencies.remove(nodeId)
+                val staleSec = (now - platform.lastUpdate) / 1000
+                Log.i(TAG, "Removed lost BLE peer: ${platform.callsign} " +
+                        "(${String.format("%08X", nodeId)}, unknown to mesh, last seen ${staleSec}s ago)")
             }
         }
     }
@@ -468,20 +898,30 @@ class HiveMapComponent : DropDownMapComponent() {
         val lifecycle = HivePluginLifecycle.getInstance()
         val node = lifecycle?.getHiveNodeJni()
         if (node == null) {
-            Log.w(TAG, "No HIVE node available - lifecycle=$lifecycle, node=$node")
-            _cells.clear()
+            Log.d(TAG, "No HIVE FFI node - running BLE-only mode")
+            // In BLE-only mode, don't clear cells/platforms - they're managed by BLE callbacks
+            // Only clear FFI-sourced data (_platforms and _tracks from JSON), preserve BLE data
             _platforms.clear()
             _tracks.clear()
-            return
+            // Don't clear _cells - synthetic BLE cell is preserved
+            return  // Skip FFI calls, BLE data is managed by callbacks
         }
 
-        // Fetch cells from HIVE sync
+        // Fetch cells from HIVE sync (only when FFI node is available)
         try {
             val cellsJson = node.getCellsJson()
             Log.d(TAG, "Cells JSON: $cellsJson")
+            // Preserve synthetic BLE cells when loading from FFI
+            val bleCells = _cells.filter { it.capabilities.contains("BLE_MESH") }
             _cells.clear()
             _cells.addAll(parseCellsJson(cellsJson))
-            Log.i(TAG, "Loaded ${_cells.size} cells from HIVE")
+            // Re-add BLE cells that aren't duplicates
+            bleCells.forEach { bleCell ->
+                if (_cells.none { it.id == bleCell.id }) {
+                    _cells.add(bleCell)
+                }
+            }
+            Log.i(TAG, "Loaded ${_cells.size} cells from HIVE (+ ${bleCells.size} BLE cells)")
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching cells: ${e.message}", e)
         }
@@ -791,6 +1231,35 @@ class HiveMapComponent : DropDownMapComponent() {
      */
     fun broadcastPliNow() {
         selfPositionBroadcaster?.broadcastNow()
+    }
+
+    /**
+     * Zoom the map to focus on a specific location.
+     * @param lat Latitude
+     * @param lon Longitude
+     * @param zoomScale Zoom scale (lower = more zoomed in)
+     */
+    fun zoomToLocation(lat: Double, lon: Double, zoomScale: Double = 1000.0) {
+        try {
+            val point = GeoPoint(lat, lon)
+            mapView.mapController.panTo(point, true)
+            mapView.mapController.zoomTo(zoomScale, true)
+            Log.i(TAG, "Zoomed to location ($lat, $lon) at scale $zoomScale")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to zoom to location: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Zoom the map to focus on a specific marker by UID.
+     * @param markerUid The marker UID to zoom to
+     * @return true if marker was found and zoomed to, false otherwise
+     */
+    fun zoomToMarker(markerUid: String): Boolean {
+        val cached = _markerCache[markerUid] ?: return false
+        val marker = cached.marker
+        zoomToLocation(marker.lat.toDouble(), marker.lon.toDouble())
+        return true
     }
 
     /**

@@ -223,9 +223,9 @@ dependencies {
     }
 
     // HIVE BLE mesh transport (for WearTAK sync)
-    // Use local path for development, switch to Maven Central for release
-    implementation project(path: ':hive-btle')
-    // implementation 'com.revolveteam:hive:0.0.9'
+    // Using composite build from local hive-btle repo (see settings.gradle)
+    // Version substituted at build time from ../../hive-btle/android
+    implementation 'com.revolveteam:hive:0.0.11'
 
     // CompileOnly dependencies - needed for compilation but provided by ATAK at runtime
     // These are excluded from packaging to avoid conflicts with ATAK's bundled versions
