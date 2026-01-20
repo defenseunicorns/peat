@@ -587,6 +587,9 @@ class HiveDropDownReceiver(
         headerRow.addView(statusText)
         card.addView(headerRow)
 
+        // Get actual platforms in this cell
+        val cellPlatforms = mapComponent.platforms.filter { it.cellId == cell.id }
+
         val platformsHeader = TextView(pluginContext).apply {
             text = "${cellPlatforms.size} platforms"
             textSize = 12f

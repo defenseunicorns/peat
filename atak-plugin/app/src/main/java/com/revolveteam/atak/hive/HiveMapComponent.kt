@@ -544,6 +544,9 @@ class HiveMapComponent : DropDownMapComponent() {
             val normalPlatform = platform.copy(status = HivePlatform.Status.OPERATIONAL)
             _blePeerPlatforms[nodeId] = normalPlatform
             updateBlePeerOverlay()
+
+            // Notify UI that emergency was cleared
+            onEmergencyCleared?.invoke(nodeId)
         }
     }
 
