@@ -31,6 +31,9 @@ class HivePlatformOverlay(private val mapView: MapView) {
         private const val GROUP_NAME = "HIVE Platforms"
         private const val STALE_THRESHOLD_MS = 5 * 60 * 1000L // 5 minutes
 
+        // Emergency color - bright red for SOS alerts
+        private val EMERGENCY_COLOR = Color.parseColor("#FF0000")
+
         // Cell colors for grouping (cycle through these)
         private val CELL_COLORS = listOf(
             Color.parseColor("#2196F3"),  // Blue
@@ -204,6 +207,18 @@ class HivePlatformOverlay(private val mapView: MapView) {
      * Apply visual style to marker based on platform and cell.
      */
     private fun applyMarkerStyle(marker: Marker, platform: HivePlatform) {
+        // EMERGENCY status overrides all other colors - bright red
+        if (platform.status == HivePlatform.Status.EMERGENCY) {
+            marker.setColor(EMERGENCY_COLOR)
+            marker.setMetaInteger("color", EMERGENCY_COLOR)
+            // Update title to indicate emergency
+            val currentTitle = marker.title ?: platform.callsign
+            if (!currentTitle.contains("SOS")) {
+                marker.title = "⚠ SOS: $currentTitle"
+            }
+            return
+        }
+
         // Get color based on cell membership
         val color = if (platform.cellId != null) {
             getColorForCell(platform.cellId)
@@ -220,6 +235,7 @@ class HivePlatformOverlay(private val mapView: MapView) {
             else -> color
         }
 
+        marker.setColor(finalColor)
         marker.setMetaInteger("color", finalColor)
     }
 
