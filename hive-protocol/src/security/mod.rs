@@ -38,6 +38,7 @@
 mod audit;
 mod authenticator;
 mod authorization;
+mod callsign;
 mod device_id;
 mod encryption;
 mod error;
@@ -79,6 +80,11 @@ pub use user_auth::{
 pub use membership::{
     CertificateRegistry, MemberPermissions, MembershipCertificate, CERTIFICATE_BASE_SIZE,
     MAX_CALLSIGN_LEN, MESH_ID_LEN,
+};
+
+// Callsign generation (ADR-048: Tactical Trust)
+pub use callsign::{
+    CallsignError, CallsignGenerator, MAX_CALLSIGN_LENGTH, NATO_ALPHABET, TOTAL_CALLSIGNS,
 };
 
 // Re-export protobuf types for convenience
