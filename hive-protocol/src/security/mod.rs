@@ -36,6 +36,7 @@
 //! ```
 
 mod audit;
+mod auth_state;
 mod authenticator;
 mod authorization;
 mod callsign;
@@ -85,6 +86,11 @@ pub use membership::{
 // Callsign generation (ADR-048: Tactical Trust)
 pub use callsign::{
     CallsignError, CallsignGenerator, MAX_CALLSIGN_LENGTH, NATO_ALPHABET, TOTAL_CALLSIGNS,
+};
+
+// Auth state tracking (ADR-048: Graceful Degradation)
+pub use auth_state::{
+    AuthConfig, AuthStateEvent, AuthStateMonitor, AuthStateTracker, CertificateState,
 };
 
 // Re-export protobuf types for convenience
