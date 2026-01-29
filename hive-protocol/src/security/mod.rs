@@ -93,7 +93,6 @@ pub use auth_state::{
     AuthConfig, AuthStateEvent, AuthStateMonitor, AuthStateTracker, CertificateState,
 };
 
-
 // Re-export protobuf types for convenience
 pub use hive_schema::security::v1::{
     Challenge, DeviceIdentity, DeviceType as ProtoDeviceType,
