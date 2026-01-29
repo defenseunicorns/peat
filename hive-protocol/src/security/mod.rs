@@ -43,6 +43,7 @@ mod encryption;
 mod error;
 mod formation_key;
 mod keypair;
+mod membership;
 mod transport;
 mod user_auth;
 
@@ -72,6 +73,12 @@ pub use user_auth::{
     AccountStatus, AuthMethod, Credential, LocalUserStore, MilitaryRank, OrganizationUnit,
     SecurityClearance, SessionId, UserAuthenticator, UserIdentity, UserIdentityBuilder, UserRecord,
     UserSession, UserStore,
+};
+
+// Membership certificates (ADR-048: Tactical Trust)
+pub use membership::{
+    CertificateRegistry, MemberPermissions, MembershipCertificate, CERTIFICATE_BASE_SIZE,
+    MAX_CALLSIGN_LEN, MESH_ID_LEN,
 };
 
 // Re-export protobuf types for convenience
