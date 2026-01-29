@@ -420,6 +420,111 @@ impl MembershipCertificate {
             issuer_signature,
         })
     }
+
+    /// Convert to a lightweight MembershipToken for constrained devices.
+    ///
+    /// This creates a new token with the authority's signature. The token has:
+    /// - Callsign truncated to 12 characters (if longer)
+    /// - mesh_id converted from 8-char hex to 4-byte binary
+    /// - No permission field (tokens don't carry permissions)
+    ///
+    /// # Arguments
+    /// * `authority_keypair` - The authority's keypair to sign the token
+    ///
+    /// # Example
+    /// ```ignore
+    /// let token = certificate.to_token(&authority_keypair);
+    /// // Send token over BLE to WearTAK
+    /// ```
+    #[cfg(feature = "bluetooth")]
+    pub fn to_token(
+        &self,
+        authority_keypair: &DeviceKeypair,
+    ) -> hive_btle::security::MembershipToken {
+        use hive_btle::security::MembershipToken;
+
+        // Convert 8-char hex mesh_id to 4 bytes
+        let mesh_id_bytes = Self::hex_to_bytes(&self.mesh_id);
+
+        // Truncate callsign to 12 chars if needed
+        let callsign = if self.callsign.len() > hive_btle::security::MAX_CALLSIGN_LEN {
+            &self.callsign[..hive_btle::security::MAX_CALLSIGN_LEN]
+        } else {
+            &self.callsign
+        };
+
+        // Create a DeviceIdentity from the authority keypair for signing
+        let authority_identity = hive_btle::security::DeviceIdentity::from_private_key(
+            &authority_keypair.secret_key_bytes(),
+        )
+        .expect("valid keypair");
+
+        MembershipToken::issue_at(
+            &authority_identity,
+            mesh_id_bytes,
+            self.member_public_key,
+            callsign,
+            self.issued_at_ms,
+            self.expires_at_ms,
+        )
+    }
+
+    /// Create a MembershipCertificate from a MembershipToken.
+    ///
+    /// This upgrades a lightweight token to a full certificate with:
+    /// - mesh_id expanded from 4-byte binary to 8-char hex
+    /// - Default permissions (STANDARD: RELAY | EMERGENCY)
+    /// - The authority's signature (re-signed for certificate format)
+    ///
+    /// # Arguments
+    /// * `token` - The token to convert
+    /// * `authority_keypair` - The authority's keypair to sign the certificate
+    ///
+    /// # Example
+    /// ```ignore
+    /// let cert = MembershipCertificate::from_token(&token, &authority_keypair);
+    /// ```
+    #[cfg(feature = "bluetooth")]
+    pub fn from_token(
+        token: &hive_btle::security::MembershipToken,
+        authority_keypair: &DeviceKeypair,
+    ) -> Self {
+        // Convert 4-byte mesh_id to 8-char hex
+        let mesh_id = format!(
+            "{:02X}{:02X}{:02X}{:02X}",
+            token.mesh_id[0], token.mesh_id[1], token.mesh_id[2], token.mesh_id[3]
+        );
+
+        let callsign = token.callsign_str().to_string();
+
+        let mut cert = Self::new(
+            token.public_key,
+            callsign,
+            mesh_id,
+            token.issued_at_ms,
+            token.expires_at_ms,
+            MemberPermissions::STANDARD, // Default permissions
+            authority_keypair.public_key_bytes(),
+        );
+
+        cert.sign_with(authority_keypair);
+        cert
+    }
+
+    /// Helper to convert 8-char hex string to 4 bytes.
+    #[cfg(feature = "bluetooth")]
+    fn hex_to_bytes(hex: &str) -> [u8; 4] {
+        let mut bytes = [0u8; 4];
+        if hex.len() == 8 {
+            for (i, chunk) in hex.as_bytes().chunks(2).enumerate() {
+                if i < 4 {
+                    let s = std::str::from_utf8(chunk).unwrap_or("00");
+                    bytes[i] = u8::from_str_radix(s, 16).unwrap_or(0);
+                }
+            }
+        }
+        bytes
+    }
 }
 
 /// Registry for storing and looking up membership certificates.
@@ -806,5 +911,156 @@ mod tests {
         assert!(MemberPermissions::AUTHORITY.contains(MemberPermissions::EMERGENCY));
         assert!(MemberPermissions::AUTHORITY.contains(MemberPermissions::ENROLL));
         assert!(MemberPermissions::AUTHORITY.contains(MemberPermissions::ADMIN));
+    }
+
+    #[cfg(feature = "bluetooth")]
+    mod token_conversion_tests {
+        use super::*;
+
+        #[test]
+        fn test_certificate_to_token() {
+            let authority = DeviceKeypair::generate();
+            let member = DeviceKeypair::generate();
+
+            let now = 1000000u64;
+            let expires = now + 86_400_000; // 24 hours
+
+            let cert = MembershipCertificate::new(
+                member.public_key_bytes(),
+                "ALPHA-07".to_string(),
+                "A1B2C3D4".to_string(),
+                now,
+                expires,
+                MemberPermissions::STANDARD,
+                authority.public_key_bytes(),
+            )
+            .signed(&authority);
+
+            // Convert to token
+            let token = cert.to_token(&authority);
+
+            // Verify token properties
+            assert_eq!(token.public_key, member.public_key_bytes());
+            assert_eq!(token.callsign_str(), "ALPHA-07");
+            assert_eq!(token.mesh_id_hex(), "A1B2C3D4");
+            assert_eq!(token.issued_at_ms, now);
+            assert_eq!(token.expires_at_ms, expires);
+
+            // Token should be verifiable
+            let authority_identity = hive_btle::security::DeviceIdentity::from_private_key(
+                &authority.secret_key_bytes(),
+            )
+            .unwrap();
+            assert!(token.verify(&authority_identity.public_key()));
+        }
+
+        #[test]
+        fn test_token_to_certificate() {
+            let authority = DeviceKeypair::generate();
+            let member_pubkey = DeviceKeypair::generate().public_key_bytes();
+
+            // Create a token (simulating what WearTAK might receive)
+            let authority_identity = hive_btle::security::DeviceIdentity::from_private_key(
+                &authority.secret_key_bytes(),
+            )
+            .unwrap();
+
+            let mesh_id = [0xA1, 0xB2, 0xC3, 0xD4];
+            let now = 1000000u64;
+            let expires = now + 86_400_000;
+
+            let token = hive_btle::security::MembershipToken::issue_at(
+                &authority_identity,
+                mesh_id,
+                member_pubkey,
+                "BRAVO-03",
+                now,
+                expires,
+            );
+
+            // Convert to certificate
+            let cert = MembershipCertificate::from_token(&token, &authority);
+
+            // Verify certificate properties
+            assert_eq!(cert.member_public_key, member_pubkey);
+            assert_eq!(cert.callsign, "BRAVO-03");
+            assert_eq!(cert.mesh_id, "A1B2C3D4");
+            assert_eq!(cert.issued_at_ms, now);
+            assert_eq!(cert.expires_at_ms, expires);
+            assert_eq!(cert.permissions, MemberPermissions::STANDARD);
+            assert_eq!(cert.issuer_public_key, authority.public_key_bytes());
+
+            // Certificate should verify
+            assert!(cert.verify().is_ok());
+        }
+
+        #[test]
+        fn test_roundtrip_conversion() {
+            let authority = DeviceKeypair::generate();
+            let member = DeviceKeypair::generate();
+
+            let now = 1000000u64;
+            let expires = now + 86_400_000;
+
+            // Start with certificate
+            let original_cert = MembershipCertificate::new(
+                member.public_key_bytes(),
+                "CHARLIE-99".to_string(),
+                "DEADBEEF".to_string(),
+                now,
+                expires,
+                MemberPermissions::RELAY | MemberPermissions::EMERGENCY | MemberPermissions::ENROLL,
+                authority.public_key_bytes(),
+            )
+            .signed(&authority);
+
+            // Convert to token (loses ENROLL permission)
+            let token = original_cert.to_token(&authority);
+
+            // Convert back to certificate (gets STANDARD permissions)
+            let recovered_cert = MembershipCertificate::from_token(&token, &authority);
+
+            // Core fields preserved
+            assert_eq!(
+                recovered_cert.member_public_key,
+                original_cert.member_public_key
+            );
+            assert_eq!(recovered_cert.callsign, original_cert.callsign);
+            assert_eq!(recovered_cert.mesh_id, original_cert.mesh_id);
+            assert_eq!(recovered_cert.issued_at_ms, original_cert.issued_at_ms);
+            assert_eq!(recovered_cert.expires_at_ms, original_cert.expires_at_ms);
+
+            // Permissions reset to STANDARD (tokens don't carry permissions)
+            assert_eq!(recovered_cert.permissions, MemberPermissions::STANDARD);
+
+            // Both should verify
+            assert!(original_cert.verify().is_ok());
+            assert!(recovered_cert.verify().is_ok());
+        }
+
+        #[test]
+        fn test_long_callsign_truncation() {
+            let authority = DeviceKeypair::generate();
+            let member = DeviceKeypair::generate();
+
+            // Certificate with 16-char callsign (max for MembershipCertificate)
+            let cert = MembershipCertificate::new(
+                member.public_key_bytes(),
+                "ALPHA-BRAVO-1234".to_string(), // 16 chars
+                "A1B2C3D4".to_string(),
+                1000,
+                2000,
+                MemberPermissions::STANDARD,
+                authority.public_key_bytes(),
+            )
+            .signed(&authority);
+
+            // Convert to token (max 12 chars)
+            let token = cert.to_token(&authority);
+
+            // Callsign should be truncated
+            assert_eq!(token.callsign_str(), "ALPHA-BRAVO-");
+            assert_eq!(token.callsign_str().len(), 12);
+        }
     }
 }
