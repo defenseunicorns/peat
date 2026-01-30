@@ -30,6 +30,19 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
     companion object {
         private const val TAG = "HivePluginLifecycle"
         const val DEFAULT_MESH_ID = "WEARTAK"
+        const val DEFAULT_CELL_ID = "ALPHA"
+
+        /**
+         * NATO phonetic alphabet for cell naming.
+         * Cells are organizational units within a mesh (squads/teams).
+         */
+        val NATO_PHONETIC_CELLS = listOf(
+            "ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO", "FOXTROT",
+            "GOLF", "HOTEL", "INDIA", "JULIET", "KILO", "LIMA",
+            "MIKE", "NOVEMBER", "OSCAR", "PAPA", "QUEBEC", "ROMEO",
+            "SIERRA", "TANGO", "UNIFORM", "VICTOR", "WHISKEY",
+            "XRAY", "YANKEE", "ZULU"
+        )
 
         @Volatile
         private var instance: HivePluginLifecycle? = null
@@ -42,6 +55,10 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
 
     // BLE mesh manager for WearTAK sync
     private var hiveBleManager: HiveBleManager? = null
+
+    // Current cell assignment (organizational unit within mesh)
+    @Volatile
+    private var currentCellId: String = DEFAULT_CELL_ID
 
     init {
         instance = this
@@ -105,6 +122,11 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
                 ?: System.getProperty("hive.mesh_id")
                 ?: System.getenv("HIVE_MESH_ID")
                 ?: DEFAULT_MESH_ID
+
+            // Load cell ID from preferences (organizational unit within mesh)
+            currentCellId = prefs.getString("cell_id", null)
+                ?: DEFAULT_CELL_ID
+            Log.i(TAG, "Cell assignment: $currentCellId (mesh: $meshId)")
 
             @Suppress("DEPRECATION")
             hiveBleManager = HiveBleManager(context, meshId)
@@ -244,6 +266,36 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
     fun getCurrentMeshId(): String {
         return hiveBleManager?.meshId ?: DEFAULT_MESH_ID
     }
+
+    /**
+     * Get the current cell ID (organizational unit within the mesh).
+     * Cells use NATO phonetic names: ALPHA, BRAVO, CHARLIE, etc.
+     */
+    fun getCurrentCellId(): String {
+        return currentCellId
+    }
+
+    /**
+     * Set the current cell ID.
+     * @param cellId Must be a valid NATO phonetic name from NATO_PHONETIC_CELLS
+     */
+    fun setCurrentCellId(context: Context, cellId: String) {
+        if (cellId !in NATO_PHONETIC_CELLS) {
+            Log.w(TAG, "Invalid cell ID: $cellId. Must be NATO phonetic (ALPHA, BRAVO, etc.)")
+            return
+        }
+        Log.i(TAG, "Changing cell from $currentCellId to $cellId")
+        currentCellId = cellId
+
+        // Persist to preferences
+        val prefs = context.getSharedPreferences("hive_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putString("cell_id", cellId).apply()
+    }
+
+    /**
+     * Get list of available cell names (NATO phonetic alphabet).
+     */
+    fun getAvailableCells(): List<String> = NATO_PHONETIC_CELLS
 
     fun setMeshId(context: Context, meshId: String) {
         // Save to preferences
