@@ -94,6 +94,17 @@ impl DeviceKeypair {
         self.signing_key.verifying_key().to_bytes()
     }
 
+    /// Get the secret key bytes (32 bytes).
+    ///
+    /// # Security Warning
+    ///
+    /// This exposes the private key material. Only use for:
+    /// - Secure storage/persistence
+    /// - Cross-crate interop (e.g., converting to hive_btle::DeviceIdentity)
+    pub fn secret_key_bytes(&self) -> [u8; 32] {
+        self.signing_key.to_bytes()
+    }
+
     /// Sign a message with the secret key.
     pub fn sign(&self, message: &[u8]) -> Signature {
         self.signing_key.sign(message)
