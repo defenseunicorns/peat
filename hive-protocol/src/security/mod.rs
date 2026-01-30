@@ -36,13 +36,16 @@
 //! ```
 
 mod audit;
+mod auth_state;
 mod authenticator;
 mod authorization;
+mod callsign;
 mod device_id;
 mod encryption;
 mod error;
 mod formation_key;
 mod keypair;
+mod membership;
 mod transport;
 mod user_auth;
 
@@ -72,6 +75,22 @@ pub use user_auth::{
     AccountStatus, AuthMethod, Credential, LocalUserStore, MilitaryRank, OrganizationUnit,
     SecurityClearance, SessionId, UserAuthenticator, UserIdentity, UserIdentityBuilder, UserRecord,
     UserSession, UserStore,
+};
+
+// Membership certificates (ADR-048: Tactical Trust)
+pub use membership::{
+    CertificateRegistry, MemberPermissions, MembershipCertificate, CERTIFICATE_BASE_SIZE,
+    MAX_CALLSIGN_LEN, MESH_ID_LEN,
+};
+
+// Callsign generation (ADR-048: Tactical Trust)
+pub use callsign::{
+    CallsignError, CallsignGenerator, MAX_CALLSIGN_LENGTH, NATO_ALPHABET, TOTAL_CALLSIGNS,
+};
+
+// Auth state tracking (ADR-048: Graceful Degradation)
+pub use auth_state::{
+    AuthConfig, AuthStateEvent, AuthStateMonitor, AuthStateTracker, CertificateState,
 };
 
 // Re-export protobuf types for convenience
