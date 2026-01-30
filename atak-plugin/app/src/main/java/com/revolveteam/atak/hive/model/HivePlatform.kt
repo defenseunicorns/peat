@@ -117,7 +117,10 @@ data class HivePlatform(
         RTB,
 
         /** Offline */
-        OFFLINE
+        OFFLINE,
+
+        /** Emergency/SOS active - highest priority */
+        EMERGENCY
     }
 
     /**
