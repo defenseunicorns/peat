@@ -1,13 +1,127 @@
-# ADR-043: Consumer Interface Adapters
+# ADR-043: Consumer Interface Adapters (Compatibility Layer)
 
-**Status**: Proposed
-**Date**: 2026-01-06
-**Authors**: Kit Plummer, Claude
+**Status**: Proposed  
+**Date**: 2026-01-06 (Updated: 2025-01-31)  
+**Authors**: Kit Plummer, Claude  
+**Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)  
 **Related ADRs**:
 - [ADR-029](029-tak-transport-adapter.md) (TAK Transport Adapter)
 - [ADR-032](032-pluggable-transport-abstraction.md) (Pluggable Transport Abstraction)
 - [ADR-042](042-direct-udp-bypass-pathway.md) (Direct UDP Bypass Pathway)
 - [ADR-005](005-datasync-abstraction-layer.md) (Data Sync Abstraction Layer)
+- [ADR-049](049-schema-extraction-and-codegen.md) (Schema Extraction)
+- [ADR-050](050-sdk-integration.md) (HIVE SDK - Optimal Integration Path)
+
+---
+
+## Executive Summary
+
+This ADR defines **Consumer Interface Adapters** - network-based interfaces (WebSocket, TCP, HTTP/REST) that enable external systems to interact with HIVE nodes.
+
+> **⚠️ IMPORTANT**: Consumer interface adapters are the **compatibility layer**, not the optimal integration path. Systems that can integrate the HIVE SDK directly (ADR-050) should do so for better performance, offline capability, and full CRDT benefits. These adapters exist for systems that **cannot** be modified to embed the SDK.
+
+---
+
+## Integration Path Guidance
+
+### Decision Tree
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│           Can you modify the external system?                │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+              ┌───────────┴───────────┐
+              │                       │
+              ▼                       ▼
+┌─────────────────────────┐   ┌─────────────────────────────────┐
+│          YES            │   │              NO                  │
+│                         │   │                                  │
+│  Use hive-sdk           │   │  Use Consumer Interface Adapters│
+│  (ADR-050)              │   │  (This ADR)                     │
+│                         │   │                                  │
+│  • Full CRDT sync       │   │  • Request/response only        │
+│  • Offline capable      │   │  • Requires adapter reachable   │
+│  • Minimal latency      │   │  • +50-200ms latency            │
+│  • Native hierarchy     │   │  • Flat data model              │
+└─────────────────────────┘   └─────────────────────────────────┘
+```
+
+### Comparison: SDK vs Consumer Interface Adapters
+
+| Capability | SDK (ADR-050) | Adapters (This ADR) |
+|------------|---------------|---------------------|
+| **Latency** | Sync only (~10-50ms) | +50-200ms overhead |
+| **Offline Operation** | ✅ Full - queues changes, syncs on reconnect | ❌ None - requires adapter |
+| **CRDT Conflict Resolution** | ✅ Automatic, deterministic | ❌ Last-write-wins at adapter |
+| **Hierarchical Membership** | ✅ Full cell participation | ❌ Not a cell member |
+| **Capability Aggregation** | ✅ Contributes to cell capabilities | ❌ Not aggregated |
+| **Bandwidth Efficiency** | ✅ Delta sync only | ❌ Full message per request |
+| **Peer-to-Peer** | ✅ Direct sync with any peer | ❌ Must go through adapter |
+| **Multi-Transport** | ✅ Iroh, BLE, LoRa, etc. | ❌ HTTP/WS/TCP only |
+
+### When to Use Each Path
+
+**Use Consumer Interface Adapters (This ADR) for:**
+- Existing ATAK/WinTAK installations that cannot run custom plugins
+- Legacy GCS software with no extension capability
+- Legacy C2 systems built on older stacks
+- IoT hubs that only speak MQTT
+- Web browsers (until WASM SDK is available)
+- Monitoring dashboards and debugging tools
+- Compliance bridges (e.g., mandatory Link 16 feeds)
+- Third-party services needing event streams
+
+**Use the SDK (ADR-050) for:**
+- New autonomous platforms (UAS, UGV, USV)
+- Custom C2 applications
+- ROS2 robots and robotic systems
+- ATAK plugins (can embed SDK)
+- Mobile apps with native development
+- Any system where you control the software
+
+---
+
+## Latency Analysis
+
+### SDK Integration (Optimal Path)
+
+```
+Platform A ──CRDT Sync──► Platform B
+           ~10-50ms (network dependent)
+           
+• No intermediate hops
+• Delta sync (only changes)
+• Offline queue when disconnected
+• Reconnect automatically syncs
+```
+
+### Adapter Integration (Compatibility Path)
+
+```
+Legacy System ──HTTP/WS──► Adapter ──Query──► HIVE ──Response──► Adapter ──HTTP/WS──► Legacy
+              ~20ms        ~5ms      ~10ms     ~5ms      ~5ms       ~20ms
+                                                                    
+Total: ~65ms minimum, typically 100-200ms
+```
+
+**Latency Breakdown**:
+
+| Component | Latency | Notes |
+|-----------|---------|-------|
+| Network to Adapter | 10-50ms | Depends on network topology |
+| Protocol parsing | 1-5ms | JSON/Protobuf decode |
+| HIVE query | 5-20ms | Local CRDT read |
+| Response serialization | 1-5ms | JSON/Protobuf encode |
+| Network from Adapter | 10-50ms | Return path |
+| **Total** | **50-200ms** | Per request |
+
+**Additional Adapter Limitations**:
+- No offline operation (adapter must be reachable)
+- No automatic conflict resolution (last-write-wins at adapter)
+- No hierarchical aggregation for external system
+- Polling required for updates (or WebSocket with its own overhead)
+- Single point of failure if adapter node goes down
 
 ---
 
@@ -15,15 +129,15 @@
 
 ### Problem Statement
 
-HIVE Protocol's primary interface is via **direct Rust API integration** using the `hive-protocol` and `hive-ffi` crates. However, many potential consumers cannot integrate at this level:
+HIVE Protocol's primary interface is via **direct Rust API integration** using the `hive-protocol` and `hive-ffi` crates, or the **HIVE SDK** (ADR-050) for multi-language support. However, many potential consumers cannot integrate at this level:
 
 1. **Legacy C2 Systems**: Existing command and control systems built on older stacks
 2. **Web Dashboards**: Browser-based monitoring and control interfaces
-3. **Scripting/Automation**: Python, Node.js, or other runtime integrations
+3. **Scripting/Automation**: Python, Node.js, or other runtime integrations (when SDK is unavailable)
 4. **Hardware Devices**: Embedded systems with limited language support
 5. **Third-Party Services**: Cloud services needing event streams
 
-These systems require **network-based interfaces** that don't require Rust compilation or FFI bindings.
+These systems require **network-based interfaces** that don't require Rust compilation, FFI bindings, or SDK embedding.
 
 ### Consumer Interface Requirements
 
@@ -75,30 +189,46 @@ This needs extension for:
 We will implement **Consumer Interface Adapters** as a facade layer over the HIVE Protocol API, supporting multiple transport protocols with unified semantics.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                   Consumer Interface Layer                       │
-│                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
-│  │  WebSocket   │  │    TCP       │  │  HTTP/REST   │           │
-│  │   Adapter    │  │   Adapter    │  │   Adapter    │           │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘           │
-│         │                 │                 │                    │
-│         └─────────────────┼─────────────────┘                    │
-│                           │                                      │
-│                           ▼                                      │
-│                  ┌────────────────┐                              │
-│                  │  Interface     │                              │
-│                  │  Coordinator   │                              │
-│                  └────────┬───────┘                              │
-│                           │                                      │
-├───────────────────────────┼──────────────────────────────────────┤
-│                           ▼                                      │
-│                  ┌────────────────┐                              │
-│                  │ hive-protocol  │                              │
-│                  │     API        │                              │
-│                  └────────────────┘                              │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         HIVE Node                                        │
+│                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │               Consumer Interface Layer (This ADR)                │   │
+│  │                                                                  │   │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │   │
+│  │  │  WebSocket   │  │    TCP       │  │  HTTP/REST   │          │   │
+│  │  │   Adapter    │  │   Adapter    │  │   Adapter    │          │   │
+│  │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘          │   │
+│  │         │                 │                 │                   │   │
+│  │         └─────────────────┼─────────────────┘                   │   │
+│  │                           │                                     │   │
+│  │                           ▼                                     │   │
+│  │                  ┌────────────────┐                             │   │
+│  │                  │   Interface    │                             │   │
+│  │                  │  Coordinator   │                             │   │
+│  │                  └────────┬───────┘                             │   │
+│  │                           │                                     │   │
+│  └───────────────────────────┼─────────────────────────────────────┘   │
+│                              │                                          │
+│                              ▼                                          │
+│                     ┌────────────────┐                                  │
+│                     │ hive-protocol  │                                  │
+│                     │     API        │                                  │
+│                     └────────────────┘                                  │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    ▲
+                                    │
+              ┌─────────────────────┼─────────────────────┐
+              │                     │                     │
+              ▼                     ▼                     ▼
+       ┌──────────┐          ┌──────────┐          ┌──────────┐
+       │  Legacy  │          │   Web    │          │   IoT    │
+       │   C2     │          │Dashboard │          │   Hub    │
+       │ (TCP)    │          │  (WS)    │          │ (HTTP)   │
+       └──────────┘          └──────────┘          └──────────┘
+       
+       These are NOT full mesh participants - they query/command only
 ```
 
 ### Core Traits
@@ -312,63 +442,17 @@ impl ConsumerAdapter for WebSocketAdapter {
     }
 
     async fn start(&self) -> Result<(), AdapterError> {
-        let listener = TcpListener::bind(&self.config.listen_addr).await?;
-        self.running.store(true, Ordering::SeqCst);
-
-        let sessions = self.sessions.clone();
-        let hive = self.hive.clone();
-        let metrics = self.metrics.clone();
-        let config = self.config.clone();
-        let mut shutdown = self.shutdown.subscribe();
-
-        tokio::spawn(async move {
-            loop {
-                tokio::select! {
-                    result = listener.accept() => {
-                        match result {
-                            Ok((stream, addr)) => {
-                                let session = WebSocketSession::new(
-                                    stream, addr, hive.clone(), config.clone()
-                                ).await;
-
-                                if let Ok(session) = session {
-                                    let session = Arc::new(session);
-                                    sessions.write().await.insert(
-                                        session.session_id().to_string(),
-                                        session.clone()
-                                    );
-                                    metrics.connections.fetch_add(1, Ordering::Relaxed);
-
-                                    // Spawn session handler
-                                    tokio::spawn(Self::handle_session(session, hive.clone()));
-                                }
-                            }
-                            Err(e) => {
-                                warn!("WebSocket accept error: {:?}", e);
-                            }
-                        }
-                    }
-                    _ = shutdown.recv() => {
-                        break;
-                    }
-                }
-            }
-        });
-
-        info!("WebSocket adapter started on {}", self.config.listen_addr);
-        Ok(())
+        // Bind WebSocket server
+        // Accept connections
+        // Spawn session handlers
+        todo!()
     }
 
     async fn stop(&self) -> Result<(), AdapterError> {
-        self.running.store(false, Ordering::SeqCst);
-        let _ = self.shutdown.send(());
-
+        // Signal shutdown
         // Close all sessions
-        for session in self.sessions.read().await.values() {
-            let _ = session.close().await;
-        }
-
-        Ok(())
+        // Wait for cleanup
+        todo!()
     }
 
     fn is_running(&self) -> bool {
@@ -376,29 +460,9 @@ impl ConsumerAdapter for WebSocketAdapter {
     }
 
     fn metrics(&self) -> AdapterMetrics {
-        (*self.metrics).clone()
+        self.metrics.as_ref().clone()
     }
 }
-```
-
-### WebSocket Protocol
-
-**Connection flow**:
-```
-Client                                    Server
-   │                                         │
-   ├─► GET /ws (HTTP Upgrade) ─────────────►│
-   │                                         │
-   │◄─ 101 Switching Protocols ─────────────│
-   │                                         │
-   ├─► {"type": "Subscribe",                │
-   │     "collection": "cells"} ───────────►│
-   │                                         │
-   │◄─ {"type": "DocumentUpdate",           │
-   │     "collection": "cells", ...} ───────│
-   │                                         │
-   │◄─ (push updates as they happen) ───────│
-   │                                         │
 ```
 
 ---
@@ -407,12 +471,12 @@ Client                                    Server
 
 ### Overview
 
-TCP provides simple framed messaging for legacy systems:
+TCP provides a simple, reliable interface for legacy systems:
 
-- **Reliable**: Guaranteed delivery and ordering
-- **Simple**: Basic length-prefixed framing
-- **Persistent**: Long-lived connections
-- **Efficient**: Binary or JSON payloads
+- **Reliable**: Ordered, guaranteed delivery
+- **Simple**: No HTTP overhead
+- **Framed**: Length-prefixed or newline-delimited
+- **Long-lived**: Persistent connections
 
 ### Implementation
 
@@ -429,27 +493,24 @@ pub struct TcpAdapter {
 
 #[derive(Debug, Clone)]
 pub struct TcpConfig {
-    /// Listen address
+    /// Listen address (e.g., "0.0.0.0:5151")
     pub listen_addr: SocketAddr,
 
-    /// Enable TLS
-    pub tls: Option<TlsConfig>,
-
     /// Message framing mode
-    pub framing: TcpFraming,
+    pub framing: FramingMode,
 
     /// Maximum message size
     pub max_message_size: usize,
 
-    /// Read timeout
-    pub read_timeout: Duration,
-
-    /// Authentication required
+    /// Require authentication
     pub require_auth: bool,
+
+    /// Idle timeout
+    pub idle_timeout: Duration,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum TcpFraming {
+pub enum FramingMode {
     /// 4-byte big-endian length prefix
     LengthPrefixed,
 
@@ -457,106 +518,34 @@ pub enum TcpFraming {
     NewlineDelimited,
 
     /// Custom delimiter
-    Delimiter(u8),
+    Delimited(u8),
 }
 
-/// TCP message frame
-struct TcpFrame {
-    length: u32,
-    payload: Vec<u8>,
-}
-
-impl TcpAdapter {
-    /// Read a framed message from TCP stream
-    async fn read_frame(
-        stream: &mut TcpStream,
-        framing: TcpFraming,
-        max_size: usize,
-    ) -> Result<Vec<u8>, AdapterError> {
-        match framing {
-            TcpFraming::LengthPrefixed => {
-                let mut len_buf = [0u8; 4];
-                stream.read_exact(&mut len_buf).await?;
-                let len = u32::from_be_bytes(len_buf) as usize;
-
-                if len > max_size {
-                    return Err(AdapterError::MessageTooLarge(len));
-                }
-
-                let mut payload = vec![0u8; len];
-                stream.read_exact(&mut payload).await?;
-                Ok(payload)
-            }
-            TcpFraming::NewlineDelimited => {
-                let mut line = String::new();
-                let mut reader = BufReader::new(stream);
-                reader.read_line(&mut line).await?;
-                Ok(line.into_bytes())
-            }
-            TcpFraming::Delimiter(delim) => {
-                let mut buf = Vec::new();
-                loop {
-                    let mut byte = [0u8; 1];
-                    stream.read_exact(&mut byte).await?;
-                    if byte[0] == delim {
-                        break;
-                    }
-                    buf.push(byte[0]);
-                    if buf.len() > max_size {
-                        return Err(AdapterError::MessageTooLarge(buf.len()));
-                    }
-                }
-                Ok(buf)
-            }
-        }
+#[async_trait]
+impl ConsumerAdapter for TcpAdapter {
+    fn adapter_type(&self) -> AdapterType {
+        AdapterType::Tcp
     }
 
-    /// Write a framed message to TCP stream
-    async fn write_frame(
-        stream: &mut TcpStream,
-        framing: TcpFraming,
-        payload: &[u8],
-    ) -> Result<(), AdapterError> {
-        match framing {
-            TcpFraming::LengthPrefixed => {
-                let len = (payload.len() as u32).to_be_bytes();
-                stream.write_all(&len).await?;
-                stream.write_all(payload).await?;
-            }
-            TcpFraming::NewlineDelimited => {
-                stream.write_all(payload).await?;
-                stream.write_all(b"\n").await?;
-            }
-            TcpFraming::Delimiter(delim) => {
-                stream.write_all(payload).await?;
-                stream.write_all(&[delim]).await?;
-            }
-        }
-        Ok(())
+    async fn start(&self) -> Result<(), AdapterError> {
+        // Bind TCP listener
+        // Accept connections
+        // Spawn session handlers with framing codec
+        todo!()
+    }
+
+    async fn stop(&self) -> Result<(), AdapterError> {
+        todo!()
+    }
+
+    fn is_running(&self) -> bool {
+        self.running.load(Ordering::SeqCst)
+    }
+
+    fn metrics(&self) -> AdapterMetrics {
+        self.metrics.as_ref().clone()
     }
 }
-```
-
-### TCP Protocol
-
-**Length-prefixed framing**:
-```
-┌─────────────────────────────────────────────┐
-│  4 bytes     │         N bytes             │
-│  length (BE) │         payload             │
-└─────────────────────────────────────────────┘
-```
-
-**Example exchange**:
-```
-Client                                    Server
-   │                                         │
-   ├─► TCP Connect ────────────────────────►│
-   │                                         │
-   ├─► [len][{"type":"Subscribe",...}] ────►│
-   │                                         │
-   │◄─ [len][{"type":"DocumentUpdate",...}]─│
-   │                                         │
 ```
 
 ---
@@ -565,268 +554,146 @@ Client                                    Server
 
 ### Overview
 
-HTTP/REST provides request/response semantics for scripting and automation:
+HTTP/REST provides a familiar interface for scripting and automation:
 
-- **Stateless**: Each request independent
-- **Cacheable**: GET responses can be cached
-- **Simple**: Standard HTTP verbs and status codes
-- **Widely supported**: Works with any HTTP client
+- **Request/Response**: Simple query model
+- **Stateless**: No connection management
+- **Cacheable**: Standard HTTP caching
+- **SSE**: Server-Sent Events for streaming
 
 ### Implementation
 
 ```rust
 /// HTTP/REST consumer adapter
-pub struct HttpRestAdapter {
-    config: HttpRestConfig,
+pub struct HttpAdapter {
+    config: HttpConfig,
     hive: Arc<HiveClient>,
     metrics: Arc<AdapterMetrics>,
     running: AtomicBool,
-    server_handle: Option<ServerHandle>,
+    shutdown: broadcast::Sender<()>,
 }
 
 #[derive(Debug, Clone)]
-pub struct HttpRestConfig {
-    /// Listen address
+pub struct HttpConfig {
+    /// Listen address (e.g., "0.0.0.0:8081")
     pub listen_addr: SocketAddr,
+
+    /// Base path for API (e.g., "/api/v1")
+    pub base_path: String,
 
     /// Enable TLS
     pub tls: Option<TlsConfig>,
 
-    /// API base path (e.g., "/api/v1")
-    pub base_path: String,
-
-    /// Enable CORS
+    /// CORS configuration
     pub cors: CorsConfig,
-
-    /// Authentication configuration
-    pub auth: AuthConfig,
 
     /// Rate limiting
     pub rate_limit: Option<RateLimitConfig>,
+
+    /// Authentication required
+    pub require_auth: bool,
 }
 
-impl HttpRestAdapter {
-    /// Build HTTP routes
-    fn routes(&self) -> Router {
-        let hive = self.hive.clone();
+#[async_trait]
+impl ConsumerAdapter for HttpAdapter {
+    fn adapter_type(&self) -> AdapterType {
+        AdapterType::HttpRest
+    }
 
-        Router::new()
-            // Node status
-            .route("/status", get(Self::get_status))
-            .route("/node", get(Self::get_node))
+    async fn start(&self) -> Result<(), AdapterError> {
+        // Build Axum router with endpoints:
+        // GET  /api/v1/status
+        // GET  /api/v1/peers
+        // GET  /api/v1/cell
+        // GET  /api/v1/documents/:collection
+        // GET  /api/v1/documents/:collection/:id
+        // POST /api/v1/documents/:collection
+        // PUT  /api/v1/documents/:collection/:id
+        // POST /api/v1/command
+        // GET  /api/v1/stream (SSE)
+        todo!()
+    }
 
-            // Peers
-            .route("/peers", get(Self::get_peers))
+    async fn stop(&self) -> Result<(), AdapterError> {
+        todo!()
+    }
 
-            // Cell operations
-            .route("/cells", get(Self::list_cells))
-            .route("/cells/:cell_id", get(Self::get_cell))
+    fn is_running(&self) -> bool {
+        self.running.load(Ordering::SeqCst)
+    }
 
-            // Document operations
-            .route("/collections/:collection", get(Self::query_collection))
-            .route("/collections/:collection", post(Self::write_document))
-            .route("/collections/:collection/:doc_id", get(Self::get_document))
-            .route("/collections/:collection/:doc_id", put(Self::update_document))
-            .route("/collections/:collection/:doc_id", delete(Self::delete_document))
-
-            // Commands
-            .route("/commands", post(Self::send_command))
-            .route("/commands/:command_id", get(Self::get_command_status))
-
-            // Subscriptions via Server-Sent Events (SSE)
-            .route("/stream", get(Self::event_stream))
-            .route("/stream/:collection", get(Self::collection_stream))
-
-            .with_state(hive)
+    fn metrics(&self) -> AdapterMetrics {
+        self.metrics.as_ref().clone()
     }
 }
-```
-
-### REST API Endpoints
-
-```yaml
-# Base path: /api/v1
-
-# Node status
-GET /status
-  Response: { "status": "healthy", "node_id": "...", "uptime_secs": 3600 }
-
-# Node information
-GET /node
-  Response: { "id": "...", "platform": "UAV", "capabilities": [...] }
-
-# Peers
-GET /peers
-  Response: [{ "id": "...", "connected": true, "address": "..." }, ...]
-
-# Cells
-GET /cells
-  Response: [{ "id": "...", "leader": "...", "members": [...] }, ...]
-
-GET /cells/{cell_id}
-  Response: { "id": "...", "leader": "...", "members": [...], "capabilities": [...] }
-
-# Collections (documents)
-GET /collections/{collection}
-  Query params: ?filter={json}&limit=100&offset=0
-  Response: { "documents": [...], "total": 42, "has_more": true }
-
-GET /collections/{collection}/{doc_id}
-  Response: { "id": "...", "data": {...}, "updated_at": "..." }
-
-POST /collections/{collection}
-  Body: { "data": {...} }
-  Response: { "id": "new_doc_id", "created": true }
-
-PUT /collections/{collection}/{doc_id}
-  Body: { "data": {...} }
-  Response: { "id": "...", "updated": true }
-
-DELETE /collections/{collection}/{doc_id}
-  Response: { "deleted": true }
-
-# Commands
-POST /commands
-  Body: { "target": "cell:abc", "action": "move_to", "params": {...} }
-  Response: { "command_id": "...", "status": "pending" }
-
-GET /commands/{command_id}
-  Response: { "command_id": "...", "status": "completed", "result": {...} }
-
-# Server-Sent Events (SSE) for streaming
-GET /stream
-  Headers: Accept: text/event-stream
-  Response: SSE stream of all updates
-
-GET /stream/{collection}
-  Headers: Accept: text/event-stream
-  Query params: ?filter={json}
-  Response: SSE stream of collection updates
-```
-
-### Server-Sent Events (SSE)
-
-For HTTP clients that need streaming without WebSocket:
-
-```rust
-/// Server-Sent Events endpoint
-async fn event_stream(
-    State(hive): State<Arc<HiveClient>>,
-    Query(params): Query<StreamParams>,
-) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
-    let stream = hive.subscribe_all(params.filter).await.unwrap();
-
-    let sse_stream = stream.map(|update| {
-        let data = serde_json::to_string(&update).unwrap();
-        Ok(Event::default()
-            .event("update")
-            .data(data))
-    });
-
-    Sse::new(sse_stream)
-        .keep_alive(KeepAlive::default())
-}
-```
-
-**SSE format**:
-```
-event: update
-data: {"type":"DocumentUpdate","collection":"cells",...}
-
-event: update
-data: {"type":"PeerUpdate","peer_id":"abc123",...}
-
-: keepalive
-
-event: update
-data: {"type":"DocumentUpdate","collection":"nodes",...}
 ```
 
 ---
 
 ## Interface Coordinator
 
-The Interface Coordinator manages all adapters and provides unified configuration:
-
 ```rust
-/// Coordinates all consumer interface adapters
+/// Coordinates multiple consumer interface adapters
 pub struct InterfaceCoordinator {
     adapters: Vec<Box<dyn ConsumerAdapter>>,
-    hive: Arc<HiveClient>,
-    config: InterfaceConfig,
-    metrics: CoordinatorMetrics,
-}
-
-#[derive(Debug, Clone)]
-pub struct InterfaceConfig {
-    /// WebSocket adapter configuration (optional)
-    pub websocket: Option<WebSocketConfig>,
-
-    /// TCP adapter configuration (optional)
-    pub tcp: Option<TcpConfig>,
-
-    /// HTTP/REST adapter configuration (optional)
-    pub http: Option<HttpRestConfig>,
-
-    /// Shared authentication configuration
-    pub auth: SharedAuthConfig,
+    config: CoordinatorConfig,
+    metrics: Arc<CoordinatorMetrics>,
 }
 
 impl InterfaceCoordinator {
-    pub fn new(config: InterfaceConfig, hive: Arc<HiveClient>) -> Self {
+    pub fn new(config: CoordinatorConfig, hive: Arc<HiveClient>) -> Self {
         let mut adapters: Vec<Box<dyn ConsumerAdapter>> = Vec::new();
 
-        if let Some(ws_config) = &config.websocket {
+        if config.websocket.enabled {
             adapters.push(Box::new(WebSocketAdapter::new(
-                ws_config.clone(),
+                config.websocket.clone(),
                 hive.clone(),
             )));
         }
 
-        if let Some(tcp_config) = &config.tcp {
+        if config.tcp.enabled {
             adapters.push(Box::new(TcpAdapter::new(
-                tcp_config.clone(),
+                config.tcp.clone(),
                 hive.clone(),
             )));
         }
 
-        if let Some(http_config) = &config.http {
-            adapters.push(Box::new(HttpRestAdapter::new(
-                http_config.clone(),
+        if config.http.enabled {
+            adapters.push(Box::new(HttpAdapter::new(
+                config.http.clone(),
                 hive.clone(),
             )));
         }
 
         Self {
             adapters,
-            hive,
             config,
-            metrics: CoordinatorMetrics::default(),
+            metrics: Arc::new(CoordinatorMetrics::default()),
         }
     }
 
-    /// Start all configured adapters
-    pub async fn start(&self) -> Result<(), AdapterError> {
+    pub async fn start_all(&self) -> Result<(), AdapterError> {
         for adapter in &self.adapters {
             adapter.start().await?;
-            info!("Started {:?} adapter", adapter.adapter_type());
         }
         Ok(())
     }
 
-    /// Stop all adapters
-    pub async fn stop(&self) -> Result<(), AdapterError> {
+    pub async fn stop_all(&self) -> Result<(), AdapterError> {
         for adapter in &self.adapters {
             adapter.stop().await?;
         }
         Ok(())
     }
 
-    /// Get aggregated metrics
     pub fn metrics(&self) -> CoordinatorMetrics {
-        let mut metrics = self.metrics.clone();
+        let mut metrics = CoordinatorMetrics::default();
         for adapter in &self.adapters {
-            metrics.merge(adapter.metrics());
+            match adapter.adapter_type() {
+                AdapterType::WebSocket => metrics.websocket = adapter.metrics(),
+                AdapterType::Tcp => metrics.tcp = adapter.metrics(),
+                AdapterType::HttpRest => metrics.http = adapter.metrics(),
+            }
         }
         metrics
     }
@@ -1083,7 +950,7 @@ pub struct CoordinatorMetrics {
 - [ ] WebSocket: 1000+ concurrent connections
 - [ ] TCP: 500+ concurrent connections
 - [ ] HTTP: 1000+ requests/second
-- [ ] Latency: <10ms for local operations
+- [ ] Latency: <200ms for operations (acceptable for compatibility layer)
 
 ### Testing
 
@@ -1122,16 +989,54 @@ pub struct CoordinatorMetrics {
 
 ---
 
+## Consequences
+
+### Positive
+
+- **Legacy integration** without modifying external systems
+- **Multiple protocols** (WS, TCP, HTTP) for different use cases
+- **Unified semantics** across all adapters
+- **Standard APIs** familiar to developers
+- **Debugging/monitoring** - useful for dashboards even when SDK is primary
+
+### Negative
+
+- **Latency overhead** adds 50-200ms vs SDK integration
+- **No offline support** - external system depends on adapter availability
+- **No CRDT benefits** - external system doesn't get conflict resolution
+- **Not a mesh participant** - cannot contribute to hierarchy/aggregation
+- **Potential misuse** - developers may use adapters when SDK is better choice
+
+### Neutral
+
+- Coexists with SDK (ADR-050) - different tools for different situations
+- Can be disabled if not needed (reduces attack surface)
+
+---
+
 ## References
 
 1. [ADR-029](029-tak-transport-adapter.md) - TAK Transport pattern
 2. [ADR-032](032-pluggable-transport-abstraction.md) - Transport abstraction
-3. [WebSocket RFC 6455](https://tools.ietf.org/html/rfc6455)
-4. [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events)
-5. [Axum Web Framework](https://docs.rs/axum)
-6. [Tokio-tungstenite](https://docs.rs/tokio-tungstenite)
+3. [ADR-050](050-sdk-integration.md) - HIVE SDK (Optimal Integration Path)
+4. [ADR-049](049-schema-extraction-and-codegen.md) - Schema Extraction
+5. [WebSocket RFC 6455](https://tools.ietf.org/html/rfc6455)
+6. [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events)
+7. [Axum Web Framework](https://docs.rs/axum)
+8. [Tokio-tungstenite](https://docs.rs/tokio-tungstenite)
 
 ---
 
-**Last Updated**: 2026-01-06
+## Decision Log
+
+| Date | Decision | Rationale |
+|------|----------|-----------|
+| 2026-01-06 | Consumer Interface Adapters for legacy integration | Network-based access for systems that can't embed SDK |
+| 2025-01-31 | Position as compatibility layer, not optimal path | SDK provides full CRDT benefits; adapters are fallback |
+| 2025-01-31 | Document latency tradeoffs explicitly | Clear guidance on when to use adapters vs SDK |
+| 2025-01-31 | Add references to ADR-049, ADR-050 | Complete integration picture |
+
+---
+
+**Last Updated**: 2025-01-31  
 **Status**: PROPOSED - Awaiting review
