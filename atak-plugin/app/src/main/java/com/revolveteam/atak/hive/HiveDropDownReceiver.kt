@@ -272,13 +272,14 @@ class HiveDropDownReceiver(
             HiveMapComponent.ConnectionStatus.CONNECTING -> Color.parseColor("#FFC107")
             else -> Color.parseColor("#F44336")
         }
-        // Combined peer count (mesh + lite)
-        val meshPeers = mapComponent.peerCount
+        // BLE peer count (deduplicated by nodeId to handle address rotation)
         val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
-        val litePeers = if (bleManager?.isRunning?.value == true) {
-            bleManager.peers.value?.count { it.isConnected } ?: 0
+        val totalPeers = if (bleManager?.isRunning?.value == true) {
+            bleManager.peers.value
+                ?.filter { it.isConnected }
+                ?.distinctBy { it.nodeId }
+                ?.size ?: 0
         } else 0
-        val totalPeers = meshPeers + litePeers
         val status = TextView(pluginContext).apply {
             text = "${mapComponent.connectionStatus.name} ($totalPeers peers)"
             textSize = 12f
@@ -300,14 +301,6 @@ class HiveDropDownReceiver(
 
         // Spacer
         container.addView(createSpacer(24))
-
-        // PLI Broadcast section (only in main view)
-        if (selectedCellId == null) {
-            val pliSection = createPliBroadcastSection()
-            container.addView(pliSection)
-            container.addView(createSpacer(24))
-        }
-
 
         // Squad Leader Summary (only in main view for leaders)
         if (selectedCellId == null && userRole.isLeader) {
@@ -1605,47 +1598,49 @@ class HiveDropDownReceiver(
         }
         card.addView(version)
 
-        val ffiStatus = if (HivePluginLifecycle.getInstance()?.isHiveFfiAvailable() == true)
-            "Available" else "Not loaded"
-        val ffi = TextView(pluginContext).apply {
-            text = "HIVE FFI: $ffiStatus"
-            textSize = 12f
-            setTextColor(Color.GRAY)
-        }
-        card.addView(ffi)
+        // BLE mesh info - show callsign and node ID
+        val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
+        val bleNodeId = bleManager?.getNodeId()
+        val nodeIdDisplay = if (bleNodeId != null) String.format("%08X", bleNodeId) else "N/A"
+        val selfCallsign = mapComponent.selfCallsign
 
-        // Node ID (full)
-        val nodeId = HivePluginLifecycle.getInstance()?.getNodeId() ?: "N/A"
-        val nodeIdLabel = TextView(pluginContext).apply {
-            text = "Node ID:"
-            textSize = 12f
-            setTextColor(Color.GRAY)
+        val nodeIdRow = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
         }
-        card.addView(nodeIdLabel)
-
+        val callsignText = TextView(pluginContext).apply {
+            text = "$selfCallsign "
+            textSize = 12f
+            setTextColor(Color.WHITE)
+        }
+        nodeIdRow.addView(callsignText)
         val nodeIdText = TextView(pluginContext).apply {
-            text = nodeId
-            textSize = 10f
-            setTextColor(Color.parseColor("#888888"))
+            text = "($nodeIdDisplay)"
+            textSize = 11f
+            setTextColor(Color.GRAY)
             setTypeface(android.graphics.Typeface.MONOSPACE)
-            setTextIsSelectable(true)
         }
-        card.addView(nodeIdText)
+        nodeIdRow.addView(nodeIdText)
+        card.addView(nodeIdRow)
 
         card.addView(createSpacer(12))
 
-        // Unified peer list header with multi-hop support
-        val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
+        // BLE peer list header
+        // Deduplicate peers by nodeId (same device may appear with multiple BLE addresses due to address rotation)
         val hiveMesh = bleManager?.getMesh()
         val blePeers = if (bleManager?.isRunning?.value == true) {
             bleManager.peers.value ?: emptyList()
         } else emptyList<BlePeer>()
-        val meshPeerCount = HivePluginLifecycle.getInstance()?.getPeerCount() ?: 0
-        val directBlePeers = blePeers.filter { it.isConnected }
+        // Group by nodeId and take the one with best RSSI (most recent/strongest connection)
+        val directBlePeers = blePeers
+            .filter { it.isConnected }
+            .groupBy { it.nodeId }
+            .values
+            .mapNotNull { group -> group.maxByOrNull { it.rssi } }
         val indirectBlePeers = if (hiveMesh != null) {
             hiveMesh.getIndirectPeers()
         } else emptyList()
-        val totalPeers = meshPeerCount + directBlePeers.size + indirectBlePeers.size
+        val totalPeers = directBlePeers.size + indirectBlePeers.size
 
         val peersHeader = TextView(pluginContext).apply {
             text = "Connected Peers ($totalPeers)"
@@ -1675,51 +1670,7 @@ class HiveDropDownReceiver(
         }
         card.addView(createSpacer(8))
 
-        // Mesh peers (full HIVE)
-        if (meshPeerCount > 0) {
-            val peersJson = HivePluginLifecycle.getInstance()?.getConnectedPeers() ?: "[]"
-            try {
-                val peerIds = org.json.JSONArray(peersJson)
-                for (i in 0 until peerIds.length()) {
-                    val peerId = peerIds.getString(i)
-                    val peerRow = LinearLayout(pluginContext).apply {
-                        orientation = LinearLayout.HORIZONTAL
-                        gravity = Gravity.CENTER_VERTICAL
-                        setPadding(0, 4, 0, 4)
-                    }
-
-                    val indicator = TextView(pluginContext).apply {
-                        text = "●"
-                        textSize = 12f
-                        setTextColor(Color.parseColor("#4CAF50"))
-                    }
-                    peerRow.addView(indicator)
-                    peerRow.addView(createHorizontalSpacer(8))
-
-                    val peerIdView = TextView(pluginContext).apply {
-                        text = peerId.take(16) + "..."
-                        textSize = 11f
-                        setTextColor(Color.WHITE)
-                        setTypeface(android.graphics.Typeface.MONOSPACE)
-                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                    }
-                    peerRow.addView(peerIdView)
-
-                    val transportLabel = TextView(pluginContext).apply {
-                        text = "mesh"
-                        textSize = 10f
-                        setTextColor(Color.parseColor("#2196F3"))
-                    }
-                    peerRow.addView(transportLabel)
-
-                    card.addView(peerRow)
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to parse peer IDs JSON: ${e.message}")
-            }
-        }
-
-        // BLE direct peers (HIVE-lite, degree 0)
+        // BLE direct peers (degree 0)
         directBlePeers.forEach { peer ->
             val peerRow = LinearLayout(pluginContext).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -1881,139 +1832,7 @@ class HiveDropDownReceiver(
             card.addView(noPeers)
         }
 
-        // BLE controls (compact)
-        card.addView(createSpacer(12))
-        val bleControlRow = LinearLayout(pluginContext).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val bleLabel = TextView(pluginContext).apply {
-            text = "BLE scan: "
-            textSize = 11f
-            setTextColor(Color.GRAY)
-        }
-        bleControlRow.addView(bleLabel)
-
-        val isRunning = bleManager?.isRunning?.value ?: false
-        val bleToggle = Button(pluginContext).apply {
-            text = if (isRunning) "Stop" else "Start"
-            textSize = 10f
-            setBackgroundColor(if (isRunning) Color.parseColor("#F44336") else Color.parseColor("#4CAF50"))
-            setTextColor(Color.WHITE)
-            setPadding(24, 8, 24, 8)
-            setOnClickListener {
-                if (isRunning) {
-                    HivePluginLifecycle.getInstance()?.stopBleMesh()
-                } else {
-                    HivePluginLifecycle.getInstance()?.startBleMesh()
-                }
-                handler.postDelayed({ refreshContent() }, 100)
-            }
-        }
-        bleControlRow.addView(bleToggle)
-
-        // Restart button - stops and restarts BLE mesh to force reconnection
-        if (isRunning) {
-            bleControlRow.addView(createHorizontalSpacer(8))
-            val restartBtn = Button(pluginContext).apply {
-                text = "Restart"
-                textSize = 10f
-                setBackgroundColor(Color.parseColor("#2196F3"))
-                setTextColor(Color.WHITE)
-                setPadding(24, 8, 24, 8)
-                setOnClickListener {
-                    HivePluginLifecycle.getInstance()?.stopBleMesh()
-                    handler.postDelayed({
-                        HivePluginLifecycle.getInstance()?.startBleMesh()
-                        handler.postDelayed({ refreshContent() }, 500)
-                    }, 500)
-                }
-            }
-            bleControlRow.addView(restartBtn)
-        }
-
-        if (bleManager != null && !bleManager.hasPermissions()) {
-            bleControlRow.addView(createHorizontalSpacer(8))
-            val permWarning = TextView(pluginContext).apply {
-                text = "⚠ permissions"
-                textSize = 10f
-                setTextColor(Color.parseColor("#FFC107"))
-            }
-            bleControlRow.addView(permWarning)
-        }
-
-        card.addView(bleControlRow)
-
         return card
-    }
-
-    private fun createPliBroadcastSection(): View {
-        val section = LinearLayout(pluginContext).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-
-        // Title
-        val title = TextView(pluginContext).apply {
-            text = "PLI Broadcast"
-            textSize = 16f
-            setTextColor(Color.WHITE)
-        }
-        section.addView(title)
-        section.addView(createSpacer(12))
-
-        // Card with toggle and status
-        val card = LinearLayout(pluginContext).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#2d2d2d"))
-            setPadding(24, 16, 24, 16)
-        }
-
-        // Description
-        val description = TextView(pluginContext).apply {
-            text = "Share your position with HIVE network peers"
-            textSize = 12f
-            setTextColor(Color.GRAY)
-        }
-        card.addView(description)
-        card.addView(createSpacer(12))
-
-        // Toggle button row
-        val buttonRow = LinearLayout(pluginContext).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val isEnabled = mapComponent.pliBroadcastEnabled
-        val toggleButton = Button(pluginContext).apply {
-            text = if (isEnabled) "Stop Broadcasting" else "Start Broadcasting"
-            setBackgroundColor(if (isEnabled) Color.parseColor("#F44336") else Color.parseColor("#4CAF50"))
-            setTextColor(Color.WHITE)
-            textSize = 12f
-            setPadding(32, 16, 32, 16)
-
-            setOnClickListener {
-                val newState = !mapComponent.pliBroadcastEnabled
-                mapComponent.setPliBroadcastEnabled(newState)
-                // Refresh the UI to show updated state
-                handler.postDelayed({ refreshContent() }, 100)
-            }
-        }
-        buttonRow.addView(toggleButton)
-        card.addView(buttonRow)
-        card.addView(createSpacer(12))
-
-        // Status indicator
-        val statusColor = if (isEnabled) Color.parseColor("#4CAF50") else Color.GRAY
-        val statusText = TextView(pluginContext).apply {
-            text = "Status: ${mapComponent.lastBroadcastStatus}"
-            textSize = 11f
-            setTextColor(statusColor)
-        }
-        card.addView(statusText)
-
-        section.addView(card)
-        return section
     }
 
     /**
