@@ -1,9 +1,10 @@
 # HIVE Whitepaper Build System
-# Requires: pandoc, and for PDF: a LaTeX distribution (texlive, mactex, etc.)
+# Requires: pandoc, typst (for PDF)
 #
 # Usage:
 #   make html    - Build HTML version
-#   make pdf     - Build PDF version
+#   make pdf     - Build PDF version (via Typst - recommended)
+#   make pdf-latex - Build PDF via LaTeX (legacy)
 #   make all     - Build both HTML and PDF
 #   make clean   - Remove generated files
 #   make watch   - Watch for changes and rebuild (requires entr)
@@ -13,7 +14,7 @@ OUTPUT_DIR = build
 OUTPUT_NAME = HIVE_Whitepaper
 METADATA = metadata.yaml
 
-# Source files in order
+# Source files in order (for HTML build)
 SOURCES = \
 	00-front-matter.md \
 	01-executive-summary.md \
@@ -25,7 +26,11 @@ SOURCES = \
 	07-why-now.md \
 	08-path-forward.md \
 	09-conclusion.md \
-	10-appendices.md
+	10a-appendix-a.md \
+	10b-spec-appendix.md \
+	10c-appendix-bc.md \
+	11-adr-appendix.md \
+	12-glossary.md
 
 # Pandoc options
 PANDOC_COMMON = --from markdown \
@@ -65,11 +70,47 @@ html: $(OUTPUT_DIR) templates/html.template templates/style.css
 	pandoc $(PANDOC_HTML) -o $(OUTPUT_DIR)/$(OUTPUT_NAME).html $(SOURCES)
 	@echo "Built: $(OUTPUT_DIR)/$(OUTPUT_NAME).html"
 
-# Build PDF
+# Sources for PDF (main content + appendix headers, specs/ADRs processed separately)
+SOURCES_MAIN = \
+	00-front-matter.md \
+	01-executive-summary.md \
+	02-scaling-crisis.md \
+	03-standards-paradox.md \
+	04-hierarchy-insight.md \
+	05-technical-architecture.md \
+	06-open-architecture.md \
+	07-why-now.md \
+	08-path-forward.md \
+	09-conclusion.md \
+	10a-appendix-a.md
+
+# Build PDF via Typst (recommended - native unicode support)
 .PHONY: pdf
-pdf: $(OUTPUT_DIR) templates/latex.template
+pdf: $(OUTPUT_DIR)
+	@echo "Converting Markdown to Typst..."
+	@cat templates/preamble.typ > $(OUTPUT_DIR)/$(OUTPUT_NAME).typ
+	@# Process main content + Appendix A header
+	@pandoc --from markdown --to typst \
+		$(SOURCES_MAIN) >> $(OUTPUT_DIR)/$(OUTPUT_NAME).typ
+	@# Process spec content: Spec titles (# HIVE Protocol Specification) -> #### (in TOC under Appendix A)
+	@sed -E 's/^#### /###### /; s/^### /###### /; s/^## /##### /; s/^# (HIVE Protocol Specification)/#### \1/; s/^# /##### /' 10b-spec-appendix.md | \
+		pandoc --from markdown --to typst >> $(OUTPUT_DIR)/$(OUTPUT_NAME).typ
+	@# Process Appendix B content + Appendix C header
+	@pandoc --from markdown --to typst 10c-appendix-bc.md >> $(OUTPUT_DIR)/$(OUTPUT_NAME).typ
+	@# Process ADR content: Only ADR titles (# ADR) -> #### (in TOC under Appendix C)
+	@sed -E 's/^#### /###### /; s/^### /###### /; s/^## /##### /; s/^# (ADR)/#### \1/; s/^# /##### /' 11-adr-appendix.md | \
+		pandoc --from markdown --to typst >> $(OUTPUT_DIR)/$(OUTPUT_NAME).typ
+	@# Process Appendix D: Glossary (comes after ADRs)
+	@pandoc --from markdown --to typst 12-glossary.md >> $(OUTPUT_DIR)/$(OUTPUT_NAME).typ
+	@echo "Compiling Typst to PDF..."
+	@typst compile $(OUTPUT_DIR)/$(OUTPUT_NAME).typ $(OUTPUT_DIR)/$(OUTPUT_NAME).pdf
+	@echo "Built: $(OUTPUT_DIR)/$(OUTPUT_NAME).pdf (via Typst)"
+
+# Build PDF via LaTeX (legacy)
+.PHONY: pdf-latex
+pdf-latex: $(OUTPUT_DIR) templates/latex.template
 	pandoc $(PANDOC_PDF) -o $(OUTPUT_DIR)/$(OUTPUT_NAME).pdf $(SOURCES)
-	@echo "Built: $(OUTPUT_DIR)/$(OUTPUT_NAME).pdf"
+	@echo "Built: $(OUTPUT_DIR)/$(OUTPUT_NAME).pdf (via LaTeX)"
 
 # Build Word document (useful for sharing/collaboration)
 .PHONY: docx
