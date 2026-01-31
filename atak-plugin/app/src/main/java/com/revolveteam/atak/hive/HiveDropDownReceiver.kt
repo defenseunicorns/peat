@@ -2137,6 +2137,55 @@ class HiveDropDownReceiver(
         meshIdRow.addView(applyButton)
         card.addView(meshIdRow)
 
+        // Message TTL configuration row
+        card.addView(createSpacer(8))
+        val ttlRow = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val ttlLabel = TextView(pluginContext).apply {
+            text = "Message TTL (sec): "
+            textSize = 12f
+            setTextColor(Color.WHITE)
+        }
+        ttlRow.addView(ttlLabel)
+
+        val currentTtl = HivePluginLifecycle.getInstance()?.getCannedMessageTtlSeconds(pluginContext)
+            ?: HivePluginLifecycle.DEFAULT_CANNED_MESSAGE_TTL_SECONDS
+        val ttlInput = android.widget.EditText(pluginContext).apply {
+            setText(currentTtl.toString())
+            textSize = 12f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#3d3d3d"))
+            setPadding(16, 8, 16, 8)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setSingleLine(true)
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        }
+        ttlRow.addView(ttlInput)
+        ttlRow.addView(createHorizontalSpacer(8))
+
+        val ttlApplyButton = Button(pluginContext).apply {
+            text = "Apply"
+            textSize = 10f
+            setBackgroundColor(Color.parseColor("#2196F3"))
+            setTextColor(Color.WHITE)
+            setPadding(16, 8, 16, 8)
+
+            setOnClickListener {
+                val newTtl = ttlInput.text.toString().trim().toIntOrNull()
+                if (newTtl != null && newTtl > 0) {
+                    HivePluginLifecycle.getInstance()?.setCannedMessageTtlSeconds(pluginContext, newTtl)
+                    android.widget.Toast.makeText(pluginContext, "TTL set to ${newTtl}s", android.widget.Toast.LENGTH_SHORT).show()
+                } else {
+                    android.widget.Toast.makeText(pluginContext, "Invalid TTL value", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        ttlRow.addView(ttlApplyButton)
+        card.addView(ttlRow)
+
         // Toggle button
         card.addView(createSpacer(12))
         val toggleButton = Button(pluginContext).apply {
