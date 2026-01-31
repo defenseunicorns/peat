@@ -95,6 +95,10 @@ class HiveCellOverlay(private val mapView: MapView) {
             return
         }
 
+        // First, clean up any orphaned HIVE circles from anywhere in the map tree
+        // This handles circles that persist in ATAK's storage from previous sessions
+        cleanupOrphanedCircles(rootGroup)
+
         // Find or create HIVE Cells group under Drawing Objects
         var drawingGroup = rootGroup.findMapGroup("Drawing Objects")
         if (drawingGroup == null) {
@@ -108,6 +112,38 @@ class HiveCellOverlay(private val mapView: MapView) {
             Log.i(TAG, "Created HIVE Cells map group")
         } else {
             Log.d(TAG, "Found existing HIVE Cells map group")
+        }
+    }
+
+    /**
+     * Recursively search and remove any orphaned HIVE cell circles from the map tree.
+     * This handles circles persisted by ATAK from previous sessions.
+     */
+    private fun cleanupOrphanedCircles(group: MapGroup) {
+        val orphanedItems = mutableListOf<MapItem>()
+
+        // Check all items in this group
+        group.items?.forEach { item ->
+            // Match by UID pattern or metadata
+            val uid = item.uid ?: ""
+            val hiveCellId = item.getMetaString("hiveCellId", "")
+            if (uid.startsWith("HIVE-CELL-CIRCLE-") || hiveCellId.isNotEmpty()) {
+                orphanedItems.add(item)
+            }
+        }
+
+        // Remove orphaned items
+        orphanedItems.forEach { item ->
+            group.removeItem(item)
+            if (item is DrawingCircle) {
+                item.dispose()
+            }
+            Log.i(TAG, "Removed orphaned HIVE circle: ${item.uid}")
+        }
+
+        // Recursively check child groups
+        group.childGroups?.forEach { childGroup ->
+            cleanupOrphanedCircles(childGroup)
         }
     }
 

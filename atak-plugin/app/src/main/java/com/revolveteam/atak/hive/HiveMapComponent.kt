@@ -24,6 +24,8 @@ import com.revolveteam.hive.HiveDocument
 import com.revolveteam.hive.HiveEventType
 import com.revolveteam.hive.HiveMarker
 import com.revolveteam.hive.HivePeer
+import uniffi.hive_lite_android.CannedMessageAckEventData
+import uniffi.hive_lite_android.CannedMessageType
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
@@ -69,6 +71,14 @@ class HiveMapComponent : DropDownMapComponent() {
 
     private val _tracks = mutableListOf<HiveTrack>()
     val tracks: List<HiveTrack> get() = _tracks.toList()
+
+    /** Get the self callsign from ATAK's self marker */
+    val selfCallsign: String
+        get() = if (::mapView.isInitialized) {
+            mapView.selfMarker?.getMetaString("callsign", null)
+                ?: mapView.selfMarker?.title
+                ?: "Self"
+        } else "Self"
 
     // BLE peer platforms for cell membership (nodeId -> platform)
     private val _blePeerPlatforms = mutableMapOf<Long, HivePlatform>()
@@ -264,6 +274,10 @@ class HiveMapComponent : DropDownMapComponent() {
 
         // Update connection status based on HIVE node availability
         updateConnectionStatus()
+
+        // Broadcast initial position to BLE mesh so the tablet's callsign is visible to watches
+        // This sets hasPeripheral=true on the mesh so peers can resolve our callsign
+        broadcastInitialPosition()
 
         // Start periodic refresh for map markers
         startPeriodicRefresh()
@@ -500,6 +514,35 @@ class HiveMapComponent : DropDownMapComponent() {
     }
 
     /**
+     * Send a canned message to all connected BLE mesh peers.
+     * The message is encoded as a CannedMessageAckEvent and broadcast.
+     *
+     * @param messageType The type of canned message to send
+     * @return The sent message document, or null if failed
+     */
+    fun sendCannedMessage(messageType: CannedMessageType): CannedMessageAckEventData? {
+        val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
+        if (bleManager == null) {
+            Log.w(TAG, "Cannot send canned message - BLE manager not available")
+            return null
+        }
+
+        if (!bleManager.isRunning.value) {
+            Log.e(TAG, "Cannot send canned message - mesh not running")
+            return null
+        }
+
+        return bleManager.sendCannedMessage(messageType)
+    }
+
+    /**
+     * Get all canned messages from the BLE manager.
+     */
+    fun getCannedMessages(): List<CannedMessageAckEventData> {
+        return HivePluginLifecycle.getInstance()?.getHiveBleManager()?.getCannedMessages() ?: emptyList()
+    }
+
+    /**
      * Create an ATAK map marker from a HiveMarker.
      */
     private fun createAtakMarkerFromHive(marker: HiveMarker, sourcePeer: HivePeer) {
@@ -657,11 +700,14 @@ class HiveMapComponent : DropDownMapComponent() {
         val callsign = cachedState.callsign
             ?: "BLE-${String.format("%08X", nodeId).takeLast(4)}"
 
-        // Get mesh_id for cell assignment (mesh_id == cell_id mapping per ADR-041)
+        // Get cell ID for organizational grouping (NATO phonetic: ALPHA, BRAVO, etc.)
+        // Cell is separate from mesh - mesh is transport layer, cell is organizational unit
+        val cellId = HivePluginLifecycle.getInstance()?.getCurrentCellId()
+            ?: HivePluginLifecycle.DEFAULT_CELL_ID
         val meshId = HivePluginLifecycle.getInstance()?.getCurrentMeshId()
 
         Log.i(TAG, "BLE document synced: nodeId=${String.format("%08X", nodeId)}, " +
-                "callsign=$callsign, cell=$meshId, location=($lat, $lon), " +
+                "callsign=$callsign, cell=$cellId, mesh=$meshId, location=($lat, $lon), " +
                 "battery=${cachedState.batteryPercent}%, heartRate=${cachedState.heartRate}, " +
                 "event=$documentEventType")
 
@@ -681,7 +727,7 @@ class HiveMapComponent : DropDownMapComponent() {
             lat = lat.toDouble(),
             lon = lon.toDouble(),
             hae = cachedState.altitude?.toDouble()?.takeIf { it != 0.0 },
-            cellId = meshId,
+            cellId = cellId,
             status = status,
             batteryPercent = cachedState.batteryPercent ?: 0,
             lastUpdate = cachedState.lastSeen
@@ -690,16 +736,21 @@ class HiveMapComponent : DropDownMapComponent() {
         // Update the BLE peer platform map and refresh overlay
         refreshHandler.post {
             _blePeerPlatforms[nodeId] = platform
-            // Ensure cell exists for this mesh_id
-            meshId?.let { ensureCellExists(it) }
+            // Ensure cell exists for this cell ID
+            ensureCellExists(cellId)
             updateBlePeerOverlay()
+            // Notify UI of platform change so dropdown refreshes
+            onPlatformsChanged?.invoke()
         }
     }
 
     /**
-     * Ensure a cell exists for the given cell_id (mesh_id).
-     * Creates a synthetic cell if one doesn't exist.
+     * Ensure a cell exists for the given cell ID (NATO phonetic: ALPHA, BRAVO, etc.).
+     * Creates a cell if one doesn't exist.
      * The tablet (full HIVE node) auto-assigns itself as cell leader.
+     *
+     * Cells are organizational units within the mesh - squads/teams working together.
+     * The mesh provides connectivity; the cell provides command structure.
      */
     private fun ensureCellExists(cellId: String) {
         if (_cells.any { it.id == cellId }) return
@@ -712,10 +763,10 @@ class HiveMapComponent : DropDownMapComponent() {
             ?: "Tablet"
         val selfPoint = selfMarker?.point
 
-        // Create synthetic cell for BLE mesh
-        val bleCell = HiveCell(
+        // Create cell for this organizational unit
+        val cell = HiveCell(
             id = cellId,
-            name = cellId,  // Use mesh_id as name
+            name = cellId,  // NATO phonetic name (ALPHA, BRAVO, etc.)
             status = HiveCell.Status.ACTIVE,
             platformCount = _blePeerPlatforms.size + 1,  // +1 for tablet
             centerLat = selfPoint?.latitude ?: _blePeerPlatforms.values.firstOrNull()?.lat ?: 0.0,
@@ -725,7 +776,7 @@ class HiveMapComponent : DropDownMapComponent() {
             leaderId = selfUid,  // Tablet is cell leader
             lastUpdate = System.currentTimeMillis()
         )
-        _cells.add(bleCell)
+        _cells.add(cell)
 
         // Add tablet itself as a platform in this cell
         if (selfUid != null && selfPoint != null) {
@@ -744,7 +795,7 @@ class HiveMapComponent : DropDownMapComponent() {
             _blePeerPlatforms[selfUid.hashCode().toLong()] = tabletPlatform
         }
 
-        Log.i(TAG, "Created synthetic cell for BLE mesh: $cellId, leader=$selfCallsign ($selfUid)")
+        Log.i(TAG, "Created cell: $cellId, leader=$selfCallsign ($selfUid)")
     }
 
     /**
@@ -786,14 +837,16 @@ class HiveMapComponent : DropDownMapComponent() {
                 // Clean up lost BLE platforms using hive-btle's connection state graph
                 cleanupLostPlatforms()
 
-                // Ensure cell exists for current mesh if BLE platforms exist
+                // Ensure cell exists for current cell assignment if BLE platforms exist
                 if (_blePeerPlatforms.isNotEmpty()) {
-                    val meshId = HivePluginLifecycle.getInstance()?.getCurrentMeshId()
-                    meshId?.let { ensureCellExists(it) }
+                    val cellId = HivePluginLifecycle.getInstance()?.getCurrentCellId()
+                        ?: HivePluginLifecycle.DEFAULT_CELL_ID
+                    ensureCellExists(cellId)
                 } else {
-                    // No BLE peers - remove synthetic BLE cell
-                    val meshId = HivePluginLifecycle.getInstance()?.getCurrentMeshId()
-                    meshId?.let { removeCellIfEmpty(it) }
+                    // No BLE peers - remove cell if empty
+                    val cellId = HivePluginLifecycle.getInstance()?.getCurrentCellId()
+                        ?: HivePluginLifecycle.DEFAULT_CELL_ID
+                    removeCellIfEmpty(cellId)
                 }
 
                 // Update map overlays - use combined tracks and platforms (includes BLE peers)
@@ -830,7 +883,7 @@ class HiveMapComponent : DropDownMapComponent() {
             if (nodeId == selfUidHash) return@filter false
 
             // Check if peer is known to mesh (direct or indirect)
-            val isKnown = hiveMesh?.isPeerKnown(nodeId) ?: true
+            val isKnown = hiveMesh?.isPeerKnown(nodeId.toUInt()) ?: true
             val isStale = (now - platform.lastUpdate > staleThresholdMs)
 
             // Remove if not known to mesh AND stale (belt and suspenders)
@@ -1234,6 +1287,48 @@ class HiveMapComponent : DropDownMapComponent() {
      */
     fun broadcastPliNow() {
         selfPositionBroadcaster?.broadcastNow()
+    }
+
+    /**
+     * Broadcast initial position/callsign to BLE mesh so the tablet is visible to watches.
+     * This sets hasPeripheral=true on the mesh so peers can resolve our callsign.
+     *
+     * Called once during initialization. For continuous updates, enable PLI broadcast.
+     */
+    private fun broadcastInitialPosition() {
+        try {
+            val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
+            if (bleManager == null || !bleManager.isRunning.value) {
+                Log.d(TAG, "BLE mesh not running - skipping initial position broadcast")
+                return
+            }
+
+            val selfMarker = mapView.selfMarker
+            val point = selfMarker?.point
+            if (point == null) {
+                Log.w(TAG, "No self marker position - will retry initial broadcast later")
+                // Retry after a delay when self marker becomes available
+                refreshHandler.postDelayed({
+                    if (!_pliBroadcastEnabled) broadcastInitialPosition()
+                }, 5000)
+                return
+            }
+
+            val callsign = selfMarker.getMetaString("callsign", null)
+                ?: selfMarker.title
+                ?: "ATAK"
+
+            bleManager.broadcastPosition(
+                lat = point.latitude,
+                lon = point.longitude,
+                alt = if (point.isAltitudeValid) point.altitude else 0.0,
+                callsign = callsign
+            )
+
+            Log.i(TAG, "Broadcast initial position: callsign=$callsign at (${point.latitude}, ${point.longitude})")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to broadcast initial position: ${e.message}", e)
+        }
     }
 
     /**

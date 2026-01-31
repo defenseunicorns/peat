@@ -15,11 +15,20 @@ import com.revolveteam.hive.HiveBtle
 import com.revolveteam.hive.HiveChat
 import com.revolveteam.hive.HiveDocument
 import com.revolveteam.hive.HiveEventType
+import com.revolveteam.hive.HiveLocation
 import com.revolveteam.hive.HiveMarker
 import com.revolveteam.hive.HiveMeshListener
 import com.revolveteam.hive.HivePeer
-import com.revolveteam.hive.PeerConnectionState
-import com.revolveteam.hive.StateCountSummary
+import uniffi.hive_btle.PeerConnectionState
+import uniffi.hive_btle.StateCountSummary
+import uniffi.hive_btle.DeviceIdentity
+import uniffi.hive_btle.decodeMeshGenesis
+import uniffi.hive_lite_android.CannedMessageAckEventData
+import uniffi.hive_lite_android.CannedMessageType
+import uniffi.hive_lite_android.createCannedMessageAckEvent
+import uniffi.hive_lite_android.encodeCannedMessageAckEvent
+import uniffi.hive_lite_android.decodeCannedMessageAckEvent
+import uniffi.hive_lite_android.cannedMessageAckEventMerge
 
 /**
  * Manages HIVE BLE mesh connectivity for the ATAK plugin.
@@ -56,11 +65,24 @@ import com.revolveteam.hive.StateCountSummary
 )
 class HiveBleManager(
     private val context: Context,
-    val meshId: String = "WEARTAK"
+    private val configuredMeshId: String = "WEARTAK"
 ) : HiveMeshListener {
+
+    /**
+     * The mesh name for display purposes (e.g., "WEARTAK").
+     * This is the human-friendly name, not the internal genesis ID.
+     */
+    val meshId: String = configuredMeshId
 
     companion object {
         private const val TAG = "HiveBleManager"
+
+        /**
+         * Shared genesis for WEARTAK encrypted mesh.
+         * All nodes (WearOS, ATAK Plugin) must use this same genesis.
+         */
+        private const val SHARED_GENESIS_BASE64: String =
+            "BwBXRUFSVEFL4O7thA03dXXBNkT+gG22aTRGICECcX5RHtOgIdLBrb7tU7LTxkFLCLP+De21IALSXAbi6ZR/c3VXW9lKWacbM0YqfK9n5JXqob7/stIM63nBMLzJiFTGl9E6wcF8Gz0gUerY2JsBAAAA"
 
         @Volatile
         private var instance: HiveBleManager? = null
@@ -92,6 +114,17 @@ class HiveBleManager(
     private var documentSyncCallback: ((HiveDocument) -> Unit)? = null
     private var markerSyncCallback: ((HivePeer, HiveMarker) -> Unit)? = null
     private var chatSyncCallback: ((HiveChat, HivePeer) -> Unit)? = null
+    private var cannedMessageCallback: ((CannedMessageAckEventData) -> Unit)? = null
+
+    // Storage for canned message documents (key = sourceNode:timestamp)
+    private val cannedMessageDocs = mutableMapOf<String, CannedMessageAckEventData>()
+
+    // Sequence counter for outgoing canned messages
+    @Volatile
+    private var cannedMessageSequence: UInt = 0u
+
+    // Observable for canned message updates (for UI refresh)
+    val cannedMessages: SimpleObservable<List<CannedMessageAckEventData>> = SimpleObservable(emptyList())
 
     init {
         instance = this
@@ -148,16 +181,33 @@ class HiveBleManager(
         }
 
         return try {
-            Log.i(TAG, "Starting HIVE BLE mesh (meshId: $meshId)")
+            // Decode shared genesis for encrypted mesh
+            val genesisBytes = android.util.Base64.decode(SHARED_GENESIS_BASE64, android.util.Base64.NO_WRAP)
+            val genesis = decodeMeshGenesis(genesisBytes)
+            if (genesis == null) {
+                Log.e(TAG, "Failed to decode shared genesis!")
+                return false
+            }
 
-            hiveBtle = HiveBtle(context, meshId = meshId).apply {
+            // Generate or load device identity
+            val identity = DeviceIdentity.generate()
+            val genesisId = genesis.getMeshId()
+
+            Log.i(TAG, "Starting HIVE BLE mesh: $meshId (genesis: $genesisId)")
+
+            hiveBtle = HiveBtle(
+                context = context,
+                meshId = genesisId,  // Use genesis ID for BLE discovery
+                identity = identity,
+                genesis = genesis
+            ).apply {
                 init()
                 startMesh(this@HiveBleManager)
             }
 
             _isRunning = true
             isRunning.value = true
-            Log.i(TAG, "HIVE BLE mesh started - nodeId: ${hiveBtle?.nodeId}")
+            Log.i(TAG, "HIVE BLE mesh started - nodeId: ${hiveBtle?.nodeId}, mesh: $meshId")
             true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start BLE mesh: ${e.message}", e)
@@ -217,7 +267,7 @@ class HiveBleManager(
     /**
      * Get all peers currently in Connected state.
      */
-    fun getConnectedPeers(): List<PeerConnectionState> =
+    fun getConnectedPeers(): List<uniffi.hive_btle.HivePeer> =
         hiveBtle?.mesh?.getConnectedPeers() ?: emptyList()
 
     /**
@@ -236,7 +286,7 @@ class HiveBleManager(
      * Get connection state for a specific peer.
      */
     fun getPeerConnectionState(nodeId: Long): PeerConnectionState? =
-        hiveBtle?.mesh?.getPeerConnectionState(nodeId)
+        hiveBtle?.mesh?.getPeerConnectionState(nodeId.toUInt())
 
     /**
      * Get summary counts of peers in each connection state (for UI badges).
@@ -249,6 +299,32 @@ class HiveBleManager(
      */
     fun sendEvent(eventType: HiveEventType) {
         hiveBtle?.sendEvent(eventType)
+    }
+
+    /**
+     * Broadcast position and callsign to all BLE mesh peers.
+     * This is critical for watches to see the tablet's callsign.
+     *
+     * @param lat Latitude in degrees
+     * @param lon Longitude in degrees
+     * @param alt Altitude in meters (HAE)
+     * @param callsign Device callsign
+     * @param battery Battery percentage (0-100)
+     */
+    fun broadcastPosition(lat: Double, lon: Double, alt: Double, callsign: String, battery: Int = 100) {
+        val location = HiveLocation(
+            latitude = lat.toFloat(),
+            longitude = lon.toFloat(),
+            altitude = alt.toFloat()
+        )
+        hiveBtle?.sendEvent(
+            eventType = HiveEventType.NONE,
+            location = location,
+            callsign = callsign,
+            battery = battery,
+            heartRate = null
+        )
+        Log.d(TAG, "Broadcast position: callsign=$callsign, lat=$lat, lon=$lon")
     }
 
     /**
@@ -301,6 +377,14 @@ class HiveBleManager(
     }
 
     /**
+     * Set callback for canned message events.
+     * Called when a canned message document is received and merged.
+     */
+    fun setCannedMessageCallback(callback: ((CannedMessageAckEventData) -> Unit)?) {
+        cannedMessageCallback = callback
+    }
+
+    /**
      * Send a chat message to all connected peers.
      * @param sender Sender callsign (max 16 chars)
      * @param message Message text (max 140 chars)
@@ -324,6 +408,77 @@ class HiveBleManager(
      */
     fun getChatMessagesSince(sinceTimestamp: Long): List<HiveChat> {
         return hiveBtle?.getChatMessagesSince(sinceTimestamp) ?: emptyList()
+    }
+
+    // ========================================================================
+    // Canned Message API
+    // ========================================================================
+
+    /**
+     * Send a canned message to all connected peers.
+     *
+     * Creates a CannedMessageAckEvent document, encodes it, and broadcasts
+     * to the mesh. The source node automatically ACKs the message.
+     *
+     * @param messageType The type of canned message to send
+     * @param targetNode Optional target node ID (0 for broadcast to all)
+     * @return The sent message document, or null if mesh not running
+     */
+    fun sendCannedMessage(messageType: CannedMessageType, targetNode: UInt = 0u): CannedMessageAckEventData? {
+        val nodeId = hiveBtle?.nodeId ?: run {
+            Log.w(TAG, "Cannot send canned message: mesh not running")
+            return null
+        }
+
+        val timestamp = System.currentTimeMillis().toULong()
+        val sequence = cannedMessageSequence++
+
+        // Create the event document (source auto-ACKs)
+        val event = createCannedMessageAckEvent(
+            messageType,
+            nodeId.toUInt(),
+            targetNode,
+            timestamp,
+            sequence
+        )
+
+        // Encode to wire format
+        val encoded = encodeCannedMessageAckEvent(event)
+
+        // Store locally
+        val key = "${event.sourceNode}:${event.timestamp}"
+        cannedMessageDocs[key] = event
+        updateCannedMessagesObservable()
+
+        // Broadcast to mesh (convert List<UByte> to ByteArray)
+        val bytes = ByteArray(encoded.size) { encoded[it].toByte() }
+        hiveBtle?.broadcastBytes(bytes)
+
+        Log.i(TAG, "Sent canned message: ${messageType.name} from ${String.format("%08X", nodeId)} (${encoded.size} bytes)")
+
+        // Notify callback
+        cannedMessageCallback?.invoke(event)
+
+        return event
+    }
+
+    /**
+     * Get all stored canned message documents, sorted by timestamp (newest first).
+     */
+    fun getCannedMessages(): List<CannedMessageAckEventData> {
+        return cannedMessageDocs.values.sortedByDescending { it.timestamp }
+    }
+
+    /**
+     * Clear all stored canned message documents.
+     */
+    fun clearCannedMessages() {
+        cannedMessageDocs.clear()
+        updateCannedMessagesObservable()
+    }
+
+    private fun updateCannedMessagesObservable() {
+        cannedMessages.value = cannedMessageDocs.values.sortedByDescending { it.timestamp }
     }
 
     // ========================================================================
@@ -384,6 +539,42 @@ class HiveBleManager(
         mainHandler.post {
             Log.d(TAG, "Chat received from ${fromPeer.displayName()}: ${chat.sender} says '${chat.message}'")
             chatSyncCallback?.invoke(chat, fromPeer)
+        }
+    }
+
+    override fun onDecryptedData(peer: HivePeer?, data: ByteArray) {
+        // Check for canned message marker (0xAF)
+        if (data.isEmpty() || data[0] != 0xAF.toByte()) {
+            return
+        }
+
+        mainHandler.post {
+            try {
+                // Decode as CannedMessageAckEvent using hive-lite
+                val incoming = decodeCannedMessageAckEvent(data)
+                if (incoming == null) {
+                    Log.w(TAG, "Failed to decode canned message from ${peer?.displayName()}")
+                    return@post
+                }
+
+                // Document key based on source node and timestamp
+                val key = "${incoming.sourceNode}:${incoming.timestamp}"
+
+                // Merge with existing document or store new
+                val merged = cannedMessageDocs[key]?.let { existing ->
+                    Log.d(TAG, "Merging canned message $key: existing has ${existing.acks.size} ACKs, incoming has ${incoming.acks.size} ACKs")
+                    cannedMessageAckEventMerge(existing, incoming)
+                } ?: incoming
+
+                cannedMessageDocs[key] = merged
+                updateCannedMessagesObservable()
+                Log.i(TAG, "Canned message $key now has ${merged.acks.size} ACKs: ${merged.acks.map { it.nodeId }}")
+
+                // Notify callback with merged document
+                cannedMessageCallback?.invoke(merged)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error processing canned message: ${e.message}", e)
+            }
         }
     }
 }
