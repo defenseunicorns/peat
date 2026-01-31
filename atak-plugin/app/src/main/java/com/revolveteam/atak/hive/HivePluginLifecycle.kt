@@ -44,6 +44,9 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
             "XRAY", "YANKEE", "ZULU"
         )
 
+        // Configuration defaults
+        const val DEFAULT_CANNED_MESSAGE_TTL_SECONDS = 300  // 5 minutes
+
         @Volatile
         private var instance: HivePluginLifecycle? = null
 
@@ -317,4 +320,31 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
             Log.i(TAG, "New BLE mesh started: $started with meshId: $meshId")
         }
     }
+
+    // ==================== HIVE Configuration Settings ====================
+
+    /**
+     * Get the canned message document TTL in seconds.
+     * Controls how long ACK-tracked messages are kept in memory.
+     */
+    fun getCannedMessageTtlSeconds(context: Context): Int {
+        val prefs = context.getSharedPreferences("hive_prefs", Context.MODE_PRIVATE)
+        return prefs.getInt("canned_message_ttl_seconds", DEFAULT_CANNED_MESSAGE_TTL_SECONDS)
+    }
+
+    /**
+     * Set the canned message document TTL in seconds.
+     * Changes take effect immediately without restart.
+     */
+    fun setCannedMessageTtlSeconds(context: Context, ttlSeconds: Int) {
+        val prefs = context.getSharedPreferences("hive_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putInt("canned_message_ttl_seconds", ttlSeconds).apply()
+        Log.i(TAG, "[CONFIG] Canned message TTL set to ${ttlSeconds}s")
+
+        // Notify listeners of config change (if any components need immediate update)
+        onConfigChanged?.invoke("canned_message_ttl_seconds", ttlSeconds)
+    }
+
+    // Callback for config changes (optional - components can register to receive updates)
+    var onConfigChanged: ((key: String, value: Any) -> Unit)? = null
 }
