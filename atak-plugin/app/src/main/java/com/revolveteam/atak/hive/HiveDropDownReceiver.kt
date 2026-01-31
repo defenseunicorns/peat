@@ -28,6 +28,7 @@ import com.revolveteam.atak.hive.model.CommsQuality
 import com.revolveteam.hive.HiveChat
 import com.revolveteam.hive.HiveMarker
 import com.revolveteam.hive.HivePeer as BlePeer
+import uniffi.hive_lite_android.CannedMessageType
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -244,13 +245,27 @@ class HiveDropDownReceiver(
             header.addView(createHorizontalSpacer(16))
         }
 
+        // Title with mesh name subtitle
+        val titleContainer = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
         val title = TextView(pluginContext).apply {
             text = if (selectedCellId != null) "Cell: $selectedCellName" else "HIVE Manager"
             textSize = 20f
             setTextColor(Color.WHITE)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
-        header.addView(title)
+        titleContainer.addView(title)
+
+        // Show mesh name as subtitle
+        val meshName = HivePluginLifecycle.getInstance()?.getCurrentMeshId() ?: "Unknown"
+        val meshSubtitle = TextView(pluginContext).apply {
+            text = "Mesh: $meshName"
+            textSize = 11f
+            setTextColor(Color.parseColor("#888888"))
+        }
+        titleContainer.addView(meshSubtitle)
+        header.addView(titleContainer)
 
         val statusColor = when (mapComponent.connectionStatus) {
             HiveMapComponent.ConnectionStatus.CONNECTED -> Color.parseColor("#4CAF50")
@@ -274,8 +289,9 @@ class HiveDropDownReceiver(
 
         // Role indicator (only in main view)
         if (selectedCellId == null) {
+            val currentCell = HivePluginLifecycle.getInstance()?.getCurrentCellId() ?: "ALPHA"
             val roleRow = TextView(pluginContext).apply {
-                text = "Role: ${userRole.toDisplayString()} • ${userRole.unitName.ifEmpty { userRole.unitId }}"
+                text = "Role: ${userRole.toDisplayString()} • Cell $currentCell"
                 textSize = 11f
                 setTextColor(Color.parseColor("#666666"))
             }
@@ -384,56 +400,29 @@ class HiveDropDownReceiver(
             container.addView(createSpacer(24))
         }
 
-        // HIVE Chat section (only in cell detail view)
+        // Canned Messages section (only in cell detail view)
         if (selectedCellId != null) {
             val chatMessages = mapComponent.chatMessages
             val chatTitle = TextView(pluginContext).apply {
-                text = "Cell Chat (${chatMessages.size})"
+                text = "Quick Messages"
                 textSize = 16f
                 setTextColor(Color.WHITE)
             }
             container.addView(chatTitle)
             container.addView(createSpacer(12))
 
-            // Chat input row
-            val inputRow = LinearLayout(pluginContext).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-            }
+            // Canned message buttons organized by category
+            container.addView(createCannedMessageSection())
+            container.addView(createSpacer(16))
 
-            val chatInput = EditText(pluginContext).apply {
-                hint = "Type message..."
+            // Recent messages section
+            val recentTitle = TextView(pluginContext).apply {
+                text = "Recent (${chatMessages.size})"
                 textSize = 14f
-                setTextColor(Color.WHITE)
-                setHintTextColor(Color.GRAY)
-                setBackgroundColor(Color.parseColor("#2d2d2d"))
-                setPadding(16, 12, 16, 12)
-                maxLines = 2
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                setTextColor(Color.parseColor("#888888"))
             }
-            inputRow.addView(chatInput)
-
-            inputRow.addView(createHorizontalSpacer(8))
-
-            val sendButton = Button(pluginContext).apply {
-                text = "Send"
-                textSize = 12f
-                setTextColor(Color.WHITE)
-                setBackgroundColor(Color.parseColor("#4CAF50"))
-                setPadding(24, 12, 24, 12)
-                setOnClickListener {
-                    val message = chatInput.text.toString().trim()
-                    if (message.isNotEmpty()) {
-                        mapComponent.sendChat(message)
-                        chatInput.setText("")
-                        refreshContent()
-                    }
-                }
-            }
-            inputRow.addView(sendButton)
-
-            container.addView(inputRow)
-            container.addView(createSpacer(12))
+            container.addView(recentTitle)
+            container.addView(createSpacer(8))
 
             // Chat messages (most recent at top)
             if (chatMessages.isEmpty()) {
@@ -445,7 +434,7 @@ class HiveDropDownReceiver(
                 container.addView(noChat)
             } else {
                 // Show most recent first (reversed)
-                chatMessages.reversed().take(20).forEach { cachedChat ->
+                chatMessages.reversed().take(10).forEach { cachedChat ->
                     container.addView(createChatMessageCard(cachedChat))
                     container.addView(createSpacer(4))
                 }
@@ -587,19 +576,19 @@ class HiveDropDownReceiver(
         headerRow.addView(statusText)
         card.addView(headerRow)
 
-        // Get actual platforms in this cell
-        val cellPlatforms = mapComponent.platforms.filter { it.cellId == cell.id }
+        // Get actual platforms in this cell (for display)
+        val displayPlatforms = mapComponent.platforms.filter { it.cellId == cell.id }
 
         val platformsHeader = TextView(pluginContext).apply {
-            text = "${cellPlatforms.size} platforms"
+            text = "${displayPlatforms.size} platforms"
             textSize = 12f
             setTextColor(Color.GRAY)
         }
         card.addView(platformsHeader)
 
         // List platform names with SOS indicator
-        if (cellPlatforms.isNotEmpty()) {
-            cellPlatforms.forEach { platform ->
+        if (displayPlatforms.isNotEmpty()) {
+            displayPlatforms.forEach { platform ->
                 val isEmergency = platform.status == HivePlatform.Status.EMERGENCY
                 val platformRow = TextView(pluginContext).apply {
                     text = if (isEmergency) {
@@ -851,6 +840,213 @@ class HiveDropDownReceiver(
         }
 
         return card
+    }
+
+    /**
+     * Canned message definition with display text and color
+     */
+    data class CannedMessageDef(
+        val messageType: CannedMessageType,
+        val label: String,
+        val color: String
+    )
+
+    /**
+     * Create the canned message selector with 2 compact rows
+     */
+    private fun createCannedMessageSection(): View {
+        val section = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        // Row 1: Status/Movement (routine ops) - green/blue
+        val row1Messages = listOf(
+            CannedMessageDef(CannedMessageType.CHECK_IN, "CHECK IN", "#4CAF50"),
+            CannedMessageDef(CannedMessageType.ALL_CLEAR, "ALL CLEAR", "#4CAF50"),
+            CannedMessageDef(CannedMessageType.MOVING, "MOVING", "#2196F3"),
+            CannedMessageDef(CannedMessageType.HOLDING, "HOLDING", "#2196F3"),
+            CannedMessageDef(CannedMessageType.ON_STATION, "ON STATION", "#4CAF50"),
+            CannedMessageDef(CannedMessageType.RETURNING, "RTB", "#2196F3")
+        )
+        section.addView(createCannedMessageRow(row1Messages))
+        section.addView(createSpacer(6))
+
+        // Row 2: Requests/Alerts (urgent) - orange/red
+        val row2Messages = listOf(
+            CannedMessageDef(CannedMessageType.NEED_SUPPORT, "SUPPORT", "#FF9800"),
+            CannedMessageDef(CannedMessageType.NEED_MEDIC, "MEDIC", "#FF9800"),
+            CannedMessageDef(CannedMessageType.NEED_EXTRACT, "EXTRACT", "#FF9800"),
+            CannedMessageDef(CannedMessageType.CONTACT, "CONTACT", "#F44336"),
+            CannedMessageDef(CannedMessageType.UNDER_FIRE, "UNDER FIRE", "#F44336"),
+            CannedMessageDef(CannedMessageType.ALERT, "ALERT", "#F44336")
+        )
+        section.addView(createCannedMessageRow(row2Messages))
+
+        // Recent canned messages with ACK counts
+        val cannedMessages = mapComponent.getCannedMessages()
+        if (cannedMessages.isNotEmpty()) {
+            section.addView(createSpacer(12))
+            val recentLabel = TextView(pluginContext).apply {
+                text = "Recent Messages"
+                textSize = 12f
+                setTextColor(Color.parseColor("#888888"))
+            }
+            section.addView(recentLabel)
+            section.addView(createSpacer(4))
+
+            // Show last 5 messages
+            cannedMessages.take(5).forEach { msg ->
+                section.addView(createCannedMessageCard(msg))
+                section.addView(createSpacer(4))
+            }
+        }
+
+        return section
+    }
+
+    /**
+     * Resolve a node ID to a callsign using the platform list.
+     * Falls back to hex format if no platform is found.
+     */
+    private fun resolveNodeIdToCallsign(nodeId: Long): String {
+        val hexId = String.format("%08X", nodeId)
+
+        // Check if this is our own node
+        val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
+        val myNodeId = bleManager?.getNodeId()
+        if (myNodeId != null && myNodeId == nodeId) {
+            return mapComponent.selfCallsign
+        }
+
+        // Look up platform by ID format "ble-XXXXXXXX"
+        val platform = mapComponent.platforms.find { it.id == "ble-$hexId" }
+        return platform?.callsign ?: hexId
+    }
+
+    /**
+     * Create a thread-style card showing a canned message with who ACK'd
+     */
+    private fun createCannedMessageCard(msg: uniffi.hive_lite_android.CannedMessageAckEventData): View {
+        val card = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#2d2d2d"))
+            setPadding(12, 10, 12, 10)
+        }
+
+        // Header row: Message type + timestamp
+        val headerRow = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        // Message type badge with color based on category
+        val msgColor = when {
+            msg.message.name.contains("EMERGENCY") || msg.message.name.contains("ALERT") ||
+            msg.message.name.contains("CONTACT") || msg.message.name.contains("UNDER_FIRE") -> "#F44336"
+            msg.message.name.contains("NEED_") -> "#FF9800"
+            msg.message.name.contains("MOVING") || msg.message.name.contains("HOLDING") ||
+            msg.message.name.contains("RETURNING") -> "#2196F3"
+            else -> "#4CAF50"
+        }
+
+        val typeLabel = TextView(pluginContext).apply {
+            text = msg.message.name.replace("_", " ")
+            textSize = 12f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor(msgColor))
+            setPadding(8, 4, 8, 4)
+        }
+        headerRow.addView(typeLabel)
+
+        // Spacer
+        headerRow.addView(View(pluginContext).apply {
+            layoutParams = LinearLayout.LayoutParams(0, 1, 1f)
+        })
+
+        // Timestamp
+        val timeStr = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date(msg.timestamp.toLong()))
+        val timeLabel = TextView(pluginContext).apply {
+            text = timeStr
+            textSize = 10f
+            setTextColor(Color.parseColor("#888888"))
+        }
+        headerRow.addView(timeLabel)
+
+        card.addView(headerRow)
+
+        // From row - show callsign instead of hex ID
+        val fromCallsign = resolveNodeIdToCallsign(msg.sourceNode.toLong())
+        val fromRow = TextView(pluginContext).apply {
+            text = "FROM: $fromCallsign"
+            textSize = 10f
+            setTextColor(Color.parseColor("#AAAAAA"))
+            setPadding(0, 4, 0, 0)
+        }
+        card.addView(fromRow)
+
+        // ACKs section - show callsigns instead of hex IDs
+        if (msg.acks.isNotEmpty()) {
+            val ackLabel = TextView(pluginContext).apply {
+                // Build list of ACKers using callsigns
+                val ackCallsigns = msg.acks
+                    .map { ack -> resolveNodeIdToCallsign(ack.nodeId.toLong()) }
+                    .joinToString(", ")
+                text = "ACK: $ackCallsigns"
+                textSize = 10f
+                setTextColor(Color.parseColor("#4CAF50"))
+                setPadding(0, 2, 0, 0)
+            }
+            card.addView(ackLabel)
+        }
+
+        return card
+    }
+
+    /**
+     * Create a row of evenly-sized canned message buttons that fill the width
+     */
+    private fun createCannedMessageRow(messages: List<CannedMessageDef>): View {
+        val row = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        messages.forEachIndexed { index, msg ->
+            if (index > 0) {
+                // Small gap between buttons
+                row.addView(View(pluginContext).apply {
+                    layoutParams = LinearLayout.LayoutParams(4, 1)
+                })
+            }
+
+            val button = Button(pluginContext).apply {
+                text = msg.label
+                textSize = 9f
+                setTextColor(Color.WHITE)
+                setBackgroundColor(Color.parseColor(msg.color))
+                setPadding(4, 8, 4, 8)
+                minWidth = 0
+                minHeight = 0
+                minimumWidth = 0
+                minimumHeight = 0
+                // Equal weight for all buttons to fill width evenly
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f  // weight
+                )
+                setOnClickListener {
+                    mapComponent.sendCannedMessage(msg.messageType)
+                    refreshContent()
+                }
+            }
+            row.addView(button)
+        }
+
+        return row
     }
 
     private fun createPlatformCard(platform: HivePlatform): View {
@@ -1463,12 +1659,12 @@ class HiveDropDownReceiver(
             val stateCounts = hiveMesh.getFullStateCounts()
             if (stateCounts != null) {
                 val directCount = stateCounts.direct.connected + stateCounts.direct.degraded
-                val indirectCount = stateCounts.totalIndirect
+                val indirectCount = stateCounts.oneHop + stateCounts.twoHop + stateCounts.threeHop
                 val summaryParts = mutableListOf<String>()
                 summaryParts.add("Direct: $directCount")
-                if (stateCounts.oneHop > 0) summaryParts.add("1-hop: ${stateCounts.oneHop}")
-                if (stateCounts.twoHop > 0) summaryParts.add("2-hop: ${stateCounts.twoHop}")
-                if (stateCounts.threeHop > 0) summaryParts.add("3-hop: ${stateCounts.threeHop}")
+                if (stateCounts.oneHop > 0u) summaryParts.add("1-hop: ${stateCounts.oneHop}")
+                if (stateCounts.twoHop > 0u) summaryParts.add("2-hop: ${stateCounts.twoHop}")
+                if (stateCounts.threeHop > 0u) summaryParts.add("3-hop: ${stateCounts.threeHop}")
                 val summaryText = TextView(pluginContext).apply {
                     text = summaryParts.joinToString(" • ")
                     textSize = 10f
@@ -1607,13 +1803,13 @@ class HiveDropDownReceiver(
 
                 // Use minHops from IndirectPeer directly
                 val hops = peer.minHops
-                val hopText = when (hops) {
+                val hopText = when (hops.toInt()) {
                     1 -> "1-hop"
                     2 -> "2-hop"
                     3 -> "3-hop"
                     else -> "${hops}-hop"
                 }
-                val hopColor = when (hops) {
+                val hopColor = when (hops.toInt()) {
                     1 -> Color.parseColor("#4CAF50")  // Green - close
                     2 -> Color.parseColor("#FFC107")  // Yellow - medium
                     3 -> Color.parseColor("#FF9800")  // Orange - far
@@ -1716,6 +1912,26 @@ class HiveDropDownReceiver(
             }
         }
         bleControlRow.addView(bleToggle)
+
+        // Restart button - stops and restarts BLE mesh to force reconnection
+        if (isRunning) {
+            bleControlRow.addView(createHorizontalSpacer(8))
+            val restartBtn = Button(pluginContext).apply {
+                text = "Restart"
+                textSize = 10f
+                setBackgroundColor(Color.parseColor("#2196F3"))
+                setTextColor(Color.WHITE)
+                setPadding(24, 8, 24, 8)
+                setOnClickListener {
+                    HivePluginLifecycle.getInstance()?.stopBleMesh()
+                    handler.postDelayed({
+                        HivePluginLifecycle.getInstance()?.startBleMesh()
+                        handler.postDelayed({ refreshContent() }, 500)
+                    }, 500)
+                }
+            }
+            bleControlRow.addView(restartBtn)
+        }
 
         if (bleManager != null && !bleManager.hasPermissions()) {
             bleControlRow.addView(createHorizontalSpacer(8))
@@ -1921,6 +2137,55 @@ class HiveDropDownReceiver(
         meshIdRow.addView(applyButton)
         card.addView(meshIdRow)
 
+        // Message TTL configuration row
+        card.addView(createSpacer(8))
+        val ttlRow = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val ttlLabel = TextView(pluginContext).apply {
+            text = "Message TTL (sec): "
+            textSize = 12f
+            setTextColor(Color.WHITE)
+        }
+        ttlRow.addView(ttlLabel)
+
+        val currentTtl = HivePluginLifecycle.getInstance()?.getCannedMessageTtlSeconds(pluginContext)
+            ?: HivePluginLifecycle.DEFAULT_CANNED_MESSAGE_TTL_SECONDS
+        val ttlInput = android.widget.EditText(pluginContext).apply {
+            setText(currentTtl.toString())
+            textSize = 12f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#3d3d3d"))
+            setPadding(16, 8, 16, 8)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setSingleLine(true)
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        }
+        ttlRow.addView(ttlInput)
+        ttlRow.addView(createHorizontalSpacer(8))
+
+        val ttlApplyButton = Button(pluginContext).apply {
+            text = "Apply"
+            textSize = 10f
+            setBackgroundColor(Color.parseColor("#2196F3"))
+            setTextColor(Color.WHITE)
+            setPadding(16, 8, 16, 8)
+
+            setOnClickListener {
+                val newTtl = ttlInput.text.toString().trim().toIntOrNull()
+                if (newTtl != null && newTtl > 0) {
+                    HivePluginLifecycle.getInstance()?.setCannedMessageTtlSeconds(pluginContext, newTtl)
+                    android.widget.Toast.makeText(pluginContext, "TTL set to ${newTtl}s", android.widget.Toast.LENGTH_SHORT).show()
+                } else {
+                    android.widget.Toast.makeText(pluginContext, "Invalid TTL value", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        ttlRow.addView(ttlApplyButton)
+        card.addView(ttlRow)
+
         // Toggle button
         card.addView(createSpacer(12))
         val toggleButton = Button(pluginContext).apply {
@@ -2034,8 +2299,10 @@ class HiveDropDownReceiver(
             gravity = Gravity.CENTER_VERTICAL
         }
 
+        // Use current cell name for the summary title
+        val cellName = HivePluginLifecycle.getInstance()?.getCurrentCellId() ?: "Squad"
         val title = TextView(pluginContext).apply {
-            text = "${userRole.unitName.ifEmpty { "Squad" }} Summary"
+            text = "$cellName Summary"
             textSize = 16f
             setTextColor(Color.WHITE)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)

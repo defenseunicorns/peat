@@ -164,6 +164,14 @@ class SelfPositionBroadcaster(private val mapView: MapView) {
             Log.w(TAG, "PLI broadcast failed")
             onBroadcastCallback?.invoke(false, "Broadcast failed")
         }
+
+        // Also broadcast via BLE mesh so watches can see our callsign
+        HiveBleManager.getInstance()?.broadcastPosition(
+            lat = lat,
+            lon = lon,
+            alt = hae ?: 0.0,
+            callsign = callsign
+        )
     }
 
     /**
