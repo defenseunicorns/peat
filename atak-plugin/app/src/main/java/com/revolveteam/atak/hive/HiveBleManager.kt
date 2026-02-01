@@ -5,6 +5,7 @@
 package com.revolveteam.atak.hive
 
 import android.Manifest
+import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -260,6 +261,12 @@ class HiveBleManager(
      */
     fun getMesh() = hiveBtle?.mesh
 
+    /**
+     * Get cached callsign for a node ID (from persisted callsign-to-nodeId mapping).
+     * Returns null if no callsign has been received for this node.
+     */
+    fun getCachedCallsign(nodeId: Long): String? = hiveBtle?.getCachedCallsign(nodeId)
+
     // ========================================================================
     // Connection State Graph API (via HiveMesh)
     // ========================================================================
@@ -312,6 +319,12 @@ class HiveBleManager(
      * @param battery Battery percentage (0-100)
      */
     fun broadcastPosition(lat: Double, lon: Double, alt: Double, callsign: String, battery: Int = 100) {
+        // Set Bluetooth adapter name to callsign so it appears in BLE advertisements
+        // Only set once per session (when callsign is first known)
+        if (!bluetoothNameSet && callsign.isNotBlank()) {
+            setBluetoothName(callsign)
+        }
+
         val location = HiveLocation(
             latitude = lat.toFloat(),
             longitude = lon.toFloat(),
@@ -325,6 +338,36 @@ class HiveBleManager(
             heartRate = null
         )
         Log.d(TAG, "Broadcast position: callsign=$callsign, lat=$lat, lon=$lon")
+    }
+
+    // Track if we've set the Bluetooth name this session
+    @Volatile
+    private var bluetoothNameSet = false
+
+    /**
+     * Set the Bluetooth adapter name to the callsign.
+     * This makes the device identifiable in BLE scanners like nRF Connect.
+     */
+    private fun setBluetoothName(callsign: String) {
+        try {
+            val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+            val bluetoothAdapter = bluetoothManager.adapter
+            if (bluetoothAdapter != null && bluetoothAdapter.name != callsign) {
+                val success = bluetoothAdapter.setName(callsign)
+                if (success) {
+                    Log.i(TAG, "Set Bluetooth adapter name to callsign: $callsign")
+                    bluetoothNameSet = true
+                } else {
+                    Log.w(TAG, "Failed to set Bluetooth adapter name to: $callsign")
+                }
+            } else if (bluetoothAdapter?.name == callsign) {
+                bluetoothNameSet = true  // Already set correctly
+            }
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Missing permission to set Bluetooth name: ${e.message}")
+        } catch (e: Exception) {
+            Log.w(TAG, "Error setting Bluetooth name: ${e.message}")
+        }
     }
 
     /**
