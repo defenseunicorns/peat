@@ -53,6 +53,9 @@ data class HivePlatform(
     /** Battery/fuel percentage (0-100) */
     val batteryPercent: Int? = null,
 
+    /** Estimated battery time remaining in minutes (computed from drain rate) */
+    val batteryTimeRemainingMinutes: Int? = null,
+
     /** Communications quality */
     val commsQuality: CommsQuality? = null,
 
