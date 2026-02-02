@@ -720,9 +720,8 @@ class HiveMapComponent : DropDownMapComponent() {
                     // Record battery reading for drain rate calculation
                     cachedState.recordBatteryAndEstimate(health.batteryPercent, System.currentTimeMillis())
                 }
-                health.heartRate?.let { hr ->
-                    if (hr > 0) cachedState.heartRate = hr
-                }
+                // Update heart rate - null or 0 means sensor not active (e.g., watch on charger)
+                cachedState.heartRate = health.heartRate?.takeIf { it > 0 }
                 // Activity level: 0 is valid, so always update if present in peripheral
                 cachedState.activityLevel = health.activityLevel
             }
@@ -802,6 +801,7 @@ class HiveMapComponent : DropDownMapComponent() {
             status = status,
             batteryPercent = cachedState.batteryPercent ?: 0,
             batteryTimeRemainingMinutes = cachedState.computeTimeRemaining(),
+            heartRate = cachedState.heartRate,
             lastUpdate = cachedState.lastSeen
         )
 
