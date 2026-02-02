@@ -1110,6 +1110,22 @@ class HiveDropDownReceiver(
             headerRow.addView(batteryText)
         }
 
+        // Heart rate indicator inline (compact)
+        platform.heartRate?.let { hr ->
+            val hrColor = when {
+                hr in 60..100 -> Color.parseColor("#4CAF50")  // Green: normal
+                hr in 40..59 || hr in 101..140 -> Color.parseColor("#FFC107")  // Yellow
+                else -> Color.parseColor("#F44336")  // Red
+            }
+            val hrText = TextView(pluginContext).apply {
+                text = "❤$hr"
+                textSize = 11f
+                setTextColor(hrColor)
+                setPadding(8, 0, 8, 0)
+            }
+            headerRow.addView(hrText)
+        }
+
         val statusColor = when (platform.status) {
             HivePlatform.Status.OPERATIONAL -> Color.parseColor("#4CAF50")
             HivePlatform.Status.DEGRADED -> Color.parseColor("#FFC107")
@@ -1349,6 +1365,16 @@ class HiveDropDownReceiver(
             }
         } ?: run {
             statusCard.addView(createDetailRow("Battery", "N/A"))
+        }
+
+        // Heart rate (for wearable devices)
+        platform.heartRate?.let { hr ->
+            val hrColor = when {
+                hr in 60..100 -> Color.parseColor("#4CAF50")  // Green: normal
+                hr in 40..59 || hr in 101..140 -> Color.parseColor("#FFC107")  // Yellow: elevated/low
+                else -> Color.parseColor("#F44336")  // Red: very high/low
+            }
+            statusCard.addView(createDetailRow("Heart Rate", "$hr BPM", hrColor))
         }
 
         // Comms quality

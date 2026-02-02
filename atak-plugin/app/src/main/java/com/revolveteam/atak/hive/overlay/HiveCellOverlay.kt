@@ -124,10 +124,15 @@ class HiveCellOverlay(private val mapView: MapView) {
 
         // Check all items in this group
         group.items?.forEach { item ->
-            // Match by UID pattern or metadata
+            // Match by UID pattern, metadata, or title containing HIVE/Cell
             val uid = item.uid ?: ""
             val hiveCellId = item.getMetaString("hiveCellId", "")
-            if (uid.startsWith("HIVE-CELL-CIRCLE-") || hiveCellId.isNotEmpty()) {
+            val title = item.title ?: ""
+            val isHiveCircle = uid.startsWith("HIVE-CELL-CIRCLE-") ||
+                    hiveCellId.isNotEmpty() ||
+                    (item is DrawingCircle && (title.contains("ALPHA") || title.contains("BRAVO") ||
+                     title.contains("CHARLIE") || title.contains("Cell")))
+            if (isHiveCircle) {
                 orphanedItems.add(item)
             }
         }
@@ -138,7 +143,7 @@ class HiveCellOverlay(private val mapView: MapView) {
             if (item is DrawingCircle) {
                 item.dispose()
             }
-            Log.i(TAG, "Removed orphaned HIVE circle: ${item.uid}")
+            Log.i(TAG, "Removed orphaned HIVE circle: ${item.uid} (title: ${item.title})")
         }
 
         // Recursively check child groups
