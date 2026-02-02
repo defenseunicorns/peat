@@ -56,6 +56,9 @@ data class HivePlatform(
     /** Estimated battery time remaining in minutes (computed from drain rate) */
     val batteryTimeRemainingMinutes: Int? = null,
 
+    /** Heart rate in BPM (for wearable devices) */
+    val heartRate: Int? = null,
+
     /** Communications quality */
     val commsQuality: CommsQuality? = null,
 

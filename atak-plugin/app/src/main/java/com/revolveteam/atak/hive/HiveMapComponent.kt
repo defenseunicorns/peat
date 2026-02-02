@@ -802,6 +802,7 @@ class HiveMapComponent : DropDownMapComponent() {
             status = status,
             batteryPercent = cachedState.batteryPercent ?: 0,
             batteryTimeRemainingMinutes = cachedState.computeTimeRemaining(),
+            heartRate = cachedState.heartRate,
             lastUpdate = cachedState.lastSeen
         )
 
