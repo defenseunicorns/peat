@@ -223,8 +223,8 @@ dependencies {
     }
 
     // HIVE BLE mesh transport (for WearTAK sync)
-    // Published to Maven Central - use composite build for local development
-    implementation 'com.revolveteam:hive:0.1.0-rc10'
+    // Use Maven dependency so composite build substitution works
+    implementation 'com.revolveteam:hive:0.0.10'
 
     // CompileOnly dependencies - needed for compilation but provided by ATAK at runtime
     // These are excluded from packaging to avoid conflicts with ATAK's bundled versions

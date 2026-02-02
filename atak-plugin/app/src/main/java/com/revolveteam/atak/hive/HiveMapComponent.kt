@@ -88,6 +88,11 @@ class HiveMapComponent : DropDownMapComponent() {
      * Delta documents contain only changed fields, so we cache full state
      * and merge incoming updates incrementally.
      */
+    /**
+     * Battery reading with timestamp for drain rate calculation.
+     */
+    private data class BatteryReading(val percent: Int, val timestamp: Long)
+
     private data class PeerState(
         var callsign: String? = null,
         var latitude: Float? = null,
@@ -96,8 +101,65 @@ class HiveMapComponent : DropDownMapComponent() {
         var batteryPercent: Int? = null,
         var heartRate: Int? = null,
         var activityLevel: Int? = null,
-        var lastSeen: Long = 0
-    )
+        var lastSeen: Long = 0,
+        // Battery history for drain rate calculation (keep last 10 readings)
+        val batteryHistory: MutableList<BatteryReading> = mutableListOf()
+    ) {
+        companion object {
+            private const val MAX_BATTERY_HISTORY = 10
+            private const val MIN_READINGS_FOR_ESTIMATE = 2
+            private const val MIN_TIME_SPAN_MS = 60_000L  // Need at least 1 min of data
+        }
+
+        /**
+         * Record a battery reading and compute estimated time remaining.
+         * Returns estimated minutes remaining, or null if insufficient data.
+         */
+        fun recordBatteryAndEstimate(percent: Int, timestamp: Long): Int? {
+            // Only record if battery changed or enough time passed
+            val lastReading = batteryHistory.lastOrNull()
+            if (lastReading != null && lastReading.percent == percent &&
+                timestamp - lastReading.timestamp < 30_000L) {
+                // Same battery, less than 30s - skip
+                return computeTimeRemaining()
+            }
+
+            batteryHistory.add(BatteryReading(percent, timestamp))
+
+            // Keep only last N readings
+            while (batteryHistory.size > MAX_BATTERY_HISTORY) {
+                batteryHistory.removeAt(0)
+            }
+
+            return computeTimeRemaining()
+        }
+
+        /**
+         * Compute estimated time remaining based on drain rate.
+         */
+        fun computeTimeRemaining(): Int? {
+            if (batteryHistory.size < MIN_READINGS_FOR_ESTIMATE) return null
+
+            val oldest = batteryHistory.first()
+            val newest = batteryHistory.last()
+            val timeSpanMs = newest.timestamp - oldest.timestamp
+
+            if (timeSpanMs < MIN_TIME_SPAN_MS) return null  // Not enough time span
+
+            val percentDrop = oldest.percent - newest.percent
+            if (percentDrop <= 0) return null  // Battery not draining (charging or stable)
+
+            // Calculate drain rate in percent per minute
+            val drainRatePerMinute = percentDrop.toDouble() / (timeSpanMs / 60_000.0)
+            if (drainRatePerMinute <= 0.001) return null  // Too slow to estimate
+
+            // Estimate time remaining
+            val minutesRemaining = (newest.percent / drainRatePerMinute).toInt()
+
+            // Sanity check: cap at 48 hours (2880 minutes)
+            return minutesRemaining.coerceIn(0, 2880)
+        }
+    }
     private val _peerStateCache = mutableMapOf<Long, PeerState>()
 
     /**
@@ -651,8 +713,12 @@ class HiveMapComponent : DropDownMapComponent() {
 
             // Merge health data if present
             peripheral.health.let { health ->
-                if (health.batteryPercent > 0) {
+                // Always update battery if it's in valid range (0-100)
+                // batteryPercent=0 is valid and means device is nearly dead
+                if (health.batteryPercent in 0..100) {
                     cachedState.batteryPercent = health.batteryPercent
+                    // Record battery reading for drain rate calculation
+                    cachedState.recordBatteryAndEstimate(health.batteryPercent, System.currentTimeMillis())
                 }
                 health.heartRate?.let { hr ->
                     if (hr > 0) cachedState.heartRate = hr
@@ -696,8 +762,13 @@ class HiveMapComponent : DropDownMapComponent() {
             return
         }
 
-        // Resolve callsign with fallback
+        // Resolve callsign with fallback chain:
+        // 1. Cached state callsign (from this session's documents)
+        // 2. BLE manager's persisted callsign cache (from previous sessions)
+        // 3. Generated fallback name
+        val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
         val callsign = cachedState.callsign
+            ?: bleManager?.getCachedCallsign(nodeId)
             ?: "BLE-${String.format("%08X", nodeId).takeLast(4)}"
 
         // Get cell ID for organizational grouping (NATO phonetic: ALPHA, BRAVO, etc.)
@@ -730,6 +801,7 @@ class HiveMapComponent : DropDownMapComponent() {
             cellId = cellId,
             status = status,
             batteryPercent = cachedState.batteryPercent ?: 0,
+            batteryTimeRemainingMinutes = cachedState.computeTimeRemaining(),
             lastUpdate = cachedState.lastSeen
         )
 
