@@ -5,6 +5,7 @@
 package com.revolveteam.atak.hive
 
 import android.Manifest
+import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -23,6 +24,7 @@ import uniffi.hive_btle.PeerConnectionState
 import uniffi.hive_btle.StateCountSummary
 import uniffi.hive_btle.DeviceIdentity
 import uniffi.hive_btle.decodeMeshGenesis
+import uniffi.hive_btle.CannedMessageInfo
 import uniffi.hive_lite_android.CannedMessageAckEventData
 import uniffi.hive_lite_android.CannedMessageType
 import uniffi.hive_lite_android.createCannedMessageAckEvent
@@ -260,6 +262,12 @@ class HiveBleManager(
      */
     fun getMesh() = hiveBtle?.mesh
 
+    /**
+     * Get cached callsign for a node ID (from persisted callsign-to-nodeId mapping).
+     * Returns null if no callsign has been received for this node.
+     */
+    fun getCachedCallsign(nodeId: Long): String? = hiveBtle?.getCachedCallsign(nodeId)
+
     // ========================================================================
     // Connection State Graph API (via HiveMesh)
     // ========================================================================
@@ -312,6 +320,12 @@ class HiveBleManager(
      * @param battery Battery percentage (0-100)
      */
     fun broadcastPosition(lat: Double, lon: Double, alt: Double, callsign: String, battery: Int = 100) {
+        // Set Bluetooth adapter name to callsign so it appears in BLE advertisements
+        // Only set once per session (when callsign is first known)
+        if (!bluetoothNameSet && callsign.isNotBlank()) {
+            setBluetoothName(callsign)
+        }
+
         val location = HiveLocation(
             latitude = lat.toFloat(),
             longitude = lon.toFloat(),
@@ -325,6 +339,36 @@ class HiveBleManager(
             heartRate = null
         )
         Log.d(TAG, "Broadcast position: callsign=$callsign, lat=$lat, lon=$lon")
+    }
+
+    // Track if we've set the Bluetooth name this session
+    @Volatile
+    private var bluetoothNameSet = false
+
+    /**
+     * Set the Bluetooth adapter name to the callsign.
+     * This makes the device identifiable in BLE scanners like nRF Connect.
+     */
+    private fun setBluetoothName(callsign: String) {
+        try {
+            val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+            val bluetoothAdapter = bluetoothManager.adapter
+            if (bluetoothAdapter != null && bluetoothAdapter.name != callsign) {
+                val success = bluetoothAdapter.setName(callsign)
+                if (success) {
+                    Log.i(TAG, "Set Bluetooth adapter name to callsign: $callsign")
+                    bluetoothNameSet = true
+                } else {
+                    Log.w(TAG, "Failed to set Bluetooth adapter name to: $callsign")
+                }
+            } else if (bluetoothAdapter?.name == callsign) {
+                bluetoothNameSet = true  // Already set correctly
+            }
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Missing permission to set Bluetooth name: ${e.message}")
+        } catch (e: Exception) {
+            Log.w(TAG, "Error setting Bluetooth name: ${e.message}")
+        }
     }
 
     /**
@@ -450,11 +494,11 @@ class HiveBleManager(
         cannedMessageDocs[key] = event
         updateCannedMessagesObservable()
 
-        // Broadcast to mesh (convert List<UByte> to ByteArray)
+        // Store in mesh for CRDT sync (convert List<UByte> to ByteArray)
         val bytes = ByteArray(encoded.size) { encoded[it].toByte() }
-        hiveBtle?.broadcastBytes(bytes)
+        val stored = hiveBtle?.storeCannedMessageDocument(bytes) ?: false
 
-        Log.i(TAG, "Sent canned message: ${messageType.name} from ${String.format("%08X", nodeId)} (${encoded.size} bytes)")
+        Log.i(TAG, "Sent canned message: ${messageType.name} from ${String.format("%08X", nodeId)} stored=$stored (${encoded.size} bytes)")
 
         // Notify callback
         cannedMessageCallback?.invoke(event)
@@ -524,6 +568,58 @@ class HiveBleManager(
         mainHandler.post {
             Log.d(TAG, "Document synced: nodeId=${document.nodeId}, version=${document.version}")
             documentSyncCallback?.invoke(document)
+
+            // Poll for CannedMessages that arrived via delta sync
+            pollCannedMessagesFromDeltaSync()
+        }
+    }
+
+    /**
+     * Poll for CannedMessages that arrived via delta sync (0xB2/0xC0 documents).
+     * Delta-synced documents are stored in Rust and need to be polled since they
+     * don't come through onDecryptedData callback.
+     */
+    private fun pollCannedMessagesFromDeltaSync() {
+        val btle = hiveBtle ?: return
+
+        try {
+            val allMessages = btle.getAllCannedMessages()
+            if (allMessages.isEmpty()) return
+
+            var updated = false
+            for (msgInfo in allMessages) {
+                val key = "${msgInfo.sourceNode}:${msgInfo.timestamp}"
+
+                // Decode the CannedMessageAckEvent from bytes
+                val incoming = decodeCannedMessageAckEvent(msgInfo.encodedBytes)
+                if (incoming == null) {
+                    Log.w(TAG, "[DELTA-POLL] Failed to decode CannedMessageAckEvent")
+                    continue
+                }
+
+                // Check if this is new or has more ACKs than what we have
+                val existing = cannedMessageDocs[key]
+                if (existing == null) {
+                    // New message from delta sync
+                    Log.i(TAG, "[DELTA-POLL] NEW message from delta sync: $key, type=${incoming.message}, ACKs=${incoming.acks.size}")
+                    cannedMessageDocs[key] = incoming
+                    cannedMessageCallback?.invoke(incoming)
+                    updated = true
+                } else if (incoming.acks.size > existing.acks.size) {
+                    // Has more ACKs - merge them
+                    val merged = cannedMessageAckEventMerge(existing, incoming)
+                    Log.i(TAG, "[DELTA-POLL] Merged ACKs for $key: ${existing.acks.size} -> ${merged.acks.size}")
+                    cannedMessageDocs[key] = merged
+                    cannedMessageCallback?.invoke(merged)
+                    updated = true
+                }
+            }
+
+            if (updated) {
+                updateCannedMessagesObservable()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "[DELTA-POLL] Error polling canned messages: ${e.message}", e)
         }
     }
 
@@ -543,38 +639,10 @@ class HiveBleManager(
     }
 
     override fun onDecryptedData(peer: HivePeer?, data: ByteArray) {
-        // Check for canned message marker (0xAF)
-        if (data.isEmpty() || data[0] != 0xAF.toByte()) {
-            return
-        }
-
-        mainHandler.post {
-            try {
-                // Decode as CannedMessageAckEvent using hive-lite
-                val incoming = decodeCannedMessageAckEvent(data)
-                if (incoming == null) {
-                    Log.w(TAG, "Failed to decode canned message from ${peer?.displayName()}")
-                    return@post
-                }
-
-                // Document key based on source node and timestamp
-                val key = "${incoming.sourceNode}:${incoming.timestamp}"
-
-                // Merge with existing document or store new
-                val merged = cannedMessageDocs[key]?.let { existing ->
-                    Log.d(TAG, "Merging canned message $key: existing has ${existing.acks.size} ACKs, incoming has ${incoming.acks.size} ACKs")
-                    cannedMessageAckEventMerge(existing, incoming)
-                } ?: incoming
-
-                cannedMessageDocs[key] = merged
-                updateCannedMessagesObservable()
-                Log.i(TAG, "Canned message $key now has ${merged.acks.size} ACKs: ${merged.acks.map { it.nodeId }}")
-
-                // Notify callback with merged document
-                cannedMessageCallback?.invoke(merged)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error processing canned message: ${e.message}", e)
-            }
+        // CannedMessages now flow through delta sync only (0xB2/0xC0 documents)
+        // No longer handling raw 0xAF broadcasts here
+        if (data.isNotEmpty()) {
+            Log.v(TAG, "[DECRYPTED] Received ${data.size} bytes, marker=0x${String.format("%02X", data[0])}")
         }
     }
 }
