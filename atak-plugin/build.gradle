@@ -21,6 +21,9 @@ allprojects {
         mavenLocal()  // For hive-btle AAR
         google()
         mavenCentral()
+        flatDir {
+            dirs 'libs'  // For local AAR files
+        }
     }
 }
 

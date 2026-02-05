@@ -29,6 +29,7 @@ import com.revolveteam.hive.HiveChat
 import com.revolveteam.hive.HiveMarker
 import com.revolveteam.hive.HivePeer as BlePeer
 import uniffi.hive_lite_android.CannedMessageType
+import uniffi.hive_lite_android.CannedMessageAckEventData
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -919,7 +920,7 @@ class HiveDropDownReceiver(
     /**
      * Create a thread-style card showing a canned message with who ACK'd
      */
-    private fun createCannedMessageCard(msg: uniffi.hive_lite_android.CannedMessageAckEventData): View {
+    private fun createCannedMessageCard(msg: CannedMessageAckEventData): View {
         val card = LinearLayout(pluginContext).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#2d2d2d"))
@@ -1091,6 +1092,39 @@ class HiveDropDownReceiver(
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
         headerRow.addView(name)
+
+        // Battery indicator inline with callsign (compact)
+        platform.batteryPercent?.let { battery ->
+            val batteryColor = when {
+                battery > 50 -> Color.parseColor("#4CAF50")  // Green
+                battery > 20 -> Color.parseColor("#FFC107")  // Yellow
+                else -> Color.parseColor("#F44336")          // Red
+            }
+            val batteryText = TextView(pluginContext).apply {
+                val icon = if (battery > 25) "🔋" else "🪫"
+                text = "$icon$battery%"
+                textSize = 11f
+                setTextColor(batteryColor)
+                setPadding(8, 0, 8, 0)
+            }
+            headerRow.addView(batteryText)
+        }
+
+        // Heart rate indicator inline (compact)
+        platform.heartRate?.let { hr ->
+            val hrColor = when {
+                hr in 60..100 -> Color.parseColor("#4CAF50")  // Green: normal
+                hr in 40..59 || hr in 101..140 -> Color.parseColor("#FFC107")  // Yellow
+                else -> Color.parseColor("#F44336")  // Red
+            }
+            val hrText = TextView(pluginContext).apply {
+                text = "❤$hr"
+                textSize = 11f
+                setTextColor(hrColor)
+                setPadding(8, 0, 8, 0)
+            }
+            headerRow.addView(hrText)
+        }
 
         val statusColor = when (platform.status) {
             HivePlatform.Status.OPERATIONAL -> Color.parseColor("#4CAF50")
@@ -1314,8 +1348,33 @@ class HiveDropDownReceiver(
             }
             batteryRow.addView(progressText)
             statusCard.addView(batteryRow)
+
+            // Estimated time remaining (if calculated)
+            platform.batteryTimeRemainingMinutes?.let { mins ->
+                val timeStr = when {
+                    mins >= 60 -> "${mins / 60}h ${mins % 60}m remaining"
+                    mins > 0 -> "${mins}m remaining"
+                    else -> "Calculating..."
+                }
+                val timeColor = when {
+                    mins > 120 -> Color.parseColor("#4CAF50")  // Green: >2h
+                    mins > 30 -> Color.parseColor("#FFC107")   // Yellow: 30m-2h
+                    else -> Color.parseColor("#F44336")        // Red: <30m
+                }
+                statusCard.addView(createDetailRow("Est. Time", timeStr, timeColor))
+            }
         } ?: run {
             statusCard.addView(createDetailRow("Battery", "N/A"))
+        }
+
+        // Heart rate (for wearable devices)
+        platform.heartRate?.let { hr ->
+            val hrColor = when {
+                hr in 60..100 -> Color.parseColor("#4CAF50")  // Green: normal
+                hr in 40..59 || hr in 101..140 -> Color.parseColor("#FFC107")  // Yellow: elevated/low
+                else -> Color.parseColor("#F44336")  // Red: very high/low
+            }
+            statusCard.addView(createDetailRow("Heart Rate", "$hr BPM", hrColor))
         }
 
         // Comms quality

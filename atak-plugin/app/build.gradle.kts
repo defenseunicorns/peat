@@ -161,6 +161,10 @@ dependencies {
     // 0.0.10 adds field-level delta sync for bandwidth efficiency
     implementation("com.revolveteam:hive:0.0.10")
 
+    // HIVE-Lite for canned message encoding/decoding (Kotlin bindings copied directly)
+    // Native libs in libs/arm64-v8a, libs/armeabi-v7a, libs/x86_64
+    implementation("net.java.dev.jna:jna:5.14.0@aar")  // Required by UniFFI
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
