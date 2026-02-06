@@ -334,6 +334,9 @@ class HiveMapComponent : DropDownMapComponent() {
         // Register BLE chat callback for mesh chat messages
         registerBleChatCallback()
 
+        // Register observer for BLE peer connectivity changes to update cell composition immediately
+        registerBlePeerConnectivityObserver()
+
         // Update connection status based on HIVE node availability
         updateConnectionStatus()
 
@@ -517,6 +520,35 @@ class HiveMapComponent : DropDownMapComponent() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error registering BLE chat callback: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Register observer for BLE peer connectivity changes.
+     * This triggers immediate cell composition updates when peers connect/disconnect,
+     * ensuring cell capabilities reflect current operational state.
+     */
+    private fun registerBlePeerConnectivityObserver() {
+        try {
+            val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
+            if (bleManager != null) {
+                // Observe peer list changes (connect/disconnect/discovery)
+                bleManager.peers.observe { peers ->
+                    refreshHandler.post {
+                        Log.d(TAG, "BLE peer connectivity changed: ${peers.size} peers, " +
+                                "${peers.count { it.isConnected }} connected")
+                        // Immediately update cell composition to reflect current capabilities
+                        updateCellComposition()
+                        // Notify UI of the change
+                        onPlatformsChanged?.invoke()
+                    }
+                }
+                Log.i(TAG, "BLE peer connectivity observer registered")
+            } else {
+                Log.w(TAG, "BLE manager not available for connectivity observer")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error registering BLE connectivity observer: ${e.message}", e)
         }
     }
 
@@ -810,6 +842,8 @@ class HiveMapComponent : DropDownMapComponent() {
             _blePeerPlatforms[nodeId] = platform
             // Ensure cell exists for this cell ID
             ensureCellExists(cellId)
+            // Update cell platform counts to reflect the new platform
+            updateCellComposition()
             updateBlePeerOverlay()
             // Notify UI of platform change so dropdown refreshes
             onPlatformsChanged?.invoke()
@@ -938,31 +972,31 @@ class HiveMapComponent : DropDownMapComponent() {
     }
 
     /**
-     * Remove BLE peer platforms that are no longer known to the mesh.
-     * Uses isPeerKnown() from hive-btle for accurate multi-hop awareness,
-     * with fallback to staleness check for robustness.
+     * Remove BLE peer platforms that are no longer CONNECTED.
+     * Platforms are removed IMMEDIATELY when connection is lost.
+     * "Discovered" (visible via BLE but not connected) is NOT sufficient to keep a platform.
+     * This ensures cell composition always reflects current operational state.
      */
     private fun cleanupLostPlatforms() {
-        val hiveMesh = HivePluginLifecycle.getInstance()?.getHiveBleManager()?.getMesh()
+        val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
+        val blePeers = bleManager?.peers?.value ?: emptyList()
         val selfUidHash = mapView.selfMarker?.uid?.hashCode()?.toLong()
-        val now = System.currentTimeMillis()
-        val staleThresholdMs = 5 * 60 * 1000L // 5 minutes - same as overlay
 
-        // Find platforms that are either:
-        // 1. Not known to the mesh (isPeerKnown returns false), OR
-        // 2. Stale (haven't sent a document in 5 minutes) as fallback
+        // Find platforms that are no longer CONNECTED (discovered is not enough)
         val toRemove = _blePeerPlatforms.entries.filter { (nodeId, platform) ->
             if (nodeId == selfUidHash) return@filter false
 
-            // Check if peer is known to mesh (direct or indirect)
-            val isKnown = hiveMesh?.isPeerKnown(nodeId.toUInt()) ?: true
-            val isStale = (now - platform.lastUpdate > staleThresholdMs)
+            // Check if peer is CONNECTED (not just discovered)
+            val isConnected = blePeers.any { peer ->
+                peer.nodeId?.toLong() == nodeId && peer.isConnected
+            }
 
-            // Remove if not known to mesh AND stale (belt and suspenders)
-            !isKnown && isStale
+            // Remove immediately if not connected
+            !isConnected
         }
 
-        Log.d(TAG, "Cleanup check: ${_blePeerPlatforms.size} platforms, ${toRemove.size} to remove")
+        val connectedCount = blePeers.count { it.isConnected }
+        Log.d(TAG, "Cleanup check: ${_blePeerPlatforms.size} platforms, $connectedCount connected peers, ${toRemove.size} to remove")
 
         if (toRemove.isNotEmpty()) {
             toRemove.forEach { (nodeId, platform) ->
@@ -971,9 +1005,102 @@ class HiveMapComponent : DropDownMapComponent() {
                 _peerStateCache.remove(nodeId)
                 // Clear any emergency state
                 _activeEmergencies.remove(nodeId)
-                val staleSec = (now - platform.lastUpdate) / 1000
-                Log.i(TAG, "Removed lost BLE peer: ${platform.callsign} " +
-                        "(${String.format("%08X", nodeId)}, unknown to mesh, last seen ${staleSec}s ago)")
+                Log.i(TAG, "Removed disconnected BLE peer: ${platform.callsign} " +
+                        "(${String.format("%08X", nodeId)})")
+            }
+            // Update cell platform counts
+            updateCellComposition()
+            // Notify UI of platform changes so dropdown refreshes
+            onPlatformsChanged?.invoke()
+        }
+    }
+
+    /**
+     * Get the set of node IDs that are currently CONNECTED.
+     * Only connected platforms contribute to cell composition.
+     * "Discovered" (visible but not connected) does NOT count as active.
+     */
+    private fun getActiveNodeIds(): Set<Long> {
+        val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
+        val blePeers = bleManager?.peers?.value ?: emptyList()
+
+        val activeIds = mutableSetOf<Long>()
+
+        // Add only CONNECTED peers (not just discovered)
+        blePeers.filter { it.isConnected }.forEach { peer ->
+            peer.nodeId?.toLong()?.let { activeIds.add(it) }
+        }
+
+        // Always include self (tablet)
+        mapView.selfMarker?.uid?.hashCode()?.toLong()?.let { activeIds.add(it) }
+
+        return activeIds
+    }
+
+    /**
+     * Get platforms that are currently "active" (connected or discoverable).
+     * These contribute to cell capabilities and represent current operational state.
+     */
+    fun getActivePlatforms(): List<HivePlatform> {
+        val activeIds = getActiveNodeIds()
+        return platforms.filter { platform ->
+            // FFI platforms are always considered active (they have their own connection management)
+            platform.id.startsWith("ble-").not() ||
+            // BLE platforms are active if their node ID is in the active set
+            activeIds.contains(platform.id.removePrefix("ble-").toLongOrNull(16))
+        }
+    }
+
+    /**
+     * Update cell composition based on ACTIVE platforms only.
+     * This includes platform count, capabilities, and status.
+     * Called when platforms change OR when peer connectivity changes.
+     */
+    private fun updateCellComposition() {
+        val activeIds = getActiveNodeIds()
+        val allPlatforms = platforms
+
+        _cells.forEachIndexed { index, cell ->
+            // Get all platforms in this cell
+            val cellPlatforms = allPlatforms.filter { it.cellId == cell.id }
+
+            // Get ACTIVE platforms in this cell (for capabilities)
+            val activePlatforms = cellPlatforms.filter { platform ->
+                platform.id.startsWith("ble-").not() ||
+                activeIds.contains(platform.id.removePrefix("ble-").toLongOrNull(16))
+            }
+
+            // Aggregate capabilities from ACTIVE platforms only
+            val activeCapabilities = activePlatforms
+                .flatMap { it.capabilities }
+                .distinct()
+                .toMutableList()
+
+            // Add base capabilities for BLE cells
+            if (cell.capabilities.contains("BLE_MESH")) {
+                if (!activeCapabilities.contains("BLE_MESH")) activeCapabilities.add("BLE_MESH")
+                if (!activeCapabilities.contains("GATEWAY")) activeCapabilities.add("GATEWAY")
+            }
+
+            // Cell status reflects current operational state of active platforms
+            // Not "DEGRADED" just because nodes left - that's just the current composition
+            val activeCount = activePlatforms.size
+            val newStatus = if (activeCount == 0) HiveCell.Status.OFFLINE else HiveCell.Status.ACTIVE
+
+            // Update cell if anything changed
+            if (cell.platformCount != activeCount ||
+                cell.capabilities != activeCapabilities ||
+                cell.status != newStatus) {
+
+                Log.i(TAG, "Cell ${cell.name} updated: platforms=$activeCount, " +
+                        "status=$newStatus, capabilities=$activeCapabilities")
+
+                _cells[index] = cell.copy(
+                    platformCount = activeCount,
+                    capabilities = activeCapabilities,
+                    status = newStatus,
+                    lastUpdate = System.currentTimeMillis()
+                )
             }
         }
     }
