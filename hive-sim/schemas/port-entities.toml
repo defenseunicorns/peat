@@ -1,0 +1,203 @@
+# Port Operations Entity Schema Definitions
+# Extends HIVE capability model for container terminal operations
+# Reference: ADR-051 (Port Operations Reference Implementation)
+
+[metadata]
+domain = "port_operations"
+version = "0.1.0"
+reference_site = "Port of Savannah, Garden City Terminal"
+
+# =============================================================================
+# Entity Types — maps to NodeConfig.platform_type in hive-schema
+# =============================================================================
+
+[entity_types]
+
+[entity_types.gantry_crane]
+description = "Ship-to-shore gantry crane (post-Panamax class)"
+hive_level = "H1"
+category = "equipment"
+
+[entity_types.worker]
+description = "Human worker (ILA longshoreman)"
+hive_level = "H1"
+category = "human"
+
+[entity_types.yard_tractor]
+description = "Terminal tractor for container transport"
+hive_level = "H1"
+category = "equipment"
+
+[entity_types.ai_agent]
+description = "AI scheduling/optimization agent"
+hive_level = "H4"
+category = "ai"
+
+[entity_types.load_sensor]
+description = "Load cell / weight measurement sensor"
+hive_level = "H0"
+category = "sensor"
+
+[entity_types.rfid_reader]
+description = "RFID container identification reader"
+hive_level = "H0"
+category = "sensor"
+
+[entity_types.hold_aggregator]
+description = "Hold team aggregation node (virtual)"
+hive_level = "H2"
+category = "aggregator"
+
+[entity_types.berth_manager]
+description = "Berth-level zone coordination node (virtual)"
+hive_level = "H3"
+category = "aggregator"
+
+[entity_types.terminal_ops_center]
+description = "Terminal Operations Center — top-level aggregation"
+hive_level = "H4"
+category = "aggregator"
+
+# =============================================================================
+# Capability Types — extends CapabilityType enum for port domain
+# Uses metadata_json for domain-specific fields per ADR-012 pattern
+# =============================================================================
+
+[capability_types]
+
+[capability_types.container_lift]
+description = "Ability to lift containers between ship and dock"
+base_type = "CAPABILITY_TYPE_PAYLOAD"
+fields = [
+    { name = "lift_capacity_tons", type = "float", required = true },
+    { name = "reach_rows", type = "int", required = true },
+    { name = "moves_per_hour", type = "int", required = true },
+    { name = "spreader_type", type = "string", required = false },
+]
+
+[capability_types.hazmat_rated]
+description = "Certification to handle hazardous materials"
+base_type = "CAPABILITY_TYPE_PAYLOAD"
+fields = [
+    { name = "classes", type = "int_array", required = true },
+    { name = "certification_expiry", type = "datetime", required = true },
+    { name = "certification_valid", type = "bool", required = true },
+]
+
+[capability_types.crane_operation]
+description = "Human skill: certified crane operator"
+base_type = "CAPABILITY_TYPE_COMPUTE"
+fields = [
+    { name = "proficiency", type = "string", required = true, enum = ["novice", "advanced_beginner", "competent", "proficient", "expert"] },
+    { name = "certification_id", type = "string", required = true },
+    { name = "certification_expiry", type = "datetime", required = true },
+    { name = "certification_valid", type = "bool", required = true },
+]
+
+[capability_types.hazmat_handling]
+description = "Human skill: hazmat materials handling"
+base_type = "CAPABILITY_TYPE_COMPUTE"
+fields = [
+    { name = "proficiency", type = "string", required = true, enum = ["novice", "advanced_beginner", "competent", "proficient", "expert"] },
+    { name = "classes", type = "int_array", required = true },
+    { name = "certification_expiry", type = "datetime", required = true },
+    { name = "certification_valid", type = "bool", required = true },
+    { name = "evidence_handling_count", type = "int", required = false },
+    { name = "evidence_incident_count", type = "int", required = false },
+]
+
+[capability_types.lashing]
+description = "Human skill: container lashing/securing"
+base_type = "CAPABILITY_TYPE_COMPUTE"
+fields = [
+    { name = "proficiency", type = "string", required = true, enum = ["novice", "advanced_beginner", "competent", "proficient", "expert"] },
+]
+
+[capability_types.container_transport]
+description = "Ability to transport containers within terminal"
+base_type = "CAPABILITY_TYPE_MOBILITY"
+fields = [
+    { name = "mode", type = "string", required = true, enum = ["human_driven", "semi_autonomous", "fully_autonomous"] },
+    { name = "load_capacity_tons", type = "float", required = true },
+    { name = "gps_tracked", type = "bool", required = true },
+    { name = "battery_pct", type = "float", required = false },
+]
+
+[capability_types.container_sequencing]
+description = "AI: stow plan optimization and container sequencing"
+base_type = "CAPABILITY_TYPE_COMPUTE"
+fields = [
+    { name = "algorithm", type = "string", required = true },
+    { name = "containers_per_second", type = "int", required = true },
+    { name = "optimization_targets", type = "string_array", required = true },
+]
+
+[capability_types.yard_optimization]
+description = "AI: yard block allocation optimization"
+base_type = "CAPABILITY_TYPE_COMPUTE"
+fields = [
+    { name = "algorithm", type = "string", required = true },
+]
+
+[capability_types.weight_measurement]
+description = "Sensor: container weight measurement"
+base_type = "CAPABILITY_TYPE_SENSOR"
+fields = [
+    { name = "range_tons", type = "float", required = true },
+    { name = "accuracy_pct", type = "float", required = true },
+    { name = "last_calibration", type = "datetime", required = true },
+]
+
+[capability_types.container_identification]
+description = "Sensor: container ID reading (RFID, OCR)"
+base_type = "CAPABILITY_TYPE_SENSOR"
+fields = [
+    { name = "read_range_m", type = "float", required = true },
+    { name = "protocols", type = "string_array", required = true },
+]
+
+# =============================================================================
+# Operational Status Extensions — maps to OperationalStatus enum
+# Port-specific status values that map to existing HIVE statuses
+# =============================================================================
+
+[status_mapping]
+OPERATIONAL = "OPERATIONAL_STATUS_READY"
+ACTIVE = "OPERATIONAL_STATUS_ACTIVE"
+DEGRADED = "OPERATIONAL_STATUS_DEGRADED"
+OFFLINE = "OPERATIONAL_STATUS_OFFLINE"
+MAINTENANCE = "OPERATIONAL_STATUS_MAINTENANCE"
+CHARGING = "OPERATIONAL_STATUS_MAINTENANCE"    # Tractors charging maps to maintenance
+
+# =============================================================================
+# Aggregation Policies — per ADR-027 event routing
+# =============================================================================
+
+[aggregation_policies]
+
+[aggregation_policies.moves_per_hour]
+description = "Container move rate aggregation"
+propagation = "summary"
+window_seconds = 30
+aggregation = "sum"
+
+[aggregation_policies.equipment_failure]
+description = "Equipment status change"
+propagation = "immediate"
+priority = "critical"
+
+[aggregation_policies.capability_gap]
+description = "Missing required capability"
+propagation = "immediate"
+priority = "high"
+
+[aggregation_policies.worker_status]
+description = "Worker availability changes"
+propagation = "summary"
+window_seconds = 10
+aggregation = "count"
+
+[aggregation_policies.container_move_complete]
+description = "Individual container move completion"
+propagation = "aggregate_at_parent"
+priority = "normal"

@@ -1,0 +1,73 @@
+{
+  "scenario": "mv_ever_forward_arrival",
+  "description": "MV Ever Forward arrives at Berth 5, Garden City Terminal, Port of Savannah",
+  "vessel": {
+    "name": "MV Ever Forward",
+    "imo": "9811000",
+    "teu_capacity": 16247,
+    "loa_m": 400,
+    "beam_m": 58.6,
+    "draft_m": 16.0,
+    "holds": 9
+  },
+  "berth": {
+    "id": "berth-5",
+    "terminal": "garden_city",
+    "cranes_available": 6,
+    "depth_m": 17.0
+  },
+  "stow_plan": {
+    "total_containers": 4200,
+    "discharge": 2100,
+    "load": 2100,
+    "hazmat_containers": 84,
+    "reefer_containers": 210,
+    "overweight_containers": 42,
+    "target_turnaround_hours": 72
+  },
+  "hold_assignments": {
+    "hold_1": {
+      "containers_discharge": 280,
+      "containers_load": 260,
+      "hazmat": false,
+      "cranes_assigned": 2
+    },
+    "hold_2": {
+      "containers_discharge": 310,
+      "containers_load": 290,
+      "hazmat": false,
+      "cranes_assigned": 2
+    },
+    "hold_3": {
+      "containers_discharge": 340,
+      "containers_load": 320,
+      "hazmat": true,
+      "hazmat_count": 28,
+      "cranes_assigned": 2,
+      "notes": "Hazmat holds require certified crane operators and hazmat-rated equipment"
+    }
+  },
+  "events": [
+    {
+      "t_minutes": 0,
+      "type": "ship_arrival",
+      "description": "Vessel moored, gangway down, manifest distributed"
+    },
+    {
+      "t_minutes": 5,
+      "type": "gap_analysis",
+      "description": "Protocol identifies hazmat certification shortage for Hold 3"
+    },
+    {
+      "t_minutes": 30,
+      "type": "equipment_degradation",
+      "entity": "crane-2",
+      "description": "Hydraulic pressure drop detected, moves/hour reduced"
+    },
+    {
+      "t_minutes": 60,
+      "type": "shift_change",
+      "description": "First shift ends, second shift begins, teams reform"
+    }
+  ]
+}
