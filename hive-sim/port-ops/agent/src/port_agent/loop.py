@@ -90,6 +90,7 @@ class AgentLoop:
         clock: SimulationClock | None = None,
         max_cycles: int = 100,
         cycle_delay_sim_minutes: float = 1.5,  # ~1.5 sim minutes per OODA loop
+        dashboard: Any = None,  # Optional LiveDashboard
     ):
         self.node_id = node_id
         self.persona = Path(persona_path).read_text()
@@ -100,6 +101,7 @@ class AgentLoop:
         self.cycle_delay_sim_minutes = cycle_delay_sim_minutes
         self.cycle_count = 0
         self.metrics: list[CycleMetrics] = []
+        self.dashboard = dashboard
 
     async def observe(self) -> dict[str, Any]:
         """OBSERVE — Read all HIVE state via MCP resources."""
@@ -184,6 +186,9 @@ class AgentLoop:
 
         logger.info(f"[{self.clock.sim_time_str}] OBSERVE complete ({observe_ms:.0f}ms)")
 
+        if self.dashboard:
+            self.dashboard.update_observe(state, self.clock.sim_time_str, self.cycle_count)
+
         # ORIENT + DECIDE
         t1 = time.time()
         decision = await self.decide(state)
@@ -194,10 +199,15 @@ class AgentLoop:
             f"| Reasoning: {decision.reasoning[:100]}... ({decide_ms:.0f}ms)"
         )
 
+        if self.dashboard:
+            self.dashboard.update_decide(decision.action, decision.arguments, decision.reasoning, decide_ms)
+
         # ACT
         t2 = time.time()
         result = await self.act(decision)
         act_ms = (time.time() - t2) * 1000
+
+        success = "Error" not in result
 
         metrics = CycleMetrics(
             cycle_number=self.cycle_count,
@@ -208,10 +218,13 @@ class AgentLoop:
             action=decision.action,
             arguments=decision.arguments,
             reasoning=decision.reasoning,
-            success="Error" not in result,
+            success=success,
             result=result,
         )
         self.metrics.append(metrics)
+
+        if self.dashboard:
+            self.dashboard.update_act(result, observe_ms, decide_ms, act_ms, success)
 
         # Log METRICS in structured format matching hive-sim pattern
         print(json.dumps({
@@ -260,6 +273,24 @@ class AgentLoop:
                 logger.error(f"Unexpected error in cycle {self.cycle_count}: {e}")
                 await asyncio.sleep(1)
 
+        # Fetch full HIVE state dump for dashboard/summary
+        if self.dashboard:
+            try:
+                dump_result = await self.mcp.read_resource("hive://debug/state-dump")
+                if hasattr(dump_result, "contents") and dump_result.contents:
+                    dump_text = dump_result.contents[0].text
+                else:
+                    dump_text = str(dump_result)
+                dump = json.loads(dump_text) if isinstance(dump_text, str) else dump_text
+                self.dashboard.update_hive_dump(
+                    dump.get("documents", {}),
+                    dump.get("events", []),
+                )
+            except Exception as e:
+                logger.warning(f"Failed to fetch state dump: {e}")
+
+            self.dashboard.cleanup()
+
         # Summary
         total_actions = sum(1 for m in self.metrics if m.action != "wait")
         total_waits = sum(1 for m in self.metrics if m.action == "wait")
@@ -268,15 +299,16 @@ class AgentLoop:
             if self.metrics else 0
         )
 
-        logger.info(
-            f"\n{'='*60}\n"
-            f"Agent loop complete: {self.node_id}\n"
-            f"  Total cycles: {self.cycle_count}\n"
-            f"  Actions: {total_actions}\n"
-            f"  Waits: {total_waits}\n"
-            f"  Avg decide time: {avg_decide:.0f}ms\n"
-            f"  Sim time: {self.clock.sim_time_str}\n"
-            f"{'='*60}"
-        )
+        if not self.dashboard:
+            logger.info(
+                f"\n{'='*60}\n"
+                f"Agent loop complete: {self.node_id}\n"
+                f"  Total cycles: {self.cycle_count}\n"
+                f"  Actions: {total_actions}\n"
+                f"  Waits: {total_waits}\n"
+                f"  Avg decide time: {avg_decide:.0f}ms\n"
+                f"  Sim time: {self.clock.sim_time_str}\n"
+                f"{'='*60}"
+            )
 
         return self.metrics

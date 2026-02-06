@@ -20,6 +20,7 @@ from pathlib import Path
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client, StdioServerParameters
 
+from .dashboard import LiveDashboard, render_post_run_summary
 from .llm import create_provider
 from .loop import AgentLoop, SimulationClock
 
@@ -102,6 +103,15 @@ async def run_phase0_inprocess(args):
 
             logger.info("MCP bridge connected and initialized")
 
+            # Create dashboard if requested
+            dashboard = None
+            if args.dashboard:
+                dashboard = LiveDashboard(
+                    node_id=args.node_id,
+                    max_cycles=args.max_cycles,
+                    enabled=True,
+                )
+
             # Create and run the agent loop
             agent = AgentLoop(
                 node_id=args.node_id,
@@ -111,9 +121,16 @@ async def run_phase0_inprocess(args):
                 clock=clock,
                 max_cycles=args.max_cycles,
                 cycle_delay_sim_minutes=args.cycle_delay,
+                dashboard=dashboard,
             )
 
             metrics = await agent.run()
+
+            # Render post-run summary
+            if dashboard:
+                summary = render_post_run_summary(dashboard.state)
+                sys.stderr.write(summary)
+                sys.stderr.flush()
 
             # Write metrics summary
             if args.metrics_file:
@@ -159,12 +176,16 @@ def main():
     parser.add_argument("--queue-size", type=int, default=20, help="Container queue size for Phase 0")
     parser.add_argument("--hazmat-count", type=int, default=3, help="Number of hazmat containers")
     parser.add_argument("--metrics-file", default=None, help="Path to write metrics JSON")
+    parser.add_argument("--dashboard", action="store_true",
+                        help="Enable live terminal dashboard (clears screen each cycle)")
     parser.add_argument("--log-level", default="INFO", help="Logging level")
 
     args = parser.parse_args()
 
+    # When dashboard is active, suppress logging to avoid fighting with screen redraws
+    log_level = logging.WARNING if args.dashboard else getattr(logging, args.log_level.upper())
     logging.basicConfig(
-        level=getattr(logging, args.log_level.upper()),
+        level=log_level,
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
         stream=sys.stderr,
     )

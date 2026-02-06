@@ -179,6 +179,12 @@ def create_server(node_id: str, entity_config: dict) -> Server:
                 description="Active directives and assignments",
                 mimeType="application/json",
             ),
+            Resource(
+                uri="hive://debug/state-dump",
+                name="Full State Dump",
+                description="All HIVE documents and events (debug/dashboard use)",
+                mimeType="application/json",
+            ),
         ]
 
     @server.read_resource()
@@ -223,6 +229,15 @@ def create_server(node_id: str, entity_config: dict) -> Server:
                 "priority": "NORMAL",
             }
             return json.dumps(tasking, indent=2, default=str)
+
+        elif uri == "hive://debug/state-dump":
+            # Full state dump: all documents across all collections + event log
+            dump = {"documents": {}, "events": _store.get_events()}
+            for col_name, col_docs in _store._collections.items():
+                dump["documents"][col_name] = {}
+                for doc_id, doc in col_docs.items():
+                    dump["documents"][col_name][doc_id] = doc.fields
+            return json.dumps(dump, indent=2, default=str)
 
         return json.dumps({"error": f"Unknown resource: {uri}"})
 
