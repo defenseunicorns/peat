@@ -71,6 +71,7 @@ class CycleMetrics:
     reasoning: str
     success: bool
     result: str = ""
+    contention_retry: bool = False
 
 
 class AgentLoop:
@@ -189,6 +190,10 @@ class AgentLoop:
         if self.dashboard:
             self.dashboard.update_observe(state, self.clock.sim_time_str, self.cycle_count)
 
+        # Yield to event loop — allows concurrent agents to overlap phases,
+        # creating natural contention when multiple cranes target the same container.
+        await asyncio.sleep(0)
+
         # ORIENT + DECIDE
         t1 = time.time()
         decision = await self.decide(state)
@@ -202,12 +207,34 @@ class AgentLoop:
         if self.dashboard:
             self.dashboard.update_decide(decision.action, decision.arguments, decision.reasoning, decide_ms)
 
+        # Yield to event loop — allows concurrent agents to all decide before any acts,
+        # creating contention when multiple cranes target the same container.
+        await asyncio.sleep(0)
+
         # ACT
         t2 = time.time()
         result = await self.act(decision)
         act_ms = (time.time() - t2) * 1000
 
         success = "Error" not in result
+
+        # Contention retry: if a container claim was beaten by another crane,
+        # re-observe and retry once within the same cycle.
+        contention_retry = False
+        if not success and "already claimed" in result:
+            contention_retry = True
+            logger.info(f"[{self.clock.sim_time_str}] {self.node_id} CONTENTION — retrying")
+            state = await self.observe()
+            retry_decision = await self.decide(state)
+            retry_result = await self.act(retry_decision)
+            retry_success = "Error" not in retry_result
+            # Record the retry as the cycle's final outcome
+            if retry_success:
+                decision = retry_decision
+                result = retry_result
+                success = True
+            # act_ms includes the retry time
+            act_ms = (time.time() - t2) * 1000
 
         metrics = CycleMetrics(
             cycle_number=self.cycle_count,
@@ -220,6 +247,7 @@ class AgentLoop:
             reasoning=decision.reasoning,
             success=success,
             result=result,
+            contention_retry=contention_retry,
         )
         self.metrics.append(metrics)
 
@@ -227,7 +255,7 @@ class AgentLoop:
             self.dashboard.update_act(result, observe_ms, decide_ms, act_ms, success)
 
         # Log METRICS in structured format matching hive-sim pattern
-        print(json.dumps({
+        metrics_json = {
             "type": "METRICS",
             "event": "ooda_cycle",
             "node_id": self.node_id,
@@ -239,8 +267,10 @@ class AgentLoop:
             "act_ms": round(act_ms, 1),
             "total_ms": round(observe_ms + decide_ms + act_ms, 1),
             "success": metrics.success,
+            "contention_retry": contention_retry,
             "timestamp_us": int(time.time() * 1_000_000),
-        }), flush=True)
+        }
+        print(json.dumps(metrics_json), flush=True)
 
         return metrics
 

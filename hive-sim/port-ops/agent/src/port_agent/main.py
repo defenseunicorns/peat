@@ -1,12 +1,16 @@
 """
-Port Agent Main — Phase 0 entrypoint
+Port Agent Main — Phase 0 & Phase 1a entrypoint
 
-Runs a single crane agent with an in-process MCP bridge (no separate server).
-This is the simplest possible Phase 0 setup: everything in one process.
+Phase 0 (single mode): Runs a single crane agent with MCP bridge subprocess.
+Phase 1a (multi mode):  Runs multiple agents with shared in-process HIVE state.
 
 Usage:
+  # Phase 0 — single agent
   python -m port_agent.main --node-id crane-1 --provider anthropic
-  python -m port_agent.main --node-id crane-1 --provider ollama --model qwen3:1.7b
+  python -m port_agent.main --node-id crane-1 --provider dry-run
+
+  # Phase 1a — multi-agent
+  python -m port_agent.main --mode multi --agents 2c1a --provider dry-run
 """
 
 import argparse
@@ -153,9 +157,49 @@ async def run_phase0_inprocess(args):
                 logger.info(f"Metrics written to {args.metrics_file}")
 
 
+async def run_phase1a_multi(args):
+    """
+    Phase 1a: Run multiple agents with shared in-process HIVE state.
+    """
+    from .orchestrator import Orchestrator, OrchestratorConfig, parse_agent_composition
+
+    script_dir = Path(__file__).parent.parent.parent.parent  # port-ops/
+    personas_dir = script_dir / "personas"
+
+    agent_specs = parse_agent_composition(
+        args.agents, provider=args.provider, model=args.model
+    )
+
+    config = OrchestratorConfig(
+        hold_id=f"hold-{args.hold}",
+        hold_num=args.hold,
+        berth=args.berth,
+        vessel=args.vessel,
+        queue_size=args.queue_size,
+        hazmat_count=args.hazmat_count,
+        max_cycles=args.max_cycles,
+        cycle_delay_sim_minutes=args.cycle_delay,
+        time_compression=args.time_compression,
+        agents=agent_specs,
+    )
+
+    orch = Orchestrator(config)
+    orch.initialize_state()
+    orch.create_agents(personas_dir)
+    await orch.run()
+
+
 def main():
     parser = argparse.ArgumentParser(description="Port Agent — HIVE Port Operations Simulation")
-    parser.add_argument("--node-id", required=True, help="Node identifier (e.g., crane-1)")
+
+    # Mode selection
+    parser.add_argument("--mode", default="single", choices=["single", "multi"],
+                        help="Run mode: single (Phase 0) or multi (Phase 1a)")
+    parser.add_argument("--agents", default="2c1a",
+                        help="Agent composition for multi mode (e.g., 2c1a = 2 cranes + 1 aggregator)")
+
+    # Common args
+    parser.add_argument("--node-id", default="crane-1", help="Node identifier (e.g., crane-1)")
     parser.add_argument("--persona", default="gantry-crane", help="Persona file name (without .md)")
     parser.add_argument("--provider", default="anthropic", choices=["anthropic", "ollama", "dry-run"],
                         help="LLM provider (dry-run for offline testing)")
@@ -190,7 +234,10 @@ def main():
         stream=sys.stderr,
     )
 
-    asyncio.run(run_phase0_inprocess(args))
+    if args.mode == "multi":
+        asyncio.run(run_phase1a_multi(args))
+    else:
+        asyncio.run(run_phase0_inprocess(args))
 
 
 if __name__ == "__main__":

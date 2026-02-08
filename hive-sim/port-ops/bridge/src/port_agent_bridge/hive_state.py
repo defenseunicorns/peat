@@ -7,6 +7,7 @@ Phase 1+: Swap for real HIVE CRDT backend via hive-transport REST API.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from dataclasses import dataclass, field
@@ -63,6 +64,7 @@ class HiveStateStore:
     def __init__(self):
         self._collections: dict[str, dict[str, HiveDocument]] = {}
         self._event_log: list[dict] = []
+        self._queue_lock = asyncio.Lock()
 
     def create_document(self, collection: str, doc_id: str, fields: dict) -> HiveDocument:
         """Create a new document (create-once pattern per ADR-021)."""
@@ -100,6 +102,92 @@ class HiveStateStore:
         if event_type:
             events = [e for e in events if e.get("event_type") == event_type]
         return events
+
+    async def claim_next_container(
+        self, hold_id: str, container_id: str, claimer_node_id: str
+    ) -> bool:
+        """
+        Atomically claim a container from the queue.
+
+        Returns True if the claim succeeded, False if already claimed or not found.
+        Uses asyncio.Lock to prevent double-booking when multiple cranes compete.
+        """
+        async with self._queue_lock:
+            queue_doc = self.get_document("container_queues", f"queue_{hold_id}")
+            if queue_doc is None:
+                return False
+
+            containers = queue_doc.fields.get("containers", [])
+            for c in containers:
+                if c["container_id"] == container_id:
+                    # Already claimed or completed
+                    if c.get("claimed_by") or c.get("status") == "COMPLETED":
+                        return False
+                    # Claim it
+                    c["claimed_by"] = claimer_node_id
+                    c["status"] = "COMPLETED"
+                    # Advance queue counters
+                    completed = queue_doc.fields.get("completed_count", 0)
+                    queue_doc.update_field("completed_count", completed + 1)
+                    next_idx = queue_doc.fields.get("next_index", 0)
+                    # Advance next_index past all claimed/completed containers
+                    while next_idx < len(containers) and containers[next_idx].get("claimed_by"):
+                        next_idx += 1
+                    queue_doc.update_field("next_index", next_idx)
+                    return True
+
+            return False
+
+    def request_operator(self, crane_id: str, hold_id: str, requirements: dict | None = None) -> str:
+        """Post an operator request from a crane. Returns request doc_id."""
+        req_id = f"req_{hold_id}_{crane_id}"
+        self.create_document(
+            collection="operator_requests",
+            doc_id=req_id,
+            fields={
+                "crane_id": crane_id,
+                "hold_id": hold_id,
+                "requirements": requirements or {},
+                "status": "PENDING",
+                "assigned_operator": None,
+            },
+        )
+        return req_id
+
+    async def assign_operator(self, operator_id: str, crane_id: str) -> bool:
+        """Atomically assign an operator to a crane."""
+        async with self._queue_lock:
+            op_doc = self.get_document("node_states", f"sim_doc_{operator_id}")
+            if not op_doc:
+                return False
+            current = op_doc.get_field("assignment.assigned_to")
+            if current is not None:
+                return False
+            op_doc.update_field("assignment.assigned_to", crane_id)
+            op_doc.update_field("operational_status", "BUSY")
+            return True
+
+    async def release_operator(self, operator_id: str) -> bool:
+        """Release an operator back to the available pool."""
+        async with self._queue_lock:
+            op_doc = self.get_document("node_states", f"sim_doc_{operator_id}")
+            if not op_doc:
+                return False
+            op_doc.update_field("assignment.assigned_to", None)
+            op_doc.update_field("operational_status", "AVAILABLE")
+            # Increment assist count
+            assists = op_doc.get_field("metrics.moves_assisted", 0)
+            op_doc.update_field("metrics.moves_assisted", assists + 1)
+            return True
+
+    def get_pending_operator_requests(self, hold_id: str) -> list[HiveDocument]:
+        """Get all pending operator requests for a hold."""
+        docs = self.query_collection("operator_requests")
+        return [
+            d for d in docs
+            if d.fields.get("hold_id") == hold_id
+            and d.fields.get("status") == "PENDING"
+        ]
 
 
 def create_crane_entity(store: HiveStateStore, node_id: str, config: dict) -> HiveDocument:
@@ -177,6 +265,48 @@ def create_team_state(store: HiveStateStore, hold_id: str) -> HiveDocument:
             "moves_remaining": 0,
             "gap_analysis": [],
             "status": "FORMING",
+        },
+    )
+
+
+def create_operator_entity(store: HiveStateStore, node_id: str, config: dict) -> HiveDocument:
+    """Initialize a crane operator entity document in the HIVE state store."""
+    return store.create_document(
+        collection="node_states",
+        doc_id=f"sim_doc_{node_id}",
+        fields={
+            "node_id": node_id,
+            "entity_type": "operator",
+            "hive_level": "H1",
+            "operational_status": "AVAILABLE",
+            "capabilities": {
+                "crane_operation": {
+                    "type": "CRANE_OPERATION",
+                    "proficiency": config.get("proficiency", "expert"),
+                    "certification_id": "OSHA_1926.1400",
+                    "certification_valid": config.get("osha_cert_valid", True),
+                },
+                "hazmat_handling": {
+                    "type": "HAZMAT_HANDLING",
+                    "classes": config.get("hazmat_classes", [3, 8, 9]),
+                    "certification_valid": config.get("hazmat_cert_valid", True),
+                },
+            },
+            "shift": {
+                "start": config.get("shift_start", "06:00"),
+                "end": config.get("shift_end", "18:00"),
+                "status": "ON_SHIFT",
+            },
+            "assignment": {
+                "assigned_to": None,
+                "berth": config.get("berth", "berth-5"),
+                "hold": config.get("hold", 3),
+            },
+            "metrics": {
+                "moves_assisted": 0,
+                "hazmat_inspections": 0,
+                "session_start_us": int(time.time() * 1_000_000),
+            },
         },
     )
 
