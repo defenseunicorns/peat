@@ -158,6 +158,42 @@ export interface GameState {
   score: number;
 }
 
+// Capability lifecycle event types for viewer relay
+// Matches Rust hive-transport/src/ws/protocol.rs ViewerEvent enum
+// Confidence values use the canonical [0.0, 1.0] range from capability.proto
+
+export interface CapabilityDegradationEvent {
+  type: 'capability_degradation';
+  /** Node whose capability degraded */
+  node_id: string;
+  /** Type of capability affected (e.g., "sensor", "compute", "mobility") */
+  capability_type: string;
+  /** Confidence score before degradation [0.0, 1.0] */
+  confidence_before: number;
+  /** Confidence score after degradation [0.0, 1.0] */
+  confidence_after: number;
+  /** Human-readable cause of degradation */
+  cause: string;
+  /** Rate of confidence decay per hour */
+  decay_rate_per_hour: number;
+}
+
+export interface LogisticalEventData {
+  type: 'logistical_event';
+  /** Node involved in the logistical event */
+  node_id: string;
+  /** Specific event subtype (e.g., "maintenance_scheduled", "resupply_delivered") */
+  event_subtype: string;
+  /** Capability being sustained or restored */
+  capability_sustained: string;
+  /** Estimated time to restore capability (seconds), if applicable */
+  eta_restore: number | null;
+  /** Human-readable details about the logistical event */
+  details: string;
+}
+
+export type ViewerEvent = CapabilityDegradationEvent | LogisticalEventData;
+
 // Terrain utilities
 export const terrainColors: Record<TerrainType, string> = {
   deep_water: '#141428',

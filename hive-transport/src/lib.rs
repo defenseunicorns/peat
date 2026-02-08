@@ -81,6 +81,7 @@
 pub mod error;
 pub mod http;
 pub mod tak;
+pub mod ws;
 
 // Re-export commonly used types
 pub use error::{Error, Result};
@@ -91,6 +92,9 @@ pub use tak::{
     MeshSaTransport, TakError, TakMessageQueue, TakMetrics, TakServerTransport, TakTransport,
     TakTransportConfig, TakTransportMode,
 };
+
+// Re-export WebSocket viewer protocol types
+pub use ws::{try_into_viewer_event, IngestError, ViewerEvent};
 
 #[cfg(test)]
 mod tests {
