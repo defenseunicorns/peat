@@ -1,4 +1,4 @@
-.PHONY: help clean clean-ditto build test test-unit test-integration test-e2e test-fast fmt clippy check pre-commit ci
+.PHONY: help clean clean-ditto build test test-unit test-integration test-e2e test-fast fmt clippy check pre-commit ci inspect-viewer
 
 # ============================================
 # HIVE Protocol Development Makefile
@@ -434,3 +434,11 @@ e11-modes:
 e12-comprehensive:
 	@echo "Running E12 comprehensive validation (legacy)..."
 	@cd labs/e12-comprehensive-empirical-validation/scripts && ./run-comprehensive-suite.sh
+
+# ============================================
+# Inspector (Headless Browser QA)
+# ============================================
+
+inspect-viewer:
+	@echo "Running HIVE Viewer inspector..."
+	@cd inspector && npx tsx src/cli.ts specs/hive-viewer-spatial.ts --verbose
