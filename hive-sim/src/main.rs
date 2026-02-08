@@ -62,6 +62,7 @@
 //! 0: Success (document synced, all operations completed)
 //! 1: Failure (timeout, error, or document not received)
 
+mod certification;
 mod metrics;
 mod utils;
 
@@ -2992,10 +2993,63 @@ async fn soldier_capability_mode(
         println!("[{}]   - {} (confidence: {:.2})", node_id, cap, 0.85);
     }
 
+    // Initialize certification lifecycle for port-ops workers
+    let sim_start_time = now_micros() as u64;
+    let mut cert_manager = certification::generate_worker_certifications(node_id, sim_start_time);
+    let cert_fields = cert_manager.capability_fields();
+    if !cert_fields.is_empty() {
+        println!("[{}] Hazmat certifications:", node_id);
+        for (name, confidence) in &cert_fields {
+            println!("[{}]   - {} (confidence: {:.2})", node_id, name, confidence);
+        }
+    }
+
     // Send status updates with capabilities (runs until MAX_UPDATES or forever)
     while message_number < max_updates {
         message_number += 1;
         let timestamp_us = now_micros();
+
+        // Tick certification lifecycle
+        let cert_events = cert_manager.tick(timestamp_us as u64);
+        for event in &cert_events {
+            match event {
+                certification::CertificationEvent::Expiring { hazmat_class, days_remaining } => {
+                    println!(
+                        "[{}] ⚠ Hazmat class {} certification expiring in {} days",
+                        node_id, hazmat_class, days_remaining
+                    );
+                }
+                certification::CertificationEvent::Expired { hazmat_class, handling_count, incident_count } => {
+                    println!(
+                        "[{}] ✗ Hazmat class {} certification EXPIRED (handlings: {}, incidents: {})",
+                        node_id, hazmat_class, handling_count, incident_count
+                    );
+                }
+                certification::CertificationEvent::RecertificationStarted { hazmat_class } => {
+                    println!(
+                        "[{}] ↻ Recertification started for hazmat class {}",
+                        node_id, hazmat_class
+                    );
+                }
+                certification::CertificationEvent::RecertificationCompleted { hazmat_class, new_confidence } => {
+                    println!(
+                        "[{}] ✓ Recertification complete for hazmat class {} (confidence: {:.2})",
+                        node_id, hazmat_class, new_confidence
+                    );
+                }
+            }
+        }
+
+        // Auto-start recertification for any expired certs
+        if cert_manager.has_expired_certs() {
+            for &class in certification::HAZMAT_CLASSES {
+                if let Some(cert) = cert_manager.certifications().get(&class) {
+                    if !cert.certification_valid {
+                        cert_manager.start_recertification(class, timestamp_us as u64);
+                    }
+                }
+            }
+        }
 
         // Create update message with capabilities
         let message_content = format!(
@@ -3031,6 +3085,25 @@ async fn soldier_capability_mode(
             ),
         );
         fields.insert("public".to_string(), Value::Bool(true));
+
+        // Add hazmat certification capability fields
+        let cert_cap_fields = cert_manager.capability_fields();
+        if !cert_cap_fields.is_empty() {
+            let mut cert_map = serde_json::Map::new();
+            for (name, confidence) in &cert_cap_fields {
+                cert_map.insert(
+                    name.clone(),
+                    serde_json::json!({
+                        "confidence": confidence,
+                        "certification_valid": *confidence >= 1.0,
+                    }),
+                );
+            }
+            fields.insert(
+                "hazmat_certifications".to_string(),
+                Value::Object(cert_map),
+            );
+        }
 
         let document = Document::with_id(doc_id.clone(), fields.clone());
 

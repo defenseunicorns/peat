@@ -73,3 +73,9 @@ hive-sim/topologies/lab4-automerge-24n-*.yaml
 hive-sim/topologies/lab4-automerge-192n-*.yaml
 hive-sim/topologies/lab4-ditto-*.yaml
 .embuild/
+
+# Gas Town (added by gt)
+.runtime/
+.claude/
+.beads/
+.logs/
