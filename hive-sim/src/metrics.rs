@@ -256,6 +256,34 @@ pub enum MetricsEvent {
         cause: String, // "fatigue", "low_hydraulic_fluid", "low_battery"
         timestamp_us: u128,
     },
+    // Certification lifecycle events
+    CertificationExpiring {
+        node_id: String,
+        hazmat_class: u8,
+        days_remaining: u64,
+        expires_at_us: u128,
+        timestamp_us: u128,
+    },
+    CertificationExpired {
+        node_id: String,
+        hazmat_class: u8,
+        handling_count: u64,
+        incident_count: u64,
+        has_evidence_chain: bool,
+        reduced_confidence: f32,
+        timestamp_us: u128,
+    },
+    RecertificationStarted {
+        node_id: String,
+        hazmat_class: u8,
+        timestamp_us: u128,
+    },
+    RecertificationCompleted {
+        node_id: String,
+        hazmat_class: u8,
+        new_confidence: f32,
+        timestamp_us: u128,
+    },
 }
 
 /// Initialize the metrics file for persistent logging
