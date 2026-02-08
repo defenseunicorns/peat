@@ -62,6 +62,7 @@
 //! 0: Success (document synced, all operations completed)
 //! 1: Failure (timeout, error, or document not received)
 
+mod degradation;
 mod metrics;
 mod utils;
 
