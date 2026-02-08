@@ -158,6 +158,98 @@ export interface GameState {
   score: number;
 }
 
+// ============================================================================
+// Gap Analysis & Logistical Dependencies (hi-9r0.7)
+// Matches Rust hive-protocol/src/cell/capability_aggregation.rs
+// ============================================================================
+
+export type CapabilityType =
+  | 'sensor'
+  | 'compute'
+  | 'communication'
+  | 'mobility'
+  | 'payload'
+  | 'emergent';
+
+export type HealthStatus = 'nominal' | 'degraded' | 'critical' | 'failed';
+
+export type AuthorityLevel = 'observer' | 'advisor' | 'supervisor' | 'commander';
+
+export type HierarchyLevel = 'H2' | 'H3';
+
+/** A single capability gap reported by the hold aggregator */
+export interface CapabilityGap {
+  /** Capability name (e.g. "HAZMAT_HANDLING") */
+  capabilityName: string;
+  capabilityType: CapabilityType;
+  /** Required confidence threshold (0.0–1.0) */
+  requiredConfidence: number;
+  /** Current aggregated confidence (0.0–1.0) */
+  currentConfidence: number;
+  /** Confidence decay per turn (negative value) */
+  decayRate: number;
+  /** Estimated turns until confidence drops below requiredConfidence */
+  etaThresholdBreach: number | null;
+  /** Why the gap exists */
+  reason: string;
+  /** Pending actions that will restore this capability */
+  pendingActions: LogisticalAction[];
+  /** Whether human oversight is required */
+  requiresOversight: boolean;
+  /** Max authority level among contributors */
+  maxAuthority: AuthorityLevel | null;
+  /** Number of contributing platforms */
+  contributorCount: number;
+}
+
+/** A logistical action that can restore or maintain a capability */
+export interface LogisticalAction {
+  id: string;
+  description: string;
+  /** Expected time to completion (minutes) */
+  etaMinutes: number | null;
+  status: 'pending' | 'in_progress' | 'blocked';
+  /** What blocks this action, if anything */
+  blockedBy: string | null;
+}
+
+/** A logistical dependency between resources */
+export interface LogisticalDependency {
+  /** Resource name (e.g. "Crane-2", "Maintenance Crew Alpha") */
+  resourceName: string;
+  /** Current status */
+  status: 'available' | 'unavailable' | 'degraded';
+  /** Human-readable explanation */
+  reason: string;
+  /** When the resource becomes available (minutes from now, null if unknown) */
+  availableInMinutes: number | null;
+  /** Capabilities affected by this dependency */
+  affectedCapabilities: string[];
+}
+
+/** Hold-level (H2) or berth-level (H3) gap analysis report */
+export interface GapAnalysisReport {
+  /** Hierarchy level */
+  level: HierarchyLevel;
+  /** Hold or berth identifier */
+  locationId: string;
+  /** Human-readable location label */
+  locationLabel: string;
+  /** Overall readiness score (0.0–1.0) */
+  readinessScore: number;
+  /** Worst health status across members */
+  worstHealth: HealthStatus;
+  /** Operational member count / total */
+  operationalCount: number;
+  totalCount: number;
+  /** Capability gaps */
+  gaps: CapabilityGap[];
+  /** Cross-cutting logistical dependencies */
+  logisticalDependencies: LogisticalDependency[];
+  /** Timestamp of last aggregation */
+  aggregatedAt: string;
+}
+
 // Terrain utilities
 export const terrainColors: Record<TerrainType, string> = {
   deep_water: '#141428',
