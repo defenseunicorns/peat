@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import Map3D from './components/Map3D/Map3D';
 import { CapabilityCard } from './components/PieceCard/PieceCard';
 import EventStream from './components/EventStream/EventStream';
+import { HierarchyTree } from './components/HierarchyTree/HierarchyTree';
 import { TerrainType, Piece, ComposedCapability, Objective, GamePhase, HiveEvent } from './types';
 
 // Generate simple terrain for demo
@@ -69,6 +70,14 @@ function createDemoState() {
       totalFuel: 35,
       maxFuel: 40,
       team: 'blue',
+      confidence: 0.92,
+      decayRate: -0.02,
+      equipmentHealth: [
+        { label: 'EO Sensor', confidence: 0.95, status: 'nominal' },
+        { label: 'IR Sensor', confidence: 0.88, status: 'nominal' },
+        { label: 'Radar', confidence: 0.78, status: 'nominal' },
+        { label: 'AI Compute', confidence: 0.92, status: 'nominal' },
+      ],
     },
     {
       id: 1,
@@ -88,6 +97,14 @@ function createDemoState() {
       totalFuel: 29,
       maxFuel: 30,
       team: 'blue',
+      confidence: 0.55,
+      decayRate: -0.08,
+      equipmentHealth: [
+        { label: 'Hydraulic', confidence: 0.48, status: 'degraded' },
+        { label: 'Electrical', confidence: 0.72, status: 'nominal' },
+        { label: 'Comms', confidence: 0.55, status: 'degraded' },
+        { label: 'Weapons', confidence: 0.90, status: 'nominal' },
+      ],
     },
     {
       id: 2,
@@ -107,6 +124,13 @@ function createDemoState() {
       totalFuel: 16,
       maxFuel: 20,
       team: 'blue',
+      confidence: 0.30,
+      decayRate: -0.12,
+      equipmentHealth: [
+        { label: 'Comms', confidence: 0.35, status: 'critical' },
+        { label: 'Mobility', confidence: 0.25, status: 'critical' },
+        { label: 'Sensors', confidence: 0.42, status: 'degraded' },
+      ],
     },
   ];
 
@@ -324,6 +348,19 @@ export default function App() {
         flexDirection: 'column',
         overflow: 'hidden',
       }}>
+        {/* Hierarchy tree panel */}
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid #333' }}>
+          <h3 style={{ color: '#88aacc', margin: '0 0 8px 0', fontSize: '12px', letterSpacing: '1px' }}>
+            FORCE HIERARCHY
+          </h3>
+          <HierarchyTree
+            capabilities={demoState.capabilities}
+            pieces={demoState.pieces}
+            selectedCapability={selectedCapability}
+            onSelectCapability={setSelectedCapability}
+          />
+        </div>
+
         {/* Capabilities panel */}
         <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
           <h3 style={{ color: '#00ffff', margin: '0 0 12px 0', fontSize: '14px' }}>

@@ -2,7 +2,7 @@ import { useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Text, Box } from '@react-three/drei';
 import * as THREE from 'three';
-import { TerrainType, terrainColors, terrainElevation, Piece, ComposedCapability, Objective } from '../../types';
+import { TerrainType, terrainColors, terrainElevation, Piece, ComposedCapability, Objective, getHealthColor, getWorstConfidence } from '../../types';
 
 interface TerrainCellProps {
   terrain: TerrainType;
@@ -77,6 +77,12 @@ interface CapabilityMarkerProps {
 
 function CapabilityMarker({ capability, isSelected }: CapabilityMarkerProps) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const materialRef = useRef<THREE.MeshStandardMaterial>(null);
+
+  // Health-based coloring
+  const worstConfidence = useMemo(() => getWorstConfidence(capability), [capability]);
+  const healthColor = useMemo(() => getHealthColor(worstConfidence), [worstConfidence]);
+  const isDegraded = worstConfidence < 0.7;
 
   useFrame((state) => {
     if (meshRef.current) {
@@ -85,26 +91,39 @@ function CapabilityMarker({ capability, isSelected }: CapabilityMarkerProps) {
         meshRef.current.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 5) * 0.1);
       }
     }
+    // Threshold flash: pulse emissive intensity when degraded
+    if (materialRef.current && isDegraded) {
+      const flash = Math.sin(state.clock.elapsedTime * 4) * 0.5 + 0.5;
+      materialRef.current.emissiveIntensity = 0.3 + flash * 0.7;
+    }
   });
 
   // Determine symbol based on capabilities
   const symbol = useMemo(() => {
-    if (capability.strikeBonus >= 3 && capability.authorizeBonus >= 2) return '⚔';
-    if (capability.fuseBonus >= 2 && capability.detectBonus >= 2) return '◆';
-    if (capability.detectBonus >= 3 && capability.trackBonus >= 2) return '◎';
-    if (capability.classifyBonus >= 2 || capability.predictBonus >= 2) return '◊';
-    if (capability.reconBonus >= 2) return '◇';
-    if (capability.relayBonus >= 2) return '◈';
-    return '●';
+    if (capability.strikeBonus >= 3 && capability.authorizeBonus >= 2) return '\u2694';
+    if (capability.fuseBonus >= 2 && capability.detectBonus >= 2) return '\u25C6';
+    if (capability.detectBonus >= 3 && capability.trackBonus >= 2) return '\u25CE';
+    if (capability.classifyBonus >= 2 || capability.predictBonus >= 2) return '\u25CA';
+    if (capability.reconBonus >= 2) return '\u25C7';
+    if (capability.relayBonus >= 2) return '\u25C8';
+    return '\u25CF';
   }, [capability]);
+
+  // Darken health color for emissive
+  const emissiveColor = useMemo(() => {
+    const c = new THREE.Color(healthColor);
+    c.multiplyScalar(0.3);
+    return '#' + c.getHexString();
+  }, [healthColor]);
 
   return (
     <group position={[capability.centerX, 0.8, capability.centerY]}>
       <mesh ref={meshRef}>
         <octahedronGeometry args={[0.4]} />
         <meshStandardMaterial
-          color="#00ffff"
-          emissive="#004444"
+          ref={materialRef}
+          color={healthColor}
+          emissive={emissiveColor}
           transparent
           opacity={0.8}
         />
@@ -112,7 +131,7 @@ function CapabilityMarker({ capability, isSelected }: CapabilityMarkerProps) {
       <Text
         position={[0, 0.8, 0]}
         fontSize={0.25}
-        color="cyan"
+        color={healthColor}
         anchorX="center"
         anchorY="middle"
       >
@@ -136,7 +155,7 @@ interface ObjectiveMarkerProps {
   isSelected?: boolean;
 }
 
-function ObjectiveMarker({ objective, isSelected }: ObjectiveMarkerProps) {
+function ObjectiveMarker({ objective }: ObjectiveMarkerProps) {
   const meshRef = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
