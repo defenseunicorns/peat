@@ -116,9 +116,8 @@ impl GantryCraneHealth {
         }
         if self.hydraulic_pct < HYDRAULIC_DOWNGRADE_THRESHOLD {
             // Linear interpolation between min and nominal across 40..70 range
-            let ratio =
-                (self.hydraulic_pct - HYDRAULIC_FAILED_THRESHOLD)
-                    / (HYDRAULIC_DOWNGRADE_THRESHOLD - HYDRAULIC_FAILED_THRESHOLD);
+            let ratio = (self.hydraulic_pct - HYDRAULIC_FAILED_THRESHOLD)
+                / (HYDRAULIC_DOWNGRADE_THRESHOLD - HYDRAULIC_FAILED_THRESHOLD);
             return MIN_DEGRADED_MOVES_PER_HOUR
                 + ratio * (NOMINAL_MOVES_PER_HOUR - MIN_DEGRADED_MOVES_PER_HOUR);
         }
@@ -369,8 +368,10 @@ mod tests {
     #[test]
     fn electrical_degrades_only_at_high_utilization() {
         let mut engine = make_engine();
-        let mut health = GantryCraneHealth::default();
-        health.utilization = 0.50; // below threshold
+        let mut health = GantryCraneHealth {
+            utilization: 0.50, // below threshold
+            ..Default::default()
+        };
 
         engine.tick(&mut health);
         assert_eq!(health.electrical_pct, 100.0);
@@ -385,11 +386,15 @@ mod tests {
         let mut engine_lo = DegradationEngine::new("c1".into(), "n1".into(), 42);
         let mut engine_hi = DegradationEngine::new("c2".into(), "n2".into(), 42);
 
-        let mut health_lo = GantryCraneHealth::default();
-        health_lo.utilization = 0.80;
+        let mut health_lo = GantryCraneHealth {
+            utilization: 0.80,
+            ..Default::default()
+        };
 
-        let mut health_hi = GantryCraneHealth::default();
-        health_hi.utilization = 1.0;
+        let mut health_hi = GantryCraneHealth {
+            utilization: 1.0,
+            ..Default::default()
+        };
 
         engine_lo.tick(&mut health_lo);
         engine_hi.tick(&mut health_hi);
@@ -400,15 +405,19 @@ mod tests {
 
     #[test]
     fn moves_per_hour_nominal_above_70() {
-        let mut health = GantryCraneHealth::default();
-        health.hydraulic_pct = 75.0;
+        let health = GantryCraneHealth {
+            hydraulic_pct: 75.0,
+            ..Default::default()
+        };
         assert_eq!(health.effective_moves_per_hour(), NOMINAL_MOVES_PER_HOUR);
     }
 
     #[test]
     fn moves_per_hour_degraded_between_40_and_70() {
-        let mut health = GantryCraneHealth::default();
-        health.hydraulic_pct = 55.0; // midpoint of 40-70 range
+        let health = GantryCraneHealth {
+            hydraulic_pct: 55.0, // midpoint of 40-70 range
+            ..Default::default()
+        };
         let mph = health.effective_moves_per_hour();
         assert!(mph > MIN_DEGRADED_MOVES_PER_HOUR);
         assert!(mph < NOMINAL_MOVES_PER_HOUR);
@@ -416,16 +425,19 @@ mod tests {
 
     #[test]
     fn moves_per_hour_zero_below_40() {
-        let mut health = GantryCraneHealth::default();
-        health.hydraulic_pct = 39.0;
+        let health = GantryCraneHealth {
+            hydraulic_pct: 39.0,
+            ..Default::default()
+        };
         assert_eq!(health.effective_moves_per_hour(), 0.0);
     }
 
     #[test]
     fn status_transitions() {
-        let mut health = GantryCraneHealth::default();
-
-        health.hydraulic_pct = 80.0;
+        let mut health = GantryCraneHealth {
+            hydraulic_pct: 80.0,
+            ..Default::default()
+        };
         assert_eq!(health.health_status(), EquipmentStatus::Nominal);
 
         health.hydraulic_pct = 60.0;
@@ -437,10 +449,12 @@ mod tests {
 
     #[test]
     fn confidence_maps_linearly_from_composite() {
-        let mut health = GantryCraneHealth::default();
-        health.hydraulic_pct = 50.0;
-        health.electrical_pct = 50.0;
-        health.spreader_alignment_error = 1.5; // 50% of max
+        let health = GantryCraneHealth {
+            hydraulic_pct: 50.0,
+            electrical_pct: 50.0,
+            spreader_alignment_error: 1.5, // 50% of max
+            ..Default::default()
+        };
 
         // composite = 50*0.5 + 50*0.3 + 50*0.2 = 50.0
         let conf = health.confidence();
@@ -450,8 +464,10 @@ mod tests {
     #[test]
     fn tick_returns_steps_with_correct_fields() {
         let mut engine = make_engine();
-        let mut health = GantryCraneHealth::default();
-        health.utilization = 0.95;
+        let mut health = GantryCraneHealth {
+            utilization: 0.95,
+            ..Default::default()
+        };
 
         let steps = engine.tick(&mut health);
 
@@ -467,8 +483,10 @@ mod tests {
     #[test]
     fn full_lifecycle_to_failure() {
         let mut engine = make_engine();
-        let mut health = GantryCraneHealth::default();
-        health.utilization = 0.85;
+        let mut health = GantryCraneHealth {
+            utilization: 0.85,
+            ..Default::default()
+        };
 
         let mut reached_degraded = false;
         let mut reached_failed = false;
