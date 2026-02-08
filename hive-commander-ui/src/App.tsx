@@ -3,7 +3,6 @@ import Map3D from './components/Map3D/Map3D';
 import { CapabilityCard } from './components/PieceCard/PieceCard';
 import EventStream from './components/EventStream/EventStream';
 import { GapAnalysisPanel } from './components/GapAnalysisPanel/GapAnalysisPanel';
-import { HierarchyTree } from './components/HierarchyTree/HierarchyTree';
 import { TerrainType, Piece, ComposedCapability, Objective, GamePhase, HiveEvent, GapAnalysisReport } from './types';
 
 // Generate simple terrain for demo
@@ -71,14 +70,6 @@ function createDemoState() {
       totalFuel: 35,
       maxFuel: 40,
       team: 'blue',
-      confidence: 0.92,
-      decayRate: -0.02,
-      equipmentHealth: [
-        { label: 'EO Sensor', confidence: 0.95, status: 'nominal' },
-        { label: 'IR Sensor', confidence: 0.88, status: 'nominal' },
-        { label: 'Radar', confidence: 0.78, status: 'nominal' },
-        { label: 'AI Compute', confidence: 0.92, status: 'nominal' },
-      ],
     },
     {
       id: 1,
@@ -98,14 +89,6 @@ function createDemoState() {
       totalFuel: 29,
       maxFuel: 30,
       team: 'blue',
-      confidence: 0.55,
-      decayRate: -0.08,
-      equipmentHealth: [
-        { label: 'Hydraulic', confidence: 0.48, status: 'degraded' },
-        { label: 'Electrical', confidence: 0.72, status: 'nominal' },
-        { label: 'Comms', confidence: 0.55, status: 'degraded' },
-        { label: 'Weapons', confidence: 0.90, status: 'nominal' },
-      ],
     },
     {
       id: 2,
@@ -125,13 +108,6 @@ function createDemoState() {
       totalFuel: 16,
       maxFuel: 20,
       team: 'blue',
-      confidence: 0.30,
-      decayRate: -0.12,
-      equipmentHealth: [
-        { label: 'Comms', confidence: 0.35, status: 'critical' },
-        { label: 'Mobility', confidence: 0.25, status: 'critical' },
-        { label: 'Sensors', confidence: 0.42, status: 'degraded' },
-      ],
     },
   ];
 
@@ -182,7 +158,6 @@ function createDemoState() {
 
   const now = Date.now();
   const events: HiveEvent[] = [
-    // Operational events
     {
       id: 'evt-001', timestamp: now - 120000, sourceNodeId: 'Alpha-1',
       eventClass: 'product', eventType: 'detection', category: 'operational',
@@ -209,7 +184,6 @@ function createDemoState() {
       eventClass: 'product', eventType: 'container_move', category: 'operational',
       priority: 'low', message: 'Sensor package relocated to grid (8,4)',
     },
-    // Logistical cause-effect chain: hydraulic degradation -> maintenance cycle
     {
       id: 'evt-010', timestamp: now - 60000, sourceNodeId: 'crane-2',
       eventClass: 'anomaly', eventType: 'capability_degraded', category: 'logistical',
@@ -242,7 +216,6 @@ function createDemoState() {
       metric: { name: 'hydraulic_pct', value: 95, unit: '%' },
       causeEventId: 'evt-013',
     },
-    // More logistical events
     {
       id: 'evt-020', timestamp: now - 50000, sourceNodeId: 'Bravo-2',
       eventClass: 'anomaly', eventType: 'resupply_requested', category: 'logistical',
@@ -265,7 +238,6 @@ function createDemoState() {
       eventClass: 'anomaly', eventType: 'recertification_required', category: 'logistical',
       priority: 'normal', message: 'Sensor calibration due',
     },
-    // Recent operational
     {
       id: 'evt-050', timestamp: now - 10000, sourceNodeId: 'Alpha-1',
       eventClass: 'product', eventType: 'track_lost', category: 'operational',
@@ -278,10 +250,164 @@ function createDemoState() {
     },
   ];
 
-  // Sort events by timestamp
   events.sort((a, b) => a.timestamp - b.timestamp);
 
-  return { terrain, pieces, capabilities, objectives, events };
+  const gapReports: GapAnalysisReport[] = [
+    {
+      level: 'H2',
+      locationId: 'hold-3',
+      locationLabel: 'Hold 3 — Alpha Squad',
+      readinessScore: 0.62,
+      worstHealth: 'degraded',
+      operationalCount: 6,
+      totalCount: 8,
+      gaps: [
+        {
+          capabilityName: 'HAZMAT_HANDLING',
+          capabilityType: 'payload',
+          requiredConfidence: 0.8,
+          currentConfidence: 0.65,
+          decayRate: -0.05,
+          etaThresholdBreach: null,
+          reason: 'op-2 HAZMAT cert expired, recertification in progress',
+          requiresOversight: true,
+          maxAuthority: 'supervisor',
+          contributorCount: 2,
+          pendingActions: [
+            {
+              id: 'act-1',
+              description: 'Recertify op-2 HAZMAT handling',
+              etaMinutes: 20,
+              status: 'in_progress',
+              blockedBy: null,
+            },
+          ],
+        },
+        {
+          capabilityName: 'SENSOR_FUSION',
+          capabilityType: 'sensor',
+          requiredConfidence: 0.7,
+          currentConfidence: 0.58,
+          decayRate: -0.04,
+          etaThresholdBreach: null,
+          reason: 'IR sensor-3 offline, radar-1 degraded calibration',
+          requiresOversight: false,
+          maxAuthority: null,
+          contributorCount: 1,
+          pendingActions: [
+            {
+              id: 'act-2',
+              description: 'Replace IR sensor-3 unit',
+              etaMinutes: 45,
+              status: 'blocked',
+              blockedBy: 'Spare parts in transit from depot',
+            },
+            {
+              id: 'act-3',
+              description: 'Recalibrate radar-1',
+              etaMinutes: 15,
+              status: 'in_progress',
+              blockedBy: null,
+            },
+          ],
+        },
+        {
+          capabilityName: 'COMMS_RELAY',
+          capabilityType: 'communication',
+          requiredConfidence: 0.8,
+          currentConfidence: 0.72,
+          decayRate: -0.02,
+          etaThresholdBreach: 4,
+          reason: 'Relay node battery at 18%, backup relay not positioned',
+          requiresOversight: true,
+          maxAuthority: 'commander',
+          contributorCount: 3,
+          pendingActions: [
+            {
+              id: 'act-4',
+              description: 'Hot-swap relay node battery',
+              etaMinutes: 10,
+              status: 'pending',
+              blockedBy: null,
+            },
+          ],
+        },
+      ],
+      logisticalDependencies: [
+        {
+          resourceName: 'Crane-2',
+          status: 'unavailable',
+          reason: 'Needs maintenance — no maintenance crew available until shift change',
+          availableInMinutes: 90,
+          affectedCapabilities: ['HEAVY_LIFT', 'CARGO_TRANSFER'],
+        },
+        {
+          resourceName: 'Maintenance Crew Bravo',
+          status: 'unavailable',
+          reason: 'Assigned to Hold 1 emergency repairs',
+          availableInMinutes: 45,
+          affectedCapabilities: ['SENSOR_FUSION', 'HAZMAT_HANDLING'],
+        },
+      ],
+      aggregatedAt: new Date().toISOString(),
+    },
+    {
+      level: 'H3',
+      locationId: 'berth-7A',
+      locationLabel: 'Berth 7A — Dock Wing',
+      readinessScore: 0.81,
+      worstHealth: 'nominal',
+      operationalCount: 22,
+      totalCount: 24,
+      gaps: [
+        {
+          capabilityName: 'AI_TARGET_ANALYSIS',
+          capabilityType: 'compute',
+          requiredConfidence: 0.75,
+          currentConfidence: 0.68,
+          decayRate: -0.01,
+          etaThresholdBreach: 7,
+          reason: 'GPU node-4 thermal throttling, reduced inference throughput',
+          requiresOversight: false,
+          maxAuthority: null,
+          contributorCount: 3,
+          pendingActions: [
+            {
+              id: 'act-5',
+              description: 'Cool down and restart GPU node-4',
+              etaMinutes: 8,
+              status: 'in_progress',
+              blockedBy: null,
+            },
+          ],
+        },
+      ],
+      logisticalDependencies: [
+        {
+          resourceName: 'Power Grid Sector-7',
+          status: 'degraded',
+          reason: 'Running on backup generator, 60% capacity',
+          availableInMinutes: null,
+          affectedCapabilities: ['AI_TARGET_ANALYSIS', 'COMMS_RELAY'],
+        },
+      ],
+      aggregatedAt: new Date().toISOString(),
+    },
+    {
+      level: 'H2',
+      locationId: 'hold-1',
+      locationLabel: 'Hold 1 — Bravo Squad',
+      readinessScore: 0.91,
+      worstHealth: 'nominal',
+      operationalCount: 8,
+      totalCount: 8,
+      gaps: [],
+      logisticalDependencies: [],
+      aggregatedAt: new Date().toISOString(),
+    },
+  ];
+
+  return { terrain, pieces, capabilities, objectives, events, gapReports };
 }
 
 export default function App() {
@@ -292,6 +418,7 @@ export default function App() {
   const [turn] = useState(1);
   const [score] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [sidebarTab, setSidebarTab] = useState<'status' | 'gaps'>('status');
 
   const demoState = useMemo(() => createDemoState(), []);
 
@@ -349,121 +476,170 @@ export default function App() {
         flexDirection: 'column',
         overflow: 'hidden',
       }}>
-        {/* Hierarchy tree panel */}
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid #333' }}>
-          <h3 style={{ color: '#88aacc', margin: '0 0 8px 0', fontSize: '12px', letterSpacing: '1px' }}>
-            FORCE HIERARCHY
-          </h3>
-          <HierarchyTree
-            capabilities={demoState.capabilities}
-            pieces={demoState.pieces}
-            selectedCapability={selectedCapability}
-            onSelectCapability={setSelectedCapability}
-          />
+        {/* Sidebar tab bar */}
+        <div style={{
+          display: 'flex',
+          borderBottom: '1px solid #333',
+          background: '#0a0a14',
+          flexShrink: 0,
+        }}>
+          <button
+            onClick={() => setSidebarTab('status')}
+            style={{
+              flex: 1,
+              padding: '10px',
+              border: 'none',
+              borderBottom: sidebarTab === 'status' ? '2px solid #00ffff' : '2px solid transparent',
+              background: 'transparent',
+              color: sidebarTab === 'status' ? '#00ffff' : '#555',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+            }}
+          >
+            STATUS
+          </button>
+          <button
+            onClick={() => setSidebarTab('gaps')}
+            style={{
+              flex: 1,
+              padding: '10px',
+              border: 'none',
+              borderBottom: sidebarTab === 'gaps' ? '2px solid #ff8844' : '2px solid transparent',
+              background: 'transparent',
+              color: sidebarTab === 'gaps' ? '#ff8844' : '#555',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              position: 'relative',
+            }}
+          >
+            GAPS
+            {demoState.gapReports.reduce((sum, r) => sum + r.gaps.filter(g => g.currentConfidence < g.requiredConfidence).length, 0) > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: '6px',
+                right: '20px',
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: '#ff4444',
+              }} />
+            )}
+          </button>
         </div>
 
-        {/* Capabilities panel */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
-          <h3 style={{ color: '#00ffff', margin: '0 0 12px 0', fontSize: '14px' }}>
-            COMPOSED CAPABILITIES
-          </h3>
-          {demoState.capabilities.map((cap) => (
-            <CapabilityCard
-              key={cap.id}
-              capability={cap}
-              isSelected={selectedCapability === cap.id}
-              onClick={() => setSelectedCapability(cap.id === selectedCapability ? undefined : cap.id)}
-            />
-          ))}
-        </div>
+        {sidebarTab === 'status' ? (
+          <>
+            {/* Capabilities panel */}
+            <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
+              <h3 style={{ color: '#00ffff', margin: '0 0 12px 0', fontSize: '14px' }}>
+                COMPOSED CAPABILITIES
+              </h3>
+              {demoState.capabilities.map((cap) => (
+                <CapabilityCard
+                  key={cap.id}
+                  capability={cap}
+                  isSelected={selectedCapability === cap.id}
+                  onClick={() => setSelectedCapability(cap.id === selectedCapability ? undefined : cap.id)}
+                />
+              ))}
+            </div>
 
-        {/* Objectives panel */}
-        <div style={{ borderTop: '1px solid #333', padding: '16px', maxHeight: '30%', overflow: 'auto' }}>
-          <h3 style={{ color: '#ff44ff', margin: '0 0 12px 0', fontSize: '14px' }}>
-            OBJECTIVES
-          </h3>
-          {demoState.objectives.filter(o => !o.completed).map((obj, idx) => (
-            <div
-              key={obj.id}
-              onClick={() => setSelectedObjective(obj.id === selectedObjective ? undefined : obj.id)}
-              style={{
-                background: selectedObjective === obj.id ? '#3a1a4a' : '#1a1a2a',
-                border: selectedObjective === obj.id ? '2px solid #ff44ff' : '1px solid #333',
-                borderRadius: '8px',
-                padding: '10px',
-                marginBottom: '8px',
-                cursor: 'pointer',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <span style={{ color: '#ff44ff', fontWeight: 'bold', fontSize: '13px' }}>
-                  [{idx + 1}] {obj.name}
-                </span>
-                <span style={{ color: '#888', fontSize: '11px' }}>
-                  {obj.points} pts
-                </span>
+            {/* Objectives panel */}
+            <div style={{ borderTop: '1px solid #333', padding: '16px', maxHeight: '30%', overflow: 'auto' }}>
+              <h3 style={{ color: '#ff44ff', margin: '0 0 12px 0', fontSize: '14px' }}>
+                OBJECTIVES
+              </h3>
+              {demoState.objectives.filter(o => !o.completed).map((obj, idx) => (
+                <div
+                  key={obj.id}
+                  onClick={() => setSelectedObjective(obj.id === selectedObjective ? undefined : obj.id)}
+                  style={{
+                    background: selectedObjective === obj.id ? '#3a1a4a' : '#1a1a2a',
+                    border: selectedObjective === obj.id ? '2px solid #ff44ff' : '1px solid #333',
+                    borderRadius: '8px',
+                    padding: '10px',
+                    marginBottom: '8px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ color: '#ff44ff', fontWeight: 'bold', fontSize: '13px' }}>
+                      [{idx + 1}] {obj.name}
+                    </span>
+                    <span style={{ color: '#888', fontSize: '11px' }}>
+                      {obj.points} pts
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>
+                    ({obj.x}, {obj.y}) - {obj.description}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', fontSize: '10px' }}>
+                    {obj.detectRequired > 0 && <span style={{ color: '#44ff44' }}>DET:{obj.detectRequired}</span>}
+                    {obj.trackRequired > 0 && <span style={{ color: '#ffff44' }}>TRK:{obj.trackRequired}</span>}
+                    {obj.strikeRequired > 0 && <span style={{ color: '#ff4444' }}>STR:{obj.strikeRequired}</span>}
+                    {obj.authorizeRequired > 0 && <span style={{ color: '#ff44ff' }}>AUTH:{obj.authorizeRequired}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Event Stream panel */}
+            <div style={{ borderTop: '1px solid #333', height: '35%', display: 'flex', flexDirection: 'column' }}>
+              {/* Playback controls */}
+              <div style={{
+                padding: '6px 12px',
+                borderBottom: '1px solid #222',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '12px',
+              }}>
+                <button
+                  onClick={() => setPlaybackSpeed(playbackSpeed === 0 ? 1 : 0)}
+                  style={{
+                    padding: '2px 8px',
+                    background: playbackSpeed === 0 ? '#332200' : '#1a1a2a',
+                    border: `1px solid ${playbackSpeed === 0 ? '#ff8800' : '#333'}`,
+                    borderRadius: '3px',
+                    color: playbackSpeed === 0 ? '#ff8800' : '#ccc',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                  }}
+                >
+                  {playbackSpeed === 0 ? '▶ Play' : '⏸ Pause'}
+                </button>
+                <span style={{ color: '#555', fontSize: '10px' }}>Speed:</span>
+                {[0.5, 1, 2, 4].map(speed => (
+                  <button
+                    key={speed}
+                    onClick={() => setPlaybackSpeed(speed)}
+                    style={{
+                      padding: '1px 5px',
+                      background: playbackSpeed === speed ? '#1a2a3a' : 'transparent',
+                      border: `1px solid ${playbackSpeed === speed ? '#00aaff' : '#333'}`,
+                      borderRadius: '3px',
+                      color: playbackSpeed === speed ? '#00aaff' : '#555',
+                      cursor: 'pointer',
+                      fontSize: '10px',
+                    }}
+                  >
+                    {speed}x
+                  </button>
+                ))}
               </div>
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>
-                ({obj.x}, {obj.y}) - {obj.description}
-              </div>
-              <div style={{ display: 'flex', gap: '8px', fontSize: '10px' }}>
-                {obj.detectRequired > 0 && <span style={{ color: '#44ff44' }}>DET:{obj.detectRequired}</span>}
-                {obj.trackRequired > 0 && <span style={{ color: '#ffff44' }}>TRK:{obj.trackRequired}</span>}
-                {obj.strikeRequired > 0 && <span style={{ color: '#ff4444' }}>STR:{obj.strikeRequired}</span>}
-                {obj.authorizeRequired > 0 && <span style={{ color: '#ff44ff' }}>AUTH:{obj.authorizeRequired}</span>}
+              <div style={{ flex: 1, overflow: 'hidden' }}>
+                <EventStream events={demoState.events} playbackSpeed={playbackSpeed} />
               </div>
             </div>
-          ))}
-        </div>
-
-        {/* Event Stream panel */}
-        <div style={{ borderTop: '1px solid #333', height: '35%', display: 'flex', flexDirection: 'column' }}>
-          {/* Playback controls */}
-          <div style={{
-            padding: '6px 12px',
-            borderBottom: '1px solid #222',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            fontSize: '12px',
-          }}>
-            <button
-              onClick={() => setPlaybackSpeed(playbackSpeed === 0 ? 1 : 0)}
-              style={{
-                padding: '2px 8px',
-                background: playbackSpeed === 0 ? '#332200' : '#1a1a2a',
-                border: `1px solid ${playbackSpeed === 0 ? '#ff8800' : '#333'}`,
-                borderRadius: '3px',
-                color: playbackSpeed === 0 ? '#ff8800' : '#ccc',
-                cursor: 'pointer',
-                fontSize: '11px',
-              }}
-            >
-              {playbackSpeed === 0 ? '\u25b6 Play' : '\u23f8 Pause'}
-            </button>
-            <span style={{ color: '#555', fontSize: '10px' }}>Speed:</span>
-            {[0.5, 1, 2, 4].map(speed => (
-              <button
-                key={speed}
-                onClick={() => setPlaybackSpeed(speed)}
-                style={{
-                  padding: '1px 5px',
-                  background: playbackSpeed === speed ? '#1a2a3a' : 'transparent',
-                  border: `1px solid ${playbackSpeed === speed ? '#00aaff' : '#333'}`,
-                  borderRadius: '3px',
-                  color: playbackSpeed === speed ? '#00aaff' : '#555',
-                  cursor: 'pointer',
-                  fontSize: '10px',
-                }}
-              >
-                {speed}x
-              </button>
-            ))}
+          </>
+        ) : (
+          /* Gap Analysis panel */
+          <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
+            <GapAnalysisPanel reports={demoState.gapReports} />
           </div>
-          <div style={{ flex: 1, overflow: 'hidden' }}>
-            <EventStream events={demoState.events} playbackSpeed={playbackSpeed} />
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

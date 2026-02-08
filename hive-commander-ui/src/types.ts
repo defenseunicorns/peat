@@ -40,7 +40,7 @@ export interface Piece {
 // confidence >= 0.4 → DEGRADED (yellow/amber)
 // confidence > 0.0  → CRITICAL (red)
 // confidence == 0.0 → OFFLINE (gray)
-export type HealthStatus = 'nominal' | 'degraded' | 'critical' | 'offline';
+export type HealthStatus = 'nominal' | 'degraded' | 'critical' | 'failed' | 'offline';
 
 export interface EquipmentHealth {
   label: string;         // e.g. "hydraulic", "electrical", "comms"
