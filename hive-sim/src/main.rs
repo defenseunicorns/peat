@@ -62,6 +62,7 @@
 //! 0: Success (document synced, all operations completed)
 //! 1: Failure (timeout, error, or document not received)
 
+#[allow(dead_code)] // Consumers land in later beads (.4 logistics)
 mod degradation;
 mod metrics;
 mod utils;
