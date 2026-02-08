@@ -1,4 +1,5 @@
-import { ComposedCapability } from '../../types';
+import { useState } from 'react';
+import { ComposedCapability, getHealthColor, getHealthStatus } from '../../types';
 
 interface CapabilityCardProps {
   capability: ComposedCapability;
@@ -7,11 +8,17 @@ interface CapabilityCardProps {
 }
 
 export function CapabilityCard({ capability, isSelected, onClick }: CapabilityCardProps) {
+  const [showHealth, setShowHealth] = useState(false);
+
   const fuelPercent = capability.maxFuel > 0
     ? (capability.totalFuel / capability.maxFuel) * 100
     : 100;
 
   const fuelColor = fuelPercent < 30 ? '#ff4444' : fuelPercent < 60 ? '#ffaa00' : '#44ff44';
+
+  const confidencePercent = capability.confidence * 100;
+  const confidenceColor = getHealthColor(capability.confidence);
+  const healthStatus = getHealthStatus(capability.confidence);
 
   // Determine primary capability type
   const primaryType = (() => {
@@ -48,8 +55,38 @@ export function CapabilityCard({ capability, isSelected, onClick }: CapabilityCa
         </span>
       </div>
 
-      <div style={{ color: '#aaa', fontSize: '11px', marginBottom: '8px' }}>
-        {primaryType}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <span style={{ color: '#aaa', fontSize: '11px' }}>
+          {primaryType}
+        </span>
+        <span style={{
+          color: confidenceColor,
+          fontSize: '10px',
+          fontWeight: 'bold',
+          textTransform: 'uppercase',
+        }}>
+          {healthStatus}
+        </span>
+      </div>
+
+      {/* Confidence bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+        <span style={{ color: '#888', fontSize: '11px', minWidth: '32px' }}>Conf:</span>
+        <div style={{ flex: 1, height: '8px', background: '#222', borderRadius: '4px', overflow: 'hidden' }}>
+          <div
+            style={{
+              width: `${confidencePercent}%`,
+              height: '100%',
+              background: confidenceColor,
+              transition: 'width 0.3s, background 0.3s',
+              borderRadius: '4px',
+            }}
+          />
+        </div>
+        <span style={{ color: confidenceColor, fontSize: '11px', minWidth: '36px', textAlign: 'right' }}>
+          {Math.round(confidencePercent)}%
+        </span>
+        <DecayIndicator rate={capability.decayRate} />
       </div>
 
       {/* Capability bonuses */}
@@ -78,7 +115,7 @@ export function CapabilityCard({ capability, isSelected, onClick }: CapabilityCa
       </div>
 
       {/* Fuel bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
         <span style={{ color: '#888', fontSize: '11px' }}>Fuel:</span>
         <div style={{ flex: 1, height: '6px', background: '#333', borderRadius: '3px', overflow: 'hidden' }}>
           <div
@@ -94,7 +131,71 @@ export function CapabilityCard({ capability, isSelected, onClick }: CapabilityCa
           {capability.pieceIds.length} units
         </span>
       </div>
+
+      {/* Equipment health breakdown (toggle) */}
+      {capability.equipmentHealth.length > 0 && (
+        <>
+          <div
+            onClick={(e) => { e.stopPropagation(); setShowHealth(!showHealth); }}
+            style={{
+              color: '#667',
+              fontSize: '10px',
+              marginTop: '6px',
+              cursor: 'pointer',
+              userSelect: 'none',
+            }}
+          >
+            {showHealth ? '\u25BC' : '\u25B6'} Equipment Health ({capability.equipmentHealth.length})
+          </div>
+          {showHealth && (
+            <div style={{ marginTop: '4px', paddingLeft: '8px' }}>
+              {capability.equipmentHealth.map((eq, idx) => {
+                const eqColor = getHealthColor(eq.confidence);
+                return (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                    <span style={{ color: '#888', fontSize: '10px', minWidth: '60px' }}>{eq.label}</span>
+                    <div style={{ flex: 1, height: '4px', background: '#222', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{
+                        width: `${eq.confidence * 100}%`,
+                        height: '100%',
+                        background: eqColor,
+                        borderRadius: '2px',
+                      }} />
+                    </div>
+                    <span style={{ color: eqColor, fontSize: '10px', minWidth: '28px', textAlign: 'right' }}>
+                      {Math.round(eq.confidence * 100)}%
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
     </div>
+  );
+}
+
+interface DecayIndicatorProps {
+  rate: number;
+}
+
+function DecayIndicator({ rate }: DecayIndicatorProps) {
+  if (rate === 0) return null;
+
+  const isDecaying = rate < 0;
+  const arrow = isDecaying ? '\u2193' : '\u2191';
+  const color = isDecaying ? '#ff6644' : '#44ff66';
+
+  return (
+    <span style={{
+      color,
+      fontSize: '12px',
+      fontWeight: 'bold',
+      lineHeight: 1,
+    }} title={`${isDecaying ? 'Decaying' : 'Recovering'} at ${Math.abs(rate).toFixed(2)}/turn`}>
+      {arrow}
+    </span>
   );
 }
 

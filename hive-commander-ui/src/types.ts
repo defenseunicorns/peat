@@ -35,6 +35,18 @@ export interface Piece {
   maxFuel: number;
 }
 
+// Health status thresholds per ADR-053:
+// confidence >= 0.7 → NOMINAL (green)
+// confidence >= 0.4 → DEGRADED (yellow/amber)
+// confidence > 0.0  → CRITICAL (red)
+// confidence == 0.0 → OFFLINE (gray)
+
+export interface EquipmentHealth {
+  label: string;         // e.g. "hydraulic", "electrical", "comms"
+  confidence: number;    // 0.0 - 1.0
+  status: HealthStatus;
+}
+
 export interface ComposedCapability {
   id: number;
   name: string;
@@ -56,6 +68,10 @@ export interface ComposedCapability {
   totalFuel: number;
   maxFuel: number;
   team: Team;
+  // Health / confidence (capability lifecycle)
+  confidence: number;          // 0.0 - 1.0 overall confidence
+  decayRate: number;           // per-turn decay rate (negative = decaying, 0 = stable, positive = recovering)
+  equipmentHealth: EquipmentHealth[];
 }
 
 export interface Objective {
@@ -171,7 +187,7 @@ export type CapabilityType =
   | 'payload'
   | 'emergent';
 
-export type HealthStatus = 'nominal' | 'degraded' | 'critical' | 'failed';
+export type HealthStatus = 'nominal' | 'degraded' | 'critical' | 'failed' | 'offline';
 
 export type AuthorityLevel = 'observer' | 'advisor' | 'supervisor' | 'commander';
 
@@ -272,3 +288,23 @@ export const terrainElevation: Record<TerrainType, number> = {
   urban: 0.1,
   base: 0,
 };
+
+// Health visualization utilities
+export function getHealthStatus(confidence: number): HealthStatus {
+  if (confidence <= 0) return 'offline';
+  if (confidence < 0.4) return 'critical';
+  if (confidence < 0.7) return 'degraded';
+  return 'nominal';
+}
+
+export function getHealthColor(confidence: number): string {
+  if (confidence <= 0) return '#666666';   // gray - offline
+  if (confidence < 0.4) return '#ff4444';  // red - critical
+  if (confidence < 0.7) return '#ffaa00';  // yellow/amber - degraded
+  return '#44ff44';                         // green - nominal
+}
+
+export function getWorstConfidence(cap: ComposedCapability): number {
+  if (cap.equipmentHealth.length === 0) return cap.confidence;
+  return Math.min(cap.confidence, ...cap.equipmentHealth.map(e => e.confidence));
+}

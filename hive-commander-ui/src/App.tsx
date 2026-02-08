@@ -3,6 +3,7 @@ import Map3D from './components/Map3D/Map3D';
 import { CapabilityCard } from './components/PieceCard/PieceCard';
 import EventStream from './components/EventStream/EventStream';
 import { GapAnalysisPanel } from './components/GapAnalysisPanel/GapAnalysisPanel';
+import { HierarchyTree } from './components/HierarchyTree/HierarchyTree';
 import { TerrainType, Piece, ComposedCapability, Objective, GamePhase, HiveEvent, GapAnalysisReport } from './types';
 
 // Generate simple terrain for demo
@@ -11,7 +12,6 @@ function generateTerrain(width: number, height: number): TerrainType[][] {
   for (let y = 0; y < height; y++) {
     const row: TerrainType[] = [];
     for (let x = 0; x < width; x++) {
-      // Simple pattern for demo
       const noise = Math.sin(x * 0.5) * Math.cos(y * 0.5) + Math.random() * 0.3;
       if (noise < -0.4) row.push('deep_water');
       else if (noise < -0.1) row.push('shallow_water');
@@ -22,10 +22,8 @@ function generateTerrain(width: number, height: number): TerrainType[][] {
     }
     terrain.push(row);
   }
-  // Add bases
   terrain[height / 2][2] = 'base';
   terrain[height / 2][width - 3] = 'base';
-  // Add urban
   terrain[4][8] = 'urban';
   terrain[4][9] = 'urban';
   terrain[5][8] = 'urban';
@@ -46,7 +44,6 @@ function createDemoState() {
     { id: 6, pieceType: { type: 'support' }, team: 'blue', x: 4, y: 6, fuel: 10, maxFuel: 10 },
     { id: 7, pieceType: { type: 'authority' }, team: 'blue', x: 2, y: 5, fuel: 10, maxFuel: 10 },
     { id: 8, pieceType: { type: 'analyst' }, team: 'blue', x: 4, y: 5, fuel: 10, maxFuel: 10 },
-    // Red pieces
     { id: 10, pieceType: { type: 'sensor', mode: 'ir' }, team: 'red', x: 15, y: 4, fuel: 10, maxFuel: 10 },
     { id: 11, pieceType: { type: 'striker' }, team: 'red', x: 16, y: 5, fuel: 10, maxFuel: 10 },
   ];
@@ -57,18 +54,38 @@ function createDemoState() {
       detectBonus: 10, trackBonus: 8, strikeBonus: 0, reconBonus: 1, authorizeBonus: 0,
       relayBonus: 0, classifyBonus: 3, predictBonus: 2, fuseBonus: 3,
       totalFuel: 35, maxFuel: 40, team: 'blue',
+      confidence: 0.92, decayRate: -0.02,
+      equipmentHealth: [
+        { label: 'EO Sensor', confidence: 0.95, status: 'nominal' },
+        { label: 'IR Sensor', confidence: 0.88, status: 'nominal' },
+        { label: 'Radar', confidence: 0.78, status: 'nominal' },
+        { label: 'AI Compute', confidence: 0.92, status: 'nominal' },
+      ],
     },
     {
       id: 1, name: 'STRIKE-2', pieceIds: [4, 5, 7], centerX: 6, centerY: 5,
       detectBonus: 0, trackBonus: 0, strikeBonus: 8, reconBonus: 0, authorizeBonus: 5,
       relayBonus: 0, classifyBonus: 0, predictBonus: 0, fuseBonus: 0,
       totalFuel: 29, maxFuel: 30, team: 'blue',
+      confidence: 0.55, decayRate: -0.08,
+      equipmentHealth: [
+        { label: 'Hydraulic', confidence: 0.48, status: 'degraded' },
+        { label: 'Electrical', confidence: 0.72, status: 'nominal' },
+        { label: 'Comms', confidence: 0.55, status: 'degraded' },
+        { label: 'Weapons', confidence: 0.90, status: 'nominal' },
+      ],
     },
     {
       id: 2, name: 'RECON-3', pieceIds: [3, 6], centerX: 5, centerY: 6,
       detectBonus: 3, trackBonus: 2, strikeBonus: 0, reconBonus: 3, authorizeBonus: 0,
       relayBonus: 3, classifyBonus: 0, predictBonus: 0, fuseBonus: 0,
       totalFuel: 16, maxFuel: 20, team: 'blue',
+      confidence: 0.30, decayRate: -0.12,
+      equipmentHealth: [
+        { label: 'Comms', confidence: 0.35, status: 'critical' },
+        { label: 'Mobility', confidence: 0.25, status: 'critical' },
+        { label: 'Sensors', confidence: 0.42, status: 'degraded' },
+      ],
     },
   ];
 
@@ -152,7 +169,6 @@ export default function App() {
       {/* Main 3D Map */}
       <div style={{ flex: 1, position: 'relative' }}>
         <Map3D terrain={demoState.terrain} pieces={demoState.pieces} capabilities={demoState.capabilities} objectives={demoState.objectives} showPieces={showPieces} selectedCapability={selectedCapability} selectedObjective={selectedObjective} />
-        {/* Overlay controls */}
         <div style={{ position: 'absolute', top: '16px', left: '16px', background: 'rgba(0,0,0,0.7)', padding: '12px', borderRadius: '8px', color: 'white' }}>
           <h2 style={{ margin: 0, fontSize: '18px', color: '#00ffff' }}>HIVE Commander</h2>
           <div style={{ marginTop: '8px', fontSize: '14px' }}>
@@ -166,6 +182,19 @@ export default function App() {
 
       {/* Right sidebar */}
       <div style={{ width: '320px', background: '#0a0a14', borderLeft: '1px solid #333', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Hierarchy tree panel */}
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid #333' }}>
+          <h3 style={{ color: '#88aacc', margin: '0 0 8px 0', fontSize: '12px', letterSpacing: '1px' }}>
+            FORCE HIERARCHY
+          </h3>
+          <HierarchyTree
+            capabilities={demoState.capabilities}
+            pieces={demoState.pieces}
+            selectedCapability={selectedCapability}
+            onSelectCapability={setSelectedCapability}
+          />
+        </div>
+
         {/* Sidebar tab bar */}
         <div style={{ display: 'flex', borderBottom: '1px solid #333', background: '#0a0a14', flexShrink: 0 }}>
           <button onClick={() => setSidebarTab('status')} style={{ flex: 1, padding: '10px', border: 'none', borderBottom: sidebarTab === 'status' ? '2px solid #00ffff' : '2px solid transparent', background: 'transparent', color: sidebarTab === 'status' ? '#00ffff' : '#555', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>
