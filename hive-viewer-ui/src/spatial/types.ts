@@ -19,6 +19,13 @@ export interface CraneVisualState {
   targetContainerIndex: number | null;
 }
 
+export interface OperatorVisualState {
+  isAvailable: boolean;
+  assignedTo: string | null;
+  isOnBreak: boolean;
+  hazmatCertified: boolean;
+}
+
 export interface HoldSummaryState {
   movesPerHour: number;
   movesCompleted: number;
@@ -29,6 +36,7 @@ export interface HoldSummaryState {
 export interface SpatialDerivedState {
   containers: DerivedContainer[];
   cranes: Record<string, CraneVisualState>;
+  operators: Record<string, OperatorVisualState>;
   holdSummary: HoldSummaryState;
   aggregatorActive: boolean;
 }

@@ -5,6 +5,7 @@ import VesselHull from './VesselHull';
 import HoldGrid from './HoldGrid';
 import ContainerQueue from './ContainerQueue';
 import CraneGantry from './CraneGantry';
+import OperatorFigure from './OperatorFigure';
 import YardBlocks from './YardBlocks';
 import ContentionFlash from './ContentionFlash';
 
@@ -61,6 +62,11 @@ export default function BerthScene({ state }: Props) {
       {/* Cranes */}
       {Object.entries(state.cranes).map(([nodeId, crane]) => (
         <CraneGantry key={nodeId} nodeId={nodeId} crane={crane} />
+      ))}
+
+      {/* Operators */}
+      {Object.entries(state.operators).map(([nodeId, op]) => (
+        <OperatorFigure key={nodeId} nodeId={nodeId} operator={op} />
       ))}
 
       <YardBlocks />

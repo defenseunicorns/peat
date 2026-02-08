@@ -30,6 +30,11 @@ export const CRANE_POSITIONS: Record<string, { x: number; z: number }> = {
   'crane-2': { x: 4, z: -6 },
 };
 
+export const OPERATOR_POSITIONS: Record<string, { x: number; z: number }> = {
+  'op-1': { x: -6, z: -4 },
+  'op-2': { x: 6, z: -4 },
+};
+
 export const CONTAINER_GRID = {
   cols: 5,
   rows: 4,
@@ -74,6 +79,10 @@ export const COLORS = {
   holdHighlightEmissive: '#0e2340',
 
   yard: '#333333',
+
+  operatorAvailable: '#22c55e',
+  operatorAssigned: '#22d3ee',
+  operatorBreak: '#6b7280',
 
   text: '#e5e7eb',
   textDim: '#6b7280',

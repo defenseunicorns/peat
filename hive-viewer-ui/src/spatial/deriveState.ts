@@ -4,6 +4,7 @@ import type { NodeState, HiveEvent } from '../protocol/types';
 import type {
   SpatialDerivedState,
   CraneVisualState,
+  OperatorVisualState,
   DerivedContainer,
   HoldSummaryState,
   EquipmentStatus,
@@ -70,12 +71,30 @@ export function deriveSpatialState(
   // --- Hold summary from HIVE events ---
   const holdSummary = getHoldSummary(events, totalCompleted);
 
+  // --- Operator states ---
+  const operators: Record<string, OperatorVisualState> = {};
+  for (const [nodeId, node] of Object.entries(nodes)) {
+    if (node.role !== 'operator') continue;
+
+    // Check if assigned by looking at accept_assignment vs complete_assignment in recent history
+    const assignIdx = [...node.history].reverse().findIndex((h) => h.action === 'accept_assignment');
+    const releaseIdx = [...node.history].reverse().findIndex((h) => h.action === 'complete_assignment');
+    const isAssigned = assignIdx !== -1 && (releaseIdx === -1 || assignIdx < releaseIdx);
+
+    operators[nodeId] = {
+      isAvailable: node.action !== 'accept_assignment' && !isAssigned,
+      assignedTo: isAssigned ? nodeId.replace('op-', 'crane-') : null,
+      isOnBreak: node.action === 'wait' && !isAssigned,
+      hazmatCertified: nodeId === 'op-1', // matches sim: op-1 is hazmat certified
+    };
+  }
+
   // --- Aggregator active ---
   const aggregatorActive = Object.values(nodes).some(
     (n) => n.role === 'aggregator' && n.action !== 'wait',
   );
 
-  return { containers, cranes, holdSummary, aggregatorActive };
+  return { containers, cranes, operators, holdSummary, aggregatorActive };
 }
 
 function getLatestEquipmentStatus(
