@@ -64,6 +64,7 @@
 
 mod degradation;
 mod metrics;
+mod resources;
 mod utils;
 
 use metrics::{init_metrics_file, log_metrics, MetricsEvent};
@@ -2342,6 +2343,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Lab 3b: Flat P2P mesh with HIVE CRDT (all nodes at same tier)
             flat_mesh_mode(&*backend, &node_id, &node_type, update_rate_ms).await
         }
+        "port_ops" => {
+            // Resource consumption and resupply cycle simulation
+            port_ops_mode(&*backend, &node_id, &node_type, update_rate_ms).await
+        }
         _ => {
             eprintln!("[{}] ✗ Invalid mode: {}", node_id, mode);
             std::process::exit(1);
@@ -3302,6 +3307,141 @@ fn generate_soldier_capabilities(node_id: &str) -> Vec<String> {
     }
 
     caps
+}
+
+/// Port operations mode: Resource consumption and resupply cycle simulation
+///
+/// Models the logistical support chain for port equipment:
+/// - Tractor: battery drains ~3-5% per transport cycle, charges at 20% (15 min)
+/// - Crane: hydraulic fluid consumed per lift, maintenance when low (requires crew)
+/// - Workers: fatigue after 4hrs continuous operation, 10% efficiency drop, break needed
+///
+/// Emits resupply_request and resupply_complete events. Models dependency chain:
+/// without maintenance crew availability, equipment stays degraded.
+async fn port_ops_mode(
+    backend: &dyn DataSyncBackend,
+    node_id: &str,
+    _node_type: &str,
+    update_rate_ms: u64,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use crate::resources::PortOpsResources;
+
+    println!(
+        "[{}] === PORT OPERATIONS RESOURCE SIMULATION ===",
+        node_id
+    );
+
+    let max_updates: u64 = std::env::var("MAX_UPDATES")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(u64::MAX);
+
+    let num_workers: usize = std::env::var("NUM_WORKERS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(3);
+
+    // Sim time acceleration: how many sim-seconds per real tick
+    let sim_time_scale: u64 = std::env::var("SIM_TIME_SCALE")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(60); // Default: 1 real second = 60 sim seconds
+
+    let update_interval = Duration::from_millis(update_rate_ms);
+    let mut tick_count: u64 = 0;
+    let doc_id = format!("port_ops_{}", node_id);
+
+    let mut resources = PortOpsResources::new(node_id, num_workers);
+
+    println!(
+        "[{}] Workers: {}, Sim scale: {}x, Update rate: {}ms",
+        node_id, num_workers, sim_time_scale, update_rate_ms
+    );
+
+    // Sim-seconds per tick
+    let sim_secs_per_tick = (update_rate_ms / 1000).max(1) * sim_time_scale;
+
+    // Transport cycle frequency: every N ticks a transport round-trip completes
+    let transport_cycle_ticks: u64 = std::env::var("TRANSPORT_CYCLE_TICKS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(5);
+
+    // Crane lifts per tick (when operational)
+    let lifts_per_tick: u32 = std::env::var("LIFTS_PER_TICK")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(2);
+
+    while tick_count < max_updates {
+        tick_count += 1;
+        let timestamp_us = now_micros();
+
+        // Determine activity this tick
+        let transport_this_tick = tick_count % transport_cycle_ticks == 0;
+
+        // Random-ish battery drain per cycle (3-5% based on tick count)
+        let battery_drain = 3.0 + (tick_count % 3) as f64;
+
+        // Crane only does lifts when operational
+        let lifts = if resources.crane.state == crate::resources::EquipmentState::Operational {
+            lifts_per_tick
+        } else {
+            0
+        };
+
+        // Run the resource tick
+        resources.tick(
+            sim_secs_per_tick,
+            transport_this_tick,
+            lifts,
+            battery_drain,
+            node_id,
+        );
+
+        // Build document with resource state
+        let mut fields = resources.to_document_fields();
+        fields.insert(
+            "node_id".to_string(),
+            serde_json::Value::String(node_id.to_string()),
+        );
+        fields.insert("timestamp_us".to_string(), serde_json::json!(timestamp_us));
+        fields.insert("tick".to_string(), serde_json::json!(tick_count));
+        fields.insert(
+            "sim_time_secs".to_string(),
+            serde_json::json!(tick_count * sim_secs_per_tick),
+        );
+        fields.insert("public".to_string(), serde_json::Value::Bool(true));
+
+        let document = Document::with_id(doc_id.clone(), fields);
+        backend.document_store().upsert("sim_poc", document).await?;
+
+        // Progress logging
+        if tick_count % 10 == 0 || tick_count <= 3 {
+            println!(
+                "[{}] Tick {} | Tractor: {:.0}% ({}) | Crane: {:.0}% ({}) | Workers: {} operational | Crew: {}",
+                node_id,
+                tick_count,
+                resources.tractor.battery_pct,
+                resources.tractor.state,
+                resources.crane.hydraulic_fluid_pct,
+                resources.crane.state,
+                resources.workers.iter().filter(|w| {
+                    w.state == crate::resources::EquipmentState::Operational
+                        || w.state == crate::resources::EquipmentState::Degraded
+                }).count(),
+                if resources.maintenance_crew.available { "available" } else { "busy" },
+            );
+        }
+
+        sleep(update_interval).await;
+    }
+
+    println!(
+        "[{}] Port operations simulation complete after {} ticks",
+        node_id, tick_count
+    );
+    Ok(())
 }
 
 /// Lab 3b: Flat P2P mesh mode with HIVE CRDT
