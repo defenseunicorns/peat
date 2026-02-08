@@ -2,6 +2,7 @@ import { useEffect, lazy, Suspense } from 'react';
 import { useViewerStore } from './protocol/state';
 import ConnectionStatus from './components/ConnectionStatus';
 import MetricsPanel from './components/MetricsPanel';
+import PlaybackControl from './components/PlaybackControl';
 import HierarchyTree from './views/ProtocolView/HierarchyTree';
 import EventStream from './views/ProtocolView/EventStream';
 import CapabilityCards from './views/ProtocolView/CapabilityCard';
@@ -64,7 +65,10 @@ export default function App() {
 
       {/* Bottom status bar */}
       <footer className="flex items-center justify-between px-4 py-1 border-t border-gray-800 bg-gray-900 text-[10px] text-gray-600 shrink-0">
-        <span>HIVE Operational Viewer (ADR-053)</span>
+        <div className="flex items-center gap-3">
+          <span>HIVE Operational Viewer (ADR-053)</span>
+          <PlaybackControl />
+        </div>
         <span>(r)evolve</span>
       </footer>
     </div>

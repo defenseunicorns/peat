@@ -47,7 +47,10 @@ export default {
     // 9. HUD shows "/20" (container count)
     textPresent('/20'),
 
-    // 10. Aggregator status shows ACTIVE or IDLE
+    // 10. Operators text present in HUD
+    textPresent('Operators'),
+
+    // 11. Aggregator status shows ACTIVE or IDLE
     {
       name: 'Aggregator shows ACTIVE or IDLE',
       fn: async (page) => {
@@ -72,7 +75,10 @@ export default {
       },
     },
 
-    // 12. No JS console errors (ignore network 404s)
+    // 13. Playback control visible
+    textPresent('1\u00D7'),
+
+    // 14. No JS console errors (ignore network 404s)
     {
       name: 'No JS console errors',
       fn: async (page) => {
