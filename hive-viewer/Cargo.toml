@@ -1,0 +1,41 @@
+[package]
+name = "hive-viewer"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Real-time WebSocket relay server for HIVE simulation visualization"
+
+[[bin]]
+name = "hive-viewer"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true }
+
+# Web framework
+axum = { version = "0.7", features = ["ws"] }
+tower-http = { version = "0.5", features = ["cors", "fs", "trace"] }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Utilities
+chrono = { workspace = true }
+anyhow = { workspace = true }
+uuid = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Async channels for broadcast
+tokio-stream = "0.1"
+
+# Future: TypeScript codegen
+# ts-rs = { version = "9", features = ["serde-compat"] }
