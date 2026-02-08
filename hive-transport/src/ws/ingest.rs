@@ -64,9 +64,7 @@ pub fn try_into_viewer_event(event: &HiveEvent) -> Result<Option<ViewerEvent>, I
         }));
     }
 
-    if event_type == EVENT_TYPE_LOGISTICAL_EVENT
-        || event_type.ends_with(".logistical_event")
-    {
+    if event_type == EVENT_TYPE_LOGISTICAL_EVENT || event_type.ends_with(".logistical_event") {
         let payload = parse_json_payload(&event.payload_value)?;
         return Ok(Some(ViewerEvent::LogisticalEvent {
             node_id: payload
@@ -84,9 +82,7 @@ pub fn try_into_viewer_event(event: &HiveEvent) -> Result<Option<ViewerEvent>, I
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string(),
-            eta_restore: payload
-                .get("eta_restore")
-                .and_then(|v| v.as_f64()),
+            eta_restore: payload.get("eta_restore").and_then(|v| v.as_f64()),
             details: payload
                 .get("details")
                 .and_then(|v| v.as_str())
@@ -219,7 +215,10 @@ mod tests {
 
         let result = try_into_viewer_event(&event).unwrap();
         assert!(result.is_some());
-        assert!(matches!(result.unwrap(), ViewerEvent::CapabilityDegradation { .. }));
+        assert!(matches!(
+            result.unwrap(),
+            ViewerEvent::CapabilityDegradation { .. }
+        ));
     }
 
     #[test]
