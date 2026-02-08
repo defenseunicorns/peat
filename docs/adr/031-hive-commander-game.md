@@ -690,6 +690,7 @@ cargo run -p hive-commander
 - ADR-001: CAP Protocol POC
 - ADR-004: Human-Machine Squad Composition
 - ADR-014: Distributed Coordination Primitives
+- [ADR-053](053-hive-operational-viewer.md): HIVE Operational Viewer (shared rendering components; viewer becomes Commander's spectator mode)
 - Industry Feedback: HIVE Hierarchy Visualization (2024-12-06)
 
 ---

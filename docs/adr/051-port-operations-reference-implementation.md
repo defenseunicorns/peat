@@ -648,7 +648,7 @@ The existence of two independent reference implementations — military and comm
 ### Ongoing: Phase 3 and Demonstration
 
 - Scale to full terminal topology
-- Build demo visualization (potentially HIVE Commander with port theme)
+- Build demo visualization via HIVE Operational Viewer ([ADR-053](053-hive-operational-viewer.md)) with port operations skin
 - Prepare GPA-facing demonstration materials
 - Publish results comparison (Army vs Port) as protocol validation evidence
 
