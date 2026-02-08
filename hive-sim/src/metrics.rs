@@ -205,6 +205,85 @@ pub enum MetricsEvent {
         bytes_saved_pct: Option<f64>,
         timestamp_us: u128,
     },
+    // Resource consumption and resupply events
+    ResourceConsumed {
+        node_id: String,
+        equipment_id: String,
+        equipment_type: String, // "tractor", "crane", "worker"
+        resource_type: String,  // "battery_pct", "hydraulic_fluid_pct", "fatigue_pct"
+        previous_level: f64,
+        current_level: f64,
+        consumed: f64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        trigger: Option<String>, // "transport_cycle", "lift_operation", "continuous_operation"
+        timestamp_us: u128,
+    },
+    ResupplyRequested {
+        node_id: String,
+        equipment_id: String,
+        equipment_type: String,
+        resource_type: String,
+        current_level: f64,
+        threshold: f64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        requires_maintenance_crew: Option<bool>,
+        timestamp_us: u128,
+    },
+    ResupplyCompleted {
+        node_id: String,
+        equipment_id: String,
+        equipment_type: String,
+        resource_type: String,
+        previous_level: f64,
+        restored_level: f64,
+        duration_sim_secs: u64,
+        timestamp_us: u128,
+    },
+    EquipmentStateChanged {
+        node_id: String,
+        equipment_id: String,
+        equipment_type: String,
+        previous_state: String,
+        new_state: String,
+        reason: String,
+        timestamp_us: u128,
+    },
+    EfficiencyDegraded {
+        node_id: String,
+        equipment_id: String,
+        equipment_type: String,
+        efficiency_pct: f64,
+        cause: String, // "fatigue", "low_hydraulic_fluid", "low_battery"
+        timestamp_us: u128,
+    },
+    // Certification lifecycle events
+    CertificationExpiring {
+        node_id: String,
+        hazmat_class: u8,
+        days_remaining: u64,
+        expires_at_us: u128,
+        timestamp_us: u128,
+    },
+    CertificationExpired {
+        node_id: String,
+        hazmat_class: u8,
+        handling_count: u64,
+        incident_count: u64,
+        has_evidence_chain: bool,
+        reduced_confidence: f32,
+        timestamp_us: u128,
+    },
+    RecertificationStarted {
+        node_id: String,
+        hazmat_class: u8,
+        timestamp_us: u128,
+    },
+    RecertificationCompleted {
+        node_id: String,
+        hazmat_class: u8,
+        new_confidence: f32,
+        timestamp_us: u128,
+    },
 }
 
 /// Initialize the metrics file for persistent logging
