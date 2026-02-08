@@ -64,6 +64,7 @@
 
 mod certification;
 mod degradation;
+mod logistics;
 mod metrics;
 mod resources;
 mod utils;
