@@ -63,6 +63,7 @@
 //! 1: Failure (timeout, error, or document not received)
 
 mod degradation;
+mod logistics;
 mod metrics;
 mod utils;
 

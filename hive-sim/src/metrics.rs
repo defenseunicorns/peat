@@ -190,6 +190,99 @@ pub enum MetricsEvent {
         total_moves: u64,
         timestamp_us: u128,
     },
+    // Logistical support events (capability lifecycle)
+    MaintenanceScheduled {
+        node_id: String,
+        equipment_id: String,
+        capability_id: String, // capability this sustains
+        reason: String,        // "hydraulic_low", "spreader_drift", "scheduled"
+        estimated_duration_secs: u64,
+        estimated_restore_time_us: u128,
+        timestamp_us: u128,
+    },
+    MaintenanceStarted {
+        node_id: String,
+        equipment_id: String,
+        capability_id: String,
+        crew_id: String,
+        estimated_duration_secs: u64,
+        estimated_restore_time_us: u128,
+        timestamp_us: u128,
+    },
+    MaintenanceComplete {
+        node_id: String,
+        equipment_id: String,
+        capability_id: String,
+        crew_id: String,
+        actual_duration_secs: u64,
+        restored_confidence: f32,
+        timestamp_us: u128,
+    },
+    ResupplyDispatched {
+        node_id: String,
+        equipment_id: String,
+        capability_id: String,
+        resource_type: String, // "battery", "hydraulic_fluid", "fuel"
+        quantity_pct: f64,
+        estimated_arrival_secs: u64,
+        estimated_restore_time_us: u128,
+        timestamp_us: u128,
+    },
+    ResupplyDelivered {
+        node_id: String,
+        equipment_id: String,
+        capability_id: String,
+        resource_type: String,
+        quantity_pct: f64,
+        previous_level: f64,
+        restored_level: f64,
+        transit_duration_secs: u64,
+        timestamp_us: u128,
+    },
+    RecertificationAssigned {
+        node_id: String,
+        worker_id: String,
+        capability_id: String,
+        cert_type: String, // "hazmat_class_3", "hazmat_class_8", etc.
+        estimated_duration_secs: u64,
+        estimated_restore_time_us: u128,
+        timestamp_us: u128,
+    },
+    RecertificationComplete {
+        node_id: String,
+        worker_id: String,
+        capability_id: String,
+        cert_type: String,
+        actual_duration_secs: u64,
+        restored_confidence: f32,
+        timestamp_us: u128,
+    },
+    ShiftReliefRequested {
+        node_id: String,
+        worker_id: String,
+        capability_id: String,
+        reason: String, // "fatigue", "shift_end", "medical"
+        estimated_arrival_secs: u64,
+        estimated_restore_time_us: u128,
+        timestamp_us: u128,
+    },
+    ShiftReliefArrived {
+        node_id: String,
+        outgoing_worker_id: String,
+        incoming_worker_id: String,
+        capability_id: String,
+        wait_duration_secs: u64,
+        restored_confidence: f32,
+        timestamp_us: u128,
+    },
+    // Hold aggregator gap analysis events
+    HoldAggregatorUpdate {
+        node_id: String,
+        pending_actions: usize,
+        capabilities_affected: Vec<String>,
+        gap_summary: String, // e.g. "crane-2 DEGRADED, maintenance ETA 20 min"
+        timestamp_us: u128,
+    },
     // Aggregation efficiency - shows bandwidth savings
     AggregationEfficiency {
         node_id: String,
