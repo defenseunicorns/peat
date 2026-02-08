@@ -62,6 +62,7 @@
 //! 0: Success (document synced, all operations completed)
 //! 1: Failure (timeout, error, or document not received)
 
+#[allow(dead_code)] // Consumers land in later beads (.4 logistics)
 mod certification;
 mod metrics;
 mod utils;
@@ -3013,13 +3014,20 @@ async fn soldier_capability_mode(
         let cert_events = cert_manager.tick(timestamp_us as u64);
         for event in &cert_events {
             match event {
-                certification::CertificationEvent::Expiring { hazmat_class, days_remaining } => {
+                certification::CertificationEvent::Expiring {
+                    hazmat_class,
+                    days_remaining,
+                } => {
                     println!(
                         "[{}] ⚠ Hazmat class {} certification expiring in {} days",
                         node_id, hazmat_class, days_remaining
                     );
                 }
-                certification::CertificationEvent::Expired { hazmat_class, handling_count, incident_count } => {
+                certification::CertificationEvent::Expired {
+                    hazmat_class,
+                    handling_count,
+                    incident_count,
+                } => {
                     println!(
                         "[{}] ✗ Hazmat class {} certification EXPIRED (handlings: {}, incidents: {})",
                         node_id, hazmat_class, handling_count, incident_count
@@ -3031,7 +3039,10 @@ async fn soldier_capability_mode(
                         node_id, hazmat_class
                     );
                 }
-                certification::CertificationEvent::RecertificationCompleted { hazmat_class, new_confidence } => {
+                certification::CertificationEvent::RecertificationCompleted {
+                    hazmat_class,
+                    new_confidence,
+                } => {
                     println!(
                         "[{}] ✓ Recertification complete for hazmat class {} (confidence: {:.2})",
                         node_id, hazmat_class, new_confidence
@@ -3099,10 +3110,7 @@ async fn soldier_capability_mode(
                     }),
                 );
             }
-            fields.insert(
-                "hazmat_certifications".to_string(),
-                Value::Object(cert_map),
-            );
+            fields.insert("hazmat_certifications".to_string(), Value::Object(cert_map));
         }
 
         let document = Document::with_id(doc_id.clone(), fields.clone());

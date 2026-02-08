@@ -61,6 +61,7 @@ pub struct RecertificationAction {
     /// Hazmat class being recertified
     pub hazmat_class: u8,
     /// When recertification started (sim_time microseconds)
+    #[allow(dead_code)]
     pub started_at: u64,
     /// When recertification completes (sim_time microseconds)
     pub completes_at: u64,
@@ -91,9 +92,7 @@ pub enum CertificationEvent {
         incident_count: u64,
     },
     /// Recertification started (45 min sim_time)
-    RecertificationStarted {
-        hazmat_class: u8,
-    },
+    RecertificationStarted { hazmat_class: u8 },
     /// Recertification completed, capability restored
     RecertificationCompleted {
         hazmat_class: u8,
@@ -169,14 +168,22 @@ impl CertificationManager {
 
     /// Start recertification for a hazmat class
     /// Returns None if already recertifying or cert doesn't exist
-    pub fn start_recertification(&mut self, hazmat_class: u8, now: u64) -> Option<CertificationEvent> {
+    pub fn start_recertification(
+        &mut self,
+        hazmat_class: u8,
+        now: u64,
+    ) -> Option<CertificationEvent> {
         // Check cert exists
         if !self.certifications.contains_key(&hazmat_class) {
             return None;
         }
 
         // Check not already recertifying this class
-        if self.pending_recertifications.iter().any(|r| r.hazmat_class == hazmat_class) {
+        if self
+            .pending_recertifications
+            .iter()
+            .any(|r| r.hazmat_class == hazmat_class)
+        {
             return None;
         }
 
@@ -202,7 +209,8 @@ impl CertificationManager {
         let mut events = Vec::new();
 
         // Check completed recertifications first
-        let (completed, pending): (Vec<_>, Vec<_>) = self.pending_recertifications
+        let (completed, pending): (Vec<_>, Vec<_>) = self
+            .pending_recertifications
             .drain(..)
             .partition(|r| now >= r.completes_at);
 
@@ -297,7 +305,10 @@ impl CertificationManager {
     pub fn has_expired_certs(&self) -> bool {
         self.certifications.values().any(|c| {
             !c.certification_valid
-                && !self.pending_recertifications.iter().any(|r| r.hazmat_class == c.hazmat_class)
+                && !self
+                    .pending_recertifications
+                    .iter()
+                    .any(|r| r.hazmat_class == c.hazmat_class)
         })
     }
 
@@ -444,7 +455,13 @@ mod tests {
         // At day 30: warning (30 days remaining == 30)
         let events = manager.tick(30 * MICROS_PER_DAY);
         assert_eq!(events.len(), 1);
-        assert!(matches!(events[0], CertificationEvent::Expiring { hazmat_class: 9, days_remaining: 30 }));
+        assert!(matches!(
+            events[0],
+            CertificationEvent::Expiring {
+                hazmat_class: 9,
+                days_remaining: 30
+            }
+        ));
 
         // At day 31: no duplicate warning
         let events = manager.tick(31 * MICROS_PER_DAY);
@@ -478,7 +495,10 @@ mod tests {
 
         // Verify capability downgraded
         let fields = manager.capability_fields();
-        let class9 = fields.iter().find(|(name, _)| name == "hazmat_handling:class_9").unwrap();
+        let class9 = fields
+            .iter()
+            .find(|(name, _)| name == "hazmat_handling:class_9")
+            .unwrap();
         assert_eq!(class9.1, 0.7); // Evidence chain: 47 handlings, 0 incidents
 
         // No duplicate expiry event
@@ -499,7 +519,10 @@ mod tests {
 
         // Start recertification
         let event = manager.start_recertification(9, now);
-        assert!(matches!(event, Some(CertificationEvent::RecertificationStarted { hazmat_class: 9 })));
+        assert!(matches!(
+            event,
+            Some(CertificationEvent::RecertificationStarted { hazmat_class: 9 })
+        ));
 
         // Before completion: no events
         let events = manager.tick(now + RECERTIFICATION_DURATION_MICROS - 1);
@@ -518,7 +541,10 @@ mod tests {
 
         // Capability restored
         let fields = manager.capability_fields();
-        let class9 = fields.iter().find(|(name, _)| name == "hazmat_handling:class_9").unwrap();
+        let class9 = fields
+            .iter()
+            .find(|(name, _)| name == "hazmat_handling:class_9")
+            .unwrap();
         assert_eq!(class9.1, 1.0);
     }
 
@@ -584,7 +610,13 @@ mod tests {
         // Tick: should get warning for class 3 only
         let events = manager.tick(0);
         assert_eq!(events.len(), 1);
-        assert!(matches!(events[0], CertificationEvent::Expiring { hazmat_class: 3, .. }));
+        assert!(matches!(
+            events[0],
+            CertificationEvent::Expiring {
+                hazmat_class: 3,
+                ..
+            }
+        ));
     }
 
     #[test]
