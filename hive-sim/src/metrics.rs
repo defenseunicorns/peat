@@ -179,14 +179,14 @@ pub enum MetricsEvent {
     CapabilityDegraded {
         node_id: String,
         crane_id: String,
-        subsystem: String,       // "hydraulic", "spreader", "electrical"
-        before: f64,             // Value before degradation
-        after: f64,              // Value after degradation
-        cause: String,           // e.g. "lift_cycle_42", "alignment_drift_after_50_moves"
-        decay_rate: f64,         // Rate applied this step
-        confidence: f32,         // Current Capability.confidence (0.0-1.0)
+        subsystem: String, // "hydraulic", "spreader", "electrical"
+        before: f64,       // Value before degradation
+        after: f64,        // Value after degradation
+        cause: String,     // e.g. "lift_cycle_42", "alignment_drift_after_50_moves"
+        decay_rate: f64,   // Rate applied this step
+        confidence: f32,   // Current Capability.confidence (0.0-1.0)
         effective_moves_per_hour: f64,
-        status: String,          // "NOMINAL", "DEGRADED", "FAILED"
+        status: String, // "NOMINAL", "DEGRADED", "FAILED"
         total_moves: u64,
         timestamp_us: u128,
     },

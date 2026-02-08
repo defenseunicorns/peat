@@ -170,16 +170,13 @@ impl LogisticsDispatcher {
     }
 
     /// Start maintenance (crew assigned). Returns updated action.
-    pub fn start_maintenance(
-        &mut self,
-        action: &mut LogisticalAction,
-        crew_id: &str,
-    ) {
+    pub fn start_maintenance(&mut self, action: &mut LogisticalAction, crew_id: &str) {
         action.status = ActionStatus::InProgress;
         action.crew_id = Some(crew_id.to_string());
         action.elapsed_secs = 0;
         let now = now_micros();
-        action.estimated_restore_time_us = now + (action.estimated_duration_secs as u128) * 1_000_000;
+        action.estimated_restore_time_us =
+            now + (action.estimated_duration_secs as u128) * 1_000_000;
 
         log_metrics(&MetricsEvent::MaintenanceStarted {
             node_id: self.node_id.clone(),
@@ -448,7 +445,8 @@ impl HoldAggregator {
 
     /// Remove completed actions from tracking.
     pub fn prune_completed(&mut self) {
-        self.actions.retain(|_, a| a.status != ActionStatus::Complete);
+        self.actions
+            .retain(|_, a| a.status != ActionStatus::Complete);
     }
 
     /// Get a mutable reference to an action by ID.
@@ -570,10 +568,7 @@ impl HoldAggregator {
             json!(self.affected_capabilities()),
         );
         let now = now_micros();
-        fields.insert(
-            "gap_summary".to_string(),
-            json!(self.gap_summary(now)),
-        );
+        fields.insert("gap_summary".to_string(), json!(self.gap_summary(now)));
 
         fields
     }
@@ -606,7 +601,10 @@ mod tests {
         assert_eq!(action.status, ActionStatus::Pending);
         assert_eq!(action.target_id, "crane-2");
         assert_eq!(action.capability_id, "crane-ops");
-        assert_eq!(action.estimated_duration_secs, DEFAULT_MAINTENANCE_DURATION_SECS);
+        assert_eq!(
+            action.estimated_duration_secs,
+            DEFAULT_MAINTENANCE_DURATION_SECS
+        );
     }
 
     #[test]
@@ -649,7 +647,10 @@ mod tests {
 
         assert_eq!(action.category, ActionCategory::Resupply);
         assert_eq!(action.status, ActionStatus::InProgress);
-        assert_eq!(action.estimated_duration_secs, DEFAULT_RESUPPLY_TRANSIT_SECS);
+        assert_eq!(
+            action.estimated_duration_secs,
+            DEFAULT_RESUPPLY_TRANSIT_SECS
+        );
     }
 
     #[test]
@@ -666,8 +667,7 @@ mod tests {
     #[test]
     fn resupply_custom_transit_time() {
         let mut disp = make_dispatcher();
-        let action =
-            disp.dispatch_resupply("tractor-1", "transport", "battery", 80.0, Some(300));
+        let action = disp.dispatch_resupply("tractor-1", "transport", "battery", 80.0, Some(300));
 
         assert_eq!(action.estimated_duration_secs, 300);
     }
@@ -907,7 +907,8 @@ mod tests {
         let mut disp = make_dispatcher();
         let mut agg = make_aggregator();
 
-        let mut action = disp.schedule_maintenance("crane-1", "crane-ops", "hydraulic_low", Some(60));
+        let mut action =
+            disp.schedule_maintenance("crane-1", "crane-ops", "hydraulic_low", Some(60));
         disp.start_maintenance(&mut action, "crew-alpha");
         disp.complete_maintenance(&mut action, 1.0);
         agg.register(action);
