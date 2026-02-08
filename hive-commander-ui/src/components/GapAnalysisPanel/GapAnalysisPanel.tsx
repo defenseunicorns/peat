@@ -17,6 +17,7 @@ const healthColors: Record<HealthStatus, string> = {
   degraded: '#ffaa00',
   critical: '#ff4444',
   failed: '#ff0000',
+  offline: '#666666',
 };
 
 const healthLabels: Record<HealthStatus, string> = {
@@ -24,6 +25,7 @@ const healthLabels: Record<HealthStatus, string> = {
   degraded: 'DEGRADED',
   critical: 'CRITICAL',
   failed: 'FAILED',
+  offline: 'OFFLINE',
 };
 
 const levelLabels: Record<HierarchyLevel, string> = {

@@ -70,6 +70,9 @@ function createDemoState() {
       totalFuel: 35,
       maxFuel: 40,
       team: 'blue',
+      confidence: 0.92,
+      decayRate: -0.02,
+      equipmentHealth: [{ label: 'UAV-1 Sensor', confidence: 0.95, status: 'nominal' as const }, { label: 'UAV-2 Optics', confidence: 0.88, status: 'nominal' as const }],
     },
     {
       id: 1,
@@ -89,6 +92,9 @@ function createDemoState() {
       totalFuel: 29,
       maxFuel: 30,
       team: 'blue',
+      confidence: 0.78,
+      decayRate: -0.03,
+      equipmentHealth: [{ label: 'Effector-1', confidence: 0.80, status: 'degraded' as const }, { label: 'Comms Relay', confidence: 0.75, status: 'degraded' as const }],
     },
     {
       id: 2,
@@ -108,6 +114,9 @@ function createDemoState() {
       totalFuel: 16,
       maxFuel: 20,
       team: 'blue',
+      confidence: 0.95,
+      decayRate: -0.01,
+      equipmentHealth: [{ label: 'Scout Drone', confidence: 0.97, status: 'nominal' as const }],
     },
   ];
 
