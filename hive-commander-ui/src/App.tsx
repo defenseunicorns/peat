@@ -2,8 +2,9 @@ import { useState, useMemo } from 'react';
 import Map3D from './components/Map3D/Map3D';
 import { CapabilityCard } from './components/PieceCard/PieceCard';
 import EventStream from './components/EventStream/EventStream';
+import { GapAnalysisPanel } from './components/GapAnalysisPanel/GapAnalysisPanel';
 import { HierarchyTree } from './components/HierarchyTree/HierarchyTree';
-import { TerrainType, Piece, ComposedCapability, Objective, GamePhase, HiveEvent } from './types';
+import { TerrainType, Piece, ComposedCapability, Objective, GamePhase, HiveEvent, GapAnalysisReport } from './types';
 
 // Generate simple terrain for demo
 function generateTerrain(width: number, height: number): TerrainType[][] {

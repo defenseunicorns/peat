@@ -211,6 +211,70 @@ export interface LogisticalEventData {
 
 export type ViewerEvent = CapabilityDegradationEvent | LogisticalEventData;
 
+// ============================================================================
+// Gap Analysis & Logistical Dependencies (hi-9r0.7)
+// Matches Rust hive-protocol/src/cell/capability_aggregation.rs
+// ============================================================================
+
+export type CapabilityType =
+  | 'sensor'
+  | 'compute'
+  | 'communication'
+  | 'mobility'
+  | 'payload'
+  | 'emergent';
+
+export type AuthorityLevel = 'observer' | 'advisor' | 'supervisor' | 'commander';
+
+export type HierarchyLevel = 'H2' | 'H3';
+
+/** A single capability gap reported by the hold aggregator */
+export interface CapabilityGap {
+  capabilityName: string;
+  capabilityType: CapabilityType;
+  requiredConfidence: number;
+  currentConfidence: number;
+  decayRate: number;
+  etaThresholdBreach: number | null;
+  reason: string;
+  pendingActions: LogisticalAction[];
+  requiresOversight: boolean;
+  maxAuthority: AuthorityLevel | null;
+  contributorCount: number;
+}
+
+/** A logistical action that can restore or maintain a capability */
+export interface LogisticalAction {
+  id: string;
+  description: string;
+  etaMinutes: number | null;
+  status: 'pending' | 'in_progress' | 'blocked';
+  blockedBy: string | null;
+}
+
+/** A logistical dependency between resources */
+export interface LogisticalDependency {
+  resourceName: string;
+  status: 'available' | 'unavailable' | 'degraded';
+  reason: string;
+  availableInMinutes: number | null;
+  affectedCapabilities: string[];
+}
+
+/** Hold-level (H2) or berth-level (H3) gap analysis report */
+export interface GapAnalysisReport {
+  level: HierarchyLevel;
+  locationId: string;
+  locationLabel: string;
+  readinessScore: number;
+  worstHealth: HealthStatus;
+  operationalCount: number;
+  totalCount: number;
+  gaps: CapabilityGap[];
+  logisticalDependencies: LogisticalDependency[];
+  aggregatedAt: string;
+}
+
 // Terrain utilities
 export const terrainColors: Record<TerrainType, string> = {
   deep_water: '#141428',
