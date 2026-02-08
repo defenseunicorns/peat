@@ -89,6 +89,59 @@ export interface CourseOfAction {
 
 export type GamePhase = 'select_objective' | 'select_coa' | 'executing' | 'enemy_turn';
 
+// Event types matching hive-schema/proto/event.proto
+export type EventClass = 'product' | 'anomaly' | 'telemetry' | 'command';
+export type EventPriority = 'critical' | 'high' | 'normal' | 'low';
+
+// Logistical event subtypes
+export type LogisticalEventType =
+  | 'maintenance_scheduled'
+  | 'maintenance_started'
+  | 'maintenance_complete'
+  | 'resupply_requested'
+  | 'resupply_delivered'
+  | 'recertification_required'
+  | 'recertification_complete'
+  | 'shift_started'
+  | 'shift_ended'
+  | 'capability_degraded'
+  | 'capability_restored';
+
+// Operational event subtypes
+export type OperationalEventType =
+  | 'detection'
+  | 'track_new'
+  | 'track_update'
+  | 'track_lost'
+  | 'classification'
+  | 'container_move'
+  | 'ooda_observe'
+  | 'ooda_orient'
+  | 'ooda_decide'
+  | 'ooda_act'
+  | 'engagement_active'
+  | 'effector_fired';
+
+export type HiveEventType = LogisticalEventType | OperationalEventType;
+
+export type EventCategory = 'operational' | 'logistical';
+
+export interface HiveEvent {
+  id: string;
+  timestamp: number;
+  sourceNodeId: string;
+  eventClass: EventClass;
+  eventType: HiveEventType;
+  category: EventCategory;
+  priority: EventPriority;
+  message: string;
+  // For cause-effect chains
+  causeEventId?: string;
+  effectEventIds?: string[];
+  // Metric context (e.g., hydraulic_pct: 65)
+  metric?: { name: string; value: number; unit: string };
+}
+
 export interface GameState {
   width: number;
   height: number;
