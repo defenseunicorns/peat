@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import Map3D from './components/Map3D/Map3D';
 import { CapabilityCard } from './components/PieceCard/PieceCard';
-import { TerrainType, Piece, ComposedCapability, Objective, GamePhase } from './types';
+import EventStream from './components/EventStream/EventStream';
+import { TerrainType, Piece, ComposedCapability, Objective, GamePhase, HiveEvent } from './types';
 
 // Generate simple terrain for demo
 function generateTerrain(width: number, height: number): TerrainType[][] {
@@ -154,7 +155,108 @@ function createDemoState() {
     },
   ];
 
-  return { terrain, pieces, capabilities, objectives };
+  const now = Date.now();
+  const events: HiveEvent[] = [
+    // Operational events
+    {
+      id: 'evt-001', timestamp: now - 120000, sourceNodeId: 'Alpha-1',
+      eventClass: 'product', eventType: 'detection', category: 'operational',
+      priority: 'normal', message: 'vehicle at (10,5), confidence: 0.92',
+    },
+    {
+      id: 'evt-002', timestamp: now - 110000, sourceNodeId: 'Alpha-1',
+      eventClass: 'product', eventType: 'track_new', category: 'operational',
+      priority: 'normal', message: 'Track #42 established',
+      causeEventId: 'evt-001',
+    },
+    {
+      id: 'evt-003', timestamp: now - 95000, sourceNodeId: 'Alpha-2',
+      eventClass: 'product', eventType: 'classification', category: 'operational',
+      priority: 'normal', message: 'Track #42 classified: armored vehicle',
+    },
+    {
+      id: 'evt-004', timestamp: now - 80000, sourceNodeId: 'Alpha-1',
+      eventClass: 'product', eventType: 'ooda_observe', category: 'operational',
+      priority: 'normal', message: 'Sector 7 sweep complete',
+    },
+    {
+      id: 'evt-005', timestamp: now - 70000, sourceNodeId: 'Alpha-3',
+      eventClass: 'product', eventType: 'container_move', category: 'operational',
+      priority: 'low', message: 'Sensor package relocated to grid (8,4)',
+    },
+    // Logistical cause-effect chain: hydraulic degradation -> maintenance cycle
+    {
+      id: 'evt-010', timestamp: now - 60000, sourceNodeId: 'crane-2',
+      eventClass: 'anomaly', eventType: 'capability_degraded', category: 'logistical',
+      priority: 'high', message: 'hydraulic_pct dropped',
+      metric: { name: 'hydraulic_pct', value: 65, unit: '%' },
+      effectEventIds: ['evt-011'],
+    },
+    {
+      id: 'evt-011', timestamp: now - 55000, sourceNodeId: 'crane-2',
+      eventClass: 'product', eventType: 'maintenance_scheduled', category: 'logistical',
+      priority: 'high', message: 'Scheduled for crane-2 hydraulic system',
+      causeEventId: 'evt-010', effectEventIds: ['evt-012'],
+    },
+    {
+      id: 'evt-012', timestamp: now - 40000, sourceNodeId: 'crane-2',
+      eventClass: 'product', eventType: 'maintenance_started', category: 'logistical',
+      priority: 'normal', message: 'Technician dispatched to crane-2',
+      causeEventId: 'evt-011', effectEventIds: ['evt-013'],
+    },
+    {
+      id: 'evt-013', timestamp: now - 20000, sourceNodeId: 'crane-2',
+      eventClass: 'product', eventType: 'maintenance_complete', category: 'logistical',
+      priority: 'normal', message: 'Hydraulic system restored',
+      causeEventId: 'evt-012', effectEventIds: ['evt-014'],
+    },
+    {
+      id: 'evt-014', timestamp: now - 15000, sourceNodeId: 'crane-2',
+      eventClass: 'product', eventType: 'capability_restored', category: 'logistical',
+      priority: 'normal', message: 'crane-2 operational',
+      metric: { name: 'hydraulic_pct', value: 95, unit: '%' },
+      causeEventId: 'evt-013',
+    },
+    // More logistical events
+    {
+      id: 'evt-020', timestamp: now - 50000, sourceNodeId: 'Bravo-2',
+      eventClass: 'anomaly', eventType: 'resupply_requested', category: 'logistical',
+      priority: 'high', message: 'Ammunition below threshold',
+      metric: { name: 'ammo', value: 2, unit: '/30' },
+    },
+    {
+      id: 'evt-021', timestamp: now - 30000, sourceNodeId: 'Bravo-2',
+      eventClass: 'product', eventType: 'resupply_delivered', category: 'logistical',
+      priority: 'normal', message: 'Ammunition resupplied',
+      causeEventId: 'evt-020',
+    },
+    {
+      id: 'evt-030', timestamp: now - 45000, sourceNodeId: 'Charlie-3',
+      eventClass: 'product', eventType: 'shift_started', category: 'logistical',
+      priority: 'normal', message: 'Watch rotation Alpha to Bravo',
+    },
+    {
+      id: 'evt-040', timestamp: now - 35000, sourceNodeId: 'Delta-1',
+      eventClass: 'anomaly', eventType: 'recertification_required', category: 'logistical',
+      priority: 'normal', message: 'Sensor calibration due',
+    },
+    // Recent operational
+    {
+      id: 'evt-050', timestamp: now - 10000, sourceNodeId: 'Alpha-1',
+      eventClass: 'product', eventType: 'track_lost', category: 'operational',
+      priority: 'high', message: 'Track #42 lost, last seen (12,6)',
+    },
+    {
+      id: 'evt-051', timestamp: now - 5000, sourceNodeId: 'Alpha-3',
+      eventClass: 'product', eventType: 'engagement_active', category: 'operational',
+      priority: 'critical', message: 'Platform Alpha-3 engaging target sector 9',
+    },
+  ];
+
+  // Sort events by timestamp
+  events.sort((a, b) => a.timestamp - b.timestamp);
+
+  return { terrain, pieces, capabilities, objectives, events };
 }
 
 export default function App() {
@@ -164,6 +266,7 @@ export default function App() {
   const [phase] = useState<GamePhase>('select_objective');
   const [turn] = useState(1);
   const [score] = useState(0);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
 
   const demoState = useMemo(() => createDemoState(), []);
 
@@ -237,7 +340,7 @@ export default function App() {
         </div>
 
         {/* Objectives panel */}
-        <div style={{ borderTop: '1px solid #333', padding: '16px', maxHeight: '40%', overflow: 'auto' }}>
+        <div style={{ borderTop: '1px solid #333', padding: '16px', maxHeight: '30%', overflow: 'auto' }}>
           <h3 style={{ color: '#ff44ff', margin: '0 0 12px 0', fontSize: '14px' }}>
             OBJECTIVES
           </h3>
@@ -273,6 +376,55 @@ export default function App() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Event Stream panel */}
+        <div style={{ borderTop: '1px solid #333', height: '35%', display: 'flex', flexDirection: 'column' }}>
+          {/* Playback controls */}
+          <div style={{
+            padding: '6px 12px',
+            borderBottom: '1px solid #222',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '12px',
+          }}>
+            <button
+              onClick={() => setPlaybackSpeed(playbackSpeed === 0 ? 1 : 0)}
+              style={{
+                padding: '2px 8px',
+                background: playbackSpeed === 0 ? '#332200' : '#1a1a2a',
+                border: `1px solid ${playbackSpeed === 0 ? '#ff8800' : '#333'}`,
+                borderRadius: '3px',
+                color: playbackSpeed === 0 ? '#ff8800' : '#ccc',
+                cursor: 'pointer',
+                fontSize: '11px',
+              }}
+            >
+              {playbackSpeed === 0 ? '\u25b6 Play' : '\u23f8 Pause'}
+            </button>
+            <span style={{ color: '#555', fontSize: '10px' }}>Speed:</span>
+            {[0.5, 1, 2, 4].map(speed => (
+              <button
+                key={speed}
+                onClick={() => setPlaybackSpeed(speed)}
+                style={{
+                  padding: '1px 5px',
+                  background: playbackSpeed === speed ? '#1a2a3a' : 'transparent',
+                  border: `1px solid ${playbackSpeed === speed ? '#00aaff' : '#333'}`,
+                  borderRadius: '3px',
+                  color: playbackSpeed === speed ? '#00aaff' : '#555',
+                  cursor: 'pointer',
+                  fontSize: '10px',
+                }}
+              >
+                {speed}x
+              </button>
+            ))}
+          </div>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <EventStream events={demoState.events} playbackSpeed={playbackSpeed} />
+          </div>
         </div>
       </div>
     </div>
