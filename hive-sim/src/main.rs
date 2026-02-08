@@ -62,10 +62,14 @@
 //! 0: Success (document synced, all operations completed)
 //! 1: Failure (timeout, error, or document not received)
 
+#[allow(dead_code)]
 mod certification;
+#[allow(dead_code)]
 mod degradation;
+#[allow(dead_code)]
 mod logistics;
 mod metrics;
+#[allow(dead_code)]
 mod resources;
 mod utils;
 
