@@ -3325,10 +3325,7 @@ async fn port_ops_mode(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use crate::resources::PortOpsResources;
 
-    println!(
-        "[{}] === PORT OPERATIONS RESOURCE SIMULATION ===",
-        node_id
-    );
+    println!("[{}] === PORT OPERATIONS RESOURCE SIMULATION ===", node_id);
 
     let max_updates: u64 = std::env::var("MAX_UPDATES")
         .ok()

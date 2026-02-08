@@ -306,7 +306,8 @@ impl CraneState {
             return false;
         }
 
-        self.maintenance_remaining_secs = self.maintenance_remaining_secs.saturating_sub(elapsed_secs);
+        self.maintenance_remaining_secs =
+            self.maintenance_remaining_secs.saturating_sub(elapsed_secs);
         crew.busy_remaining_secs = crew.busy_remaining_secs.saturating_sub(elapsed_secs);
 
         if self.maintenance_remaining_secs == 0 {
@@ -314,11 +315,7 @@ impl CraneState {
             self.hydraulic_fluid_pct = CRANE_FLUID_TARGET;
             crew.available = true;
             crew.busy_remaining_secs = 0;
-            self.transition_to(
-                EquipmentState::Operational,
-                "maintenance_complete",
-                node_id,
-            );
+            self.transition_to(EquipmentState::Operational, "maintenance_complete", node_id);
 
             log_metrics(&MetricsEvent::ResupplyCompleted {
                 node_id: node_id.to_string(),
@@ -545,7 +542,8 @@ impl PortOpsResources {
     ) {
         // -- Tractor --
         if transport_this_tick {
-            self.tractor.complete_transport_cycle(node_id, battery_drain);
+            self.tractor
+                .complete_transport_cycle(node_id, battery_drain);
         }
         self.tractor.tick_charging(sim_elapsed_secs, node_id);
 
@@ -610,10 +608,7 @@ impl PortOpsResources {
             "crane_state".to_string(),
             json!(self.crane.state.to_string()),
         );
-        fields.insert(
-            "crane_lifts".to_string(),
-            json!(self.crane.lifts_completed),
-        );
+        fields.insert("crane_lifts".to_string(), json!(self.crane.lifts_completed));
 
         let worker_states: Vec<serde_json::Value> = self
             .workers
@@ -715,9 +710,7 @@ mod tests {
         assert_eq!(crane.hydraulic_fluid_pct, 100.0);
 
         assert!(crane.complete_lift("node1"));
-        assert!(
-            (crane.hydraulic_fluid_pct - (100.0 - CRANE_FLUID_PER_LIFT)).abs() < f64::EPSILON
-        );
+        assert!((crane.hydraulic_fluid_pct - (100.0 - CRANE_FLUID_PER_LIFT)).abs() < f64::EPSILON);
         assert_eq!(crane.lifts_completed, 1);
     }
 
