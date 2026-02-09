@@ -11,13 +11,40 @@ const ACTION_ICONS: Record<string, string> = {
   request_support: '\u2691',          // flag
   report_equipment_status: '\u2699',  // gear
   update_capability: '\u2B06',        // up arrow
+  transport_container: '\u{1F69A}',   // truck
+  report_position: '\u{1F4CD}',       // pin
+  request_charge: '\u{1F50B}',        // battery
+  rebalance_assignments: '\u21C4',    // arrows
+  update_priority_queue: '\u2195',    // up-down
+  dispatch_resource: '\u27A1',        // right arrow
+  emit_schedule_event: '\u{1F4CB}',   // clipboard
+  emit_reading: '\u{1F4CA}',          // chart
+  report_calibration: '\u{1F527}',    // wrench
   wait: '\u23F8',                     // pause
 };
 
-const PRIORITY_COLORS: Record<string, string> = {
-  HIGH: 'text-red-400',
-  ROUTINE: 'text-gray-400',
-  LOW: 'text-gray-600',
+/** Lifecycle event icons and colors by event_type. */
+const LIFECYCLE_STYLE: Record<string, { icon: string; color: string }> = {
+  CAPABILITY_DEGRADED:      { icon: '\u2193', color: 'text-amber-400' },    // down arrow
+  RESOURCE_CONSUMED:        { icon: '\u2B07', color: 'text-cyan-400' },     // down arrow
+  RESUPPLY_REQUESTED:       { icon: '\u26FD', color: 'text-yellow-400' },   // fuel pump
+  RESUPPLY_COMPLETED:       { icon: '\u2705', color: 'text-green-400' },    // check
+  MAINTENANCE_SCHEDULED:    { icon: '\uD83D\uDD27', color: 'text-orange-400' }, // wrench
+  MAINTENANCE_STARTED:      { icon: '\u2692', color: 'text-orange-300' },   // hammers
+  MAINTENANCE_COMPLETE:     { icon: '\u2714', color: 'text-green-400' },    // check
+  CERTIFICATION_EXPIRING:   { icon: '\u23F0', color: 'text-amber-400' },    // alarm
+  CERTIFICATION_EXPIRED:    { icon: '\u274C', color: 'text-red-400' },      // cross
+  RECERTIFICATION_COMPLETED:{ icon: '\u2714', color: 'text-green-400' },    // check
+  GAP_ANALYSIS_REPORT:      { icon: '\u2637', color: 'text-violet-400' },   // trigram
+  SHIFT_RELIEF_REQUESTED:   { icon: '\u21C4', color: 'text-blue-400' },     // arrows
+  SHIFT_RELIEF_ARRIVED:     { icon: '\u2714', color: 'text-green-400' },    // check
+  CALIBRATION_DRIFT:        { icon: '\u{1F527}', color: 'text-amber-400' }, // wrench
+  container_transported:    { icon: '\u{1F69A}', color: 'text-amber-300' }, // truck
+  sensor_reading:           { icon: '\u{1F4CA}', color: 'text-blue-300' },  // chart
+  anomaly_detected:         { icon: '\u26A0', color: 'text-red-400' },      // warning
+  operator_reassigned:      { icon: '\u21C4', color: 'text-purple-400' },   // arrows
+  queue_reordered:          { icon: '\u2195', color: 'text-purple-300' },   // up-down
+  resource_dispatched:      { icon: '\u27A1', color: 'text-purple-400' },   // right arrow
 };
 
 const NODE_COLORS: Record<string, string> = {
@@ -27,7 +54,65 @@ const NODE_COLORS: Record<string, string> = {
 };
 
 function nodeColor(nodeId: string): string {
+  if (nodeId.startsWith('crane')) return 'text-cyan-400';
+  if (nodeId.includes('agg')) return 'text-violet-400';
+  if (nodeId.startsWith('op-')) return 'text-green-400';
+  if (nodeId.startsWith('tractor-')) return 'text-amber-400';
+  if (nodeId.startsWith('scheduler')) return 'text-purple-400';
+  if (nodeId.startsWith('load-cell-') || nodeId.startsWith('rfid-')) return 'text-blue-400';
   return NODE_COLORS[nodeId] ?? 'text-gray-300';
+}
+
+/** Extract a short detail summary from lifecycle event details. */
+function lifecycleDetail(eventType: string, details: unknown): string {
+  const d = (details ?? {}) as Record<string, unknown>;
+  switch (eventType) {
+    case 'CAPABILITY_DEGRADED': {
+      const sub = d.subsystem as string ?? '';
+      const after = d.after as number;
+      const status = d.status as string ?? '';
+      return `${sub} ${(after * 100).toFixed(0)}% [${status}]`;
+    }
+    case 'RESOURCE_CONSUMED': {
+      const res = (d.resource as string ?? '').replace('_pct', '');
+      const after = d.after as number;
+      return `${res} ${after.toFixed(0)}%`;
+    }
+    case 'RESUPPLY_REQUESTED':
+    case 'RESUPPLY_COMPLETED':
+      return (d.equipment_id as string) ?? '';
+    case 'MAINTENANCE_SCHEDULED':
+    case 'MAINTENANCE_STARTED':
+    case 'MAINTENANCE_COMPLETE': {
+      const sub = d.subsystem as string ?? d.equipment_id as string ?? '';
+      const restored = d.restored_confidence as number;
+      return restored !== undefined ? `${sub} \u2192 ${(restored * 100).toFixed(0)}%` : sub;
+    }
+    case 'GAP_ANALYSIS_REPORT': {
+      const score = d.readiness_score as number;
+      const gaps = d.gaps as unknown[];
+      return `RDY ${(score * 100).toFixed(0)}% / ${gaps?.length ?? 0} gaps`;
+    }
+    case 'CERTIFICATION_EXPIRING':
+    case 'CERTIFICATION_EXPIRED':
+    case 'RECERTIFICATION_COMPLETED':
+      return (d.worker_id as string) ?? (d.cert_type as string) ?? '';
+    case 'CALIBRATION_DRIFT': {
+      const acc = d.accuracy_pct as number;
+      const st = d.status as string ?? '';
+      return `${acc?.toFixed(0)}% [${st}]`;
+    }
+    case 'container_transported':
+      return `${d.container_id ?? ''} → ${d.destination ?? ''}`;
+    case 'sensor_reading':
+      return `${d.reading_type ?? ''} ${d.value ?? ''}${d.unit ?? ''}`;
+    case 'anomaly_detected':
+      return `${d.reading_type ?? ''} ${d.value ?? ''} (expected ${d.expected ?? ''})`;
+    case 'resource_dispatched':
+      return `${d.resource_type ?? ''}: ${d.from_entity ?? ''} → ${d.to_entity ?? ''}`;
+    default:
+      return '';
+  }
 }
 
 /** Merge OODA cycle histories and HIVE events into a unified timeline. */
@@ -63,6 +148,7 @@ function buildTimeline(
       eventType: e.event_type,
       source: e.source,
       priority: e.priority,
+      details: e.details,
     });
   }
 
@@ -89,6 +175,7 @@ type TimelineEntry =
       eventType: string;
       source: string;
       priority: string;
+      details: unknown;
     };
 
 export default function EventStream() {
@@ -142,16 +229,23 @@ export default function EventStream() {
               </div>
             );
           } else {
-            const prioClass = PRIORITY_COLORS[entry.priority] ?? 'text-gray-400';
+            const style = LIFECYCLE_STYLE[entry.eventType];
+            const icon = style?.icon ?? '\u26A1';
+            const colorClass = style?.color ?? 'text-gray-400';
+            const detail = lifecycleDetail(entry.eventType, entry.details);
             return (
-              <div key={i} className={`flex gap-1.5 items-baseline ${prioClass}`}>
-                <span className="w-4 text-center shrink-0">{'\u26A1'}</span>
+              <div key={i} className={`flex gap-1.5 items-baseline ${colorClass}`}>
+                <span className="w-4 text-center shrink-0">{icon}</span>
                 <span className={`w-20 shrink-0 ${nodeColor(entry.source)}`}>
                   {entry.source}
                 </span>
-                <span className="flex-1 truncate font-semibold">
-                  {entry.eventType}
+                <span className="shrink-0 font-semibold">
+                  {formatEventType(entry.eventType)}
                 </span>
+                {detail && (
+                  <span className="flex-1 truncate text-gray-400">{detail}</span>
+                )}
+                {!detail && <span className="flex-1" />}
                 <span className="text-gray-600 shrink-0 text-[10px]">{entry.priority}</span>
               </div>
             );
@@ -165,4 +259,8 @@ export default function EventStream() {
 
 function formatAction(action: string): string {
   return action.replace(/_/g, ' ');
+}
+
+function formatEventType(eventType: string): string {
+  return eventType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c);
 }

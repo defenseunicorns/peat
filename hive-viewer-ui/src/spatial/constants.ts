@@ -33,6 +33,21 @@ export const CRANE_POSITIONS: Record<string, { x: number; z: number }> = {
 export const OPERATOR_POSITIONS: Record<string, { x: number; z: number }> = {
   'op-1': { x: -6, z: -4 },
   'op-2': { x: 6, z: -4 },
+  'op-3': { x: -3, z: -4 },
+  'op-4': { x: 0, z: -4 },
+  'op-5': { x: 3, z: -4 },
+};
+
+export const TRACTOR_POSITIONS: Record<string, { x: number; z: number }> = {
+  'tractor-1': { x: -9, z: -9 },
+  'tractor-2': { x: -3, z: -9 },
+  'tractor-3': { x: 3, z: -9 },
+  'tractor-4': { x: 9, z: -9 },
+};
+
+export const SENSOR_POSITIONS: Record<string, { x: number; z: number }> = {
+  'load-cell-1': { x: -4, z: -4.5 },
+  'rfid-1': { x: 4, z: -4.5 },
 };
 
 export const CONTAINER_GRID = {
@@ -83,6 +98,15 @@ export const COLORS = {
   operatorAvailable: '#22c55e',
   operatorAssigned: '#22d3ee',
   operatorBreak: '#6b7280',
+
+  tractorIdle: '#6b7280',
+  tractorMoving: '#f59e0b',
+  tractorCharging: '#eab308',
+
+  sensorActive: '#3b82f6',
+  sensorDrifting: '#f59e0b',
+
+  schedulerActive: '#a78bfa',
 
   text: '#e5e7eb',
   textDim: '#6b7280',

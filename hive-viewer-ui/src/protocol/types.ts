@@ -64,6 +64,29 @@ export interface SimClock {
   real_elapsed_ms: number;
 }
 
+/** Per-subsystem health state (from CAPABILITY_DEGRADED events). */
+export interface SubsystemHealth {
+  confidence: number;
+  status: 'NOMINAL' | 'DEGRADED' | 'CRITICAL' | 'OFFLINE';
+}
+
+/** Per-resource level (from RESOURCE_CONSUMED events). */
+export interface ResourceLevel {
+  value: number;  // 0-100 percent
+}
+
+/** Lifecycle state aggregated from hive_event messages. */
+export interface LifecycleState {
+  subsystems: Record<string, SubsystemHealth>;
+  resources: Record<string, ResourceLevel>;
+  equipmentState: string;  // OPERATIONAL | RESUPPLYING
+  maintenanceJobs: string[];  // active subsystem maintenance
+  gapReport: {
+    readinessScore: number;
+    gaps: Array<{ name: string; confidence: number; required: number; status: string }>;
+  } | null;
+}
+
 /** Parsed OODA cycle data stored per-node. */
 export interface NodeState {
   node_id: string;
@@ -77,9 +100,11 @@ export interface NodeState {
   act_ms: number;
   total_ms?: number;
   /** Role inferred from node_id pattern. */
-  role: 'crane' | 'aggregator' | 'operator' | 'unknown';
+  role: 'crane' | 'aggregator' | 'operator' | 'tractor' | 'scheduler' | 'sensor' | 'unknown';
   /** All cycles received for this node. */
   history: OodaCycleData[];
+  /** Lifecycle state from degradation/resource/gap events. */
+  lifecycle: LifecycleState;
 }
 
 export interface OodaCycleData {
@@ -94,9 +119,12 @@ export interface OodaCycleData {
   total_ms?: number;
 }
 
-export function inferRole(nodeId: string): 'crane' | 'aggregator' | 'operator' | 'unknown' {
+export function inferRole(nodeId: string): 'crane' | 'aggregator' | 'operator' | 'tractor' | 'scheduler' | 'sensor' | 'unknown' {
   if (nodeId.startsWith('crane')) return 'crane';
   if (nodeId.startsWith('op-')) return 'operator';
+  if (nodeId.startsWith('tractor-')) return 'tractor';
+  if (nodeId.startsWith('scheduler')) return 'scheduler';
+  if (nodeId.startsWith('load-cell-') || nodeId.startsWith('rfid-')) return 'sensor';
   if (nodeId.includes('agg')) return 'aggregator';
   return 'unknown';
 }

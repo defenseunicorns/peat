@@ -249,6 +249,12 @@ class DryRunProvider(LLMProvider):
             return self._decide_aggregator(observed_state)
         elif self._role == "operator":
             return self._decide_operator(observed_state)
+        elif self._role == "tractor":
+            return self._decide_tractor(observed_state)
+        elif self._role == "scheduler":
+            return self._decide_scheduler(observed_state)
+        elif self._role == "sensor":
+            return self._decide_sensor(observed_state)
         return self._decide_crane(observed_state)
 
     def _decide_crane(self, observed_state: dict) -> AgentDecision:
@@ -355,6 +361,168 @@ class DryRunProvider(LLMProvider):
             arguments={"reason": "Available — no pending crane requests"},
             reasoning=f"DryRun cycle {self._cycle}: operator idle, waiting for assignment",
         )
+
+    def _decide_tractor(self, observed_state: dict) -> AgentDecision:
+        tasking = observed_state.get("tasking", {})
+        battery = tasking.get("battery_pct", 100)
+        pending_jobs = tasking.get("pending_transport_jobs", [])
+        trips = tasking.get("trips_completed", 0)
+
+        # Battery critical: request charge
+        if battery < 30:
+            return AgentDecision(
+                action="request_charge",
+                arguments={},
+                reasoning=f"DryRun cycle {self._cycle}: battery at {battery}%, requesting charge",
+            )
+
+        # Cycle 14+: return to depot
+        if self._cycle >= 14:
+            return AgentDecision(
+                action="report_position",
+                arguments={"zone": "yard", "block": "DEPOT", "status": "IDLE"},
+                reasoning=f"DryRun cycle {self._cycle}: returning to depot",
+            )
+
+        # Every 6th cycle: report position
+        if self._cycle % 6 == 0:
+            return AgentDecision(
+                action="report_position",
+                arguments={"zone": "yard", "block": f"YB-{chr(65 + (trips % 6))}", "status": "IN_TRANSIT"},
+                reasoning=f"DryRun cycle {self._cycle}: periodic position report",
+            )
+
+        # Primary: transport container from queue
+        if pending_jobs:
+            job = pending_jobs[0]
+            return AgentDecision(
+                action="transport_container",
+                arguments={
+                    "container_id": job.get("container_id", "UNKNOWN"),
+                    "destination_block": job.get("destination_block", "YB-A01"),
+                },
+                reasoning=f"DryRun cycle {self._cycle}: transporting {job.get('container_id')}",
+            )
+
+        return AgentDecision(
+            action="wait",
+            arguments={"reason": "No transport jobs pending"},
+            reasoning=f"DryRun cycle {self._cycle}: tractor idle, no jobs",
+        )
+
+    def _decide_scheduler(self, observed_state: dict) -> AgentDecision:
+        team = observed_state.get("team_state", {})
+        members = team.get("team_members", {})
+        gaps = team.get("gap_analysis", [])
+
+        # If crane DEGRADED: dispatch resource
+        for mid, mdata in members.items():
+            if mdata.get("entity_type") == "gantry_crane" and mdata.get("status") == "DEGRADED":
+                return AgentDecision(
+                    action="dispatch_resource",
+                    arguments={
+                        "resource_type": "tractor",
+                        "from_entity": "tractor-1",
+                        "to_entity": mid,
+                        "reason": f"{mid} degraded — rerouting transport support",
+                    },
+                    reasoning=f"DryRun cycle {self._cycle}: dispatching to degraded crane {mid}",
+                )
+
+        # Every 2nd cycle: rebalance assignments
+        if self._cycle % 2 == 0:
+            operators = [m for m, d in members.items() if d.get("entity_type") == "operator"]
+            cranes = [m for m, d in members.items() if d.get("entity_type") == "gantry_crane"]
+            assignments = {}
+            for i, op in enumerate(operators[:len(cranes)]):
+                assignments[op] = cranes[i % len(cranes)] if cranes else "crane-1"
+            return AgentDecision(
+                action="rebalance_assignments",
+                arguments={"assignments": assignments},
+                reasoning=f"DryRun cycle {self._cycle}: periodic rebalance",
+            )
+
+        # Every 4th cycle: update priority queue
+        if self._cycle % 4 == 0:
+            return AgentDecision(
+                action="update_priority_queue",
+                arguments={"priority_order": ["MSCU-4472891", "MSCU-4472892", "MSCU-4472893"]},
+                reasoning=f"DryRun cycle {self._cycle}: reprioritizing queue",
+            )
+
+        # If gaps detected: dispatch resource
+        if gaps:
+            return AgentDecision(
+                action="dispatch_resource",
+                arguments={
+                    "resource_type": "operator",
+                    "from_entity": "op-3",
+                    "to_entity": gaps[-1].get("reported_by", "crane-1"),
+                    "reason": f"Gap: {gaps[-1].get('capability', 'unknown')}",
+                },
+                reasoning=f"DryRun cycle {self._cycle}: dispatching for gap",
+            )
+
+        return AgentDecision(
+            action="emit_schedule_event",
+            arguments={
+                "event_type": "schedule_check",
+                "details": f"Cycle {self._cycle}: all systems nominal",
+                "priority": "LOW",
+            },
+            reasoning=f"DryRun cycle {self._cycle}: routine schedule check",
+        )
+
+    def _decide_sensor(self, observed_state: dict) -> AgentDecision:
+        tasking = observed_state.get("tasking", {})
+        sensor_type = tasking.get("sensor_type", "LOAD_CELL")
+
+        # Every 5th cycle: report calibration
+        if self._cycle % 5 == 0:
+            # Simulate drift increasing over time
+            drift = self._cycle * 0.3
+            accuracy = max(75.0, 100.0 - drift)
+            status = "CALIBRATED" if accuracy >= 95 else "DRIFTING" if accuracy >= 85 else "NEEDS_RECALIBRATION"
+            return AgentDecision(
+                action="report_calibration",
+                arguments={
+                    "accuracy_pct": round(accuracy, 1),
+                    "drift": round(drift, 2),
+                    "status": status,
+                },
+                reasoning=f"DryRun cycle {self._cycle}: calibration report (accuracy={accuracy:.1f}%)",
+            )
+
+        # All other cycles: emit readings (sensors never wait)
+        if sensor_type == "LOAD_CELL":
+            # Weight reading — slight variation, occasional anomaly
+            base_weight = 25.0
+            variation = (self._cycle % 7) * 0.5
+            value = base_weight + variation
+            if self._cycle % 11 == 0:
+                value = base_weight * 1.08  # Anomaly: >5% divergence
+            return AgentDecision(
+                action="emit_reading",
+                arguments={
+                    "reading_type": "weight",
+                    "value": round(value, 1),
+                    "unit": "tons",
+                    "container_id": f"MSCU-{4472891 + (self._cycle % 20)}",
+                },
+                reasoning=f"DryRun cycle {self._cycle}: load cell reading {value:.1f}t",
+            )
+        else:
+            # RFID tag scan
+            return AgentDecision(
+                action="emit_reading",
+                arguments={
+                    "reading_type": "rfid_tag",
+                    "value": 4472891 + (self._cycle % 20),
+                    "unit": "id",
+                    "container_id": f"MSCU-{4472891 + (self._cycle % 20)}",
+                },
+                reasoning=f"DryRun cycle {self._cycle}: RFID scan",
+            )
 
     def _decide_aggregator(self, observed_state: dict) -> AgentDecision:
         team = observed_state.get("team_state", {})

@@ -26,6 +26,19 @@ export interface OperatorVisualState {
   hazmatCertified: boolean;
 }
 
+export interface TractorVisualState {
+  isMoving: boolean;
+  batteryPct: number;
+  isCharging: boolean;
+  tripsCompleted: number;
+}
+
+export interface SensorVisualState {
+  isEmitting: boolean;
+  sensorType: 'LOAD_CELL' | 'RFID';
+  calibrationPct: number;
+}
+
 export interface HoldSummaryState {
   movesPerHour: number;
   movesCompleted: number;
@@ -37,6 +50,9 @@ export interface SpatialDerivedState {
   containers: DerivedContainer[];
   cranes: Record<string, CraneVisualState>;
   operators: Record<string, OperatorVisualState>;
+  tractors: Record<string, TractorVisualState>;
+  sensors: Record<string, SensorVisualState>;
   holdSummary: HoldSummaryState;
   aggregatorActive: boolean;
+  schedulerActive: boolean;
 }

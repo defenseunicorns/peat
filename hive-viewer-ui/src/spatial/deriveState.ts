@@ -5,6 +5,8 @@ import type {
   SpatialDerivedState,
   CraneVisualState,
   OperatorVisualState,
+  TractorVisualState,
+  SensorVisualState,
   DerivedContainer,
   HoldSummaryState,
   EquipmentStatus,
@@ -89,12 +91,44 @@ export function deriveSpatialState(
     };
   }
 
+  // --- Tractor states ---
+  const tractors: Record<string, TractorVisualState> = {};
+  for (const [nodeId, node] of Object.entries(nodes)) {
+    if (node.role !== 'tractor') continue;
+    const isMoving = node.action === 'transport_container';
+    const isCharging = node.action === 'request_charge';
+    const tripsCompleted = node.history.filter(
+      (c) => c.action === 'transport_container' && c.success,
+    ).length;
+    // Battery from lifecycle resources
+    const batteryRes = node.lifecycle.resources['battery_pct'];
+    const batteryPct = batteryRes ? batteryRes.value : 100;
+    tractors[nodeId] = { isMoving, batteryPct, isCharging, tripsCompleted };
+  }
+
+  // --- Sensor states ---
+  const sensors: Record<string, SensorVisualState> = {};
+  for (const [nodeId, node] of Object.entries(nodes)) {
+    if (node.role !== 'sensor') continue;
+    const isEmitting = node.action === 'emit_reading';
+    const sensorType = nodeId.startsWith('load-cell') ? 'LOAD_CELL' : 'RFID';
+    // Calibration from lifecycle subsystems
+    const calSub = node.lifecycle.subsystems['calibration'];
+    const calibrationPct = calSub ? calSub.confidence * 100 : 100;
+    sensors[nodeId] = { isEmitting, sensorType, calibrationPct };
+  }
+
   // --- Aggregator active ---
   const aggregatorActive = Object.values(nodes).some(
     (n) => n.role === 'aggregator' && n.action !== 'wait',
   );
 
-  return { containers, cranes, operators, holdSummary, aggregatorActive };
+  // --- Scheduler active ---
+  const schedulerActive = Object.values(nodes).some(
+    (n) => n.role === 'scheduler' && n.action !== 'wait',
+  );
+
+  return { containers, cranes, operators, tractors, sensors, holdSummary, aggregatorActive, schedulerActive };
 }
 
 function getLatestEquipmentStatus(

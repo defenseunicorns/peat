@@ -6,6 +6,8 @@ import HoldGrid from './HoldGrid';
 import ContainerQueue from './ContainerQueue';
 import CraneGantry from './CraneGantry';
 import OperatorFigure from './OperatorFigure';
+import TractorUnit from './TractorUnit';
+import SensorBeacon from './SensorBeacon';
 import YardBlocks from './YardBlocks';
 import ContentionFlash from './ContentionFlash';
 
@@ -67,6 +69,16 @@ export default function BerthScene({ state }: Props) {
       {/* Operators */}
       {Object.entries(state.operators).map(([nodeId, op]) => (
         <OperatorFigure key={nodeId} nodeId={nodeId} operator={op} />
+      ))}
+
+      {/* Tractors */}
+      {Object.entries(state.tractors).map(([nodeId, tractor]) => (
+        <TractorUnit key={nodeId} nodeId={nodeId} tractor={tractor} />
+      ))}
+
+      {/* Sensors */}
+      {Object.entries(state.sensors).map(([nodeId, sensor]) => (
+        <SensorBeacon key={nodeId} nodeId={nodeId} sensor={sensor} />
       ))}
 
       <YardBlocks />

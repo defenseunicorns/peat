@@ -271,6 +271,204 @@ AGGREGATOR_TOOLS = [
     ),
 ]
 
+# ── Tractor tool definitions ───────────────────────────────────────────────
+
+TRACTOR_TOOLS = [
+    ToolShim(
+        name="transport_container",
+        description=(
+            "Claim a discharged container from the transport queue and deliver "
+            "it to the destination yard block."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "container_id": {
+                    "type": "string",
+                    "description": "Container ID to transport (e.g., MSCU-4472891)",
+                },
+                "destination_block": {
+                    "type": "string",
+                    "description": "Destination yard block (e.g., YB-A01)",
+                },
+            },
+            "required": ["container_id", "destination_block"],
+        },
+    ),
+    ToolShim(
+        name="report_position",
+        description=(
+            "Report current tractor position and status in the yard."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "zone": {"type": "string", "description": "Current zone (yard, berth, lane)"},
+                "block": {"type": "string", "description": "Current block (YB-A, DEPOT, etc.)"},
+                "status": {
+                    "type": "string",
+                    "enum": ["IDLE", "IN_TRANSIT", "LOADING", "CHARGING"],
+                    "description": "Current movement status",
+                },
+            },
+            "required": ["zone", "block", "status"],
+        },
+    ),
+    ToolShim(
+        name="request_charge",
+        description=(
+            "Request battery charging. Sets status to CHARGING and emits resupply event."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {},
+        },
+    ),
+    ToolShim(
+        name="report_equipment_status",
+        description=(
+            "Report a change in equipment status. Status: OPERATIONAL, DEGRADED, FAILED, MAINTENANCE."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": ["OPERATIONAL", "DEGRADED", "FAILED", "MAINTENANCE"],
+                    "description": "New equipment status",
+                },
+                "details": {
+                    "type": "string",
+                    "description": "Description of the status change",
+                },
+            },
+            "required": ["status", "details"],
+        },
+    ),
+]
+
+# ── Scheduler tool definitions ─────────────────────────────────────────────
+
+SCHEDULER_TOOLS = [
+    ToolShim(
+        name="rebalance_assignments",
+        description=(
+            "Reassign operators between cranes based on workload. "
+            "Emits operator_reassigned events."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "assignments": {
+                    "type": "object",
+                    "description": "Mapping of operator_id → crane_id reassignments",
+                },
+            },
+            "required": ["assignments"],
+        },
+    ),
+    ToolShim(
+        name="update_priority_queue",
+        description=(
+            "Reorder the unclaimed container priority queue."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "priority_order": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Ordered list of container IDs (highest priority first)",
+                },
+            },
+            "required": ["priority_order"],
+        },
+    ),
+    ToolShim(
+        name="dispatch_resource",
+        description=(
+            "Assign a resource (tractor, operator) to an entity. "
+            "Emits resource_dispatched event with HIGH priority."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "resource_type": {"type": "string", "description": "Type of resource (tractor, operator)"},
+                "from_entity": {"type": "string", "description": "Source entity ID"},
+                "to_entity": {"type": "string", "description": "Target entity ID"},
+                "reason": {"type": "string", "description": "Reason for dispatch"},
+            },
+            "required": ["resource_type", "from_entity", "to_entity", "reason"],
+        },
+    ),
+    ToolShim(
+        name="emit_schedule_event",
+        description=(
+            "Emit a schedule-level event up the HIVE hierarchy."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "event_type": {"type": "string", "description": "Event type"},
+                "details": {"type": "string", "description": "Event details"},
+                "priority": {
+                    "type": "string",
+                    "enum": ["LOW", "NORMAL", "HIGH", "CRITICAL"],
+                    "description": "Event priority",
+                },
+            },
+            "required": ["event_type", "details", "priority"],
+        },
+    ),
+]
+
+# ── Sensor tool definitions ────────────────────────────────────────────────
+
+SENSOR_TOOLS = [
+    ToolShim(
+        name="emit_reading",
+        description=(
+            "Emit a sensor reading. If value diverges >5%% from expected, "
+            "also emits an anomaly_detected event."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "reading_type": {
+                    "type": "string",
+                    "description": "Type of reading (weight, rfid_tag, temperature)",
+                },
+                "value": {"type": "number", "description": "Sensor reading value"},
+                "unit": {"type": "string", "description": "Unit (tons, id, celsius)"},
+                "container_id": {
+                    "type": "string",
+                    "description": "Associated container ID (optional)",
+                },
+            },
+            "required": ["reading_type", "value", "unit"],
+        },
+    ),
+    ToolShim(
+        name="report_calibration",
+        description=(
+            "Report calibration status. If accuracy below threshold, emits CALIBRATION_DRIFT."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "accuracy_pct": {"type": "number", "description": "Current accuracy percentage (0-100)"},
+                "drift": {"type": "number", "description": "Drift magnitude"},
+                "status": {
+                    "type": "string",
+                    "enum": ["CALIBRATED", "DRIFTING", "NEEDS_RECALIBRATION"],
+                    "description": "Calibration status",
+                },
+            },
+            "required": ["accuracy_pct", "drift", "status"],
+        },
+    ),
+]
+
 
 # ── BridgeAPI ────────────────────────────────────────────────────────────────
 
@@ -348,11 +546,31 @@ class BridgeAPI:
                 [r.fields for r in requests], indent=2, default=str
             )
 
+        elif uri == "hive://transport-queue":
+            tq = self.store.get_document("transport_queues", f"transport_{self.hold_id}")
+            if tq:
+                jobs = tq.fields.get("pending_jobs", [])
+                pending = [j for j in jobs if j.get("status") == "PENDING"]
+                text = json.dumps({
+                    "hold_id": self.hold_id,
+                    "pending_jobs": pending[:5],
+                    "total_pending": len(pending),
+                    "completed_count": tq.fields.get("completed_count", 0),
+                }, indent=2, default=str)
+            else:
+                text = json.dumps({"error": "Transport queue not found"})
+
         elif uri == "hive://tasking":
             if self.role == "aggregator":
                 text = self._read_aggregator_tasking()
             elif self.role == "operator":
                 text = self._read_operator_tasking()
+            elif self.role == "tractor":
+                text = self._read_tractor_tasking()
+            elif self.role == "scheduler":
+                text = self._read_scheduler_tasking()
+            elif self.role == "sensor":
+                text = self._read_sensor_tasking()
             else:
                 text = self._read_crane_tasking()
 
@@ -417,12 +635,64 @@ class BridgeAPI:
         }
         return json.dumps(tasking, indent=2, default=str)
 
+    def _read_tractor_tasking(self) -> str:
+        entity = self._get_entity_doc()
+        tq = self.store.get_document("transport_queues", f"transport_{self.hold_id}")
+        pending_jobs = []
+        if tq:
+            pending_jobs = [
+                j for j in tq.fields.get("pending_jobs", [])
+                if j.get("status") == "PENDING"
+            ]
+        tasking = {
+            "directive": "TRANSPORT_CONTAINERS",
+            "position": entity.fields.get("position", {}) if entity else {},
+            "battery_pct": entity.get_field("equipment_health.battery_pct", 100) if entity else 100,
+            "pending_transport_jobs": pending_jobs[:3],
+            "trips_completed": entity.get_field("metrics.trips_completed", 0) if entity else 0,
+        }
+        return json.dumps(tasking, indent=2, default=str)
+
+    def _read_scheduler_tasking(self) -> str:
+        team = self._get_team_doc()
+        queue = self._get_queue_doc()
+        members = team.fields.get("team_members", {}) if team else {}
+        tasking = {
+            "directive": "COORDINATE_HOLD",
+            "hold_id": self.hold_id,
+            "team_size": len(members),
+            "team_members": {
+                k: {"status": v.get("status"), "entity_type": v.get("entity_type")}
+                for k, v in members.items()
+            },
+            "moves_completed": team.get_field("moves_completed", 0) if team else 0,
+            "moves_remaining": team.get_field("moves_remaining", 0) if team else 0,
+            "gap_count": len(team.get_field("gap_analysis", [])) if team else 0,
+        }
+        return json.dumps(tasking, indent=2, default=str)
+
+    def _read_sensor_tasking(self) -> str:
+        entity = self._get_entity_doc()
+        tasking = {
+            "directive": "EMIT_READINGS",
+            "sensor_type": entity.get_field("sensor_type", "UNKNOWN") if entity else "UNKNOWN",
+            "calibration": entity.fields.get("calibration", {}) if entity else {},
+            "readings_emitted": entity.get_field("metrics.readings_emitted", 0) if entity else 0,
+        }
+        return json.dumps(tasking, indent=2, default=str)
+
     async def list_tools(self) -> ListToolsResultShim:
         """Return tools appropriate for this agent's role."""
         if self.role == "aggregator":
             return ListToolsResultShim(tools=list(AGGREGATOR_TOOLS))
         elif self.role == "operator":
             return ListToolsResultShim(tools=list(OPERATOR_TOOLS))
+        elif self.role == "tractor":
+            return ListToolsResultShim(tools=list(TRACTOR_TOOLS))
+        elif self.role == "scheduler":
+            return ListToolsResultShim(tools=list(SCHEDULER_TOOLS))
+        elif self.role == "sensor":
+            return ListToolsResultShim(tools=list(SENSOR_TOOLS))
         return ListToolsResultShim(tools=list(CRANE_TOOLS))
 
     async def call_tool(self, name: str, arguments: dict) -> CallToolResultShim:
@@ -441,6 +711,18 @@ class BridgeAPI:
             # Aggregator tools
             "update_hold_summary": self._tool_update_hold_summary,
             "emit_hold_event": self._tool_emit_hold_event,
+            # Tractor tools
+            "transport_container": self._tool_transport_container,
+            "report_position": self._tool_report_position,
+            "request_charge": self._tool_request_charge,
+            # Scheduler tools
+            "rebalance_assignments": self._tool_rebalance_assignments,
+            "update_priority_queue": self._tool_update_priority_queue,
+            "dispatch_resource": self._tool_dispatch_resource,
+            "emit_schedule_event": self._tool_emit_schedule_event,
+            # Sensor tools
+            "emit_reading": self._tool_emit_reading,
+            "report_calibration": self._tool_report_calibration,
         }.get(name)
 
         if handler is None:
@@ -559,6 +841,12 @@ class BridgeAPI:
             team.update_field("moves_completed", team_completed + 1)
             remaining = team.get_field("moves_remaining", 0)
             team.update_field("moves_remaining", max(0, remaining - 1))
+
+        # Enqueue for tractor transport (if transport queue exists)
+        containers = queue.fields.get("containers", [])
+        target_c = next((c for c in containers if c["container_id"] == container_id), None)
+        dest = target_c.get("destination_block", "YB-A01") if target_c else "YB-A01"
+        self.store.enqueue_transport_job(self.hold_id, container_id, dest)
 
         logger.info(
             f"METRICS: container_move_complete node={self.node_id} "
@@ -797,3 +1085,247 @@ class BridgeAPI:
             f"type={event_type} priority={priority}"
         )
         return f"Hold event emitted: {event_type} ({priority}). {details}"
+
+    # ── Tractor tool handlers ────────────────────────────────────────────
+
+    async def _tool_transport_container(self, arguments: dict) -> str:
+        container_id = arguments["container_id"]
+        destination = arguments["destination_block"]
+
+        claimed = await self.store.claim_transport_job(
+            self.hold_id, container_id, self.node_id
+        )
+        if not claimed:
+            return f"Error: transport job for {container_id} already claimed or not found"
+
+        entity = self._get_entity_doc()
+        if entity:
+            entity.update_field("position.status", "IN_TRANSIT")
+            entity.update_field("position.block", destination)
+            trips = entity.get_field("metrics.trips_completed", 0)
+            entity.update_field("metrics.trips_completed", trips + 1)
+
+        # Complete the job
+        self.store.complete_transport_job(self.hold_id, container_id)
+
+        self.store.emit_event({
+            "event_type": "container_transported",
+            "source": self.node_id,
+            "container_id": container_id,
+            "destination": destination,
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL",
+        })
+
+        logger.info(
+            f"METRICS: container_transported node={self.node_id} "
+            f"container={container_id} dest={destination}"
+        )
+        return f"Container {container_id} transported to {destination}."
+
+    async def _tool_report_position(self, arguments: dict) -> str:
+        zone = arguments["zone"]
+        block = arguments["block"]
+        status = arguments["status"]
+
+        entity = self._get_entity_doc()
+        if not entity:
+            return "Error: entity document not found"
+
+        entity.update_field("position.zone", zone)
+        entity.update_field("position.block", block)
+        entity.update_field("position.status", status)
+
+        logger.info(
+            f"METRICS: position_update node={self.node_id} zone={zone} block={block} status={status}"
+        )
+        return f"Position updated: {zone}/{block}, status={status}."
+
+    async def _tool_request_charge(self, arguments: dict) -> str:
+        entity = self._get_entity_doc()
+        if not entity:
+            return "Error: entity document not found"
+
+        entity.update_field("position.status", "CHARGING")
+        entity.update_field("operational_status", "CHARGING")
+
+        self.store.emit_event({
+            "event_type": "RESUPPLY_REQUESTED",
+            "source": self.node_id,
+            "priority": "HIGH",
+            "details": {
+                "resource": "battery_pct",
+                "equipment_id": self.node_id,
+                "current_level": entity.get_field("equipment_health.battery_pct", 0),
+                "eta_sim_minutes": 5.0,
+            },
+        })
+
+        logger.info(f"METRICS: charge_requested node={self.node_id}")
+        return "Charging requested. Status: CHARGING."
+
+    # ── Scheduler tool handlers ──────────────────────────────────────────
+
+    async def _tool_rebalance_assignments(self, arguments: dict) -> str:
+        assignments = arguments.get("assignments", {})
+
+        entity = self._get_entity_doc()
+        if entity:
+            rebalances = entity.get_field("metrics.rebalances", 0)
+            entity.update_field("metrics.rebalances", rebalances + 1)
+
+        for op_id, crane_id in assignments.items():
+            self.store.emit_event({
+                "event_type": "operator_reassigned",
+                "source": self.node_id,
+                "operator_id": op_id,
+                "crane_id": crane_id,
+                "aggregation_policy": "AGGREGATE_AT_PARENT",
+                "priority": "NORMAL",
+            })
+
+        logger.info(
+            f"METRICS: rebalance_assignments node={self.node_id} "
+            f"assignments={len(assignments)}"
+        )
+        return f"Rebalanced {len(assignments)} assignments."
+
+    async def _tool_update_priority_queue(self, arguments: dict) -> str:
+        priority_order = arguments.get("priority_order", [])
+
+        self.store.emit_event({
+            "event_type": "queue_reordered",
+            "source": self.node_id,
+            "priority_order": priority_order,
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL",
+        })
+
+        logger.info(
+            f"METRICS: queue_reordered node={self.node_id} count={len(priority_order)}"
+        )
+        return f"Priority queue updated with {len(priority_order)} entries."
+
+    async def _tool_dispatch_resource(self, arguments: dict) -> str:
+        resource_type = arguments["resource_type"]
+        from_entity = arguments["from_entity"]
+        to_entity = arguments["to_entity"]
+        reason = arguments["reason"]
+
+        entity = self._get_entity_doc()
+        if entity:
+            dispatches = entity.get_field("metrics.dispatches", 0)
+            entity.update_field("metrics.dispatches", dispatches + 1)
+
+        self.store.emit_event({
+            "event_type": "resource_dispatched",
+            "source": self.node_id,
+            "resource_type": resource_type,
+            "from_entity": from_entity,
+            "to_entity": to_entity,
+            "reason": reason,
+            "aggregation_policy": "IMMEDIATE_PROPAGATE",
+            "priority": "HIGH",
+        })
+
+        logger.info(
+            f"METRICS: resource_dispatched node={self.node_id} "
+            f"type={resource_type} {from_entity}→{to_entity}"
+        )
+        return f"Dispatched {resource_type} from {from_entity} to {to_entity}. Reason: {reason}"
+
+    async def _tool_emit_schedule_event(self, arguments: dict) -> str:
+        event_type = arguments["event_type"]
+        details = arguments["details"]
+        priority = arguments["priority"]
+
+        self.store.emit_event({
+            "event_type": event_type,
+            "source": self.node_id,
+            "details": details,
+            "aggregation_policy": "IMMEDIATE_PROPAGATE",
+            "priority": priority,
+        })
+
+        logger.info(
+            f"METRICS: schedule_event node={self.node_id} type={event_type} priority={priority}"
+        )
+        return f"Schedule event emitted: {event_type} ({priority})."
+
+    # ── Sensor tool handlers ─────────────────────────────────────────────
+
+    async def _tool_emit_reading(self, arguments: dict) -> str:
+        reading_type = arguments["reading_type"]
+        value = arguments["value"]
+        unit = arguments["unit"]
+        container_id = arguments.get("container_id")
+
+        entity = self._get_entity_doc()
+        if entity:
+            readings = entity.get_field("metrics.readings_emitted", 0)
+            entity.update_field("metrics.readings_emitted", readings + 1)
+
+        event = {
+            "event_type": "sensor_reading",
+            "source": self.node_id,
+            "reading_type": reading_type,
+            "value": value,
+            "unit": unit,
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "ROUTINE",
+        }
+        if container_id:
+            event["container_id"] = container_id
+        self.store.emit_event(event)
+
+        # Anomaly detection: >5% divergence from expected
+        expected = 25.0 if reading_type == "weight" else 100.0
+        if abs(value - expected) / expected > 0.05:
+            self.store.emit_event({
+                "event_type": "anomaly_detected",
+                "source": self.node_id,
+                "reading_type": reading_type,
+                "value": value,
+                "expected": expected,
+                "aggregation_policy": "IMMEDIATE_PROPAGATE",
+                "priority": "HIGH",
+            })
+            if entity:
+                anomalies = entity.get_field("metrics.anomalies_detected", 0)
+                entity.update_field("metrics.anomalies_detected", anomalies + 1)
+
+        logger.info(
+            f"METRICS: sensor_reading node={self.node_id} type={reading_type} value={value}{unit}"
+        )
+        return f"Reading emitted: {reading_type}={value}{unit}."
+
+    async def _tool_report_calibration(self, arguments: dict) -> str:
+        accuracy_pct = arguments["accuracy_pct"]
+        drift = arguments["drift"]
+        status = arguments["status"]
+
+        entity = self._get_entity_doc()
+        if entity:
+            entity.update_field("calibration.accuracy_pct", accuracy_pct)
+            entity.update_field("calibration.drift", drift)
+            entity.update_field("calibration.status", status)
+
+        # Emit CALIBRATION_DRIFT if below threshold
+        if accuracy_pct < 95.0:
+            self.store.emit_event({
+                "event_type": "CALIBRATION_DRIFT",
+                "source": self.node_id,
+                "priority": "HIGH" if accuracy_pct < 85.0 else "NORMAL",
+                "details": {
+                    "sensor_id": self.node_id,
+                    "accuracy_pct": accuracy_pct,
+                    "drift": drift,
+                    "status": status,
+                },
+            })
+
+        logger.info(
+            f"METRICS: calibration node={self.node_id} "
+            f"accuracy={accuracy_pct}% drift={drift} status={status}"
+        )
+        return f"Calibration reported: {accuracy_pct}% accuracy, drift={drift}, status={status}."

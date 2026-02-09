@@ -8,14 +8,20 @@ const ROLE_COLORS: Record<string, { active: string; idle: string }> = {
   crane: { active: '#22d3ee', idle: '#155e75' },       // cyan
   operator: { active: '#22c55e', idle: '#14532d' },    // green
   aggregator: { active: '#a78bfa', idle: '#4c1d95' },  // violet
+  tractor: { active: '#f59e0b', idle: '#78350f' },     // amber
+  scheduler: { active: '#a78bfa', idle: '#581c87' },   // purple
+  sensor: { active: '#3b82f6', idle: '#1e3a5f' },      // blue
   unknown: { active: '#9ca3af', idle: '#374151' },      // gray
 };
 
 const HIVE_LEVELS: Record<string, { label: string; y: number }> = {
-  aggregator: { label: 'H2 — Aggregator', y: 60 },
-  crane: { label: 'H1 — Entity', y: 180 },
-  operator: { label: 'H1 — Operator', y: 180 },
-  unknown: { label: 'H0', y: 260 },
+  scheduler: { label: 'H4 — Scheduler', y: 30 },
+  aggregator: { label: 'H2 — Aggregator', y: 80 },
+  crane: { label: 'H1 — Entity', y: 150 },
+  operator: { label: 'H1 — Operator', y: 150 },
+  tractor: { label: 'H1 — Tractor', y: 150 },
+  sensor: { label: 'H0 — Sensor', y: 230 },
+  unknown: { label: '?', y: 270 },
 };
 
 function nodeColor(node: NodeState): string {
@@ -34,6 +40,15 @@ function actionLabel(action: string): string {
     request_support: 'SUPPORT',
     report_equipment_status: 'STATUS',
     update_capability: 'CAPABILITY',
+    transport_container: 'TRANSPORT',
+    report_position: 'POSITION',
+    request_charge: 'CHARGE',
+    rebalance_assignments: 'REBALANCE',
+    update_priority_queue: 'PRIORITY',
+    dispatch_resource: 'DISPATCH',
+    emit_schedule_event: 'SCHEDULE',
+    emit_reading: 'READING',
+    report_calibration: 'CALIBRATE',
     wait: 'IDLE',
   };
   return labels[action] ?? action.toUpperCase();
@@ -52,12 +67,16 @@ export default function HierarchyTree() {
   }
 
   // Group nodes by role for layout
+  const schedulers = nodeList.filter((n) => n.role === 'scheduler');
   const aggregators = nodeList.filter((n) => n.role === 'aggregator');
   const cranes = nodeList.filter((n) => n.role === 'crane');
+  const operators = nodeList.filter((n) => n.role === 'operator');
+  const tractors = nodeList.filter((n) => n.role === 'tractor');
+  const sensorNodes = nodeList.filter((n) => n.role === 'sensor');
   const others = nodeList.filter((n) => n.role === 'unknown');
 
-  const svgWidth = 400;
-  const svgHeight = 300;
+  const svgWidth = 460;
+  const svgHeight = 310;
 
   // Position nodes horizontally
   function xPositions(items: NodeState[], y: number): { node: NodeState; x: number; y: number }[] {
@@ -65,19 +84,35 @@ export default function HierarchyTree() {
     return items.map((node, i) => ({ node, x: spacing * (i + 1), y }));
   }
 
+  const schedPositions = xPositions(schedulers, HIVE_LEVELS.scheduler.y);
   const aggPositions = xPositions(aggregators, HIVE_LEVELS.aggregator.y);
-  const cranePositions = xPositions(cranes, HIVE_LEVELS.crane.y);
-  const otherPositions = xPositions(others, HIVE_LEVELS.unknown.y);
+  const h1Nodes = [...cranes, ...operators, ...tractors];
+  const h1Positions = xPositions(h1Nodes, HIVE_LEVELS.crane.y);
+  const sensorPositions = xPositions(sensorNodes, HIVE_LEVELS.sensor.y);
+  const otherPositions = xPositions(others, HIVE_LEVELS.unknown?.y ?? 270);
 
-  // Draw edges from aggregators to cranes
+  // Draw edges: H4→H2, H2→H1, H1→H0
   const edges: { x1: number; y1: number; x2: number; y2: number }[] = [];
+  for (const sched of schedPositions) {
+    for (const agg of aggPositions) {
+      edges.push({ x1: sched.x, y1: sched.y + 14, x2: agg.x, y2: agg.y - 14 });
+    }
+  }
   for (const agg of aggPositions) {
-    for (const crane of cranePositions) {
-      edges.push({ x1: agg.x, y1: agg.y + 20, x2: crane.x, y2: crane.y - 20 });
+    for (const h1 of h1Positions) {
+      edges.push({ x1: agg.x, y1: agg.y + 14, x2: h1.x, y2: h1.y - 14 });
+    }
+  }
+  for (const h1 of h1Positions) {
+    for (const s of sensorPositions) {
+      // Only connect sensors to nearby cranes (by proximity in layout)
+      if (Math.abs(h1.x - s.x) < svgWidth / 4) {
+        edges.push({ x1: h1.x, y1: h1.y + 14, x2: s.x, y2: s.y - 14 });
+      }
     }
   }
 
-  const allPositions = [...aggPositions, ...cranePositions, ...otherPositions];
+  const allPositions = [...schedPositions, ...aggPositions, ...h1Positions, ...sensorPositions, ...otherPositions];
 
   return (
     <div className="flex flex-col h-full">
@@ -87,12 +122,22 @@ export default function HierarchyTree() {
       <div className="flex-1 flex items-center justify-center p-2">
         <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-full max-h-72">
           {/* Level labels */}
-          <text x="8" y={HIVE_LEVELS.aggregator.y - 20} className="fill-gray-600" fontSize="10">
+          {schedulers.length > 0 && (
+            <text x="8" y={HIVE_LEVELS.scheduler.y - 10} className="fill-gray-600" fontSize="9">
+              {HIVE_LEVELS.scheduler.label}
+            </text>
+          )}
+          <text x="8" y={HIVE_LEVELS.aggregator.y - 10} className="fill-gray-600" fontSize="9">
             {HIVE_LEVELS.aggregator.label}
           </text>
-          <text x="8" y={HIVE_LEVELS.crane.y - 20} className="fill-gray-600" fontSize="10">
-            {HIVE_LEVELS.crane.label}
+          <text x="8" y={HIVE_LEVELS.crane.y - 10} className="fill-gray-600" fontSize="9">
+            H1 — Entities
           </text>
+          {sensorNodes.length > 0 && (
+            <text x="8" y={HIVE_LEVELS.sensor.y - 10} className="fill-gray-600" fontSize="9">
+              {HIVE_LEVELS.sensor.label}
+            </text>
+          )}
 
           {/* Edges */}
           {edges.map((e, i) => (
@@ -108,7 +153,7 @@ export default function HierarchyTree() {
           {/* Nodes */}
           {allPositions.map(({ node, x, y }) => {
             const color = nodeColor(node);
-            const radius = node.role === 'aggregator' ? 22 : 18;
+            const radius = (node.role === 'aggregator' || node.role === 'scheduler') ? 18 : node.role === 'sensor' ? 12 : 15;
             return (
               <g key={node.node_id}>
                 {/* Glow for active nodes */}

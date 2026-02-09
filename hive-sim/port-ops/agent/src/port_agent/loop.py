@@ -25,6 +25,11 @@ from typing import Any, Optional
 
 from .llm import LLMProvider, AgentDecision
 
+try:
+    from port_agent_bridge.lifecycle import LifecycleManager
+except ImportError:
+    LifecycleManager = None  # type: ignore[assignment,misc]
+
 logger = logging.getLogger(__name__)
 
 
@@ -92,8 +97,10 @@ class AgentLoop:
         max_cycles: int = 100,
         cycle_delay_sim_minutes: float = 1.5,  # ~1.5 sim minutes per OODA loop
         dashboard: Any = None,  # Optional LiveDashboard
+        role: str = "crane",
     ):
         self.node_id = node_id
+        self.role = role
         self.persona = Path(persona_path).read_text()
         self.llm = llm
         self.mcp = mcp_client
@@ -103,6 +110,9 @@ class AgentLoop:
         self.cycle_count = 0
         self.metrics: list[CycleMetrics] = []
         self.dashboard = dashboard
+        self.lifecycle: Any = (
+            LifecycleManager(node_id, role=role) if LifecycleManager else None
+        )
 
     async def observe(self) -> dict[str, Any]:
         """OBSERVE — Read all HIVE state via MCP resources."""
@@ -253,6 +263,17 @@ class AgentLoop:
 
         if self.dashboard:
             self.dashboard.update_act(result, observe_ms, decide_ms, act_ms, success)
+
+        # Lifecycle events (degradation, resources, logistics, gaps)
+        if self.lifecycle:
+            lifecycle_events = self.lifecycle.tick(
+                cycle=self.cycle_count,
+                action=decision.action,
+                node_id=self.node_id,
+                sim_minutes=self.clock.sim_minutes,
+            )
+            for evt in lifecycle_events:
+                print(json.dumps(evt), flush=True)
 
         # Log METRICS in structured format matching hive-sim pattern
         metrics_json = {

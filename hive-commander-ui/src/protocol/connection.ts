@@ -1,4 +1,4 @@
-/** WebSocket client with auto-reconnect. */
+/** WebSocket client with auto-reconnect for HIVE Commander UI. */
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 
@@ -55,7 +55,6 @@ export class ViewerConnection {
 
     ws.onopen = () => {
       this.currentInterval = this.opts.reconnectInterval;
-      this.opts.onError('');  // Clear any previous error on successful connect
       this.opts.onStatusChange('connected');
     };
 
@@ -64,7 +63,7 @@ export class ViewerConnection {
         const data = JSON.parse(event.data);
         this.opts.onMessage(data);
       } catch {
-        console.warn('Failed to parse WebSocket message:', event.data);
+        console.warn('[Commander] Failed to parse WebSocket message:', event.data);
       }
     };
 
@@ -77,7 +76,7 @@ export class ViewerConnection {
     };
 
     ws.onerror = (ev) => {
-      console.error('[HIVE Viewer] WebSocket error:', this.opts.url, ev);
+      console.error('[Commander] WebSocket error:', this.opts.url, ev);
       this.opts.onError(`WebSocket error connecting to ${this.opts.url}`);
     };
   }
@@ -88,14 +87,14 @@ export class ViewerConnection {
       this.reconnectTimer = null;
       this.currentInterval = Math.min(
         this.currentInterval * 1.5,
-        this.opts.maxReconnectInterval
+        this.opts.maxReconnectInterval,
       );
       this.doConnect();
     }, this.currentInterval);
   }
 }
 
-/** Build WebSocket URL from current page location (proxied by Vite to relay). */
+/** Build WebSocket URL from current page location (uses Vite proxy). */
 export function defaultWsUrl(): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${protocol}//${window.location.host}/ws`;

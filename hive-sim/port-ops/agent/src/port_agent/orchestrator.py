@@ -1,11 +1,12 @@
 """
-Phase 1a Orchestrator — multi-agent simulation runner.
+Phase 1b Orchestrator — multi-agent simulation runner.
 
 Runs multiple agents as asyncio tasks in one Python process with a shared
 HiveStateStore. Agents use BridgeAPI (duck-types MCP ClientSession) instead
 of MCP stdio transport.
 
-Default composition: 2 gantry cranes + 2 operators + 1 hold aggregator (2c2w1a).
+Target composition: 2c5w4t1s1a2x = 15 agents (cranes, operators, tractors,
+scheduler, aggregator, sensors).
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import sys
 import time
 from dataclasses import dataclass, field
@@ -32,7 +34,7 @@ logger = logging.getLogger(__name__)
 class AgentSpec:
     """Specification for a single agent in the orchestrator."""
     node_id: str
-    role: str           # "crane" | "aggregator" | "operator"
+    role: str           # "crane" | "aggregator" | "operator" | "tractor" | "scheduler" | "sensor"
     persona: str        # persona filename without .md
     provider: str       # "anthropic" | "ollama" | "dry-run"
     model: str | None = None
@@ -53,6 +55,20 @@ class OrchestratorConfig:
     agents: list[AgentSpec] = field(default_factory=list)
 
 
+# Letter → (role, persona, node_id_pattern)
+_COMPOSITION_MAP: dict[str, tuple[str, str, str]] = {
+    "c": ("crane",      "gantry-crane",     "crane-{n}"),
+    "w": ("operator",   "crane-operator",   "op-{n}"),
+    "t": ("tractor",    "yard-tractor",     "tractor-{n}"),
+    "s": ("scheduler",  "ai-scheduler",     "scheduler-1"),
+    "a": ("aggregator", "hold-aggregator",  "hold-agg-3"),
+    "x": ("sensor",     "sensor",           None),  # special: interleave load-cell / rfid
+}
+
+# Sensor node IDs cycle through these types
+_SENSOR_IDS = ["load-cell-1", "rfid-1", "load-cell-2", "rfid-2"]
+
+
 def parse_agent_composition(
     composition: str,
     provider: str,
@@ -61,34 +77,46 @@ def parse_agent_composition(
     """
     Parse agent composition string into AgentSpec list.
 
-    Supported formats:
-      - '2c1a'   — 2 cranes + 1 aggregator
-      - '2c2w1a' — 2 cranes + 2 operators + 1 aggregator (default)
+    Format: ``<count><letter>`` pairs, e.g. ``2c5w4t1s1a2x``.
+    Letters: c=crane, w=operator, t=tractor, s=scheduler, a=aggregator, x=sensor.
     """
-    if composition == "2c1a":
-        return [
-            AgentSpec(node_id="crane-1", role="crane", persona="gantry-crane",
-                      provider=provider, model=model),
-            AgentSpec(node_id="crane-2", role="crane", persona="gantry-crane",
-                      provider=provider, model=model),
-            AgentSpec(node_id="hold-agg-3", role="aggregator", persona="hold-aggregator",
-                      provider=provider, model=model),
-        ]
-    elif composition == "2c2w1a":
-        return [
-            AgentSpec(node_id="crane-1", role="crane", persona="gantry-crane",
-                      provider=provider, model=model),
-            AgentSpec(node_id="crane-2", role="crane", persona="gantry-crane",
-                      provider=provider, model=model),
-            AgentSpec(node_id="op-1", role="operator", persona="crane-operator",
-                      provider=provider, model=model),
-            AgentSpec(node_id="op-2", role="operator", persona="crane-operator",
-                      provider=provider, model=model),
-            AgentSpec(node_id="hold-agg-3", role="aggregator", persona="hold-aggregator",
-                      provider=provider, model=model),
-        ]
-    else:
-        raise ValueError(f"Unknown composition: {composition}. Supported: '2c1a', '2c2w1a'")
+    specs: list[AgentSpec] = []
+    pairs = re.findall(r"(\d+)([a-z])", composition)
+    if not pairs:
+        raise ValueError(
+            f"Invalid composition: {composition!r}. "
+            f"Expected format like '2c5w4t1s1a2x'."
+        )
+
+    sensor_idx = 0
+    for count_str, letter in pairs:
+        count = int(count_str)
+        entry = _COMPOSITION_MAP.get(letter)
+        if entry is None:
+            raise ValueError(
+                f"Unknown role letter '{letter}' in composition. "
+                f"Supported: {', '.join(f'{k}={v[0]}' for k, v in _COMPOSITION_MAP.items())}"
+            )
+
+        role, persona, id_pattern = entry
+        for i in range(1, count + 1):
+            if letter == "x":
+                node_id = _SENSOR_IDS[sensor_idx % len(_SENSOR_IDS)]
+                sensor_idx += 1
+            elif id_pattern and "{n}" in id_pattern:
+                node_id = id_pattern.replace("{n}", str(i))
+            else:
+                node_id = id_pattern  # singleton like hold-agg-3, scheduler-1
+
+            specs.append(AgentSpec(
+                node_id=node_id,
+                role=role,
+                persona=persona,
+                provider=provider,
+                model=model,
+            ))
+
+    return specs
 
 
 class Orchestrator:
@@ -111,7 +139,11 @@ class Orchestrator:
             HiveStateStore,
             create_crane_entity,
             create_operator_entity,
+            create_tractor_entity,
+            create_scheduler_entity,
+            create_sensor_entity,
             create_container_queue,
+            create_transport_queue,
             create_team_state,
             create_sample_containers,
         )
@@ -191,6 +223,55 @@ class Orchestrator:
                         "capabilities": ["AGGREGATION"],
                     })
 
+            elif spec.role == "tractor":
+                tractor_config = {
+                    "capacity_tons": 40,
+                    "max_speed_kph": 25,
+                    "hold": self.config.hold_num,
+                    "berth": self.config.berth,
+                }
+                create_tractor_entity(self.store, spec.node_id, tractor_config)
+                if team_doc:
+                    team_doc.update_field(f"team_members.{spec.node_id}", {
+                        "entity_type": "yard_tractor",
+                        "status": "OPERATIONAL",
+                        "capabilities": ["CONTAINER_TRANSPORT"],
+                    })
+
+            elif spec.role == "scheduler":
+                sched_config = {
+                    "hold": self.config.hold_num,
+                    "berth": self.config.berth,
+                    "vessel": self.config.vessel,
+                }
+                create_scheduler_entity(self.store, spec.node_id, sched_config)
+                if team_doc:
+                    team_doc.update_field(f"team_members.{spec.node_id}", {
+                        "entity_type": "scheduler",
+                        "status": "OPERATIONAL",
+                        "capabilities": ["SCHEDULING", "RESOURCE_DISPATCH"],
+                    })
+
+            elif spec.role == "sensor":
+                sensor_type = "LOAD_CELL" if "load-cell" in spec.node_id else "RFID"
+                sensor_config = {
+                    "sensor_type": sensor_type,
+                    "hold": self.config.hold_num,
+                    "berth": self.config.berth,
+                }
+                create_sensor_entity(self.store, spec.node_id, sensor_config)
+                if team_doc:
+                    team_doc.update_field(f"team_members.{spec.node_id}", {
+                        "entity_type": "sensor",
+                        "status": "OPERATIONAL",
+                        "capabilities": [sensor_type],
+                    })
+
+        # Create transport queue (for tractors to claim discharged containers)
+        has_tractors = any(s.role == "tractor" for s in self.config.agents)
+        if has_tractors:
+            create_transport_queue(self.store, hold_id)
+
         if team_doc:
             team_doc.update_field("moves_remaining", len(containers))
             team_doc.update_field("status", "ACTIVE")
@@ -233,6 +314,7 @@ class Orchestrator:
                 clock=self.clock,
                 max_cycles=self.config.max_cycles,
                 cycle_delay_sim_minutes=self.config.cycle_delay_sim_minutes,
+                role=spec.role,
             )
             self.agents.append(agent)
 
@@ -242,7 +324,7 @@ class Orchestrator:
         """Run all agents concurrently and collect metrics."""
         logger.info(
             f"\n{'='*60}\n"
-            f"  HIVE Port Operations — Phase 1a Multi-Agent\n"
+            f"  HIVE Port Operations — Phase 1b (15-Node Hold Team)\n"
             f"  Agents: {', '.join(s.node_id for s in self.config.agents)}\n"
             f"  Queue: {self.config.queue_size} containers "
             f"({self.config.hazmat_count} hazmat)\n"
@@ -275,7 +357,7 @@ class Orchestrator:
     def _print_summary(self, all_metrics: dict[str, list[CycleMetrics]]):
         """Print final multi-agent summary."""
         print("\n" + "=" * 60, flush=True)
-        print("  PHASE 1a MULTI-AGENT SUMMARY", flush=True)
+        print("  PHASE 1b MULTI-AGENT SUMMARY", flush=True)
         print("=" * 60, flush=True)
 
         # Per-agent summary

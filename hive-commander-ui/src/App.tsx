@@ -1,8 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Map3D from './components/Map3D/Map3D';
 import { CapabilityCard } from './components/PieceCard/PieceCard';
 import EventStream from './components/EventStream/EventStream';
 import { GapAnalysisPanel } from './components/GapAnalysisPanel/GapAnalysisPanel';
+import { ConnectionStatus } from './components/ConnectionStatus/ConnectionStatus';
+import { useCommanderStore } from './protocol/store';
 import { TerrainType, Piece, ComposedCapability, Objective, GamePhase, HiveEvent, GapAnalysisReport } from './types';
 
 // Generate simple terrain for demo
@@ -431,6 +433,26 @@ export default function App() {
 
   const demoState = useMemo(() => createDemoState(), []);
 
+  // Live data from WebSocket store (falls back to demo data when offline)
+  const storeStatus = useCommanderStore((s) => s.status);
+  const storeCapabilities = useCommanderStore((s) => s.capabilities);
+  const storeEvents = useCommanderStore((s) => s.events);
+  const storeGapReports = useCommanderStore((s) => s.gapReports);
+  const connect = useCommanderStore((s) => s.connect);
+  const disconnect = useCommanderStore((s) => s.disconnect);
+
+  // Connect on mount, disconnect on unmount
+  useEffect(() => {
+    connect();
+    return () => disconnect();
+  }, [connect, disconnect]);
+
+  // Use live data when connected and store has data, otherwise fall back to demo
+  const isLive = storeStatus === 'connected';
+  const capabilities = isLive && storeCapabilities.length > 0 ? storeCapabilities : demoState.capabilities;
+  const events = isLive && storeEvents.length > 0 ? storeEvents : demoState.events;
+  const gapReports = isLive && storeGapReports.length > 0 ? storeGapReports : demoState.gapReports;
+
   return (
     <div style={{ display: 'flex', width: '100%', height: '100%' }}>
       {/* Main 3D Map */}
@@ -455,7 +477,10 @@ export default function App() {
           borderRadius: '8px',
           color: 'white',
         }}>
-          <h2 style={{ margin: 0, fontSize: '18px', color: '#00ffff' }}>HIVE Commander</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h2 style={{ margin: 0, fontSize: '18px', color: '#00ffff' }}>HIVE Commander</h2>
+            <ConnectionStatus />
+          </div>
           <div style={{ marginTop: '8px', fontSize: '14px' }}>
             Turn: {turn} | Score: {score} | Phase: {phase.toUpperCase().replace('_', ' ')}
           </div>
@@ -524,7 +549,7 @@ export default function App() {
             }}
           >
             GAPS
-            {demoState.gapReports.reduce((sum, r) => sum + r.gaps.filter(g => g.currentConfidence < g.requiredConfidence).length, 0) > 0 && (
+            {gapReports.reduce((sum, r) => sum + r.gaps.filter(g => g.currentConfidence < g.requiredConfidence).length, 0) > 0 && (
               <span style={{
                 position: 'absolute',
                 top: '6px',
@@ -545,7 +570,7 @@ export default function App() {
               <h3 style={{ color: '#00ffff', margin: '0 0 12px 0', fontSize: '14px' }}>
                 COMPOSED CAPABILITIES
               </h3>
-              {demoState.capabilities.map((cap) => (
+              {capabilities.map((cap) => (
                 <CapabilityCard
                   key={cap.id}
                   capability={cap}
@@ -639,14 +664,14 @@ export default function App() {
                 ))}
               </div>
               <div style={{ flex: 1, overflow: 'hidden' }}>
-                <EventStream events={demoState.events} playbackSpeed={playbackSpeed} />
+                <EventStream events={events} playbackSpeed={playbackSpeed} />
               </div>
             </div>
           </>
         ) : (
           /* Gap Analysis panel */
           <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
-            <GapAnalysisPanel reports={demoState.gapReports} />
+            <GapAnalysisPanel reports={gapReports} />
           </div>
         )}
       </div>

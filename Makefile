@@ -1,4 +1,4 @@
-.PHONY: help clean clean-ditto build test test-unit test-integration test-e2e test-fast fmt clippy check pre-commit ci inspect-viewer
+.PHONY: help clean clean-ditto build test test-unit test-integration test-e2e test-fast fmt clippy check pre-commit ci inspect-viewer inspect-lifecycle inspect-lifecycle-json
 
 # ============================================
 # HIVE Protocol Development Makefile
@@ -442,3 +442,10 @@ e12-comprehensive:
 inspect-viewer:
 	@echo "Running HIVE Viewer inspector..."
 	@cd inspector && npx tsx src/cli.ts specs/hive-viewer-spatial.ts --verbose
+
+inspect-lifecycle:  ## Phase 2: inspect lifecycle UI (requires make phase2 running)
+	@echo "Running HIVE Viewer lifecycle inspector..."
+	@cd inspector && npx tsx src/cli.ts specs/hive-viewer-lifecycle.ts --verbose
+
+inspect-lifecycle-json:  ## Phase 2: inspect lifecycle UI (JSON output)
+	@cd inspector && npx tsx src/cli.ts specs/hive-viewer-lifecycle.ts --json

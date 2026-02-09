@@ -180,6 +180,65 @@ class HiveStateStore:
             op_doc.update_field("metrics.moves_assisted", assists + 1)
             return True
 
+    def get_capability_health(self, node_id: str) -> dict[str, Any]:
+        """Return current confidence/degradation state for a node.
+
+        Used by lifecycle engine to seed initial state from HIVE documents.
+        """
+        doc = self.get_document("node_states", f"sim_doc_{node_id}")
+        if doc is None:
+            return {"operational_status": "UNKNOWN", "equipment_health": {}}
+        return {
+            "operational_status": doc.get_field("operational_status", "UNKNOWN"),
+            "equipment_health": doc.get_field("equipment_health", {}),
+            "capabilities": doc.get_field("capabilities", {}),
+        }
+
+    def enqueue_transport_job(self, hold_id: str, container_id: str, destination_block: str) -> None:
+        """Add a discharged container to the transport queue for tractor pickup."""
+        tq = self.get_document("transport_queues", f"transport_{hold_id}")
+        if tq is None:
+            return
+        jobs = tq.fields.get("pending_jobs", [])
+        jobs.append({
+            "container_id": container_id,
+            "destination_block": destination_block,
+            "status": "PENDING",
+            "claimed_by": None,
+        })
+        tq.update_field("pending_jobs", jobs)
+
+    async def claim_transport_job(
+        self, hold_id: str, container_id: str, tractor_id: str
+    ) -> bool:
+        """Atomically claim a transport job from the queue (tractor-to-tractor contention)."""
+        async with self._queue_lock:
+            tq = self.get_document("transport_queues", f"transport_{hold_id}")
+            if tq is None:
+                return False
+            jobs = tq.fields.get("pending_jobs", [])
+            for job in jobs:
+                if job["container_id"] == container_id:
+                    if job.get("claimed_by") or job.get("status") == "COMPLETED":
+                        return False
+                    job["claimed_by"] = tractor_id
+                    job["status"] = "IN_TRANSIT"
+                    return True
+            return False
+
+    def complete_transport_job(self, hold_id: str, container_id: str) -> None:
+        """Mark a transport job as completed."""
+        tq = self.get_document("transport_queues", f"transport_{hold_id}")
+        if tq is None:
+            return
+        jobs = tq.fields.get("pending_jobs", [])
+        for job in jobs:
+            if job["container_id"] == container_id:
+                job["status"] = "COMPLETED"
+                break
+        completed = tq.fields.get("completed_count", 0)
+        tq.update_field("completed_count", completed + 1)
+
     def get_pending_operator_requests(self, hold_id: str) -> list[HiveDocument]:
         """Get all pending operator requests for a hold."""
         docs = self.query_collection("operator_requests")
@@ -307,6 +366,130 @@ def create_operator_entity(store: HiveStateStore, node_id: str, config: dict) ->
                 "hazmat_inspections": 0,
                 "session_start_us": int(time.time() * 1_000_000),
             },
+        },
+    )
+
+
+def create_tractor_entity(store: HiveStateStore, node_id: str, config: dict) -> HiveDocument:
+    """Initialize a yard tractor entity document in the HIVE state store."""
+    return store.create_document(
+        collection="node_states",
+        doc_id=f"sim_doc_{node_id}",
+        fields={
+            "node_id": node_id,
+            "entity_type": "yard_tractor",
+            "hive_level": "H1",
+            "operational_status": "OPERATIONAL",
+            "capabilities": {
+                "container_transport": {
+                    "type": "CONTAINER_TRANSPORT",
+                    "capacity_tons": config.get("capacity_tons", 40),
+                    "max_speed_kph": config.get("max_speed_kph", 25),
+                    "status": "READY",
+                },
+            },
+            "equipment_health": {
+                "battery_pct": 100,
+                "drivetrain_status": "NORMAL",
+                "hydraulic_lift_status": "NORMAL",
+            },
+            "position": {
+                "zone": "yard",
+                "block": "DEPOT",
+                "status": "IDLE",
+            },
+            "assignment": {
+                "berth": config.get("berth", "berth-5"),
+                "hold": config.get("hold", 3),
+            },
+            "metrics": {
+                "trips_completed": 0,
+                "total_tons_transported": 0.0,
+                "session_start_us": int(time.time() * 1_000_000),
+            },
+        },
+    )
+
+
+def create_scheduler_entity(store: HiveStateStore, node_id: str, config: dict) -> HiveDocument:
+    """Initialize a scheduler entity document in the HIVE state store."""
+    return store.create_document(
+        collection="node_states",
+        doc_id=f"sim_doc_{node_id}",
+        fields={
+            "node_id": node_id,
+            "entity_type": "scheduler",
+            "hive_level": "H4",
+            "operational_status": "OPERATIONAL",
+            "capabilities": {
+                "scheduling": {
+                    "type": "SCHEDULING",
+                    "status": "ACTIVE",
+                },
+                "resource_dispatch": {
+                    "type": "RESOURCE_DISPATCH",
+                    "status": "ACTIVE",
+                },
+            },
+            "assignment": {
+                "berth": config.get("berth", "berth-5"),
+                "hold": config.get("hold", 3),
+                "vessel": config.get("vessel", "MV Ever Forward"),
+            },
+            "metrics": {
+                "rebalances": 0,
+                "dispatches": 0,
+                "session_start_us": int(time.time() * 1_000_000),
+            },
+        },
+    )
+
+
+def create_sensor_entity(store: HiveStateStore, node_id: str, config: dict) -> HiveDocument:
+    """Initialize a sensor entity document in the HIVE state store."""
+    sensor_type = config.get("sensor_type", "LOAD_CELL")
+    return store.create_document(
+        collection="node_states",
+        doc_id=f"sim_doc_{node_id}",
+        fields={
+            "node_id": node_id,
+            "entity_type": "sensor",
+            "hive_level": "H0",
+            "operational_status": "OPERATIONAL",
+            "sensor_type": sensor_type,
+            "capabilities": {
+                sensor_type.lower(): {
+                    "type": sensor_type,
+                    "status": "ACTIVE",
+                },
+            },
+            "calibration": {
+                "accuracy_pct": 100.0,
+                "drift": 0.0,
+                "status": "CALIBRATED",
+            },
+            "assignment": {
+                "berth": config.get("berth", "berth-5"),
+                "hold": config.get("hold", 3),
+            },
+            "metrics": {
+                "readings_emitted": 0,
+                "anomalies_detected": 0,
+                "session_start_us": int(time.time() * 1_000_000),
+            },
+        },
+    )
+
+
+def create_transport_queue(store: HiveStateStore, hold_id: str) -> HiveDocument:
+    """Initialize the transport queue for tractors (containers needing yard transport)."""
+    return store.create_document(
+        collection="transport_queues",
+        doc_id=f"transport_{hold_id}",
+        fields={
+            "hold_id": hold_id,
+            "pending_jobs": [],  # list of {container_id, destination_block, status, claimed_by}
+            "completed_count": 0,
         },
     )
 
