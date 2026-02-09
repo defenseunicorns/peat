@@ -293,7 +293,34 @@ hive-sim/
 
 **Deliverable:** Production tool that works for demos, documentation, and development.
 
-### Phase 4: Commander Convergence
+### Phase 4: Operational Simulation — "Watch the Port Work"
+
+**Goal:** The viewer shows a complete port operation — not status dashboards, but actual operations unfolding spatially. A ship approaches, is directed to berth, cranes swing and lift containers off the vessel, trucks pull up under the crane, containers lower onto chassis, trucks drive to yard blocks. Every movement is driven by HIVE agent decisions flowing through the hierarchy.
+
+This is the phase where the viewer becomes a **simulation visualization** rather than a **telemetry dashboard**.
+
+**World Model (Sim):**
+- Spatial state documents in HIVE state: vessel position on approach lane, crane boom angle + trolley position + spreader height, container coordinates (ship cell → crane → truck → yard slot), truck route waypoints
+- Operational state machine per entity: crane has states (IDLE → ROTATING → TROLLEYING → LOWERING → GRIPPING → HOISTING → ROTATING → LOWERING → RELEASING → IDLE), truck has states (QUEUED → APPROACHING → UNDER_CRANE → LOADED → IN_TRANSIT → AT_YARD → UNLOADING → RETURNING)
+- Container lifecycle: STOWED → PICKED → IN_TRANSIT → YARD_PLACED, with position at each stage
+- Sequence coordination via HIVE: scheduler publishes discharge sequence, cranes claim containers, trucks claim transport jobs, aggregator tracks throughput
+
+**Spatial Events (Protocol):**
+- `spatial_update` event type: `{ entity_id, position: {x,y,z}, rotation, state, target? }`
+- Emitted by sim whenever an entity moves or changes physical state
+- Viewer interpolates smoothly between spatial updates (lerp position, slerp rotation)
+
+**Viewer Animation:**
+- Crane: boom rotates to target hold, trolley slides along boom, spreader descends, grips container (color change), hoists, rotates to truck side, lowers onto chassis
+- Container: follows crane spreader while gripped, then follows truck while loaded
+- Truck: drives along route waypoints (approach lane → under crane → exit lane → yard block)
+- Vessel: arrives from right edge, docks at berth (one-time approach animation)
+
+**Scenario:** ADR-030 MV Ever Forward — ship arrival triggers hierarchy formation, 20 containers discharged through the full crane-truck-yard pipeline, with equipment degradation and shift change events mid-operation.
+
+**Deliverable:** Someone watching this says "that's a port working." The HIVE protocol view on the left shows *why* things are happening (agent decisions, capability changes, contention). The spatial view on the right shows *what* is happening (physical operations). Together they demonstrate HIVE coordinating real operations.
+
+### Phase 5: Commander Convergence
 
 **Goal:** Viewer becomes Commander's spectator mode.
 
@@ -406,8 +433,9 @@ When the Python sim is replaced by Rust HIVE nodes (ContainerLab topology), the 
 
 **Decision Record:**
 - **Proposed:** 2026-02-07
-- **Accepted:** TBD
-- **Phase 1 (Protocol View) Complete:** TBD
-- **Phase 2 (Port Ops Skin) Complete:** TBD
+- **Phase 1 (Protocol View) Complete:** 2026-02-07
+- **Phase 2 (Port Ops Skin) Complete:** 2026-02-08
+- **Phase 3 (Replay Engine) Complete:** 2026-02-09
+- **Phase 4 (Operational Simulation):** In Progress
 
 **Authors:** Kit Plummer, Claude
