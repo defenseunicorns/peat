@@ -1,4 +1,4 @@
-import { useEffect, lazy, Suspense } from 'react';
+import { useEffect, useCallback, useRef, useState, lazy, Suspense } from 'react';
 import { useViewerStore } from './protocol/state';
 import ConnectionStatus from './components/ConnectionStatus';
 import MetricsPanel from './components/MetricsPanel';
@@ -9,14 +9,37 @@ import CapabilityCards from './views/ProtocolView/CapabilityCard';
 
 const SpatialView = lazy(() => import('./views/SpatialView'));
 
+const EVENT_STREAM_MIN = 200;
+const EVENT_STREAM_MAX = 600;
+const EVENT_STREAM_DEFAULT = 320;
+
 export default function App() {
   const connect = useViewerStore((s) => s.connect);
   const disconnect = useViewerStore((s) => s.disconnect);
+  const [esWidth, setEsWidth] = useState(EVENT_STREAM_DEFAULT);
+  const dragging = useRef(false);
 
   useEffect(() => {
     connect();
     return () => disconnect();
   }, [connect, disconnect]);
+
+  const onDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    dragging.current = true;
+    const onMove = (ev: MouseEvent) => {
+      if (!dragging.current) return;
+      const newWidth = Math.min(EVENT_STREAM_MAX, Math.max(EVENT_STREAM_MIN, window.innerWidth - ev.clientX));
+      setEsWidth(newWidth);
+    };
+    const onUp = () => {
+      dragging.current = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, []);
 
   return (
     <div className="h-screen flex flex-col bg-gray-950 text-gray-100">
@@ -44,12 +67,7 @@ export default function App() {
           </div>
         </aside>
 
-        {/* Center: Event stream */}
-        <section className="flex-1 min-w-[280px] overflow-hidden">
-          <EventStream />
-        </section>
-
-        {/* Right: Spatial View */}
+        {/* Center: Spatial View */}
         <section className="flex-1 min-w-[400px] border-l border-gray-800 overflow-hidden">
           <Suspense
             fallback={
@@ -60,6 +78,17 @@ export default function App() {
           >
             <SpatialView />
           </Suspense>
+        </section>
+
+        {/* Drag handle */}
+        <div
+          onMouseDown={onDragStart}
+          className="w-1 shrink-0 cursor-col-resize bg-gray-800 hover:bg-cyan-700 transition-colors"
+        />
+
+        {/* Right: Event stream */}
+        <section className="shrink-0 overflow-hidden" style={{ width: esWidth }}>
+          <EventStream />
         </section>
       </main>
 
