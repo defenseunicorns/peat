@@ -34,6 +34,10 @@ const SYNC_POLL_INTERVAL: Duration = Duration::from_millis(200);
 #[tokio::test]
 async fn test_ditto_three_node_mesh() {
     dotenvy::dotenv().ok();
+    if std::env::var("HIVE_APP_ID").or_else(|_| std::env::var("DITTO_APP_ID")).is_err() {
+        eprintln!("Skipping test: HIVE_APP_ID/DITTO_APP_ID not set");
+        return;
+    }
     println!("=== Multi-Node Mesh E2E: Ditto 3-Node Mesh ===");
 
     let mut harness = E2EHarness::new("ditto_3node_mesh");

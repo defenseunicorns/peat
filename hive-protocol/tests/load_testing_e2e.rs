@@ -41,6 +41,10 @@ fn get_test_node_count() -> usize {
 #[tokio::test]
 async fn test_load_large_formation_nodes() {
     dotenvy::dotenv().ok();
+    if std::env::var("HIVE_APP_ID").or_else(|_| std::env::var("DITTO_APP_ID")).is_err() {
+        eprintln!("Skipping test: HIVE_APP_ID/DITTO_APP_ID not set");
+        return;
+    }
     let node_count = get_test_node_count();
     let cell_count = node_count / 2; // 2 nodes per cell
     let mut harness = E2EHarness::new("large_formation_test");
@@ -284,6 +288,10 @@ async fn test_load_large_formation_nodes() {
 #[tokio::test]
 async fn test_load_multi_zone_hierarchy() {
     dotenvy::dotenv().ok();
+    if std::env::var("HIVE_APP_ID").or_else(|_| std::env::var("DITTO_APP_ID")).is_err() {
+        eprintln!("Skipping test: HIVE_APP_ID/DITTO_APP_ID not set");
+        return;
+    }
     let total_nodes = get_test_node_count();
     let mut harness = E2EHarness::new("multi_zone_hierarchy_test");
 

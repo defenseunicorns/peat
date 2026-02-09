@@ -43,10 +43,16 @@ const SYNC_POLL_INTERVAL: Duration = Duration::from_millis(200);
 #[tokio::test]
 async fn test_e2e_partition_during_formation() {
     dotenvy::dotenv().ok();
-    let ditto_app_id = std::env::var("HIVE_APP_ID")
+    let Ok(ditto_app_id) = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("HIVE_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty());
+    else {
+        eprintln!("Skipping test: HIVE_APP_ID/DITTO_APP_ID not set");
+        return;
+    };
+    if ditto_app_id.is_empty() {
+        eprintln!("Skipping test: HIVE_APP_ID is empty");
+        return;
+    }
 
     let mut harness = E2EHarness::new("partition_formation");
 
@@ -166,10 +172,16 @@ async fn test_e2e_partition_during_formation() {
 #[tokio::test]
 async fn test_e2e_multi_zone_partition_isolation() {
     dotenvy::dotenv().ok();
-    let ditto_app_id = std::env::var("HIVE_APP_ID")
+    let Ok(ditto_app_id) = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("HIVE_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty());
+    else {
+        eprintln!("Skipping test: HIVE_APP_ID/DITTO_APP_ID not set");
+        return;
+    };
+    if ditto_app_id.is_empty() {
+        eprintln!("Skipping test: HIVE_APP_ID is empty");
+        return;
+    }
 
     let mut harness = E2EHarness::new("zone_partition");
 

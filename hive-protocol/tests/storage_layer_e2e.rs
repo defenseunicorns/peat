@@ -44,10 +44,16 @@ use std::time::Duration;
 async fn test_e2e_nodestore_gset_sync() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id = std::env::var("HIVE_APP_ID")
+    let Ok(ditto_app_id) = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("HIVE_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
+    else {
+        eprintln!("Skipping test: HIVE_APP_ID/DITTO_APP_ID not set");
+        return;
+    };
+    if ditto_app_id.is_empty() {
+        eprintln!("Skipping test: HIVE_APP_ID is empty");
+        return;
+    }
 
     let mut harness = E2EHarness::new("nodestore_gset");
 
@@ -171,10 +177,16 @@ async fn test_e2e_nodestore_gset_sync() {
 async fn test_e2e_cellstore_orset_operations() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id = std::env::var("HIVE_APP_ID")
+    let Ok(ditto_app_id) = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("HIVE_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
+    else {
+        eprintln!("Skipping test: HIVE_APP_ID/DITTO_APP_ID not set");
+        return;
+    };
+    if ditto_app_id.is_empty() {
+        eprintln!("Skipping test: HIVE_APP_ID is empty");
+        return;
+    }
 
     let mut harness = E2EHarness::new("cellstore_orset");
 
@@ -296,10 +308,16 @@ async fn test_e2e_cellstore_orset_operations() {
 async fn test_e2e_concurrent_writes_lww_resolution() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id = std::env::var("HIVE_APP_ID")
+    let Ok(ditto_app_id) = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("HIVE_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "HIVE_APP_ID cannot be empty");
+    else {
+        eprintln!("Skipping test: HIVE_APP_ID/DITTO_APP_ID not set");
+        return;
+    };
+    if ditto_app_id.is_empty() {
+        eprintln!("Skipping test: HIVE_APP_ID is empty");
+        return;
+    }
 
     let mut harness = E2EHarness::new("lww_resolution");
 

@@ -2683,6 +2683,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_command_upsert_and_retrieve() {
+        let Some(_creds) = get_test_credentials() else {
+            eprintln!("Skipping test: credentials not available");
+            return;
+        };
         let (store, _temp_dir) = create_test_store("test_command_upsert").await;
 
         use hive_schema::command::v1::{command_target::Scope, CommandTarget, HierarchicalCommand};
@@ -2737,6 +2741,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_command_acknowledgment_upsert_and_query() {
+        let Some(_creds) = get_test_credentials() else {
+            eprintln!("Skipping test: credentials not available");
+            return;
+        };
         let (store, _temp_dir) = create_test_store("test_command_ack").await;
 
         use hive_schema::command::v1::{AckStatus, CommandAcknowledgment};

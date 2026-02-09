@@ -107,25 +107,35 @@ impl CommandStorage for MockCommandStorage {
 }
 
 /// Helper to create a test DittoStore
-async fn create_test_store(test_name: &str) -> DittoStore {
+async fn create_test_store(test_name: &str) -> Option<DittoStore> {
     use hive_protocol::credentials::HiveCredentials;
 
     dotenvy::dotenv().ok();
 
     // Load credentials via HiveCredentials (supports HIVE_* with DITTO_* fallback)
-    let credentials = HiveCredentials::from_env().expect(
-        "Credentials required (HIVE_APP_ID/HIVE_SECRET_KEY or DITTO_APP_ID/DITTO_SHARED_KEY)",
-    );
+    let credentials = match HiveCredentials::from_env() {
+        Ok(c) => c,
+        Err(_) => {
+            eprintln!("Skipping test: credentials not available");
+            return None;
+        }
+    };
 
     let app_id = credentials.app_id().to_string();
-    let shared_key = credentials
-        .require_secret_key()
-        .expect("Secret key required for test")
-        .to_string();
-    let offline_token = credentials
-        .require_offline_token()
-        .expect("Offline token required for test")
-        .to_string();
+    let shared_key = match credentials.require_secret_key() {
+        Ok(k) => k.to_string(),
+        Err(_) => {
+            eprintln!("Skipping test: secret key not available");
+            return None;
+        }
+    };
+    let offline_token = match credentials.require_offline_token() {
+        Ok(t) => t.to_string(),
+        Err(_) => {
+            eprintln!("Skipping test: offline token not available");
+            return None;
+        }
+    };
 
     let persistence_dir =
         std::path::PathBuf::from(format!("/tmp/cap-persistence-test-{}", test_name));
@@ -143,13 +153,13 @@ async fn create_test_store(test_name: &str) -> DittoStore {
 
     let store = DittoStore::new(config).expect("Failed to create Ditto store");
     store.start_sync().expect("Failed to start sync");
-    store
+    Some(store)
 }
 
 #[tokio::test]
 async fn test_command_issue_and_persist() {
     // Setup: Create coordinator and store
-    let store = create_test_store("test_command_issue").await;
+    let Some(store) = create_test_store("test_command_issue").await else { return; };
     let coordinator = CommandCoordinator::new(
         Some("squad-alpha".to_string()),
         "node-leader".to_string(),
@@ -213,7 +223,7 @@ async fn test_command_issue_and_persist() {
 #[tokio::test]
 async fn test_command_reception_and_execution() {
     // Setup: Create coordinator for a squad member
-    let store = create_test_store("test_command_reception").await;
+    let Some(store) = create_test_store("test_command_reception").await else { return; };
     let coordinator = CommandCoordinator::new(
         Some("squad-alpha".to_string()),
         "node-1".to_string(),
@@ -275,7 +285,7 @@ async fn test_command_reception_and_execution() {
 #[tokio::test]
 async fn test_acknowledgment_persistence() {
     // Setup: Create store and coordinator
-    let store = create_test_store("test_ack_persistence").await;
+    let Some(store) = create_test_store("test_ack_persistence").await else { return; };
     let coordinator = CommandCoordinator::new(
         Some("squad-alpha".to_string()),
         "node-1".to_string(),
@@ -338,7 +348,7 @@ async fn test_acknowledgment_persistence() {
 #[tokio::test]
 async fn test_squad_command_routing() {
     // Setup: Create leader coordinator
-    let store = create_test_store("test_squad_routing").await;
+    let Some(store) = create_test_store("test_squad_routing").await else { return; };
     let leader = CommandCoordinator::new(
         Some("squad-alpha".to_string()),
         "node-leader".to_string(),
@@ -388,7 +398,7 @@ async fn test_squad_command_routing() {
 #[tokio::test]
 async fn test_acknowledgment_policy_none() {
     // Setup: Create coordinator
-    let store = create_test_store("test_ack_policy_none").await;
+    let Some(store) = create_test_store("test_ack_policy_none").await else { return; };
     let coordinator = CommandCoordinator::new(
         Some("squad-alpha".to_string()),
         "node-1".to_string(),
@@ -443,7 +453,7 @@ async fn test_acknowledgment_policy_none() {
 #[tokio::test]
 async fn test_command_not_applicable() {
     // Setup: Create coordinator for node-1
-    let store = create_test_store("test_not_applicable").await;
+    let Some(store) = create_test_store("test_not_applicable").await else { return; };
     let coordinator = CommandCoordinator::new(
         Some("squad-alpha".to_string()),
         "node-1".to_string(),
@@ -496,7 +506,7 @@ async fn test_command_not_applicable() {
 #[tokio::test]
 async fn test_multiple_acknowledgments_collection() {
     // Setup: Simulate multiple nodes acknowledging a command
-    let store = create_test_store("test_multiple_acks").await;
+    let Some(store) = create_test_store("test_multiple_acks").await else { return; };
 
     // Create acknowledgments from different nodes
     let ack1 = CommandAcknowledgment {

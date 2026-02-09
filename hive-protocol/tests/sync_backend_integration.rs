@@ -11,10 +11,11 @@ use hive_protocol::sync::{
 use std::collections::HashMap;
 
 /// Helper to create a test backend with real Ditto instance
-async fn setup_backend() -> DittoBackend {
+/// Returns None if credentials are not available (test should skip)
+async fn setup_backend() -> Option<DittoBackend> {
     dotenvy::dotenv().ok();
 
-    // Fail explicitly if credentials not available (prefer HIVE_*, fallback to DITTO_*)
+    // Skip if credentials not available (prefer HIVE_*, fallback to DITTO_*)
     let app_id = std::env::var("HIVE_APP_ID")
         .or_else(|_| std::env::var("DITTO_APP_ID"))
         .ok()
@@ -25,8 +26,11 @@ async fn setup_backend() -> DittoBackend {
             } else {
                 Some(trimmed.to_string())
             }
-        })
-        .expect("HIVE_APP_ID environment variable is required for sync backend integration tests. Set it in .env file or environment.");
+        });
+    let Some(app_id) = app_id else {
+        eprintln!("Skipping test: HIVE_APP_ID/DITTO_APP_ID not set");
+        return None;
+    };
 
     let shared_key = std::env::var("HIVE_SECRET_KEY")
         .or_else(|_| std::env::var("HIVE_SHARED_KEY"))
@@ -39,12 +43,21 @@ async fn setup_backend() -> DittoBackend {
             } else {
                 Some(trimmed.to_string())
             }
-        })
-        .expect("HIVE_SECRET_KEY environment variable is required for sync backend integration tests. Set it in .env file or environment.");
+        });
+    let Some(shared_key) = shared_key else {
+        eprintln!("Skipping test: HIVE_SECRET_KEY not set");
+        return None;
+    };
 
-    let offline_token = std::env::var("HIVE_OFFLINE_TOKEN")
+    let offline_token = match std::env::var("HIVE_OFFLINE_TOKEN")
         .or_else(|_| std::env::var("DITTO_OFFLINE_TOKEN"))
-        .expect("HIVE_OFFLINE_TOKEN environment variable is required for sync backend integration tests. Set it in .env file or environment.");
+    {
+        Ok(t) => t,
+        Err(_) => {
+            eprintln!("Skipping test: HIVE_OFFLINE_TOKEN not set");
+            return None;
+        }
+    };
 
     let mut extra = HashMap::new();
     extra.insert("offline_token".to_string(), offline_token);
@@ -73,7 +86,7 @@ async fn setup_backend() -> DittoBackend {
         .await
         .expect("Failed to start sync");
 
-    backend
+    Some(backend)
 }
 
 async fn cleanup_backend(backend: DittoBackend) {
@@ -84,7 +97,7 @@ async fn cleanup_backend(backend: DittoBackend) {
 
 #[tokio::test]
 async fn test_backend_lifecycle() {
-    let backend = setup_backend().await;
+    let Some(backend) = setup_backend().await else { return; };
 
     // Verify backend is ready
     assert!(backend.is_ready().await);
@@ -97,7 +110,7 @@ async fn test_backend_lifecycle() {
 
 #[tokio::test]
 async fn test_document_upsert() {
-    let backend = setup_backend().await;
+    let Some(backend) = setup_backend().await else { return; };
     let doc_store = backend.document_store();
 
     // Create a document
@@ -129,7 +142,7 @@ async fn test_document_upsert() {
 
 #[tokio::test]
 async fn test_document_query() {
-    let backend = setup_backend().await;
+    let Some(backend) = setup_backend().await else { return; };
     let doc_store = backend.document_store();
 
     // Insert a test document
@@ -177,7 +190,7 @@ async fn test_document_query() {
 
 #[tokio::test]
 async fn test_document_query_all() {
-    let backend = setup_backend().await;
+    let Some(backend) = setup_backend().await else { return; };
     let doc_store = backend.document_store();
 
     // Insert multiple documents
@@ -223,7 +236,7 @@ async fn test_document_query_all() {
 
 #[tokio::test]
 async fn test_document_query_with_comparison() {
-    let backend = setup_backend().await;
+    let Some(backend) = setup_backend().await else { return; };
     let doc_store = backend.document_store();
 
     // Insert documents with different scores
@@ -289,7 +302,7 @@ async fn test_document_query_with_comparison() {
 
 #[tokio::test]
 async fn test_document_remove() {
-    let backend = setup_backend().await;
+    let Some(backend) = setup_backend().await else { return; };
     let doc_store = backend.document_store();
 
     // Insert a document
@@ -334,7 +347,7 @@ async fn test_document_remove() {
 
 #[tokio::test]
 async fn test_document_get() {
-    let backend = setup_backend().await;
+    let Some(backend) = setup_backend().await else { return; };
     let doc_store = backend.document_store();
 
     // Insert a document
@@ -368,7 +381,7 @@ async fn test_document_get() {
 
 #[tokio::test]
 async fn test_document_count() {
-    let backend = setup_backend().await;
+    let Some(backend) = setup_backend().await else { return; };
     let doc_store = backend.document_store();
 
     // Insert multiple documents
@@ -414,7 +427,7 @@ async fn test_document_count() {
 
 #[tokio::test]
 async fn test_sync_subscription() {
-    let backend = setup_backend().await;
+    let Some(backend) = setup_backend().await else { return; };
     let sync_engine = backend.sync_engine();
 
     // Create a subscription

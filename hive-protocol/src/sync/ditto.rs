@@ -834,12 +834,21 @@ mod tests {
         let backend = DittoBackend::new();
         let mut config = create_test_config();
         config.shared_key = None;
+        // Provide a dummy offline_token so initialize() reaches the shared_key check
+        // (offline_token is validated first in initialize())
+        config
+            .extra
+            .insert("offline_token".to_string(), "dummy-token".to_string());
 
         let result = backend.initialize(config).await;
         assert!(result.is_err());
         // Verify error message contains expected text
         if let Err(e) = result {
-            assert!(e.to_string().contains("shared_key required"));
+            assert!(
+                e.to_string().contains("shared_key required"),
+                "Expected 'shared_key required' error, got: {}",
+                e
+            );
         }
     }
 
