@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useRef, useState, lazy, Suspense } from 'react';
 import { useViewerStore } from './protocol/state';
+import { parseReplayFile } from './protocol/replay';
 import ConnectionStatus from './components/ConnectionStatus';
 import MetricsPanel from './components/MetricsPanel';
 import PlaybackControl from './components/PlaybackControl';
@@ -13,16 +14,87 @@ const EVENT_STREAM_MIN = 200;
 const EVENT_STREAM_MAX = 600;
 const EVENT_STREAM_DEFAULT = 320;
 
+const SPEED_STEPS = [0.5, 1, 2, 4, 8, 16];
+
 export default function App() {
   const connect = useViewerStore((s) => s.connect);
   const disconnect = useViewerStore((s) => s.disconnect);
+  const replayMode = useViewerStore((s) => s.replayMode);
+  const loadReplay = useViewerStore((s) => s.loadReplay);
+  const exitReplay = useViewerStore((s) => s.exitReplay);
   const [esWidth, setEsWidth] = useState(EVENT_STREAM_DEFAULT);
   const dragging = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Connect on mount (unless loading from ?replay= URL)
   useEffect(() => {
-    connect();
+    const params = new URLSearchParams(window.location.search);
+    const replayUrl = params.get('replay');
+    if (replayUrl) {
+      fetch(replayUrl)
+        .then((r) => r.text())
+        .then((text) => {
+          const events = parseReplayFile(text);
+          if (events.length > 0) loadReplay(events);
+          else connect();
+        })
+        .catch(() => connect());
+    } else {
+      connect();
+    }
     return () => disconnect();
-  }, [connect, disconnect]);
+  }, [connect, disconnect, loadReplay]);
+
+  // Keyboard shortcuts (only in replay mode)
+  useEffect(() => {
+    if (!replayMode) return;
+    const handler = (e: KeyboardEvent) => {
+      // Don't intercept when typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const store = useViewerStore.getState();
+      switch (e.key) {
+        case ' ':
+          e.preventDefault();
+          store.togglePlayPause();
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          store.step(-1);
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          store.step(1);
+          break;
+        case 'Home':
+          e.preventDefault();
+          store.seekTo(0);
+          break;
+        case 'End':
+          e.preventDefault();
+          store.seekTo(store.replayLog.length - 1);
+          break;
+        case '[': {
+          e.preventDefault();
+          const cur = store.playbackSpeed || store._lastSpeed;
+          const idx = SPEED_STEPS.indexOf(cur);
+          if (idx > 0) store.setPlaybackSpeed(SPEED_STEPS[idx - 1]);
+          break;
+        }
+        case ']': {
+          e.preventDefault();
+          const cur = store.playbackSpeed || store._lastSpeed;
+          const idx = SPEED_STEPS.indexOf(cur);
+          if (idx < SPEED_STEPS.length - 1) store.setPlaybackSpeed(SPEED_STEPS[idx + 1]);
+          break;
+        }
+        case 'Escape':
+          store.exitReplay();
+          break;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [replayMode]);
 
   const onDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -41,6 +113,20 @@ export default function App() {
     window.addEventListener('mouseup', onUp);
   }, []);
 
+  const handleFileLoad = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = reader.result as string;
+      const events = parseReplayFile(text);
+      if (events.length > 0) loadReplay(events);
+    };
+    reader.readAsText(file);
+    // Reset input so the same file can be re-selected
+    e.target.value = '';
+  }, [loadReplay]);
+
   return (
     <div className="h-screen flex flex-col bg-gray-950 text-gray-100">
       {/* Top bar */}
@@ -51,6 +137,32 @@ export default function App() {
             <span className="text-gray-400">Viewer</span>
           </h1>
           <ConnectionStatus />
+          {/* File loader */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".jsonl,.json"
+            onChange={handleFileLoad}
+            className="hidden"
+          />
+          {replayMode ? (
+            <button
+              onClick={exitReplay}
+              className="px-2 py-0.5 rounded text-[10px] leading-tight bg-amber-800 text-amber-200 hover:bg-amber-700"
+            >
+              Exit Replay
+            </button>
+          ) : (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-2 py-0.5 rounded text-[10px] leading-tight bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700"
+            >
+              Load JSONL
+            </button>
+          )}
+          {replayMode && (
+            <span className="text-[10px] text-cyan-600">REPLAY</span>
+          )}
         </div>
         <MetricsPanel />
       </header>

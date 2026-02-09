@@ -11,6 +11,8 @@ import type {
 } from './types';
 import { inferRole } from './types';
 import { ViewerConnection, defaultWsUrl, type ConnectionStatus } from './connection';
+import type { ReplayMeta } from './replay';
+import { extractMeta } from './replay';
 
 export interface ViewerStore {
   /** WebSocket connection status. */
@@ -49,6 +51,12 @@ export interface ViewerStore {
   /** Last non-zero speed (for play/pause toggle). */
   _lastSpeed: number;
 
+  /** Replay mode state. */
+  replayMode: boolean;
+  replayLog: ViewerEvent[];
+  replayMeta: ReplayMeta | null;
+  replayCursor: number;
+
   /** Set playback speed. */
   setPlaybackSpeed: (speed: number) => void;
 
@@ -66,9 +74,53 @@ export interface ViewerStore {
 
   /** Apply an incoming ViewerEvent. */
   applyEvent: (event: ViewerEvent) => void;
+
+  /** Load a JSONL recording for replay. */
+  loadReplay: (events: ViewerEvent[]) => void;
+
+  /** Exit replay mode, return to live WebSocket. */
+  exitReplay: () => void;
+
+  /** Seek to frame N (reconstructs state from events[0..N]). */
+  seekTo: (frame: number) => void;
+
+  /** Step forward/backward by N frames. */
+  step: (delta: number) => void;
 }
 
 const PLAYBACK_TICK_MS = 150;
+
+type StoreGet = () => ViewerStore;
+type StoreSet = (partial: Partial<ViewerStore> | ((state: ViewerStore) => Partial<ViewerStore>)) => void;
+
+/** Shared drain loop: handles both live playbackQueue and replay mode. */
+function startDrainLoop(get: StoreGet, set: StoreSet): ReturnType<typeof setInterval> {
+  return setInterval(() => {
+    const state = get();
+    if (state.playbackSpeed === 0) return;
+    const n = Math.ceil(state.playbackSpeed);
+
+    if (state.replayMode) {
+      // Replay mode: read from replayLog at cursor
+      if (state.replayCursor >= state.replayLog.length - 1) {
+        // Reached end — auto-pause
+        set({ playbackSpeed: 0 });
+        return;
+      }
+      const end = Math.min(state.replayCursor + n, state.replayLog.length - 1);
+      for (let i = state.replayCursor + 1; i <= end; i++) {
+        state.applyEvent(state.replayLog[i]);
+      }
+      set({ replayCursor: end });
+    } else {
+      // Live mode: drain from playbackQueue
+      if (state.playbackQueue.length === 0) return;
+      const toApply = state.playbackQueue.slice(0, n);
+      set({ playbackQueue: state.playbackQueue.slice(n) });
+      for (const ev of toApply) state.applyEvent(ev);
+    }
+  }, PLAYBACK_TICK_MS);
+}
 
 export const useViewerStore = create<ViewerStore>((set, get) => ({
   status: 'disconnected',
@@ -83,6 +135,10 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
   playbackQueue: [],
   _playbackTimer: null,
   _lastSpeed: 1,
+  replayMode: false,
+  replayLog: [],
+  replayMeta: null,
+  replayCursor: 0,
 
   setPlaybackSpeed: (speed: number) => {
     if (speed > 0) set({ playbackSpeed: speed, _lastSpeed: speed });
@@ -145,14 +201,7 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
     });
 
     // Start playback drain loop
-    const timer = setInterval(() => {
-      const { playbackSpeed, playbackQueue, applyEvent } = get();
-      if (playbackSpeed === 0 || playbackQueue.length === 0) return;
-      const n = Math.ceil(playbackSpeed);
-      const toApply = playbackQueue.slice(0, n);
-      set({ playbackQueue: playbackQueue.slice(n) });
-      for (const ev of toApply) applyEvent(ev);
-    }, PLAYBACK_TICK_MS);
+    const timer = startDrainLoop(get, set);
 
     set({ connection: conn, wsUrl, lastError: null, _playbackTimer: timer });
     conn.connect();
@@ -163,6 +212,82 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
     if (connection) connection.disconnect();
     if (_playbackTimer) clearInterval(_playbackTimer);
     set({ connection: null, _playbackTimer: null, playbackQueue: [] });
+  },
+
+  loadReplay: (events: ViewerEvent[]) => {
+    // Disconnect WebSocket, stop live mode
+    get().disconnect();
+    const meta = extractMeta(events);
+    set({
+      nodes: {},
+      events: [],
+      simClock: null,
+      totalCycles: 0,
+      playbackQueue: [],
+      replayMode: true,
+      replayLog: events,
+      replayMeta: meta,
+      replayCursor: 0,
+      playbackSpeed: 0,
+      _lastSpeed: 1,
+      status: 'disconnected',
+      lastError: null,
+    });
+    // Start the drain loop for replay playback
+    const timer = startDrainLoop(get, set);
+    set({ _playbackTimer: timer });
+  },
+
+  exitReplay: () => {
+    const { _playbackTimer } = get();
+    if (_playbackTimer) clearInterval(_playbackTimer);
+    set({
+      replayMode: false,
+      replayLog: [],
+      replayMeta: null,
+      replayCursor: 0,
+      _playbackTimer: null,
+      nodes: {},
+      events: [],
+      simClock: null,
+      totalCycles: 0,
+      playbackSpeed: 1,
+      _lastSpeed: 1,
+    });
+    // Reconnect to live WebSocket
+    setTimeout(() => get().connect(), 100);
+  },
+
+  seekTo: (frame: number) => {
+    const { replayLog, applyEvent } = get();
+    const clamped = Math.max(0, Math.min(frame, replayLog.length - 1));
+    // Reset state to empty
+    set({
+      nodes: {},
+      events: [],
+      simClock: null,
+      totalCycles: 0,
+    });
+    // Replay events[0..clamped] through applyEvent
+    for (let i = 0; i <= clamped; i++) {
+      applyEvent(replayLog[i]);
+    }
+    set({ replayCursor: clamped });
+  },
+
+  step: (delta: number) => {
+    const { replayCursor, replayLog, applyEvent, seekTo } = get();
+    if (delta > 0) {
+      // Apply next `delta` events from cursor
+      const end = Math.min(replayCursor + delta, replayLog.length - 1);
+      for (let i = replayCursor + 1; i <= end; i++) {
+        applyEvent(replayLog[i]);
+      }
+      set({ replayCursor: end });
+    } else if (delta < 0) {
+      // Replay from start (simple, correct)
+      seekTo(Math.max(0, replayCursor + delta));
+    }
   },
 
   applyEvent: (event: ViewerEvent) => {
@@ -365,6 +490,16 @@ function applyLifecycleEvent(
           required: (g.required_confidence as number) ?? 0.7,
           status: (g.status as string) ?? '',
         })),
+      };
+      break;
+    }
+    case 'CALIBRATION_DRIFT': {
+      const accuracy = details.accuracy_pct as number;
+      const drift = details.drift as number;
+      const status = details.status as string ?? 'DRIFTING';
+      next.subsystems['calibration'] = {
+        confidence: (accuracy ?? 100) / 100,
+        status: (accuracy >= 95 ? 'NOMINAL' : accuracy >= 85 ? 'DEGRADED' : 'CRITICAL') as LifecycleState['subsystems'][string]['status'],
       };
       break;
     }
