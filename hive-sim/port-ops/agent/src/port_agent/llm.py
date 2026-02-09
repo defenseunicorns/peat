@@ -11,6 +11,7 @@ a structured action decision.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -239,12 +240,16 @@ class DryRunProvider(LLMProvider):
     Role-aware: 'crane' processes containers, 'aggregator' produces summaries.
     """
 
+    # Simulate LLM thinking time so the viewer can keep up
+    DRY_RUN_DELAY_S = 0.3
+
     def __init__(self, role: str = "crane", **kwargs):
         self._cycle = 0
         self._role = role
 
     async def decide(self, persona: str, observed_state: dict, available_tools: list[dict]) -> AgentDecision:
         self._cycle += 1
+        await asyncio.sleep(self.DRY_RUN_DELAY_S)
         if self._role == "aggregator":
             return self._decide_aggregator(observed_state)
         elif self._role == "operator":

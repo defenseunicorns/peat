@@ -29,7 +29,7 @@ PYTHONPATH := $(SIM_DIR)/bridge/src:$(SIM_DIR)/agent/src
 export PYTHONPATH
 
 # Defaults (override on command line: make phase0 MAX_CYCLES=5)
-MAX_CYCLES       ?= 10
+MAX_CYCLES       ?= 50
 TIME_COMPRESSION ?= 600
 PROVIDER         ?= anthropic
 LISTEN           ?= 0.0.0.0:9090

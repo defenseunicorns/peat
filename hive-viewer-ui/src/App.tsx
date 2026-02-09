@@ -14,6 +14,10 @@ const EVENT_STREAM_MIN = 200;
 const EVENT_STREAM_MAX = 600;
 const EVENT_STREAM_DEFAULT = 320;
 
+const LEFT_PANEL_MIN = 240;
+const LEFT_PANEL_MAX = 500;
+const LEFT_PANEL_DEFAULT = 320;
+
 const SPEED_STEPS = [0.5, 1, 2, 4, 8, 16];
 
 export default function App() {
@@ -23,7 +27,8 @@ export default function App() {
   const loadReplay = useViewerStore((s) => s.loadReplay);
   const exitReplay = useViewerStore((s) => s.exitReplay);
   const [esWidth, setEsWidth] = useState(EVENT_STREAM_DEFAULT);
-  const dragging = useRef(false);
+  const [leftWidth, setLeftWidth] = useState(LEFT_PANEL_DEFAULT);
+  const dragging = useRef<'left' | 'right' | false>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Connect on mount (unless loading from ?replay= URL)
@@ -96,13 +101,16 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler);
   }, [replayMode]);
 
-  const onDragStart = useCallback((e: React.MouseEvent) => {
+  const onDragStart = useCallback((side: 'left' | 'right', e: React.MouseEvent) => {
     e.preventDefault();
-    dragging.current = true;
+    dragging.current = side;
     const onMove = (ev: MouseEvent) => {
       if (!dragging.current) return;
-      const newWidth = Math.min(EVENT_STREAM_MAX, Math.max(EVENT_STREAM_MIN, window.innerWidth - ev.clientX));
-      setEsWidth(newWidth);
+      if (dragging.current === 'right') {
+        setEsWidth(Math.min(EVENT_STREAM_MAX, Math.max(EVENT_STREAM_MIN, window.innerWidth - ev.clientX)));
+      } else {
+        setLeftWidth(Math.min(LEFT_PANEL_MAX, Math.max(LEFT_PANEL_MIN, ev.clientX)));
+      }
     };
     const onUp = () => {
       dragging.current = false;
@@ -170,14 +178,20 @@ export default function App() {
       {/* Main content — 3 column layout */}
       <main className="flex-1 flex overflow-hidden">
         {/* Left: Hierarchy + Capability Cards */}
-        <aside className="w-60 border-r border-gray-800 flex flex-col shrink-0 overflow-hidden">
-          <div className="h-72 border-b border-gray-800 shrink-0">
+        <aside className="border-r border-gray-800 flex flex-col shrink-0 overflow-hidden" style={{ width: leftWidth }}>
+          <div className="h-80 border-b border-gray-800 shrink-0">
             <HierarchyTree />
           </div>
           <div className="flex-1 overflow-hidden">
             <CapabilityCards />
           </div>
         </aside>
+
+        {/* Left drag handle */}
+        <div
+          onMouseDown={(e) => onDragStart('left', e)}
+          className="w-1 shrink-0 cursor-col-resize bg-gray-800 hover:bg-cyan-700 transition-colors"
+        />
 
         {/* Center: Spatial View */}
         <section className="flex-1 min-w-[400px] border-l border-gray-800 overflow-hidden">
@@ -192,9 +206,9 @@ export default function App() {
           </Suspense>
         </section>
 
-        {/* Drag handle */}
+        {/* Right drag handle */}
         <div
-          onMouseDown={onDragStart}
+          onMouseDown={(e) => onDragStart('right', e)}
           className="w-1 shrink-0 cursor-col-resize bg-gray-800 hover:bg-cyan-700 transition-colors"
         />
 
