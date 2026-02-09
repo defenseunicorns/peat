@@ -1,6 +1,9 @@
+import { useMemo } from 'react';
 import { OrbitControls, OrthographicCamera } from '@react-three/drei';
 import type { SpatialDerivedState } from '../../spatial/types';
 import { CAMERA, COLORS } from '../../spatial/constants';
+import { useAnimationStore } from '../../spatial/animationState';
+import { useAnimationTick } from '../../spatial/useAnimationTick';
 import VesselHull from './VesselHull';
 import HoldGrid from './HoldGrid';
 import ContainerQueue from './ContainerQueue';
@@ -17,6 +20,23 @@ interface Props {
 
 export default function BerthScene({ state }: Props) {
   const anyContention = Object.values(state.cranes).some((c) => c.isContending);
+
+  // Drive animation state machines every frame
+  useAnimationTick();
+
+  const craneAnims = useAnimationStore((s) => s.cranes);
+  const tractorAnims = useAnimationStore((s) => s.tractors);
+
+  // Collect container indices currently being animated by cranes
+  const animatingContainerIndices = useMemo(() => {
+    const indices = new Set<number>();
+    for (const anim of Object.values(craneAnims)) {
+      if (anim.phase !== 'idle') {
+        indices.add(anim.containerIndex);
+      }
+    }
+    return indices;
+  }, [craneAnims]);
 
   return (
     <>
@@ -59,11 +79,16 @@ export default function BerthScene({ state }: Props) {
       {/* Scene elements */}
       <VesselHull />
       <HoldGrid />
-      <ContainerQueue state={state} />
+      <ContainerQueue state={state} animatingIndices={animatingContainerIndices} />
 
       {/* Cranes */}
       {Object.entries(state.cranes).map(([nodeId, crane]) => (
-        <CraneGantry key={nodeId} nodeId={nodeId} crane={crane} />
+        <CraneGantry
+          key={nodeId}
+          nodeId={nodeId}
+          crane={crane}
+          animation={craneAnims[nodeId] ?? null}
+        />
       ))}
 
       {/* Operators */}
@@ -73,7 +98,12 @@ export default function BerthScene({ state }: Props) {
 
       {/* Tractors */}
       {Object.entries(state.tractors).map(([nodeId, tractor]) => (
-        <TractorUnit key={nodeId} nodeId={nodeId} tractor={tractor} />
+        <TractorUnit
+          key={nodeId}
+          nodeId={nodeId}
+          tractor={tractor}
+          animation={tractorAnims[nodeId] ?? null}
+        />
       ))}
 
       {/* Sensors */}

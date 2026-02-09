@@ -6,6 +6,7 @@ import { CONTAINER_GRID, COLORS } from '../../spatial/constants';
 
 interface Props {
   state: SpatialDerivedState;
+  animatingIndices?: Set<number>;
 }
 
 function ContainerBox({
@@ -78,10 +79,13 @@ function ContainerBox({
   );
 }
 
-export default function ContainerQueue({ state }: Props) {
+export default function ContainerQueue({ state, animatingIndices }: Props) {
   return (
     <group>
       {state.containers.map((c) => {
+        // Hide containers that are currently attached to a crane spreader
+        if (animatingIndices?.has(c.index)) return null;
+
         const col = c.index % CONTAINER_GRID.cols;
         const row = Math.floor(c.index / CONTAINER_GRID.cols);
         return (

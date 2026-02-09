@@ -10,6 +10,7 @@ import type {
   LifecycleState,
 } from './types';
 import { inferRole } from './types';
+import { useAnimationStore } from '../spatial/animationState';
 import { ViewerConnection, defaultWsUrl, type ConnectionStatus } from './connection';
 import type { ReplayMeta } from './replay';
 import { extractMeta } from './replay';
@@ -356,6 +357,22 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
       }
 
       case 'hive_event': {
+        // Dispatch spatial animation triggers
+        if (event.event_type === 'spatial_update') {
+          const d = event.details as Record<string, unknown> | undefined;
+          if (d?.operation === 'crane_discharge') {
+            useAnimationStore.getState().triggerCraneDischarge(
+              d.crane_id as string, d.container_id as string,
+              d.container_index as number, d.destination_block as string,
+            );
+          } else if (d?.operation === 'tractor_transport') {
+            useAnimationStore.getState().triggerTractorTransport(
+              d.tractor_id as string, d.container_id as string,
+              d.destination_block as string,
+            );
+          }
+        }
+
         set((state) => {
           const details = (event.details ?? {}) as Record<string, unknown>;
           const source = event.source;

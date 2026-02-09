@@ -72,6 +72,17 @@ export const YARD = {
   labels: ['YB-A', 'YB-B', 'YB-C', 'YB-D', 'YB-E', 'YB-F'],
 };
 
+export const CRANE_ANIM = {
+  BOOM_SHIP_ANGLE: 0.15,       // radians toward ship (+Z)
+  BOOM_SHORE_ANGLE: -0.1,      // radians toward shore (-Z)
+  TROLLEY_RETRACTED_Z: 1.5,
+  TROLLEY_EXTENDED_Z: 4.5,     // over container in hold
+  SPREADER_REST_Y: 4.2,
+  SPREADER_GRAB_Y: 1.0,        // container height on vessel
+  SPREADER_TRUCK_Y: 1.5,       // truck bed height
+  CONTAINER_SIZE: [0.6, 0.35, 0.6] as const,
+};
+
 export const COLORS = {
   water: '#0a1628',
   berth: '#2a2a2a',

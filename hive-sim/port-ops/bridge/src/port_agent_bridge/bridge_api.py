@@ -854,6 +854,21 @@ class BridgeAPI:
             f"total_moves={moves + 1}"
         )
 
+        spatial_event = {
+            "event_type": "spatial_update",
+            "source": self.node_id,
+            "priority": "ROUTINE",
+            "details": {
+                "operation": "crane_discharge",
+                "crane_id": self.node_id,
+                "container_id": container_id,
+                "container_index": queue.fields.get("completed_count", 1) - 1,
+                "weight_tons": weight,
+                "destination_block": dest,
+            },
+        }
+        print(json.dumps(spatial_event), flush=True)
+
         remaining_count = queue.fields["total_containers"] - queue.fields.get("completed_count", 0)
         return (
             f"Container {container_id} move completed. "
@@ -1116,6 +1131,19 @@ class BridgeAPI:
             "aggregation_policy": "AGGREGATE_AT_PARENT",
             "priority": "NORMAL",
         })
+
+        spatial_event = {
+            "event_type": "spatial_update",
+            "source": self.node_id,
+            "priority": "ROUTINE",
+            "details": {
+                "operation": "tractor_transport",
+                "tractor_id": self.node_id,
+                "container_id": container_id,
+                "destination_block": destination,
+            },
+        }
+        print(json.dumps(spatial_event), flush=True)
 
         logger.info(
             f"METRICS: container_transported node={self.node_id} "
