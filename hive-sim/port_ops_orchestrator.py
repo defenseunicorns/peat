@@ -20,6 +20,7 @@ from lifecycle import get_role_config, RoleConfig
 # Composition map: shorthand key -> (role, persona, name_template)
 _COMPOSITION_MAP: dict[str, tuple[str, str, str]] = {
     "g": ("signaler", "signaler", "signaler-{n}"),
+    "m": ("gate_manager", "gate-manager", "gate-mgr-{n}"),
 }
 
 

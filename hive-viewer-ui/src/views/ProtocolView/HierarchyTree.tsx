@@ -14,12 +14,14 @@ const ROLE_COLORS: Record<string, { active: string; idle: string }> = {
   sensor: { active: '#3b82f6', idle: '#1e3a5f' },      // blue
   yard_block: { active: '#fb923c', idle: '#7c2d12' },  // orange
   lashing_crew: { active: '#ef4444', idle: '#7f1d1d' }, // red
+  gate_manager: { active: '#84cc16', idle: '#3f6212' }, // lime
   unknown: { active: '#9ca3af', idle: '#374151' },      // gray
 };
 
 const HIVE_LEVELS: Record<string, { label: string; y: number }> = {
   scheduler: { label: 'H4 — Scheduler', y: 30 },
   berth_manager: { label: 'H3 — Berth Mgr', y: 60 },
+  gate_manager: { label: 'H3 — Gate Mgr', y: 60 },
   aggregator: { label: 'H2 — Aggregator', y: 100 },
   yard_block: { label: 'H2 — Yard Block', y: 100 },
   crane: { label: 'H1 — Entity', y: 170 },
@@ -65,6 +67,10 @@ function actionLabel(action: string): string {
     report_lashing_complete: 'COMPLETE',
     inspect_lashing: 'INSPECT',
     request_lashing_tools: 'TOOLS',
+    update_gate_summary: 'GATE SUM',
+    release_container: 'RELEASE',
+    manage_truck_queue: 'QUEUE',
+    schedule_rail_load: 'RAIL',
     wait: 'IDLE',
   };
   return labels[action] ?? action.toUpperCase();
@@ -85,6 +91,7 @@ export default function HierarchyTree() {
   // Group nodes by role for layout
   const schedulers = nodeList.filter((n) => n.role === 'scheduler');
   const berthManagers = nodeList.filter((n) => n.role === 'berth_manager');
+  const gateManagers = nodeList.filter((n) => n.role === 'gate_manager');
   const aggregators = nodeList.filter((n) => n.role === 'aggregator');
   const yardBlocks = nodeList.filter((n) => n.role === 'yard_block');
   const cranes = nodeList.filter((n) => n.role === 'crane');
@@ -104,7 +111,8 @@ export default function HierarchyTree() {
   }
 
   const schedPositions = xPositions(schedulers, HIVE_LEVELS.scheduler.y);
-  const berthMgrPositions = xPositions(berthManagers, HIVE_LEVELS.berth_manager.y);
+  const h3Nodes = [...berthManagers, ...gateManagers];
+  const berthMgrPositions = xPositions(h3Nodes, HIVE_LEVELS.berth_manager.y);
   const h2Nodes = [...aggregators, ...yardBlocks];
   const aggPositions = xPositions(h2Nodes, HIVE_LEVELS.aggregator.y);
   const h1Nodes = [...cranes, ...operators, ...tractors, ...lashingCrew];
@@ -171,9 +179,9 @@ export default function HierarchyTree() {
               {HIVE_LEVELS.scheduler.label}
             </text>
           )}
-          {berthManagers.length > 0 && (
+          {h3Nodes.length > 0 && (
             <text x="8" y={HIVE_LEVELS.berth_manager.y - 10} className="fill-gray-600" fontSize="9">
-              {HIVE_LEVELS.berth_manager.label}
+              H3 — Zone Mgr
             </text>
           )}
           <text x="8" y={HIVE_LEVELS.aggregator.y - 10} className="fill-gray-600" fontSize="9">
@@ -202,7 +210,7 @@ export default function HierarchyTree() {
           {/* Nodes */}
           {allPositions.map(({ node, x, y }) => {
             const color = nodeColor(node);
-            const radius = (node.role === 'aggregator' || node.role === 'scheduler' || node.role === 'berth_manager' || node.role === 'yard_block') ? 18 : node.role === 'sensor' ? 12 : 15;
+            const radius = (node.role === 'aggregator' || node.role === 'scheduler' || node.role === 'berth_manager' || node.role === 'gate_manager' || node.role === 'yard_block') ? 18 : node.role === 'sensor' ? 12 : 15;
             return (
               <g key={node.node_id}>
                 {/* Glow for active nodes */}

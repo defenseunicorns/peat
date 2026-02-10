@@ -624,6 +624,105 @@ BERTH_MANAGER_TOOLS = [
     ),
 ]
 
+# ── Gate manager tool definitions ──────────────────────────────────────────
+
+GATE_MANAGER_TOOLS = [
+    ToolShim(
+        name="update_gate_summary",
+        description=(
+            "Update gate zone summary with aggregated throughput metrics. "
+            "Reports trucks/hour, queue length, and container readiness."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "trucks_per_hour": {
+                    "type": "number",
+                    "description": "Aggregate truck throughput across all gate lanes",
+                },
+                "queue_length": {
+                    "type": "number",
+                    "description": "Current number of trucks in queue",
+                },
+                "ready_containers": {
+                    "type": "number",
+                    "description": "Number of containers ready for pickup at yard",
+                },
+                "summary": {
+                    "type": "string",
+                    "description": "Brief human-readable gate summary",
+                },
+            },
+            "required": ["trucks_per_hour", "queue_length", "summary"],
+        },
+    ),
+    ToolShim(
+        name="release_container",
+        description=(
+            "Release a container from yard storage to gate for truck pickup. "
+            "Coordinates with yard blocks to move container to gate lane."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "container_id": {
+                    "type": "string",
+                    "description": "Container ID to release (e.g., MSCU-4472891)",
+                },
+                "gate_lane": {
+                    "type": "string",
+                    "description": "Target gate lane (e.g., outbound-1)",
+                },
+            },
+            "required": ["container_id", "gate_lane"],
+        },
+    ),
+    ToolShim(
+        name="manage_truck_queue",
+        description=(
+            "Manage truck queue priority and lane assignments. "
+            "Used to optimize throughput during congestion."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["prioritize_fast_lane", "reorder_by_appointment", "open_additional_lane"],
+                    "description": "Queue management action to take",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Explanation for queue management decision",
+                },
+            },
+            "required": ["action", "reason"],
+        },
+    ),
+    ToolShim(
+        name="schedule_rail_load",
+        description=(
+            "Schedule containers for rail loading at intermodal facility. "
+            "Coordinates rail slot timing with yard container availability."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "rail_slot": {
+                    "type": "string",
+                    "description": "Rail track/slot identifier (e.g., rail-1)",
+                },
+                "containers": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of container IDs for rail load",
+                },
+            },
+            "required": ["rail_slot", "containers"],
+        },
+    ),
+]
+
 # ── Sensor tool definitions ────────────────────────────────────────────────
 
 SENSOR_TOOLS = [
@@ -942,6 +1041,8 @@ class BridgeAPI:
                 text = self._read_aggregator_tasking()
             elif self.role == "berth_manager":
                 text = self._read_berth_manager_tasking()
+            elif self.role == "gate_manager":
+                text = self._read_gate_manager_tasking()
             elif self.role == "operator":
                 text = self._read_operator_tasking()
             elif self.role == "tractor":
@@ -1202,12 +1303,55 @@ class BridgeAPI:
         }
         return json.dumps(tasking, indent=2, default=str)
 
+    def _read_gate_manager_tasking(self) -> str:
+        gate_statuses = []
+        truck_queue = []
+        yard_ready_containers = []
+        rail_schedule = []
+
+        for doc_id, doc in self.store._collections.get("node_states", {}).items():
+            fields = doc.fields
+            entity_type = fields.get("entity_type", "")
+            if entity_type in ("gate_scanner", "rfid_reader", "gate_worker"):
+                gate_statuses.append({
+                    "gate_id": fields.get("node_id", doc_id),
+                    "status": fields.get("status", "UNKNOWN"),
+                    "trucks_per_hour": fields.get("metrics", {}).get("trucks_per_hour", 0),
+                    "lane": fields.get("lane", "unknown"),
+                })
+
+        queue_doc = self.store.get_document("gate_queues", "truck_queue")
+        if queue_doc:
+            truck_queue = queue_doc.fields.get("trucks", [])
+
+        for doc_id, doc in self.store._collections.get("yard_blocks", {}).items():
+            ready = doc.fields.get("ready_for_pickup", [])
+            yard_ready_containers.extend(ready)
+
+        rail_doc = self.store.get_document("rail_schedule", "rail-1")
+        if rail_doc:
+            rail_schedule = rail_doc.fields.get("slots", [])
+
+        tasking = {
+            "directive": "COORDINATE_GATE_OPERATIONS",
+            "zone": "gate-zone",
+            "gate_count": len(gate_statuses),
+            "gate_statuses": gate_statuses,
+            "truck_queue": truck_queue,
+            "yard_ready_containers": yard_ready_containers,
+            "rail_schedule": rail_schedule,
+            "priority": "NORMAL",
+        }
+        return json.dumps(tasking, indent=2, default=str)
+
     async def list_tools(self) -> ListToolsResultShim:
         """Return tools appropriate for this agent's role."""
         if self.role == "aggregator":
             return ListToolsResultShim(tools=list(AGGREGATOR_TOOLS))
         elif self.role == "berth_manager":
             return ListToolsResultShim(tools=list(BERTH_MANAGER_TOOLS))
+        elif self.role == "gate_manager":
+            return ListToolsResultShim(tools=list(GATE_MANAGER_TOOLS))
         elif self.role == "operator":
             return ListToolsResultShim(tools=list(OPERATOR_TOOLS))
         elif self.role == "tractor":
@@ -1245,6 +1389,11 @@ class BridgeAPI:
             "reassign_worker": self._tool_reassign_worker,
             "escalate_to_scheduler": self._tool_escalate_to_scheduler,
             "update_hold_priority": self._tool_update_hold_priority,
+            # Gate manager tools
+            "update_gate_summary": self._tool_update_gate_summary,
+            "release_container": self._tool_release_container,
+            "manage_truck_queue": self._tool_manage_truck_queue,
+            "schedule_rail_load": self._tool_schedule_rail_load,
             # Tractor tools
             "transport_container": self._tool_transport_container,
             "report_position": self._tool_report_position,
@@ -1863,6 +2012,115 @@ class BridgeAPI:
         return (
             f"Hold {hold_id} priority updated to {priority_level}. "
             f"{('Reason: ' + reason) if reason else ''}"
+        )
+
+    # ── Gate manager tool handlers ─────────────────────────────────────────
+
+    async def _tool_update_gate_summary(self, arguments: dict) -> str:
+        trucks_per_hour = arguments["trucks_per_hour"]
+        queue_length = arguments["queue_length"]
+        ready_containers = arguments.get("ready_containers", 0)
+        summary = arguments["summary"]
+
+        entity = self._get_entity_doc()
+        if entity:
+            summaries = entity.get_field("metrics.summaries_produced", 0)
+            entity.update_field("metrics.summaries_produced", summaries + 1)
+
+        self.store.emit_event({
+            "event_type": "gate_summary_update",
+            "source": self.node_id,
+            "trucks_per_hour": trucks_per_hour,
+            "queue_length": queue_length,
+            "ready_containers": ready_containers,
+            "summary": summary,
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL",
+        })
+
+        logger.info(
+            f"METRICS: gate_summary_update node={self.node_id} "
+            f"trucks/hr={trucks_per_hour} queue={queue_length}"
+        )
+        return (
+            f"Gate summary updated: {trucks_per_hour} trucks/hr, "
+            f"{queue_length} in queue, {ready_containers} ready. {summary}"
+        )
+
+    async def _tool_release_container(self, arguments: dict) -> str:
+        container_id = arguments["container_id"]
+        gate_lane = arguments["gate_lane"]
+
+        entity = self._get_entity_doc()
+        if entity:
+            releases = entity.get_field("metrics.containers_released", 0)
+            entity.update_field("metrics.containers_released", releases + 1)
+
+        self.store.emit_event({
+            "event_type": "container_released_to_gate",
+            "source": self.node_id,
+            "container_id": container_id,
+            "gate_lane": gate_lane,
+            "aggregation_policy": "IMMEDIATE_PROPAGATE",
+            "priority": "NORMAL",
+        })
+
+        logger.info(
+            f"METRICS: container_released node={self.node_id} "
+            f"container={container_id} lane={gate_lane}"
+        )
+        return f"Container {container_id} released to gate lane {gate_lane}."
+
+    async def _tool_manage_truck_queue(self, arguments: dict) -> str:
+        action = arguments["action"]
+        reason = arguments["reason"]
+
+        entity = self._get_entity_doc()
+        if entity:
+            queue_actions = entity.get_field("metrics.queue_actions", 0)
+            entity.update_field("metrics.queue_actions", queue_actions + 1)
+
+        self.store.emit_event({
+            "event_type": "truck_queue_managed",
+            "source": self.node_id,
+            "action": action,
+            "reason": reason,
+            "aggregation_policy": "IMMEDIATE_PROPAGATE",
+            "priority": "HIGH",
+        })
+
+        logger.info(
+            f"METRICS: truck_queue_managed node={self.node_id} "
+            f"action={action} reason={reason}"
+        )
+        return f"Truck queue action: {action}. Reason: {reason}"
+
+    async def _tool_schedule_rail_load(self, arguments: dict) -> str:
+        rail_slot = arguments["rail_slot"]
+        containers = arguments["containers"]
+
+        entity = self._get_entity_doc()
+        if entity:
+            rail_loads = entity.get_field("metrics.rail_loads_scheduled", 0)
+            entity.update_field("metrics.rail_loads_scheduled", rail_loads + 1)
+
+        self.store.emit_event({
+            "event_type": "rail_load_scheduled",
+            "source": self.node_id,
+            "rail_slot": rail_slot,
+            "containers": containers,
+            "container_count": len(containers),
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL",
+        })
+
+        logger.info(
+            f"METRICS: rail_load_scheduled node={self.node_id} "
+            f"slot={rail_slot} containers={len(containers)}"
+        )
+        return (
+            f"Rail load scheduled: {len(containers)} containers "
+            f"on {rail_slot}."
         )
 
     # ── Tractor tool handlers ────────────────────────────────────────────

@@ -60,6 +60,15 @@ _ROLE_CONFIGS: dict[str, RoleConfig] = {
         visibility_range_m=150.0,
         description="Visual hand-signal communication between crane operator and ground crew",
     ),
+    "gate_manager": RoleConfig(
+        name="gate_manager",
+        hierarchy_level=3,
+        physical_actions=frozenset(),
+        requires_line_of_sight=False,
+        heavy_subsystems=False,
+        visibility_range_m=0.0,
+        description="H3 zone coordinator for gate operations — truck queuing, container release, and rail loading",
+    ),
 }
 
 

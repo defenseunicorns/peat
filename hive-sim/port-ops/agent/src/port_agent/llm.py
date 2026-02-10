@@ -345,6 +345,8 @@ class DryRunProvider(LLMProvider):
             return self._decide_lashing_crew(observed_state)
         elif self._role == "signaler":
             return self._decide_signaler(observed_state)
+        elif self._role == "gate_manager":
+            return self._decide_gate_manager(observed_state)
         return self._decide_crane(observed_state)
 
     def _decide_crane(self, observed_state: dict) -> AgentDecision:
@@ -1055,6 +1057,96 @@ class DryRunProvider(LLMProvider):
                 "crane_id": tasking.get("assigned_crane", "crane-1"),
             },
             reasoning=f"DryRun cycle {self._cycle}: routine clear signal",
+        )
+
+    def _decide_gate_manager(self, observed_state: dict) -> AgentDecision:
+        tasking = observed_state.get("tasking", {})
+        gate_statuses = tasking.get("gate_statuses", [])
+        truck_queue = tasking.get("truck_queue", [])
+        yard_containers = tasking.get("yard_ready_containers", [])
+        queue_length = len(truck_queue)
+
+        # Every 4 cycles: produce a gate summary
+        if self._cycle % 4 == 0:
+            total_throughput = sum(
+                g.get("trucks_per_hour", 0) for g in gate_statuses
+            )
+            return AgentDecision(
+                action="update_gate_summary",
+                arguments={
+                    "trucks_per_hour": total_throughput,
+                    "queue_length": queue_length,
+                    "ready_containers": len(yard_containers),
+                    "summary": (
+                        f"{len(gate_statuses)} gates reporting, "
+                        f"{total_throughput} trucks/hr, "
+                        f"{queue_length} in queue"
+                    ),
+                },
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: periodic gate summary — "
+                    f"{total_throughput} trucks/hr, {queue_length} queued"
+                ),
+            )
+
+        # Queue backup: prioritize fast lane
+        if queue_length > 10:
+            return AgentDecision(
+                action="manage_truck_queue",
+                arguments={
+                    "action": "prioritize_fast_lane",
+                    "reason": (
+                        f"Queue backup detected ({queue_length} trucks), "
+                        f"prioritizing pre-cleared trucks"
+                    ),
+                },
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: queue exceeds threshold, "
+                    f"reordering for efficiency"
+                ),
+            )
+
+        # Release containers from yard to gate when trucks are waiting
+        if yard_containers and queue_length > 0:
+            container_id = (
+                yard_containers[0]
+                if isinstance(yard_containers[0], str)
+                else yard_containers[0].get("container_id", "UNKNOWN")
+            )
+            return AgentDecision(
+                action="release_container",
+                arguments={
+                    "container_id": container_id,
+                    "gate_lane": "outbound-1",
+                },
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: container ready and truck "
+                    f"waiting, releasing {container_id} from yard"
+                ),
+            )
+
+        # Every 8 cycles: schedule rail load
+        if self._cycle % 8 == 0:
+            rail_containers = [
+                (c if isinstance(c, str) else c.get("container_id", "UNKNOWN"))
+                for c in yard_containers[:5]
+            ]
+            return AgentDecision(
+                action="schedule_rail_load",
+                arguments={
+                    "rail_slot": "rail-1",
+                    "containers": rail_containers,
+                },
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: periodic rail load "
+                    f"coordination, {len(rail_containers)} containers"
+                ),
+            )
+
+        return AgentDecision(
+            action="wait",
+            arguments={"reason": "Monitoring — no immediate gate operations needed"},
+            reasoning=f"DryRun cycle {self._cycle}: gate manager idle, watching gate status",
         )
 
     def _decide_aggregator(self, observed_state: dict) -> AgentDecision:
