@@ -22,6 +22,7 @@ from .lifecycle import HierarchyLevel, RoleConfig, get_role_config
 
 _COMPOSITION: dict[str, str] = {
     "yard_manager": "personas/yard-manager.md",
+    "stacking_crane": "personas/stacking-crane.md",
 }
 
 
@@ -87,8 +88,40 @@ class Orchestrator:
         if config.lifecycle is None:
             entity.state["status"] = "active"
 
+        # Managed equipment gets a startup sequence
+        if config.lifecycle == "managed":
+            entity.state["status"] = "starting"
+            # Initialize subsystem states
+            for sub in config.subsystems:
+                entity.state[f"subsystem_{sub.name}"] = {
+                    "kind": sub.kind,
+                    "status": "nominal",
+                }
+            entity.state["status"] = "active"
+
         self._entities[eid] = entity
         return entity
+
+    def create_stacking_crane(
+        self,
+        yard_block_id: str,
+        zone_scope: str,
+        *,
+        entity_id: Optional[str] = None,
+    ) -> Entity:
+        """Create a stacking crane entity assigned to a yard block.
+
+        The crane is linked as equipment under the given yard block and
+        receives the block's slot map in its initial state.
+        """
+        crane = self.create_entity("stacking_crane", zone_scope, entity_id=entity_id)
+        crane.state["yard_block"] = yard_block_id
+        crane.state["current_task"] = None
+        crane.state["position"] = {"row": 0, "bay": 0}
+        crane.state["hoist_load_kg"] = 0.0
+        self.link(yard_block_id, crane.entity_id)
+        return crane
+
 
     # -- Hierarchy wiring ----------------------------------------------------
 

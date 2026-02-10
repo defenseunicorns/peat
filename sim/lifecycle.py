@@ -26,6 +26,14 @@ class HierarchyLevel(Enum):
 
 
 @dataclass(frozen=True)
+class SubsystemSpec:
+    """Specification for an equipment subsystem."""
+    name: str
+    kind: str  # actuator type: "winch", "rotary", "linear"
+    description: str = ""
+
+
+@dataclass(frozen=True)
 class RoleConfig:
     """Immutable configuration for a simulation role."""
     level: HierarchyLevel
@@ -35,6 +43,7 @@ class RoleConfig:
     superior: Optional[str] = None
     description: str = ""
     min_subordinates: int = 0
+    subsystems: tuple[SubsystemSpec, ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -50,6 +59,31 @@ _ROLE_CONFIGS: dict[str, RoleConfig] = {
         superior="toc",
         description="Zone coordinator for yard blocks, stacking cranes, and tractor routing",
         min_subordinates=4,
+    ),
+    "stacking_crane": RoleConfig(
+        level=HierarchyLevel.H1,
+        zone="yard",
+        lifecycle="managed",
+        subordinates=(),
+        superior="yard_manager",
+        description="RTG crane — stacks/retrieves containers in yard blocks by row/bay/tier",
+        subsystems=(
+            SubsystemSpec(
+                name="hoist",
+                kind="winch",
+                description="Vertical lift/lower via spreader and cables",
+            ),
+            SubsystemSpec(
+                name="trolley",
+                kind="rotary",
+                description="Horizontal traverse across yard block width",
+            ),
+            SubsystemSpec(
+                name="gantry_travel",
+                kind="linear",
+                description="Longitudinal travel along yard block length",
+            ),
+        ),
     ),
 }
 

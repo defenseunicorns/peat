@@ -215,6 +215,199 @@ def _balance_cranes(
                 break
 
 
+
+# ---------------------------------------------------------------------------
+# Stacking Crane (H1)
+# ---------------------------------------------------------------------------
+
+# Operational limits
+_HOIST_LOAD_MAX_KG = 40_000
+_HOIST_LOAD_WARN_KG = 38_000  # 95% of rated
+_MAX_TIER = 5  # max container stack height
+
+
+@_register("stacking_crane")
+def _decide_stacking_crane(entity: Entity, orchestrator: Orchestrator) -> dict[str, Any]:
+    """Stacking crane decision cycle (dry-run).
+
+    Steps:
+      1. Check subsystem health
+      2. If current task: execute next step (receive -> travel -> stack/retrieve -> report)
+      3. If idle: pull next task from yard block queue
+    """
+    actions: list[dict[str, Any]] = []
+    task = entity.state.get("current_task")
+
+    # -- 1. Subsystem health check ------------------------------------------
+    hoist_load = entity.state.get("hoist_load_kg", 0.0)
+    if hoist_load > _HOIST_LOAD_MAX_KG:
+        actions.append({
+            "tool": "report_position",
+            "params": {
+                "crane_id": entity.entity_id,
+                "fault": "hoist_overload",
+                "load_kg": hoist_load,
+                "yard_block": entity.state.get("yard_block"),
+            },
+        })
+        return {"actions": actions, "status": "fault"}
+
+    # -- 2. Execute current task --------------------------------------------
+    if task is not None:
+        _execute_crane_task(entity, task, actions)
+        return {"actions": actions, "status": "working"}
+
+    # -- 3. Pull next task from queue ---------------------------------------
+    task_queue = entity.state.get("task_queue", [])
+    if task_queue:
+        next_task = task_queue.pop(0)
+        entity.state["current_task"] = next_task
+        _execute_crane_task(entity, next_task, actions)
+        return {"actions": actions, "status": "working"}
+
+    # Idle — report position
+    actions.append({
+        "tool": "report_position",
+        "params": {
+            "crane_id": entity.entity_id,
+            "status": "idle",
+            "position": entity.state.get("position", {}),
+            "yard_block": entity.state.get("yard_block"),
+        },
+    })
+    return {"actions": actions, "status": "idle"}
+
+
+def _execute_crane_task(
+    entity: Entity,
+    task: dict[str, Any],
+    actions: list[dict[str, Any]],
+) -> None:
+    """Progress through a stack or retrieve task."""
+    task_type = task.get("type", "stack")
+    phase = task.get("phase", "receive")
+
+    if task_type == "stack":
+        _execute_stack(entity, task, phase, actions)
+    elif task_type == "retrieve":
+        _execute_retrieve(entity, task, phase, actions)
+
+
+def _execute_stack(
+    entity: Entity,
+    task: dict[str, Any],
+    phase: str,
+    actions: list[dict[str, Any]],
+) -> None:
+    """Stack sequence: receive -> travel -> place -> complete."""
+    container_id = task.get("container_id")
+    target = task.get("target_slot", {})
+
+    if phase == "receive":
+        # Receive container from tractor at transfer lane
+        entity.state["hoist_load_kg"] = task.get("weight_kg", 20_000)
+        task["phase"] = "travel"
+        actions.append({
+            "tool": "report_position",
+            "params": {
+                "crane_id": entity.entity_id,
+                "status": "received",
+                "container_id": container_id,
+                "yard_block": entity.state.get("yard_block"),
+            },
+        })
+
+    elif phase == "travel":
+        # Move gantry + trolley to target slot
+        entity.state["position"] = {
+            "row": target.get("row", 0),
+            "bay": target.get("bay", 0),
+        }
+        task["phase"] = "place"
+
+    elif phase == "place":
+        # Lower container into slot
+        tier = target.get("tier", 0)
+        if tier > _MAX_TIER:
+            actions.append({
+                "tool": "report_position",
+                "params": {
+                    "crane_id": entity.entity_id,
+                    "fault": "tier_limit_exceeded",
+                    "container_id": container_id,
+                    "target_slot": target,
+                    "yard_block": entity.state.get("yard_block"),
+                },
+            })
+            entity.state["current_task"] = None
+            return
+        actions.append({
+            "tool": "stack_container",
+            "params": {
+                "crane_id": entity.entity_id,
+                "container_id": container_id,
+                "row": target.get("row", 0),
+                "bay": target.get("bay", 0),
+                "tier": tier,
+                "yard_block": entity.state.get("yard_block"),
+            },
+        })
+        entity.state["hoist_load_kg"] = 0.0
+        entity.state["current_task"] = None
+
+
+def _execute_retrieve(
+    entity: Entity,
+    task: dict[str, Any],
+    phase: str,
+    actions: list[dict[str, Any]],
+) -> None:
+    """Retrieve sequence: travel -> pick -> deliver -> complete."""
+    container_id = task.get("container_id")
+    source = task.get("source_slot", {})
+
+    if phase == "receive":
+        # 'receive' means accept the task — first step is travel
+        task["phase"] = "travel"
+
+    elif phase == "travel":
+        entity.state["position"] = {
+            "row": source.get("row", 0),
+            "bay": source.get("bay", 0),
+        }
+        task["phase"] = "pick"
+
+    elif phase == "pick":
+        entity.state["hoist_load_kg"] = task.get("weight_kg", 20_000)
+        actions.append({
+            "tool": "retrieve_container",
+            "params": {
+                "crane_id": entity.entity_id,
+                "container_id": container_id,
+                "row": source.get("row", 0),
+                "bay": source.get("bay", 0),
+                "tier": source.get("tier", 0),
+                "yard_block": entity.state.get("yard_block"),
+            },
+        })
+        task["phase"] = "deliver"
+
+    elif phase == "deliver":
+        # Move to transfer lane and lower onto tractor
+        entity.state["position"] = {"row": 0, "bay": 0}
+        entity.state["hoist_load_kg"] = 0.0
+        entity.state["current_task"] = None
+        actions.append({
+            "tool": "report_position",
+            "params": {
+                "crane_id": entity.entity_id,
+                "status": "delivered",
+                "container_id": container_id,
+                "yard_block": entity.state.get("yard_block"),
+            },
+        })
+
+
 def _maybe_escalate(
     entity: Entity,
     yard_summary: dict[str, Any],

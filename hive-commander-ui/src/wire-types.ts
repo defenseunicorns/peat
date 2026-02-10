@@ -70,6 +70,20 @@ export interface BerthEvent {
   message: string;
 }
 
+// -- Viewer hierarchy types (ADR-051) ---------------------------------------
+
+export type ViewerHierarchyLevel = 'H1' | 'H2' | 'H3' | 'H4';
+
+export interface HierarchyNode {
+  id: string;
+  role: string;
+  level: ViewerHierarchyLevel;
+  zone: string;
+  status: 'active' | 'degraded' | 'offline';
+  children: string[];
+  parentId?: string;
+}
+
 // -- Yard Manager (H3) types (ADR-051) -------------------------------------
 
 export interface YardSummary {
@@ -121,14 +135,34 @@ export interface BerthTopology {
   events: BerthEvent[];
 }
 
+// -- Stacking Crane (H1) ---------------------------------------------------
+
+export interface CranePosition {
+  craneId: string;
+  yardBlock: string;
+  position: { row: number; bay: number };
+  status: 'idle' | 'working' | 'received' | 'delivered' | 'fault';
+  fault?: string;
+  containerId?: string;
+  hoistLoadKg?: number;
+}
+
+export interface YardSlot {
+  slotKey: string; // "block:row:bay:tier"
+  containerId: string;
+  stackedBy: string; // crane_id
+}
+
 // -- Full terminal state (for viewer) ---------------------------------------
 
 export interface TerminalState {
-  nodes: BerthNode[];
+  nodes: HierarchyNode[];
   yardSummaries: Record<string, YardSummary>;
   blockSummaries: Record<string, YardBlockSummary>;
   tractorRoutes: TractorRoute[];
   congestionEvents: CongestionEvent[];
+  cranePositions: Record<string, CranePosition>;
+  yardSlots: YardSlot[];
 }
 
 // Role display properties

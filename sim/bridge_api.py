@@ -35,6 +35,9 @@ class SimState:
         self.block_assignments: dict[str, str] = {}  # container_id -> block_id
         self.tractor_routes: dict[str, dict[str, Any]] = {}  # tractor_id -> route
         self.congestion_events: list[dict[str, Any]] = []
+        # Stacking crane state
+        self.slot_map: dict[str, dict[str, Any]] = {}  # "block:row:bay:tier" -> container
+        self.crane_positions: dict[str, dict[str, Any]] = {}  # crane_id -> position/status
 
     def read_all_block_summaries(self) -> list[dict[str, Any]]:
         """Return every yard-block summary currently stored."""
@@ -96,6 +99,90 @@ def _handle_report_congestion(
     return {"status": "escalated" if escalated else "recorded", "event": params}
 
 
+
+# ---------------------------------------------------------------------------
+# Stacking Crane tools (H1)
+# ---------------------------------------------------------------------------
+
+def _handle_stack_container(
+    state: SimState, params: dict[str, Any],
+) -> dict[str, Any]:
+    """Place a container at a specific row/bay/tier slot in the yard block."""
+    yard_block = params.get("yard_block", "")
+    row = params.get("row", 0)
+    bay = params.get("bay", 0)
+    tier = params.get("tier", 0)
+    container_id = params.get("container_id")
+    crane_id = params.get("crane_id")
+
+    slot_key = f"{yard_block}:{row}:{bay}:{tier}"
+    if slot_key in state.slot_map:
+        return {
+            "status": "error",
+            "reason": "slot_occupied",
+            "slot": slot_key,
+        }
+
+    state.slot_map[slot_key] = {
+        "container_id": container_id,
+        "stacked_by": crane_id,
+    }
+    return {
+        "status": "stacked",
+        "container_id": container_id,
+        "slot": slot_key,
+    }
+
+
+def _handle_retrieve_container(
+    state: SimState, params: dict[str, Any],
+) -> dict[str, Any]:
+    """Pick up a container from a yard slot for outbound transfer."""
+    yard_block = params.get("yard_block", "")
+    row = params.get("row", 0)
+    bay = params.get("bay", 0)
+    tier = params.get("tier", 0)
+    container_id = params.get("container_id")
+
+    slot_key = f"{yard_block}:{row}:{bay}:{tier}"
+    stored = state.slot_map.get(slot_key)
+    if stored is None:
+        return {"status": "error", "reason": "slot_empty", "slot": slot_key}
+
+    if stored.get("container_id") != container_id:
+        return {
+            "status": "error",
+            "reason": "container_mismatch",
+            "expected": container_id,
+            "found": stored.get("container_id"),
+        }
+
+    del state.slot_map[slot_key]
+    return {
+        "status": "retrieved",
+        "container_id": container_id,
+        "slot": slot_key,
+    }
+
+
+def _handle_report_position(
+    state: SimState, params: dict[str, Any],
+) -> dict[str, Any]:
+    """Broadcast crane position, task status, and subsystem health."""
+    crane_id = params.get("crane_id")
+    if crane_id is None:
+        return {"status": "error", "reason": "missing crane_id"}
+
+    state.crane_positions[crane_id] = {
+        "position": params.get("position", {}),
+        "status": params.get("status", "unknown"),
+        "yard_block": params.get("yard_block"),
+        "fault": params.get("fault"),
+        "container_id": params.get("container_id"),
+    }
+    return {"status": "reported", "crane_id": crane_id}
+
+
 # -- Tool registry ----------------------------------------------------------
 
 YARD_MANAGER_TOOLS: list[ToolDef] = [
@@ -121,10 +208,30 @@ YARD_MANAGER_TOOLS: list[ToolDef] = [
     ),
 ]
 
+STACKING_CRANE_TOOLS: list[ToolDef] = [
+    ToolDef(
+        name="stack_container",
+        description="Place a container at the assigned row/bay/tier slot in the yard block.",
+        handler=_handle_stack_container,
+    ),
+    ToolDef(
+        name="retrieve_container",
+        description="Pick up a container from a yard slot for outbound transfer.",
+        handler=_handle_retrieve_container,
+    ),
+    ToolDef(
+        name="report_position",
+        description="Broadcast crane position, task status, and subsystem health.",
+        handler=_handle_report_position,
+    ),
+]
+
+
 # -- Convenience lookup -----------------------------------------------------
 
 _TOOL_REGISTRY: dict[str, dict[str, ToolDef]] = {
     "yard_manager": {t.name: t for t in YARD_MANAGER_TOOLS},
+    "stacking_crane": {t.name: t for t in STACKING_CRANE_TOOLS},
 }
 
 
