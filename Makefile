@@ -63,6 +63,11 @@ help:
 	@echo "  phase2-validate-long     - Extended run (50 cycles)"
 	@echo "  phase2-validate-replay   - Replay recorded JSONL (FILE=path)"
 	@echo ""
+	@echo "Phase 3: Port Terminal (200-node):"
+	@echo "  clab-deploy-phase3       - Deploy 200-node port terminal + impairments"
+	@echo "  clab-destroy-phase3      - Destroy Phase 3 topology"
+	@echo "  clab-impairments-phase3  - Re-apply zone network impairments"
+	@echo ""
 	@echo "Legacy E-Series Tests (for reference):"
 	@echo "  e11-modes                - Test HIVE modes (legacy)"
 	@echo "  e12-comprehensive        - Full validation suite (legacy)"
@@ -453,6 +458,36 @@ phase2-validate-replay:
 		exit 1; \
 	fi
 	@python3 validation/port/phase2-metrics.py --replay $(FILE)
+
+# ============================================
+# Phase 3: Port Terminal (200-node)
+# ============================================
+
+.PHONY: clab-deploy-phase3 clab-destroy-phase3 clab-impairments-phase3
+
+clab-deploy-phase3:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Phase 3: Port Terminal 200-Node Topology                  ║"
+	@echo "║  TOC + 2 Berths + Yard + Gate = 200 nodes                  ║"
+	@echo "║  Zone impairments: industrial WiFi / cellular / wired      ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@cd hive-sim && containerlab deploy -t topologies/port-terminal-200node.clab.yaml
+	@echo ""
+	@echo "Applying per-zone network impairments..."
+	@cd hive-sim && ./apply-port-terminal-impairments.sh
+	@echo ""
+	@echo "✓ Phase 3 topology deployed with impairments"
+
+clab-destroy-phase3:
+	@echo "Destroying Phase 3 port terminal topology..."
+	@cd hive-sim && containerlab destroy -t topologies/port-terminal-200node.clab.yaml
+	@echo "✓ Phase 3 topology destroyed"
+
+clab-impairments-phase3:
+	@echo "Re-applying Phase 3 network impairments..."
+	@cd hive-sim && ./apply-port-terminal-impairments.sh
+	@echo "✓ Impairments applied"
 
 # ============================================
 # Legacy E-Series Tests (kept for compatibility)
