@@ -168,6 +168,41 @@ record-scenario:  ## Record full scenario to JSONL for replay
 		2>/dev/null > recordings/scenario-$$(date +%Y%m%d-%H%M%S).jsonl
 	@echo "Recording saved to recordings/"
 
+# --------------------------------------------------------------------------
+#  Run: Multi-berth (Phase 3)
+# --------------------------------------------------------------------------
+
+.PHONY: phase3-2berth
+phase3-2berth: $(RELAY_BIN)  ## Phase 3: 2 berths, each with full hold team → relay → viewer
+	@echo "=== HIVE Port Ops — Phase 3 (2 Independent Berths) ==="
+	@echo "  Viewer:  http://localhost:5173"
+	@echo "  Relay:   ws://localhost:9090/ws"
+	@echo "  Berths:  2 (independent holds, shared tractors)"
+	@echo ""
+	cd $(VIEWER_UI) && npm run dev &
+	python -m port_agent.main \
+		--mode multi \
+		--agents 2c5w4t1s1a2x \
+		--berths 2 \
+		--provider $(PROVIDER) \
+		--max-cycles $(MAX_CYCLES) \
+		--time-compression $(TIME_COMPRESSION) \
+	  2>/dev/null | $(RELAY_BIN) --ingest stdin --listen $(LISTEN)
+
+.PHONY: phase3-2berth-dry
+phase3-2berth-dry: $(RELAY_BIN)  ## Phase 3 (2 berths) with dry-run provider
+	@$(MAKE) phase3-2berth PROVIDER=dry-run
+
+.PHONY: sim-phase3-2berth-dry
+sim-phase3-2berth-dry:  ## Run Phase 3 (2 berths) dry-run sim only (stdout)
+	python -m port_agent.main \
+		--mode multi \
+		--agents 2c5w4t1s1a2x \
+		--berths 2 \
+		--provider dry-run \
+		--max-cycles $(MAX_CYCLES) \
+		--time-compression $(TIME_COMPRESSION)
+
 .PHONY: phase2
 phase2: $(RELAY_BIN)  ## Phase 2: 3 hold teams + berth manager + scheduler (53 agents)
 	@echo "=== HIVE Port Ops — Phase 2 (3 Hold Teams + Berth Manager + Scheduler) ==="

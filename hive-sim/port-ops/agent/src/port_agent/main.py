@@ -25,7 +25,7 @@ from mcp import ClientSession
 from mcp.client.stdio import stdio_client, StdioServerParameters
 
 from .dashboard import LiveDashboard, render_post_run_summary
-from .llm import create_provider, load_tier_config
+from .llm import create_provider
 from .loop import AgentLoop, SimulationClock
 
 
@@ -159,29 +159,28 @@ async def run_phase0_inprocess(args):
 
 async def run_phase1a_multi(args):
     """
-    Run multiple agents with shared in-process HIVE state.
-    Supports both single-hold (Phase 1c) and multi-hold (Phase 2) compositions.
+    Phase 1a / Phase 3: Run multiple agents with shared in-process HIVE state.
+
+    When ``--berths N`` is specified (N > 1), runs N independent berth instances
+    with per-berth holds, container queues, and teams. Tractors are shared.
     """
     from .orchestrator import Orchestrator, OrchestratorConfig, parse_agent_composition
 
     script_dir = Path(__file__).parent.parent.parent.parent  # port-ops/
     personas_dir = script_dir / "personas"
 
-    # Load tiered LLM config if specified
-    tier_config = None
-    if args.llm_config:
-        tier_config = load_tier_config(args.llm_config)
-        logger.info(f"Loaded tiered LLM config from {args.llm_config}")
-        logger.info(f"  Tiers: {', '.join(tier_config.tiers.keys())}")
-        logger.info(f"  Role mappings: {tier_config.role_mapping}")
+    num_berths = getattr(args, "berths", 1) or 1
 
-    agent_specs, num_holds, hold_nums = parse_agent_composition(
-        args.agents, provider=args.provider, model=args.model
+    agent_specs = parse_agent_composition(
+        args.agents,
+        provider=args.provider,
+        model=args.model,
+        num_berths=num_berths,
     )
 
     config = OrchestratorConfig(
-        hold_id=f"hold-{hold_nums[0]}",
-        hold_num=hold_nums[0],
+        hold_id=f"hold-{args.hold}",
+        hold_num=args.hold,
         berth=args.berth,
         vessel=args.vessel,
         queue_size=args.queue_size,
@@ -189,10 +188,8 @@ async def run_phase1a_multi(args):
         max_cycles=args.max_cycles,
         cycle_delay_sim_minutes=args.cycle_delay,
         time_compression=args.time_compression,
+        num_berths=num_berths,
         agents=agent_specs,
-        num_holds=num_holds,
-        hold_nums=hold_nums,
-        tier_config=tier_config,
     )
 
     orch = Orchestrator(config)
@@ -209,6 +206,8 @@ def main():
                         help="Run mode: single (Phase 0) or multi (Phase 1a)")
     parser.add_argument("--agents", default="2c1a",
                         help="Agent composition for multi mode (e.g., 2c1a = 2 cranes + 1 aggregator)")
+    parser.add_argument("--berths", type=int, default=1,
+                        help="Number of berth instances (default 1). Each berth gets its own hold team.")
 
     # Common args
     parser.add_argument("--node-id", default="crane-1", help="Node identifier (e.g., crane-1)")
@@ -234,8 +233,6 @@ def main():
     parser.add_argument("--metrics-file", default=None, help="Path to write metrics JSON")
     parser.add_argument("--dashboard", action="store_true",
                         help="Enable live terminal dashboard (clears screen each cycle)")
-    parser.add_argument("--llm-config", default=None,
-                        help="Path to tiered LLM config TOML (overrides --provider per role)")
     parser.add_argument("--log-level", default="INFO", help="Logging level")
 
     args = parser.parse_args()

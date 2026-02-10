@@ -2,7 +2,7 @@
 name = "port-agent-bridge"
 version = "0.1.0"
 description = "MCP server bridging Gastown agents to HIVE state for port operations simulation"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "mcp>=1.0.0",
 ]

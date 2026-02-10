@@ -402,36 +402,6 @@ SCHEDULER_TOOLS = [
         },
     ),
     ToolShim(
-        name="assign_container",
-        description=(
-            "Assign a specific container to specific workers (crane, operator, tractor). "
-            "Creates a container_assignment record tracking the full lifecycle. "
-            "Status progresses: QUEUED → IN_PROGRESS → DISCHARGED → TRANSPORTED → SECURED."
-        ),
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "container_id": {
-                    "type": "string",
-                    "description": "Container ID to assign (e.g., MSCU-4472891)",
-                },
-                "assigned_crane": {
-                    "type": "string",
-                    "description": "Crane node_id to assign (e.g., crane-1)",
-                },
-                "assigned_operator": {
-                    "type": "string",
-                    "description": "Operator node_id to assign (e.g., op-1)",
-                },
-                "assigned_tractor": {
-                    "type": "string",
-                    "description": "Tractor node_id to assign (e.g., tractor-1)",
-                },
-            },
-            "required": ["container_id", "assigned_crane"],
-        },
-    ),
-    ToolShim(
         name="emit_schedule_event",
         description=(
             "Emit a schedule-level event up the HIVE hierarchy."
@@ -535,192 +505,6 @@ BERTH_MANAGER_TOOLS = [
             "required": ["from_hold", "to_hold", "reason"],
         },
     ),
-    ToolShim(
-        name="reassign_worker",
-        description=(
-            "Reassign a worker (operator, lashing crew) from one hold to another. "
-            "Use when a hold is underperforming due to workforce gaps. "
-            "Emits worker_reassigned event."
-        ),
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "worker_id": {
-                    "type": "string",
-                    "description": "Worker node_id to reassign (e.g., op-2)",
-                },
-                "from_hold": {
-                    "type": "string",
-                    "description": "Hold the worker is currently in",
-                },
-                "to_hold": {
-                    "type": "string",
-                    "description": "Hold to reassign the worker to",
-                },
-                "reason": {
-                    "type": "string",
-                    "description": "Reason for the reassignment",
-                },
-            },
-            "required": ["worker_id", "from_hold", "to_hold", "reason"],
-        },
-    ),
-    ToolShim(
-        name="escalate_to_scheduler",
-        description=(
-            "Escalate a structural problem to the scheduler that requires "
-            "stow plan changes or broader coordination. Use for crane failures, "
-            "persistent throughput gaps, or issues beyond berth-level fixes. "
-            "Emits scheduler_escalation event."
-        ),
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "issue_type": {
-                    "type": "string",
-                    "enum": [
-                        "crane_failure",
-                        "persistent_throughput_gap",
-                        "stow_plan_change_needed",
-                        "workforce_shortage",
-                        "equipment_cascade_failure",
-                    ],
-                    "description": "Category of structural issue",
-                },
-                "details": {
-                    "type": "string",
-                    "description": "Detailed description of the issue and impact",
-                },
-            },
-            "required": ["issue_type", "details"],
-        },
-    ),
-    ToolShim(
-        name="update_hold_priority",
-        description=(
-            "Adjust the priority level of a hold to direct more or fewer "
-            "shared resources to it. Higher priority holds get preferential "
-            "tractor and worker allocation. Emits hold_priority_changed event."
-        ),
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "hold_num": {
-                    "type": "integer",
-                    "description": "Hold number (1, 2, or 3)",
-                },
-                "priority_level": {
-                    "type": "string",
-                    "enum": ["LOW", "NORMAL", "HIGH", "CRITICAL"],
-                    "description": "New priority level for the hold",
-                },
-                "reason": {
-                    "type": "string",
-                    "description": "Reason for the priority change",
-                },
-            },
-            "required": ["hold_num", "priority_level"],
-        },
-    ),
-]
-
-# ── Gate manager tool definitions ──────────────────────────────────────────
-
-GATE_MANAGER_TOOLS = [
-    ToolShim(
-        name="update_gate_summary",
-        description=(
-            "Update gate zone summary with aggregated throughput metrics. "
-            "Reports trucks/hour, queue length, and container readiness."
-        ),
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "trucks_per_hour": {
-                    "type": "number",
-                    "description": "Aggregate truck throughput across all gate lanes",
-                },
-                "queue_length": {
-                    "type": "number",
-                    "description": "Current number of trucks in queue",
-                },
-                "ready_containers": {
-                    "type": "number",
-                    "description": "Number of containers ready for pickup at yard",
-                },
-                "summary": {
-                    "type": "string",
-                    "description": "Brief human-readable gate summary",
-                },
-            },
-            "required": ["trucks_per_hour", "queue_length", "summary"],
-        },
-    ),
-    ToolShim(
-        name="release_container",
-        description=(
-            "Release a container from yard storage to gate for truck pickup. "
-            "Coordinates with yard blocks to move container to gate lane."
-        ),
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "container_id": {
-                    "type": "string",
-                    "description": "Container ID to release (e.g., MSCU-4472891)",
-                },
-                "gate_lane": {
-                    "type": "string",
-                    "description": "Target gate lane (e.g., outbound-1)",
-                },
-            },
-            "required": ["container_id", "gate_lane"],
-        },
-    ),
-    ToolShim(
-        name="manage_truck_queue",
-        description=(
-            "Manage truck queue priority and lane assignments. "
-            "Used to optimize throughput during congestion."
-        ),
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "action": {
-                    "type": "string",
-                    "enum": ["prioritize_fast_lane", "reorder_by_appointment", "open_additional_lane"],
-                    "description": "Queue management action to take",
-                },
-                "reason": {
-                    "type": "string",
-                    "description": "Explanation for queue management decision",
-                },
-            },
-            "required": ["action", "reason"],
-        },
-    ),
-    ToolShim(
-        name="schedule_rail_load",
-        description=(
-            "Schedule containers for rail loading at intermodal facility. "
-            "Coordinates rail slot timing with yard container availability."
-        ),
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "rail_slot": {
-                    "type": "string",
-                    "description": "Rail track/slot identifier (e.g., rail-1)",
-                },
-                "containers": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "List of container IDs for rail load",
-                },
-            },
-            "required": ["rail_slot", "containers"],
-        },
-    ),
 ]
 
 # ── Sensor tool definitions ────────────────────────────────────────────────
@@ -770,144 +554,6 @@ SENSOR_TOOLS = [
     ),
 ]
 
-# ── Lashing Crew tool definitions ────────────────────────────────────────────
-
-LASHING_CREW_TOOLS = [
-    ToolShim(
-        name="secure_container",
-        description=(
-            "Secure a container after crane placement using twist-locks or lashing rods. "
-            "Only call after receiving crane clear signal for this container."
-        ),
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "container_id": {
-                    "type": "string",
-                    "description": "Container ID to secure (e.g., MSCU-4472891)",
-                },
-                "lashing_type": {
-                    "type": "string",
-                    "enum": ["twist_lock", "lashing_rod"],
-                    "description": "Type of securing method",
-                },
-            },
-            "required": ["container_id", "lashing_type"],
-        },
-    ),
-    ToolShim(
-        name="report_lashing_complete",
-        description=(
-            "Report that a container has been fully secured and lashing is complete. "
-            "Emits a lashing_complete event so the next operation can proceed."
-        ),
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "container_id": {
-                    "type": "string",
-                    "description": "Container ID that was secured",
-                },
-            },
-            "required": ["container_id"],
-        },
-    ),
-    ToolShim(
-        name="inspect_lashing",
-        description=(
-            "Inspect existing lashings on a container for integrity. "
-            "Reports PASS, DEGRADED, or FAIL."
-        ),
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "container_id": {
-                    "type": "string",
-                    "description": "Container ID to inspect",
-                },
-                "result": {
-                    "type": "string",
-                    "enum": ["PASS", "DEGRADED", "FAIL"],
-                    "description": "Inspection result",
-                },
-            },
-            "required": ["container_id", "result"],
-        },
-    ),
-    ToolShim(
-        name="request_lashing_tools",
-        description=(
-            "Request replacement lashing tools (twist-lock keys, lashing rods, turnbuckles). "
-            "Use when tools are worn or damaged."
-        ),
-        inputSchema={
-            "type": "object",
-            "properties": {},
-        },
-    ),
-]
-
-
-# ── Signaler tool definitions ────────────────────────────────────────────────
-
-SIGNALER_TOOLS = [
-    ToolShim(
-        name="signal_crane",
-        description=(
-            "Send a visual signal to the crane operator. "
-            "Used to authorize or halt crane movements during lift/lower cycles."
-        ),
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "signal_type": {
-                    "type": "string",
-                    "enum": ["HOIST", "LOWER", "STOP", "CLEAR"],
-                    "description": "The type of signal to send",
-                },
-                "crane_id": {
-                    "type": "string",
-                    "description": "Identifier of the target crane",
-                },
-            },
-            "required": ["signal_type", "crane_id"],
-        },
-    ),
-    ToolShim(
-        name="report_hazard",
-        description=(
-            "Report a hazard observed in the operational zone. "
-            "Triggers immediate halt of crane operations in the affected area."
-        ),
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "hazard_type": {
-                    "type": "string",
-                    "enum": ["personnel", "obstruction", "equipment", "weather", "other"],
-                    "description": "Category of the observed hazard",
-                },
-                "location": {
-                    "type": "string",
-                    "description": "Location description relative to the crane and load",
-                },
-            },
-            "required": ["hazard_type", "location"],
-        },
-    ),
-    ToolShim(
-        name="confirm_ground_clear",
-        description=(
-            "Confirm that the ground zone beneath the crane is clear of "
-            "personnel and obstructions. Required before any lift/lower operation."
-        ),
-        inputSchema={
-            "type": "object",
-            "properties": {},
-        },
-    ),
-]
-
 
 # ── BridgeAPI ────────────────────────────────────────────────────────────────
 
@@ -917,6 +563,11 @@ class BridgeAPI:
 
     Duck-types the MCP ClientSession interface so AgentLoop can use it
     transparently instead of a real MCP connection.
+
+    Each BridgeAPI is scoped to a specific berth via ``hold_id`` and
+    ``berth_id``. Entity state and events are partitioned by berth—agents
+    only see state from their own berth unless explicitly accessing
+    cross-berth resources (e.g., yard tractors via berth_manager).
     """
 
     def __init__(
@@ -925,13 +576,13 @@ class BridgeAPI:
         node_id: str,
         role: str = "crane",
         hold_id: str = "hold-3",
-        hold_num: int | None = None,
+        berth_id: str = "berth-5",
     ):
         self.store = store
         self.node_id = node_id
         self.role = role
         self.hold_id = hold_id
-        self.hold_num = hold_num
+        self.berth_id = berth_id
         self._entity_doc_id = f"sim_doc_{node_id}"
 
     # ── Internal helpers ─────────────────────────────────────────────────
@@ -1001,48 +652,11 @@ class BridgeAPI:
             else:
                 text = json.dumps({"error": "Transport queue not found"})
 
-        elif uri == "hive://container-assignments":
-            doc = self.store.get_document(
-                "container_assignments", f"assignments_{self.hold_id}"
-            )
-            if doc:
-                assignments = doc.fields.get("assignments", {})
-                # Filter to show assignments relevant to this agent
-                if self.role == "crane":
-                    relevant = {
-                        k: v for k, v in assignments.items()
-                        if v.get("assigned_crane") == self.node_id
-                    }
-                elif self.role == "tractor":
-                    relevant = {
-                        k: v for k, v in assignments.items()
-                        if v.get("assigned_tractor") == self.node_id
-                    }
-                elif self.role == "operator":
-                    relevant = {
-                        k: v for k, v in assignments.items()
-                        if v.get("assigned_operator") == self.node_id
-                    }
-                else:
-                    relevant = assignments
-                text = json.dumps({
-                    "hold_id": self.hold_id,
-                    "assignments": relevant,
-                    "total_assigned": len(assignments),
-                    "status_breakdown": self.store.get_container_status_breakdown(
-                        self.hold_id
-                    ),
-                }, indent=2, default=str)
-            else:
-                text = json.dumps({"error": "Container assignments not initialized"})
-
         elif uri == "hive://tasking":
             if self.role == "aggregator":
                 text = self._read_aggregator_tasking()
             elif self.role == "berth_manager":
                 text = self._read_berth_manager_tasking()
-            elif self.role == "gate_manager":
-                text = self._read_gate_manager_tasking()
             elif self.role == "operator":
                 text = self._read_operator_tasking()
             elif self.role == "tractor":
@@ -1051,10 +665,6 @@ class BridgeAPI:
                 text = self._read_scheduler_tasking()
             elif self.role == "sensor":
                 text = self._read_sensor_tasking()
-            elif self.role == "lashing_crew":
-                text = self._read_lashing_crew_tasking()
-            elif self.role == "signaler":
-                text = self._read_signaler_tasking()
             else:
                 text = self._read_crane_tasking()
 
@@ -1074,14 +684,6 @@ class BridgeAPI:
     def _read_crane_tasking(self) -> str:
         entity = self._get_entity_doc()
         queue = self._get_queue_doc()
-        # Get containers assigned to this crane
-        my_assignments = self.store.get_container_assignments_by_role(
-            self.hold_id, "assigned_crane", self.node_id
-        )
-        assigned_pending = [
-            a for a in my_assignments
-            if a.get("status") in ("QUEUED", "IN_PROGRESS")
-        ]
         tasking = {
             "directive": "PROCESS_CONTAINERS",
             "assignment": entity.fields.get("assignment", {}) if entity else {},
@@ -1089,8 +691,6 @@ class BridgeAPI:
                 queue.fields.get("total_containers", 0) - queue.fields.get("completed_count", 0)
                 if queue else 0
             ),
-            "assigned_containers": [a["container_id"] for a in assigned_pending],
-            "total_assigned": len(my_assignments),
             "target_rate": 35,
             "priority": "NORMAL",
         }
@@ -1099,21 +699,13 @@ class BridgeAPI:
     def _read_aggregator_tasking(self) -> str:
         team = self._get_team_doc()
         queue = self._get_queue_doc()
-        # Aggregator only sees entities scoped to its own hold
-        hold_members = {}
-        if team:
-            for mid, mdata in team.fields.get("team_members", {}).items():
-                hold_members[mid] = mdata
-        container_status = self.store.get_container_status_breakdown(self.hold_id)
         tasking = {
             "directive": "AGGREGATE_HOLD_STATUS",
             "hold_id": self.hold_id,
-            "hold_num": self.hold_num,
-            "team_size": len(hold_members),
+            "team_size": len(team.fields.get("team_members", {})) if team else 0,
             "moves_completed": team.fields.get("moves_completed", 0) if team else 0,
             "moves_remaining": team.fields.get("moves_remaining", 0) if team else 0,
             "gap_count": len(team.fields.get("gap_analysis", [])) if team else 0,
-            "container_status_breakdown": container_status,
             "target_rate": 35,
             "priority": "NORMAL",
         }
@@ -1146,20 +738,11 @@ class BridgeAPI:
                 j for j in tq.fields.get("pending_jobs", [])
                 if j.get("status") == "PENDING"
             ]
-        # Get containers specifically assigned to this tractor
-        my_assignments = self.store.get_container_assignments_by_role(
-            self.hold_id, "assigned_tractor", self.node_id
-        )
-        assigned_discharged = [
-            a["container_id"] for a in my_assignments
-            if a.get("status") == "DISCHARGED"
-        ]
         tasking = {
             "directive": "TRANSPORT_CONTAINERS",
             "position": entity.fields.get("position", {}) if entity else {},
             "battery_pct": entity.get_field("equipment_health.battery_pct", 100) if entity else 100,
             "pending_transport_jobs": pending_jobs[:3],
-            "assigned_containers": assigned_discharged,
             "trips_completed": entity.get_field("metrics.trips_completed", 0) if entity else 0,
         }
         return json.dumps(tasking, indent=2, default=str)
@@ -1168,20 +751,6 @@ class BridgeAPI:
         team = self._get_team_doc()
         queue = self._get_queue_doc()
         members = team.fields.get("team_members", {}) if team else {}
-        container_status = self.store.get_container_status_breakdown(self.hold_id)
-        # Get unassigned containers from queue
-        unassigned = []
-        if queue:
-            assign_doc = self.store.get_document(
-                "container_assignments", f"assignments_{self.hold_id}"
-            )
-            assigned_ids = set()
-            if assign_doc:
-                assigned_ids = set(assign_doc.fields.get("assignments", {}).keys())
-            for c in queue.fields.get("containers", []):
-                cid = c.get("container_id")
-                if cid and cid not in assigned_ids and c.get("status") != "COMPLETED":
-                    unassigned.append(cid)
         tasking = {
             "directive": "COORDINATE_HOLD",
             "hold_id": self.hold_id,
@@ -1193,9 +762,6 @@ class BridgeAPI:
             "moves_completed": team.get_field("moves_completed", 0) if team else 0,
             "moves_remaining": team.get_field("moves_remaining", 0) if team else 0,
             "gap_count": len(team.get_field("gap_analysis", [])) if team else 0,
-            "container_status_breakdown": container_status,
-            "unassigned_containers": unassigned[:10],
-            "total_unassigned": len(unassigned),
         }
         return json.dumps(tasking, indent=2, default=str)
 
@@ -1209,137 +775,39 @@ class BridgeAPI:
         }
         return json.dumps(tasking, indent=2, default=str)
 
-    def _read_lashing_crew_tasking(self) -> str:
-        entity = self._get_entity_doc()
-        # Find containers recently discharged by cranes (available for lashing)
-        events = self.store.get_events()
-        pending_containers = []
-        for evt in events:
-            if evt.get("event_type") == "container_move_complete":
-                pending_containers.append({
-                    "container_id": evt.get("container_id"),
-                    "crane_id": evt.get("source"),
-                })
-        tasking = {
-            "directive": "SECURE_CONTAINERS",
-            "containers_secured": entity.get_field("metrics.containers_secured", 0) if entity else 0,
-            "lashings_inspected": entity.get_field("metrics.lashings_inspected", 0) if entity else 0,
-            "equipment_health": entity.fields.get("equipment_health", {}) if entity else {},
-            "pending_containers": pending_containers[-5:],
-        }
-        return json.dumps(tasking, indent=2, default=str)
-
-    def _read_signaler_tasking(self) -> str:
-        entity = self._get_entity_doc()
-        # Check crane states in the hold to determine active operations
-        team = self._get_team_doc()
-        crane_state = "idle"
-        assigned_crane = "crane-1"
-        if team:
-            members = team.fields.get("team_members", {})
-            for mid, mdata in members.items():
-                if mdata.get("entity_type") == "gantry_crane":
-                    assigned_crane = mid
-                    if mdata.get("status") == "OPERATIONAL":
-                        crane_state = "LIFTING"
-                    break
-        tasking = {
-            "directive": "SIGNAL_OPERATIONS",
-            "crane_state": crane_state,
-            "assigned_crane": assigned_crane,
-            "ground_clear": True,
-            "personnel_in_zone": 0,
-            "active_hazards": [],
-            "signals_sent": entity.get_field("metrics.signals_sent", 0) if entity else 0,
-            "hazards_reported": entity.get_field("metrics.hazards_reported", 0) if entity else 0,
-        }
-        return json.dumps(tasking, indent=2, default=str)
-
     def _read_berth_manager_tasking(self) -> str:
-        # Aggregate all hold docs from team_summaries into berth-level context
+        # Aggregate hold docs from team_summaries into berth-level context.
+        # Each berth manager only sees the hold(s) belonging to its berth.
         hold_summaries = []
         total_remaining = 0
         for doc_id, doc in self.store._collections.get("team_summaries", {}).items():
             fields = doc.fields
             hold_id = fields.get("hold_id", doc_id.replace("team_", ""))
+            # Filter: berth manager only sees its own berth's holds
+            if self.hold_id != hold_id and self.hold_id not in hold_id:
+                # Allow if hold_id matches the berth manager's hold_id
+                # (single-berth mode) or contains the berth prefix (multi-berth)
+                if not hold_id.startswith(self.hold_id.replace("hold-", "hold-")):
+                    continue
             moves_per_hour = fields.get("moves_per_hour", 0)
             status = fields.get("status", "UNKNOWN")
             gap_count = len(fields.get("gap_analysis", []))
             remaining = fields.get("moves_remaining", 0)
             total_remaining += remaining
-
-            # Count workers and equipment by type per hold
-            members = fields.get("team_members", {})
-            worker_counts = {}
-            equipment_status = {}
-            for mid, mdata in members.items():
-                etype = mdata.get("entity_type", "unknown")
-                worker_counts[etype] = worker_counts.get(etype, 0) + 1
-                # Track degraded/failed equipment
-                mstatus = mdata.get("status", "UNKNOWN")
-                if mstatus in ("DEGRADED", "FAILED"):
-                    equipment_status[mid] = mstatus
-
             hold_summaries.append({
                 "hold_id": hold_id,
                 "moves_per_hour": moves_per_hour,
                 "status": status,
-                "priority": fields.get("priority", "NORMAL"),
                 "gap_count": gap_count,
-                "gap_details": fields.get("gap_analysis", []),
                 "moves_remaining": remaining,
                 "moves_completed": fields.get("moves_completed", 0),
-                "target_rate": fields.get("target_moves_per_hour", 35),
-                "worker_counts": worker_counts,
-                "degraded_equipment": equipment_status,
             })
         tasking = {
             "directive": "AGGREGATE_BERTH_STATUS",
-            "berth_id": "berth-5",
+            "berth_id": self.berth_id,
             "hold_count": len(hold_summaries),
             "hold_summaries": hold_summaries,
             "total_moves_remaining": total_remaining,
-            "priority": "NORMAL",
-        }
-        return json.dumps(tasking, indent=2, default=str)
-
-    def _read_gate_manager_tasking(self) -> str:
-        gate_statuses = []
-        truck_queue = []
-        yard_ready_containers = []
-        rail_schedule = []
-
-        for doc_id, doc in self.store._collections.get("node_states", {}).items():
-            fields = doc.fields
-            entity_type = fields.get("entity_type", "")
-            if entity_type in ("gate_scanner", "rfid_reader", "gate_worker"):
-                gate_statuses.append({
-                    "gate_id": fields.get("node_id", doc_id),
-                    "status": fields.get("status", "UNKNOWN"),
-                    "trucks_per_hour": fields.get("metrics", {}).get("trucks_per_hour", 0),
-                    "lane": fields.get("lane", "unknown"),
-                })
-
-        queue_doc = self.store.get_document("gate_queues", "truck_queue")
-        if queue_doc:
-            truck_queue = queue_doc.fields.get("trucks", [])
-
-        for doc_id, doc in self.store._collections.get("yard_blocks", {}).items():
-            ready = doc.fields.get("ready_for_pickup", [])
-            yard_ready_containers.extend(ready)
-
-        rail_doc = self.store.get_document("rail_schedule", "rail-1")
-        if rail_doc:
-            rail_schedule = rail_doc.fields.get("slots", [])
-
-        tasking = {
-            "directive": "COORDINATE_GATE_OPERATIONS",
-            "zone": "gate-zone",
-            "gate_count": len(gate_statuses),
-            "gate_statuses": gate_statuses,
-            "truck_queue": truck_queue,
-            "yard_ready_containers": yard_ready_containers,
-            "rail_schedule": rail_schedule,
             "priority": "NORMAL",
         }
         return json.dumps(tasking, indent=2, default=str)
@@ -1350,8 +818,6 @@ class BridgeAPI:
             return ListToolsResultShim(tools=list(AGGREGATOR_TOOLS))
         elif self.role == "berth_manager":
             return ListToolsResultShim(tools=list(BERTH_MANAGER_TOOLS))
-        elif self.role == "gate_manager":
-            return ListToolsResultShim(tools=list(GATE_MANAGER_TOOLS))
         elif self.role == "operator":
             return ListToolsResultShim(tools=list(OPERATOR_TOOLS))
         elif self.role == "tractor":
@@ -1360,10 +826,6 @@ class BridgeAPI:
             return ListToolsResultShim(tools=list(SCHEDULER_TOOLS))
         elif self.role == "sensor":
             return ListToolsResultShim(tools=list(SENSOR_TOOLS))
-        elif self.role == "lashing_crew":
-            return ListToolsResultShim(tools=list(LASHING_CREW_TOOLS))
-        elif self.role == "signaler":
-            return ListToolsResultShim(tools=list(SIGNALER_TOOLS))
         return ListToolsResultShim(tools=list(CRANE_TOOLS))
 
     async def call_tool(self, name: str, arguments: dict) -> CallToolResultShim:
@@ -1386,14 +848,6 @@ class BridgeAPI:
             "update_berth_summary": self._tool_update_berth_summary,
             "emit_berth_event": self._tool_emit_berth_event,
             "request_tractor_rebalance": self._tool_request_tractor_rebalance,
-            "reassign_worker": self._tool_reassign_worker,
-            "escalate_to_scheduler": self._tool_escalate_to_scheduler,
-            "update_hold_priority": self._tool_update_hold_priority,
-            # Gate manager tools
-            "update_gate_summary": self._tool_update_gate_summary,
-            "release_container": self._tool_release_container,
-            "manage_truck_queue": self._tool_manage_truck_queue,
-            "schedule_rail_load": self._tool_schedule_rail_load,
             # Tractor tools
             "transport_container": self._tool_transport_container,
             "report_position": self._tool_report_position,
@@ -1402,20 +856,10 @@ class BridgeAPI:
             "rebalance_assignments": self._tool_rebalance_assignments,
             "update_priority_queue": self._tool_update_priority_queue,
             "dispatch_resource": self._tool_dispatch_resource,
-            "assign_container": self._tool_assign_container,
             "emit_schedule_event": self._tool_emit_schedule_event,
             # Sensor tools
             "emit_reading": self._tool_emit_reading,
             "report_calibration": self._tool_report_calibration,
-            # Lashing crew tools
-            "secure_container": self._tool_secure_container,
-            "report_lashing_complete": self._tool_report_lashing_complete,
-            "inspect_lashing": self._tool_inspect_lashing,
-            "request_lashing_tools": self._tool_request_lashing_tools,
-            # Signaler tools
-            "signal_crane": self._tool_signal_crane,
-            "report_hazard": self._tool_report_hazard,
-            "confirm_ground_clear": self._tool_confirm_ground_clear,
         }.get(name)
 
         if handler is None:
@@ -1510,9 +954,6 @@ class BridgeAPI:
             (c["weight_tons"] for c in containers if c["container_id"] == container_id),
             25.0,
         )
-
-        # Update container assignment status: QUEUED/IN_PROGRESS → DISCHARGED
-        self.store.update_container_status(self.hold_id, container_id, "DISCHARGED")
 
         # Update crane entity metrics
         moves = entity.get_field("metrics.moves_completed", 0)
@@ -1919,210 +1360,6 @@ class BridgeAPI:
         )
         return f"Tractor rebalance requested: {from_hold} → {to_hold}. Reason: {reason}"
 
-    async def _tool_reassign_worker(self, arguments: dict) -> str:
-        worker_id = arguments["worker_id"]
-        from_hold = arguments["from_hold"]
-        to_hold = arguments["to_hold"]
-        reason = arguments["reason"]
-
-        entity = self._get_entity_doc()
-        if entity:
-            reassignments = entity.get_field("metrics.worker_reassignments", 0)
-            entity.update_field("metrics.worker_reassignments", reassignments + 1)
-
-        self.store.emit_event({
-            "event_type": "worker_reassigned",
-            "source": self.node_id,
-            "worker_id": worker_id,
-            "from_hold": from_hold,
-            "to_hold": to_hold,
-            "reason": reason,
-            "aggregation_policy": "IMMEDIATE_PROPAGATE",
-            "priority": "HIGH",
-        })
-
-        logger.info(
-            f"METRICS: worker_reassigned node={self.node_id} "
-            f"worker={worker_id} {from_hold}→{to_hold} reason={reason}"
-        )
-        return (
-            f"Worker {worker_id} reassigned: {from_hold} → {to_hold}. "
-            f"Reason: {reason}"
-        )
-
-    async def _tool_escalate_to_scheduler(self, arguments: dict) -> str:
-        issue_type = arguments["issue_type"]
-        details = arguments["details"]
-
-        entity = self._get_entity_doc()
-        if entity:
-            escalations = entity.get_field("metrics.scheduler_escalations", 0)
-            entity.update_field("metrics.scheduler_escalations", escalations + 1)
-
-        self.store.emit_event({
-            "event_type": "scheduler_escalation",
-            "source": self.node_id,
-            "issue_type": issue_type,
-            "details": details,
-            "aggregation_policy": "IMMEDIATE_PROPAGATE",
-            "priority": "CRITICAL",
-        })
-
-        logger.info(
-            f"METRICS: scheduler_escalation node={self.node_id} "
-            f"issue_type={issue_type} details={details}"
-        )
-        return (
-            f"Escalated to scheduler: {issue_type}. "
-            f"Details: {details}. Priority: CRITICAL."
-        )
-
-    async def _tool_update_hold_priority(self, arguments: dict) -> str:
-        hold_num = arguments["hold_num"]
-        priority_level = arguments["priority_level"]
-        reason = arguments.get("reason", "")
-
-        hold_id = f"hold-{hold_num}"
-
-        # Update the team summary doc with the new priority
-        team_doc = self.store.get_document("team_summaries", f"team_{hold_id}")
-        if team_doc:
-            team_doc.update_field("priority", priority_level)
-
-        entity = self._get_entity_doc()
-        if entity:
-            priority_changes = entity.get_field("metrics.hold_priority_changes", 0)
-            entity.update_field("metrics.hold_priority_changes", priority_changes + 1)
-
-        self.store.emit_event({
-            "event_type": "hold_priority_changed",
-            "source": self.node_id,
-            "hold_id": hold_id,
-            "hold_num": hold_num,
-            "priority_level": priority_level,
-            "reason": reason,
-            "aggregation_policy": "IMMEDIATE_PROPAGATE",
-            "priority": "HIGH",
-        })
-
-        logger.info(
-            f"METRICS: hold_priority_changed node={self.node_id} "
-            f"hold={hold_id} priority={priority_level} reason={reason}"
-        )
-        return (
-            f"Hold {hold_id} priority updated to {priority_level}. "
-            f"{('Reason: ' + reason) if reason else ''}"
-        )
-
-    # ── Gate manager tool handlers ─────────────────────────────────────────
-
-    async def _tool_update_gate_summary(self, arguments: dict) -> str:
-        trucks_per_hour = arguments["trucks_per_hour"]
-        queue_length = arguments["queue_length"]
-        ready_containers = arguments.get("ready_containers", 0)
-        summary = arguments["summary"]
-
-        entity = self._get_entity_doc()
-        if entity:
-            summaries = entity.get_field("metrics.summaries_produced", 0)
-            entity.update_field("metrics.summaries_produced", summaries + 1)
-
-        self.store.emit_event({
-            "event_type": "gate_summary_update",
-            "source": self.node_id,
-            "trucks_per_hour": trucks_per_hour,
-            "queue_length": queue_length,
-            "ready_containers": ready_containers,
-            "summary": summary,
-            "aggregation_policy": "AGGREGATE_AT_PARENT",
-            "priority": "NORMAL",
-        })
-
-        logger.info(
-            f"METRICS: gate_summary_update node={self.node_id} "
-            f"trucks/hr={trucks_per_hour} queue={queue_length}"
-        )
-        return (
-            f"Gate summary updated: {trucks_per_hour} trucks/hr, "
-            f"{queue_length} in queue, {ready_containers} ready. {summary}"
-        )
-
-    async def _tool_release_container(self, arguments: dict) -> str:
-        container_id = arguments["container_id"]
-        gate_lane = arguments["gate_lane"]
-
-        entity = self._get_entity_doc()
-        if entity:
-            releases = entity.get_field("metrics.containers_released", 0)
-            entity.update_field("metrics.containers_released", releases + 1)
-
-        self.store.emit_event({
-            "event_type": "container_released_to_gate",
-            "source": self.node_id,
-            "container_id": container_id,
-            "gate_lane": gate_lane,
-            "aggregation_policy": "IMMEDIATE_PROPAGATE",
-            "priority": "NORMAL",
-        })
-
-        logger.info(
-            f"METRICS: container_released node={self.node_id} "
-            f"container={container_id} lane={gate_lane}"
-        )
-        return f"Container {container_id} released to gate lane {gate_lane}."
-
-    async def _tool_manage_truck_queue(self, arguments: dict) -> str:
-        action = arguments["action"]
-        reason = arguments["reason"]
-
-        entity = self._get_entity_doc()
-        if entity:
-            queue_actions = entity.get_field("metrics.queue_actions", 0)
-            entity.update_field("metrics.queue_actions", queue_actions + 1)
-
-        self.store.emit_event({
-            "event_type": "truck_queue_managed",
-            "source": self.node_id,
-            "action": action,
-            "reason": reason,
-            "aggregation_policy": "IMMEDIATE_PROPAGATE",
-            "priority": "HIGH",
-        })
-
-        logger.info(
-            f"METRICS: truck_queue_managed node={self.node_id} "
-            f"action={action} reason={reason}"
-        )
-        return f"Truck queue action: {action}. Reason: {reason}"
-
-    async def _tool_schedule_rail_load(self, arguments: dict) -> str:
-        rail_slot = arguments["rail_slot"]
-        containers = arguments["containers"]
-
-        entity = self._get_entity_doc()
-        if entity:
-            rail_loads = entity.get_field("metrics.rail_loads_scheduled", 0)
-            entity.update_field("metrics.rail_loads_scheduled", rail_loads + 1)
-
-        self.store.emit_event({
-            "event_type": "rail_load_scheduled",
-            "source": self.node_id,
-            "rail_slot": rail_slot,
-            "containers": containers,
-            "container_count": len(containers),
-            "aggregation_policy": "AGGREGATE_AT_PARENT",
-            "priority": "NORMAL",
-        })
-
-        logger.info(
-            f"METRICS: rail_load_scheduled node={self.node_id} "
-            f"slot={rail_slot} containers={len(containers)}"
-        )
-        return (
-            f"Rail load scheduled: {len(containers)} containers "
-            f"on {rail_slot}."
-        )
-
     # ── Tractor tool handlers ────────────────────────────────────────────
 
     async def _tool_transport_container(self, arguments: dict) -> str:
@@ -2142,9 +1379,8 @@ class BridgeAPI:
             trips = entity.get_field("metrics.trips_completed", 0)
             entity.update_field("metrics.trips_completed", trips + 1)
 
-        # Complete the job and update container assignment status
+        # Complete the job
         self.store.complete_transport_job(self.hold_id, container_id)
-        self.store.update_container_status(self.hold_id, container_id, "TRANSPORTED")
 
         self.store.emit_event({
             "event_type": "container_transported",
@@ -2285,37 +1521,6 @@ class BridgeAPI:
         )
         return f"Dispatched {resource_type} from {from_entity} to {to_entity}. Reason: {reason}"
 
-    async def _tool_assign_container(self, arguments: dict) -> str:
-        container_id = arguments["container_id"]
-        assigned_crane = arguments.get("assigned_crane")
-        assigned_operator = arguments.get("assigned_operator")
-        assigned_tractor = arguments.get("assigned_tractor")
-
-        ok = self.store.assign_container(
-            hold_id=self.hold_id,
-            container_id=container_id,
-            assigned_crane=assigned_crane,
-            assigned_operator=assigned_operator,
-            assigned_tractor=assigned_tractor,
-        )
-        if not ok:
-            return f"Error: could not assign container {container_id}"
-
-        parts = [f"crane={assigned_crane}"]
-        if assigned_operator:
-            parts.append(f"operator={assigned_operator}")
-        if assigned_tractor:
-            parts.append(f"tractor={assigned_tractor}")
-
-        logger.info(
-            f"METRICS: container_assignment node={self.node_id} "
-            f"container={container_id} {' '.join(parts)}"
-        )
-        return (
-            f"Container {container_id} assigned: {', '.join(parts)}. "
-            f"Status: QUEUED → tracking through lifecycle."
-        )
-
     async def _tool_emit_schedule_event(self, arguments: dict) -> str:
         event_type = arguments["event_type"]
         details = arguments["details"]
@@ -2411,164 +1616,3 @@ class BridgeAPI:
             f"accuracy={accuracy_pct}% drift={drift} status={status}"
         )
         return f"Calibration reported: {accuracy_pct}% accuracy, drift={drift}, status={status}."
-
-    # ── Lashing Crew tool handlers ──────────────────────────────────────
-
-    async def _tool_secure_container(self, arguments: dict) -> str:
-        container_id = arguments["container_id"]
-        lashing_type = arguments["lashing_type"]
-
-        entity = self._get_entity_doc()
-        if entity:
-            secured = entity.get_field("metrics.containers_secured", 0)
-            entity.update_field("metrics.containers_secured", secured + 1)
-
-        self.store.emit_event({
-            "event_type": "container_secured",
-            "source": self.node_id,
-            "container_id": container_id,
-            "lashing_type": lashing_type,
-            "aggregation_policy": "AGGREGATE_AT_PARENT",
-            "priority": "NORMAL",
-        })
-
-        logger.info(
-            f"METRICS: container_secured node={self.node_id} "
-            f"container={container_id} type={lashing_type}"
-        )
-        return (
-            f"Container {container_id} secured with {lashing_type}. "
-            f"Total secured: {(entity.get_field('metrics.containers_secured', 0) if entity else 0)}."
-        )
-
-    async def _tool_report_lashing_complete(self, arguments: dict) -> str:
-        container_id = arguments["container_id"]
-
-        self.store.emit_event({
-            "event_type": "lashing_complete",
-            "source": self.node_id,
-            "container_id": container_id,
-            "aggregation_policy": "AGGREGATE_AT_PARENT",
-            "priority": "NORMAL",
-        })
-
-        logger.info(
-            f"METRICS: lashing_complete node={self.node_id} container={container_id}"
-        )
-        return f"Lashing complete for container {container_id}. Ready for next operation."
-
-    async def _tool_inspect_lashing(self, arguments: dict) -> str:
-        container_id = arguments["container_id"]
-        result = arguments["result"]
-
-        entity = self._get_entity_doc()
-        if entity:
-            inspections = entity.get_field("metrics.lashings_inspected", 0)
-            entity.update_field("metrics.lashings_inspected", inspections + 1)
-
-        priority = "NORMAL"
-        if result == "FAIL":
-            priority = "CRITICAL"
-        elif result == "DEGRADED":
-            priority = "HIGH"
-
-        self.store.emit_event({
-            "event_type": "lashing_inspection",
-            "source": self.node_id,
-            "container_id": container_id,
-            "result": result,
-            "aggregation_policy": "IMMEDIATE_PROPAGATE" if result != "PASS" else "AGGREGATE_AT_PARENT",
-            "priority": priority,
-        })
-
-        logger.info(
-            f"METRICS: lashing_inspection node={self.node_id} "
-            f"container={container_id} result={result}"
-        )
-        return f"Lashing inspection for {container_id}: {result}."
-
-    async def _tool_request_lashing_tools(self, arguments: dict) -> str:
-        entity = self._get_entity_doc()
-        if entity:
-            entity.update_field("equipment_health.lashing_tools_status", "REQUESTED")
-
-        self.store.emit_event({
-            "event_type": "RESUPPLY_REQUESTED",
-            "source": self.node_id,
-            "priority": "HIGH",
-            "details": {
-                "resource": "lashing_tools",
-                "equipment_id": self.node_id,
-                "eta_sim_minutes": 3.0,
-            },
-        })
-
-        logger.info(f"METRICS: lashing_tools_requested node={self.node_id}")
-        return "Lashing tools requested. Replacement equipment en route."
-
-    # ── Signaler tool handlers ─────────────────────────────────────────
-
-    async def _tool_signal_crane(self, arguments: dict) -> str:
-        signal_type = arguments["signal_type"]
-        crane_id = arguments["crane_id"]
-
-        entity = self._get_entity_doc()
-        if entity:
-            signals = entity.get_field("metrics.signals_sent", 0)
-            entity.update_field("metrics.signals_sent", signals + 1)
-
-        priority = "CRITICAL" if signal_type == "STOP" else "NORMAL"
-        self.store.emit_event({
-            "event_type": "crane_signal",
-            "source": self.node_id,
-            "signal_type": signal_type,
-            "crane_id": crane_id,
-            "aggregation_policy": "IMMEDIATE_PROPAGATE" if signal_type == "STOP" else "AGGREGATE_AT_PARENT",
-            "priority": priority,
-        })
-
-        logger.info(
-            f"METRICS: crane_signal node={self.node_id} "
-            f"signal={signal_type} crane={crane_id}"
-        )
-        return f"Signal {signal_type} sent to {crane_id}."
-
-    async def _tool_report_hazard(self, arguments: dict) -> str:
-        hazard_type = arguments["hazard_type"]
-        location = arguments["location"]
-
-        entity = self._get_entity_doc()
-        if entity:
-            hazards = entity.get_field("metrics.hazards_reported", 0)
-            entity.update_field("metrics.hazards_reported", hazards + 1)
-
-        self.store.emit_event({
-            "event_type": "hazard_reported",
-            "source": self.node_id,
-            "hazard_type": hazard_type,
-            "location": location,
-            "aggregation_policy": "IMMEDIATE_PROPAGATE",
-            "priority": "CRITICAL",
-        })
-
-        logger.info(
-            f"METRICS: hazard_reported node={self.node_id} "
-            f"type={hazard_type} location={location}"
-        )
-        return f"Hazard reported: {hazard_type} at {location}. All crane ops halted."
-
-    async def _tool_confirm_ground_clear(self, arguments: dict) -> str:
-        entity = self._get_entity_doc()
-        if entity:
-            clears = entity.get_field("metrics.ground_clears", 0)
-            entity.update_field("metrics.ground_clears", clears + 1)
-
-        self.store.emit_event({
-            "event_type": "ground_clear_confirmed",
-            "source": self.node_id,
-            "aggregation_policy": "AGGREGATE_AT_PARENT",
-            "priority": "NORMAL",
-        })
-
-        logger.info(f"METRICS: ground_clear node={self.node_id}")
-        return "Ground zone confirmed clear. Safe to proceed with crane operations."
