@@ -1,0 +1,72 @@
+"""
+Role lifecycle configuration for the port terminal simulation.
+
+Defines _ROLE_CONFIGS for all hierarchy levels in the terminal (ADR-051).
+Each role specifies its hierarchy level, lifecycle type, zone scope,
+and relationships to other roles.
+
+Lifecycle types:
+  - "managed"  — Has startup/shutdown sequences, health checks
+  - None       — Virtual role, always-on coordination entity
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Optional
+
+
+class HierarchyLevel(Enum):
+    """Terminal hierarchy levels per ADR-051."""
+    H1 = 1  # Equipment (cranes, tractors, handlers)
+    H2 = 2  # Yard block (group of container stacks)
+    H3 = 3  # Yard manager (zone coordinator)
+    H4 = 4  # Terminal Operations Center (TOC)
+
+
+@dataclass(frozen=True)
+class RoleConfig:
+    """Immutable configuration for a simulation role."""
+    level: HierarchyLevel
+    zone: str
+    lifecycle: Optional[str]  # None = virtual (always-on)
+    subordinates: tuple[str, ...] = ()
+    superior: Optional[str] = None
+    description: str = ""
+    min_subordinates: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Role registry
+# ---------------------------------------------------------------------------
+
+_ROLE_CONFIGS: dict[str, RoleConfig] = {
+    "yard_manager": RoleConfig(
+        level=HierarchyLevel.H3,
+        zone="yard",
+        lifecycle=None,  # virtual — no startup/shutdown
+        subordinates=("yard_block",),
+        superior="toc",
+        description="Zone coordinator for yard blocks, stacking cranes, and tractor routing",
+        min_subordinates=4,
+    ),
+}
+
+
+def get_role_config(role_name: str) -> RoleConfig:
+    """Look up a role configuration by name.
+
+    Raises KeyError if the role is not registered.
+    """
+    return _ROLE_CONFIGS[role_name]
+
+
+def registered_roles() -> list[str]:
+    """Return all registered role names."""
+    return list(_ROLE_CONFIGS.keys())
+
+
+def roles_at_level(level: HierarchyLevel) -> list[str]:
+    """Return role names at the given hierarchy level."""
+    return [name for name, cfg in _ROLE_CONFIGS.items() if cfg.level == level]

@@ -66,6 +66,12 @@ function layoutTopology(topology: BerthTopology) {
   placeNode(topology.berthManager, centerX - NODE_W / 2, rowY(3));
   addEdge(topology.scheduler.id, topology.berthManager.id);
 
+  // Place H3 Yard Manager (if present)
+  if (topology.yardManager) {
+    placeNode(topology.yardManager, centerX + NODE_W * 2, rowY(3));
+    addEdge(topology.scheduler.id, topology.yardManager.id);
+  }
+
   // Place 3 holds side by side
   const holdWidth = 240;
   const holdsStartX = (totalWidth - (3 * holdWidth + 2 * HOLD_GAP + SHARED_GAP + 200)) / 2;

@@ -1,11 +1,12 @@
 // Phase 2 berth operation wire types
-// Port hierarchy: H4 (Scheduler) -> H3 (Berth Manager) -> H2 (Hold Supervisor) -> H1 (Team Lead) -> H0 (Worker)
+// Port hierarchy: H4 (Scheduler) -> H3 (Berth Manager / Yard Manager) -> H2 (Hold Supervisor) -> H1 (Team Lead) -> H0 (Worker)
 
 export type HierarchyLevel = 0 | 1 | 2 | 3 | 4;
 
 export type BerthRole =
   | 'scheduler'        // H4
   | 'berth_manager'    // H3
+  | 'yard_manager'     // H3 — zone coordination (ADR-051)
   | 'hold_supervisor'  // H2
   | 'crane_lead'       // H1
   | 'stevedore_lead'   // H1
@@ -69,9 +70,49 @@ export interface BerthEvent {
   message: string;
 }
 
+// -- Yard Manager (H3) types (ADR-051) -------------------------------------
+
+export interface YardSummary {
+  zone: string;
+  blockCount: number;
+  totalCapacityTeu: number;
+  totalUsedTeu: number;
+  utilization: number;
+  balanceStddev: number;
+  reeferSlotsFree: number;
+  hazmatZonesActive: number;
+}
+
+export interface YardBlockSummary {
+  blockId: string;
+  capacityTeu: number;
+  usedTeu: number;
+  queueDepth: number;
+  craneQueue: number;
+  craneIdle: number;
+  reeferFree: number;
+  hazmatActive: boolean;
+  hazmatCapable: boolean;
+}
+
+export interface TractorRoute {
+  tractorId: string;
+  targetBlock: string;
+  containerId?: string;
+}
+
+export interface CongestionEvent {
+  blockId?: string;
+  zone: string;
+  queueDepth?: number;
+  escalateTo?: string;
+  reasons?: string[];
+}
+
 export interface BerthTopology {
   scheduler: BerthNode;
   berthManager: BerthNode;
+  yardManager?: BerthNode;  // H3 Yard Manager (ADR-051)
   holds: HoldTeam[];
   shared: SharedPool;
   yardBlocks: YardBlock[];
@@ -80,10 +121,21 @@ export interface BerthTopology {
   events: BerthEvent[];
 }
 
+// -- Full terminal state (for viewer) ---------------------------------------
+
+export interface TerminalState {
+  nodes: BerthNode[];
+  yardSummaries: Record<string, YardSummary>;
+  blockSummaries: Record<string, YardBlockSummary>;
+  tractorRoutes: TractorRoute[];
+  congestionEvents: CongestionEvent[];
+}
+
 // Role display properties
 export const roleColors: Record<BerthRole, string> = {
   scheduler: '#ff9900',
   berth_manager: '#ff6600',
+  yard_manager: '#ffaa00',   // amber (ADR-051)
   hold_supervisor: '#cc44ff',
   crane_lead: '#00ccff',
   stevedore_lead: '#44ff44',
@@ -101,6 +153,7 @@ export const roleColors: Record<BerthRole, string> = {
 export const roleLabels: Record<BerthRole, string> = {
   scheduler: 'SCH',
   berth_manager: 'BMG',
+  yard_manager: 'YMG',      // ADR-051
   hold_supervisor: 'HSV',
   crane_lead: 'CLd',
   stevedore_lead: 'SLd',
@@ -152,6 +205,9 @@ export function createPhase2Topology(): BerthTopology {
   // H3: Berth Manager
   const berthManager = makeNode('berth_manager', 3, 'Berth Mgr', undefined, scheduler.id);
 
+  // H3: Yard Manager (ADR-051)
+  const yardManager = makeNode('yard_manager', 3, 'Yard Mgr', undefined, scheduler.id);
+
   // H2 + H1 + H0: Per-hold teams
   const holds: HoldTeam[] = ([1, 2, 3] as HoldId[]).map((holdId) => {
     const supervisor = makeNode('hold_supervisor', 2, `Hold ${holdId} Sup`, holdId, berthManager.id);
@@ -196,13 +252,13 @@ export function createPhase2Topology(): BerthTopology {
   );
 
   // Shared: Yard Block A
-  const yardLeadA = makeNode('yard_lead', 1, 'Yard A Lead', undefined, berthManager.id);
+  const yardLeadA = makeNode('yard_lead', 1, 'Yard A Lead', undefined, yardManager.id);
   const yardWorkersA = Array.from({ length: 3 }, (_, i) =>
     makeNode('yard_worker', 0, `Yard A Wkr ${i + 1}`, undefined, yardLeadA.id)
   );
 
   // Shared: Yard Block B
-  const yardLeadB = makeNode('yard_lead', 1, 'Yard B Lead', undefined, berthManager.id);
+  const yardLeadB = makeNode('yard_lead', 1, 'Yard B Lead', undefined, yardManager.id);
   const yardWorkersB = Array.from({ length: 3 }, (_, i) =>
     makeNode('yard_worker', 0, `Yard B Wkr ${i + 1}`, undefined, yardLeadB.id)
   );
@@ -220,7 +276,7 @@ export function createPhase2Topology(): BerthTopology {
 
   const events = generateDemoEvents();
 
-  return { scheduler, berthManager, holds, shared, yardBlocks, nodes, edges, events };
+  return { scheduler, berthManager, yardManager, holds, shared, yardBlocks, nodes, edges, events };
 }
 
 function generateDemoEvents(): BerthEvent[] {
