@@ -37,6 +37,10 @@ coverage/
 # Logs
 *.log
 
+# Python
+__pycache__/
+*.pyc
+
 # Build artifacts
 dist/
 build/
