@@ -422,6 +422,194 @@ SCHEDULER_TOOLS = [
     ),
 ]
 
+# ── Yard Optimizer tool definitions ────────────────────────────────────────
+
+YARD_OPTIMIZER_TOOLS = [
+    ToolShim(
+        name="publish_optimization_plan",
+        description=(
+            "Publish a yard optimization plan with block allocation strategy "
+            "and utilization metrics."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "zone": {"type": "string", "description": "Yard zone identifier"},
+                "block_count": {"type": "integer", "description": "Number of blocks in zone"},
+                "total_capacity_teu": {"type": "integer", "description": "Total TEU capacity"},
+                "total_used_teu": {"type": "integer", "description": "Currently used TEU"},
+                "utilization": {"type": "number", "description": "Utilization ratio (0-1)"},
+                "strategy": {
+                    "type": "string",
+                    "enum": ["proximity", "balanced", "overflow"],
+                    "description": "Current allocation strategy",
+                },
+                "summary": {"type": "string", "description": "Human-readable summary"},
+            },
+            "required": ["zone", "utilization", "strategy", "summary"],
+        },
+    ),
+    ToolShim(
+        name="allocate_block",
+        description=(
+            "Assign an inbound container to an optimal yard block based on "
+            "utilization, proximity, and type compatibility."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "container_id": {"type": "string", "description": "Container to allocate"},
+                "target_block": {"type": "string", "description": "Target yard block ID"},
+                "container_type": {
+                    "type": "string",
+                    "enum": ["standard", "reefer", "hazmat"],
+                    "description": "Container type for compatibility check",
+                },
+                "reason": {"type": "string", "description": "Allocation rationale"},
+            },
+            "required": ["container_id", "target_block", "reason"],
+        },
+    ),
+    ToolShim(
+        name="match_backhaul",
+        description=(
+            "Match an idle tractor with a nearby pickup to minimize empty return trips."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "tractor_id": {"type": "string", "description": "Tractor to assign backhaul"},
+                "current_block": {"type": "string", "description": "Tractor's current block"},
+                "pickup_block": {"type": "string", "description": "Block with pending pickup"},
+                "reason": {"type": "string", "description": "Backhaul match rationale"},
+            },
+            "required": ["tractor_id", "current_block", "pickup_block", "reason"],
+        },
+    ),
+    ToolShim(
+        name="emit_yard_optimization_event",
+        description=(
+            "Emit a yard optimization event up the HIVE hierarchy."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "event_type": {"type": "string", "description": "Event type"},
+                "details": {"type": "string", "description": "Event details"},
+                "priority": {
+                    "type": "string",
+                    "enum": ["LOW", "NORMAL", "HIGH", "CRITICAL"],
+                    "description": "Event priority",
+                },
+            },
+            "required": ["event_type", "details", "priority"],
+        },
+    ),
+]
+
+# ── Gate Flow AI tool definitions ─────────────────────────────────────────
+
+GATE_FLOW_TOOLS = [
+    ToolShim(
+        name="publish_gate_flow_plan",
+        description=(
+            "Publish a gate flow plan with queue metrics, appointment status, "
+            "and throttle state."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "queue_length": {"type": "integer", "description": "Current truck queue length"},
+                "pending_appointments": {"type": "integer", "description": "Pending appointment count"},
+                "avg_wait_minutes": {"type": "number", "description": "Average truck wait time in minutes"},
+                "yard_ready_count": {"type": "integer", "description": "Containers ready for pickup"},
+                "throttle_active": {"type": "boolean", "description": "Whether appointment throttling is active"},
+                "summary": {"type": "string", "description": "Human-readable summary"},
+            },
+            "required": ["queue_length", "throttle_active", "summary"],
+        },
+    ),
+    ToolShim(
+        name="throttle_appointments",
+        description=(
+            "Activate or adjust appointment throttling to manage truck queue depth."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["reduce_rate", "pause", "resume"],
+                    "description": "Throttle action",
+                },
+                "current_queue": {"type": "integer", "description": "Current queue length"},
+                "target_queue": {"type": "integer", "description": "Target queue length"},
+                "reason": {"type": "string", "description": "Throttle rationale"},
+            },
+            "required": ["action", "reason"],
+        },
+    ),
+    ToolShim(
+        name="schedule_pickup",
+        description=(
+            "Schedule a truck pickup by matching a waiting truck with a yard-ready container."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "truck_id": {"type": "string", "description": "Truck identifier"},
+                "container_id": {"type": "string", "description": "Container to pick up"},
+                "gate_lane": {"type": "string", "description": "Assigned gate lane"},
+                "priority": {
+                    "type": "string",
+                    "enum": ["LOW", "NORMAL", "HIGH", "URGENT"],
+                    "description": "Pickup priority",
+                },
+            },
+            "required": ["truck_id", "container_id", "gate_lane"],
+        },
+    ),
+    ToolShim(
+        name="schedule_rail_loading",
+        description=(
+            "Schedule a batch of containers for rail loading in a time window."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "rail_track": {"type": "string", "description": "Rail track identifier"},
+                "containers": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Container IDs to load",
+                },
+                "window_start": {"type": "string", "description": "Loading window start time"},
+                "estimated_duration_min": {"type": "number", "description": "Estimated loading duration in minutes"},
+            },
+            "required": ["rail_track", "containers"],
+        },
+    ),
+    ToolShim(
+        name="emit_gate_flow_event",
+        description=(
+            "Emit a gate flow event up the HIVE hierarchy."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "event_type": {"type": "string", "description": "Event type"},
+                "details": {"type": "string", "description": "Event details"},
+                "priority": {
+                    "type": "string",
+                    "enum": ["LOW", "NORMAL", "HIGH", "CRITICAL"],
+                    "description": "Event priority",
+                },
+            },
+            "required": ["event_type", "details", "priority"],
+        },
+    ),
+]
+
 # ── Berth Manager tool definitions ─────────────────────────────────────────
 
 BERTH_MANAGER_TOOLS = [
@@ -1213,6 +1401,10 @@ class BridgeAPI:
                 text = self._read_tractor_tasking()
             elif self.role == "scheduler":
                 text = self._read_scheduler_tasking()
+            elif self.role == "yard_optimizer":
+                text = self._read_yard_optimizer_tasking()
+            elif self.role == "gate_flow":
+                text = self._read_gate_flow_tasking()
             elif self.role == "sensor":
                 text = self._read_sensor_tasking()
             elif self.role in ("gate_scanner", "rfid_reader"):
@@ -1404,6 +1596,59 @@ class BridgeAPI:
         }
         return json.dumps(tasking, indent=2, default=str)
 
+    def _read_yard_optimizer_tasking(self) -> str:
+        entity = self._get_entity_doc()
+        # Gather yard block summaries for optimization decisions
+        block_summaries = []
+        for doc_id, doc in self.store._collections.get("node_states", {}).items():
+            if doc.fields.get("entity_type") == "yard_block":
+                block_summaries.append({
+                    "block_id": doc.fields.get("block_id", doc_id),
+                    "capacity_teu": doc.fields.get("capacity_teu", 200),
+                    "used_teu": doc.fields.get("used_teu", 0),
+                    "utilization": doc.fields.get("used_teu", 0) / max(doc.fields.get("capacity_teu", 200), 1),
+                    "queue_depth": doc.fields.get("queue_depth", 0),
+                })
+        # Gather tractor positions for backhaul matching
+        tractor_positions = []
+        for doc_id, doc in self.store._collections.get("node_states", {}).items():
+            if doc.fields.get("entity_type") == "yard_tractor":
+                tractor_positions.append({
+                    "tractor_id": doc.fields.get("node_id", doc_id),
+                    "block": doc.fields.get("position", {}).get("block", "unknown"),
+                    "status": doc.fields.get("operational_status", "IDLE"),
+                })
+        tasking = {
+            "directive": "OPTIMIZE_YARD",
+            "zone": entity.get_field("assignment.zone", "yard-north") if entity else "yard-north",
+            "block_summaries": block_summaries,
+            "pending_allocations": [],
+            "tractor_positions": tractor_positions,
+        }
+        return json.dumps(tasking, indent=2, default=str)
+
+    def _read_gate_flow_tasking(self) -> str:
+        entity = self._get_entity_doc()
+        # Gather gate queue and yard readiness for flow decisions
+        truck_queue = []
+        yard_ready = []
+        appointments = []
+        for doc_id, doc in self.store._collections.get("node_states", {}).items():
+            if doc.fields.get("entity_type") in ("gate_scanner", "gate_worker"):
+                truck = doc.fields.get("current_truck")
+                if truck:
+                    truck_queue.append(truck)
+        tasking = {
+            "directive": "OPTIMIZE_GATE_FLOW",
+            "zone": entity.get_field("assignment.zone", "gate-complex") if entity else "gate-complex",
+            "truck_queue": truck_queue,
+            "appointments": appointments,
+            "yard_ready_containers": yard_ready,
+            "rail_schedule": [],
+            "avg_wait_minutes": 0,
+        }
+        return json.dumps(tasking, indent=2, default=str)
+
     def _read_berth_manager_tasking(self) -> str:
         # Aggregate hold docs from team_summaries into berth-level context.
         # Each berth manager only sees the hold(s) belonging to its berth.
@@ -1459,6 +1704,10 @@ class BridgeAPI:
             return ListToolsResultShim(tools=list(TRACTOR_TOOLS))
         elif self.role == "scheduler":
             return ListToolsResultShim(tools=list(SCHEDULER_TOOLS))
+        elif self.role == "yard_optimizer":
+            return ListToolsResultShim(tools=list(YARD_OPTIMIZER_TOOLS))
+        elif self.role == "gate_flow":
+            return ListToolsResultShim(tools=list(GATE_FLOW_TOOLS))
         elif self.role == "sensor":
             return ListToolsResultShim(tools=list(SENSOR_TOOLS))
         elif self.role in ("gate_scanner", "rfid_reader"):
@@ -1518,6 +1767,17 @@ class BridgeAPI:
             # Stacking Crane tools
             "stack_container": self._tool_stack_container,
             "retrieve_container": self._tool_retrieve_container,
+            # Yard Optimizer tools
+            "publish_optimization_plan": self._tool_publish_optimization_plan,
+            "allocate_block": self._tool_allocate_block,
+            "match_backhaul": self._tool_match_backhaul,
+            "emit_yard_optimization_event": self._tool_emit_yard_optimization_event,
+            # Gate Flow AI tools
+            "publish_gate_flow_plan": self._tool_publish_gate_flow_plan,
+            "throttle_appointments": self._tool_throttle_appointments,
+            "schedule_pickup": self._tool_schedule_pickup,
+            "schedule_rail_loading": self._tool_schedule_rail_loading,
+            "emit_gate_flow_event": self._tool_emit_gate_flow_event,
         }.get(name)
 
         if handler is None:
@@ -2804,3 +3064,191 @@ class BridgeAPI:
             f"container={container_id} slot={slot_key}"
         )
         return f"Container {container_id} retrieved from {slot_key}."
+
+    # ── Yard Optimizer tool handlers ─────────────────────────────────────
+
+    async def _tool_publish_optimization_plan(self, arguments: dict) -> str:
+        entity = self._get_entity_doc()
+        if entity:
+            entity.update_field("metrics.allocations_made",
+                                entity.get_field("metrics.allocations_made", 0) + 1)
+        self.store.emit_event({
+            "event_type": "yard_optimization_plan",
+            "source": self.node_id,
+            "zone": arguments.get("zone"),
+            "utilization": arguments.get("utilization"),
+            "strategy": arguments.get("strategy"),
+            "summary": arguments.get("summary"),
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL",
+        })
+        logger.info(
+            f"METRICS: yard_optimization_plan node={self.node_id} "
+            f"strategy={arguments.get('strategy')} "
+            f"utilization={arguments.get('utilization')}"
+        )
+        return f"Yard optimization plan published: {arguments.get('summary')}"
+
+    async def _tool_allocate_block(self, arguments: dict) -> str:
+        container_id = arguments["container_id"]
+        target_block = arguments["target_block"]
+        entity = self._get_entity_doc()
+        if entity:
+            entity.update_field("metrics.allocations_made",
+                                entity.get_field("metrics.allocations_made", 0) + 1)
+        self.store.emit_event({
+            "event_type": "block_allocation",
+            "source": self.node_id,
+            "container_id": container_id,
+            "target_block": target_block,
+            "container_type": arguments.get("container_type", "standard"),
+            "reason": arguments.get("reason"),
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL",
+        })
+        logger.info(
+            f"METRICS: block_allocation node={self.node_id} "
+            f"container={container_id} block={target_block}"
+        )
+        return f"Container {container_id} allocated to block {target_block}."
+
+    async def _tool_match_backhaul(self, arguments: dict) -> str:
+        tractor_id = arguments["tractor_id"]
+        pickup_block = arguments["pickup_block"]
+        entity = self._get_entity_doc()
+        if entity:
+            entity.update_field("metrics.backhaul_matches",
+                                entity.get_field("metrics.backhaul_matches", 0) + 1)
+        self.store.emit_event({
+            "event_type": "backhaul_match",
+            "source": self.node_id,
+            "tractor_id": tractor_id,
+            "current_block": arguments.get("current_block"),
+            "pickup_block": pickup_block,
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL",
+        })
+        logger.info(
+            f"METRICS: backhaul_match node={self.node_id} "
+            f"tractor={tractor_id} pickup={pickup_block}"
+        )
+        return f"Tractor {tractor_id} matched with backhaul at {pickup_block}."
+
+    async def _tool_emit_yard_optimization_event(self, arguments: dict) -> str:
+        entity = self._get_entity_doc()
+        if entity and arguments.get("event_type") == "congestion_redirect":
+            entity.update_field("metrics.congestion_mitigations",
+                                entity.get_field("metrics.congestion_mitigations", 0) + 1)
+        self.store.emit_event({
+            "event_type": arguments["event_type"],
+            "source": self.node_id,
+            "details": arguments.get("details"),
+            "aggregation_policy": "IMMEDIATE_PROPAGATE",
+            "priority": arguments.get("priority", "NORMAL"),
+        })
+        logger.info(
+            f"METRICS: yard_optimization_event node={self.node_id} "
+            f"type={arguments['event_type']} priority={arguments.get('priority')}"
+        )
+        return f"Yard optimization event emitted: {arguments['event_type']}"
+
+    # ── Gate Flow AI tool handlers ───────────────────────────────────────
+
+    async def _tool_publish_gate_flow_plan(self, arguments: dict) -> str:
+        entity = self._get_entity_doc()
+        self.store.emit_event({
+            "event_type": "gate_flow_plan",
+            "source": self.node_id,
+            "queue_length": arguments.get("queue_length"),
+            "throttle_active": arguments.get("throttle_active"),
+            "summary": arguments.get("summary"),
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL",
+        })
+        logger.info(
+            f"METRICS: gate_flow_plan node={self.node_id} "
+            f"queue={arguments.get('queue_length')} "
+            f"throttle={arguments.get('throttle_active')}"
+        )
+        return f"Gate flow plan published: {arguments.get('summary')}"
+
+    async def _tool_throttle_appointments(self, arguments: dict) -> str:
+        entity = self._get_entity_doc()
+        if entity:
+            entity.update_field("metrics.throttle_activations",
+                                entity.get_field("metrics.throttle_activations", 0) + 1)
+        self.store.emit_event({
+            "event_type": "appointment_throttle",
+            "source": self.node_id,
+            "action": arguments["action"],
+            "current_queue": arguments.get("current_queue"),
+            "target_queue": arguments.get("target_queue"),
+            "reason": arguments.get("reason"),
+            "aggregation_policy": "IMMEDIATE_PROPAGATE",
+            "priority": "HIGH",
+        })
+        logger.info(
+            f"METRICS: appointment_throttle node={self.node_id} "
+            f"action={arguments['action']}"
+        )
+        return f"Appointment throttle: {arguments['action']} — {arguments.get('reason')}"
+
+    async def _tool_schedule_pickup(self, arguments: dict) -> str:
+        truck_id = arguments["truck_id"]
+        container_id = arguments["container_id"]
+        entity = self._get_entity_doc()
+        if entity:
+            entity.update_field("metrics.appointments_scheduled",
+                                entity.get_field("metrics.appointments_scheduled", 0) + 1)
+        self.store.emit_event({
+            "event_type": "pickup_scheduled",
+            "source": self.node_id,
+            "truck_id": truck_id,
+            "container_id": container_id,
+            "gate_lane": arguments.get("gate_lane"),
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": arguments.get("priority", "NORMAL"),
+        })
+        logger.info(
+            f"METRICS: pickup_scheduled node={self.node_id} "
+            f"truck={truck_id} container={container_id}"
+        )
+        return f"Pickup scheduled: truck {truck_id} → container {container_id}."
+
+    async def _tool_schedule_rail_loading(self, arguments: dict) -> str:
+        rail_track = arguments["rail_track"]
+        containers = arguments.get("containers", [])
+        entity = self._get_entity_doc()
+        if entity:
+            entity.update_field("metrics.rail_loads_coordinated",
+                                entity.get_field("metrics.rail_loads_coordinated", 0) + 1)
+        self.store.emit_event({
+            "event_type": "rail_loading_scheduled",
+            "source": self.node_id,
+            "rail_track": rail_track,
+            "container_count": len(containers),
+            "containers": containers,
+            "window_start": arguments.get("window_start"),
+            "estimated_duration_min": arguments.get("estimated_duration_min"),
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL",
+        })
+        logger.info(
+            f"METRICS: rail_loading_scheduled node={self.node_id} "
+            f"track={rail_track} containers={len(containers)}"
+        )
+        return f"Rail loading scheduled: {len(containers)} containers on {rail_track}."
+
+    async def _tool_emit_gate_flow_event(self, arguments: dict) -> str:
+        self.store.emit_event({
+            "event_type": arguments["event_type"],
+            "source": self.node_id,
+            "details": arguments.get("details"),
+            "aggregation_policy": "IMMEDIATE_PROPAGATE",
+            "priority": arguments.get("priority", "NORMAL"),
+        })
+        logger.info(
+            f"METRICS: gate_flow_event node={self.node_id} "
+            f"type={arguments['event_type']} priority={arguments.get('priority')}"
+        )
+        return f"Gate flow event emitted: {arguments['event_type']}"

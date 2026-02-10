@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 class AgentSpec:
     """Specification for a single agent in the orchestrator."""
     node_id: str
-    role: str           # "crane" | "aggregator" | "berth_manager" | "toc" | "yard_manager" | "stacking_crane" | "operator" | "tractor" | "scheduler" | "sensor"
+    role: str           # "crane" | "aggregator" | "berth_manager" | "toc" | "yard_manager" | "stacking_crane" | "operator" | "tractor" | "scheduler" | "yard_optimizer" | "gate_flow" | "sensor"
     persona: str        # persona filename without .md
     provider: str       # "anthropic" | "ollama" | "dry-run"
     model: str | None = None
@@ -74,6 +74,8 @@ _COMPOSITION_MAP: dict[str, tuple[str, str, str]] = {
     "y": ("yard_manager", "yard-manager",   "yard-mgr-{n}"),
     "k": ("stacking_crane", "stacking-crane", "stk-crane-{n}"),
     "x": ("sensor",     "sensor",           None),  # special: interleave load-cell / rfid
+    "p": ("yard_optimizer", "yard-optimizer", "yard-opt-{n}"),
+    "g": ("gate_flow",  "gate-flow-ai",     "gate-flow-{n}"),
 }
 
 # Sensor node IDs cycle through these types
@@ -454,6 +456,62 @@ class Orchestrator:
                     "entity_type": "stacking_crane",
                     "status": "OPERATIONAL",
                     "capabilities": ["CONTAINER_STACK", "CONTAINER_RETRIEVE"],
+                })
+
+        elif spec.role == "yard_optimizer":
+            self.store.create_document(
+                collection="node_states",
+                doc_id=f"sim_doc_{spec.node_id}",
+                fields={
+                    "node_id": spec.node_id,
+                    "entity_type": "yard_optimizer",
+                    "hive_level": "H3",
+                    "operational_status": "OPERATIONAL",
+                    "assignment": {
+                        "zone": "yard-north",
+                        "berth": berth_id,
+                        "vessel": self.config.vessel,
+                    },
+                    "metrics": {
+                        "allocations_made": 0,
+                        "backhaul_matches": 0,
+                        "congestion_mitigations": 0,
+                    },
+                },
+            )
+            if team_doc:
+                team_doc.update_field(f"team_members.{spec.node_id}", {
+                    "entity_type": "yard_optimizer",
+                    "status": "OPERATIONAL",
+                    "capabilities": ["YARD_OPTIMIZATION", "TRACTOR_ROUTING"],
+                })
+
+        elif spec.role == "gate_flow":
+            self.store.create_document(
+                collection="node_states",
+                doc_id=f"sim_doc_{spec.node_id}",
+                fields={
+                    "node_id": spec.node_id,
+                    "entity_type": "gate_flow",
+                    "hive_level": "H3",
+                    "operational_status": "OPERATIONAL",
+                    "assignment": {
+                        "zone": "gate-complex",
+                        "berth": berth_id,
+                        "vessel": self.config.vessel,
+                    },
+                    "metrics": {
+                        "appointments_scheduled": 0,
+                        "rail_loads_coordinated": 0,
+                        "throttle_activations": 0,
+                    },
+                },
+            )
+            if team_doc:
+                team_doc.update_field(f"team_members.{spec.node_id}", {
+                    "entity_type": "gate_flow",
+                    "status": "OPERATIONAL",
+                    "capabilities": ["TRUCK_SCHEDULING", "RAIL_OPTIMIZATION"],
                 })
 
         elif spec.role == "tractor":

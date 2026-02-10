@@ -351,6 +351,10 @@ class DryRunProvider(LLMProvider):
             return self._decide_lashing_crew(observed_state)
         elif self._role == "signaler":
             return self._decide_signaler(observed_state)
+        elif self._role == "yard_optimizer":
+            return self._decide_yard_optimizer(observed_state)
+        elif self._role == "gate_flow":
+            return self._decide_gate_flow(observed_state)
         elif self._role == "gate_manager":
             return self._decide_gate_manager(observed_state)
         elif self._role == "gate_scanner":
@@ -1637,6 +1641,242 @@ class DryRunProvider(LLMProvider):
                 "yard_block": yard_block,
             },
             reasoning=f"DryRun cycle {self._cycle}: stacking crane idle, reporting position",
+        )
+
+    def _decide_yard_optimizer(self, observed_state: dict) -> AgentDecision:
+        tasking = observed_state.get("tasking", {})
+        block_summaries = tasking.get("block_summaries", [])
+        pending_allocations = tasking.get("pending_allocations", [])
+        tractor_positions = tasking.get("tractor_positions", [])
+
+        # Every 4 cycles: produce yard optimization summary
+        if self._cycle % 4 == 0:
+            total_capacity = sum(b.get("capacity_teu", 0) for b in block_summaries)
+            total_used = sum(b.get("used_teu", 0) for b in block_summaries)
+            utilization = total_used / max(total_capacity, 1)
+            return AgentDecision(
+                action="publish_optimization_plan",
+                arguments={
+                    "zone": tasking.get("zone", "yard-north"),
+                    "block_count": len(block_summaries),
+                    "total_capacity_teu": total_capacity,
+                    "total_used_teu": total_used,
+                    "utilization": round(utilization, 3),
+                    "strategy": (
+                        "proximity" if utilization < 0.7
+                        else "balanced" if utilization < 0.85
+                        else "overflow"
+                    ),
+                    "summary": (
+                        f"{len(block_summaries)} blocks, "
+                        f"{total_used}/{total_capacity} TEU, "
+                        f"{utilization:.0%} utilization"
+                    ),
+                },
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: yard optimization plan — "
+                    f"{total_used}/{total_capacity} TEU, strategy="
+                    f"{'proximity' if utilization < 0.7 else 'balanced' if utilization < 0.85 else 'overflow'}"
+                ),
+            )
+
+        # Allocate pending containers to optimal blocks
+        if pending_allocations:
+            container = pending_allocations[0]
+            cid = container.get("container_id", "UNKNOWN")
+            container_type = container.get("type", "standard")
+
+            # Pick optimal block: least utilized with compatible type
+            candidates = [
+                b for b in block_summaries
+                if b.get("utilization", 0) < 0.9
+                and b.get("queue_depth", 0) <= 3
+            ]
+            if not candidates:
+                candidates = block_summaries[:1] if block_summaries else []
+
+            if candidates:
+                # Sort by utilization ascending for balanced allocation
+                candidates.sort(key=lambda b: b.get("utilization", 0))
+                best = candidates[0]
+                return AgentDecision(
+                    action="allocate_block",
+                    arguments={
+                        "container_id": cid,
+                        "target_block": best.get("block_id", "YB-A"),
+                        "container_type": container_type,
+                        "reason": (
+                            f"Block {best.get('block_id', 'YB-A')} at "
+                            f"{best.get('utilization', 0):.0%} utilization, "
+                            f"lowest among candidates"
+                        ),
+                    },
+                    reasoning=(
+                        f"DryRun cycle {self._cycle}: allocating {cid} to "
+                        f"{best.get('block_id', 'YB-A')}"
+                    ),
+                )
+
+        # Every 6 cycles: backhaul matching for tractors
+        if self._cycle % 6 == 0 and tractor_positions:
+            idle_tractors = [
+                t for t in tractor_positions
+                if t.get("status") == "IDLE"
+            ]
+            if idle_tractors:
+                tractor = idle_tractors[0]
+                return AgentDecision(
+                    action="match_backhaul",
+                    arguments={
+                        "tractor_id": tractor.get("tractor_id", "tractor-1"),
+                        "current_block": tractor.get("block", "YB-A"),
+                        "pickup_block": f"YB-{chr(65 + (self._cycle % 6))}",
+                        "reason": "Backhaul match — reduce empty return trip",
+                    },
+                    reasoning=(
+                        f"DryRun cycle {self._cycle}: backhaul match for "
+                        f"{tractor.get('tractor_id', 'tractor-1')}"
+                    ),
+                )
+
+        # Congestion detection
+        congested = [
+            b for b in block_summaries
+            if b.get("queue_depth", 0) > 3
+        ]
+        if congested:
+            block = congested[0]
+            return AgentDecision(
+                action="emit_yard_optimization_event",
+                arguments={
+                    "event_type": "congestion_redirect",
+                    "details": (
+                        f"Block {block.get('block_id', '?')} queue depth "
+                        f"{block.get('queue_depth', 0)} — redirecting inbound"
+                    ),
+                    "priority": "HIGH",
+                },
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: congestion in "
+                    f"{block.get('block_id', '?')}"
+                ),
+            )
+
+        return AgentDecision(
+            action="wait",
+            arguments={"reason": "Monitoring — no pending allocations or congestion"},
+            reasoning=f"DryRun cycle {self._cycle}: yard optimizer idle",
+        )
+
+    def _decide_gate_flow(self, observed_state: dict) -> AgentDecision:
+        tasking = observed_state.get("tasking", {})
+        truck_queue = tasking.get("truck_queue", [])
+        appointments = tasking.get("appointments", [])
+        yard_ready = tasking.get("yard_ready_containers", [])
+        rail_schedule = tasking.get("rail_schedule", [])
+        queue_length = len(truck_queue)
+
+        # Every 5 cycles: produce gate flow summary
+        if self._cycle % 5 == 0:
+            pending_appointments = len([a for a in appointments if a.get("status") == "PENDING"])
+            avg_wait = tasking.get("avg_wait_minutes", 0)
+            return AgentDecision(
+                action="publish_gate_flow_plan",
+                arguments={
+                    "queue_length": queue_length,
+                    "pending_appointments": pending_appointments,
+                    "avg_wait_minutes": avg_wait,
+                    "yard_ready_count": len(yard_ready),
+                    "throttle_active": queue_length > 10,
+                    "summary": (
+                        f"{queue_length} trucks queued, "
+                        f"{pending_appointments} appointments pending, "
+                        f"avg wait {avg_wait} min"
+                    ),
+                },
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: gate flow plan — "
+                    f"{queue_length} queued, avg wait {avg_wait} min"
+                ),
+            )
+
+        # Queue backup: activate appointment throttling
+        if queue_length > 10:
+            return AgentDecision(
+                action="throttle_appointments",
+                arguments={
+                    "action": "reduce_rate",
+                    "current_queue": queue_length,
+                    "target_queue": 8,
+                    "reason": (
+                        f"Queue at {queue_length} trucks, "
+                        f"throttling appointments to reduce to target 8"
+                    ),
+                },
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: queue backup ({queue_length}), "
+                    f"activating throttle"
+                ),
+            )
+
+        # Match waiting trucks with yard-ready containers
+        if truck_queue and yard_ready:
+            truck = truck_queue[0]
+            container_id = (
+                yard_ready[0]
+                if isinstance(yard_ready[0], str)
+                else yard_ready[0].get("container_id", "UNKNOWN")
+            )
+            return AgentDecision(
+                action="schedule_pickup",
+                arguments={
+                    "truck_id": truck.get("truck_id", f"TRK-{self._cycle}"),
+                    "container_id": container_id,
+                    "gate_lane": "outbound-1",
+                    "priority": "NORMAL",
+                },
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: matching truck with "
+                    f"yard-ready container {container_id}"
+                ),
+            )
+
+        # Every 8 cycles: coordinate rail loading
+        if self._cycle % 8 == 0:
+            rail_containers = [
+                (c if isinstance(c, str) else c.get("container_id", "UNKNOWN"))
+                for c in yard_ready[:5]
+            ]
+            return AgentDecision(
+                action="schedule_rail_loading",
+                arguments={
+                    "rail_track": "rail-1",
+                    "containers": rail_containers,
+                    "window_start": f"T+{self._cycle * 10}min",
+                    "estimated_duration_min": len(rail_containers) * 12,
+                },
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: rail loading coordination, "
+                    f"{len(rail_containers)} containers"
+                ),
+            )
+
+        # Emit routine flow event
+        if self._cycle % 3 == 0:
+            return AgentDecision(
+                action="emit_gate_flow_event",
+                arguments={
+                    "event_type": "flow_check",
+                    "details": f"Cycle {self._cycle}: gate flow nominal, queue {queue_length}",
+                    "priority": "LOW",
+                },
+                reasoning=f"DryRun cycle {self._cycle}: routine gate flow check",
+            )
+
+        return AgentDecision(
+            action="wait",
+            arguments={"reason": "Monitoring — gate flow nominal"},
+            reasoning=f"DryRun cycle {self._cycle}: gate flow AI idle",
         )
 
     def _decide_aggregator(self, observed_state: dict) -> AgentDecision:
