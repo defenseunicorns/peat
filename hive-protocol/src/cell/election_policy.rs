@@ -313,8 +313,8 @@ mod tests {
 
         // Qualified E-7 with low cognitive load and fatigue
         let qualified = Operator::new(
-            "op_1".to_string(),
-            "SFC Smith".to_string(),
+            "worker_martinez_j".to_string(),
+            "Martinez, J".to_string(),
             OperatorRank::E7,
             AuthorityLevel::Commander,
             "11B".to_string(),
@@ -323,8 +323,8 @@ mod tests {
 
         // Disqualified - rank too low (E-4 < E-5 minimum)
         let low_rank = Operator::new(
-            "op_2".to_string(),
-            "SPC Jones".to_string(),
+            "worker_chen_l".to_string(),
+            "Chen, L".to_string(),
             OperatorRank::E4,
             AuthorityLevel::Commander,
             "11B".to_string(),

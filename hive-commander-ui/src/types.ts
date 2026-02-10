@@ -33,12 +33,14 @@ export interface Piece {
   y: number;
   fuel: number;
   maxFuel: number;
+  workerName?: string;
 }
 
 export interface ComposedCapability {
   id: number;
   name: string;
   pieceIds: number[];
+  workerNames?: string[];
   centerX: number;
   centerY: number;
   // Bonuses

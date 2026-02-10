@@ -311,14 +311,14 @@ mod tests {
     #[test]
     fn test_operator_creation() {
         let op = Operator::new(
-            "op1".to_string(),
-            "John Doe".to_string(),
+            "worker_martinez_j".to_string(),
+            "Martinez, J".to_string(),
             OperatorRank::E7,
             AuthorityLevel::Commander,
             "11B".to_string(),
         );
 
-        assert_eq!(op.id, "op1");
+        assert_eq!(op.id, "worker_martinez_j");
         assert_eq!(op.rank, OperatorRank::E7 as i32);
         assert_eq!(op.cognitive_load(), 0.0);
         assert_eq!(op.fatigue(), 0.0);
@@ -327,8 +327,8 @@ mod tests {
     #[test]
     fn test_operator_cognitive_load() {
         let mut op = Operator::new(
-            "op1".to_string(),
-            "John".to_string(),
+            "worker_chen_l".to_string(),
+            "Chen, L".to_string(),
             OperatorRank::E5,
             AuthorityLevel::Supervisor,
             "11B".to_string(),
@@ -347,8 +347,8 @@ mod tests {
     #[test]
     fn test_operator_effectiveness() {
         let mut op = Operator::new(
-            "op1".to_string(),
-            "John".to_string(),
+            "worker_chen_l".to_string(),
+            "Chen, L".to_string(),
             OperatorRank::E5,
             AuthorityLevel::Supervisor,
             "11B".to_string(),
@@ -409,8 +409,8 @@ mod tests {
     #[test]
     fn test_human_machine_pair_one_to_one() {
         let op = Operator::new(
-            "op1".to_string(),
-            "John".to_string(),
+            "worker_chen_l".to_string(),
+            "Chen, L".to_string(),
             OperatorRank::E5,
             AuthorityLevel::Commander,
             "11B".to_string(),
@@ -427,15 +427,15 @@ mod tests {
     #[test]
     fn test_human_machine_pair_primary_operator() {
         let op1 = Operator::new(
-            "op1".to_string(),
-            "John".to_string(),
+            "worker_chen_l".to_string(),
+            "Chen, L".to_string(),
             OperatorRank::E5,
             AuthorityLevel::Supervisor,
             "11B".to_string(),
         );
         let op2 = Operator::new(
-            "op2".to_string(),
-            "Jane".to_string(),
+            "worker_williams_d".to_string(),
+            "Williams, D".to_string(),
             OperatorRank::E7,
             AuthorityLevel::Commander,
             "11B".to_string(),
@@ -450,21 +450,21 @@ mod tests {
         // Should return highest-ranking operator
         let primary = pair.primary_operator().unwrap();
         assert_eq!(primary.rank, OperatorRank::E7 as i32);
-        assert_eq!(primary.name, "Jane");
+        assert_eq!(primary.name, "Williams, D");
     }
 
     #[test]
     fn test_human_machine_pair_max_authority() {
         let op1 = Operator::new(
-            "op1".to_string(),
-            "John".to_string(),
+            "worker_chen_l".to_string(),
+            "Chen, L".to_string(),
             OperatorRank::E7,
             AuthorityLevel::Supervisor,
             "11B".to_string(),
         );
         let op2 = Operator::new(
-            "op2".to_string(),
-            "Jane".to_string(),
+            "worker_williams_d".to_string(),
+            "Williams, D".to_string(),
             OperatorRank::E5,
             AuthorityLevel::Commander,
             "11B".to_string(),
@@ -482,8 +482,8 @@ mod tests {
     #[test]
     fn test_human_machine_pair_overloaded_check() {
         let mut op1 = Operator::new(
-            "op1".to_string(),
-            "John".to_string(),
+            "worker_chen_l".to_string(),
+            "Chen, L".to_string(),
             OperatorRank::E5,
             AuthorityLevel::Supervisor,
             "11B".to_string(),
@@ -491,8 +491,8 @@ mod tests {
         op1.update_cognitive_load(0.9);
 
         let op2 = Operator::new(
-            "op2".to_string(),
-            "Jane".to_string(),
+            "worker_williams_d".to_string(),
+            "Williams, D".to_string(),
             OperatorRank::E7,
             AuthorityLevel::Commander,
             "11B".to_string(),
@@ -511,8 +511,8 @@ mod tests {
     #[test]
     fn test_operator_cognitive_load_clamping() {
         let mut op = Operator::new(
-            "op1".to_string(),
-            "Test".to_string(),
+            "worker_thompson_r".to_string(),
+            "Thompson, R".to_string(),
             OperatorRank::E5,
             AuthorityLevel::Supervisor,
             "11B".to_string(),
@@ -534,8 +534,8 @@ mod tests {
     #[test]
     fn test_operator_fatigue_clamping() {
         let mut op = Operator::new(
-            "op1".to_string(),
-            "Test".to_string(),
+            "worker_thompson_r".to_string(),
+            "Thompson, R".to_string(),
             OperatorRank::E5,
             AuthorityLevel::Supervisor,
             "11B".to_string(),
@@ -553,8 +553,8 @@ mod tests {
     #[test]
     fn test_operator_is_overloaded_edge_cases() {
         let mut op = Operator::new(
-            "op1".to_string(),
-            "Test".to_string(),
+            "worker_thompson_r".to_string(),
+            "Thompson, R".to_string(),
             OperatorRank::E5,
             AuthorityLevel::Supervisor,
             "11B".to_string(),
@@ -572,8 +572,8 @@ mod tests {
     #[test]
     fn test_operator_is_fatigued_edge_cases() {
         let mut op = Operator::new(
-            "op1".to_string(),
-            "Test".to_string(),
+            "worker_thompson_r".to_string(),
+            "Thompson, R".to_string(),
             OperatorRank::E5,
             AuthorityLevel::Supervisor,
             "11B".to_string(),
@@ -590,8 +590,8 @@ mod tests {
     #[test]
     fn test_operator_effectiveness_edge_cases() {
         let mut op = Operator::new(
-            "op1".to_string(),
-            "Test".to_string(),
+            "worker_thompson_r".to_string(),
+            "Thompson, R".to_string(),
             OperatorRank::E5,
             AuthorityLevel::Supervisor,
             "11B".to_string(),
@@ -616,8 +616,8 @@ mod tests {
     #[test]
     fn test_operator_metadata_json_invalid() {
         let mut op = Operator::new(
-            "op1".to_string(),
-            "Test".to_string(),
+            "worker_thompson_r".to_string(),
+            "Thompson, R".to_string(),
             OperatorRank::E5,
             AuthorityLevel::Supervisor,
             "11B".to_string(),
@@ -732,8 +732,8 @@ mod tests {
     #[test]
     fn test_human_machine_pair_avg_effectiveness_multiple() {
         let mut op1 = Operator::new(
-            "op1".to_string(),
-            "Op1".to_string(),
+            "worker_garcia_m".to_string(),
+            "Garcia, M".to_string(),
             OperatorRank::E5,
             AuthorityLevel::Supervisor,
             "11B".to_string(),
@@ -742,8 +742,8 @@ mod tests {
         op1.update_fatigue(0.2);
 
         let mut op2 = Operator::new(
-            "op2".to_string(),
-            "Op2".to_string(),
+            "worker_johnson_k".to_string(),
+            "Johnson, K".to_string(),
             OperatorRank::E6,
             AuthorityLevel::Supervisor,
             "11B".to_string(),
@@ -765,8 +765,8 @@ mod tests {
     #[test]
     fn test_human_machine_pair_multiple_platforms() {
         let op = Operator::new(
-            "op1".to_string(),
-            "Operator".to_string(),
+            "worker_brown_a".to_string(),
+            "Brown, A".to_string(),
             OperatorRank::E6,
             AuthorityLevel::Supervisor,
             "11B".to_string(),
@@ -791,8 +791,8 @@ mod tests {
     fn test_human_machine_pair_max_rank_and_authority_mismatch() {
         // Lower rank but higher authority
         let op1 = Operator::new(
-            "op1".to_string(),
-            "Junior Commander".to_string(),
+            "worker_davis_s".to_string(),
+            "Davis, S".to_string(),
             OperatorRank::E4,
             AuthorityLevel::Commander,
             "11B".to_string(),
@@ -800,8 +800,8 @@ mod tests {
 
         // Higher rank but lower authority
         let op2 = Operator::new(
-            "op2".to_string(),
-            "Senior Advisor".to_string(),
+            "worker_wilson_p".to_string(),
+            "Wilson, P".to_string(),
             OperatorRank::E8,
             AuthorityLevel::Advisor,
             "11B".to_string(),
@@ -827,8 +827,8 @@ mod tests {
     #[test]
     fn test_human_machine_pair_binding_types() {
         let op = Operator::new(
-            "op1".to_string(),
-            "Operator".to_string(),
+            "worker_anderson_t".to_string(),
+            "Anderson, T".to_string(),
             OperatorRank::E5,
             AuthorityLevel::Supervisor,
             "11B".to_string(),

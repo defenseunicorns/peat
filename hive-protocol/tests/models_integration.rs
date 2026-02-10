@@ -73,8 +73,8 @@ fn test_node_to_cell_capability_aggregation() {
 fn test_human_operated_node_in_cell() {
     // Create operator
     let operator = Operator::new(
-        "op_1".to_string(),
-        "SSG Smith".to_string(),
+        "worker_martinez_j".to_string(),
+        "Martinez, J".to_string(),
         OperatorRank::E6,
         AuthorityLevel::Commander,
         "11B".to_string(),
@@ -127,8 +127,8 @@ fn test_mixed_autonomous_and_human_operated_cell() {
 
     // Create human-operated node
     let operator = Operator::new(
-        "op_1".to_string(),
-        "SFC Davis".to_string(),
+        "worker_chen_l".to_string(),
+        "Chen, L".to_string(),
         OperatorRank::E7,
         AuthorityLevel::Supervisor,
         "11B".to_string(),
@@ -165,8 +165,8 @@ fn test_mixed_autonomous_and_human_operated_cell() {
 #[test]
 fn test_operator_cognitive_load_affects_cell_readiness() {
     let mut operator = Operator::new(
-        "op_1".to_string(),
-        "CPL Johnson".to_string(),
+        "worker_thompson_r".to_string(),
+        "Thompson, R".to_string(),
         OperatorRank::E4,
         AuthorityLevel::Supervisor,
         "11B".to_string(),
@@ -273,16 +273,16 @@ fn test_capability_validation_across_models() {
 fn test_multiple_operators_in_cell_leader_selection() {
     // Create operators of different ranks
     let commander = Operator::new(
-        "op_1".to_string(),
-        "CPT Williams".to_string(),
+        "worker_williams_d".to_string(),
+        "Williams, D".to_string(),
         OperatorRank::O3,
         AuthorityLevel::Commander,
         "11A".to_string(),
     );
 
     let nco = Operator::new(
-        "op_2".to_string(),
-        "SFC Davis".to_string(),
+        "worker_garcia_m".to_string(),
+        "Garcia, M".to_string(),
         OperatorRank::E7,
         AuthorityLevel::Supervisor,
         "11B".to_string(),
@@ -322,8 +322,8 @@ fn test_multiple_operators_in_cell_leader_selection() {
 fn test_protobuf_serialization_roundtrip() {
     // Create a complex setup
     let mut operator = Operator::new(
-        "op_1".to_string(),
-        "Test Operator".to_string(),
+        "worker_johnson_k".to_string(),
+        "Johnson, K".to_string(),
         OperatorRank::E5,
         AuthorityLevel::Supervisor,
         "11B".to_string(),
@@ -349,7 +349,7 @@ fn test_protobuf_serialization_roundtrip() {
 
     let retrieved_binding = node.operator_binding.as_ref().unwrap();
     assert_eq!(retrieved_binding.operators.len(), 1);
-    assert_eq!(retrieved_binding.operators[0].id, "op_1");
+    assert_eq!(retrieved_binding.operators[0].id, "worker_johnson_k");
 
     // Verify metadata is preserved
     let retrieved_op = &retrieved_binding.operators[0];

@@ -77,6 +77,13 @@ export function CapabilityCard({ capability, isSelected, onClick }: CapabilityCa
         )}
       </div>
 
+      {/* Worker names */}
+      {capability.workerNames && capability.workerNames.length > 0 && (
+        <div style={{ color: '#8af', fontSize: '11px', marginBottom: '8px' }}>
+          {capability.workerNames.join(', ')}
+        </div>
+      )}
+
       {/* Fuel bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <span style={{ color: '#888', fontSize: '11px' }}>Fuel:</span>

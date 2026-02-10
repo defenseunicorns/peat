@@ -316,8 +316,8 @@ mod tests {
 
     fn create_test_operator(mos: &str, rank: OperatorRank) -> Operator {
         Operator::new(
-            "op_1".to_string(),
-            "Test Operator".to_string(),
+            "worker_martinez_j".to_string(),
+            "Martinez, J".to_string(),
             rank,
             AuthorityLevel::Commander,
             mos.to_string(),

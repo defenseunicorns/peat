@@ -503,8 +503,8 @@ mod tests {
         use crate::models::{OperatorExt, OperatorRank};
 
         let operator = Operator::new(
-            "op_1".to_string(),
-            "SSG Smith".to_string(),
+            "worker_martinez_j".to_string(),
+            "Martinez, J".to_string(),
             OperatorRank::E6,
             AuthorityLevel::Commander,
             "11B".to_string(), // Infantry
@@ -524,7 +524,7 @@ mod tests {
 
         let primary = config.get_primary_operator().unwrap();
         assert_eq!(primary.rank, OperatorRank::E6 as i32);
-        assert_eq!(primary.name, "SSG Smith");
+        assert_eq!(primary.name, "Martinez, J");
     }
 
     #[test]
@@ -536,8 +536,8 @@ mod tests {
 
         // Add operator binding
         let operator = Operator::new(
-            "op_1".to_string(),
-            "PFC Jones".to_string(),
+            "worker_chen_l".to_string(),
+            "Chen, L".to_string(),
             OperatorRank::E3,
             AuthorityLevel::Supervisor,
             "11B".to_string(),
@@ -564,24 +564,24 @@ mod tests {
 
         // Command vehicle with multiple operators
         let commander = Operator::new(
-            "op_1".to_string(),
-            "CPT Williams".to_string(),
+            "worker_williams_d".to_string(),
+            "Williams, D".to_string(),
             OperatorRank::O3,
             AuthorityLevel::Commander,
             "11A".to_string(), // Infantry Officer
         );
 
         let nco = Operator::new(
-            "op_2".to_string(),
-            "SFC Davis".to_string(),
+            "worker_garcia_m".to_string(),
+            "Garcia, M".to_string(),
             OperatorRank::E7,
             AuthorityLevel::Supervisor,
             "11B".to_string(),
         );
 
         let rto = Operator::new(
-            "op_3".to_string(),
-            "SPC Brown".to_string(),
+            "worker_brown_a".to_string(),
+            "Brown, A".to_string(),
             OperatorRank::E4,
             AuthorityLevel::Advisor,
             "25U".to_string(), // Signal
@@ -600,7 +600,7 @@ mod tests {
         // Primary operator should be highest rank (O3)
         let primary = config.get_primary_operator().unwrap();
         assert_eq!(primary.rank, OperatorRank::O3 as i32);
-        assert_eq!(primary.name, "CPT Williams");
+        assert_eq!(primary.name, "Williams, D");
 
         let binding = config.get_operator_binding().unwrap();
         assert_eq!(binding.operators.len(), 3);

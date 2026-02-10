@@ -438,7 +438,7 @@ mod tests {
         let mut degraded = NodeState::new((37.6, -122.3, 80.0));
         degraded.update_health(HealthStatus::Degraded);
 
-        store.store_state("node_op_1", &operational).await.unwrap();
+        store.store_state("worker_martinez_j", &operational).await.unwrap();
         store.store_state("node_failed", &failed).await.unwrap();
         store.store_state("node_degraded", &degraded).await.unwrap();
 

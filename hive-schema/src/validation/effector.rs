@@ -594,7 +594,7 @@ mod tests {
             target: None,
             authorization: None, // Not required for SAFE command
             rounds_authorized: 0,
-            issued_by: "operator-1".to_string(),
+            issued_by: "worker_martinez_j".to_string(),
             priority: 1,
             issued_at: Some(Timestamp {
                 seconds: 1702000000,
@@ -615,7 +615,7 @@ mod tests {
             target: None,
             authorization: None, // Missing - required for ARM
             rounds_authorized: 0,
-            issued_by: "operator-1".to_string(),
+            issued_by: "worker_martinez_j".to_string(),
             priority: 1,
             issued_at: Some(Timestamp {
                 seconds: 1702000000,
@@ -650,7 +650,7 @@ mod tests {
                 special_instructions: String::new(),
             }),
             rounds_authorized: 50,
-            issued_by: "operator-1".to_string(),
+            issued_by: "worker_martinez_j".to_string(),
             priority: 1,
             issued_at: Some(Timestamp {
                 seconds: 1702000000,
@@ -672,7 +672,7 @@ mod tests {
             target: None,
             authorization: None,
             rounds_authorized: 0,
-            issued_by: "operator-1".to_string(),
+            issued_by: "worker_martinez_j".to_string(),
             priority: 1,
             issued_at: Some(Timestamp {
                 seconds: 1702000000,

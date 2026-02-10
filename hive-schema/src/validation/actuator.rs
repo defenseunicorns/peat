@@ -768,7 +768,7 @@ mod tests {
             target_position: 1.0,
             target_velocity: 0.0,
             priority: 1,
-            issued_by: "operator-1".to_string(),
+            issued_by: "worker_martinez_j".to_string(),
             issued_at: Some(Timestamp {
                 seconds: 1702000000,
                 nanos: 0,
@@ -788,7 +788,7 @@ mod tests {
             target_position: 1.0,
             target_velocity: 0.0,
             priority: 1,
-            issued_by: "operator-1".to_string(),
+            issued_by: "worker_martinez_j".to_string(),
             issued_at: Some(Timestamp {
                 seconds: 1702000000,
                 nanos: 0,
@@ -809,7 +809,7 @@ mod tests {
             target_position: 1.0,
             target_velocity: 0.0,
             priority: 1,
-            issued_by: "operator-1".to_string(),
+            issued_by: "worker_martinez_j".to_string(),
             issued_at: Some(Timestamp {
                 seconds: 1702000000,
                 nanos: 0,

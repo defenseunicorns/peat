@@ -33,6 +33,35 @@ from typing import Optional
 from urllib.parse import parse_qs, urlparse
 
 
+# Realistic worker name pool (ILA Local 1414 style, per ADR-051 entity model)
+# Pattern: worker_{surname}_{initial} as node ID, "Surname, I" as display name
+WORKER_NAME_POOL = [
+    ("martinez_j", "Martinez, J"),
+    ("chen_l", "Chen, L"),
+    ("thompson_r", "Thompson, R"),
+    ("williams_d", "Williams, D"),
+    ("garcia_m", "Garcia, M"),
+    ("johnson_k", "Johnson, K"),
+    ("brown_a", "Brown, A"),
+    ("davis_s", "Davis, S"),
+    ("wilson_p", "Wilson, P"),
+    ("anderson_t", "Anderson, T"),
+]
+
+
+def assign_worker_name(index: int) -> tuple[str, str]:
+    """Assign a realistic worker name from the pool.
+
+    Returns (worker_id, display_name) tuple. Cycles through the pool
+    for indices beyond pool size.
+    """
+    entry = WORKER_NAME_POOL[index % len(WORKER_NAME_POOL)]
+    suffix = f"_{index // len(WORKER_NAME_POOL) + 1}" if index >= len(WORKER_NAME_POOL) else ""
+    worker_id = f"worker_{entry[0]}{suffix}"
+    display_name = entry[1]
+    return worker_id, display_name
+
+
 @dataclass
 class NodeState:
     node_id: str
@@ -41,6 +70,8 @@ class NodeState:
     last_seen: Optional[str] = None
     backend: str = "unknown"
     role: str = "unknown"
+    display_name: Optional[str] = None
+    worker_id: Optional[str] = None
     errors: list = field(default_factory=list)
     metrics: dict = field(default_factory=dict)
 
@@ -57,11 +88,16 @@ class Orchestrator:
         with self.lock:
             now = datetime.utcnow().isoformat()
             if node_id not in self.nodes:
+                # Assign realistic worker identity from the name pool
+                worker_index = len(self.nodes)
+                worker_id, display_name = assign_worker_name(worker_index)
                 self.nodes[node_id] = NodeState(
                     node_id=node_id,
                     registered_at=now,
                     backend=backend,
                     role=role,
+                    display_name=display_name,
+                    worker_id=worker_id,
                 )
             self.nodes[node_id].last_seen = now
 
@@ -69,7 +105,13 @@ class Orchestrator:
                 self.test_state = "deploying"
                 self.test_start_time = now
 
-            return {"status": "registered", "node_count": len(self.nodes)}
+            node = self.nodes[node_id]
+            return {
+                "status": "registered",
+                "node_count": len(self.nodes),
+                "worker_id": node.worker_id,
+                "display_name": node.display_name,
+            }
 
     def mark_ready(self, node_id: str) -> dict:
         with self.lock:
@@ -119,6 +161,17 @@ class Orchestrator:
             for n in self.nodes.values():
                 by_backend[n.backend] += 1
 
+            # Build worker roster with display names
+            workers = {
+                n.node_id: {
+                    "worker_id": n.worker_id,
+                    "display_name": n.display_name,
+                    "role": n.role,
+                    "ready": n.ready_at is not None,
+                }
+                for n in self.nodes.values()
+            }
+
             return {
                 "test_state": self.test_state,
                 "test_start_time": self.test_start_time,
@@ -131,6 +184,7 @@ class Orchestrator:
                 "by_role": dict(by_role),
                 "by_backend": dict(by_backend),
                 "nodes_with_errors": [n.node_id for n in self.nodes.values() if n.errors],
+                "workers": workers,
             }
 
     def reset(self):
@@ -269,6 +323,11 @@ class OrchestratorHandler(BaseHTTPRequestHandler):
     <div class="box">
         <strong>By Role:</strong><br>
         {'<br>'.join(f"  {role}: {counts['registered']} registered, {counts['ready']} ready" for role, counts in status['by_role'].items())}
+    </div>
+
+    <div class="box">
+        <strong>Worker Roster:</strong><br>
+        {'<br>'.join(f"  {w['worker_id']} ({w['display_name']}) — {w['role']} {'✓' if w['ready'] else '…'}" for w in status.get('workers', {{}}).values())}
     </div>
 
     <div class="box">
