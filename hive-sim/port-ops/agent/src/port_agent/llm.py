@@ -15,23 +15,11 @@ import asyncio
 import json
 import logging
 import os
-import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
 logger = logging.getLogger(__name__)
-
-
-# ── Proficiency modifiers (ADR-051) ──────────────────────────────────────────
-# speed_factor: multiplier on base delay (lower = faster decisions)
-# error_rate: probability of making a wrong tool call per cycle
-PROFICIENCY_MODIFIERS: dict[str, dict[str, float]] = {
-    "expert":            {"speed_factor": 1.0,   "error_rate": 0.00},
-    "competent":         {"speed_factor": 1.18,  "error_rate": 0.02},
-    "advanced_beginner": {"speed_factor": 1.43,  "error_rate": 0.05},
-    "novice":            {"speed_factor": 1.82,  "error_rate": 0.10},
-}
 
 
 @dataclass
@@ -250,42 +238,22 @@ class DryRunProvider(LLMProvider):
     making it possible to validate the full OODA loop offline.
 
     Role-aware: 'crane' processes containers, 'aggregator' produces summaries.
-    Proficiency-aware: delay and error rate vary by proficiency level.
     """
 
-    # Base delay for expert-level decisions; scaled by proficiency speed_factor
-    _BASE_DELAY_S = 0.3
+    # Simulate LLM thinking time so the viewer can keep up
+    DRY_RUN_DELAY_S = 0.3
 
-    def __init__(self, role: str = "crane", proficiency: str = "competent", **kwargs):
+    def __init__(self, role: str = "crane", **kwargs):
         self._cycle = 0
         self._role = role
-        self._proficiency = proficiency
-        mods = PROFICIENCY_MODIFIERS.get(proficiency, PROFICIENCY_MODIFIERS["competent"])
-        self._speed_factor = mods["speed_factor"]
-        self._error_rate = mods["error_rate"]
 
     async def decide(self, persona: str, observed_state: dict, available_tools: list[dict]) -> AgentDecision:
         self._cycle += 1
-        # Proficiency-scaled thinking delay
-        await asyncio.sleep(self._BASE_DELAY_S * self._speed_factor)
-
-        # Proficiency-based error: occasionally make wrong tool call
-        if self._error_rate > 0 and random.random() < self._error_rate:
-            return AgentDecision(
-                action="wait",
-                arguments={"reason": f"Hesitation — {self._proficiency} re-evaluating situation"},
-                reasoning=(
-                    f"DryRun cycle {self._cycle}: proficiency error "
-                    f"({self._proficiency}, {self._error_rate:.0%} rate) — delayed response"
-                ),
-                confidence=0.5,
-            )
+        await asyncio.sleep(self.DRY_RUN_DELAY_S)
         if self._role == "aggregator":
             return self._decide_aggregator(observed_state)
         elif self._role == "berth_manager":
             return self._decide_berth_manager(observed_state)
-        elif self._role == "yard_block":
-            return self._decide_yard_block(observed_state)
         elif self._role == "operator":
             return self._decide_operator(observed_state)
         elif self._role == "tractor":
@@ -296,6 +264,8 @@ class DryRunProvider(LLMProvider):
             return self._decide_sensor(observed_state)
         elif self._role == "lashing_crew":
             return self._decide_lashing_crew(observed_state)
+        elif self._role == "signaler":
+            return self._decide_signaler(observed_state)
         return self._decide_crane(observed_state)
 
     def _decide_crane(self, observed_state: dict) -> AgentDecision:
@@ -657,59 +627,6 @@ class DryRunProvider(LLMProvider):
             reasoning=f"DryRun cycle {self._cycle}: berth manager idle, waiting for data",
         )
 
-    def _decide_yard_block(self, observed_state: dict) -> AgentDecision:
-        tasking = observed_state.get("tasking", {})
-        incoming = tasking.get("incoming_containers", [])
-        current_fill = tasking.get("current_fill", 0)
-        total_slots = tasking.get("total_slots", 300)
-        fill_pct = (current_fill / total_slots * 100) if total_slots > 0 else 0
-
-        # Accept incoming container from tractor
-        if incoming:
-            container = incoming[0]
-            return AgentDecision(
-                action="accept_container",
-                arguments={
-                    "container_id": container.get("container_id", "UNKNOWN"),
-                    "source_tractor": container.get("source_tractor", "tractor-1"),
-                },
-                reasoning=(
-                    f"DryRun cycle {self._cycle}: accepting container "
-                    f"{container.get('container_id')} from {container.get('source_tractor')}"
-                ),
-            )
-
-        # After accepting, assign a slot
-        if self._cycle % 2 == 0 and current_fill > 0:
-            row = (current_fill % 10) + 1
-            bay = ((current_fill // 10) % 6) + 1
-            tier = ((current_fill // 60) % 5) + 1
-            return AgentDecision(
-                action="assign_slot",
-                arguments={"row": row, "bay": bay, "tier": tier},
-                reasoning=(
-                    f"DryRun cycle {self._cycle}: assigning slot "
-                    f"R{row}-B{bay}-T{tier} (fill={current_fill})"
-                ),
-            )
-
-        # Every 5 cycles: report capacity
-        if self._cycle % 5 == 0:
-            return AgentDecision(
-                action="report_capacity",
-                arguments={},
-                reasoning=(
-                    f"DryRun cycle {self._cycle}: capacity report — "
-                    f"{current_fill}/{total_slots} ({fill_pct:.0f}%)"
-                ),
-            )
-
-        return AgentDecision(
-            action="wait",
-            arguments={"reason": "No incoming containers — waiting for tractor deliveries"},
-            reasoning=f"DryRun cycle {self._cycle}: yard block idle, no incoming",
-        )
-
     def _decide_lashing_crew(self, observed_state: dict) -> AgentDecision:
         tasking = observed_state.get("tasking", {})
         containers_secured = tasking.get("containers_secured", 0)
@@ -763,6 +680,50 @@ class DryRunProvider(LLMProvider):
             action="wait",
             arguments={"reason": "Waiting for crane clear signal"},
             reasoning=f"DryRun cycle {self._cycle}: lashing crew idle, awaiting crane completion",
+        )
+
+    def _decide_signaler(self, observed_state: dict) -> AgentDecision:
+        tasking = observed_state.get("tasking", {})
+        crane_state = tasking.get("crane_state", "idle")
+        ground_clear = tasking.get("ground_clear", True)
+
+        # Every 8th cycle: report a hazard (simulate intermittent obstruction)
+        if self._cycle % 8 == 0:
+            return AgentDecision(
+                action="report_hazard",
+                arguments={
+                    "hazard_type": "personnel",
+                    "location": "under crane boom, bay 3",
+                },
+                reasoning=f"DryRun cycle {self._cycle}: spotted personnel in lift zone",
+            )
+
+        # If crane is actively lifting, monitor and signal
+        if crane_state in ("LIFTING", "LOWERING"):
+            return AgentDecision(
+                action="signal_crane",
+                arguments={
+                    "signal_type": "CLEAR" if ground_clear else "STOP",
+                    "crane_id": tasking.get("assigned_crane", "crane-1"),
+                },
+                reasoning=f"DryRun cycle {self._cycle}: {'clear' if ground_clear else 'STOP'} signal during {crane_state}",
+            )
+
+        # Default: confirm ground clear for next operation
+        if self._cycle % 2 == 0:
+            return AgentDecision(
+                action="confirm_ground_clear",
+                arguments={},
+                reasoning=f"DryRun cycle {self._cycle}: confirming ground zone clear",
+            )
+
+        return AgentDecision(
+            action="signal_crane",
+            arguments={
+                "signal_type": "CLEAR",
+                "crane_id": tasking.get("assigned_crane", "crane-1"),
+            },
+            reasoning=f"DryRun cycle {self._cycle}: routine clear signal",
         )
 
     def _decide_aggregator(self, observed_state: dict) -> AgentDecision:
@@ -827,14 +788,13 @@ class DryRunProvider(LLMProvider):
 
 def create_provider(provider_type: str = "anthropic", **kwargs) -> LLMProvider:
     """Factory for LLM providers."""
-    # DryRunProvider accepts 'role' and 'proficiency'; other providers don't — pop for safety
+    # DryRunProvider accepts 'role'; other providers don't — pop it for safety
     role = kwargs.pop("role", "crane")
-    proficiency = kwargs.pop("proficiency", "competent")
     if provider_type == "anthropic":
         return AnthropicProvider(**kwargs)
     elif provider_type in ("ollama", "openai"):
         return OllamaProvider(**kwargs)
     elif provider_type == "dry-run":
-        return DryRunProvider(role=role, proficiency=proficiency, **kwargs)
+        return DryRunProvider(role=role, **kwargs)
     else:
         raise ValueError(f"Unknown provider: {provider_type}. Use 'anthropic', 'ollama', or 'dry-run'.")

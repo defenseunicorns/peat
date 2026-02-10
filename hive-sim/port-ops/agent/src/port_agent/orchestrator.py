@@ -1,12 +1,12 @@
 """
-Phase 1b Orchestrator — multi-agent simulation runner.
+Multi-hold orchestrator — multi-agent simulation runner.
 
 Runs multiple agents as asyncio tasks in one Python process with a shared
 HiveStateStore. Agents use BridgeAPI (duck-types MCP ClientSession) instead
 of MCP stdio transport.
 
-Target composition: 2c5w4t1s1a2x = 15 agents (cranes, operators, tractors,
-scheduler, aggregator, sensors).
+Phase 1c composition: 2c5w4t1s1a1b2l1g2x = 18 agents (single hold).
+Phase 2  composition: 3h(2c5w2l1g4t1a2x)1b1s = 3 holds × 17 + 2 shared = 53 agents.
 """
 
 from __future__ import annotations
@@ -30,19 +30,15 @@ logger = logging.getLogger(__name__)
 # We import inside methods after PYTHONPATH is set by the caller.
 
 
-# Proficiency levels per ADR-051 entity model
-PROFICIENCY_LEVELS = ("novice", "advanced_beginner", "competent", "expert")
-
-
 @dataclass
 class AgentSpec:
     """Specification for a single agent in the orchestrator."""
     node_id: str
-    role: str           # "crane" | "aggregator" | "berth_manager" | "operator" | "tractor" | "scheduler" | "sensor"
+    role: str           # "crane" | "aggregator" | "berth_manager" | "operator" | "tractor" | "scheduler" | "sensor" | "lashing_crew" | "signaler"
     persona: str        # persona filename without .md
     provider: str       # "anthropic" | "ollama" | "dry-run"
     model: str | None = None
-    proficiency: str = "competent"  # novice | advanced_beginner | competent | expert
+    hold_num: int | None = None  # None for shared roles (berth_manager, scheduler)
 
 
 @dataclass
@@ -58,6 +54,8 @@ class OrchestratorConfig:
     cycle_delay_sim_minutes: float = 1.5
     time_compression: float = 600.0
     agents: list[AgentSpec] = field(default_factory=list)
+    num_holds: int = 1              # 1 = single hold (Phase 1c), 3 = multi-hold (Phase 2)
+    hold_nums: list[int] = field(default_factory=lambda: [3])
 
 
 # Letter → (role, persona, node_id_pattern)
@@ -68,25 +66,27 @@ _COMPOSITION_MAP: dict[str, tuple[str, str, str]] = {
     "s": ("scheduler",  "ai-scheduler",     "scheduler-1"),
     "a": ("aggregator", "hold-aggregator",  "hold-agg-3"),
     "b": ("berth_manager", "berth-manager", "berth-mgr-{n}"),
-    "y": ("yard_block",   "yard-block",     "yard-blk-{n}"),
     "x": ("sensor",     "sensor",           None),  # special: interleave load-cell / rfid
     "l": ("lashing_crew", "lashing-crew",   "lasher-{n}"),
+    "g": ("signaler",     "signaler",       "signaler-{n}"),
 }
 
 # Sensor node IDs cycle through these types
 _SENSOR_IDS = ["load-cell-1", "rfid-1", "load-cell-2", "rfid-2"]
 
 
-def parse_agent_composition(
+def _parse_flat_composition(
     composition: str,
     provider: str,
     model: str | None = None,
+    hold_num: int | None = None,
+    hold_prefix: str = "",
 ) -> list[AgentSpec]:
     """
-    Parse agent composition string into AgentSpec list.
+    Parse a flat composition string (no hold multiplier) into AgentSpec list.
 
     Format: ``<count><letter>`` pairs, e.g. ``2c5w4t1s1a2x``.
-    Letters: c=crane, w=operator, t=tractor, s=scheduler, a=aggregator, x=sensor.
+    When hold_prefix is set (e.g. "h1-"), node IDs are prefixed for hold scoping.
     """
     specs: list[AgentSpec] = []
     pairs = re.findall(r"(\d+)([a-z])", composition)
@@ -95,10 +95,6 @@ def parse_agent_composition(
             f"Invalid composition: {composition!r}. "
             f"Expected format like '2c5w4t1s1a2x'."
         )
-
-    # Proficiency assignment pattern: first worker of a role is expert (lead),
-    # subsequent workers get mixed proficiency for realistic variation.
-    _MIXED_PROFICIENCY = ("competent", "advanced_beginner", "novice", "competent")
 
     sensor_idx = 0
     for count_str, letter in pairs:
@@ -113,18 +109,18 @@ def parse_agent_composition(
         role, persona, id_pattern = entry
         for i in range(1, count + 1):
             if letter == "x":
-                node_id = _SENSOR_IDS[sensor_idx % len(_SENSOR_IDS)]
+                base_id = _SENSOR_IDS[sensor_idx % len(_SENSOR_IDS)]
+                node_id = f"{hold_prefix}{base_id}" if hold_prefix else base_id
                 sensor_idx += 1
             elif id_pattern and "{n}" in id_pattern:
-                node_id = id_pattern.replace("{n}", str(i))
+                base_id = id_pattern.replace("{n}", str(i))
+                node_id = f"{hold_prefix}{base_id}" if hold_prefix else base_id
             else:
-                node_id = id_pattern  # singleton like hold-agg-3, scheduler-1
-
-            # Lead (first) gets expert; singletons get expert; rest get mixed
-            if count == 1 or i == 1:
-                proficiency = "expert"
-            else:
-                proficiency = _MIXED_PROFICIENCY[(i - 2) % len(_MIXED_PROFICIENCY)]
+                # Singleton — scope to hold if within hold group
+                if hold_prefix and "{n}" not in (id_pattern or ""):
+                    node_id = f"{hold_prefix}{id_pattern}" if id_pattern else id_pattern
+                else:
+                    node_id = id_pattern
 
             specs.append(AgentSpec(
                 node_id=node_id,
@@ -132,10 +128,61 @@ def parse_agent_composition(
                 persona=persona,
                 provider=provider,
                 model=model,
-                proficiency=proficiency,
+                hold_num=hold_num,
             ))
 
     return specs
+
+
+def parse_agent_composition(
+    composition: str,
+    provider: str,
+    model: str | None = None,
+) -> tuple[list[AgentSpec], int, list[int]]:
+    """
+    Parse agent composition string into AgentSpec list.
+
+    Supports two formats:
+    - Flat:       ``2c5w4t1s1a2x`` (single hold, backward compat)
+    - Multi-hold: ``3h(2c5w2l1g4t1a2x)1b1s`` (3 holds + shared roles)
+
+    Returns:
+        (specs, num_holds, hold_nums)
+    """
+    # Check for multi-hold format: Nh(...)...
+    multi_match = re.match(r"(\d+)h\(([^)]+)\)(.*)", composition)
+    if multi_match:
+        num_holds = int(multi_match.group(1))
+        hold_inner = multi_match.group(2)
+        shared_suffix = multi_match.group(3)
+        hold_nums = list(range(1, num_holds + 1))
+
+        specs: list[AgentSpec] = []
+
+        # Parse per-hold agents
+        for hold_num in hold_nums:
+            hold_prefix = f"h{hold_num}-"
+            hold_specs = _parse_flat_composition(
+                hold_inner, provider, model,
+                hold_num=hold_num,
+                hold_prefix=hold_prefix,
+            )
+            specs.extend(hold_specs)
+
+        # Parse shared agents (no hold scope)
+        if shared_suffix.strip():
+            shared_specs = _parse_flat_composition(
+                shared_suffix, provider, model,
+                hold_num=None,
+                hold_prefix="",
+            )
+            specs.extend(shared_specs)
+
+        return specs, num_holds, hold_nums
+
+    # Flat format (single hold, backward compat)
+    specs = _parse_flat_composition(composition, provider, model)
+    return specs, 1, [3]
 
 
 class Orchestrator:
@@ -152,8 +199,16 @@ class Orchestrator:
         self.agents: list[AgentLoop] = []
         self.clock = SimulationClock(compression_ratio=config.time_compression)
 
+    def _hold_id_for(self, hold_num: int) -> str:
+        return f"hold-{hold_num}"
+
     def initialize_state(self):
-        """Create shared HIVE state store and populate initial state."""
+        """Create shared HIVE state store and populate initial state.
+
+        Multi-hold: creates per-hold container queues, team summaries,
+        and transport queues.  Shared roles (berth_manager, scheduler)
+        span all holds.
+        """
         from port_agent_bridge.hive_state import (
             HiveStateStore,
             create_crane_entity,
@@ -162,6 +217,7 @@ class Orchestrator:
             create_scheduler_entity,
             create_sensor_entity,
             create_lashing_crew_entity,
+            create_signaler_entity,
             create_container_queue,
             create_transport_queue,
             create_team_state,
@@ -169,27 +225,43 @@ class Orchestrator:
         )
 
         self.store = HiveStateStore()
-        hold_id = self.config.hold_id
 
-        # Create container queue (shared by all cranes)
-        containers = create_sample_containers(
-            count=self.config.queue_size,
-            hazmat_count=self.config.hazmat_count,
-        )
-        create_container_queue(self.store, hold_id, containers)
+        # Create per-hold shared resources
+        for hold_num in self.config.hold_nums:
+            hold_id = self._hold_id_for(hold_num)
+            containers = create_sample_containers(
+                count=self.config.queue_size,
+                hazmat_count=self.config.hazmat_count,
+            )
+            create_container_queue(self.store, hold_id, containers)
+            create_team_state(self.store, hold_id)
 
-        # Create team state
-        create_team_state(self.store, hold_id)
-        team_doc = self.store.get_document("team_summaries", f"team_{hold_id}")
+            team_doc = self.store.get_document("team_summaries", f"team_{hold_id}")
+            if team_doc:
+                team_doc.update_field("moves_remaining", len(containers))
+                team_doc.update_field("status", "ACTIVE")
+
+            # Transport queue per hold
+            has_tractors = any(
+                s.role == "tractor" and s.hold_num == hold_num
+                for s in self.config.agents
+            )
+            if has_tractors:
+                create_transport_queue(self.store, hold_id)
 
         # Initialize entity documents for each agent
         for spec in self.config.agents:
+            # Determine which hold this agent belongs to
+            hold_num = spec.hold_num if spec.hold_num is not None else self.config.hold_nums[0]
+            hold_id = self._hold_id_for(hold_num)
+            team_doc = self.store.get_document("team_summaries", f"team_{hold_id}")
+
             if spec.role == "crane":
                 entity_config = {
                     "lift_capacity_tons": 65,
                     "reach_rows": 22,
                     "moves_per_hour": 30,
-                    "hold": self.config.hold_num,
+                    "hold": hold_num,
                     "berth": self.config.berth,
                     "vessel": self.config.vessel,
                     "hazmat_classes": [1, 3, 8, 9],
@@ -202,13 +274,22 @@ class Orchestrator:
                         "status": "OPERATIONAL",
                         "capabilities": ["CONTAINER_LIFT", "HAZMAT_RATED"],
                     })
+
             elif spec.role == "operator":
+                # First operator per hold gets hazmat cert
+                is_first_op = not any(
+                    s.node_id != spec.node_id
+                    and s.role == "operator"
+                    and s.hold_num == spec.hold_num
+                    and self.config.agents.index(s) < self.config.agents.index(spec)
+                    for s in self.config.agents
+                )
                 op_config = {
-                    "proficiency": spec.proficiency,
+                    "proficiency": "expert",
                     "osha_cert_valid": True,
                     "hazmat_classes": [3, 8, 9],
-                    "hazmat_cert_valid": spec.node_id == "op-1",  # op-1 certified, op-2 not
-                    "hold": self.config.hold_num,
+                    "hazmat_cert_valid": is_first_op,
+                    "hold": hold_num,
                     "berth": self.config.berth,
                 }
                 create_operator_entity(self.store, spec.node_id, op_config)
@@ -219,8 +300,8 @@ class Orchestrator:
                         "capabilities": ["CRANE_OPERATION", "HAZMAT_HANDLING"],
                         "hazmat_cert_valid": op_config["hazmat_cert_valid"],
                     })
+
             elif spec.role == "aggregator":
-                # Aggregator gets a lightweight entity doc
                 self.store.create_document(
                     collection="node_states",
                     doc_id=f"sim_doc_{spec.node_id}",
@@ -231,7 +312,7 @@ class Orchestrator:
                         "operational_status": "OPERATIONAL",
                         "assignment": {
                             "berth": self.config.berth,
-                            "hold": self.config.hold_num,
+                            "hold": hold_num,
                             "vessel": self.config.vessel,
                         },
                     },
@@ -244,7 +325,7 @@ class Orchestrator:
                     })
 
             elif spec.role == "berth_manager":
-                # Berth manager gets a lightweight H3 entity doc
+                # Berth manager spans all holds — no hold-scoped team doc
                 self.store.create_document(
                     collection="node_states",
                     doc_id=f"sim_doc_{spec.node_id}",
@@ -264,57 +345,12 @@ class Orchestrator:
                         },
                     },
                 )
-                if team_doc:
-                    team_doc.update_field(f"team_members.{spec.node_id}", {
-                        "entity_type": "berth_manager",
-                        "status": "OPERATIONAL",
-                        "capabilities": ["BERTH_AGGREGATION", "TRACTOR_REBALANCE"],
-                    })
-
-            elif spec.role == "yard_block":
-                # Yard block gets an H2 entity doc with capacity tracking
-                block_num = int(spec.node_id.split("-")[-1]) if spec.node_id.split("-")[-1].isdigit() else 1
-                rows, bays, tiers = 10, 6, 5
-                self.store.create_document(
-                    collection="node_states",
-                    doc_id=f"sim_doc_{spec.node_id}",
-                    fields={
-                        "node_id": spec.node_id,
-                        "entity_type": "yard_block",
-                        "hive_level": "H2",
-                        "operational_status": "OPERATIONAL",
-                        "block_id": f"YB-{chr(64 + block_num)}",
-                        "capacity": {
-                            "rows": rows,
-                            "bays": bays,
-                            "tiers": tiers,
-                            "total_slots": rows * bays * tiers,
-                        },
-                        "current_fill": 0,
-                        "containers": {},
-                        "assignment": {
-                            "berth": self.config.berth,
-                            "vessel": self.config.vessel,
-                        },
-                        "metrics": {
-                            "containers_accepted": 0,
-                            "slots_assigned": 0,
-                            "capacity_reports": 0,
-                        },
-                    },
-                )
-                if team_doc:
-                    team_doc.update_field(f"team_members.{spec.node_id}", {
-                        "entity_type": "yard_block",
-                        "status": "OPERATIONAL",
-                        "capabilities": ["CONTAINER_STORAGE"],
-                    })
 
             elif spec.role == "tractor":
                 tractor_config = {
                     "capacity_tons": 40,
                     "max_speed_kph": 25,
-                    "hold": self.config.hold_num,
+                    "hold": hold_num,
                     "berth": self.config.berth,
                 }
                 create_tractor_entity(self.store, spec.node_id, tractor_config)
@@ -326,24 +362,19 @@ class Orchestrator:
                     })
 
             elif spec.role == "scheduler":
+                # Scheduler spans all holds
                 sched_config = {
-                    "hold": self.config.hold_num,
+                    "hold": hold_num,
                     "berth": self.config.berth,
                     "vessel": self.config.vessel,
                 }
                 create_scheduler_entity(self.store, spec.node_id, sched_config)
-                if team_doc:
-                    team_doc.update_field(f"team_members.{spec.node_id}", {
-                        "entity_type": "scheduler",
-                        "status": "OPERATIONAL",
-                        "capabilities": ["SCHEDULING", "RESOURCE_DISPATCH"],
-                    })
 
             elif spec.role == "sensor":
                 sensor_type = "LOAD_CELL" if "load-cell" in spec.node_id else "RFID"
                 sensor_config = {
                     "sensor_type": sensor_type,
-                    "hold": self.config.hold_num,
+                    "hold": hold_num,
                     "berth": self.config.berth,
                 }
                 create_sensor_entity(self.store, spec.node_id, sensor_config)
@@ -356,7 +387,7 @@ class Orchestrator:
 
             elif spec.role == "lashing_crew":
                 lashing_config = {
-                    "hold": self.config.hold_num,
+                    "hold": hold_num,
                     "berth": self.config.berth,
                 }
                 create_lashing_crew_entity(self.store, spec.node_id, lashing_config)
@@ -367,18 +398,25 @@ class Orchestrator:
                         "capabilities": ["CONTAINER_SECURING"],
                     })
 
-        # Create transport queue (for tractors to claim discharged containers)
-        has_tractors = any(s.role == "tractor" for s in self.config.agents)
-        if has_tractors:
-            create_transport_queue(self.store, hold_id)
+            elif spec.role == "signaler":
+                signaler_config = {
+                    "hold": hold_num,
+                    "berth": self.config.berth,
+                }
+                create_signaler_entity(self.store, spec.node_id, signaler_config)
+                if team_doc:
+                    team_doc.update_field(f"team_members.{spec.node_id}", {
+                        "entity_type": "signaler",
+                        "status": "OPERATIONAL",
+                        "capabilities": ["VISUAL_SIGNALING"],
+                    })
 
-        if team_doc:
-            team_doc.update_field("moves_remaining", len(containers))
-            team_doc.update_field("status", "ACTIVE")
-
+        total_agents = len(self.config.agents)
+        holds_str = ", ".join(self._hold_id_for(h) for h in self.config.hold_nums)
         logger.info(
-            f"Orchestrator initialized: {len(self.config.agents)} agents, "
-            f"{self.config.queue_size} containers, hold={hold_id}"
+            f"Orchestrator initialized: {total_agents} agents across "
+            f"{self.config.num_holds} hold(s) [{holds_str}], "
+            f"{self.config.queue_size} containers/hold"
         )
 
     def create_agents(self, personas_dir: Path):
@@ -391,13 +429,17 @@ class Orchestrator:
             if not persona_path.exists():
                 raise FileNotFoundError(f"Persona file not found: {persona_path}")
 
+            # Determine hold_id for this agent
+            hold_num = spec.hold_num if spec.hold_num is not None else self.config.hold_nums[0]
+            hold_id = self._hold_id_for(hold_num)
+
             # Per-agent BridgeAPI (duck-types MCP ClientSession)
             bridge = BridgeAPI(
                 store=self.store,
                 node_id=spec.node_id,
                 role=spec.role,
-                hold_id=self.config.hold_id,
-                proficiency=spec.proficiency,
+                hold_id=hold_id,
+                hold_num=hold_num,
             )
 
             # Per-agent LLM provider
@@ -405,7 +447,6 @@ class Orchestrator:
             if spec.model:
                 provider_kwargs["model"] = spec.model
             provider_kwargs["role"] = spec.role
-            provider_kwargs["proficiency"] = spec.proficiency
             llm = create_provider(spec.provider, **provider_kwargs)
 
             agent = AgentLoop(
@@ -424,18 +465,14 @@ class Orchestrator:
 
     async def run(self) -> dict[str, list[CycleMetrics]]:
         """Run all agents concurrently and collect metrics."""
-        # Log proficiency distribution
-        prof_dist: dict[str, int] = {}
-        for s in self.config.agents:
-            prof_dist[s.proficiency] = prof_dist.get(s.proficiency, 0) + 1
-        prof_summary = ", ".join(f"{k}={v}" for k, v in sorted(prof_dist.items()))
-
+        phase = "Phase 2 (Multi-Hold)" if self.config.num_holds > 1 else "Phase 1c"
+        holds_str = ", ".join(self._hold_id_for(h) for h in self.config.hold_nums)
         logger.info(
             f"\n{'='*60}\n"
-            f"  HIVE Port Operations — Phase 1b (15-Node Hold Team)\n"
-            f"  Agents: {', '.join(s.node_id for s in self.config.agents)}\n"
-            f"  Proficiency: {prof_summary}\n"
-            f"  Queue: {self.config.queue_size} containers "
+            f"  HIVE Port Operations — {phase}\n"
+            f"  Holds: {self.config.num_holds} [{holds_str}]\n"
+            f"  Agents: {len(self.config.agents)} total\n"
+            f"  Queue: {self.config.queue_size} containers/hold "
             f"({self.config.hazmat_count} hazmat)\n"
             f"  Max cycles: {self.config.max_cycles}\n"
             f"  Time compression: {self.config.time_compression}x\n"
@@ -478,12 +515,10 @@ class Orchestrator:
 
     def _print_summary(self, all_metrics: dict[str, list[CycleMetrics]]):
         """Print final multi-agent summary."""
+        phase = "PHASE 2 MULTI-HOLD" if self.config.num_holds > 1 else "MULTI-AGENT"
         print("\n" + "=" * 60, flush=True)
-        print("  PHASE 1b MULTI-AGENT SUMMARY", flush=True)
+        print(f"  {phase} SUMMARY", flush=True)
         print("=" * 60, flush=True)
-
-        # Build node_id → proficiency map for display
-        prof_map = {s.node_id: s.proficiency for s in self.config.agents}
 
         # Per-agent summary
         for node_id, metrics in all_metrics.items():
@@ -491,44 +526,44 @@ class Orchestrator:
             waits = sum(1 for m in metrics if m.action == "wait")
             successes = sum(1 for m in metrics if m.success)
             failures = sum(1 for m in metrics if not m.success)
-            prof_label = prof_map.get(node_id, "?")
             print(
-                f"\n  {node_id} [{prof_label}]: {len(metrics)} cycles, "
+                f"\n  {node_id}: {len(metrics)} cycles, "
                 f"{actions} actions, {waits} waits, "
                 f"{successes} ok, {failures} fail",
                 flush=True,
             )
-            # Action breakdown
             action_counts: dict[str, int] = {}
             for m in metrics:
                 action_counts[m.action] = action_counts.get(m.action, 0) + 1
             for action, count in sorted(action_counts.items()):
                 print(f"    {action}: {count}", flush=True)
 
-        # Team state from HIVE
+        # Per-hold team state from HIVE
         if self.store:
-            team_doc = self.store.get_document(
-                "team_summaries", f"team_{self.config.hold_id}"
-            )
-            if team_doc:
-                print(f"\n  TEAM STATE ({self.config.hold_id}):", flush=True)
-                print(f"    moves_completed: {team_doc.get_field('moves_completed', 0)}", flush=True)
-                print(f"    moves_remaining: {team_doc.get_field('moves_remaining', 0)}", flush=True)
-                print(f"    moves_per_hour:  {team_doc.get_field('moves_per_hour', 0)}", flush=True)
-                print(f"    status:          {team_doc.get_field('status', '?')}", flush=True)
-                print(f"    gaps:            {len(team_doc.get_field('gap_analysis', []))}", flush=True)
+            for hold_num in self.config.hold_nums:
+                hold_id = self._hold_id_for(hold_num)
+                team_doc = self.store.get_document(
+                    "team_summaries", f"team_{hold_id}"
+                )
+                if team_doc:
+                    print(f"\n  HOLD STATE ({hold_id}):", flush=True)
+                    print(f"    moves_completed: {team_doc.get_field('moves_completed', 0)}", flush=True)
+                    print(f"    moves_remaining: {team_doc.get_field('moves_remaining', 0)}", flush=True)
+                    print(f"    moves_per_hour:  {team_doc.get_field('moves_per_hour', 0)}", flush=True)
+                    print(f"    status:          {team_doc.get_field('status', '?')}", flush=True)
+                    print(f"    gaps:            {len(team_doc.get_field('gap_analysis', []))}", flush=True)
 
-            # Per-crane entity metrics
-            for spec in self.config.agents:
-                if spec.role == "crane":
-                    entity = self.store.get_document("node_states", f"sim_doc_{spec.node_id}")
-                    if entity:
-                        print(
-                            f"    {spec.node_id}: "
-                            f"moves={entity.get_field('metrics.moves_completed', 0)}, "
-                            f"tons={entity.get_field('metrics.total_tons_lifted', 0.0):.1f}t",
-                            flush=True,
-                        )
+                # Per-crane entity metrics for this hold
+                for spec in self.config.agents:
+                    if spec.role == "crane" and (spec.hold_num == hold_num or (spec.hold_num is None and hold_num == self.config.hold_nums[0])):
+                        entity = self.store.get_document("node_states", f"sim_doc_{spec.node_id}")
+                        if entity:
+                            print(
+                                f"    {spec.node_id}: "
+                                f"moves={entity.get_field('metrics.moves_completed', 0)}, "
+                                f"tons={entity.get_field('metrics.total_tons_lifted', 0.0):.1f}t",
+                                flush=True,
+                            )
 
             # Event log summary
             events = self.store.get_events()
@@ -547,7 +582,6 @@ class Orchestrator:
             for es, count in sorted(event_sources.items()):
                 print(f"    {es}: {count}", flush=True)
 
-            # Contention check: count contention retries (claims beaten by another crane)
             contention_retries = sum(
                 1 for m_list in all_metrics.values()
                 for m in m_list

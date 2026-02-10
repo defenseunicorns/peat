@@ -5,6 +5,7 @@
 #   make install         # one-time setup
 #   make phase0          # single crane agent → relay → viewer
 #   make phase1a         # multi-agent (2 cranes + aggregator)
+#   make phase2-dry      # 3 hold teams + berth mgr + scheduler (53 agents, dry-run)
 #
 # Individual components:
 #   make sim-phase0      # just the Python sim (stdout)
@@ -102,16 +103,16 @@ phase1a-dry: $(RELAY_BIN)  ## Phase 1a with dry-run provider (no API key needed)
 	@$(MAKE) phase1a PROVIDER=dry-run
 
 .PHONY: phase1b
-phase1b: $(RELAY_BIN)  ## Phase 1b: 15-node hold team → relay → viewer
-	@echo "=== HIVE Port Ops — Phase 1b (15-Node Hold Team) ==="
+phase1b: $(RELAY_BIN)  ## Phase 1b: 17-node hold team → relay → viewer
+	@echo "=== HIVE Port Ops — Phase 1b (17-Node Hold Team) ==="
 	@echo "  Viewer:  http://localhost:5173"
 	@echo "  Relay:   ws://localhost:9090/ws"
-	@echo "  Agents:  2c5w4t1s1a2x (15 total)"
+	@echo "  Agents:  2c5w2l1g4t1s1a2x (17 total)"
 	@echo ""
 	cd $(VIEWER_UI) && npm run dev &
 	python -m port_agent.main \
 		--mode multi \
-		--agents 2c5w4t1s1a2x \
+		--agents 2c5w2l1g4t1s1a2x \
 		--provider $(PROVIDER) \
 		--max-cycles $(MAX_CYCLES) \
 		--time-compression $(TIME_COMPRESSION) \
@@ -122,16 +123,16 @@ phase1b-dry: $(RELAY_BIN)  ## Phase 1b with dry-run provider (no API key needed)
 	@$(MAKE) phase1b PROVIDER=dry-run
 
 .PHONY: phase1c
-phase1c: $(RELAY_BIN)  ## Phase 1c: 16-node hold team + berth manager → relay → viewer
-	@echo "=== HIVE Port Ops — Phase 1c (16-Node Hold Team + Berth Manager) ==="
+phase1c: $(RELAY_BIN)  ## Phase 1c: 19-node hold team + berth manager → relay → viewer
+	@echo "=== HIVE Port Ops — Phase 1c (19-Node Hold Team + Berth Manager) ==="
 	@echo "  Viewer:  http://localhost:5173"
 	@echo "  Relay:   ws://localhost:9090/ws"
-	@echo "  Agents:  2c5w4t1s1a1b2x (16 total)"
+	@echo "  Agents:  2c5w2l1g4t1s1a1b2x (19 total)"
 	@echo ""
 	cd $(VIEWER_UI) && npm run dev &
 	python -m port_agent.main \
 		--mode multi \
-		--agents 2c5w4t1s1a1b2x \
+		--agents 2c5w2l1g4t1s1a1b2x \
 		--provider $(PROVIDER) \
 		--max-cycles $(MAX_CYCLES) \
 		--time-compression $(TIME_COMPRESSION) \
@@ -146,13 +147,13 @@ scenario: $(RELAY_BIN)  ## Full MV Ever Forward scenario (60 cycles, dry-run)
 	@echo "=== HIVE Port Ops — MV Ever Forward Scenario ==="
 	@echo "  Viewer:  http://localhost:5173"
 	@echo "  Relay:   ws://localhost:9090/ws"
-	@echo "  Agents:  2c5w4t1s1a2x (15 total)"
+	@echo "  Agents:  2c5w2l1g4t1s1a2x (17 total)"
 	@echo "  Cycles:  60 (full ADR-030 sequence)"
 	@echo ""
 	cd $(VIEWER_UI) && npm run dev &
 	python -m port_agent.main \
 		--mode multi \
-		--agents 2c5w4t1s1a2x \
+		--agents 2c5w2l1g4t1s1a2x \
 		--provider dry-run \
 		--max-cycles 60 \
 		--time-compression $(TIME_COMPRESSION) \
@@ -161,29 +162,27 @@ scenario: $(RELAY_BIN)  ## Full MV Ever Forward scenario (60 cycles, dry-run)
 .PHONY: record-scenario
 record-scenario:  ## Record full scenario to JSONL for replay
 	@mkdir -p recordings
-	python -m port_agent.main --mode multi --agents 2c5w4t1s1a2x \
+	python -m port_agent.main --mode multi --agents 2c5w2l1g4t1s1a2x \
 		--provider dry-run --max-cycles 60 \
 		--time-compression $(TIME_COMPRESSION) \
 		2>/dev/null > recordings/scenario-$$(date +%Y%m%d-%H%M%S).jsonl
 	@echo "Recording saved to recordings/"
 
 .PHONY: phase2
-phase2: $(RELAY_BIN)  ## Phase 2: lifecycle integration (degradation + logistics + gaps)
-	@echo "=== HIVE Port Ops — Phase 2 ==="
-	@echo "  Viewer:  http://localhost:3001"
+phase2: $(RELAY_BIN)  ## Phase 2: 3 hold teams + berth manager + scheduler (53 agents)
+	@echo "=== HIVE Port Ops — Phase 2 (3 Hold Teams + Berth Manager + Scheduler) ==="
+	@echo "  Viewer:  http://localhost:5173"
 	@echo "  Relay:   ws://localhost:9090/ws"
-	@echo "  (Relay stays alive after sim ends — Ctrl-C to stop)"
+	@echo "  Agents:  3h(2c5w2l1g4t1a2x)1b1s (53 total)"
 	@echo ""
 	cd $(VIEWER_UI) && npm run dev &
-	@# tail -f /dev/null keeps the pipe open so relay survives after sim exits
-	(python -m port_agent.main \
+	python -m port_agent.main \
 		--mode multi \
-		--agents 2c1a \
+		--agents '3h(2c5w2l1g4t1a2x)1b1s' \
 		--provider $(PROVIDER) \
 		--max-cycles $(MAX_CYCLES) \
 		--time-compression $(TIME_COMPRESSION) \
-	  2>/dev/null; echo "--- sim complete, relay holding ---" >&2; tail -f /dev/null) \
-	  | $(RELAY_BIN) --ingest stdin --listen $(LISTEN)
+	  2>/dev/null | $(RELAY_BIN) --ingest stdin --listen $(LISTEN)
 
 .PHONY: phase2-dry
 phase2-dry: $(RELAY_BIN)  ## Phase 2 with dry-run provider (no API key needed)
@@ -193,10 +192,20 @@ phase2-dry: $(RELAY_BIN)  ## Phase 2 with dry-run provider (no API key needed)
 #  Recording (for offline replay in viewer)
 # --------------------------------------------------------------------------
 
+.PHONY: record-phase2
+record-phase2:  ## Record Phase 2 (3 hold teams) dry-run to JSONL for replay
+	@mkdir -p recordings
+	python -m port_agent.main --mode multi \
+		--agents '3h(2c5w2l1g4t1a2x)1b1s' \
+		--provider dry-run --max-cycles $(MAX_CYCLES) \
+		--time-compression $(TIME_COMPRESSION) \
+		2>/dev/null > recordings/phase2-$$(date +%Y%m%d-%H%M%S).jsonl
+	@echo "Recording saved to recordings/"
+
 .PHONY: record-phase1b
 record-phase1b:  ## Record Phase 1b dry-run to JSONL for replay
 	@mkdir -p recordings
-	python -m port_agent.main --mode multi --agents 2c5w4t1s1a2x \
+	python -m port_agent.main --mode multi --agents 2c5w2l1g4t1s1a2x \
 		--provider dry-run --max-cycles $(MAX_CYCLES) \
 		--time-compression $(TIME_COMPRESSION) \
 		2>/dev/null > recordings/phase1b-$$(date +%Y%m%d-%H%M%S).jsonl

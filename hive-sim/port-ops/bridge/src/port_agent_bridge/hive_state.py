@@ -514,6 +514,40 @@ def create_lashing_crew_entity(store: HiveStateStore, node_id: str, config: dict
     )
 
 
+def create_signaler_entity(store: HiveStateStore, node_id: str, config: dict) -> HiveDocument:
+    """Initialize a signaler entity document in the HIVE state store."""
+    return store.create_document(
+        collection="node_states",
+        doc_id=f"sim_doc_{node_id}",
+        fields={
+            "node_id": node_id,
+            "entity_type": "signaler",
+            "hive_level": "H1",
+            "operational_status": "OPERATIONAL",
+            "capabilities": {
+                "visual_signaling": {
+                    "type": "VISUAL_SIGNALING",
+                    "status": "READY",
+                },
+            },
+            "equipment_health": {
+                "visibility": "GOOD",
+                "line_of_sight": True,
+            },
+            "assignment": {
+                "berth": config.get("berth", "berth-5"),
+                "hold": config.get("hold", 3),
+            },
+            "metrics": {
+                "signals_sent": 0,
+                "hazards_reported": 0,
+                "ground_clears": 0,
+                "session_start_us": int(time.time() * 1_000_000),
+            },
+        },
+    )
+
+
 def create_transport_queue(store: HiveStateStore, hold_id: str) -> HiveDocument:
     """Initialize the transport queue for tractors (containers needing yard transport)."""
     return store.create_document(

@@ -507,59 +507,6 @@ BERTH_MANAGER_TOOLS = [
     ),
 ]
 
-# ── Yard Block tool definitions ────────────────────────────────────────────
-
-YARD_BLOCK_TOOLS = [
-    ToolShim(
-        name="accept_container",
-        description=(
-            "Accept an incoming container from a tractor delivery. "
-            "Registers the container in this yard block."
-        ),
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "container_id": {
-                    "type": "string",
-                    "description": "Container ID being delivered (e.g., MSCU-4472891)",
-                },
-                "source_tractor": {
-                    "type": "string",
-                    "description": "Tractor ID delivering the container (e.g., tractor-1)",
-                },
-            },
-            "required": ["container_id", "source_tractor"],
-        },
-    ),
-    ToolShim(
-        name="assign_slot",
-        description=(
-            "Assign a storage slot (row, bay, tier) to the most recently "
-            "accepted container."
-        ),
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "row": {"type": "integer", "description": "Row number (1-based)"},
-                "bay": {"type": "integer", "description": "Bay number (1-based)"},
-                "tier": {"type": "integer", "description": "Tier/stack level (1-based)"},
-            },
-            "required": ["row", "bay", "tier"],
-        },
-    ),
-    ToolShim(
-        name="report_capacity",
-        description=(
-            "Report current yard block capacity and fill level. "
-            "Emits a capacity status event. Alerts when fill exceeds 85%%."
-        ),
-        inputSchema={
-            "type": "object",
-            "properties": {},
-        },
-    ),
-]
-
 # ── Sensor tool definitions ────────────────────────────────────────────────
 
 SENSOR_TOOLS = [
@@ -685,17 +632,68 @@ LASHING_CREW_TOOLS = [
 ]
 
 
+# ── Signaler tool definitions ────────────────────────────────────────────────
+
+SIGNALER_TOOLS = [
+    ToolShim(
+        name="signal_crane",
+        description=(
+            "Send a visual signal to the crane operator. "
+            "Used to authorize or halt crane movements during lift/lower cycles."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "signal_type": {
+                    "type": "string",
+                    "enum": ["HOIST", "LOWER", "STOP", "CLEAR"],
+                    "description": "The type of signal to send",
+                },
+                "crane_id": {
+                    "type": "string",
+                    "description": "Identifier of the target crane",
+                },
+            },
+            "required": ["signal_type", "crane_id"],
+        },
+    ),
+    ToolShim(
+        name="report_hazard",
+        description=(
+            "Report a hazard observed in the operational zone. "
+            "Triggers immediate halt of crane operations in the affected area."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "hazard_type": {
+                    "type": "string",
+                    "enum": ["personnel", "obstruction", "equipment", "weather", "other"],
+                    "description": "Category of the observed hazard",
+                },
+                "location": {
+                    "type": "string",
+                    "description": "Location description relative to the crane and load",
+                },
+            },
+            "required": ["hazard_type", "location"],
+        },
+    ),
+    ToolShim(
+        name="confirm_ground_clear",
+        description=(
+            "Confirm that the ground zone beneath the crane is clear of "
+            "personnel and obstructions. Required before any lift/lower operation."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {},
+        },
+    ),
+]
+
+
 # ── BridgeAPI ────────────────────────────────────────────────────────────────
-
-# ── Proficiency modifiers for tool execution ─────────────────────────────────
-# Maps proficiency → multiplier on base execution time for physical actions
-PROFICIENCY_EXEC_MODIFIERS: dict[str, float] = {
-    "expert":            1.0,
-    "competent":         1.18,
-    "advanced_beginner": 1.43,
-    "novice":            1.82,
-}
-
 
 class BridgeAPI:
     """
@@ -711,14 +709,13 @@ class BridgeAPI:
         node_id: str,
         role: str = "crane",
         hold_id: str = "hold-3",
-        proficiency: str = "competent",
+        hold_num: int | None = None,
     ):
         self.store = store
         self.node_id = node_id
         self.role = role
         self.hold_id = hold_id
-        self.proficiency = proficiency
-        self._exec_modifier = PROFICIENCY_EXEC_MODIFIERS.get(proficiency, 1.0)
+        self.hold_num = hold_num
         self._entity_doc_id = f"sim_doc_{node_id}"
 
     # ── Internal helpers ─────────────────────────────────────────────────
@@ -793,8 +790,6 @@ class BridgeAPI:
                 text = self._read_aggregator_tasking()
             elif self.role == "berth_manager":
                 text = self._read_berth_manager_tasking()
-            elif self.role == "yard_block":
-                text = self._read_yard_block_tasking()
             elif self.role == "operator":
                 text = self._read_operator_tasking()
             elif self.role == "tractor":
@@ -805,6 +800,8 @@ class BridgeAPI:
                 text = self._read_sensor_tasking()
             elif self.role == "lashing_crew":
                 text = self._read_lashing_crew_tasking()
+            elif self.role == "signaler":
+                text = self._read_signaler_tasking()
             else:
                 text = self._read_crane_tasking()
 
@@ -832,7 +829,6 @@ class BridgeAPI:
                 if queue else 0
             ),
             "target_rate": 35,
-            "proficiency": self.proficiency,
             "priority": "NORMAL",
         }
         return json.dumps(tasking, indent=2, default=str)
@@ -840,10 +836,16 @@ class BridgeAPI:
     def _read_aggregator_tasking(self) -> str:
         team = self._get_team_doc()
         queue = self._get_queue_doc()
+        # Aggregator only sees entities scoped to its own hold
+        hold_members = {}
+        if team:
+            for mid, mdata in team.fields.get("team_members", {}).items():
+                hold_members[mid] = mdata
         tasking = {
             "directive": "AGGREGATE_HOLD_STATUS",
             "hold_id": self.hold_id,
-            "team_size": len(team.fields.get("team_members", {})) if team else 0,
+            "hold_num": self.hold_num,
+            "team_size": len(hold_members),
             "moves_completed": team.fields.get("moves_completed", 0) if team else 0,
             "moves_remaining": team.fields.get("moves_remaining", 0) if team else 0,
             "gap_count": len(team.fields.get("gap_analysis", [])) if team else 0,
@@ -862,7 +864,6 @@ class BridgeAPI:
             "status": status,
             "assigned_to": assigned_to,
             "pending_requests": [r.fields.get("crane_id") for r in requests],
-            "proficiency": self.proficiency,
             "instructions": (
                 "Check in as AVAILABLE at shift start. Accept crane assignments when "
                 "pending. Complete assignment after crane move finishes. Report hazmat "
@@ -937,6 +938,32 @@ class BridgeAPI:
         }
         return json.dumps(tasking, indent=2, default=str)
 
+    def _read_signaler_tasking(self) -> str:
+        entity = self._get_entity_doc()
+        # Check crane states in the hold to determine active operations
+        team = self._get_team_doc()
+        crane_state = "idle"
+        assigned_crane = "crane-1"
+        if team:
+            members = team.fields.get("team_members", {})
+            for mid, mdata in members.items():
+                if mdata.get("entity_type") == "gantry_crane":
+                    assigned_crane = mid
+                    if mdata.get("status") == "OPERATIONAL":
+                        crane_state = "LIFTING"
+                    break
+        tasking = {
+            "directive": "SIGNAL_OPERATIONS",
+            "crane_state": crane_state,
+            "assigned_crane": assigned_crane,
+            "ground_clear": True,
+            "personnel_in_zone": 0,
+            "active_hazards": [],
+            "signals_sent": entity.get_field("metrics.signals_sent", 0) if entity else 0,
+            "hazards_reported": entity.get_field("metrics.hazards_reported", 0) if entity else 0,
+        }
+        return json.dumps(tasking, indent=2, default=str)
+
     def _read_berth_manager_tasking(self) -> str:
         # Aggregate all hold docs from team_summaries into berth-level context
         hold_summaries = []
@@ -967,41 +994,12 @@ class BridgeAPI:
         }
         return json.dumps(tasking, indent=2, default=str)
 
-    def _read_yard_block_tasking(self) -> str:
-        entity = self._get_entity_doc()
-        capacity = entity.fields.get("capacity", {}) if entity else {}
-        total_slots = capacity.get("total_slots", 300)
-        current_fill = entity.fields.get("current_fill", 0) if entity else 0
-        # Check transport queue for incoming containers destined for this block
-        block_id = entity.fields.get("block_id", "YB-A") if entity else "YB-A"
-        tq = self.store.get_document("transport_queues", f"transport_{self.hold_id}")
-        incoming = []
-        if tq:
-            for job in tq.fields.get("pending_jobs", []):
-                if job.get("status") == "COMPLETED" and job.get("destination_block", "").startswith(block_id[:4]):
-                    incoming.append({
-                        "container_id": job.get("container_id"),
-                        "source_tractor": job.get("claimed_by", "tractor-1"),
-                    })
-        tasking = {
-            "directive": "MANAGE_YARD_BLOCK",
-            "block_id": block_id,
-            "total_slots": total_slots,
-            "current_fill": current_fill,
-            "fill_pct": round(current_fill / total_slots * 100, 1) if total_slots else 0,
-            "incoming_containers": incoming[:3],
-            "priority": "NORMAL",
-        }
-        return json.dumps(tasking, indent=2, default=str)
-
     async def list_tools(self) -> ListToolsResultShim:
         """Return tools appropriate for this agent's role."""
         if self.role == "aggregator":
             return ListToolsResultShim(tools=list(AGGREGATOR_TOOLS))
         elif self.role == "berth_manager":
             return ListToolsResultShim(tools=list(BERTH_MANAGER_TOOLS))
-        elif self.role == "yard_block":
-            return ListToolsResultShim(tools=list(YARD_BLOCK_TOOLS))
         elif self.role == "operator":
             return ListToolsResultShim(tools=list(OPERATOR_TOOLS))
         elif self.role == "tractor":
@@ -1012,6 +1010,8 @@ class BridgeAPI:
             return ListToolsResultShim(tools=list(SENSOR_TOOLS))
         elif self.role == "lashing_crew":
             return ListToolsResultShim(tools=list(LASHING_CREW_TOOLS))
+        elif self.role == "signaler":
+            return ListToolsResultShim(tools=list(SIGNALER_TOOLS))
         return ListToolsResultShim(tools=list(CRANE_TOOLS))
 
     async def call_tool(self, name: str, arguments: dict) -> CallToolResultShim:
@@ -1043,10 +1043,6 @@ class BridgeAPI:
             "update_priority_queue": self._tool_update_priority_queue,
             "dispatch_resource": self._tool_dispatch_resource,
             "emit_schedule_event": self._tool_emit_schedule_event,
-            # Yard block tools
-            "accept_container": self._tool_accept_container,
-            "assign_slot": self._tool_assign_slot,
-            "report_capacity": self._tool_report_capacity,
             # Sensor tools
             "emit_reading": self._tool_emit_reading,
             "report_calibration": self._tool_report_calibration,
@@ -1055,6 +1051,10 @@ class BridgeAPI:
             "report_lashing_complete": self._tool_report_lashing_complete,
             "inspect_lashing": self._tool_inspect_lashing,
             "request_lashing_tools": self._tool_request_lashing_tools,
+            # Signaler tools
+            "signal_crane": self._tool_signal_crane,
+            "report_hazard": self._tool_report_hazard,
+            "confirm_ground_clear": self._tool_confirm_ground_clear,
         }.get(name)
 
         if handler is None:
@@ -1156,14 +1156,12 @@ class BridgeAPI:
         total_tons = entity.get_field("metrics.total_tons_lifted", 0.0)
         entity.update_field("metrics.total_tons_lifted", total_tons + weight)
 
-        # Emit event with proficiency context
+        # Emit event
         self.store.emit_event({
             "event_type": "container_move_complete",
             "source": self.node_id,
             "container_id": container_id,
             "weight_tons": weight,
-            "proficiency": self.proficiency,
-            "exec_time_modifier": self._exec_modifier,
             "aggregation_policy": "AGGREGATE_AT_PARENT",
             "priority": "NORMAL",
         })
@@ -1584,8 +1582,6 @@ class BridgeAPI:
             "source": self.node_id,
             "container_id": container_id,
             "destination": destination,
-            "proficiency": self.proficiency,
-            "exec_time_modifier": self._exec_modifier,
             "aggregation_policy": "AGGREGATE_AT_PARENT",
             "priority": "NORMAL",
         })
@@ -1737,123 +1733,6 @@ class BridgeAPI:
             f"METRICS: schedule_event node={self.node_id} type={event_type} priority={priority}"
         )
         return f"Schedule event emitted: {event_type} ({priority})."
-
-    # ── Yard Block tool handlers ──────────────────────────────────────────
-
-    async def _tool_accept_container(self, arguments: dict) -> str:
-        container_id = arguments["container_id"]
-        source_tractor = arguments["source_tractor"]
-
-        entity = self._get_entity_doc()
-        if not entity:
-            return "Error: entity document not found"
-
-        current_fill = entity.get_field("current_fill", 0)
-        total_slots = entity.get_field("capacity.total_slots", 300)
-        if current_fill >= total_slots:
-            return f"Error: block is full ({current_fill}/{total_slots} slots occupied)"
-
-        # Register container
-        containers = entity.fields.get("containers", {})
-        containers[container_id] = {"source_tractor": source_tractor, "slot": None}
-        entity.update_field("containers", containers)
-
-        accepted = entity.get_field("metrics.containers_accepted", 0)
-        entity.update_field("metrics.containers_accepted", accepted + 1)
-
-        self.store.emit_event({
-            "event_type": "container_accepted",
-            "source": self.node_id,
-            "container_id": container_id,
-            "source_tractor": source_tractor,
-            "aggregation_policy": "AGGREGATE_AT_PARENT",
-            "priority": "NORMAL",
-        })
-
-        logger.info(
-            f"METRICS: container_accepted node={self.node_id} "
-            f"container={container_id} from={source_tractor}"
-        )
-        return f"Container {container_id} accepted from {source_tractor}."
-
-    async def _tool_assign_slot(self, arguments: dict) -> str:
-        row = arguments["row"]
-        bay = arguments["bay"]
-        tier = arguments["tier"]
-
-        entity = self._get_entity_doc()
-        if not entity:
-            return "Error: entity document not found"
-
-        slot_key = f"R{row}-B{bay}-T{tier}"
-
-        # Find the most recently accepted container without a slot
-        containers = entity.fields.get("containers", {})
-        unslotted = [cid for cid, data in containers.items() if data.get("slot") is None]
-        if not unslotted:
-            return "Error: no unslotted containers to assign"
-
-        container_id = unslotted[0]
-        containers[container_id]["slot"] = slot_key
-        entity.update_field("containers", containers)
-
-        current_fill = entity.get_field("current_fill", 0)
-        entity.update_field("current_fill", current_fill + 1)
-
-        assigned = entity.get_field("metrics.slots_assigned", 0)
-        entity.update_field("metrics.slots_assigned", assigned + 1)
-
-        self.store.emit_event({
-            "event_type": "slot_assigned",
-            "source": self.node_id,
-            "container_id": container_id,
-            "slot": slot_key,
-            "aggregation_policy": "AGGREGATE_AT_PARENT",
-            "priority": "NORMAL",
-        })
-
-        logger.info(
-            f"METRICS: slot_assigned node={self.node_id} "
-            f"container={container_id} slot={slot_key}"
-        )
-        return f"Container {container_id} assigned to slot {slot_key}."
-
-    async def _tool_report_capacity(self, arguments: dict) -> str:
-        entity = self._get_entity_doc()
-        if not entity:
-            return "Error: entity document not found"
-
-        current_fill = entity.get_field("current_fill", 0)
-        total_slots = entity.get_field("capacity.total_slots", 300)
-        fill_pct = round(current_fill / total_slots * 100, 1) if total_slots else 0
-        block_id = entity.get_field("block_id", "YB-A")
-
-        reports = entity.get_field("metrics.capacity_reports", 0)
-        entity.update_field("metrics.capacity_reports", reports + 1)
-
-        priority = "HIGH" if fill_pct > 85 else "NORMAL"
-
-        self.store.emit_event({
-            "event_type": "yard_block_capacity",
-            "source": self.node_id,
-            "block_id": block_id,
-            "current_fill": current_fill,
-            "total_slots": total_slots,
-            "fill_pct": fill_pct,
-            "aggregation_policy": "AGGREGATE_AT_PARENT",
-            "priority": priority,
-        })
-
-        logger.info(
-            f"METRICS: yard_block_capacity node={self.node_id} "
-            f"fill={current_fill}/{total_slots} ({fill_pct}%)"
-        )
-
-        alert = " ALERT: Block near full!" if fill_pct > 85 else ""
-        return (
-            f"Capacity report: {block_id} — {current_fill}/{total_slots} "
-            f"({fill_pct}% full).{alert}"
-        )
 
     # ── Sensor tool handlers ─────────────────────────────────────────────
 
@@ -2026,3 +1905,70 @@ class BridgeAPI:
 
         logger.info(f"METRICS: lashing_tools_requested node={self.node_id}")
         return "Lashing tools requested. Replacement equipment en route."
+
+    # ── Signaler tool handlers ─────────────────────────────────────────
+
+    async def _tool_signal_crane(self, arguments: dict) -> str:
+        signal_type = arguments["signal_type"]
+        crane_id = arguments["crane_id"]
+
+        entity = self._get_entity_doc()
+        if entity:
+            signals = entity.get_field("metrics.signals_sent", 0)
+            entity.update_field("metrics.signals_sent", signals + 1)
+
+        priority = "CRITICAL" if signal_type == "STOP" else "NORMAL"
+        self.store.emit_event({
+            "event_type": "crane_signal",
+            "source": self.node_id,
+            "signal_type": signal_type,
+            "crane_id": crane_id,
+            "aggregation_policy": "IMMEDIATE_PROPAGATE" if signal_type == "STOP" else "AGGREGATE_AT_PARENT",
+            "priority": priority,
+        })
+
+        logger.info(
+            f"METRICS: crane_signal node={self.node_id} "
+            f"signal={signal_type} crane={crane_id}"
+        )
+        return f"Signal {signal_type} sent to {crane_id}."
+
+    async def _tool_report_hazard(self, arguments: dict) -> str:
+        hazard_type = arguments["hazard_type"]
+        location = arguments["location"]
+
+        entity = self._get_entity_doc()
+        if entity:
+            hazards = entity.get_field("metrics.hazards_reported", 0)
+            entity.update_field("metrics.hazards_reported", hazards + 1)
+
+        self.store.emit_event({
+            "event_type": "hazard_reported",
+            "source": self.node_id,
+            "hazard_type": hazard_type,
+            "location": location,
+            "aggregation_policy": "IMMEDIATE_PROPAGATE",
+            "priority": "CRITICAL",
+        })
+
+        logger.info(
+            f"METRICS: hazard_reported node={self.node_id} "
+            f"type={hazard_type} location={location}"
+        )
+        return f"Hazard reported: {hazard_type} at {location}. All crane ops halted."
+
+    async def _tool_confirm_ground_clear(self, arguments: dict) -> str:
+        entity = self._get_entity_doc()
+        if entity:
+            clears = entity.get_field("metrics.ground_clears", 0)
+            entity.update_field("metrics.ground_clears", clears + 1)
+
+        self.store.emit_event({
+            "event_type": "ground_clear_confirmed",
+            "source": self.node_id,
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL",
+        })
+
+        logger.info(f"METRICS: ground_clear node={self.node_id}")
+        return "Ground zone confirmed clear. Safe to proceed with crane operations."

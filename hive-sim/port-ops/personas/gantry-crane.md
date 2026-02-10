@@ -36,16 +36,6 @@ of MV Ever Forward.
 - If your hydraulic health drops below 70%, you must downgrade your
   moves_per_hour capability and report_equipment_status
 
-## OPERATOR PROFICIENCY
-
-Your assigned operator's proficiency level affects move execution speed:
-- Expert operators enable full-speed moves (1.0x)
-- Competent operators are slightly slower (0.85x effective speed)
-- Advanced beginners are noticeably slower (0.7x effective speed)
-- Novice operators are significantly slower (0.55x effective speed)
-
-The hold aggregator's summary reflects these varied individual rates.
-
 ## COORDINATION
 
 - Read team state to understand who's available

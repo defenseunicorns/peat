@@ -159,20 +159,21 @@ async def run_phase0_inprocess(args):
 
 async def run_phase1a_multi(args):
     """
-    Phase 1a: Run multiple agents with shared in-process HIVE state.
+    Run multiple agents with shared in-process HIVE state.
+    Supports both single-hold (Phase 1c) and multi-hold (Phase 2) compositions.
     """
     from .orchestrator import Orchestrator, OrchestratorConfig, parse_agent_composition
 
     script_dir = Path(__file__).parent.parent.parent.parent  # port-ops/
     personas_dir = script_dir / "personas"
 
-    agent_specs = parse_agent_composition(
+    agent_specs, num_holds, hold_nums = parse_agent_composition(
         args.agents, provider=args.provider, model=args.model
     )
 
     config = OrchestratorConfig(
-        hold_id=f"hold-{args.hold}",
-        hold_num=args.hold,
+        hold_id=f"hold-{hold_nums[0]}",
+        hold_num=hold_nums[0],
         berth=args.berth,
         vessel=args.vessel,
         queue_size=args.queue_size,
@@ -181,6 +182,8 @@ async def run_phase1a_multi(args):
         cycle_delay_sim_minutes=args.cycle_delay,
         time_compression=args.time_compression,
         agents=agent_specs,
+        num_holds=num_holds,
+        hold_nums=hold_nums,
     )
 
     orch = Orchestrator(config)
