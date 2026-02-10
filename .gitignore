@@ -83,3 +83,4 @@ hive-sim/topologies/lab4-ditto-*.yaml
 .claude/
 .beads/
 .logs/
+__pycache__/
