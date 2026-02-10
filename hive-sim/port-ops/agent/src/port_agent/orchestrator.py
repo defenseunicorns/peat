@@ -479,7 +479,6 @@ class Orchestrator:
                     persona="yard-tractor",
                     provider=self.config.agents[0].provider if self.config.agents else "dry-run",
                     model=self.config.agents[0].model if self.config.agents else None,
-                    proficiency="competent",
                 ))
 
             logger.info(

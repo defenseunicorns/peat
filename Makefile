@@ -58,6 +58,11 @@ help:
 	@echo "  android                  - Build and deploy ATAK plugin"
 	@echo "  clean-android            - Clean Android build artifacts"
 	@echo ""
+	@echo "Phase 2 Port Operations Validation:"
+	@echo "  phase2-validate          - Run P2-1 through P2-5 metrics (dry-run, 30 cycles)"
+	@echo "  phase2-validate-long     - Extended run (50 cycles)"
+	@echo "  phase2-validate-replay   - Replay recorded JSONL (FILE=path)"
+	@echo ""
 	@echo "Legacy E-Series Tests (for reference):"
 	@echo "  e11-modes                - Test HIVE modes (legacy)"
 	@echo "  e12-comprehensive        - Full validation suite (legacy)"
@@ -422,6 +427,32 @@ clean-android:
 	@rm -rf atak-plugin/app/libs/armeabi-v7a/libhive_ffi.so
 	@rm -rf atak-plugin/app/build
 	@echo "✓ Android artifacts cleaned"
+
+# ============================================
+# Phase 2 Port Operations Validation
+# ============================================
+
+phase2-validate:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Phase 2 Metrics Validation (ADR-051 P2-1 through P2-5)   ║"
+	@echo "║  53-agent port berth simulation, dry-run, 30 cycles       ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@python3 validation/port/phase2-metrics.py --max-cycles 30
+
+phase2-validate-long:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Phase 2 Metrics Validation (Extended: 50 cycles)         ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@python3 validation/port/phase2-metrics.py --max-cycles 50
+
+phase2-validate-replay:
+	@if [ -z "$(FILE)" ]; then \
+		echo "Usage: make phase2-validate-replay FILE=recordings/phase2-YYYYMMDD-HHMMSS.jsonl"; \
+		exit 1; \
+	fi
+	@python3 validation/port/phase2-metrics.py --replay $(FILE)
 
 # ============================================
 # Legacy E-Series Tests (kept for compatibility)
