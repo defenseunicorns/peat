@@ -68,6 +68,7 @@ _COMPOSITION_MAP: dict[str, tuple[str, str, str]] = {
     "s": ("scheduler",  "ai-scheduler",     "scheduler-1"),
     "a": ("aggregator", "hold-aggregator",  "hold-agg-3"),
     "b": ("berth_manager", "berth-manager", "berth-mgr-{n}"),
+    "y": ("yard_block",   "yard-block",     "yard-blk-{n}"),
     "x": ("sensor",     "sensor",           None),  # special: interleave load-cell / rfid
 }
 
@@ -266,6 +267,45 @@ class Orchestrator:
                         "entity_type": "berth_manager",
                         "status": "OPERATIONAL",
                         "capabilities": ["BERTH_AGGREGATION", "TRACTOR_REBALANCE"],
+                    })
+
+            elif spec.role == "yard_block":
+                # Yard block gets an H2 entity doc with capacity tracking
+                block_num = int(spec.node_id.split("-")[-1]) if spec.node_id.split("-")[-1].isdigit() else 1
+                rows, bays, tiers = 10, 6, 5
+                self.store.create_document(
+                    collection="node_states",
+                    doc_id=f"sim_doc_{spec.node_id}",
+                    fields={
+                        "node_id": spec.node_id,
+                        "entity_type": "yard_block",
+                        "hive_level": "H2",
+                        "operational_status": "OPERATIONAL",
+                        "block_id": f"YB-{chr(64 + block_num)}",
+                        "capacity": {
+                            "rows": rows,
+                            "bays": bays,
+                            "tiers": tiers,
+                            "total_slots": rows * bays * tiers,
+                        },
+                        "current_fill": 0,
+                        "containers": {},
+                        "assignment": {
+                            "berth": self.config.berth,
+                            "vessel": self.config.vessel,
+                        },
+                        "metrics": {
+                            "containers_accepted": 0,
+                            "slots_assigned": 0,
+                            "capacity_reports": 0,
+                        },
+                    },
+                )
+                if team_doc:
+                    team_doc.update_field(f"team_members.{spec.node_id}", {
+                        "entity_type": "yard_block",
+                        "status": "OPERATIONAL",
+                        "capabilities": ["CONTAINER_STORAGE"],
                     })
 
             elif spec.role == "tractor":

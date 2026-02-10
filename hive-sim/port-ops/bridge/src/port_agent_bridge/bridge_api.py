@@ -507,6 +507,59 @@ BERTH_MANAGER_TOOLS = [
     ),
 ]
 
+# ── Yard Block tool definitions ────────────────────────────────────────────
+
+YARD_BLOCK_TOOLS = [
+    ToolShim(
+        name="accept_container",
+        description=(
+            "Accept an incoming container from a tractor delivery. "
+            "Registers the container in this yard block."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "container_id": {
+                    "type": "string",
+                    "description": "Container ID being delivered (e.g., MSCU-4472891)",
+                },
+                "source_tractor": {
+                    "type": "string",
+                    "description": "Tractor ID delivering the container (e.g., tractor-1)",
+                },
+            },
+            "required": ["container_id", "source_tractor"],
+        },
+    ),
+    ToolShim(
+        name="assign_slot",
+        description=(
+            "Assign a storage slot (row, bay, tier) to the most recently "
+            "accepted container."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "row": {"type": "integer", "description": "Row number (1-based)"},
+                "bay": {"type": "integer", "description": "Bay number (1-based)"},
+                "tier": {"type": "integer", "description": "Tier/stack level (1-based)"},
+            },
+            "required": ["row", "bay", "tier"],
+        },
+    ),
+    ToolShim(
+        name="report_capacity",
+        description=(
+            "Report current yard block capacity and fill level. "
+            "Emits a capacity status event. Alerts when fill exceeds 85%%."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {},
+        },
+    ),
+]
+
 # ── Sensor tool definitions ────────────────────────────────────────────────
 
 SENSOR_TOOLS = [
@@ -663,6 +716,8 @@ class BridgeAPI:
                 text = self._read_aggregator_tasking()
             elif self.role == "berth_manager":
                 text = self._read_berth_manager_tasking()
+            elif self.role == "yard_block":
+                text = self._read_yard_block_tasking()
             elif self.role == "operator":
                 text = self._read_operator_tasking()
             elif self.role == "tractor":
@@ -813,12 +868,41 @@ class BridgeAPI:
         }
         return json.dumps(tasking, indent=2, default=str)
 
+    def _read_yard_block_tasking(self) -> str:
+        entity = self._get_entity_doc()
+        capacity = entity.fields.get("capacity", {}) if entity else {}
+        total_slots = capacity.get("total_slots", 300)
+        current_fill = entity.fields.get("current_fill", 0) if entity else 0
+        # Check transport queue for incoming containers destined for this block
+        block_id = entity.fields.get("block_id", "YB-A") if entity else "YB-A"
+        tq = self.store.get_document("transport_queues", f"transport_{self.hold_id}")
+        incoming = []
+        if tq:
+            for job in tq.fields.get("pending_jobs", []):
+                if job.get("status") == "COMPLETED" and job.get("destination_block", "").startswith(block_id[:4]):
+                    incoming.append({
+                        "container_id": job.get("container_id"),
+                        "source_tractor": job.get("claimed_by", "tractor-1"),
+                    })
+        tasking = {
+            "directive": "MANAGE_YARD_BLOCK",
+            "block_id": block_id,
+            "total_slots": total_slots,
+            "current_fill": current_fill,
+            "fill_pct": round(current_fill / total_slots * 100, 1) if total_slots else 0,
+            "incoming_containers": incoming[:3],
+            "priority": "NORMAL",
+        }
+        return json.dumps(tasking, indent=2, default=str)
+
     async def list_tools(self) -> ListToolsResultShim:
         """Return tools appropriate for this agent's role."""
         if self.role == "aggregator":
             return ListToolsResultShim(tools=list(AGGREGATOR_TOOLS))
         elif self.role == "berth_manager":
             return ListToolsResultShim(tools=list(BERTH_MANAGER_TOOLS))
+        elif self.role == "yard_block":
+            return ListToolsResultShim(tools=list(YARD_BLOCK_TOOLS))
         elif self.role == "operator":
             return ListToolsResultShim(tools=list(OPERATOR_TOOLS))
         elif self.role == "tractor":
@@ -858,6 +942,10 @@ class BridgeAPI:
             "update_priority_queue": self._tool_update_priority_queue,
             "dispatch_resource": self._tool_dispatch_resource,
             "emit_schedule_event": self._tool_emit_schedule_event,
+            # Yard block tools
+            "accept_container": self._tool_accept_container,
+            "assign_slot": self._tool_assign_slot,
+            "report_capacity": self._tool_report_capacity,
             # Sensor tools
             "emit_reading": self._tool_emit_reading,
             "report_calibration": self._tool_report_calibration,
@@ -1543,6 +1631,123 @@ class BridgeAPI:
             f"METRICS: schedule_event node={self.node_id} type={event_type} priority={priority}"
         )
         return f"Schedule event emitted: {event_type} ({priority})."
+
+    # ── Yard Block tool handlers ──────────────────────────────────────────
+
+    async def _tool_accept_container(self, arguments: dict) -> str:
+        container_id = arguments["container_id"]
+        source_tractor = arguments["source_tractor"]
+
+        entity = self._get_entity_doc()
+        if not entity:
+            return "Error: entity document not found"
+
+        current_fill = entity.get_field("current_fill", 0)
+        total_slots = entity.get_field("capacity.total_slots", 300)
+        if current_fill >= total_slots:
+            return f"Error: block is full ({current_fill}/{total_slots} slots occupied)"
+
+        # Register container
+        containers = entity.fields.get("containers", {})
+        containers[container_id] = {"source_tractor": source_tractor, "slot": None}
+        entity.update_field("containers", containers)
+
+        accepted = entity.get_field("metrics.containers_accepted", 0)
+        entity.update_field("metrics.containers_accepted", accepted + 1)
+
+        self.store.emit_event({
+            "event_type": "container_accepted",
+            "source": self.node_id,
+            "container_id": container_id,
+            "source_tractor": source_tractor,
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL",
+        })
+
+        logger.info(
+            f"METRICS: container_accepted node={self.node_id} "
+            f"container={container_id} from={source_tractor}"
+        )
+        return f"Container {container_id} accepted from {source_tractor}."
+
+    async def _tool_assign_slot(self, arguments: dict) -> str:
+        row = arguments["row"]
+        bay = arguments["bay"]
+        tier = arguments["tier"]
+
+        entity = self._get_entity_doc()
+        if not entity:
+            return "Error: entity document not found"
+
+        slot_key = f"R{row}-B{bay}-T{tier}"
+
+        # Find the most recently accepted container without a slot
+        containers = entity.fields.get("containers", {})
+        unslotted = [cid for cid, data in containers.items() if data.get("slot") is None]
+        if not unslotted:
+            return "Error: no unslotted containers to assign"
+
+        container_id = unslotted[0]
+        containers[container_id]["slot"] = slot_key
+        entity.update_field("containers", containers)
+
+        current_fill = entity.get_field("current_fill", 0)
+        entity.update_field("current_fill", current_fill + 1)
+
+        assigned = entity.get_field("metrics.slots_assigned", 0)
+        entity.update_field("metrics.slots_assigned", assigned + 1)
+
+        self.store.emit_event({
+            "event_type": "slot_assigned",
+            "source": self.node_id,
+            "container_id": container_id,
+            "slot": slot_key,
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL",
+        })
+
+        logger.info(
+            f"METRICS: slot_assigned node={self.node_id} "
+            f"container={container_id} slot={slot_key}"
+        )
+        return f"Container {container_id} assigned to slot {slot_key}."
+
+    async def _tool_report_capacity(self, arguments: dict) -> str:
+        entity = self._get_entity_doc()
+        if not entity:
+            return "Error: entity document not found"
+
+        current_fill = entity.get_field("current_fill", 0)
+        total_slots = entity.get_field("capacity.total_slots", 300)
+        fill_pct = round(current_fill / total_slots * 100, 1) if total_slots else 0
+        block_id = entity.get_field("block_id", "YB-A")
+
+        reports = entity.get_field("metrics.capacity_reports", 0)
+        entity.update_field("metrics.capacity_reports", reports + 1)
+
+        priority = "HIGH" if fill_pct > 85 else "NORMAL"
+
+        self.store.emit_event({
+            "event_type": "yard_block_capacity",
+            "source": self.node_id,
+            "block_id": block_id,
+            "current_fill": current_fill,
+            "total_slots": total_slots,
+            "fill_pct": fill_pct,
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": priority,
+        })
+
+        logger.info(
+            f"METRICS: yard_block_capacity node={self.node_id} "
+            f"fill={current_fill}/{total_slots} ({fill_pct}%)"
+        )
+
+        alert = " ALERT: Block near full!" if fill_pct > 85 else ""
+        return (
+            f"Capacity report: {block_id} — {current_fill}/{total_slots} "
+            f"({fill_pct}% full).{alert}"
+        )
 
     # ── Sensor tool handlers ─────────────────────────────────────────────
 

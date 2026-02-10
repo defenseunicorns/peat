@@ -284,6 +284,8 @@ class DryRunProvider(LLMProvider):
             return self._decide_aggregator(observed_state)
         elif self._role == "berth_manager":
             return self._decide_berth_manager(observed_state)
+        elif self._role == "yard_block":
+            return self._decide_yard_block(observed_state)
         elif self._role == "operator":
             return self._decide_operator(observed_state)
         elif self._role == "tractor":
@@ -651,6 +653,59 @@ class DryRunProvider(LLMProvider):
             action="wait",
             arguments={"reason": "Monitoring — no summary due, no cross-hold gaps"},
             reasoning=f"DryRun cycle {self._cycle}: berth manager idle, waiting for data",
+        )
+
+    def _decide_yard_block(self, observed_state: dict) -> AgentDecision:
+        tasking = observed_state.get("tasking", {})
+        incoming = tasking.get("incoming_containers", [])
+        current_fill = tasking.get("current_fill", 0)
+        total_slots = tasking.get("total_slots", 300)
+        fill_pct = (current_fill / total_slots * 100) if total_slots > 0 else 0
+
+        # Accept incoming container from tractor
+        if incoming:
+            container = incoming[0]
+            return AgentDecision(
+                action="accept_container",
+                arguments={
+                    "container_id": container.get("container_id", "UNKNOWN"),
+                    "source_tractor": container.get("source_tractor", "tractor-1"),
+                },
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: accepting container "
+                    f"{container.get('container_id')} from {container.get('source_tractor')}"
+                ),
+            )
+
+        # After accepting, assign a slot
+        if self._cycle % 2 == 0 and current_fill > 0:
+            row = (current_fill % 10) + 1
+            bay = ((current_fill // 10) % 6) + 1
+            tier = ((current_fill // 60) % 5) + 1
+            return AgentDecision(
+                action="assign_slot",
+                arguments={"row": row, "bay": bay, "tier": tier},
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: assigning slot "
+                    f"R{row}-B{bay}-T{tier} (fill={current_fill})"
+                ),
+            )
+
+        # Every 5 cycles: report capacity
+        if self._cycle % 5 == 0:
+            return AgentDecision(
+                action="report_capacity",
+                arguments={},
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: capacity report — "
+                    f"{current_fill}/{total_slots} ({fill_pct:.0f}%)"
+                ),
+            )
+
+        return AgentDecision(
+            action="wait",
+            arguments={"reason": "No incoming containers — waiting for tractor deliveries"},
+            reasoning=f"DryRun cycle {self._cycle}: yard block idle, no incoming",
         )
 
     def _decide_aggregator(self, observed_state: dict) -> AgentDecision:

@@ -522,8 +522,9 @@ _ROLE_CONFIGS: dict[str, dict] = {
         "cert_hours": None,
         "physical_actions": {"emit_reading", "report_calibration"},
     },
-    # scheduler/aggregator/berth_manager: no lifecycle
+    # scheduler/aggregator/berth_manager/yard_block: no lifecycle — virtual nodes
     "berth_manager": {"subsystems": None, "resources": None, "cert_hours": None, "physical_actions": set()},
+    "yard_block": {"subsystems": None, "resources": None, "cert_hours": None, "physical_actions": set()},
 }
 
 
@@ -574,7 +575,7 @@ class LifecycleManager:
         Returns list of event dicts (each has event_type, source, priority, details).
         """
         # Roles without lifecycle: return nothing
-        if self.role in ("scheduler", "aggregator", "berth_manager") and not self.degradation and not self.certs:
+        if self.role in ("scheduler", "aggregator", "berth_manager", "yard_block") and not self.degradation and not self.certs:
             return []
 
         events: list[dict] = []
