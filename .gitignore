@@ -34,6 +34,10 @@ CLAUDE.md
 # Testing
 coverage/
 
+# Python
+__pycache__/
+*.pyc
+
 # Logs
 *.log
 

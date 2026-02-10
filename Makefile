@@ -1,4 +1,4 @@
-.PHONY: help clean clean-ditto build test test-unit test-integration test-e2e test-fast fmt clippy check pre-commit ci
+.PHONY: help clean clean-ditto build test test-unit test-integration test-e2e test-fast fmt clippy check pre-commit ci inspect-viewer inspect-lifecycle inspect-lifecycle-json phase3-validate
 
 # ============================================
 # HIVE Protocol Development Makefile
@@ -25,6 +25,7 @@ help:
 	@echo "Quick Validation:"
 	@echo "  validate              - Quick validation (Traditional 24-node) ⭐ Start here!"
 	@echo "  validate-event-driven - Validate event-driven hierarchical (24-node, 60s)"
+	@echo "  phase3-validate       - Phase 3 port-domain metrics (P3-1 through P3-4)"
 	@echo ""
 	@echo "Architecture Comparison (O(n²) vs O(n log n)):"
 	@echo "  baseline-client-server    - Traditional hub-spoke (all node counts)"
@@ -233,6 +234,24 @@ clean-labs:
 
 validate:
 	@$(MAKE) -C hive-sim validate
+
+# Phase 3 validation: Port-domain metrics (P3-1 through P3-4)
+# Usage: make phase3-validate LOG_DIR=<path-to-logs> [SCALE=24]
+phase3-validate:
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Phase 3 Validation — Port Domain Metrics                 ║"
+	@echo "║  P3-1: TOC convergence < 30s                              ║"
+	@echo "║  P3-2: O(n log n) scaling                                 ║"
+	@echo "║  P3-3: E2E latency (sensor → TOC) < 10s                  ║"
+	@echo "║  P3-4: Berth isolation (concurrent ship ops)              ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@if [ -z "$(LOG_DIR)" ]; then \
+		echo "Error: LOG_DIR parameter required"; \
+		echo "Usage: make phase3-validate LOG_DIR=/data/logs [SCALE=24]"; \
+		exit 1; \
+	fi
+	@python3 validation/port/phase3-metrics.py $(LOG_DIR) --scale $(or $(SCALE),24)
 
 # ============================================
 # Architecture Comparison (O(n²) vs O(n))
