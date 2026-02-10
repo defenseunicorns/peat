@@ -1,0 +1,26 @@
+# HIVE Relay Server — lightweight container for ContainerLab
+#
+# Build context should be the rig root (hive/refinery/rig/) so we can
+# access the Rust workspace. Or: pre-build and COPY the binary.
+#
+# Quick build (from hive-sim/port-ops/):
+#   docker build -f docker/Dockerfile.relay \
+#     --build-arg RELAY_BIN=../../target/release/hive-viewer \
+#     -t hive-relay:latest ../..
+
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates iproute2 iputils-ping \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG RELAY_BIN=target/release/hive-viewer
+COPY ${RELAY_BIN} /usr/local/bin/hive-viewer
+RUN chmod +x /usr/local/bin/hive-viewer
+
+ENV INGEST="tcp://0.0.0.0:9100"
+ENV LISTEN="0.0.0.0:9090"
+
+EXPOSE 9090 9100
+
+ENTRYPOINT ["sh", "-c", "exec hive-viewer --ingest ${INGEST} --listen ${LISTEN}"]

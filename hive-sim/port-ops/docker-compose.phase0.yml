@@ -1,0 +1,48 @@
+# Phase 0: Single crane agent — proves the agent-MCP-HIVE loop
+#
+# Usage:
+#   # With Claude API:
+#   ANTHROPIC_API_KEY=sk-... docker compose -f docker-compose.phase0.yml up
+#
+#   # With local Ollama:
+#   docker compose -f docker-compose.phase0.yml --profile ollama up
+
+services:
+  # The crane agent with in-process MCP bridge
+  crane-1:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    environment:
+      NODE_ID: crane-1
+      PERSONA: gantry-crane
+      LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
+      LLM_MODEL: ${LLM_MODEL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434/v1}
+      MAX_CYCLES: ${MAX_CYCLES:-20}
+      TIME_COMPRESSION: ${TIME_COMPRESSION:-60}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      METRICS_FILE: /data/metrics/crane-1.json
+    volumes:
+      - metrics:/data/metrics
+
+  # Optional: Local Ollama for SLM inference
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ollama"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  metrics:
+  ollama-models:

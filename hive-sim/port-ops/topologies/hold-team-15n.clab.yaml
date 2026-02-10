@@ -1,0 +1,73 @@
+# HIVE Port Operations — Hold Team Topology (15 nodes)
+#
+# ADR-030 Phase 1: Single hold operation on MV Ever Forward.
+# Parallel to Army 12-node squad validation.
+#
+# Nodes: 2 cranes, 5 operators, 4 tractors, 1 scheduler,
+#        1 aggregator, 2 sensors = 15 total
+#
+# The orchestrator node runs all 15 agents in-process with shared
+# HiveStateStore. The relay node serves the viewer WebSocket.
+# ContainerLab provides network impairments between them.
+#
+# Usage:
+#   cd hive-sim/port-ops
+#   make clab-deploy    # deploy topology
+#   make clab-destroy   # tear down
+#
+# Viewer: http://localhost:5173 (run `make viewer` separately)
+# Relay:  ws://localhost:9090/ws
+
+name: hive-port-hold-team
+
+mgmt:
+  network: hive-port-ops
+  ipv4-subnet: 172.30.10.0/24
+
+topology:
+  nodes:
+    # ── Orchestrator ────────────────────────────────────────────
+    # Runs all 15 port-ops agents in a single Python process.
+    # Emits OODA cycle + spatial events to stdout, piped to relay.
+    orchestrator:
+      kind: linux
+      image: hive-port-ops:latest
+      env:
+        NODE_ID: orchestrator
+        MODE: multi
+        AGENTS: 2c5w4t1s1a2x
+        LLM_PROVIDER: dry-run
+        MAX_CYCLES: "60"
+        TIME_COMPRESSION: "600"
+        LOG_LEVEL: INFO
+        # Pipe stdout to relay via TCP
+        RELAY_HOST: clab-hive-port-hold-team-relay
+        RELAY_PORT: "9100"
+      exec:
+        - sleep 5  # wait for relay to start
+      publish:
+        - tcp/9200  # metrics endpoint (future)
+
+    # ── Relay Server ────────────────────────────────────────────
+    # Rust relay: ingests events via TCP, serves WebSocket to viewer.
+    relay:
+      kind: linux
+      image: hive-relay:latest
+      env:
+        INGEST: "tcp://0.0.0.0:9100"
+        LISTEN: "0.0.0.0:9090"
+      ports:
+        - "9090:9090"  # WebSocket for viewer
+      publish:
+        - tcp/9100  # TCP ingest from orchestrator
+        - tcp/9090  # WebSocket for viewer
+
+  links:
+    # Orchestrator → Relay: simulated industrial backbone
+    # (fiber between control room and server room)
+    - endpoints: ["orchestrator:eth1", "relay:eth1"]
+      impairments:
+        delay: 5ms
+        jitter: 2ms
+        loss: 0.1%
+        rate: 100mbps
