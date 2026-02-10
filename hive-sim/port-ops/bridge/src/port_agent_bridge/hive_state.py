@@ -481,6 +481,39 @@ def create_sensor_entity(store: HiveStateStore, node_id: str, config: dict) -> H
     )
 
 
+def create_lashing_crew_entity(store: HiveStateStore, node_id: str, config: dict) -> HiveDocument:
+    """Initialize a lashing crew entity document in the HIVE state store."""
+    return store.create_document(
+        collection="node_states",
+        doc_id=f"sim_doc_{node_id}",
+        fields={
+            "node_id": node_id,
+            "entity_type": "lashing_crew",
+            "hive_level": "H1",
+            "operational_status": "OPERATIONAL",
+            "capabilities": {
+                "container_securing": {
+                    "type": "CONTAINER_SECURING",
+                    "status": "READY",
+                },
+            },
+            "equipment_health": {
+                "safety_harness_status": "NORMAL",
+                "lashing_tools_status": "NORMAL",
+            },
+            "assignment": {
+                "berth": config.get("berth", "berth-5"),
+                "hold": config.get("hold", 3),
+            },
+            "metrics": {
+                "containers_secured": 0,
+                "lashings_inspected": 0,
+                "session_start_us": int(time.time() * 1_000_000),
+            },
+        },
+    )
+
+
 def create_transport_queue(store: HiveStateStore, hold_id: str) -> HiveDocument:
     """Initialize the transport queue for tractors (containers needing yard transport)."""
     return store.create_document(

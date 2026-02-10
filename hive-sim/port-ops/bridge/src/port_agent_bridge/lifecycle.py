@@ -522,6 +522,12 @@ _ROLE_CONFIGS: dict[str, dict] = {
         "cert_hours": None,
         "physical_actions": {"emit_reading", "report_calibration"},
     },
+    "lashing_crew": {
+        "subsystems": {"safety_harness": 0.010, "lashing_tools": 0.020},
+        "resources": None,
+        "cert_hours": None,
+        "physical_actions": {"secure_container", "inspect_lashing"},
+    },
     # scheduler/aggregator/berth_manager/yard_block: no lifecycle — virtual nodes
     "berth_manager": {"subsystems": None, "resources": None, "cert_hours": None, "physical_actions": set()},
     "yard_block": {"subsystems": None, "resources": None, "cert_hours": None, "physical_actions": set()},

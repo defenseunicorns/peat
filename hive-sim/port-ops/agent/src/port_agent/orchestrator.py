@@ -70,6 +70,7 @@ _COMPOSITION_MAP: dict[str, tuple[str, str, str]] = {
     "b": ("berth_manager", "berth-manager", "berth-mgr-{n}"),
     "y": ("yard_block",   "yard-block",     "yard-blk-{n}"),
     "x": ("sensor",     "sensor",           None),  # special: interleave load-cell / rfid
+    "l": ("lashing_crew", "lashing-crew",   "lasher-{n}"),
 }
 
 # Sensor node IDs cycle through these types
@@ -160,6 +161,7 @@ class Orchestrator:
             create_tractor_entity,
             create_scheduler_entity,
             create_sensor_entity,
+            create_lashing_crew_entity,
             create_container_queue,
             create_transport_queue,
             create_team_state,
@@ -350,6 +352,19 @@ class Orchestrator:
                         "entity_type": "sensor",
                         "status": "OPERATIONAL",
                         "capabilities": [sensor_type],
+                    })
+
+            elif spec.role == "lashing_crew":
+                lashing_config = {
+                    "hold": self.config.hold_num,
+                    "berth": self.config.berth,
+                }
+                create_lashing_crew_entity(self.store, spec.node_id, lashing_config)
+                if team_doc:
+                    team_doc.update_field(f"team_members.{spec.node_id}", {
+                        "entity_type": "lashing_crew",
+                        "status": "OPERATIONAL",
+                        "capabilities": ["CONTAINER_SECURING"],
                     })
 
         # Create transport queue (for tractors to claim discharged containers)

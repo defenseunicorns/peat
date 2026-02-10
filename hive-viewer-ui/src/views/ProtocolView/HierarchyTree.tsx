@@ -13,6 +13,7 @@ const ROLE_COLORS: Record<string, { active: string; idle: string }> = {
   scheduler: { active: '#a78bfa', idle: '#581c87' },   // purple
   sensor: { active: '#3b82f6', idle: '#1e3a5f' },      // blue
   yard_block: { active: '#fb923c', idle: '#7c2d12' },  // orange
+  lashing_crew: { active: '#ef4444', idle: '#7f1d1d' }, // red
   unknown: { active: '#9ca3af', idle: '#374151' },      // gray
 };
 
@@ -24,6 +25,7 @@ const HIVE_LEVELS: Record<string, { label: string; y: number }> = {
   crane: { label: 'H1 — Entity', y: 170 },
   operator: { label: 'H1 — Operator', y: 170 },
   tractor: { label: 'H1 — Tractor', y: 170 },
+  lashing_crew: { label: 'H1 — Lashing', y: 170 },
   sensor: { label: 'H0 — Sensor', y: 250 },
   unknown: { label: '?', y: 290 },
 };
@@ -59,6 +61,10 @@ function actionLabel(action: string): string {
     accept_container: 'ACCEPT',
     assign_slot: 'ASSIGN',
     report_capacity: 'CAPACITY',
+    secure_container: 'SECURE',
+    report_lashing_complete: 'COMPLETE',
+    inspect_lashing: 'INSPECT',
+    request_lashing_tools: 'TOOLS',
     wait: 'IDLE',
   };
   return labels[action] ?? action.toUpperCase();
@@ -84,6 +90,7 @@ export default function HierarchyTree() {
   const cranes = nodeList.filter((n) => n.role === 'crane');
   const operators = nodeList.filter((n) => n.role === 'operator');
   const tractors = nodeList.filter((n) => n.role === 'tractor');
+  const lashingCrew = nodeList.filter((n) => n.role === 'lashing_crew');
   const sensorNodes = nodeList.filter((n) => n.role === 'sensor');
   const others = nodeList.filter((n) => n.role === 'unknown');
 
@@ -100,7 +107,7 @@ export default function HierarchyTree() {
   const berthMgrPositions = xPositions(berthManagers, HIVE_LEVELS.berth_manager.y);
   const h2Nodes = [...aggregators, ...yardBlocks];
   const aggPositions = xPositions(h2Nodes, HIVE_LEVELS.aggregator.y);
-  const h1Nodes = [...cranes, ...operators, ...tractors];
+  const h1Nodes = [...cranes, ...operators, ...tractors, ...lashingCrew];
   const h1Positions = xPositions(h1Nodes, HIVE_LEVELS.crane.y);
   const sensorPositions = xPositions(sensorNodes, HIVE_LEVELS.sensor.y);
   const otherPositions = xPositions(others, HIVE_LEVELS.unknown?.y ?? 290);

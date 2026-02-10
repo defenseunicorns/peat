@@ -100,7 +100,7 @@ export interface NodeState {
   act_ms: number;
   total_ms?: number;
   /** Role inferred from node_id pattern. */
-  role: 'crane' | 'aggregator' | 'operator' | 'tractor' | 'scheduler' | 'sensor' | 'berth_manager' | 'yard_block' | 'unknown';
+  role: 'crane' | 'aggregator' | 'operator' | 'tractor' | 'scheduler' | 'sensor' | 'berth_manager' | 'yard_block' | 'lashing_crew' | 'unknown';
   /** All cycles received for this node. */
   history: OodaCycleData[];
   /** Lifecycle state from degradation/resource/gap events. */
@@ -119,7 +119,7 @@ export interface OodaCycleData {
   total_ms?: number;
 }
 
-export function inferRole(nodeId: string): 'crane' | 'aggregator' | 'operator' | 'tractor' | 'scheduler' | 'sensor' | 'berth_manager' | 'yard_block' | 'unknown' {
+export function inferRole(nodeId: string): 'crane' | 'aggregator' | 'operator' | 'tractor' | 'scheduler' | 'sensor' | 'berth_manager' | 'yard_block' | 'lashing_crew' | 'unknown' {
   if (nodeId.startsWith('crane')) return 'crane';
   if (nodeId.startsWith('op-')) return 'operator';
   if (nodeId.startsWith('tractor-')) return 'tractor';
@@ -127,6 +127,7 @@ export function inferRole(nodeId: string): 'crane' | 'aggregator' | 'operator' |
   if (nodeId.startsWith('load-cell-') || nodeId.startsWith('rfid-')) return 'sensor';
   if (nodeId.startsWith('berth-mgr')) return 'berth_manager';
   if (nodeId.startsWith('yard-blk')) return 'yard_block';
+  if (nodeId.startsWith('lasher-')) return 'lashing_crew';
   if (nodeId.includes('agg')) return 'aggregator';
   return 'unknown';
 }

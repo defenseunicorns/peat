@@ -294,6 +294,8 @@ class DryRunProvider(LLMProvider):
             return self._decide_scheduler(observed_state)
         elif self._role == "sensor":
             return self._decide_sensor(observed_state)
+        elif self._role == "lashing_crew":
+            return self._decide_lashing_crew(observed_state)
         return self._decide_crane(observed_state)
 
     def _decide_crane(self, observed_state: dict) -> AgentDecision:
@@ -706,6 +708,61 @@ class DryRunProvider(LLMProvider):
             action="wait",
             arguments={"reason": "No incoming containers — waiting for tractor deliveries"},
             reasoning=f"DryRun cycle {self._cycle}: yard block idle, no incoming",
+        )
+
+    def _decide_lashing_crew(self, observed_state: dict) -> AgentDecision:
+        tasking = observed_state.get("tasking", {})
+        containers_secured = tasking.get("containers_secured", 0)
+        pending_containers = tasking.get("pending_containers", [])
+
+        # Every 6th cycle: inspect existing lashings
+        if self._cycle % 6 == 0:
+            return AgentDecision(
+                action="inspect_lashing",
+                arguments={
+                    "container_id": f"MSCU-{4472891 + (containers_secured % 20)}",
+                    "result": "PASS",
+                },
+                reasoning=f"DryRun cycle {self._cycle}: periodic lashing inspection",
+            )
+
+        # Every 10th cycle: request lashing tools
+        if self._cycle % 10 == 0:
+            return AgentDecision(
+                action="request_lashing_tools",
+                arguments={},
+                reasoning=f"DryRun cycle {self._cycle}: requesting fresh lashing tools",
+            )
+
+        # Primary: secure container from pending queue (crane completions)
+        if pending_containers:
+            container = pending_containers[0]
+            cid = container.get("container_id", "UNKNOWN")
+            return AgentDecision(
+                action="secure_container",
+                arguments={
+                    "container_id": cid,
+                    "lashing_type": "twist_lock",
+                },
+                reasoning=f"DryRun cycle {self._cycle}: securing container {cid}",
+            )
+
+        # Simulate securing a container every other cycle
+        if self._cycle % 2 == 0:
+            cid = f"MSCU-{4472891 + (self._cycle % 20)}"
+            return AgentDecision(
+                action="secure_container",
+                arguments={
+                    "container_id": cid,
+                    "lashing_type": "lashing_rod",
+                },
+                reasoning=f"DryRun cycle {self._cycle}: securing container {cid}",
+            )
+
+        return AgentDecision(
+            action="wait",
+            arguments={"reason": "Waiting for crane clear signal"},
+            reasoning=f"DryRun cycle {self._cycle}: lashing crew idle, awaiting crane completion",
         )
 
     def _decide_aggregator(self, observed_state: dict) -> AgentDecision:

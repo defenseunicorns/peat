@@ -607,6 +607,83 @@ SENSOR_TOOLS = [
     ),
 ]
 
+# ── Lashing Crew tool definitions ────────────────────────────────────────────
+
+LASHING_CREW_TOOLS = [
+    ToolShim(
+        name="secure_container",
+        description=(
+            "Secure a container after crane placement using twist-locks or lashing rods. "
+            "Only call after receiving crane clear signal for this container."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "container_id": {
+                    "type": "string",
+                    "description": "Container ID to secure (e.g., MSCU-4472891)",
+                },
+                "lashing_type": {
+                    "type": "string",
+                    "enum": ["twist_lock", "lashing_rod"],
+                    "description": "Type of securing method",
+                },
+            },
+            "required": ["container_id", "lashing_type"],
+        },
+    ),
+    ToolShim(
+        name="report_lashing_complete",
+        description=(
+            "Report that a container has been fully secured and lashing is complete. "
+            "Emits a lashing_complete event so the next operation can proceed."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "container_id": {
+                    "type": "string",
+                    "description": "Container ID that was secured",
+                },
+            },
+            "required": ["container_id"],
+        },
+    ),
+    ToolShim(
+        name="inspect_lashing",
+        description=(
+            "Inspect existing lashings on a container for integrity. "
+            "Reports PASS, DEGRADED, or FAIL."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "container_id": {
+                    "type": "string",
+                    "description": "Container ID to inspect",
+                },
+                "result": {
+                    "type": "string",
+                    "enum": ["PASS", "DEGRADED", "FAIL"],
+                    "description": "Inspection result",
+                },
+            },
+            "required": ["container_id", "result"],
+        },
+    ),
+    ToolShim(
+        name="request_lashing_tools",
+        description=(
+            "Request replacement lashing tools (twist-lock keys, lashing rods, turnbuckles). "
+            "Use when tools are worn or damaged."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {},
+        },
+    ),
+]
+
 
 # ── BridgeAPI ────────────────────────────────────────────────────────────────
 
@@ -726,6 +803,8 @@ class BridgeAPI:
                 text = self._read_scheduler_tasking()
             elif self.role == "sensor":
                 text = self._read_sensor_tasking()
+            elif self.role == "lashing_crew":
+                text = self._read_lashing_crew_tasking()
             else:
                 text = self._read_crane_tasking()
 
@@ -838,6 +917,26 @@ class BridgeAPI:
         }
         return json.dumps(tasking, indent=2, default=str)
 
+    def _read_lashing_crew_tasking(self) -> str:
+        entity = self._get_entity_doc()
+        # Find containers recently discharged by cranes (available for lashing)
+        events = self.store.get_events()
+        pending_containers = []
+        for evt in events:
+            if evt.get("event_type") == "container_move_complete":
+                pending_containers.append({
+                    "container_id": evt.get("container_id"),
+                    "crane_id": evt.get("source"),
+                })
+        tasking = {
+            "directive": "SECURE_CONTAINERS",
+            "containers_secured": entity.get_field("metrics.containers_secured", 0) if entity else 0,
+            "lashings_inspected": entity.get_field("metrics.lashings_inspected", 0) if entity else 0,
+            "equipment_health": entity.fields.get("equipment_health", {}) if entity else {},
+            "pending_containers": pending_containers[-5:],
+        }
+        return json.dumps(tasking, indent=2, default=str)
+
     def _read_berth_manager_tasking(self) -> str:
         # Aggregate all hold docs from team_summaries into berth-level context
         hold_summaries = []
@@ -911,6 +1010,8 @@ class BridgeAPI:
             return ListToolsResultShim(tools=list(SCHEDULER_TOOLS))
         elif self.role == "sensor":
             return ListToolsResultShim(tools=list(SENSOR_TOOLS))
+        elif self.role == "lashing_crew":
+            return ListToolsResultShim(tools=list(LASHING_CREW_TOOLS))
         return ListToolsResultShim(tools=list(CRANE_TOOLS))
 
     async def call_tool(self, name: str, arguments: dict) -> CallToolResultShim:
@@ -949,6 +1050,11 @@ class BridgeAPI:
             # Sensor tools
             "emit_reading": self._tool_emit_reading,
             "report_calibration": self._tool_report_calibration,
+            # Lashing crew tools
+            "secure_container": self._tool_secure_container,
+            "report_lashing_complete": self._tool_report_lashing_complete,
+            "inspect_lashing": self._tool_inspect_lashing,
+            "request_lashing_tools": self._tool_request_lashing_tools,
         }.get(name)
 
         if handler is None:
@@ -1826,3 +1932,97 @@ class BridgeAPI:
             f"accuracy={accuracy_pct}% drift={drift} status={status}"
         )
         return f"Calibration reported: {accuracy_pct}% accuracy, drift={drift}, status={status}."
+
+    # ── Lashing Crew tool handlers ──────────────────────────────────────
+
+    async def _tool_secure_container(self, arguments: dict) -> str:
+        container_id = arguments["container_id"]
+        lashing_type = arguments["lashing_type"]
+
+        entity = self._get_entity_doc()
+        if entity:
+            secured = entity.get_field("metrics.containers_secured", 0)
+            entity.update_field("metrics.containers_secured", secured + 1)
+
+        self.store.emit_event({
+            "event_type": "container_secured",
+            "source": self.node_id,
+            "container_id": container_id,
+            "lashing_type": lashing_type,
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL",
+        })
+
+        logger.info(
+            f"METRICS: container_secured node={self.node_id} "
+            f"container={container_id} type={lashing_type}"
+        )
+        return (
+            f"Container {container_id} secured with {lashing_type}. "
+            f"Total secured: {(entity.get_field('metrics.containers_secured', 0) if entity else 0)}."
+        )
+
+    async def _tool_report_lashing_complete(self, arguments: dict) -> str:
+        container_id = arguments["container_id"]
+
+        self.store.emit_event({
+            "event_type": "lashing_complete",
+            "source": self.node_id,
+            "container_id": container_id,
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL",
+        })
+
+        logger.info(
+            f"METRICS: lashing_complete node={self.node_id} container={container_id}"
+        )
+        return f"Lashing complete for container {container_id}. Ready for next operation."
+
+    async def _tool_inspect_lashing(self, arguments: dict) -> str:
+        container_id = arguments["container_id"]
+        result = arguments["result"]
+
+        entity = self._get_entity_doc()
+        if entity:
+            inspections = entity.get_field("metrics.lashings_inspected", 0)
+            entity.update_field("metrics.lashings_inspected", inspections + 1)
+
+        priority = "NORMAL"
+        if result == "FAIL":
+            priority = "CRITICAL"
+        elif result == "DEGRADED":
+            priority = "HIGH"
+
+        self.store.emit_event({
+            "event_type": "lashing_inspection",
+            "source": self.node_id,
+            "container_id": container_id,
+            "result": result,
+            "aggregation_policy": "IMMEDIATE_PROPAGATE" if result != "PASS" else "AGGREGATE_AT_PARENT",
+            "priority": priority,
+        })
+
+        logger.info(
+            f"METRICS: lashing_inspection node={self.node_id} "
+            f"container={container_id} result={result}"
+        )
+        return f"Lashing inspection for {container_id}: {result}."
+
+    async def _tool_request_lashing_tools(self, arguments: dict) -> str:
+        entity = self._get_entity_doc()
+        if entity:
+            entity.update_field("equipment_health.lashing_tools_status", "REQUESTED")
+
+        self.store.emit_event({
+            "event_type": "RESUPPLY_REQUESTED",
+            "source": self.node_id,
+            "priority": "HIGH",
+            "details": {
+                "resource": "lashing_tools",
+                "equipment_id": self.node_id,
+                "eta_sim_minutes": 3.0,
+            },
+        })
+
+        logger.info(f"METRICS: lashing_tools_requested node={self.node_id}")
+        return "Lashing tools requested. Replacement equipment en route."
