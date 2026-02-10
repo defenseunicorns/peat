@@ -25,7 +25,7 @@ from mcp import ClientSession
 from mcp.client.stdio import stdio_client, StdioServerParameters
 
 from .dashboard import LiveDashboard, render_post_run_summary
-from .llm import create_provider
+from .llm import create_provider, load_tier_config
 from .loop import AgentLoop, SimulationClock
 
 
@@ -167,6 +167,14 @@ async def run_phase1a_multi(args):
     script_dir = Path(__file__).parent.parent.parent.parent  # port-ops/
     personas_dir = script_dir / "personas"
 
+    # Load tiered LLM config if specified
+    tier_config = None
+    if args.llm_config:
+        tier_config = load_tier_config(args.llm_config)
+        logger.info(f"Loaded tiered LLM config from {args.llm_config}")
+        logger.info(f"  Tiers: {', '.join(tier_config.tiers.keys())}")
+        logger.info(f"  Role mappings: {tier_config.role_mapping}")
+
     agent_specs, num_holds, hold_nums = parse_agent_composition(
         args.agents, provider=args.provider, model=args.model
     )
@@ -184,6 +192,7 @@ async def run_phase1a_multi(args):
         agents=agent_specs,
         num_holds=num_holds,
         hold_nums=hold_nums,
+        tier_config=tier_config,
     )
 
     orch = Orchestrator(config)
@@ -225,6 +234,8 @@ def main():
     parser.add_argument("--metrics-file", default=None, help="Path to write metrics JSON")
     parser.add_argument("--dashboard", action="store_true",
                         help="Enable live terminal dashboard (clears screen each cycle)")
+    parser.add_argument("--llm-config", default=None,
+                        help="Path to tiered LLM config TOML (overrides --provider per role)")
     parser.add_argument("--log-level", default="INFO", help="Logging level")
 
     args = parser.parse_args()

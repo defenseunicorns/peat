@@ -1117,10 +1117,113 @@ class DryRunProvider(LLMProvider):
         )
 
 
+class HybridProvider(LLMProvider):
+    """SLM for routine decisions, escalates to API for complex ones.
+
+    Checks the observed state for escalation keywords (hazmat, certification,
+    safety, emergency). If found, routes to the API provider; otherwise uses
+    the local SLM for low-latency decisions.
+    """
+
+    def __init__(
+        self,
+        slm: LLMProvider,
+        api: LLMProvider,
+        escalation_keywords: list[str] | None = None,
+    ):
+        self.slm = slm
+        self.api = api
+        self.escalation_keywords = [
+            k.lower() for k in (escalation_keywords or [
+                "hazmat", "certification", "safety", "emergency", "incident",
+            ])
+        ]
+        self.slm_calls = 0
+        self.api_calls = 0
+
+    def _needs_escalation(self, observed_state: dict) -> bool:
+        """Check if state contains complexity markers requiring API reasoning."""
+        state_text = json.dumps(observed_state, default=str).lower()
+        return any(kw in state_text for kw in self.escalation_keywords)
+
+    async def decide(self, persona: str, observed_state: dict, available_tools: list[dict]) -> AgentDecision:
+        if self._needs_escalation(observed_state):
+            self.api_calls += 1
+            logger.info("Hybrid: escalating to API (complex decision)")
+            return await self.api.decide(persona, observed_state, available_tools)
+        self.slm_calls += 1
+        return await self.slm.decide(persona, observed_state, available_tools)
+
+
+@dataclass
+class TierConfig:
+    """Parsed tier configuration from TOML."""
+    tiers: dict[str, dict]      # tier_name → provider settings
+    role_mapping: dict[str, str]  # role → tier_name
+
+
+def load_tier_config(config_path: str) -> TierConfig:
+    """Load tiered LLM config from a TOML file."""
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        import tomli as tomllib  # Python < 3.11 fallback
+
+    from pathlib import Path
+    text = Path(config_path).read_bytes()
+    data = tomllib.loads(text.decode())
+
+    tiers = {}
+    for tier_name, tier_data in data.get("tiers", {}).items():
+        tiers[tier_name] = dict(tier_data)
+
+    role_mapping = dict(data.get("roles", {}))
+    return TierConfig(tiers=tiers, role_mapping=role_mapping)
+
+
+def create_provider_from_tier(tier_config: TierConfig, role: str) -> LLMProvider:
+    """Create an LLM provider for a role based on tier configuration."""
+    tier_name = tier_config.role_mapping.get(role)
+    if tier_name is None:
+        logger.warning("No tier mapping for role %r, falling back to dry-run", role)
+        return DryRunProvider(role=role)
+
+    tier = tier_config.tiers.get(tier_name)
+    if tier is None:
+        raise ValueError(f"Tier {tier_name!r} referenced by role {role!r} not defined in config")
+
+    provider_type = tier.get("provider", "dry-run")
+
+    if tier_name == "hybrid" or "escalation_provider" in tier:
+        slm = create_provider(
+            provider_type,
+            role=role,
+            model=tier.get("model"),
+            base_url=tier.get("base_url"),
+        )
+        esc_provider = tier.get("escalation_provider", "anthropic")
+        api = create_provider(
+            esc_provider,
+            role=role,
+            model=tier.get("escalation_model"),
+        )
+        keywords = tier.get("escalation_keywords")
+        return HybridProvider(slm=slm, api=api, escalation_keywords=keywords)
+
+    return create_provider(
+        provider_type,
+        role=role,
+        model=tier.get("model"),
+        base_url=tier.get("base_url"),
+    )
+
+
 def create_provider(provider_type: str = "anthropic", **kwargs) -> LLMProvider:
     """Factory for LLM providers."""
     # DryRunProvider accepts 'role'; other providers don't — pop it for safety
     role = kwargs.pop("role", "crane")
+    # Strip None values so providers use their defaults
+    kwargs = {k: v for k, v in kwargs.items() if v is not None}
     if provider_type == "anthropic":
         return AnthropicProvider(**kwargs)
     elif provider_type in ("ollama", "openai"):

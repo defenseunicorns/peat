@@ -27,6 +27,10 @@ if [ "${MODE}" = "multi" ]; then
         ARGS="${ARGS} --model ${LLM_MODEL}"
     fi
 
+    if [ -n "${LLM_CONFIG}" ]; then
+        ARGS="${ARGS} --llm-config ${LLM_CONFIG}"
+    fi
+
     if [ -n "${RELAY_HOST}" ]; then
         # Pipe stdout to relay via TCP (ContainerLab mode)
         echo "Connecting to relay at ${RELAY_HOST}:${RELAY_PORT:-9100}..."

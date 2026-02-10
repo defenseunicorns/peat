@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .llm import create_provider, LLMProvider
+from .llm import create_provider, create_provider_from_tier, load_tier_config, LLMProvider, TierConfig
 from .loop import AgentLoop, SimulationClock, CycleMetrics
 
 logger = logging.getLogger(__name__)
@@ -57,6 +57,7 @@ class OrchestratorConfig:
     num_holds: int = 1              # 1 = single hold (Phase 1c), 3 = multi-hold (Phase 2)
     hold_nums: list[int] = field(default_factory=lambda: [3])
     shared_tractor_count: int = 8  # Phase 2: berth-level shared tractor pool
+    tier_config: TierConfig | None = None  # Tiered LLM config (overrides per-agent provider)
 
 
 # Letter → (role, persona, node_id_pattern)
@@ -493,6 +494,13 @@ class Orchestrator:
             f"{self.config.num_holds} hold(s) [{holds_str}], "
             f"{self.config.queue_size} containers/hold"
         )
+        if self.config.tier_config:
+            tier_counts: dict[str, int] = {}
+            for spec in self.config.agents:
+                tier = self.config.tier_config.role_mapping.get(spec.role, "unknown")
+                tier_counts[tier] = tier_counts.get(tier, 0) + 1
+            tier_str = ", ".join(f"{t}: {c}" for t, c in sorted(tier_counts.items()))
+            logger.info(f"LLM tiers: {tier_str}")
 
     def create_agents(self, personas_dir: Path):
         """Create AgentLoop instances for each agent spec."""
@@ -517,12 +525,15 @@ class Orchestrator:
                 hold_num=hold_num,
             )
 
-            # Per-agent LLM provider
-            provider_kwargs = {}
-            if spec.model:
-                provider_kwargs["model"] = spec.model
-            provider_kwargs["role"] = spec.role
-            llm = create_provider(spec.provider, **provider_kwargs)
+            # Per-agent LLM provider — tier config overrides per-agent provider
+            if self.config.tier_config:
+                llm = create_provider_from_tier(self.config.tier_config, spec.role)
+            else:
+                provider_kwargs = {}
+                if spec.model:
+                    provider_kwargs["model"] = spec.model
+                provider_kwargs["role"] = spec.role
+                llm = create_provider(spec.provider, **provider_kwargs)
 
             agent = AgentLoop(
                 node_id=spec.node_id,
@@ -594,6 +605,22 @@ class Orchestrator:
         print("\n" + "=" * 60, flush=True)
         print(f"  {phase} SUMMARY", flush=True)
         print("=" * 60, flush=True)
+
+        # LLM tier breakdown
+        if self.config.tier_config:
+            tier_counts: dict[str, list[str]] = {}
+            for spec in self.config.agents:
+                tier = self.config.tier_config.role_mapping.get(spec.role, "unknown")
+                tier_counts.setdefault(tier, []).append(spec.node_id)
+            print("\n  LLM TIERS:", flush=True)
+            for tier, nodes in sorted(tier_counts.items()):
+                desc = self.config.tier_config.tiers.get(tier, {}).get("description", "")
+                print(f"    {tier} ({len(nodes)}): {desc}", flush=True)
+                # API cost tracking: only api and hybrid tiers incur API costs
+                if tier in ("api", "hybrid"):
+                    api_agents = [n for n in nodes if n in all_metrics]
+                    api_cycles = sum(len(all_metrics[n]) for n in api_agents)
+                    print(f"      API-eligible cycles: {api_cycles}", flush=True)
 
         # Per-agent summary
         for node_id, metrics in all_metrics.items():

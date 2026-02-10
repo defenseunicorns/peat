@@ -37,6 +37,7 @@ topology:
         MODE: multi
         AGENTS: 2c5w4t1s1a2x
         LLM_PROVIDER: dry-run
+        LLM_CONFIG: /opt/port-ops/config/llm-tiers.toml
         MAX_CYCLES: "60"
         TIME_COMPRESSION: "600"
         LOG_LEVEL: INFO

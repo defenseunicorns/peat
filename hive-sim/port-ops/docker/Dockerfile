@@ -24,6 +24,7 @@ RUN pip install --no-cache-dir \
 COPY bridge/ bridge/
 COPY agent/ agent/
 COPY personas/ personas/
+COPY config/ config/
 
 # Re-install with source
 RUN pip install --no-cache-dir ./bridge ./agent
@@ -40,5 +41,6 @@ ENV LLM_MODEL=""
 ENV MAX_CYCLES=20
 ENV TIME_COMPRESSION=60
 ENV LOG_LEVEL=INFO
+ENV LLM_CONFIG=""
 
 ENTRYPOINT ["/entrypoint.sh"]

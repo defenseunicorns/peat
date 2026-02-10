@@ -1,0 +1,47 @@
+# LLM Tier Configuration — Addendum A §Technical Implementation (Option C: Tiered)
+#
+# Maps agent roles to LLM tiers with per-tier provider settings.
+# Different agents use different cognitive backends based on their
+# reasoning requirements and cost constraints.
+#
+# Tiers:
+#   rule_based  — deterministic state machines, no LLM calls (H0 sensors)
+#   local_slm   — local small language model via Ollama (H1 equipment)
+#   api         — remote API calls to capable models (H2+ coordination)
+#   hybrid      — SLM for routine, escalates to API for complex decisions (workers)
+
+[tiers.rule_based]
+provider = "dry-run"
+description = "Deterministic rule-based decisions, no LLM"
+
+[tiers.local_slm]
+provider = "ollama"
+model = "qwen3:1.7b"
+base_url = "http://host.docker.internal:11434/v1"
+description = "Local SLM for equipment — low latency, no API dependency"
+
+[tiers.api]
+provider = "anthropic"
+model = "claude-sonnet-4-5-20250929"
+description = "Capable model API for coordination and complex reasoning"
+
+[tiers.hybrid]
+provider = "ollama"
+model = "qwen3:1.7b"
+base_url = "http://host.docker.internal:11434/v1"
+escalation_provider = "anthropic"
+escalation_model = "claude-sonnet-4-5-20250929"
+escalation_keywords = ["hazmat", "certification", "safety", "emergency", "incident"]
+description = "SLM for routine ops, escalates to API for complex decisions"
+
+# Role → tier mapping
+[roles]
+sensor        = "rule_based"
+crane         = "local_slm"
+tractor       = "local_slm"
+operator      = "hybrid"
+lashing_crew  = "hybrid"
+signaler      = "hybrid"
+aggregator    = "api"
+berth_manager = "api"
+scheduler     = "api"
