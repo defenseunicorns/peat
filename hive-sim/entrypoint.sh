@@ -60,6 +60,10 @@ fi
 # USE_BASELINE: If "true", use ditto_baseline (CRDT without CAP)
 # USE_TRADITIONAL: If "true", use traditional_baseline (NO CRDT, periodic full messages)
 # UPDATE_FREQUENCY_SECS: For traditional_baseline - period in seconds (default: 5)
+# LLM_PROVIDER: LLM provider for equipment agents (dry-run, ollama, api)
+# OLLAMA_ENDPOINT: Ollama API endpoint URL
+# OLLAMA_MODEL: Ollama model name (e.g., llama3:8b, mistral:7b)
+# EQUIPMENT_TYPE: Equipment type for LLM tier assignment (crane, tractor, etc.)
 
 USE_BASELINE=${USE_BASELINE:-false}
 USE_TRADITIONAL=${USE_TRADITIONAL:-false}
@@ -68,6 +72,15 @@ NODE_TYPE=${NODE_TYPE:-unknown}
 UPDATE_RATE_MS=${UPDATE_RATE_MS:-5000}
 UPDATE_FREQUENCY_SECS=${UPDATE_FREQUENCY_SECS:-5}
 CAP_FILTER_ENABLED=${CAP_FILTER_ENABLED:-false}
+LLM_PROVIDER=${LLM_PROVIDER:-dry-run}
+OLLAMA_ENDPOINT=${OLLAMA_ENDPOINT:-http://localhost:11434}
+OLLAMA_MODEL=${OLLAMA_MODEL:-llama3:8b}
+EQUIPMENT_TYPE=${EQUIPMENT_TYPE:-}
+
+# Log LLM provider config for equipment nodes
+if [ -n "$EQUIPMENT_TYPE" ]; then
+    echo "[${NODE_ID}] Equipment type: ${EQUIPMENT_TYPE}, LLM provider: ${LLM_PROVIDER}"
+fi
 
 ARGS="--node-id ${NODE_ID} --mode ${MODE} --backend ${BACKEND} --node-type ${NODE_TYPE} --update-rate-ms ${UPDATE_RATE_MS}"
 

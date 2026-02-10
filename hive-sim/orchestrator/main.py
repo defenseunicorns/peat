@@ -7,15 +7,18 @@ Nodes POST their status to this service. The orchestrator tracks:
 - Sync/convergence status
 - Errors and failures
 - Test lifecycle (waiting -> ready -> running -> complete)
+- Equipment agent LLM decisions (via tiered provider system)
 
 Usage:
     python3 orchestrator/main.py --expected-nodes 447 --port 8080
+    python3 orchestrator/main.py --expected-nodes 12 --provider ollama --ollama-model llama3:8b
 
 Endpoints:
     POST /register      - Node registers itself (called on startup)
     POST /ready         - Node reports it's ready (sync established)
     POST /metrics       - Node pushes metrics
     POST /error         - Node reports an error
+    POST /decide        - Equipment agent requests LLM decision
     GET  /status        - Dashboard JSON
     GET  /              - Human-readable dashboard
     POST /reset         - Reset all state for new test run
@@ -23,6 +26,7 @@ Endpoints:
 
 import argparse
 import json
+import logging
 import threading
 import time
 from collections import defaultdict
@@ -31,6 +35,16 @@ from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Optional
 from urllib.parse import parse_qs, urlparse
+
+from llm import (
+    EQUIPMENT_LLM_TIERS,
+    LlmProvider,
+    LlmResponse,
+    create_provider,
+    get_system_prompt,
+)
+
+logger = logging.getLogger(__name__)
 
 
 # Realistic worker name pool (ILA Local 1414 style, per ADR-051 entity model)
@@ -72,21 +86,30 @@ class NodeState:
     role: str = "unknown"
     display_name: Optional[str] = None
     worker_id: Optional[str] = None
+    llm_tier: str = "none"  # none, local_slm, api
+    equipment_type: str = ""  # crane, tractor, etc.
     errors: list = field(default_factory=list)
     metrics: dict = field(default_factory=dict)
+    llm_decisions: list = field(default_factory=list)
 
 
 class Orchestrator:
-    def __init__(self, expected_nodes: int):
+    def __init__(self, expected_nodes: int, llm_provider: Optional[LlmProvider] = None):
         self.expected_nodes = expected_nodes
         self.nodes: dict[str, NodeState] = {}
         self.test_start_time: Optional[str] = None
         self.test_state = "waiting"  # waiting -> deploying -> ready -> running -> complete
         self.lock = threading.Lock()
+        self.llm_provider = llm_provider
+        self.llm_decision_count = 0
+        self.llm_total_latency_ms = 0.0
 
-    def register(self, node_id: str, backend: str = "unknown", role: str = "unknown") -> dict:
+    def register(self, node_id: str, backend: str = "unknown", role: str = "unknown",
+                 equipment_type: str = "") -> dict:
         with self.lock:
             now = datetime.utcnow().isoformat()
+            # Determine LLM tier based on equipment type
+            llm_tier = EQUIPMENT_LLM_TIERS.get(equipment_type, "none")
             if node_id not in self.nodes:
                 # Assign realistic worker identity from the name pool
                 worker_index = len(self.nodes)
@@ -98,6 +121,8 @@ class Orchestrator:
                     role=role,
                     display_name=display_name,
                     worker_id=worker_id,
+                    llm_tier=llm_tier,
+                    equipment_type=equipment_type,
                 )
             self.nodes[node_id].last_seen = now
 
@@ -111,6 +136,7 @@ class Orchestrator:
                 "node_count": len(self.nodes),
                 "worker_id": node.worker_id,
                 "display_name": node.display_name,
+                "llm_tier": llm_tier,
             }
 
     def mark_ready(self, node_id: str) -> dict:
@@ -143,6 +169,52 @@ class Orchestrator:
                 self.nodes[node_id].last_seen = now
             return {"status": "recorded"}
 
+    def request_decision(self, node_id: str, prompt: str, context: dict = None) -> dict:
+        """Equipment agent requests an LLM decision."""
+        with self.lock:
+            node = self.nodes.get(node_id)
+            if not node:
+                return {"status": "error", "error": "node not registered"}
+            if node.llm_tier == "none":
+                return {"status": "error", "error": "node has no LLM tier assigned"}
+            if not self.llm_provider:
+                return {"status": "error", "error": "no LLM provider configured"}
+
+        # Run inference outside the lock
+        equipment_type = node.equipment_type or "default"
+        system_prompt = get_system_prompt(equipment_type)
+
+        # Include context in prompt if provided
+        full_prompt = prompt
+        if context:
+            ctx_str = json.dumps(context, indent=2)
+            full_prompt = f"{prompt}\n\nOperational context:\n{ctx_str}"
+
+        response = self.llm_provider.generate(full_prompt, system=system_prompt)
+
+        with self.lock:
+            now = datetime.utcnow().isoformat()
+            decision = {
+                "time": now,
+                "prompt": prompt[:200],  # Truncate for storage
+                "response": response.text[:500],
+                "model": response.model,
+                "latency_ms": response.latency_ms,
+            }
+            if node_id in self.nodes:
+                self.nodes[node_id].llm_decisions.append(decision)
+                self.nodes[node_id].last_seen = now
+            self.llm_decision_count += 1
+            self.llm_total_latency_ms += response.latency_ms
+
+        return {
+            "status": "ok",
+            "decision": response.text,
+            "model": response.model,
+            "provider": response.provider,
+            "latency_ms": round(response.latency_ms, 1),
+        }
+
     def get_status(self) -> dict:
         with self.lock:
             registered = len(self.nodes)
@@ -172,6 +244,16 @@ class Orchestrator:
                 for n in self.nodes.values()
             }
 
+            # Group by LLM tier
+            by_llm_tier = defaultdict(int)
+            for n in self.nodes.values():
+                by_llm_tier[n.llm_tier] += 1
+
+            avg_llm_latency = (
+                round(self.llm_total_latency_ms / self.llm_decision_count, 1)
+                if self.llm_decision_count else 0.0
+            )
+
             return {
                 "test_state": self.test_state,
                 "test_start_time": self.test_start_time,
@@ -183,6 +265,10 @@ class Orchestrator:
                 "total_errors": errors,
                 "by_role": dict(by_role),
                 "by_backend": dict(by_backend),
+                "by_llm_tier": dict(by_llm_tier),
+                "llm_provider": self.llm_provider.provider_name() if self.llm_provider else "none",
+                "llm_decisions": self.llm_decision_count,
+                "llm_avg_latency_ms": avg_llm_latency,
                 "nodes_with_errors": [n.node_id for n in self.nodes.values() if n.errors],
                 "workers": workers,
             }
@@ -192,6 +278,8 @@ class Orchestrator:
             self.nodes.clear()
             self.test_state = "waiting"
             self.test_start_time = None
+            self.llm_decision_count = 0
+            self.llm_total_latency_ms = 0.0
 
 
 # Global orchestrator instance
@@ -251,6 +339,7 @@ class OrchestratorHandler(BaseHTTPRequestHandler):
                     data.get("node_id", "unknown"),
                     data.get("backend", "unknown"),
                     data.get("role", "unknown"),
+                    data.get("equipment_type", ""),
                 )
                 self.send_json(result)
 
@@ -269,6 +358,14 @@ class OrchestratorHandler(BaseHTTPRequestHandler):
                 result = orchestrator.report_error(
                     data.get("node_id", "unknown"),
                     data.get("error", "unknown error"),
+                )
+                self.send_json(result)
+
+            elif parsed.path == "/decide":
+                result = orchestrator.request_decision(
+                    data.get("node_id", "unknown"),
+                    data.get("prompt", ""),
+                    data.get("context"),
                 )
                 self.send_json(result)
 
@@ -335,6 +432,14 @@ class OrchestratorHandler(BaseHTTPRequestHandler):
         {'<br>'.join(f"  {backend}: {count}" for backend, count in status['by_backend'].items())}
     </div>
 
+    <div class="box">
+        <strong>LLM Provider:</strong> {status['llm_provider']}<br>
+        <strong>Decisions:</strong> {status['llm_decisions']}<br>
+        <strong>Avg Latency:</strong> {status['llm_avg_latency_ms']}ms<br>
+        <strong>By Tier:</strong><br>
+        {'<br>'.join(f"  {tier}: {count}" for tier, count in status['by_llm_tier'].items())}
+    </div>
+
     <div class="box {'error' if status['total_errors'] else ''}">
         <strong>Errors:</strong> {status['total_errors']}<br>
         {('<br>'.join(status['nodes_with_errors'][:10])) if status['nodes_with_errors'] else 'None'}
@@ -367,9 +472,28 @@ def main():
     parser = argparse.ArgumentParser(description="Lab Orchestrator")
     parser.add_argument("--port", type=int, default=8080, help="HTTP port")
     parser.add_argument("--expected-nodes", type=int, default=447, help="Expected node count")
+    parser.add_argument("--provider", type=str, default="dry-run",
+                        choices=["dry-run", "ollama", "api"],
+                        help="LLM provider for equipment agent decisions (default: dry-run)")
+    parser.add_argument("--ollama-endpoint", type=str, default="http://localhost:11434",
+                        help="Ollama API endpoint (default: http://localhost:11434)")
+    parser.add_argument("--ollama-model", type=str, default="llama3:8b",
+                        help="Ollama model name (default: llama3:8b)")
     args = parser.parse_args()
 
-    orchestrator = Orchestrator(args.expected_nodes)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
+    llm_provider = create_provider(
+        args.provider,
+        ollama_endpoint=args.ollama_endpoint,
+        ollama_model=args.ollama_model,
+    )
+    orchestrator = Orchestrator(args.expected_nodes, llm_provider=llm_provider)
+
+    if llm_provider.is_ready():
+        print(f"LLM provider: {args.provider} (ready)")
+    else:
+        print(f"LLM provider: {args.provider} (not ready - check endpoint/model)")
 
     server = ThreadedHTTPServer(("0.0.0.0", args.port), OrchestratorHandler)
     print(f"Lab Orchestrator running on http://0.0.0.0:{args.port}")

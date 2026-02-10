@@ -42,6 +42,7 @@ FROM debian:bookworm-slim
 # Install runtime dependencies + tini for proper signal handling
 # tini runs as PID 1 and forwards signals to child processes
 # Without this, SIGTERM is ignored and containers don't stop cleanly
+# python3 is needed for the orchestrator and LLM provider integration
 RUN apt-get update && apt-get install -y \
     iproute2 \
     iptables \
@@ -52,6 +53,7 @@ RUN apt-get update && apt-get install -y \
     jq \
     ca-certificates \
     tini \
+    python3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create runtime directory for Ditto persistence
@@ -62,6 +64,10 @@ COPY --from=builder /build/target/release/hive-sim /usr/local/bin/hive-sim
 COPY --from=builder /build/target/release/examples/traditional_baseline /usr/local/bin/traditional_baseline
 COPY --from=builder /build/target/release/examples/producer_only_baseline /usr/local/bin/producer_only_baseline
 COPY --from=builder /build/target/release/examples/p2p_mesh_baseline /usr/local/bin/p2p_mesh_baseline
+
+# Copy orchestrator Python files for LLM provider integration
+COPY hive-sim/orchestrator/main.py /orchestrator/main.py
+COPY hive-sim/orchestrator/llm.py /orchestrator/llm.py
 
 # Copy entrypoint script (relative to build context which is parent dir)
 COPY hive-sim/entrypoint.sh /entrypoint.sh
@@ -80,7 +86,10 @@ RUN chmod +x /entrypoint.sh
 #   NETEM_RATE: bandwidth limit (e.g., "10mbit")
 ENV NODE_ID="node1" \
     MODE="reader" \
-    LOG_LEVEL="info"
+    LOG_LEVEL="info" \
+    LLM_PROVIDER="dry-run" \
+    OLLAMA_ENDPOINT="http://localhost:11434" \
+    OLLAMA_MODEL="llama3:8b"
 
 # Expose ports for P2P communication
 EXPOSE 12345
