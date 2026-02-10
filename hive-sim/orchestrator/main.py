@@ -9,30 +9,44 @@ Nodes POST their status to this service. The orchestrator tracks:
 - Test lifecycle (waiting -> ready -> running -> complete)
 - Equipment agent LLM decisions (via tiered provider system)
 
+Scenario mode (--scenario):
+- Loads ADR-051 scenario timeline from JSON
+- Injects events at specified cycle counts
+- Drives bridge_api entity state mutations
+- Produces dry-run decisions via llm.py
+
 Usage:
     python3 orchestrator/main.py --expected-nodes 447 --port 8080
     python3 orchestrator/main.py --expected-nodes 12 --provider ollama --ollama-model llama3:8b
+    python3 orchestrator/main.py --scenario scenarios/mv_ever_forward.json --port 8080
 
 Endpoints:
-    POST /register      - Node registers itself (called on startup)
-    POST /ready         - Node reports it's ready (sync established)
-    POST /metrics       - Node pushes metrics
-    POST /error         - Node reports an error
-    POST /decide        - Equipment agent requests LLM decision
-    GET  /status        - Dashboard JSON
-    GET  /              - Human-readable dashboard
-    POST /reset         - Reset all state for new test run
+    POST /register          - Node registers itself (called on startup)
+    POST /ready             - Node reports it's ready (sync established)
+    POST /metrics           - Node pushes metrics
+    POST /error             - Node reports an error
+    POST /decide            - Equipment agent requests LLM decision
+    GET  /status            - Dashboard JSON
+    GET  /                  - Human-readable dashboard
+    POST /reset             - Reset all state for new test run
+    GET  /scenario/status   - Scenario timeline and progress
+    GET  /scenario/state    - Full entity state snapshot
+    GET  /scenario/metrics  - Berth-level metrics
+    POST /scenario/advance  - Manually advance scenario cycle
 """
 
 import argparse
 import json
 import logging
+import os
+import sys
 import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from pathlib import Path
 from typing import Optional
 from urllib.parse import parse_qs, urlparse
 
@@ -93,6 +107,191 @@ class NodeState:
     llm_decisions: list = field(default_factory=list)
 
 
+class ScenarioEngine:
+    """Loads scenario timeline and fires events at specified cycle counts."""
+
+    def __init__(self, scenario_path: str):
+        self.scenario_path = Path(scenario_path)
+        self.scenario_dir = self.scenario_path.parent
+        self.scenario: dict = {}
+        self.phases: list[dict] = []
+        self.all_events: list[dict] = []  # Flattened, sorted by absolute cycle
+        self.fired_events: list[dict] = []
+        self.decisions: list[dict] = []
+        self.cycle: int = 0
+        self.running: bool = False
+        self.lock = threading.Lock()
+        self._cycle_thread: Optional[threading.Thread] = None
+        self._entity_manager = None
+        self._decision_engine = None
+
+    def load(self) -> None:
+        """Load scenario definition and all event files."""
+        with open(self.scenario_path) as f:
+            self.scenario = json.load(f)
+
+        self.phases = self.scenario.get("phases", [])
+        cycle_duration_ms = self.scenario.get("cycle_duration_ms", 5000)
+
+        # Load and flatten all events with absolute cycle numbers
+        for phase in self.phases:
+            events_file = phase.get("events_file")
+            if not events_file:
+                continue
+            events_path = self.scenario_dir / events_file
+            if not events_path.exists():
+                print(f"Warning: events file not found: {events_path}")
+                continue
+            with open(events_path) as f:
+                phase_data = json.load(f)
+            trigger_cycle = phase.get("trigger_cycle", 0)
+            for event in phase_data.get("events", []):
+                abs_cycle = trigger_cycle + event.get("cycle_offset", 0)
+                self.all_events.append({
+                    "absolute_cycle": abs_cycle,
+                    "phase_id": phase["phase_id"],
+                    "phase_name": phase["name"],
+                    **event,
+                })
+
+        self.all_events.sort(key=lambda e: (e["absolute_cycle"], e.get("event_id", "")))
+        print(f"Scenario loaded: {self.scenario.get('name', 'unknown')}")
+        print(f"  {len(self.phases)} phases, {len(self.all_events)} events")
+        print(f"  Cycle duration: {cycle_duration_ms}ms")
+
+    def init_modules(self) -> None:
+        """Initialize bridge_api and llm modules, then fire cycle-0 events."""
+        # Import from same directory
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        if script_dir not in sys.path:
+            sys.path.insert(0, script_dir)
+
+        from bridge_api import EntityStateManager, dispatch_event
+        from llm import DryRunDecisionEngine
+
+        self._entity_manager = EntityStateManager()
+        self._entity_manager.load_scenario_entities(self.scenario)
+        self._decision_engine = DryRunDecisionEngine(self._entity_manager)
+        self._dispatch_event = dispatch_event
+
+        # Fire any events scheduled for cycle 0 (T=0 initialization)
+        for event in self.all_events:
+            if event["absolute_cycle"] == 0 and event not in self.fired_events:
+                self._fire_event(event)
+
+    def start(self, cycle_duration_ms: int = 5000) -> None:
+        """Start automatic cycle advancement."""
+        if self.running:
+            return
+        self.running = True
+        interval = cycle_duration_ms / 1000.0
+        self._cycle_thread = threading.Thread(
+            target=self._cycle_loop, args=(interval,), daemon=True
+        )
+        self._cycle_thread.start()
+        print(f"Scenario engine started (cycle interval: {interval}s)")
+
+    def stop(self) -> None:
+        self.running = False
+
+    def _cycle_loop(self, interval: float) -> None:
+        while self.running:
+            time.sleep(interval)
+            self.advance_cycle()
+
+    def advance_cycle(self) -> list[dict]:
+        """Advance one cycle. Fire any events scheduled for this cycle."""
+        with self.lock:
+            self.cycle += 1
+            if self._entity_manager:
+                self._entity_manager.cycle = self.cycle
+
+            fired = []
+            for event in self.all_events:
+                if event["absolute_cycle"] == self.cycle and event not in self.fired_events:
+                    result = self._fire_event(event)
+                    fired.append({"event": event, "result": result})
+
+            return fired
+
+    def _fire_event(self, event: dict) -> dict:
+        """Fire a single event: dispatch to bridge_api, then get LLM decisions."""
+        self.fired_events.append(event)
+        phase = event.get("phase_name", "unknown")
+        eid = event.get("event_id", "?")
+        etype = event.get("type", "?")
+        print(f"  [cycle {self.cycle}] {phase} | {eid}: {etype} - {event.get('description', '')}")
+
+        result = {}
+        if self._entity_manager and self._dispatch_event:
+            result = self._dispatch_event(self._entity_manager, event)
+
+        # Get dry-run decisions for decision-worthy events
+        if self._decision_engine:
+            decisions = self._decision_engine.decide_on_event(event)
+            for dec in decisions:
+                dec_dict = dec.to_dict()
+                dec_dict["triggered_by"] = eid
+                dec_dict["cycle"] = self.cycle
+                self.decisions.append(dec_dict)
+                print(f"    -> Decision {dec.decision_id}: {dec.action} (confidence: {dec.confidence})")
+
+        return result
+
+    def get_status(self) -> dict:
+        with self.lock:
+            total_events = len(self.all_events)
+            fired_count = len(self.fired_events)
+            pending = [e for e in self.all_events if e not in self.fired_events]
+            next_event = pending[0] if pending else None
+
+            phases_status = []
+            for phase in self.phases:
+                phase_events = [e for e in self.all_events if e["phase_id"] == phase["phase_id"]]
+                phase_fired = [e for e in self.fired_events if e["phase_id"] == phase["phase_id"]]
+                phases_status.append({
+                    "phase_id": phase["phase_id"],
+                    "name": phase["name"],
+                    "trigger_cycle": phase["trigger_cycle"],
+                    "total_events": len(phase_events),
+                    "fired_events": len(phase_fired),
+                    "complete": len(phase_fired) == len(phase_events),
+                })
+
+            return {
+                "scenario": self.scenario.get("name", "unknown"),
+                "cycle": self.cycle,
+                "running": self.running,
+                "total_events": total_events,
+                "fired_events": fired_count,
+                "pending_events": total_events - fired_count,
+                "progress_pct": round(100 * fired_count / total_events, 1) if total_events else 0,
+                "next_event_cycle": next_event["absolute_cycle"] if next_event else None,
+                "next_event_type": next_event.get("type") if next_event else None,
+                "phases": phases_status,
+                "decisions_made": len(self.decisions),
+            }
+
+    def get_entity_state(self) -> dict:
+        if self._entity_manager:
+            return self._entity_manager.get_all_state()
+        return {}
+
+    def get_berth_metrics(self) -> dict:
+        if self._entity_manager:
+            return self._entity_manager.get_berth_metrics()
+        return {}
+
+    def get_decisions(self) -> list[dict]:
+        with self.lock:
+            return list(self.decisions)
+
+    def get_event_log(self) -> list[dict]:
+        if self._entity_manager:
+            return list(self._entity_manager.event_log)
+        return []
+
+
 class Orchestrator:
     def __init__(self, expected_nodes: int, llm_provider: Optional[LlmProvider] = None):
         self.expected_nodes = expected_nodes
@@ -103,6 +302,7 @@ class Orchestrator:
         self.llm_provider = llm_provider
         self.llm_decision_count = 0
         self.llm_total_latency_ms = 0.0
+        self.scenario_engine: Optional[ScenarioEngine] = None
 
     def register(self, node_id: str, backend: str = "unknown", role: str = "unknown",
                  equipment_type: str = "") -> dict:
@@ -254,7 +454,7 @@ class Orchestrator:
                 if self.llm_decision_count else 0.0
             )
 
-            return {
+            status = {
                 "test_state": self.test_state,
                 "test_start_time": self.test_start_time,
                 "expected_nodes": self.expected_nodes,
@@ -273,6 +473,11 @@ class Orchestrator:
                 "workers": workers,
             }
 
+            if self.scenario_engine:
+                status["scenario"] = self.scenario_engine.get_status()
+
+            return status
+
     def reset(self):
         with self.lock:
             self.nodes.clear()
@@ -280,6 +485,9 @@ class Orchestrator:
             self.test_start_time = None
             self.llm_decision_count = 0
             self.llm_total_latency_ms = 0.0
+            if self.scenario_engine:
+                self.scenario_engine.stop()
+                self.scenario_engine = None
 
 
 # Global orchestrator instance
@@ -299,13 +507,13 @@ class OrchestratorHandler(BaseHTTPRequestHandler):
         if "Broken pipe" not in str(args):
             super().log_error(format, *args)
 
-    def send_json(self, data: dict, status: int = 200):
+    def send_json(self, data, status: int = 200):
         try:
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Connection", "close")
             self.end_headers()
-            self.wfile.write(json.dumps(data).encode())
+            self.wfile.write(json.dumps(data, default=str).encode())
         except BrokenPipeError:
             pass  # Client disconnected, ignore
 
@@ -324,6 +532,31 @@ class OrchestratorHandler(BaseHTTPRequestHandler):
 
         if parsed.path == "/status":
             self.send_json(orchestrator.get_status())
+        elif parsed.path == "/scenario/status":
+            if orchestrator.scenario_engine:
+                self.send_json(orchestrator.scenario_engine.get_status())
+            else:
+                self.send_json({"error": "no scenario loaded"}, 404)
+        elif parsed.path == "/scenario/state":
+            if orchestrator.scenario_engine:
+                self.send_json(orchestrator.scenario_engine.get_entity_state())
+            else:
+                self.send_json({"error": "no scenario loaded"}, 404)
+        elif parsed.path == "/scenario/metrics":
+            if orchestrator.scenario_engine:
+                self.send_json(orchestrator.scenario_engine.get_berth_metrics())
+            else:
+                self.send_json({"error": "no scenario loaded"}, 404)
+        elif parsed.path == "/scenario/decisions":
+            if orchestrator.scenario_engine:
+                self.send_json(orchestrator.scenario_engine.get_decisions())
+            else:
+                self.send_json({"error": "no scenario loaded"}, 404)
+        elif parsed.path == "/scenario/events":
+            if orchestrator.scenario_engine:
+                self.send_json(orchestrator.scenario_engine.get_event_log())
+            else:
+                self.send_json({"error": "no scenario loaded"}, 404)
         elif parsed.path == "/":
             self.send_dashboard()
         else:
@@ -373,6 +606,36 @@ class OrchestratorHandler(BaseHTTPRequestHandler):
                 orchestrator.reset()
                 self.send_json({"status": "reset"})
 
+            elif parsed.path == "/scenario/advance":
+                if orchestrator.scenario_engine:
+                    cycles = data.get("cycles", 1)
+                    results = []
+                    for _ in range(cycles):
+                        fired = orchestrator.scenario_engine.advance_cycle()
+                        results.extend(fired)
+                    self.send_json({
+                        "status": "advanced",
+                        "cycle": orchestrator.scenario_engine.cycle,
+                        "events_fired": len(results),
+                    })
+                else:
+                    self.send_json({"error": "no scenario loaded"}, 404)
+
+            elif parsed.path == "/scenario/start":
+                if orchestrator.scenario_engine:
+                    cycle_ms = data.get("cycle_duration_ms", 5000)
+                    orchestrator.scenario_engine.start(cycle_ms)
+                    self.send_json({"status": "started", "cycle_duration_ms": cycle_ms})
+                else:
+                    self.send_json({"error": "no scenario loaded"}, 404)
+
+            elif parsed.path == "/scenario/stop":
+                if orchestrator.scenario_engine:
+                    orchestrator.scenario_engine.stop()
+                    self.send_json({"status": "stopped", "cycle": orchestrator.scenario_engine.cycle})
+                else:
+                    self.send_json({"error": "no scenario loaded"}, 404)
+
             else:
                 self.send_json({"error": "not found"}, 404)
         except BrokenPipeError:
@@ -382,6 +645,52 @@ class OrchestratorHandler(BaseHTTPRequestHandler):
 
     def send_dashboard(self):
         status = orchestrator.get_status()
+        scenario_html = ""
+
+        if orchestrator.scenario_engine:
+            sc = orchestrator.scenario_engine.get_status()
+            phases_html = ""
+            for phase in sc.get("phases", []):
+                check = "&#10003;" if phase["complete"] else "&#9744;"
+                phases_html += (
+                    f"  {check} {phase['name']} (cycle {phase['trigger_cycle']}): "
+                    f"{phase['fired_events']}/{phase['total_events']} events<br>"
+                )
+
+            metrics = orchestrator.scenario_engine.get_berth_metrics()
+            metrics_html = ""
+            if metrics:
+                metrics_html = f"""
+    <div class="box">
+        <strong>Berth Metrics:</strong><br>
+        Vessel: {metrics.get('vessel', '-')}<br>
+        Active Cranes: {metrics.get('active_cranes', 0)} | Active Workers: {metrics.get('active_workers', 0)}<br>
+        Throughput: {metrics.get('berth_throughput_moves_hr', 0)} moves/hr<br>
+        Containers Remaining: {metrics.get('total_containers_remaining', 0)}<br>
+    </div>"""
+
+            scenario_html = f"""
+    <div class="box" style="border-color: #ffaa00; color: #ffaa00;">
+        <strong>Scenario:</strong> {sc.get('scenario', '-')}<br>
+        <strong>Cycle:</strong> {sc.get('cycle', 0)} | {'RUNNING' if sc.get('running') else 'PAUSED'}<br>
+        <strong>Events:</strong> {sc.get('fired_events', 0)} / {sc.get('total_events', 0)} ({sc.get('progress_pct', 0)}%)<br>
+        <strong>Decisions:</strong> {sc.get('decisions_made', 0)}<br>
+        <strong>Next:</strong> {sc.get('next_event_type', 'none')} at cycle {sc.get('next_event_cycle', '-')}<br>
+        <div class="progress"><div class="progress-bar" style="width: {sc.get('progress_pct', 0)}%; background: #ffaa00;"></div></div>
+    </div>
+
+    <div class="box">
+        <strong>Phases:</strong><br>
+        {phases_html}
+    </div>
+    {metrics_html}
+    <div class="box">
+        <a href="/scenario/status">Scenario JSON</a> |
+        <a href="/scenario/state">Entity State</a> |
+        <a href="/scenario/metrics">Metrics</a> |
+        <a href="/scenario/decisions">Decisions</a> |
+        <a href="/scenario/events">Event Log</a>
+    </div>"""
 
         # Simple ASCII dashboard
         html = f"""
@@ -444,7 +753,7 @@ class OrchestratorHandler(BaseHTTPRequestHandler):
         <strong>Errors:</strong> {status['total_errors']}<br>
         {('<br>'.join(status['nodes_with_errors'][:10])) if status['nodes_with_errors'] else 'None'}
     </div>
-
+    {scenario_html}
     <div class="box">
         <a href="/status">JSON Status</a> |
         <form style="display:inline" method="POST" action="/reset"><button type="submit">Reset</button></form>
@@ -479,6 +788,12 @@ def main():
                         help="Ollama API endpoint (default: http://localhost:11434)")
     parser.add_argument("--ollama-model", type=str, default="llama3:8b",
                         help="Ollama model name (default: llama3:8b)")
+    parser.add_argument("--scenario", type=str, default=None,
+                        help="Path to scenario JSON file (enables phase2-dry mode)")
+    parser.add_argument("--auto-start", action="store_true",
+                        help="Auto-start scenario cycle advancement")
+    parser.add_argument("--cycle-duration-ms", type=int, default=5000,
+                        help="Scenario cycle duration in milliseconds (default: 5000)")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -495,9 +810,29 @@ def main():
     else:
         print(f"LLM provider: {args.provider} (not ready - check endpoint/model)")
 
+    # Load scenario if specified
+    if args.scenario:
+        scenario_path = Path(args.scenario)
+        if not scenario_path.is_absolute():
+            scenario_path = Path.cwd() / scenario_path
+        if not scenario_path.exists():
+            print(f"Error: scenario file not found: {scenario_path}")
+            sys.exit(1)
+
+        engine = ScenarioEngine(str(scenario_path))
+        engine.load()
+        engine.init_modules()
+        orchestrator.scenario_engine = engine
+
+        if args.auto_start:
+            engine.start(args.cycle_duration_ms)
+
     server = ThreadedHTTPServer(("0.0.0.0", args.port), OrchestratorHandler)
     print(f"Lab Orchestrator running on http://0.0.0.0:{args.port}")
     print(f"Expecting {args.expected_nodes} nodes")
+    if orchestrator.scenario_engine:
+        print(f"Scenario: {orchestrator.scenario_engine.scenario.get('name', 'unknown')}")
+        print(f"Mode: phase2-dry")
     print(f"Dashboard: http://localhost:{args.port}/")
     print(f"Status API: http://localhost:{args.port}/status")
 
@@ -505,6 +840,8 @@ def main():
         server.serve_forever()
     except KeyboardInterrupt:
         print("\nShutting down...")
+        if orchestrator.scenario_engine:
+            orchestrator.scenario_engine.stop()
         server.shutdown()
 
 

@@ -1,5 +1,5 @@
 """
-LLM provider abstraction for simulation equipment agents.
+LLM provider abstraction and dry-run decision engine for port operations simulation.
 
 Supports tiered LLM runtime per Addendum A §LLM Runtime Options (Option C: Tiered):
 - dry-run: No LLM, returns canned responses (for testing)
@@ -8,6 +8,9 @@ Supports tiered LLM runtime per Addendum A §LLM Runtime Options (Option C: Tier
 
 Equipment agents (cranes, tractors) use local_slm for low-latency,
 no-external-dependency reasoning suitable for lift sequencing and route decisions.
+
+Phase2-dry mode uses DryRunDecisionEngine for deterministic, rule-based decisions
+that mirror what an LLM would produce during live operation.
 """
 
 import json
@@ -244,3 +247,224 @@ def create_provider(provider_type: str, **kwargs) -> LlmProvider:
 def get_system_prompt(equipment_type: str) -> str:
     """Get the system prompt for an equipment type."""
     return EQUIPMENT_SYSTEM_PROMPTS.get(equipment_type, EQUIPMENT_SYSTEM_PROMPTS["default"])
+
+
+# ---------------------------------------------------------------------------
+# Dry-Run Decision Engine (phase2-dry scenario mode)
+# ---------------------------------------------------------------------------
+
+from bridge_api import EntityStateManager, EntityStatus
+
+
+@dataclass
+class Decision:
+    decision_id: str
+    decision_type: str
+    action: str
+    rationale: str
+    confidence: float
+    affected_entities: list[str] = field(default_factory=list)
+    parameters: dict = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        return {
+            "decision_id": self.decision_id,
+            "decision_type": self.decision_type,
+            "action": self.action,
+            "rationale": self.rationale,
+            "confidence": self.confidence,
+            "affected_entities": self.affected_entities,
+            "parameters": self.parameters,
+        }
+
+
+class DryRunDecisionEngine:
+    """Deterministic decision engine for phase2-dry simulation."""
+
+    def __init__(self, state: EntityStateManager):
+        self.state = state
+        self._decision_counter = 0
+
+    def _next_id(self) -> str:
+        self._decision_counter += 1
+        return f"dec-{self._decision_counter:04d}"
+
+    def decide_on_event(self, event: dict) -> list[Decision]:
+        """Produce decisions based on a scenario event and current state."""
+        event_type = event.get("type", "")
+        handler = _EVENT_DECISION_MAP.get(event_type)
+        if handler:
+            return handler(self, event)
+        return []
+
+    def decide_gap_resolution(self, event: dict) -> list[Decision]:
+        """Decide how to resolve capability gaps."""
+        gaps = event.get("payload", {}).get("gaps", [])
+        decisions = []
+        for gap in gaps:
+            if gap["gap_type"] == "hazmat_certification":
+                candidates = gap.get("candidates", [])
+                decisions.append(Decision(
+                    decision_id=self._next_id(),
+                    decision_type="gap_resolution",
+                    action="initiate_recertification",
+                    rationale=(
+                        f"Hazmat certification shortfall of {gap['shortfall']}. "
+                        f"{len(candidates)} candidates identified with prior certification history. "
+                        f"Targeted recertification is faster than sourcing external certified workers."
+                    ),
+                    confidence=0.92,
+                    affected_entities=candidates,
+                    parameters={
+                        "gap_type": "hazmat_certification",
+                        "shortfall": gap["shortfall"],
+                        "resolution_method": "targeted_recertification",
+                    },
+                ))
+        return decisions
+
+    def decide_team_assignment(self, event: dict) -> list[Decision]:
+        """Decide team composition for holds."""
+        teams = event.get("payload", {}).get("teams", [])
+        decisions = []
+        for team in teams:
+            hold_id = team["hold_id"]
+            decisions.append(Decision(
+                decision_id=self._next_id(),
+                decision_type="team_formation",
+                action="assign_team",
+                rationale=(
+                    f"Forming team for {hold_id} based on capability matching. "
+                    f"Crane operator, {len(team.get('stevedores', []))} stevedores assigned. "
+                    f"{'Supervisor assigned.' if team.get('supervisor') else 'No supervisor available - escalation recommended.'}"
+                ),
+                confidence=0.88,
+                affected_entities=[team.get("crane_operator", "")] + team.get("stevedores", []),
+                parameters={"hold_id": hold_id, "team": team},
+            ))
+        return decisions
+
+    def decide_degradation_response(self, event: dict) -> list[Decision]:
+        """Decide response to equipment degradation."""
+        payload = event.get("payload", {})
+        entity_id = payload.get("entity_id", "")
+        crane = self.state.cranes.get(entity_id)
+        if not crane:
+            return []
+
+        degraded_rate = payload.get("degraded_moves_per_hour", 0)
+        nominal_rate = crane.nominal_moves_per_hour
+        hold_id = payload.get("affected_hold", crane.hold_id)
+
+        # Find which holds have spare capacity
+        other_holds = [h for h in self.state.holds.values() if h.hold_id != hold_id]
+        spare_capacity = sum(
+            self.state.cranes.get(h.crane_id, type("", (), {"moves_per_hour": 0, "status": EntityStatus.ACTIVE})()).moves_per_hour
+            for h in other_holds
+            if self.state.cranes.get(h.crane_id) and self.state.cranes[h.crane_id].status == EntityStatus.ACTIVE
+        )
+
+        decisions = [
+            Decision(
+                decision_id=self._next_id(),
+                decision_type="degradation_response",
+                action="redistribute_containers",
+                rationale=(
+                    f"{entity_id} degraded to {degraded_rate} moves/hr (was {nominal_rate}). "
+                    f"Reduction of {nominal_rate - degraded_rate} moves/hr on {hold_id}. "
+                    f"Other holds have {spare_capacity} moves/hr spare capacity. "
+                    f"Redistributing containers to maintain berth throughput."
+                ),
+                confidence=0.95,
+                affected_entities=[entity_id, hold_id],
+                parameters={
+                    "degraded_crane": entity_id,
+                    "affected_hold": hold_id,
+                    "capacity_loss": nominal_rate - degraded_rate,
+                    "redistribution_strategy": "proportional",
+                },
+            ),
+            Decision(
+                decision_id=self._next_id(),
+                decision_type="degradation_response",
+                action="reassign_surplus_workers",
+                rationale=(
+                    f"With reduced throughput on {hold_id}, excess workers should be "
+                    f"redistributed to holds receiving additional containers."
+                ),
+                confidence=0.87,
+                affected_entities=[],
+                parameters={"source_hold": hold_id, "strategy": "capacity_proportional"},
+            ),
+        ]
+        return decisions
+
+    def decide_shift_transition(self, event: dict) -> list[Decision]:
+        """Decide shift transition strategy."""
+        payload = event.get("payload", {})
+        outgoing = payload.get("outgoing_workers", [])
+        incoming = payload.get("incoming_workers", [])
+
+        return [Decision(
+            decision_id=self._next_id(),
+            decision_type="shift_transition",
+            action="staggered_handoff",
+            rationale=(
+                f"Shift change: {len(outgoing)} workers departing, {len(incoming)} arriving. "
+                f"Staggered handoff: stevedores transition first, crane operators and "
+                f"supervisors hand off last to maintain continuous operations. "
+                f"Target: zero workforce gap on any hold."
+            ),
+            confidence=0.94,
+            affected_entities=outgoing + incoming,
+            parameters={
+                "strategy": "staggered",
+                "phase_1": "stevedores_transition",
+                "phase_2": "new_shift_registers",
+                "phase_3": "crane_ops_supervisor_handoff",
+                "phase_4": "team_reformation",
+                "transition_window_cycles": payload.get("transition_window_cycles", 20),
+            },
+        )]
+
+    def decide_team_reformation(self, event: dict) -> list[Decision]:
+        """Decide team reformation after disruption (shift change, degradation)."""
+        teams = event.get("payload", {}).get("teams", [])
+        decisions = []
+        for team in teams:
+            hold_id = team["hold_id"]
+            crane_id = team.get("crane", "")
+            crane = self.state.cranes.get(crane_id)
+            crane_status = crane.status.value if crane else "unknown"
+
+            decisions.append(Decision(
+                decision_id=self._next_id(),
+                decision_type="team_reformation",
+                action="reform_team",
+                rationale=(
+                    f"Reforming {hold_id} team. Crane {crane_id} is {crane_status}. "
+                    f"Assigning {len(team.get('stevedores', []))} stevedores, "
+                    f"operator {team.get('crane_operator', 'none')}."
+                ),
+                confidence=0.90,
+                affected_entities=team.get("stevedores", []) + [team.get("crane_operator", "")],
+                parameters={"hold_id": hold_id, "team": team},
+            ))
+        return decisions
+
+    def get_decisions_summary(self) -> dict:
+        """Summary of all decisions made this session."""
+        return {
+            "total_decisions": self._decision_counter,
+            "engine": "dry-run-deterministic",
+        }
+
+
+# Map event types to decision handlers
+_EVENT_DECISION_MAP = {
+    "gap_analysis": DryRunDecisionEngine.decide_gap_resolution,
+    "team_formation": DryRunDecisionEngine.decide_team_assignment,
+    "equipment_fault": DryRunDecisionEngine.decide_degradation_response,
+    "shift_transition_start": DryRunDecisionEngine.decide_shift_transition,
+    "team_reformation": DryRunDecisionEngine.decide_team_reformation,
+}

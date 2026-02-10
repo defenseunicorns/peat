@@ -1,0 +1,81 @@
+{
+  "scenario_id": "mv-ever-forward",
+  "name": "MV Ever Forward - Multi-Hold Container Operations",
+  "description": "ADR-051 Phase 2 scenario: container vessel unloading with dynamic disruptions. Tests hierarchical coordination across 3 holds with equipment degradation, workforce changes, and capability gaps.",
+  "vessel": {
+    "name": "MV Ever Forward",
+    "imo": "9811000",
+    "containers_total": 1200,
+    "holds": ["hold-1", "hold-2", "hold-3"],
+    "berth": "berth-7"
+  },
+  "cycle_duration_ms": 5000,
+  "phases": [
+    {
+      "phase_id": "ship-arrival",
+      "trigger_cycle": 0,
+      "name": "Ship Arrival",
+      "description": "Vessel manifest injected. Discovery phase: entities register, capability matching, gap analysis, team formation.",
+      "events_file": "events/ship_arrival.json"
+    },
+    {
+      "phase_id": "hazmat-gap-resolution",
+      "trigger_cycle": 60,
+      "name": "Gap Resolution (Hazmat Recertification)",
+      "description": "3 workers with expired hazmat certs identified and targeted for recertification.",
+      "events_file": "events/hazmat_gap_resolution.json"
+    },
+    {
+      "phase_id": "equipment-degradation",
+      "trigger_cycle": 360,
+      "name": "Equipment Degradation",
+      "description": "Crane-2 hydraulic issue. Reduced capacity triggers container redistribution.",
+      "events_file": "events/equipment_degradation.json"
+    },
+    {
+      "phase_id": "shift-change",
+      "trigger_cycle": 720,
+      "name": "Shift Change",
+      "description": "Half workforce transitions OFFLINE. Arriving workers register. Teams dynamically reform.",
+      "events_file": "events/shift_change.json"
+    }
+  ],
+  "entities": {
+    "cranes": [
+      {"id": "crane-1", "hold": "hold-1", "type": "STS-gantry", "moves_per_hour": 30},
+      {"id": "crane-2", "hold": "hold-2", "type": "STS-gantry", "moves_per_hour": 30},
+      {"id": "crane-3", "hold": "hold-3", "type": "STS-gantry", "moves_per_hour": 30}
+    ],
+    "workers": [
+      {"id": "worker-01", "shift": "A", "capabilities": ["stevedore", "hazmat"], "hazmat_cert_valid": true},
+      {"id": "worker-02", "shift": "A", "capabilities": ["stevedore", "hazmat"], "hazmat_cert_valid": true},
+      {"id": "worker-03", "shift": "A", "capabilities": ["stevedore"], "hazmat_cert_valid": false},
+      {"id": "worker-04", "shift": "A", "capabilities": ["stevedore", "lashing"], "hazmat_cert_valid": false},
+      {"id": "worker-05", "shift": "A", "capabilities": ["stevedore", "hazmat"], "hazmat_cert_valid": false},
+      {"id": "worker-06", "shift": "A", "capabilities": ["stevedore", "lashing"], "hazmat_cert_valid": true},
+      {"id": "worker-07", "shift": "A", "capabilities": ["crane-operator"], "hazmat_cert_valid": false},
+      {"id": "worker-08", "shift": "A", "capabilities": ["crane-operator"], "hazmat_cert_valid": false},
+      {"id": "worker-09", "shift": "A", "capabilities": ["crane-operator"], "hazmat_cert_valid": false},
+      {"id": "worker-10", "shift": "A", "capabilities": ["supervisor"], "hazmat_cert_valid": true},
+      {"id": "worker-11", "shift": "A", "capabilities": ["stevedore", "hazmat"], "hazmat_cert_valid": true},
+      {"id": "worker-12", "shift": "A", "capabilities": ["stevedore"], "hazmat_cert_valid": false},
+      {"id": "worker-13", "shift": "B", "capabilities": ["stevedore", "hazmat"], "hazmat_cert_valid": true},
+      {"id": "worker-14", "shift": "B", "capabilities": ["stevedore"], "hazmat_cert_valid": false},
+      {"id": "worker-15", "shift": "B", "capabilities": ["stevedore", "lashing"], "hazmat_cert_valid": true},
+      {"id": "worker-16", "shift": "B", "capabilities": ["crane-operator"], "hazmat_cert_valid": false},
+      {"id": "worker-17", "shift": "B", "capabilities": ["crane-operator"], "hazmat_cert_valid": false},
+      {"id": "worker-18", "shift": "B", "capabilities": ["crane-operator"], "hazmat_cert_valid": false},
+      {"id": "worker-19", "shift": "B", "capabilities": ["supervisor"], "hazmat_cert_valid": true},
+      {"id": "worker-20", "shift": "B", "capabilities": ["stevedore", "hazmat"], "hazmat_cert_valid": true},
+      {"id": "worker-21", "shift": "B", "capabilities": ["stevedore"], "hazmat_cert_valid": false},
+      {"id": "worker-22", "shift": "B", "capabilities": ["stevedore", "lashing"], "hazmat_cert_valid": false},
+      {"id": "worker-23", "shift": "B", "capabilities": ["stevedore"], "hazmat_cert_valid": false},
+      {"id": "worker-24", "shift": "B", "capabilities": ["stevedore", "hazmat"], "hazmat_cert_valid": true}
+    ],
+    "holds": [
+      {"id": "hold-1", "containers": 400, "hazmat_containers": 12, "crane": "crane-1"},
+      {"id": "hold-2", "containers": 450, "hazmat_containers": 18, "crane": "crane-2"},
+      {"id": "hold-3", "containers": 350, "hazmat_containers": 8, "crane": "crane-3"}
+    ]
+  }
+}

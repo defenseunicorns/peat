@@ -1,0 +1,91 @@
+{
+  "phase_id": "equipment-degradation",
+  "trigger_cycle": 360,
+  "events": [
+    {
+      "event_id": "evt-020",
+      "type": "equipment_fault",
+      "cycle_offset": 0,
+      "description": "Crane-2 hydraulic issue detected. Capability assertion updates.",
+      "payload": {
+        "action": "degrade_equipment",
+        "entity_id": "crane-2",
+        "fault_type": "hydraulic_pressure_low",
+        "severity": "degraded",
+        "previous_moves_per_hour": 30,
+        "degraded_moves_per_hour": 12,
+        "affected_hold": "hold-2"
+      }
+    },
+    {
+      "event_id": "evt-021",
+      "type": "capability_assertion",
+      "cycle_offset": 1,
+      "description": "Crane-2 capability assertion updated to DEGRADED.",
+      "payload": {
+        "action": "update_capability",
+        "entity_id": "crane-2",
+        "capability": "container_lift",
+        "status": "DEGRADED",
+        "capacity_pct": 40,
+        "details": "Hydraulic pressure at 60% nominal. Safe to operate at reduced rate."
+      }
+    },
+    {
+      "event_id": "evt-022",
+      "type": "hold_capacity_alert",
+      "cycle_offset": 2,
+      "description": "Hold-2 aggregator detects reduced capacity.",
+      "payload": {
+        "action": "capacity_alert",
+        "hold_id": "hold-2",
+        "previous_capacity_moves_hr": 30,
+        "current_capacity_moves_hr": 12,
+        "reduction_pct": 60,
+        "containers_remaining": 320,
+        "revised_eta_hours": 26.7
+      }
+    },
+    {
+      "event_id": "evt-023",
+      "type": "container_redistribution",
+      "cycle_offset": 5,
+      "description": "Scheduler redistributes containers across holds to compensate.",
+      "payload": {
+        "action": "redistribute_containers",
+        "transfers": [
+          {
+            "from_hold": "hold-2",
+            "to_hold": "hold-1",
+            "container_count": 60,
+            "reason": "crane-2 degraded capacity"
+          },
+          {
+            "from_hold": "hold-2",
+            "to_hold": "hold-3",
+            "container_count": 50,
+            "reason": "crane-2 degraded capacity"
+          }
+        ],
+        "revised_distribution": {
+          "hold-1": {"containers": 460, "crane_moves_hr": 30, "eta_hours": 15.3},
+          "hold-2": {"containers": 210, "crane_moves_hr": 12, "eta_hours": 17.5},
+          "hold-3": {"containers": 400, "crane_moves_hr": 30, "eta_hours": 13.3}
+        }
+      }
+    },
+    {
+      "event_id": "evt-024",
+      "type": "worker_redistribution",
+      "cycle_offset": 8,
+      "description": "Excess workers from hold-2 redistributed to holds 1 and 3.",
+      "payload": {
+        "action": "reassign_workers",
+        "reassignments": [
+          {"worker_id": "worker-06", "from_hold": "hold-2", "to_hold": "hold-1", "reason": "capacity_rebalance"},
+          {"worker_id": "worker-05", "from_hold": "hold-2", "to_hold": "hold-3", "reason": "capacity_rebalance"}
+        ]
+      }
+    }
+  ]
+}

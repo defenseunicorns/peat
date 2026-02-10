@@ -1,0 +1,130 @@
+{
+  "phase_id": "shift-change",
+  "trigger_cycle": 720,
+  "events": [
+    {
+      "event_id": "evt-030",
+      "type": "shift_transition_start",
+      "cycle_offset": 0,
+      "description": "Shift A workers begin transition to OFFLINE.",
+      "payload": {
+        "action": "start_shift_transition",
+        "outgoing_shift": "A",
+        "incoming_shift": "B",
+        "transition_window_cycles": 20,
+        "outgoing_workers": [
+          "worker-01", "worker-02", "worker-03", "worker-04", "worker-05", "worker-06",
+          "worker-07", "worker-08", "worker-09", "worker-10", "worker-11", "worker-12"
+        ],
+        "incoming_workers": [
+          "worker-13", "worker-14", "worker-15", "worker-16", "worker-17", "worker-18",
+          "worker-19", "worker-20", "worker-21", "worker-22", "worker-23", "worker-24"
+        ]
+      }
+    },
+    {
+      "event_id": "evt-031",
+      "type": "worker_status_batch",
+      "cycle_offset": 2,
+      "description": "Shift A first wave goes OFFLINE (supervisors and crane operators hand off last).",
+      "payload": {
+        "action": "batch_status_update",
+        "updates": [
+          {"worker_id": "worker-01", "status": "OFFLINE", "reason": "shift_end"},
+          {"worker_id": "worker-02", "status": "OFFLINE", "reason": "shift_end"},
+          {"worker_id": "worker-03", "status": "OFFLINE", "reason": "shift_end"},
+          {"worker_id": "worker-04", "status": "OFFLINE", "reason": "shift_end"},
+          {"worker_id": "worker-05", "status": "OFFLINE", "reason": "shift_end"},
+          {"worker_id": "worker-06", "status": "OFFLINE", "reason": "shift_end"},
+          {"worker_id": "worker-11", "status": "OFFLINE", "reason": "shift_end"},
+          {"worker_id": "worker-12", "status": "OFFLINE", "reason": "shift_end"}
+        ]
+      }
+    },
+    {
+      "event_id": "evt-032",
+      "type": "worker_registration_batch",
+      "cycle_offset": 3,
+      "description": "Shift B workers register on network.",
+      "payload": {
+        "action": "batch_register",
+        "registrations": [
+          {"worker_id": "worker-13", "capabilities": ["stevedore", "hazmat"], "status": "ACTIVE"},
+          {"worker_id": "worker-14", "capabilities": ["stevedore"], "status": "ACTIVE"},
+          {"worker_id": "worker-15", "capabilities": ["stevedore", "lashing"], "status": "ACTIVE"},
+          {"worker_id": "worker-16", "capabilities": ["crane-operator"], "status": "ACTIVE"},
+          {"worker_id": "worker-17", "capabilities": ["crane-operator"], "status": "ACTIVE"},
+          {"worker_id": "worker-18", "capabilities": ["crane-operator"], "status": "ACTIVE"},
+          {"worker_id": "worker-19", "capabilities": ["supervisor"], "status": "ACTIVE"},
+          {"worker_id": "worker-20", "capabilities": ["stevedore", "hazmat"], "status": "ACTIVE"},
+          {"worker_id": "worker-21", "capabilities": ["stevedore"], "status": "ACTIVE"},
+          {"worker_id": "worker-22", "capabilities": ["stevedore", "lashing"], "status": "ACTIVE"},
+          {"worker_id": "worker-23", "capabilities": ["stevedore"], "status": "ACTIVE"},
+          {"worker_id": "worker-24", "capabilities": ["stevedore", "hazmat"], "status": "ACTIVE"}
+        ]
+      }
+    },
+    {
+      "event_id": "evt-033",
+      "type": "worker_status_batch",
+      "cycle_offset": 8,
+      "description": "Shift A crane operators and supervisors complete handoff, go OFFLINE.",
+      "payload": {
+        "action": "batch_status_update",
+        "updates": [
+          {"worker_id": "worker-07", "status": "OFFLINE", "reason": "shift_end"},
+          {"worker_id": "worker-08", "status": "OFFLINE", "reason": "shift_end"},
+          {"worker_id": "worker-09", "status": "OFFLINE", "reason": "shift_end"},
+          {"worker_id": "worker-10", "status": "OFFLINE", "reason": "shift_end"}
+        ]
+      }
+    },
+    {
+      "event_id": "evt-034",
+      "type": "team_reformation",
+      "cycle_offset": 10,
+      "description": "Hold teams dynamically reform with Shift B workers.",
+      "payload": {
+        "action": "reform_teams",
+        "teams": [
+          {
+            "hold_id": "hold-1",
+            "crane": "crane-1",
+            "crane_operator": "worker-16",
+            "stevedores": ["worker-13", "worker-14", "worker-22"],
+            "supervisor": "worker-19"
+          },
+          {
+            "hold_id": "hold-2",
+            "crane": "crane-2",
+            "crane_operator": "worker-17",
+            "stevedores": ["worker-20", "worker-23"],
+            "supervisor": null
+          },
+          {
+            "hold_id": "hold-3",
+            "crane": "crane-3",
+            "crane_operator": "worker-18",
+            "stevedores": ["worker-15", "worker-21", "worker-24"],
+            "supervisor": null
+          }
+        ]
+      }
+    },
+    {
+      "event_id": "evt-035",
+      "type": "berth_metrics_check",
+      "cycle_offset": 15,
+      "description": "Verify no disruption to berth-level metrics during shift transition.",
+      "payload": {
+        "action": "assert_metrics",
+        "assertions": [
+          {"metric": "berth_throughput_moves_hr", "operator": ">=", "value": 60, "description": "Combined berth throughput maintained"},
+          {"metric": "active_holds", "operator": "==", "value": 3, "description": "All holds remain active"},
+          {"metric": "active_cranes", "operator": "==", "value": 3, "description": "All cranes remain operational"},
+          {"metric": "workforce_gap_seconds", "operator": "<=", "value": 45, "description": "Max gap in workforce coverage under 45s"}
+        ]
+      }
+    }
+  ]
+}

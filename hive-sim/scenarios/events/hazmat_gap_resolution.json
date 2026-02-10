@@ -1,0 +1,109 @@
+{
+  "phase_id": "hazmat-gap-resolution",
+  "trigger_cycle": 60,
+  "events": [
+    {
+      "event_id": "evt-010",
+      "type": "recertification_start",
+      "cycle_offset": 0,
+      "description": "3 workers with expired hazmat certs + strong evidence chains identified for targeted recertification.",
+      "payload": {
+        "action": "start_recertification",
+        "workers": [
+          {
+            "worker_id": "worker-03",
+            "current_capabilities": ["stevedore"],
+            "target_capability": "hazmat",
+            "evidence_chain_strength": 0.92,
+            "previous_cert_date": "2025-08-15",
+            "assigned_hold": "hold-1"
+          },
+          {
+            "worker_id": "worker-04",
+            "current_capabilities": ["stevedore", "lashing"],
+            "target_capability": "hazmat",
+            "evidence_chain_strength": 0.87,
+            "previous_cert_date": "2025-06-22",
+            "assigned_hold": "hold-1"
+          },
+          {
+            "worker_id": "worker-05",
+            "current_capabilities": ["stevedore"],
+            "target_capability": "hazmat",
+            "evidence_chain_strength": 0.95,
+            "previous_cert_date": "2025-09-01",
+            "assigned_hold": "hold-2"
+          }
+        ]
+      }
+    },
+    {
+      "event_id": "evt-011",
+      "type": "content_routing",
+      "cycle_offset": 5,
+      "description": "Targeted recertification content routed to workers.",
+      "payload": {
+        "action": "route_content",
+        "content_type": "hazmat_recertification_module",
+        "target_workers": ["worker-03", "worker-04", "worker-05"],
+        "estimated_completion_cycles": 20
+      }
+    },
+    {
+      "event_id": "evt-012",
+      "type": "capability_update",
+      "cycle_offset": 25,
+      "description": "Worker-03 completes recertification. Capability status updated.",
+      "payload": {
+        "action": "update_capability",
+        "worker_id": "worker-03",
+        "capability": "hazmat",
+        "status": "ACTIVE",
+        "cert_valid": true,
+        "cert_expiry": "2027-02-10"
+      }
+    },
+    {
+      "event_id": "evt-013",
+      "type": "capability_update",
+      "cycle_offset": 30,
+      "description": "Worker-05 completes recertification. Capability status updated.",
+      "payload": {
+        "action": "update_capability",
+        "worker_id": "worker-05",
+        "capability": "hazmat",
+        "status": "ACTIVE",
+        "cert_valid": true,
+        "cert_expiry": "2027-02-10"
+      }
+    },
+    {
+      "event_id": "evt-014",
+      "type": "capability_update",
+      "cycle_offset": 35,
+      "description": "Worker-04 completes recertification. Capability status updated.",
+      "payload": {
+        "action": "update_capability",
+        "worker_id": "worker-04",
+        "capability": "hazmat",
+        "status": "ACTIVE",
+        "cert_valid": true,
+        "cert_expiry": "2027-02-10"
+      }
+    },
+    {
+      "event_id": "evt-015",
+      "type": "worker_reassignment",
+      "cycle_offset": 40,
+      "description": "Recertified workers reassigned to hazmat holds.",
+      "payload": {
+        "action": "reassign_workers",
+        "reassignments": [
+          {"worker_id": "worker-03", "from_hold": "hold-1", "to_hold": "hold-2", "reason": "hazmat_capable"},
+          {"worker_id": "worker-05", "from_hold": "hold-2", "to_hold": "hold-2", "reason": "hazmat_capable_retain"},
+          {"worker_id": "worker-04", "from_hold": "hold-1", "to_hold": "hold-1", "reason": "hazmat_capable_retain"}
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "phase_id": "ship-arrival",
+  "trigger_cycle": 0,
+  "events": [
+    {
+      "event_id": "evt-001",
+      "type": "vessel_manifest",
+      "cycle_offset": 0,
+      "description": "MV Ever Forward arrives at berth-7. Manifest injected.",
+      "payload": {
+        "vessel": "MV Ever Forward",
+        "berth": "berth-7",
+        "total_containers": 1200,
+        "hazmat_containers": 38,
+        "holds": [
+          {"hold_id": "hold-1", "containers": 400, "hazmat": 12, "priority": "high"},
+          {"hold_id": "hold-2", "containers": 450, "hazmat": 18, "priority": "high"},
+          {"hold_id": "hold-3", "containers": 350, "hazmat": 8, "priority": "normal"}
+        ],
+        "estimated_completion_hours": 18
+      }
+    },
+    {
+      "event_id": "evt-002",
+      "type": "entity_discovery",
+      "cycle_offset": 1,
+      "description": "All entities register on the network. Discovery phase begins.",
+      "payload": {
+        "action": "register_all",
+        "entity_types": ["crane", "worker", "hold"],
+        "expected_registrations": 27
+      }
+    },
+    {
+      "event_id": "evt-003",
+      "type": "capability_matching",
+      "cycle_offset": 2,
+      "description": "Stow plan matched against available capabilities.",
+      "payload": {
+        "action": "match_capabilities",
+        "requirements": {
+          "hazmat_certified_workers": 6,
+          "crane_operators": 3,
+          "stevedores": 12,
+          "lashing_crew": 3,
+          "supervisors": 1
+        }
+      }
+    },
+    {
+      "event_id": "evt-004",
+      "type": "gap_analysis",
+      "cycle_offset": 3,
+      "description": "Gap analysis identifies hazmat certification shortage.",
+      "payload": {
+        "action": "analyze_gaps",
+        "gaps": [
+          {
+            "gap_type": "hazmat_certification",
+            "required": 6,
+            "available": 3,
+            "shortfall": 3,
+            "candidates": ["worker-03", "worker-04", "worker-05"],
+            "resolution": "recertification",
+            "severity": "blocking"
+          }
+        ]
+      }
+    },
+    {
+      "event_id": "evt-005",
+      "type": "team_formation",
+      "cycle_offset": 5,
+      "description": "Dynamic clusters form around each hold.",
+      "payload": {
+        "action": "form_teams",
+        "teams": [
+          {
+            "hold_id": "hold-1",
+            "crane": "crane-1",
+            "crane_operator": "worker-07",
+            "stevedores": ["worker-01", "worker-03", "worker-04"],
+            "supervisor": "worker-10"
+          },
+          {
+            "hold_id": "hold-2",
+            "crane": "crane-2",
+            "crane_operator": "worker-08",
+            "stevedores": ["worker-02", "worker-05", "worker-06"],
+            "supervisor": null
+          },
+          {
+            "hold_id": "hold-3",
+            "crane": "crane-3",
+            "crane_operator": "worker-09",
+            "stevedores": ["worker-11", "worker-12"],
+            "supervisor": null
+          }
+        ]
+      }
+    }
+  ]
+}
