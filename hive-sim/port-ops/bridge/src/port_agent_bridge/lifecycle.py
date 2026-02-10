@@ -208,15 +208,27 @@ class ResourceTracker:
 #  Certification Tracker
 # ---------------------------------------------------------------------------
 
+# Proficiency → recertification time multiplier (experts recertify faster)
+_RECERT_TIME_MULTIPLIER: dict[str, float] = {
+    "expert":            0.5,    # 5 sim-minutes (fast)
+    "competent":         0.75,   # 7.5 sim-minutes
+    "advanced_beginner": 1.0,    # 10 sim-minutes (baseline)
+    "novice":            1.5,    # 15 sim-minutes (slow)
+}
+
+
 class CertTracker:
     """Per-worker certification expiry based on simulated hours."""
 
-    def __init__(self, node_id: str, cert_hours: float = 120.0):
+    def __init__(self, node_id: str, cert_hours: float = 120.0, proficiency: str = "competent"):
         self.node_id = node_id
+        self.proficiency = proficiency
         self.cert_hours_remaining = cert_hours  # hours until expiry
         self.warning_hours = 20.0
         self.expired = False
         self._recert_complete_at: float | None = None
+        self._recert_base_minutes = 10.0
+        self._recert_multiplier = _RECERT_TIME_MULTIPLIER.get(proficiency, 1.0)
 
     def tick(self, sim_minutes: float) -> list[dict]:
         """Advance cert clock, return expiry events."""
@@ -234,6 +246,7 @@ class CertTracker:
                 "details": {
                     "worker_id": self.node_id,
                     "new_expiry_hours": 120.0,
+                    "proficiency": self.proficiency,
                 },
             })
             return events
@@ -247,14 +260,16 @@ class CertTracker:
         if self.cert_hours_remaining <= 0:
             self.cert_hours_remaining = 0
             self.expired = True
-            self._recert_complete_at = sim_minutes + 10.0  # 10 sim-minutes
+            recert_time = self._recert_base_minutes * self._recert_multiplier
+            self._recert_complete_at = sim_minutes + recert_time
             events.append({
                 "event_type": "CERTIFICATION_EXPIRED",
                 "source": self.node_id,
                 "priority": "CRITICAL",
                 "details": {
                     "worker_id": self.node_id,
-                    "recert_eta_sim_minutes": 10.0,
+                    "proficiency": self.proficiency,
+                    "recert_eta_sim_minutes": recert_time,
                 },
             })
         elif self.cert_hours_remaining <= self.warning_hours:
@@ -264,6 +279,7 @@ class CertTracker:
                 "priority": "HIGH",
                 "details": {
                     "worker_id": self.node_id,
+                    "proficiency": self.proficiency,
                     "hours_remaining": round(self.cert_hours_remaining, 1),
                 },
             })
@@ -519,9 +535,10 @@ class LifecycleManager:
     Returns list of JSON event dicts to print to stdout.
     """
 
-    def __init__(self, node_id: str, role: str = "crane", report_every_n_cycles: int = 10):
+    def __init__(self, node_id: str, role: str = "crane", report_every_n_cycles: int = 10, proficiency: str = "competent"):
         self.node_id = node_id
         self.role = role
+        self.proficiency = proficiency
         cfg = _ROLE_CONFIGS.get(role, {})
         self._physical_actions: set[str] = cfg.get("physical_actions", {"complete_container_move", "report_equipment_status"})
 
@@ -535,9 +552,9 @@ class LifecycleManager:
         if role == "crane" and resources is None:
             self.resources = ResourceTracker(node_id)
 
-        # Certifications (operators and cranes)
+        # Certifications (operators and cranes) — proficiency affects renewal time
         cert_hours = cfg.get("cert_hours")
-        self.certs = CertTracker(node_id, cert_hours=cert_hours) if cert_hours else None
+        self.certs = CertTracker(node_id, cert_hours=cert_hours, proficiency=proficiency) if cert_hours else None
 
         # Logistics + gap analysis (only if degradation is tracked)
         self.logistics = LogisticsDispatcher(node_id) if self.degradation else None

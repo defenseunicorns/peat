@@ -557,6 +557,16 @@ SENSOR_TOOLS = [
 
 # ── BridgeAPI ────────────────────────────────────────────────────────────────
 
+# ── Proficiency modifiers for tool execution ─────────────────────────────────
+# Maps proficiency → multiplier on base execution time for physical actions
+PROFICIENCY_EXEC_MODIFIERS: dict[str, float] = {
+    "expert":            1.0,
+    "competent":         1.18,
+    "advanced_beginner": 1.43,
+    "novice":            1.82,
+}
+
+
 class BridgeAPI:
     """
     Per-agent interface to a shared HiveStateStore.
@@ -571,11 +581,14 @@ class BridgeAPI:
         node_id: str,
         role: str = "crane",
         hold_id: str = "hold-3",
+        proficiency: str = "competent",
     ):
         self.store = store
         self.node_id = node_id
         self.role = role
         self.hold_id = hold_id
+        self.proficiency = proficiency
+        self._exec_modifier = PROFICIENCY_EXEC_MODIFIERS.get(proficiency, 1.0)
         self._entity_doc_id = f"sim_doc_{node_id}"
 
     # ── Internal helpers ─────────────────────────────────────────────────
@@ -685,6 +698,7 @@ class BridgeAPI:
                 if queue else 0
             ),
             "target_rate": 35,
+            "proficiency": self.proficiency,
             "priority": "NORMAL",
         }
         return json.dumps(tasking, indent=2, default=str)
@@ -714,6 +728,7 @@ class BridgeAPI:
             "status": status,
             "assigned_to": assigned_to,
             "pending_requests": [r.fields.get("crane_id") for r in requests],
+            "proficiency": self.proficiency,
             "instructions": (
                 "Check in as AVAILABLE at shift start. Accept crane assignments when "
                 "pending. Complete assignment after crane move finishes. Report hazmat "
@@ -947,12 +962,14 @@ class BridgeAPI:
         total_tons = entity.get_field("metrics.total_tons_lifted", 0.0)
         entity.update_field("metrics.total_tons_lifted", total_tons + weight)
 
-        # Emit event
+        # Emit event with proficiency context
         self.store.emit_event({
             "event_type": "container_move_complete",
             "source": self.node_id,
             "container_id": container_id,
             "weight_tons": weight,
+            "proficiency": self.proficiency,
+            "exec_time_modifier": self._exec_modifier,
             "aggregation_policy": "AGGREGATE_AT_PARENT",
             "priority": "NORMAL",
         })
@@ -1373,6 +1390,8 @@ class BridgeAPI:
             "source": self.node_id,
             "container_id": container_id,
             "destination": destination,
+            "proficiency": self.proficiency,
+            "exec_time_modifier": self._exec_modifier,
             "aggregation_policy": "AGGREGATE_AT_PARENT",
             "priority": "NORMAL",
         })

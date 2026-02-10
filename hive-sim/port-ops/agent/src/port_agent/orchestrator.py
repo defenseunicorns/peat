@@ -30,6 +30,10 @@ logger = logging.getLogger(__name__)
 # We import inside methods after PYTHONPATH is set by the caller.
 
 
+# Proficiency levels per ADR-051 entity model
+PROFICIENCY_LEVELS = ("novice", "advanced_beginner", "competent", "expert")
+
+
 @dataclass
 class AgentSpec:
     """Specification for a single agent in the orchestrator."""
@@ -38,6 +42,7 @@ class AgentSpec:
     persona: str        # persona filename without .md
     provider: str       # "anthropic" | "ollama" | "dry-run"
     model: str | None = None
+    proficiency: str = "competent"  # novice | advanced_beginner | competent | expert
 
 
 @dataclass
@@ -89,6 +94,10 @@ def parse_agent_composition(
             f"Expected format like '2c5w4t1s1a2x'."
         )
 
+    # Proficiency assignment pattern: first worker of a role is expert (lead),
+    # subsequent workers get mixed proficiency for realistic variation.
+    _MIXED_PROFICIENCY = ("competent", "advanced_beginner", "novice", "competent")
+
     sensor_idx = 0
     for count_str, letter in pairs:
         count = int(count_str)
@@ -109,12 +118,19 @@ def parse_agent_composition(
             else:
                 node_id = id_pattern  # singleton like hold-agg-3, scheduler-1
 
+            # Lead (first) gets expert; singletons get expert; rest get mixed
+            if count == 1 or i == 1:
+                proficiency = "expert"
+            else:
+                proficiency = _MIXED_PROFICIENCY[(i - 2) % len(_MIXED_PROFICIENCY)]
+
             specs.append(AgentSpec(
                 node_id=node_id,
                 role=role,
                 persona=persona,
                 provider=provider,
                 model=model,
+                proficiency=proficiency,
             ))
 
     return specs
@@ -185,7 +201,7 @@ class Orchestrator:
                     })
             elif spec.role == "operator":
                 op_config = {
-                    "proficiency": "expert",
+                    "proficiency": spec.proficiency,
                     "osha_cert_valid": True,
                     "hazmat_classes": [3, 8, 9],
                     "hazmat_cert_valid": spec.node_id == "op-1",  # op-1 certified, op-2 not
@@ -326,6 +342,7 @@ class Orchestrator:
                 node_id=spec.node_id,
                 role=spec.role,
                 hold_id=self.config.hold_id,
+                proficiency=spec.proficiency,
             )
 
             # Per-agent LLM provider
@@ -333,6 +350,7 @@ class Orchestrator:
             if spec.model:
                 provider_kwargs["model"] = spec.model
             provider_kwargs["role"] = spec.role
+            provider_kwargs["proficiency"] = spec.proficiency
             llm = create_provider(spec.provider, **provider_kwargs)
 
             agent = AgentLoop(
@@ -351,10 +369,17 @@ class Orchestrator:
 
     async def run(self) -> dict[str, list[CycleMetrics]]:
         """Run all agents concurrently and collect metrics."""
+        # Log proficiency distribution
+        prof_dist: dict[str, int] = {}
+        for s in self.config.agents:
+            prof_dist[s.proficiency] = prof_dist.get(s.proficiency, 0) + 1
+        prof_summary = ", ".join(f"{k}={v}" for k, v in sorted(prof_dist.items()))
+
         logger.info(
             f"\n{'='*60}\n"
             f"  HIVE Port Operations — Phase 1b (15-Node Hold Team)\n"
             f"  Agents: {', '.join(s.node_id for s in self.config.agents)}\n"
+            f"  Proficiency: {prof_summary}\n"
             f"  Queue: {self.config.queue_size} containers "
             f"({self.config.hazmat_count} hazmat)\n"
             f"  Max cycles: {self.config.max_cycles}\n"
@@ -402,14 +427,18 @@ class Orchestrator:
         print("  PHASE 1b MULTI-AGENT SUMMARY", flush=True)
         print("=" * 60, flush=True)
 
+        # Build node_id → proficiency map for display
+        prof_map = {s.node_id: s.proficiency for s in self.config.agents}
+
         # Per-agent summary
         for node_id, metrics in all_metrics.items():
             actions = sum(1 for m in metrics if m.action != "wait")
             waits = sum(1 for m in metrics if m.action == "wait")
             successes = sum(1 for m in metrics if m.success)
             failures = sum(1 for m in metrics if not m.success)
+            prof_label = prof_map.get(node_id, "?")
             print(
-                f"\n  {node_id}: {len(metrics)} cycles, "
+                f"\n  {node_id} [{prof_label}]: {len(metrics)} cycles, "
                 f"{actions} actions, {waits} waits, "
                 f"{successes} ok, {failures} fail",
                 flush=True,

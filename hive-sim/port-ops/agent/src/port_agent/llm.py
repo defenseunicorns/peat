@@ -15,11 +15,23 @@ import asyncio
 import json
 import logging
 import os
+import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+# ── Proficiency modifiers (ADR-051) ──────────────────────────────────────────
+# speed_factor: multiplier on base delay (lower = faster decisions)
+# error_rate: probability of making a wrong tool call per cycle
+PROFICIENCY_MODIFIERS: dict[str, dict[str, float]] = {
+    "expert":            {"speed_factor": 1.0,   "error_rate": 0.00},
+    "competent":         {"speed_factor": 1.18,  "error_rate": 0.02},
+    "advanced_beginner": {"speed_factor": 1.43,  "error_rate": 0.05},
+    "novice":            {"speed_factor": 1.82,  "error_rate": 0.10},
+}
 
 
 @dataclass
@@ -238,18 +250,36 @@ class DryRunProvider(LLMProvider):
     making it possible to validate the full OODA loop offline.
 
     Role-aware: 'crane' processes containers, 'aggregator' produces summaries.
+    Proficiency-aware: delay and error rate vary by proficiency level.
     """
 
-    # Simulate LLM thinking time so the viewer can keep up
-    DRY_RUN_DELAY_S = 0.3
+    # Base delay for expert-level decisions; scaled by proficiency speed_factor
+    _BASE_DELAY_S = 0.3
 
-    def __init__(self, role: str = "crane", **kwargs):
+    def __init__(self, role: str = "crane", proficiency: str = "competent", **kwargs):
         self._cycle = 0
         self._role = role
+        self._proficiency = proficiency
+        mods = PROFICIENCY_MODIFIERS.get(proficiency, PROFICIENCY_MODIFIERS["competent"])
+        self._speed_factor = mods["speed_factor"]
+        self._error_rate = mods["error_rate"]
 
     async def decide(self, persona: str, observed_state: dict, available_tools: list[dict]) -> AgentDecision:
         self._cycle += 1
-        await asyncio.sleep(self.DRY_RUN_DELAY_S)
+        # Proficiency-scaled thinking delay
+        await asyncio.sleep(self._BASE_DELAY_S * self._speed_factor)
+
+        # Proficiency-based error: occasionally make wrong tool call
+        if self._error_rate > 0 and random.random() < self._error_rate:
+            return AgentDecision(
+                action="wait",
+                arguments={"reason": f"Hesitation — {self._proficiency} re-evaluating situation"},
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: proficiency error "
+                    f"({self._proficiency}, {self._error_rate:.0%} rate) — delayed response"
+                ),
+                confidence=0.5,
+            )
         if self._role == "aggregator":
             return self._decide_aggregator(observed_state)
         elif self._role == "berth_manager":
@@ -685,13 +715,14 @@ class DryRunProvider(LLMProvider):
 
 def create_provider(provider_type: str = "anthropic", **kwargs) -> LLMProvider:
     """Factory for LLM providers."""
-    # DryRunProvider accepts 'role'; other providers don't — pop it for safety
+    # DryRunProvider accepts 'role' and 'proficiency'; other providers don't — pop for safety
     role = kwargs.pop("role", "crane")
+    proficiency = kwargs.pop("proficiency", "competent")
     if provider_type == "anthropic":
         return AnthropicProvider(**kwargs)
     elif provider_type in ("ollama", "openai"):
         return OllamaProvider(**kwargs)
     elif provider_type == "dry-run":
-        return DryRunProvider(role=role, **kwargs)
+        return DryRunProvider(role=role, proficiency=proficiency, **kwargs)
     else:
         raise ValueError(f"Unknown provider: {provider_type}. Use 'anthropic', 'ollama', or 'dry-run'.")
