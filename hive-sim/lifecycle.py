@@ -69,6 +69,33 @@ _ROLE_CONFIGS: dict[str, RoleConfig] = {
         visibility_range_m=0.0,
         description="H3 zone coordinator for gate operations — truck queuing, container release, and rail loading",
     ),
+    "gate_scanner": RoleConfig(
+        name="gate_scanner",
+        hierarchy_level=0,
+        physical_actions=frozenset(),
+        requires_line_of_sight=False,
+        heavy_subsystems=True,
+        visibility_range_m=0.0,
+        description="H0 automated container damage detection and weight verification at gate lane",
+    ),
+    "rfid_reader": RoleConfig(
+        name="rfid_reader",
+        hierarchy_level=0,
+        physical_actions=frozenset(),
+        requires_line_of_sight=False,
+        heavy_subsystems=False,
+        visibility_range_m=0.0,
+        description="H0 automated container identification via ISO 18000-6C / EPC GEN2",
+    ),
+    "gate_worker": RoleConfig(
+        name="gate_worker",
+        hierarchy_level=1,
+        physical_actions=frozenset(),
+        requires_line_of_sight=False,
+        heavy_subsystems=False,
+        visibility_range_m=50.0,
+        description="H1 truck processing — document verification, seal inspection, truck release",
+    ),
 }
 
 

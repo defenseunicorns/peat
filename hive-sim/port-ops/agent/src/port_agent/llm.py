@@ -347,6 +347,12 @@ class DryRunProvider(LLMProvider):
             return self._decide_signaler(observed_state)
         elif self._role == "gate_manager":
             return self._decide_gate_manager(observed_state)
+        elif self._role == "gate_scanner":
+            return self._decide_gate_scanner(observed_state)
+        elif self._role == "rfid_reader":
+            return self._decide_rfid_reader(observed_state)
+        elif self._role == "gate_worker":
+            return self._decide_gate_worker(observed_state)
         return self._decide_crane(observed_state)
 
     def _decide_crane(self, observed_state: dict) -> AgentDecision:
@@ -1147,6 +1153,117 @@ class DryRunProvider(LLMProvider):
             action="wait",
             arguments={"reason": "Monitoring — no immediate gate operations needed"},
             reasoning=f"DryRun cycle {self._cycle}: gate manager idle, watching gate status",
+        )
+
+    def _decide_gate_scanner(self, observed_state: dict) -> AgentDecision:
+        tasking = observed_state.get("tasking", {})
+        truck = tasking.get("current_truck")
+
+        if not truck:
+            return AgentDecision(
+                action="wait",
+                arguments={"reason": "No truck in scan position"},
+                reasoning=f"DryRun cycle {self._cycle}: gate scanner idle",
+            )
+
+        container_id = truck.get("container_id", f"MSCU-{4472891 + (self._cycle % 20)}")
+        declared_weight = truck.get("declared_weight_tons", 25.0)
+        # Simulate occasional weight anomaly
+        measured_weight = declared_weight + (0.5 if self._cycle % 7 == 0 else 0.1)
+        damage = self._cycle % 13 == 0
+
+        return AgentDecision(
+            action="scan_container",
+            arguments={
+                "container_id": container_id,
+                "measured_weight_tons": round(measured_weight, 1),
+                "declared_weight_tons": declared_weight,
+                "weight_within_tolerance": abs(measured_weight - declared_weight) / declared_weight <= 0.05,
+                "damage_detected": damage,
+                "confidence": 0.98,
+            },
+            reasoning=(
+                f"DryRun cycle {self._cycle}: scanning container {container_id}, "
+                f"weight {measured_weight:.1f}t (declared {declared_weight}t)"
+                + (", DAMAGE DETECTED" if damage else "")
+            ),
+        )
+
+    def _decide_rfid_reader(self, observed_state: dict) -> AgentDecision:
+        tasking = observed_state.get("tasking", {})
+        truck = tasking.get("current_truck")
+
+        if not truck:
+            return AgentDecision(
+                action="wait",
+                arguments={"reason": "No truck in read position"},
+                reasoning=f"DryRun cycle {self._cycle}: RFID reader idle",
+            )
+
+        container_id = truck.get("container_id", f"MSCU-{4472891 + (self._cycle % 20)}")
+
+        return AgentDecision(
+            action="scan_container",
+            arguments={
+                "container_id": container_id,
+                "epc_tag": container_id,
+                "match": True,
+                "reading_type": "rfid",
+            },
+            reasoning=f"DryRun cycle {self._cycle}: RFID read {container_id}",
+        )
+
+    def _decide_gate_worker(self, observed_state: dict) -> AgentDecision:
+        tasking = observed_state.get("tasking", {})
+        truck = tasking.get("current_truck")
+        trucks_processed = tasking.get("trucks_processed", 0)
+
+        if not truck:
+            return AgentDecision(
+                action="wait",
+                arguments={"reason": "No truck in processing position"},
+                reasoning=f"DryRun cycle {self._cycle}: gate worker idle",
+            )
+
+        container_id = truck.get("container_id", f"MSCU-{4472891 + (self._cycle % 20)}")
+
+        # Every 3rd cycle: verify documents first
+        if self._cycle % 3 == 0:
+            return AgentDecision(
+                action="verify_documents",
+                arguments={
+                    "container_id": container_id,
+                    "customs_cleared": True,
+                    "bill_of_lading": True,
+                    "documents_valid": True,
+                },
+                reasoning=f"DryRun cycle {self._cycle}: verifying docs for {container_id}",
+            )
+
+        # Every 5th cycle: inspect seal
+        if self._cycle % 5 == 0:
+            return AgentDecision(
+                action="inspect_seal",
+                arguments={
+                    "container_id": container_id,
+                    "seal_intact": True,
+                    "seal_number_match": True,
+                },
+                reasoning=f"DryRun cycle {self._cycle}: inspecting seal for {container_id}",
+            )
+
+        # Default: process truck (release)
+        return AgentDecision(
+            action="process_truck",
+            arguments={
+                "container_id": container_id,
+                "action": "release",
+                "gate_lane": tasking.get("gate_lane", "gate-a-1"),
+            },
+            reasoning=(
+                f"DryRun cycle {self._cycle}: releasing truck with {container_id} "
+                f"(total processed: {trucks_processed + 1})"
+            ),
         )
 
     def _decide_aggregator(self, observed_state: dict) -> AgentDecision:

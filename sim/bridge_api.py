@@ -38,6 +38,10 @@ class SimState:
         # Stacking crane state
         self.slot_map: dict[str, dict[str, Any]] = {}  # "block:row:bay:tier" -> container
         self.crane_positions: dict[str, dict[str, Any]] = {}  # crane_id -> position/status
+        # Gate operations state
+        self.scan_results: dict[str, dict[str, Any]] = {}  # container_id -> scan
+        self.truck_log: list[dict[str, Any]] = []  # processed trucks
+        self.seal_inspections: dict[str, dict[str, Any]] = {}  # container_id -> seal
 
     def read_all_block_summaries(self) -> list[dict[str, Any]]:
         """Return every yard-block summary currently stored."""
@@ -183,7 +187,97 @@ def _handle_report_position(
     return {"status": "reported", "crane_id": crane_id}
 
 
-# -- Tool registry ----------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Gate Scanner tools (H0)
+# ---------------------------------------------------------------------------
+
+def _handle_scan_container(
+    state: SimState, params: dict[str, Any],
+) -> dict[str, Any]:
+    """Perform an optical and weight scan of a container."""
+    container_id = params.get("container_id", "UNKNOWN")
+    state.scan_results[container_id] = params
+    flagged = params.get("damage_detected", False) or not params.get("weight_within_tolerance", True)
+    return {"status": "flagged" if flagged else "ok", "container_id": container_id}
+
+
+# ---------------------------------------------------------------------------
+# Gate Worker tools (H1)
+# ---------------------------------------------------------------------------
+
+def _handle_verify_documents(
+    state: SimState, params: dict[str, Any],
+) -> dict[str, Any]:
+    """Check truck/container documents against expected manifest."""
+    container_id = params.get("container_id", "UNKNOWN")
+    valid = params.get("documents_valid", False)
+    return {"status": "valid" if valid else "invalid", "container_id": container_id}
+
+
+def _handle_process_truck(
+    state: SimState, params: dict[str, Any],
+) -> dict[str, Any]:
+    """Complete truck processing (release or reject)."""
+    container_id = params.get("container_id", "UNKNOWN")
+    action = params.get("action", "release")
+    state.truck_log.append(params)
+    return {"status": action, "container_id": container_id}
+
+
+def _handle_inspect_seal(
+    state: SimState, params: dict[str, Any],
+) -> dict[str, Any]:
+    """Record seal inspection result for a container."""
+    container_id = params.get("container_id", "UNKNOWN")
+    state.seal_inspections[container_id] = params
+    intact = params.get("seal_intact", True) and params.get("seal_number_match", True)
+    return {"status": "intact" if intact else "compromised", "container_id": container_id}
+
+
+def _handle_gate_equipment_status(
+    state: SimState, params: dict[str, Any],
+) -> dict[str, Any]:
+    """Report gate equipment or lane operational status."""
+    return {"status": "recorded", "details": params}
+
+
+# -- Tool registries --------------------------------------------------------
+
+GATE_SCANNER_TOOLS: list[ToolDef] = [
+    ToolDef(
+        name="scan_container",
+        description="Perform optical and weight scan of a container at the gate lane.",
+        handler=_handle_scan_container,
+    ),
+    ToolDef(
+        name="report_equipment_status",
+        description="Report scanner operational status (OPERATIONAL, DEGRADED, FAILED).",
+        handler=_handle_gate_equipment_status,
+    ),
+]
+
+GATE_WORKER_TOOLS: list[ToolDef] = [
+    ToolDef(
+        name="verify_documents",
+        description="Check truck/container documents (bill of lading, customs clearance) against manifest.",
+        handler=_handle_verify_documents,
+    ),
+    ToolDef(
+        name="process_truck",
+        description="Complete truck processing — release to yard or reject with reason code.",
+        handler=_handle_process_truck,
+    ),
+    ToolDef(
+        name="inspect_seal",
+        description="Record seal inspection result (intact, broken, number mismatch).",
+        handler=_handle_inspect_seal,
+    ),
+    ToolDef(
+        name="report_equipment_status",
+        description="Report gate lane operational status.",
+        handler=_handle_gate_equipment_status,
+    ),
+]
 
 YARD_MANAGER_TOOLS: list[ToolDef] = [
     ToolDef(
@@ -232,6 +326,9 @@ STACKING_CRANE_TOOLS: list[ToolDef] = [
 _TOOL_REGISTRY: dict[str, dict[str, ToolDef]] = {
     "yard_manager": {t.name: t for t in YARD_MANAGER_TOOLS},
     "stacking_crane": {t.name: t for t in STACKING_CRANE_TOOLS},
+    "gate_scanner": {t.name: t for t in GATE_SCANNER_TOOLS},
+    "rfid_reader": {t.name: t for t in GATE_SCANNER_TOOLS},
+    "gate_worker": {t.name: t for t in GATE_WORKER_TOOLS},
 }
 
 

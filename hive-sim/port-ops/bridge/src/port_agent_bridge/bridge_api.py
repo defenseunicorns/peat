@@ -555,6 +555,178 @@ SENSOR_TOOLS = [
 ]
 
 
+# ── Gate Scanner tool definitions ────────────────────────────────────────────
+
+GATE_SCANNER_TOOLS = [
+    ToolShim(
+        name="scan_container",
+        description=(
+            "Perform optical and weight scan of a container at the gate lane. "
+            "Reports measured weight, damage status, and OCR container number."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "container_id": {
+                    "type": "string",
+                    "description": "Container ID being scanned",
+                },
+                "measured_weight_tons": {
+                    "type": "number",
+                    "description": "Measured weight in metric tons",
+                },
+                "declared_weight_tons": {
+                    "type": "number",
+                    "description": "Declared weight from shipping documents",
+                },
+                "weight_within_tolerance": {
+                    "type": "boolean",
+                    "description": "Whether weight is within 5% SOLAS VGM tolerance",
+                },
+                "damage_detected": {
+                    "type": "boolean",
+                    "description": "Whether structural damage was detected",
+                },
+                "confidence": {
+                    "type": "number",
+                    "description": "Scan confidence (0.0-1.0)",
+                },
+            },
+            "required": ["container_id"],
+        },
+    ),
+    ToolShim(
+        name="report_equipment_status",
+        description=(
+            "Report gate scanner operational status (OPERATIONAL, DEGRADED, FAILED, FLAGGED)."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": ["OPERATIONAL", "DEGRADED", "FAILED", "FLAGGED"],
+                    "description": "Equipment status",
+                },
+                "details": {
+                    "type": "string",
+                    "description": "Status details",
+                },
+            },
+            "required": ["status", "details"],
+        },
+    ),
+]
+
+# ── Gate Worker tool definitions ─────────────────────────────────────────────
+
+GATE_WORKER_TOOLS = [
+    ToolShim(
+        name="verify_documents",
+        description=(
+            "Check truck/container documents (bill of lading, customs clearance) "
+            "against expected manifest."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "container_id": {
+                    "type": "string",
+                    "description": "Container ID to verify",
+                },
+                "customs_cleared": {
+                    "type": "boolean",
+                    "description": "Whether customs clearance is confirmed",
+                },
+                "bill_of_lading": {
+                    "type": "boolean",
+                    "description": "Whether bill of lading matches",
+                },
+                "documents_valid": {
+                    "type": "boolean",
+                    "description": "Overall document validity",
+                },
+            },
+            "required": ["container_id", "documents_valid"],
+        },
+    ),
+    ToolShim(
+        name="process_truck",
+        description=(
+            "Complete truck processing — release to yard or reject with reason code."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "container_id": {
+                    "type": "string",
+                    "description": "Container ID on the truck",
+                },
+                "action": {
+                    "type": "string",
+                    "enum": ["release", "reject"],
+                    "description": "Release to yard or reject",
+                },
+                "gate_lane": {
+                    "type": "string",
+                    "description": "Gate lane ID (e.g., gate-a-1)",
+                },
+                "reasons": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Rejection reason codes (if rejecting)",
+                },
+            },
+            "required": ["container_id", "action"],
+        },
+    ),
+    ToolShim(
+        name="inspect_seal",
+        description=(
+            "Record seal inspection result — seal integrity and number verification."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "container_id": {
+                    "type": "string",
+                    "description": "Container ID",
+                },
+                "seal_intact": {
+                    "type": "boolean",
+                    "description": "Whether the seal is physically intact",
+                },
+                "seal_number_match": {
+                    "type": "boolean",
+                    "description": "Whether seal number matches documentation",
+                },
+            },
+            "required": ["container_id", "seal_intact", "seal_number_match"],
+        },
+    ),
+    ToolShim(
+        name="report_equipment_status",
+        description=(
+            "Report gate lane operational status."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": ["OPERATIONAL", "DEGRADED", "FAILED", "MAINTENANCE"],
+                    "description": "Lane status",
+                },
+                "details": {
+                    "type": "string",
+                    "description": "Status details",
+                },
+            },
+            "required": ["status", "details"],
+        },
+    ),
+]
+
 # ── BridgeAPI ────────────────────────────────────────────────────────────────
 
 class BridgeAPI:
@@ -665,6 +837,10 @@ class BridgeAPI:
                 text = self._read_scheduler_tasking()
             elif self.role == "sensor":
                 text = self._read_sensor_tasking()
+            elif self.role in ("gate_scanner", "rfid_reader"):
+                text = self._read_gate_scanner_tasking()
+            elif self.role == "gate_worker":
+                text = self._read_gate_worker_tasking()
             else:
                 text = self._read_crane_tasking()
 
@@ -775,6 +951,27 @@ class BridgeAPI:
         }
         return json.dumps(tasking, indent=2, default=str)
 
+    def _read_gate_scanner_tasking(self) -> str:
+        entity = self._get_entity_doc()
+        tasking = {
+            "directive": "SCAN_CONTAINERS",
+            "current_truck": entity.fields.get("current_truck") if entity else None,
+            "calibration": entity.fields.get("calibration", {}) if entity else {},
+            "scans_completed": entity.get_field("metrics.scans_completed", 0) if entity else 0,
+        }
+        return json.dumps(tasking, indent=2, default=str)
+
+    def _read_gate_worker_tasking(self) -> str:
+        entity = self._get_entity_doc()
+        tasking = {
+            "directive": "PROCESS_TRUCKS",
+            "current_truck": entity.fields.get("current_truck") if entity else None,
+            "gate_lane": entity.get_field("gate_lane", self.hold_id) if entity else self.hold_id,
+            "trucks_processed": entity.get_field("metrics.trucks_processed", 0) if entity else 0,
+            "scanner_results": entity.fields.get("scanner_results", {}) if entity else {},
+        }
+        return json.dumps(tasking, indent=2, default=str)
+
     def _read_berth_manager_tasking(self) -> str:
         # Aggregate hold docs from team_summaries into berth-level context.
         # Each berth manager only sees the hold(s) belonging to its berth.
@@ -826,6 +1023,10 @@ class BridgeAPI:
             return ListToolsResultShim(tools=list(SCHEDULER_TOOLS))
         elif self.role == "sensor":
             return ListToolsResultShim(tools=list(SENSOR_TOOLS))
+        elif self.role in ("gate_scanner", "rfid_reader"):
+            return ListToolsResultShim(tools=list(GATE_SCANNER_TOOLS))
+        elif self.role == "gate_worker":
+            return ListToolsResultShim(tools=list(GATE_WORKER_TOOLS))
         return ListToolsResultShim(tools=list(CRANE_TOOLS))
 
     async def call_tool(self, name: str, arguments: dict) -> CallToolResultShim:
@@ -860,6 +1061,12 @@ class BridgeAPI:
             # Sensor tools
             "emit_reading": self._tool_emit_reading,
             "report_calibration": self._tool_report_calibration,
+            # Gate scanner tools
+            "scan_container": self._tool_scan_container,
+            # Gate worker tools
+            "verify_documents": self._tool_verify_documents,
+            "process_truck": self._tool_process_truck,
+            "inspect_seal": self._tool_inspect_seal,
         }.get(name)
 
         if handler is None:
@@ -1616,3 +1823,138 @@ class BridgeAPI:
             f"accuracy={accuracy_pct}% drift={drift} status={status}"
         )
         return f"Calibration reported: {accuracy_pct}% accuracy, drift={drift}, status={status}."
+
+    # ── Gate Scanner tool handlers ───────────────────────────────────────
+
+    async def _tool_scan_container(self, arguments: dict) -> str:
+        container_id = arguments.get("container_id", "UNKNOWN")
+        measured_weight = arguments.get("measured_weight_tons")
+        damage = arguments.get("damage_detected", False)
+        within_tolerance = arguments.get("weight_within_tolerance", True)
+
+        entity = self._get_entity_doc()
+        if entity:
+            scans = entity.get_field("metrics.scans_completed", 0)
+            entity.update_field("metrics.scans_completed", scans + 1)
+
+        event_priority = "NORMAL"
+        if damage or not within_tolerance:
+            event_priority = "HIGH"
+
+        self.store.emit_event({
+            "event_type": "container_scanned",
+            "source": self.node_id,
+            "container_id": container_id,
+            "measured_weight_tons": measured_weight,
+            "damage_detected": damage,
+            "weight_within_tolerance": within_tolerance,
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": event_priority,
+        })
+
+        logger.info(
+            f"METRICS: container_scanned node={self.node_id} "
+            f"container={container_id} weight={measured_weight}t "
+            f"damage={damage} tolerance={within_tolerance}"
+        )
+
+        flags = []
+        if damage:
+            flags.append("DAMAGE")
+        if not within_tolerance:
+            flags.append("OVERWEIGHT")
+        flag_str = f" FLAGS: {', '.join(flags)}" if flags else ""
+        return f"Container {container_id} scanned.{flag_str}"
+
+    # ── Gate Worker tool handlers ────────────────────────────────────────
+
+    async def _tool_verify_documents(self, arguments: dict) -> str:
+        container_id = arguments.get("container_id", "UNKNOWN")
+        valid = arguments.get("documents_valid", False)
+
+        entity = self._get_entity_doc()
+        if entity:
+            checks = entity.get_field("metrics.doc_checks", 0)
+            entity.update_field("metrics.doc_checks", checks + 1)
+
+        self.store.emit_event({
+            "event_type": "documents_verified",
+            "source": self.node_id,
+            "container_id": container_id,
+            "valid": valid,
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL" if valid else "HIGH",
+        })
+
+        logger.info(
+            f"METRICS: documents_verified node={self.node_id} "
+            f"container={container_id} valid={valid}"
+        )
+        return f"Documents for {container_id}: {'VALID' if valid else 'INVALID'}."
+
+    async def _tool_process_truck(self, arguments: dict) -> str:
+        container_id = arguments.get("container_id", "UNKNOWN")
+        action = arguments.get("action", "release")
+        gate_lane = arguments.get("gate_lane", "unknown")
+
+        entity = self._get_entity_doc()
+        if entity:
+            processed = entity.get_field("metrics.trucks_processed", 0)
+            entity.update_field("metrics.trucks_processed", processed + 1)
+
+        self.store.emit_event({
+            "event_type": "truck_processed",
+            "source": self.node_id,
+            "container_id": container_id,
+            "action": action,
+            "gate_lane": gate_lane,
+            "reasons": arguments.get("reasons", []),
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL" if action == "release" else "HIGH",
+        })
+
+        spatial_event = {
+            "event_type": "spatial_update",
+            "source": self.node_id,
+            "priority": "ROUTINE",
+            "details": {
+                "operation": f"truck_{action}",
+                "container_id": container_id,
+                "gate_lane": gate_lane,
+            },
+        }
+        print(json.dumps(spatial_event), flush=True)
+
+        logger.info(
+            f"METRICS: truck_processed node={self.node_id} "
+            f"container={container_id} action={action} lane={gate_lane}"
+        )
+        return f"Truck {action}d: container {container_id} at {gate_lane}."
+
+    async def _tool_inspect_seal(self, arguments: dict) -> str:
+        container_id = arguments.get("container_id", "UNKNOWN")
+        seal_intact = arguments.get("seal_intact", True)
+        seal_match = arguments.get("seal_number_match", True)
+
+        entity = self._get_entity_doc()
+        if entity:
+            inspections = entity.get_field("metrics.seal_inspections", 0)
+            entity.update_field("metrics.seal_inspections", inspections + 1)
+
+        compromised = not seal_intact or not seal_match
+
+        self.store.emit_event({
+            "event_type": "seal_inspected",
+            "source": self.node_id,
+            "container_id": container_id,
+            "seal_intact": seal_intact,
+            "seal_number_match": seal_match,
+            "aggregation_policy": "AGGREGATE_AT_PARENT" if not compromised else "IMMEDIATE_PROPAGATE",
+            "priority": "NORMAL" if not compromised else "CRITICAL",
+        })
+
+        logger.info(
+            f"METRICS: seal_inspected node={self.node_id} "
+            f"container={container_id} intact={seal_intact} match={seal_match}"
+        )
+        return f"Seal inspection for {container_id}: {'INTACT' if not compromised else 'COMPROMISED'}."

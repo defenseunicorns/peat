@@ -21,6 +21,9 @@ from lifecycle import get_role_config, RoleConfig
 _COMPOSITION_MAP: dict[str, tuple[str, str, str]] = {
     "g": ("signaler", "signaler", "signaler-{n}"),
     "m": ("gate_manager", "gate-manager", "gate-mgr-{n}"),
+    "s": ("gate_scanner", "gate-scanner", "gate-scanner-{n}"),
+    "r": ("rfid_reader", "gate-scanner", "rfid-reader-{n}"),
+    "w": ("gate_worker", "gate-worker", "gate-worker-{n}"),
 }
 
 

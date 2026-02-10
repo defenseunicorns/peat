@@ -19,9 +19,10 @@ from typing import Optional
 
 class HierarchyLevel(Enum):
     """Terminal hierarchy levels per ADR-051."""
-    H1 = 1  # Equipment (cranes, tractors, handlers)
+    H0 = 0  # Automated equipment (scanners, RFID readers)
+    H1 = 1  # Equipment / team leads (cranes, tractors, gate workers)
     H2 = 2  # Yard block (group of container stacks)
-    H3 = 3  # Yard manager (zone coordinator)
+    H3 = 3  # Yard/Gate manager (zone coordinator)
     H4 = 4  # Terminal Operations Center (TOC)
 
 
@@ -84,6 +85,31 @@ _ROLE_CONFIGS: dict[str, RoleConfig] = {
                 description="Longitudinal travel along yard block length",
             ),
         ),
+    ),
+    "gate_scanner": RoleConfig(
+        level=HierarchyLevel.H0,
+        zone="gate",
+        lifecycle="managed",  # physical equipment with startup/shutdown
+        subordinates=(),
+        superior="gate_worker",
+        description="Automated container damage detection and weight verification at gate lane",
+    ),
+    "rfid_reader": RoleConfig(
+        level=HierarchyLevel.H0,
+        zone="gate",
+        lifecycle="managed",
+        subordinates=(),
+        superior="gate_worker",
+        description="Automated container identification via ISO 18000-6C / EPC GEN2 RFID",
+    ),
+    "gate_worker": RoleConfig(
+        level=HierarchyLevel.H1,
+        zone="gate",
+        lifecycle="managed",
+        subordinates=("gate_scanner", "rfid_reader"),
+        superior="gate_manager",
+        description="Truck processing, document verification, and seal inspection at gate lane",
+        min_subordinates=2,
     ),
 }
 

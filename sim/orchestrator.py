@@ -23,6 +23,9 @@ from .lifecycle import HierarchyLevel, RoleConfig, get_role_config
 _COMPOSITION: dict[str, str] = {
     "yard_manager": "personas/yard-manager.md",
     "stacking_crane": "personas/stacking-crane.md",
+    "gate_scanner": "personas/gate-scanner.md",
+    "rfid_reader": "personas/gate-scanner.md",  # shares scanner persona (equipment)
+    "gate_worker": "personas/gate-worker.md",
 }
 
 

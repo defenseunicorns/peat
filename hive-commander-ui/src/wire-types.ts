@@ -7,18 +7,22 @@ export type BerthRole =
   | 'scheduler'        // H4
   | 'berth_manager'    // H3
   | 'yard_manager'     // H3 — zone coordination (ADR-051)
+  | 'gate_manager'     // H3 — gate zone coordination (ADR-051)
   | 'hold_supervisor'  // H2
   | 'crane_lead'       // H1
   | 'stevedore_lead'   // H1
   | 'lashing_lead'     // H1
   | 'tractor_lead'     // H1
   | 'yard_lead'        // H1
+  | 'gate_worker'      // H1 — truck processing (ADR-051)
   | 'crane_operator'   // H0
   | 'stevedore'        // H0
   | 'lasher'           // H0
   | 'signaler'         // H0
   | 'tractor_driver'   // H0
-  | 'yard_worker';     // H0
+  | 'yard_worker'      // H0
+  | 'gate_scanner'     // H0 — container inspection (ADR-051)
+  | 'rfid_reader';     // H0 — container identification (ADR-051)
 
 export type HoldId = 1 | 2 | 3;
 
@@ -123,10 +127,18 @@ export interface CongestionEvent {
   reasons?: string[];
 }
 
+export interface GateZone {
+  gateManager: BerthNode;        // H3
+  gateWorkers: BerthNode[];      // H1
+  gateScanners: BerthNode[];     // H0
+  rfidReaders: BerthNode[];      // H0
+}
+
 export interface BerthTopology {
   scheduler: BerthNode;
   berthManager: BerthNode;
   yardManager?: BerthNode;  // H3 Yard Manager (ADR-051)
+  gateZone?: GateZone;      // H3 Gate Zone (ADR-051)
   holds: HoldTeam[];
   shared: SharedPool;
   yardBlocks: YardBlock[];
@@ -170,36 +182,44 @@ export const roleColors: Record<BerthRole, string> = {
   scheduler: '#ff9900',
   berth_manager: '#ff6600',
   yard_manager: '#ffaa00',   // amber (ADR-051)
+  gate_manager: '#ff8844',   // orange (ADR-051 gate zone)
   hold_supervisor: '#cc44ff',
   crane_lead: '#00ccff',
   stevedore_lead: '#44ff44',
   lashing_lead: '#ffcc00',
   tractor_lead: '#ff44aa',
   yard_lead: '#88aaff',
+  gate_worker: '#ee7744',    // ADR-051
   crane_operator: '#0088cc',
   stevedore: '#22aa22',
   lasher: '#cc9900',
   signaler: '#ff8888',
   tractor_driver: '#cc2266',
   yard_worker: '#6688cc',
+  gate_scanner: '#dd6633',   // ADR-051
+  rfid_reader: '#cc5522',    // ADR-051
 };
 
 export const roleLabels: Record<BerthRole, string> = {
   scheduler: 'SCH',
   berth_manager: 'BMG',
   yard_manager: 'YMG',      // ADR-051
+  gate_manager: 'GMG',      // ADR-051 gate zone
   hold_supervisor: 'HSV',
   crane_lead: 'CLd',
   stevedore_lead: 'SLd',
   lashing_lead: 'LLd',
   tractor_lead: 'TLd',
   yard_lead: 'YLd',
+  gate_worker: 'GWk',       // ADR-051
   crane_operator: 'CrO',
   stevedore: 'Stv',
   lasher: 'Lsh',
   signaler: 'Sig',
   tractor_driver: 'TrD',
   yard_worker: 'YWk',
+  gate_scanner: 'GSc',      // ADR-051
+  rfid_reader: 'RFI',       // ADR-051
 };
 
 export const levelColors: Record<HierarchyLevel, string> = {
@@ -303,6 +323,31 @@ export function createPhase2Topology(): BerthTopology {
     yardBlockB: { lead: yardLeadB, workers: yardWorkersB },
   };
 
+  // Gate Zone (ADR-051)
+  const gateManager = makeNode('gate_manager', 3, 'Gate Mgr', undefined, scheduler.id);
+
+  // Gate A — lane team
+  const gateWorkerA = makeNode('gate_worker', 1, 'Gate A Worker', undefined, gateManager.id);
+  const gateScannerA = makeNode('gate_scanner', 0, 'Gate A Scanner', undefined, gateWorkerA.id);
+  const rfidReaderA = makeNode('rfid_reader', 0, 'Gate A RFID', undefined, gateWorkerA.id);
+
+  // Gate B — lane team
+  const gateWorkerB = makeNode('gate_worker', 1, 'Gate B Worker', undefined, gateManager.id);
+  const gateScannerB = makeNode('gate_scanner', 0, 'Gate B Scanner', undefined, gateWorkerB.id);
+  const rfidReaderB = makeNode('rfid_reader', 0, 'Gate B RFID', undefined, gateWorkerB.id);
+
+  // Rail 1 — lane team
+  const gateWorkerR = makeNode('gate_worker', 1, 'Rail 1 Worker', undefined, gateManager.id);
+  const gateScannerR = makeNode('gate_scanner', 0, 'Rail 1 Scanner', undefined, gateWorkerR.id);
+  const rfidReaderR = makeNode('rfid_reader', 0, 'Rail 1 RFID', undefined, gateWorkerR.id);
+
+  const gateZone: GateZone = {
+    gateManager,
+    gateWorkers: [gateWorkerA, gateWorkerB, gateWorkerR],
+    gateScanners: [gateScannerA, gateScannerB, gateScannerR],
+    rfidReaders: [rfidReaderA, rfidReaderB, rfidReaderR],
+  };
+
   const yardBlocks: YardBlock[] = [
     { id: 'yard-a', name: 'Yard Block A', capacity: 120, filled: 78, rows: 4, cols: 6 },
     { id: 'yard-b', name: 'Yard Block B', capacity: 120, filled: 45, rows: 4, cols: 6 },
@@ -310,7 +355,7 @@ export function createPhase2Topology(): BerthTopology {
 
   const events = generateDemoEvents();
 
-  return { scheduler, berthManager, yardManager, holds, shared, yardBlocks, nodes, edges, events };
+  return { scheduler, berthManager, yardManager, gateZone, holds, shared, yardBlocks, nodes, edges, events };
 }
 
 function generateDemoEvents(): BerthEvent[] {

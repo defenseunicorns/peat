@@ -408,6 +408,196 @@ def _execute_retrieve(
         })
 
 
+# ---------------------------------------------------------------------------
+# Gate Scanner (H0)
+# ---------------------------------------------------------------------------
+
+_WEIGHT_TOLERANCE = 0.05  # 5 % SOLAS VGM tolerance
+_CONFIDENCE_THRESHOLD = 0.95
+
+
+@_register("gate_scanner")
+def _decide_gate_scanner(entity: Entity, orchestrator: Orchestrator) -> dict[str, Any]:
+    """Gate Scanner decision cycle.
+
+    Steps:
+      1. Check for a container in the scan position
+      2. Perform optical + weight scan
+      3. Flag anomalies (overweight, damage)
+    """
+    actions: list[dict[str, Any]] = []
+    truck = entity.state.get("current_truck")
+
+    if truck is None:
+        return {"actions": actions, "status": "idle"}
+
+    container_id = truck.get("container_id", "UNKNOWN")
+    declared_weight = truck.get("declared_weight_tons", 25.0)
+
+    # Simulate scan result from entity state
+    measured_weight = entity.state.get("last_measured_weight", declared_weight)
+    weight_delta = abs(measured_weight - declared_weight) / max(declared_weight, 1)
+    damage_detected = entity.state.get("damage_detected", False)
+
+    scan_result = {
+        "container_id": container_id,
+        "measured_weight_tons": measured_weight,
+        "declared_weight_tons": declared_weight,
+        "weight_within_tolerance": weight_delta <= _WEIGHT_TOLERANCE,
+        "damage_detected": damage_detected,
+        "ocr_number": entity.state.get("ocr_number", container_id),
+        "confidence": entity.state.get("scan_confidence", 0.98),
+    }
+
+    actions.append({
+        "tool": "scan_container",
+        "params": scan_result,
+    })
+
+    if damage_detected or weight_delta > _WEIGHT_TOLERANCE:
+        actions.append({
+            "tool": "report_equipment_status",
+            "params": {
+                "status": "FLAGGED",
+                "details": (
+                    f"Container {container_id}: "
+                    + ("damage detected" if damage_detected else "")
+                    + (", " if damage_detected and weight_delta > _WEIGHT_TOLERANCE else "")
+                    + (f"weight delta {weight_delta:.1%}" if weight_delta > _WEIGHT_TOLERANCE else "")
+                ),
+            },
+        })
+
+    return {"actions": actions, "scan_result": scan_result}
+
+
+@_register("rfid_reader")
+def _decide_rfid_reader(entity: Entity, orchestrator: Orchestrator) -> dict[str, Any]:
+    """RFID Reader decision cycle — reads EPC tag from container."""
+    actions: list[dict[str, Any]] = []
+    truck = entity.state.get("current_truck")
+
+    if truck is None:
+        return {"actions": actions, "status": "idle"}
+
+    container_id = truck.get("container_id", "UNKNOWN")
+    epc_tag = entity.state.get("epc_tag", container_id)
+
+    actions.append({
+        "tool": "scan_container",
+        "params": {
+            "container_id": container_id,
+            "epc_tag": epc_tag,
+            "match": epc_tag == container_id,
+            "reading_type": "rfid",
+        },
+    })
+
+    return {"actions": actions}
+
+
+# ---------------------------------------------------------------------------
+# Gate Worker (H1)
+# ---------------------------------------------------------------------------
+
+@_register("gate_worker")
+def _decide_gate_worker(entity: Entity, orchestrator: Orchestrator) -> dict[str, Any]:
+    """Gate Worker decision cycle.
+
+    Steps:
+      1. Check for truck in processing position
+      2. Gather scanner/RFID results from subordinates
+      3. Verify documents
+      4. Inspect seal
+      5. Process truck (release or reject)
+    """
+    actions: list[dict[str, Any]] = []
+    truck = entity.state.get("current_truck")
+
+    if truck is None:
+        return {"actions": actions, "status": "idle"}
+
+    container_id = truck.get("container_id", "UNKNOWN")
+
+    # Gather subordinate scan results
+    scan_results = _gather_scan_results(entity, orchestrator)
+
+    # Step 1: Verify documents
+    docs_ok = truck.get("customs_cleared", False) and truck.get("bill_of_lading", False)
+    actions.append({
+        "tool": "verify_documents",
+        "params": {
+            "container_id": container_id,
+            "customs_cleared": truck.get("customs_cleared", False),
+            "bill_of_lading": truck.get("bill_of_lading", False),
+            "documents_valid": docs_ok,
+        },
+    })
+
+    # Step 2: Inspect seal
+    seal_intact = truck.get("seal_intact", True)
+    seal_number_match = truck.get("seal_number_match", True)
+    actions.append({
+        "tool": "inspect_seal",
+        "params": {
+            "container_id": container_id,
+            "seal_intact": seal_intact,
+            "seal_number_match": seal_number_match,
+        },
+    })
+
+    # Step 3: Determine release or reject
+    scan_ok = all(
+        sr.get("weight_within_tolerance", True) and not sr.get("damage_detected", False)
+        for sr in scan_results
+    )
+    release = docs_ok and seal_intact and seal_number_match and scan_ok
+
+    if release:
+        actions.append({
+            "tool": "process_truck",
+            "params": {
+                "container_id": container_id,
+                "action": "release",
+                "gate_lane": entity.zone_scope,
+            },
+        })
+    else:
+        reasons: list[str] = []
+        if not docs_ok:
+            reasons.append("documents_invalid")
+        if not seal_intact:
+            reasons.append("seal_broken")
+        if not seal_number_match:
+            reasons.append("seal_number_mismatch")
+        if not scan_ok:
+            reasons.append("scan_anomaly")
+        actions.append({
+            "tool": "process_truck",
+            "params": {
+                "container_id": container_id,
+                "action": "reject",
+                "reasons": reasons,
+                "gate_lane": entity.zone_scope,
+            },
+        })
+
+    return {"actions": actions, "released": release}
+
+
+def _gather_scan_results(
+    entity: Entity,
+    orchestrator: Orchestrator,
+) -> list[dict[str, Any]]:
+    """Read scan results from subordinate H0 entities (scanners, RFID)."""
+    results: list[dict[str, Any]] = []
+    for sub in orchestrator.subordinates_of(entity.entity_id):
+        scan = sub.state.get("last_scan_result", {})
+        if scan:
+            results.append(scan)
+    return results
+
+
 def _maybe_escalate(
     entity: Entity,
     yard_summary: dict[str, Any],
