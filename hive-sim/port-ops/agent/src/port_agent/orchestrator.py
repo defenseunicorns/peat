@@ -236,6 +236,7 @@ class Orchestrator:
             create_container_queue(self.store, hold_id, containers)
             create_team_state(self.store, hold_id)
 
+            self.store.create_container_assignments(hold_id)
             team_doc = self.store.get_document("team_summaries", f"team_{hold_id}")
             if team_doc:
                 team_doc.update_field("moves_remaining", len(containers))

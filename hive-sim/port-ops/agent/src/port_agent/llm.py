@@ -269,11 +269,40 @@ class DryRunProvider(LLMProvider):
         return self._decide_crane(observed_state)
 
     def _decide_crane(self, observed_state: dict) -> AgentDecision:
+        tasking = observed_state.get("tasking", {})
         queue = observed_state.get("container_queue", {})
         next_containers = queue.get("next_containers", [])
+        # Phase 2: prefer containers specifically assigned to this crane
+        assigned_containers = tasking.get("assigned_containers", [])
 
+        if assigned_containers:
+            # Process next assigned container that's still in the queue
+            for cid in assigned_containers:
+                target = next(
+                    (c for c in next_containers
+                     if c.get("container_id") == cid
+                     and c.get("status") != "COMPLETED"
+                     and not c.get("claimed_by")),
+                    None,
+                )
+                if target:
+                    if target.get("hazmat"):
+                        return AgentDecision(
+                            action="request_support",
+                            arguments={
+                                "capability_needed": "HAZMAT_CERTIFIED_OPERATOR",
+                                "reason": f"Assigned container {cid} is hazmat class {target.get('hazmat_class')} — need certified handler",
+                            },
+                            reasoning=f"DryRun cycle {self._cycle}: assigned hazmat container {cid}",
+                        )
+                    return AgentDecision(
+                        action="complete_container_move",
+                        arguments={"container_id": cid},
+                        reasoning=f"DryRun cycle {self._cycle}: processing assigned container {cid}",
+                    )
+
+        # Fallback: process next available container from queue (backward compat)
         if next_containers:
-            # Separate available containers into hazmat and non-hazmat
             first_hazmat = None
             first_normal = None
             for container in next_containers:
@@ -286,7 +315,6 @@ class DryRunProvider(LLMProvider):
                 elif not is_hazmat and first_normal is None:
                     first_normal = container
 
-            # Prefer processing non-hazmat; escalate hazmat on odd cycles
             if first_normal:
                 cid = first_normal.get("container_id", "UNKNOWN")
                 return AgentDecision(
@@ -378,6 +406,8 @@ class DryRunProvider(LLMProvider):
         battery = tasking.get("battery_pct", 100)
         pending_jobs = tasking.get("pending_transport_jobs", [])
         trips = tasking.get("trips_completed", 0)
+        # Phase 2: containers specifically assigned to this tractor
+        assigned_containers = tasking.get("assigned_containers", [])
 
         # Battery critical: request charge
         if battery < 30:
@@ -403,7 +433,24 @@ class DryRunProvider(LLMProvider):
                 reasoning=f"DryRun cycle {self._cycle}: periodic position report",
             )
 
-        # Primary: transport container from queue
+        # Phase 2: prefer assigned containers from transport queue
+        if assigned_containers:
+            for cid in assigned_containers:
+                job = next(
+                    (j for j in pending_jobs if j.get("container_id") == cid),
+                    None,
+                )
+                if job:
+                    return AgentDecision(
+                        action="transport_container",
+                        arguments={
+                            "container_id": cid,
+                            "destination_block": job.get("destination_block", "YB-A01"),
+                        },
+                        reasoning=f"DryRun cycle {self._cycle}: transporting assigned container {cid}",
+                    )
+
+        # Fallback: transport first available from queue (backward compat)
         if pending_jobs:
             job = pending_jobs[0]
             return AgentDecision(
@@ -423,8 +470,11 @@ class DryRunProvider(LLMProvider):
 
     def _decide_scheduler(self, observed_state: dict) -> AgentDecision:
         team = observed_state.get("team_state", {})
+        tasking = observed_state.get("tasking", {})
         members = team.get("team_members", {})
         gaps = team.get("gap_analysis", [])
+        # Phase 2: container-level assignment
+        unassigned = tasking.get("unassigned_containers", [])
 
         # If crane DEGRADED: dispatch resource
         for mid, mdata in members.items():
@@ -439,6 +489,42 @@ class DryRunProvider(LLMProvider):
                     },
                     reasoning=f"DryRun cycle {self._cycle}: dispatching to degraded crane {mid}",
                 )
+
+        # Phase 2: assign unassigned containers to specific cranes/operators/tractors
+        if unassigned:
+            cranes = sorted(
+                [m for m, d in members.items() if d.get("entity_type") == "gantry_crane"],
+            )
+            operators = sorted(
+                [m for m, d in members.items() if d.get("entity_type") == "operator"],
+            )
+            tractors = sorted(
+                [m for m, d in members.items() if d.get("entity_type") == "yard_tractor"],
+            )
+
+            # Round-robin assign next unassigned container
+            cid = unassigned[0]
+            crane_idx = self._cycle % len(cranes) if cranes else 0
+            op_idx = self._cycle % len(operators) if operators else 0
+            tractor_idx = self._cycle % len(tractors) if tractors else 0
+
+            args = {
+                "container_id": cid,
+                "assigned_crane": cranes[crane_idx] if cranes else "crane-1",
+            }
+            if operators:
+                args["assigned_operator"] = operators[op_idx]
+            if tractors:
+                args["assigned_tractor"] = tractors[tractor_idx]
+
+            return AgentDecision(
+                action="assign_container",
+                arguments=args,
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: assigning container {cid} to "
+                    f"{args.get('assigned_crane')}"
+                ),
+            )
 
         # Every 2nd cycle: rebalance assignments
         if self._cycle % 2 == 0:

@@ -248,6 +248,117 @@ class HiveStateStore:
             and d.fields.get("status") == "PENDING"
         ]
 
+    # ── Container assignment tracking ────────────────────────────────────
+
+    def create_container_assignments(self, hold_id: str) -> HiveDocument:
+        """Initialize the container_assignments document for a hold."""
+        return self.create_document(
+            collection="container_assignments",
+            doc_id=f"assignments_{hold_id}",
+            fields={
+                "hold_id": hold_id,
+                "assignments": {},  # container_id → assignment record
+            },
+        )
+
+    def assign_container(
+        self,
+        hold_id: str,
+        container_id: str,
+        assigned_crane: str | None = None,
+        assigned_operator: str | None = None,
+        assigned_tractor: str | None = None,
+        lashing_crew: str | None = None,
+    ) -> bool:
+        """Create or update a container assignment record.
+
+        Each container tracks which crane, operator, tractor, and lashing crew
+        are assigned to it, plus its lifecycle status.
+        """
+        doc = self.get_document("container_assignments", f"assignments_{hold_id}")
+        if doc is None:
+            return False
+        assignments = doc.fields.get("assignments", {})
+        existing = assignments.get(container_id, {})
+        record = {
+            "container_id": container_id,
+            "assigned_crane": assigned_crane or existing.get("assigned_crane"),
+            "assigned_operator": assigned_operator or existing.get("assigned_operator"),
+            "assigned_tractor": assigned_tractor or existing.get("assigned_tractor"),
+            "lashing_crew": lashing_crew or existing.get("lashing_crew"),
+            "status": existing.get("status", "QUEUED"),
+            "updated_us": int(time.time() * 1_000_000),
+        }
+        assignments[container_id] = record
+        doc.update_field("assignments", assignments)
+
+        self.emit_event({
+            "event_type": "container_assignment",
+            "source": "scheduler",
+            "container_id": container_id,
+            "assigned_crane": record["assigned_crane"],
+            "assigned_operator": record["assigned_operator"],
+            "assigned_tractor": record["assigned_tractor"],
+            "lashing_crew": record["lashing_crew"],
+            "status": record["status"],
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL",
+        })
+        return True
+
+    def update_container_status(
+        self, hold_id: str, container_id: str, status: str
+    ) -> bool:
+        """Update the lifecycle status of a container assignment.
+
+        Valid statuses: QUEUED, IN_PROGRESS, DISCHARGED, TRANSPORTED, SECURED.
+        """
+        doc = self.get_document("container_assignments", f"assignments_{hold_id}")
+        if doc is None:
+            return False
+        assignments = doc.fields.get("assignments", {})
+        if container_id not in assignments:
+            return False
+        assignments[container_id]["status"] = status
+        assignments[container_id]["updated_us"] = int(time.time() * 1_000_000)
+        doc.update_field("assignments", assignments)
+        return True
+
+    def get_container_assignment(
+        self, hold_id: str, container_id: str
+    ) -> dict | None:
+        """Get the assignment record for a specific container."""
+        doc = self.get_document("container_assignments", f"assignments_{hold_id}")
+        if doc is None:
+            return None
+        return doc.fields.get("assignments", {}).get(container_id)
+
+    def get_container_assignments_by_role(
+        self, hold_id: str, role: str, agent_id: str
+    ) -> list[dict]:
+        """Get all container assignments for a specific agent.
+
+        role: 'assigned_crane', 'assigned_operator', 'assigned_tractor', 'lashing_crew'
+        """
+        doc = self.get_document("container_assignments", f"assignments_{hold_id}")
+        if doc is None:
+            return []
+        return [
+            a for a in doc.fields.get("assignments", {}).values()
+            if a.get(role) == agent_id
+        ]
+
+    def get_container_status_breakdown(self, hold_id: str) -> dict[str, int]:
+        """Get count of containers in each lifecycle status for a hold."""
+        doc = self.get_document("container_assignments", f"assignments_{hold_id}")
+        if doc is None:
+            return {}
+        breakdown: dict[str, int] = {}
+        for a in doc.fields.get("assignments", {}).values():
+            status = a.get("status", "QUEUED")
+            breakdown[status] = breakdown.get(status, 0) + 1
+        return breakdown
+
 
 def create_crane_entity(store: HiveStateStore, node_id: str, config: dict) -> HiveDocument:
     """Initialize a gantry crane entity document in the HIVE state store."""

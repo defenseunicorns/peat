@@ -402,6 +402,36 @@ SCHEDULER_TOOLS = [
         },
     ),
     ToolShim(
+        name="assign_container",
+        description=(
+            "Assign a specific container to specific workers (crane, operator, tractor). "
+            "Creates a container_assignment record tracking the full lifecycle. "
+            "Status progresses: QUEUED → IN_PROGRESS → DISCHARGED → TRANSPORTED → SECURED."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "container_id": {
+                    "type": "string",
+                    "description": "Container ID to assign (e.g., MSCU-4472891)",
+                },
+                "assigned_crane": {
+                    "type": "string",
+                    "description": "Crane node_id to assign (e.g., crane-1)",
+                },
+                "assigned_operator": {
+                    "type": "string",
+                    "description": "Operator node_id to assign (e.g., op-1)",
+                },
+                "assigned_tractor": {
+                    "type": "string",
+                    "description": "Tractor node_id to assign (e.g., tractor-1)",
+                },
+            },
+            "required": ["container_id", "assigned_crane"],
+        },
+    ),
+    ToolShim(
         name="emit_schedule_event",
         description=(
             "Emit a schedule-level event up the HIVE hierarchy."
@@ -785,6 +815,41 @@ class BridgeAPI:
             else:
                 text = json.dumps({"error": "Transport queue not found"})
 
+        elif uri == "hive://container-assignments":
+            doc = self.store.get_document(
+                "container_assignments", f"assignments_{self.hold_id}"
+            )
+            if doc:
+                assignments = doc.fields.get("assignments", {})
+                # Filter to show assignments relevant to this agent
+                if self.role == "crane":
+                    relevant = {
+                        k: v for k, v in assignments.items()
+                        if v.get("assigned_crane") == self.node_id
+                    }
+                elif self.role == "tractor":
+                    relevant = {
+                        k: v for k, v in assignments.items()
+                        if v.get("assigned_tractor") == self.node_id
+                    }
+                elif self.role == "operator":
+                    relevant = {
+                        k: v for k, v in assignments.items()
+                        if v.get("assigned_operator") == self.node_id
+                    }
+                else:
+                    relevant = assignments
+                text = json.dumps({
+                    "hold_id": self.hold_id,
+                    "assignments": relevant,
+                    "total_assigned": len(assignments),
+                    "status_breakdown": self.store.get_container_status_breakdown(
+                        self.hold_id
+                    ),
+                }, indent=2, default=str)
+            else:
+                text = json.dumps({"error": "Container assignments not initialized"})
+
         elif uri == "hive://tasking":
             if self.role == "aggregator":
                 text = self._read_aggregator_tasking()
@@ -821,6 +886,14 @@ class BridgeAPI:
     def _read_crane_tasking(self) -> str:
         entity = self._get_entity_doc()
         queue = self._get_queue_doc()
+        # Get containers assigned to this crane
+        my_assignments = self.store.get_container_assignments_by_role(
+            self.hold_id, "assigned_crane", self.node_id
+        )
+        assigned_pending = [
+            a for a in my_assignments
+            if a.get("status") in ("QUEUED", "IN_PROGRESS")
+        ]
         tasking = {
             "directive": "PROCESS_CONTAINERS",
             "assignment": entity.fields.get("assignment", {}) if entity else {},
@@ -828,6 +901,8 @@ class BridgeAPI:
                 queue.fields.get("total_containers", 0) - queue.fields.get("completed_count", 0)
                 if queue else 0
             ),
+            "assigned_containers": [a["container_id"] for a in assigned_pending],
+            "total_assigned": len(my_assignments),
             "target_rate": 35,
             "priority": "NORMAL",
         }
@@ -841,6 +916,7 @@ class BridgeAPI:
         if team:
             for mid, mdata in team.fields.get("team_members", {}).items():
                 hold_members[mid] = mdata
+        container_status = self.store.get_container_status_breakdown(self.hold_id)
         tasking = {
             "directive": "AGGREGATE_HOLD_STATUS",
             "hold_id": self.hold_id,
@@ -849,6 +925,7 @@ class BridgeAPI:
             "moves_completed": team.fields.get("moves_completed", 0) if team else 0,
             "moves_remaining": team.fields.get("moves_remaining", 0) if team else 0,
             "gap_count": len(team.fields.get("gap_analysis", [])) if team else 0,
+            "container_status_breakdown": container_status,
             "target_rate": 35,
             "priority": "NORMAL",
         }
@@ -881,11 +958,20 @@ class BridgeAPI:
                 j for j in tq.fields.get("pending_jobs", [])
                 if j.get("status") == "PENDING"
             ]
+        # Get containers specifically assigned to this tractor
+        my_assignments = self.store.get_container_assignments_by_role(
+            self.hold_id, "assigned_tractor", self.node_id
+        )
+        assigned_discharged = [
+            a["container_id"] for a in my_assignments
+            if a.get("status") == "DISCHARGED"
+        ]
         tasking = {
             "directive": "TRANSPORT_CONTAINERS",
             "position": entity.fields.get("position", {}) if entity else {},
             "battery_pct": entity.get_field("equipment_health.battery_pct", 100) if entity else 100,
             "pending_transport_jobs": pending_jobs[:3],
+            "assigned_containers": assigned_discharged,
             "trips_completed": entity.get_field("metrics.trips_completed", 0) if entity else 0,
         }
         return json.dumps(tasking, indent=2, default=str)
@@ -894,6 +980,20 @@ class BridgeAPI:
         team = self._get_team_doc()
         queue = self._get_queue_doc()
         members = team.fields.get("team_members", {}) if team else {}
+        container_status = self.store.get_container_status_breakdown(self.hold_id)
+        # Get unassigned containers from queue
+        unassigned = []
+        if queue:
+            assign_doc = self.store.get_document(
+                "container_assignments", f"assignments_{self.hold_id}"
+            )
+            assigned_ids = set()
+            if assign_doc:
+                assigned_ids = set(assign_doc.fields.get("assignments", {}).keys())
+            for c in queue.fields.get("containers", []):
+                cid = c.get("container_id")
+                if cid and cid not in assigned_ids and c.get("status") != "COMPLETED":
+                    unassigned.append(cid)
         tasking = {
             "directive": "COORDINATE_HOLD",
             "hold_id": self.hold_id,
@@ -905,6 +1005,9 @@ class BridgeAPI:
             "moves_completed": team.get_field("moves_completed", 0) if team else 0,
             "moves_remaining": team.get_field("moves_remaining", 0) if team else 0,
             "gap_count": len(team.get_field("gap_analysis", [])) if team else 0,
+            "container_status_breakdown": container_status,
+            "unassigned_containers": unassigned[:10],
+            "total_unassigned": len(unassigned),
         }
         return json.dumps(tasking, indent=2, default=str)
 
@@ -1042,6 +1145,7 @@ class BridgeAPI:
             "rebalance_assignments": self._tool_rebalance_assignments,
             "update_priority_queue": self._tool_update_priority_queue,
             "dispatch_resource": self._tool_dispatch_resource,
+            "assign_container": self._tool_assign_container,
             "emit_schedule_event": self._tool_emit_schedule_event,
             # Sensor tools
             "emit_reading": self._tool_emit_reading,
@@ -1149,6 +1253,9 @@ class BridgeAPI:
             (c["weight_tons"] for c in containers if c["container_id"] == container_id),
             25.0,
         )
+
+        # Update container assignment status: QUEUED/IN_PROGRESS → DISCHARGED
+        self.store.update_container_status(self.hold_id, container_id, "DISCHARGED")
 
         # Update crane entity metrics
         moves = entity.get_field("metrics.moves_completed", 0)
@@ -1574,8 +1681,9 @@ class BridgeAPI:
             trips = entity.get_field("metrics.trips_completed", 0)
             entity.update_field("metrics.trips_completed", trips + 1)
 
-        # Complete the job
+        # Complete the job and update container assignment status
         self.store.complete_transport_job(self.hold_id, container_id)
+        self.store.update_container_status(self.hold_id, container_id, "TRANSPORTED")
 
         self.store.emit_event({
             "event_type": "container_transported",
@@ -1715,6 +1823,37 @@ class BridgeAPI:
             f"type={resource_type} {from_entity}→{to_entity}"
         )
         return f"Dispatched {resource_type} from {from_entity} to {to_entity}. Reason: {reason}"
+
+    async def _tool_assign_container(self, arguments: dict) -> str:
+        container_id = arguments["container_id"]
+        assigned_crane = arguments.get("assigned_crane")
+        assigned_operator = arguments.get("assigned_operator")
+        assigned_tractor = arguments.get("assigned_tractor")
+
+        ok = self.store.assign_container(
+            hold_id=self.hold_id,
+            container_id=container_id,
+            assigned_crane=assigned_crane,
+            assigned_operator=assigned_operator,
+            assigned_tractor=assigned_tractor,
+        )
+        if not ok:
+            return f"Error: could not assign container {container_id}"
+
+        parts = [f"crane={assigned_crane}"]
+        if assigned_operator:
+            parts.append(f"operator={assigned_operator}")
+        if assigned_tractor:
+            parts.append(f"tractor={assigned_tractor}")
+
+        logger.info(
+            f"METRICS: container_assignment node={self.node_id} "
+            f"container={container_id} {' '.join(parts)}"
+        )
+        return (
+            f"Container {container_id} assigned: {', '.join(parts)}. "
+            f"Status: QUEUED → tracking through lifecycle."
+        )
 
     async def _tool_emit_schedule_event(self, arguments: dict) -> str:
         event_type = arguments["event_type"]
