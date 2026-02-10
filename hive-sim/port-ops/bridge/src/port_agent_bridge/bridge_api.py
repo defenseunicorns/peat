@@ -17,7 +17,6 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .hive_state import HiveStateStore
-from .lifecycle import MINIMUM_CREW_PER_CRANE
 
 logger = logging.getLogger(__name__)
 
@@ -537,29 +536,90 @@ BERTH_MANAGER_TOOLS = [
         },
     ),
     ToolShim(
-        name="dispatch_shared_tractor",
+        name="reassign_worker",
         description=(
-            "Dispatch a shared tractor from the berth-level pool to a specific hold. "
-            "Picks an unassigned shared tractor (or reassigns one from another hold) "
-            "and assigns it to the target hold. Emits tractor_reassigned event."
+            "Reassign a worker (operator, lashing crew) from one hold to another. "
+            "Use when a hold is underperforming due to workforce gaps. "
+            "Emits worker_reassigned event."
         ),
         inputSchema={
             "type": "object",
             "properties": {
-                "to_hold": {
+                "worker_id": {
                     "type": "string",
-                    "description": "Target hold to assign the shared tractor to",
+                    "description": "Worker node_id to reassign (e.g., op-2)",
                 },
                 "from_hold": {
                     "type": "string",
-                    "description": "If reassigning, the hold to pull the tractor from (optional)",
+                    "description": "Hold the worker is currently in",
+                },
+                "to_hold": {
+                    "type": "string",
+                    "description": "Hold to reassign the worker to",
                 },
                 "reason": {
                     "type": "string",
-                    "description": "Reason for the dispatch",
+                    "description": "Reason for the reassignment",
                 },
             },
-            "required": ["to_hold", "reason"],
+            "required": ["worker_id", "from_hold", "to_hold", "reason"],
+        },
+    ),
+    ToolShim(
+        name="escalate_to_scheduler",
+        description=(
+            "Escalate a structural problem to the scheduler that requires "
+            "stow plan changes or broader coordination. Use for crane failures, "
+            "persistent throughput gaps, or issues beyond berth-level fixes. "
+            "Emits scheduler_escalation event."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "issue_type": {
+                    "type": "string",
+                    "enum": [
+                        "crane_failure",
+                        "persistent_throughput_gap",
+                        "stow_plan_change_needed",
+                        "workforce_shortage",
+                        "equipment_cascade_failure",
+                    ],
+                    "description": "Category of structural issue",
+                },
+                "details": {
+                    "type": "string",
+                    "description": "Detailed description of the issue and impact",
+                },
+            },
+            "required": ["issue_type", "details"],
+        },
+    ),
+    ToolShim(
+        name="update_hold_priority",
+        description=(
+            "Adjust the priority level of a hold to direct more or fewer "
+            "shared resources to it. Higher priority holds get preferential "
+            "tractor and worker allocation. Emits hold_priority_changed event."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "hold_num": {
+                    "type": "integer",
+                    "description": "Hold number (1, 2, or 3)",
+                },
+                "priority_level": {
+                    "type": "string",
+                    "enum": ["LOW", "NORMAL", "HIGH", "CRITICAL"],
+                    "description": "New priority level for the hold",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Reason for the priority change",
+                },
+            },
+            "required": ["hold_num", "priority_level"],
         },
     ),
 ]
@@ -910,85 +970,6 @@ class BridgeAPI:
 
         return ReadResourceResultShim(contents=[TextContentShim(text=text)])
 
-    def _get_labor_state(self, entity) -> dict:
-        """Extract labor constraint state from entity doc for tasking context."""
-        if not entity:
-            return {}
-        labor = entity.fields.get("labor", {})
-        if not labor:
-            return {}
-        return {
-            "shift_elapsed_hours": labor.get("shift_elapsed_hours", 0),
-            "consecutive_hours": labor.get("consecutive_hours", 0),
-            "max_consecutive_hours": labor.get("max_consecutive_hours", 6.0),
-            "remaining_shift_hours": labor.get("remaining_shift_hours", 12.0),
-            "break_eligible": labor.get("break_eligible", False),
-            "break_required": labor.get("break_required", False),
-            "on_break": labor.get("on_break", False),
-            "break_duration_min": labor.get("break_duration_min", 30.0),
-            "shift_ended": labor.get("shift_ended", False),
-            "breaks_taken": labor.get("breaks_taken", 0),
-        }
-
-    def _get_crane_crew_count(self) -> int:
-        """Count crew members (operators + signalers) assigned to this crane."""
-        team = self._get_team_doc()
-        if not team:
-            return 0
-        members = team.fields.get("team_members", {})
-        count = 0
-        for mid, mdata in members.items():
-            if mdata.get("entity_type") == "operator":
-                op_doc = self.store.get_document("node_states", f"sim_doc_{mid}")
-                if op_doc and op_doc.get_field("assignment.assigned_to") == self.node_id:
-                    count += 1
-        return count
-
-    def _check_labor_violations(self, entity) -> list[dict]:
-        """Check for labor constraint violations and return events."""
-        if not entity:
-            return []
-        labor = entity.fields.get("labor", {})
-        if not labor:
-            return []
-
-        events = []
-        remaining = labor.get("remaining_shift_hours", 12.0)
-        consecutive = labor.get("consecutive_hours", 0)
-        max_consec = labor.get("max_consecutive_hours", 6.0)
-
-        # Approaching shift end (< 1 hour remaining)
-        if 0 < remaining <= 1.0 and not labor.get("shift_ended"):
-            events.append({
-                "event_type": "labor_constraint_violation",
-                "source": self.node_id,
-                "priority": "HIGH",
-                "details": {
-                    "constraint": "shift_limit_approaching",
-                    "worker_id": self.node_id,
-                    "remaining_shift_hours": round(remaining, 2),
-                    "consecutive_hours": round(consecutive, 2),
-                    "break_eligible": labor.get("break_eligible", False),
-                },
-            })
-
-        # Break overdue
-        if consecutive >= max_consec and not labor.get("on_break") and not labor.get("shift_ended"):
-            events.append({
-                "event_type": "labor_constraint_violation",
-                "source": self.node_id,
-                "priority": "CRITICAL",
-                "details": {
-                    "constraint": "mandatory_break_overdue",
-                    "worker_id": self.node_id,
-                    "consecutive_hours": round(consecutive, 2),
-                    "max_consecutive_hours": max_consec,
-                    "break_eligible": True,
-                },
-            })
-
-        return events
-
     def _read_crane_tasking(self) -> str:
         entity = self._get_entity_doc()
         queue = self._get_queue_doc()
@@ -1000,14 +981,6 @@ class BridgeAPI:
             a for a in my_assignments
             if a.get("status") in ("QUEUED", "IN_PROGRESS")
         ]
-        labor_state = self._get_labor_state(entity)
-
-        # Check crew sufficiency for crane
-        crew_count = self._get_crane_crew_count()
-        if labor_state:
-            labor_state["crew_insufficient"] = crew_count < MINIMUM_CREW_PER_CRANE
-            labor_state["current_crew"] = crew_count
-            labor_state["minimum_crew"] = MINIMUM_CREW_PER_CRANE
         tasking = {
             "directive": "PROCESS_CONTAINERS",
             "assignment": entity.fields.get("assignment", {}) if entity else {},
@@ -1020,13 +993,6 @@ class BridgeAPI:
             "target_rate": 35,
             "priority": "NORMAL",
         }
-        if labor_state:
-            tasking["labor_constraints"] = labor_state
-
-        # Emit violation events
-        for evt in self._check_labor_violations(entity):
-            self.store.emit_event(evt)
-
         return json.dumps(tasking, indent=2, default=str)
 
     def _read_aggregator_tasking(self) -> str:
@@ -1057,7 +1023,6 @@ class BridgeAPI:
         requests = self.store.get_pending_operator_requests(self.hold_id)
         assigned_to = entity.fields.get("assignment", {}).get("assigned_to") if entity else None
         status = entity.fields.get("operational_status", "AVAILABLE") if entity else "UNKNOWN"
-        labor_state = self._get_labor_state(entity)
         tasking = {
             "directive": "OPERATE_CRANE",
             "status": status,
@@ -1066,32 +1031,20 @@ class BridgeAPI:
             "instructions": (
                 "Check in as AVAILABLE at shift start. Accept crane assignments when "
                 "pending. Complete assignment after crane move finishes. Report hazmat "
-                "status for hazmat containers. Take mandatory breaks per union rules."
+                "status for hazmat containers. Take breaks as needed."
             ),
         }
-        if labor_state:
-            tasking["labor_constraints"] = labor_state
-
-        for evt in self._check_labor_violations(entity):
-            self.store.emit_event(evt)
-
         return json.dumps(tasking, indent=2, default=str)
 
     def _read_tractor_tasking(self) -> str:
         entity = self._get_entity_doc()
-        is_shared = entity.get_field("assignment.shared", False) if entity else False
-        hold_assignment = entity.get_field("assignment.hold_assignment") if entity else None
-
-        # For shared tractors, read from the assigned hold's transport queue
-        effective_hold = hold_assignment if is_shared else self.hold_id
+        tq = self.store.get_document("transport_queues", f"transport_{self.hold_id}")
         pending_jobs = []
-        if effective_hold:
-            tq = self.store.get_document("transport_queues", f"transport_{effective_hold}")
-            if tq:
-                pending_jobs = [
-                    j for j in tq.fields.get("pending_jobs", [])
-                    if j.get("status") == "PENDING"
-                ]
+        if tq:
+            pending_jobs = [
+                j for j in tq.fields.get("pending_jobs", [])
+                if j.get("status") == "PENDING"
+            ]
         # Get containers specifically assigned to this tractor
         my_assignments = self.store.get_container_assignments_by_role(
             self.hold_id, "assigned_tractor", self.node_id
@@ -1100,7 +1053,6 @@ class BridgeAPI:
             a["container_id"] for a in my_assignments
             if a.get("status") == "DISCHARGED"
         ]
-        labor_state = self._get_labor_state(entity)
         tasking = {
             "directive": "TRANSPORT_CONTAINERS",
             "position": entity.fields.get("position", {}) if entity else {},
@@ -1108,27 +1060,7 @@ class BridgeAPI:
             "pending_transport_jobs": pending_jobs[:3],
             "assigned_containers": assigned_discharged,
             "trips_completed": entity.get_field("metrics.trips_completed", 0) if entity else 0,
-            "shared": is_shared,
-            "hold_assignment": hold_assignment,
         }
-        if labor_state:
-            tasking["labor_constraints"] = labor_state
-
-        for evt in self._check_labor_violations(entity):
-            self.store.emit_event(evt)
-
-        # Check for reassignment directive (from tractor_reassigned events)
-        if is_shared:
-            reassign_events = self.store.get_events(event_type="tractor_reassigned")
-            for evt in reversed(reassign_events):
-                if evt.get("tractor_id") == self.node_id:
-                    tasking["reassignment_directive"] = {
-                        "to_hold": evt.get("to_hold"),
-                        "from_hold": evt.get("from_hold"),
-                        "reason": evt.get("reason"),
-                    }
-                    break
-
         return json.dumps(tasking, indent=2, default=str)
 
     def _read_scheduler_tasking(self) -> str:
@@ -1234,42 +1166,38 @@ class BridgeAPI:
             gap_count = len(fields.get("gap_analysis", []))
             remaining = fields.get("moves_remaining", 0)
             total_remaining += remaining
-            # Count tractors assigned to this hold (including shared)
+
+            # Count workers and equipment by type per hold
             members = fields.get("team_members", {})
-            tractor_count = sum(
-                1 for m in members.values()
-                if m.get("entity_type") == "yard_tractor"
-            )
+            worker_counts = {}
+            equipment_status = {}
+            for mid, mdata in members.items():
+                etype = mdata.get("entity_type", "unknown")
+                worker_counts[etype] = worker_counts.get(etype, 0) + 1
+                # Track degraded/failed equipment
+                mstatus = mdata.get("status", "UNKNOWN")
+                if mstatus in ("DEGRADED", "FAILED"):
+                    equipment_status[mid] = mstatus
+
             hold_summaries.append({
                 "hold_id": hold_id,
                 "moves_per_hour": moves_per_hour,
                 "status": status,
+                "priority": fields.get("priority", "NORMAL"),
                 "gap_count": gap_count,
+                "gap_details": fields.get("gap_analysis", []),
                 "moves_remaining": remaining,
                 "moves_completed": fields.get("moves_completed", 0),
-                "tractor_count": tractor_count,
+                "target_rate": fields.get("target_moves_per_hour", 35),
+                "worker_counts": worker_counts,
+                "degraded_equipment": equipment_status,
             })
-
-        # Include shared tractor pool status
-        entity = self._get_entity_doc()
-        berth_id = entity.get_field("assignment.berth", "berth-5") if entity else "berth-5"
-        shared_tractors = self.store.get_shared_tractors(berth_id)
-        pool_summary = {
-            "total": len(shared_tractors),
-            "unassigned": sum(1 for t in shared_tractors.values() if t.get("hold_assignment") is None),
-            "assignments": {
-                tid: tdata.get("hold_assignment")
-                for tid, tdata in shared_tractors.items()
-            },
-        }
-
         tasking = {
             "directive": "AGGREGATE_BERTH_STATUS",
-            "berth_id": berth_id,
+            "berth_id": "berth-5",
             "hold_count": len(hold_summaries),
             "hold_summaries": hold_summaries,
             "total_moves_remaining": total_remaining,
-            "shared_tractor_pool": pool_summary,
             "priority": "NORMAL",
         }
         return json.dumps(tasking, indent=2, default=str)
@@ -1314,7 +1242,9 @@ class BridgeAPI:
             "update_berth_summary": self._tool_update_berth_summary,
             "emit_berth_event": self._tool_emit_berth_event,
             "request_tractor_rebalance": self._tool_request_tractor_rebalance,
-            "dispatch_shared_tractor": self._tool_dispatch_shared_tractor,
+            "reassign_worker": self._tool_reassign_worker,
+            "escalate_to_scheduler": self._tool_escalate_to_scheduler,
+            "update_hold_priority": self._tool_update_hold_priority,
             # Tractor tools
             "transport_container": self._tool_transport_container,
             "report_position": self._tool_report_position,
@@ -1840,96 +1770,99 @@ class BridgeAPI:
         )
         return f"Tractor rebalance requested: {from_hold} → {to_hold}. Reason: {reason}"
 
-    async def _tool_dispatch_shared_tractor(self, arguments: dict) -> str:
+    async def _tool_reassign_worker(self, arguments: dict) -> str:
+        worker_id = arguments["worker_id"]
+        from_hold = arguments["from_hold"]
         to_hold = arguments["to_hold"]
-        from_hold = arguments.get("from_hold")
         reason = arguments["reason"]
 
         entity = self._get_entity_doc()
-        berth_id = entity.get_field("assignment.berth", "berth-5") if entity else "berth-5"
+        if entity:
+            reassignments = entity.get_field("metrics.worker_reassignments", 0)
+            entity.update_field("metrics.worker_reassignments", reassignments + 1)
 
-        shared_tractors = self.store.get_shared_tractors(berth_id)
-        if not shared_tractors:
-            return "Error: no shared tractor pool found for this berth"
-
-        # Find a tractor to dispatch: prefer unassigned, then from_hold source
-        target_tractor = None
-        for tid, tdata in shared_tractors.items():
-            if tdata.get("hold_assignment") is None:
-                target_tractor = tid
-                break
-        if target_tractor is None and from_hold:
-            for tid, tdata in shared_tractors.items():
-                if tdata.get("hold_assignment") == from_hold:
-                    target_tractor = tid
-                    break
-        if target_tractor is None:
-            return (
-                f"Error: no available shared tractors to dispatch to {to_hold}. "
-                f"All {len(shared_tractors)} shared tractors are assigned."
-            )
-
-        success, prev_hold = await self.store.reassign_shared_tractor(
-            berth_id, target_tractor, to_hold
-        )
-        if not success:
-            return f"Error: failed to reassign {target_tractor} to {to_hold}"
-
-        # Emit tractor_reassigned event (per issue spec)
         self.store.emit_event({
-            "event_type": "tractor_reassigned",
+            "event_type": "worker_reassigned",
             "source": self.node_id,
-            "tractor_id": target_tractor,
-            "from_hold": prev_hold,
+            "worker_id": worker_id,
+            "from_hold": from_hold,
             "to_hold": to_hold,
             "reason": reason,
             "aggregation_policy": "IMMEDIATE_PROPAGATE",
             "priority": "HIGH",
         })
 
-        # Emit spatial update for viewer
-        spatial_event = {
-            "event_type": "spatial_update",
-            "source": self.node_id,
-            "priority": "HIGH",
-            "details": {
-                "operation": "tractor_reassigned",
-                "tractor_id": target_tractor,
-                "from_hold": prev_hold,
-                "to_hold": to_hold,
-                "reason": reason,
-            },
-        }
-        print(json.dumps(spatial_event), flush=True)
-
-        if entity:
-            rebalances = entity.get_field("metrics.rebalance_requests", 0)
-            entity.update_field("metrics.rebalance_requests", rebalances + 1)
-
-        # Update team_summaries tractor counts for affected holds
-        if prev_hold:
-            prev_team = self.store.get_document("team_summaries", f"team_{prev_hold}")
-            if prev_team:
-                members = prev_team.fields.get("team_members", {})
-                members.pop(target_tractor, None)
-                prev_team.update_field("team_members", members)
-
-        to_team = self.store.get_document("team_summaries", f"team_{to_hold}")
-        if to_team:
-            to_team.update_field(f"team_members.{target_tractor}", {
-                "entity_type": "yard_tractor",
-                "status": "OPERATIONAL",
-                "capabilities": ["CONTAINER_TRANSPORT"],
-                "shared": True,
-            })
-
         logger.info(
-            f"METRICS: tractor_reassigned node={self.node_id} "
-            f"tractor={target_tractor} {prev_hold}→{to_hold} reason={reason}"
+            f"METRICS: worker_reassigned node={self.node_id} "
+            f"worker={worker_id} {from_hold}→{to_hold} reason={reason}"
         )
         return (
-            f"Shared tractor {target_tractor} dispatched to {to_hold} "
-            f"(was: {prev_hold or 'unassigned'}). Reason: {reason}"
+            f"Worker {worker_id} reassigned: {from_hold} → {to_hold}. "
+            f"Reason: {reason}"
+        )
+
+    async def _tool_escalate_to_scheduler(self, arguments: dict) -> str:
+        issue_type = arguments["issue_type"]
+        details = arguments["details"]
+
+        entity = self._get_entity_doc()
+        if entity:
+            escalations = entity.get_field("metrics.scheduler_escalations", 0)
+            entity.update_field("metrics.scheduler_escalations", escalations + 1)
+
+        self.store.emit_event({
+            "event_type": "scheduler_escalation",
+            "source": self.node_id,
+            "issue_type": issue_type,
+            "details": details,
+            "aggregation_policy": "IMMEDIATE_PROPAGATE",
+            "priority": "CRITICAL",
+        })
+
+        logger.info(
+            f"METRICS: scheduler_escalation node={self.node_id} "
+            f"issue_type={issue_type} details={details}"
+        )
+        return (
+            f"Escalated to scheduler: {issue_type}. "
+            f"Details: {details}. Priority: CRITICAL."
+        )
+
+    async def _tool_update_hold_priority(self, arguments: dict) -> str:
+        hold_num = arguments["hold_num"]
+        priority_level = arguments["priority_level"]
+        reason = arguments.get("reason", "")
+
+        hold_id = f"hold-{hold_num}"
+
+        # Update the team summary doc with the new priority
+        team_doc = self.store.get_document("team_summaries", f"team_{hold_id}")
+        if team_doc:
+            team_doc.update_field("priority", priority_level)
+
+        entity = self._get_entity_doc()
+        if entity:
+            priority_changes = entity.get_field("metrics.hold_priority_changes", 0)
+            entity.update_field("metrics.hold_priority_changes", priority_changes + 1)
+
+        self.store.emit_event({
+            "event_type": "hold_priority_changed",
+            "source": self.node_id,
+            "hold_id": hold_id,
+            "hold_num": hold_num,
+            "priority_level": priority_level,
+            "reason": reason,
+            "aggregation_policy": "IMMEDIATE_PROPAGATE",
+            "priority": "HIGH",
+        })
+
+        logger.info(
+            f"METRICS: hold_priority_changed node={self.node_id} "
+            f"hold={hold_id} priority={priority_level} reason={reason}"
+        )
+        return (
+            f"Hold {hold_id} priority updated to {priority_level}. "
+            f"{('Reason: ' + reason) if reason else ''}"
         )
 
     # ── Tractor tool handlers ────────────────────────────────────────────
@@ -1938,15 +1871,8 @@ class BridgeAPI:
         container_id = arguments["container_id"]
         destination = arguments["destination_block"]
 
-        # Shared tractors use their assigned hold, not the orchestrator hold_id
-        entity = self._get_entity_doc()
-        is_shared = entity.get_field("assignment.shared", False) if entity else False
-        effective_hold = (
-            entity.get_field("assignment.hold_assignment") if is_shared and entity else self.hold_id
-        ) or self.hold_id
-
         claimed = await self.store.claim_transport_job(
-            effective_hold, container_id, self.node_id
+            self.hold_id, container_id, self.node_id
         )
         if not claimed:
             return f"Error: transport job for {container_id} already claimed or not found"

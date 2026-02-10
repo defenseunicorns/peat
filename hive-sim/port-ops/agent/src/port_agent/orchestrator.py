@@ -373,6 +373,9 @@ class Orchestrator:
                             "summaries_produced": 0,
                             "events_emitted": 0,
                             "rebalance_requests": 0,
+                            "worker_reassignments": 0,
+                            "scheduler_escalations": 0,
+                            "hold_priority_changes": 0,
                         },
                     },
                 )

@@ -249,81 +249,7 @@ class DryRunProvider(LLMProvider):
 
     async def decide(self, persona: str, observed_state: dict, available_tools: list[dict]) -> AgentDecision:
         self._cycle += 1
-        # Proficiency-scaled thinking delay
-        await asyncio.sleep(self._BASE_DELAY_S * self._speed_factor)
-
-        # Proficiency-based error: occasionally make wrong tool call
-        if self._error_rate > 0 and random.random() < self._error_rate:
-            return AgentDecision(
-                action="wait",
-                arguments={"reason": f"Hesitation — {self._proficiency} re-evaluating situation"},
-                reasoning=(
-                    f"DryRun cycle {self._cycle}: proficiency error "
-                    f"({self._proficiency}, {self._error_rate:.0%} rate) — delayed response"
-                ),
-                confidence=0.5,
-            )
-
-        # ── Labor constraint checks (applies to worker roles) ────────────
-        labor = observed_state.get("labor_constraints", {})
-        if labor:
-            # Shift expired → worker goes off shift
-            if labor.get("shift_ended"):
-                return AgentDecision(
-                    action="report_available" if self._role == "operator" else "wait",
-                    arguments=(
-                        {"status": "OFF_SHIFT", "details": "Shift ended per ILA Local 1414 rules"}
-                        if self._role == "operator"
-                        else {"reason": "Shift ended — off duty per union contract"}
-                    ),
-                    reasoning=(
-                        f"DryRun cycle {self._cycle}: shift expired "
-                        f"({labor.get('shift_elapsed_hours', 0):.1f}h worked), going off shift"
-                    ),
-                )
-
-            # Mandatory break required → worker takes break
-            if labor.get("break_required"):
-                return AgentDecision(
-                    action="report_available" if self._role == "operator" else "wait",
-                    arguments=(
-                        {"status": "BREAK", "details": f"Mandatory break — {labor.get('consecutive_hours', 0):.1f}h consecutive work"}
-                        if self._role == "operator"
-                        else {"reason": f"Mandatory break — {labor.get('consecutive_hours', 0):.1f}h consecutive (max {labor.get('max_consecutive_hours', 6)}h)"}
-                    ),
-                    reasoning=(
-                        f"DryRun cycle {self._cycle}: mandatory break required "
-                        f"({labor.get('consecutive_hours', 0):.1f}h consecutive, "
-                        f"max {labor.get('max_consecutive_hours', 6)}h)"
-                    ),
-                )
-
-            # On break → wait for break to complete
-            if labor.get("on_break"):
-                return AgentDecision(
-                    action="wait",
-                    arguments={"reason": f"On break ({labor.get('break_duration_min', 30)} min mandatory)"},
-                    reasoning=f"DryRun cycle {self._cycle}: on mandatory break",
-                )
-
-            # Crane: crew insufficient → pause operations
-            if self._role == "crane" and labor.get("crew_insufficient"):
-                return AgentDecision(
-                    action="request_support",
-                    arguments={
-                        "capability_needed": "SIGNALER",
-                        "reason": (
-                            f"Crew below minimum ({labor.get('current_crew', 0)}"
-                            f"/{labor.get('minimum_crew', 2)}) — "
-                            f"ILA Local 1414 requires operator + signaler"
-                        ),
-                    },
-                    reasoning=(
-                        f"DryRun cycle {self._cycle}: crane paused — "
-                        f"crew {labor.get('current_crew', 0)}/{labor.get('minimum_crew', 2)} "
-                        f"below ILA minimum"
-                    ),
-                )
+        await asyncio.sleep(self.DRY_RUN_DELAY_S)
         if self._role == "aggregator":
             return self._decide_aggregator(observed_state)
         elif self._role == "berth_manager":
@@ -482,36 +408,6 @@ class DryRunProvider(LLMProvider):
         trips = tasking.get("trips_completed", 0)
         # Phase 2: containers specifically assigned to this tractor
         assigned_containers = tasking.get("assigned_containers", [])
-        is_shared = tasking.get("shared", False)
-        hold_assignment = tasking.get("hold_assignment")
-        reassignment = tasking.get("reassignment_directive")
-
-        # Shared tractors: acknowledge reassignment by reporting new position
-        if is_shared and reassignment:
-            to_hold = reassignment.get("to_hold")
-            return AgentDecision(
-                action="report_position",
-                arguments={
-                    "zone": "berth",
-                    "block": to_hold or "TRANSIT",
-                    "status": "IN_TRANSIT",
-                },
-                reasoning=(
-                    f"DryRun cycle {self._cycle}: shared tractor reassigned to {to_hold}, "
-                    f"moving to new hold"
-                ),
-            )
-
-        # Shared tractors without assignment wait for dispatch
-        if is_shared and hold_assignment is None:
-            return AgentDecision(
-                action="report_position",
-                arguments={"zone": "berth", "block": "STAGING", "status": "IDLE"},
-                reasoning=(
-                    f"DryRun cycle {self._cycle}: shared tractor unassigned, "
-                    f"waiting at berth staging area"
-                ),
-            )
 
         # Battery critical: request charge
         if battery < 30:
@@ -521,8 +417,8 @@ class DryRunProvider(LLMProvider):
                 reasoning=f"DryRun cycle {self._cycle}: battery at {battery}%, requesting charge",
             )
 
-        # Cycle 42+: return to depot (after shift change) — hold-assigned only
-        if not is_shared and self._cycle >= 42:
+        # Cycle 42+: return to depot (after shift change)
+        if self._cycle >= 42:
             return AgentDecision(
                 action="report_position",
                 arguments={"zone": "yard", "block": "DEPOT", "status": "IDLE"},
@@ -531,10 +427,9 @@ class DryRunProvider(LLMProvider):
 
         # Every 10th cycle: report position
         if self._cycle % 10 == 0:
-            zone = "berth" if is_shared else "yard"
             return AgentDecision(
                 action="report_position",
-                arguments={"zone": zone, "block": f"YB-{chr(65 + (trips % 6))}", "status": "IN_TRANSIT"},
+                arguments={"zone": "yard", "block": f"YB-{chr(65 + (trips % 6))}", "status": "IN_TRANSIT"},
                 reasoning=f"DryRun cycle {self._cycle}: periodic position report",
             )
 
@@ -730,11 +625,11 @@ class DryRunProvider(LLMProvider):
         tasking = observed_state.get("tasking", {})
         hold_summaries = tasking.get("hold_summaries", [])
         total_remaining = tasking.get("total_moves_remaining", 0)
-        shared_pool = tasking.get("shared_tractor_pool", {})
 
         # Every 5 cycles: produce a berth summary
         if self._cycle % 5 == 0:
             total_rate = sum(h.get("moves_per_hour", 0) for h in hold_summaries)
+            # Estimate ETA: remaining moves / rate (in minutes)
             eta_minutes = round((total_remaining / max(total_rate, 1)) * 60, 1) if total_remaining > 0 else 0.0
             hold_statuses = {
                 h.get("hold_id", f"hold-{i}"): h.get("status", "UNKNOWN")
@@ -749,8 +644,7 @@ class DryRunProvider(LLMProvider):
                     "summary": (
                         f"{len(hold_summaries)} holds reporting, "
                         f"{total_rate} moves/hr aggregate, "
-                        f"ETA {eta_minutes} min, "
-                        f"{shared_pool.get('unassigned', 0)} shared tractors available"
+                        f"ETA {eta_minutes} min"
                     ),
                 },
                 reasoning=(
@@ -759,72 +653,151 @@ class DryRunProvider(LLMProvider):
                 ),
             )
 
-        # Cross-hold gap: dispatch shared tractor to underperforming hold
+        # Cross-hold coordination: detect imbalance and take corrective action
         if len(hold_summaries) > 1:
             rates = [h.get("moves_per_hour", 0) for h in hold_summaries]
             avg_rate = sum(rates) / len(rates) if rates else 0
+
             for h in hold_summaries:
                 h_rate = h.get("moves_per_hour", 0)
-                if avg_rate > 0 and h_rate < avg_rate * 0.8:
-                    # If shared tractors available, dispatch one to the underperforming hold
-                    unassigned = shared_pool.get("unassigned", 0)
-                    if unassigned > 0:
-                        return AgentDecision(
-                            action="dispatch_shared_tractor",
-                            arguments={
-                                "to_hold": h.get("hold_id", "hold-1"),
-                                "reason": (
-                                    f"Hold {h.get('hold_id', '?')} at {h_rate} moves/hr "
-                                    f"vs avg {avg_rate:.0f} — dispatching shared tractor"
-                                ),
-                            },
-                            reasoning=(
-                                f"DryRun cycle {self._cycle}: dispatching shared tractor to "
-                                f"underperforming hold {h.get('hold_id')}"
-                            ),
-                        )
-                    # No unassigned — try pulling from overperforming hold
-                    assignments = shared_pool.get("assignments", {})
-                    overperforming = max(hold_summaries, key=lambda x: x.get("moves_per_hour", 0))
-                    over_hold = overperforming.get("hold_id")
-                    has_tractor_from_over = any(
-                        v == over_hold for v in assignments.values()
-                    )
-                    if has_tractor_from_over and over_hold != h.get("hold_id"):
-                        return AgentDecision(
-                            action="dispatch_shared_tractor",
-                            arguments={
-                                "to_hold": h.get("hold_id", "hold-1"),
-                                "from_hold": over_hold,
-                                "reason": (
-                                    f"Rebalancing: {h.get('hold_id')} underperforming "
-                                    f"({h_rate} vs avg {avg_rate:.0f}), "
-                                    f"pulling from {over_hold}"
-                                ),
-                            },
-                            reasoning=(
-                                f"DryRun cycle {self._cycle}: rebalancing shared tractor "
-                                f"from {over_hold} to {h.get('hold_id')}"
-                            ),
-                        )
-                    # Fall back to emit event if no shared tractors to dispatch
-                    return AgentDecision(
-                        action="emit_berth_event",
-                        arguments={
-                            "event_type": "cross_hold_gap",
-                            "details": (
-                                f"Hold {h.get('hold_id', '?')} at {h_rate} moves/hr "
-                                f"vs avg {avg_rate:.0f} — below 80% threshold, "
-                                f"no shared tractors available"
-                            ),
-                            "priority": "HIGH",
-                        },
-                        reasoning=(
-                            f"DryRun cycle {self._cycle}: cross-hold gap, no shared tractors"
-                        ),
-                    )
+                hold_id = h.get("hold_id", "?")
+                target_rate = h.get("target_rate", 35)
 
-        # Escalate unresolved hold gaps
+                # Check if hold is below 80% of target rate
+                if target_rate > 0 and h_rate < target_rate * 0.8:
+                    degraded = h.get("degraded_equipment", {})
+                    gap_count = h.get("gap_count", 0)
+                    worker_counts = h.get("worker_counts", {})
+
+                    # Analyze cause: equipment degradation
+                    if degraded:
+                        failed_ids = [
+                            mid for mid, st in degraded.items()
+                            if st == "FAILED"
+                        ]
+                        if failed_ids:
+                            # Structural problem — escalate to scheduler
+                            return AgentDecision(
+                                action="escalate_to_scheduler",
+                                arguments={
+                                    "issue_type": "crane_failure",
+                                    "details": (
+                                        f"Hold {hold_id}: equipment failure on "
+                                        f"{', '.join(failed_ids)}. "
+                                        f"Rate {h_rate} vs target {target_rate} moves/hr. "
+                                        f"May require stow plan change."
+                                    ),
+                                },
+                                reasoning=(
+                                    f"DryRun cycle {self._cycle}: crane failure in {hold_id}, "
+                                    f"escalating to scheduler"
+                                ),
+                            )
+
+                        # Non-fatal degradation — raise hold priority
+                        return AgentDecision(
+                            action="update_hold_priority",
+                            arguments={
+                                "hold_num": int(hold_id.split("-")[-1]) if "-" in hold_id else 1,
+                                "priority_level": "HIGH",
+                                "reason": (
+                                    f"Equipment degradation on {', '.join(degraded.keys())} — "
+                                    f"rate {h_rate} below target {target_rate}"
+                                ),
+                            },
+                            reasoning=(
+                                f"DryRun cycle {self._cycle}: degraded equipment in {hold_id}, "
+                                f"raising priority"
+                            ),
+                        )
+
+                    # Analyze cause: workforce gap
+                    operator_count = worker_counts.get("operator", 0)
+                    crane_count = worker_counts.get("gantry_crane", 0)
+                    if crane_count > 0 and operator_count < crane_count:
+                        # Find a hold with surplus workers to reassign
+                        best_source = self._find_surplus_hold(
+                            hold_summaries, hold_id, "operator"
+                        )
+                        if best_source:
+                            return AgentDecision(
+                                action="reassign_worker",
+                                arguments={
+                                    "worker_id": f"op-{self._cycle % 10}",
+                                    "from_hold": best_source,
+                                    "to_hold": hold_id,
+                                    "reason": (
+                                        f"{hold_id} has {operator_count} operators for "
+                                        f"{crane_count} cranes — below ratio"
+                                    ),
+                                },
+                                reasoning=(
+                                    f"DryRun cycle {self._cycle}: workforce gap in {hold_id}, "
+                                    f"reassigning from {best_source}"
+                                ),
+                            )
+
+                    # Analyze cause: tractor shortage — dispatch shared tractor
+                    tractor_count = worker_counts.get("yard_tractor", 0)
+                    if tractor_count < 2 and h.get("moves_remaining", 0) > 0:
+                        best_source = self._find_surplus_hold(
+                            hold_summaries, hold_id, "yard_tractor"
+                        )
+                        if best_source:
+                            return AgentDecision(
+                                action="request_tractor_rebalance",
+                                arguments={
+                                    "from_hold": best_source,
+                                    "to_hold": hold_id,
+                                    "reason": (
+                                        f"{hold_id} has {tractor_count} tractor(s) and is "
+                                        f"at {h_rate} moves/hr (target {target_rate})"
+                                    ),
+                                },
+                                reasoning=(
+                                    f"DryRun cycle {self._cycle}: tractor shortage in {hold_id}, "
+                                    f"rebalancing from {best_source}"
+                                ),
+                            )
+
+                    # Generic cross-hold gap — no specific cause identified
+                    if avg_rate > 0 and h_rate < avg_rate * 0.8:
+                        return AgentDecision(
+                            action="emit_berth_event",
+                            arguments={
+                                "event_type": "cross_hold_gap",
+                                "details": (
+                                    f"Hold {hold_id} at {h_rate} moves/hr "
+                                    f"vs avg {avg_rate:.0f} — below 80% threshold"
+                                ),
+                                "priority": "HIGH",
+                            },
+                            reasoning=(
+                                f"DryRun cycle {self._cycle}: cross-hold gap detected in {hold_id}"
+                            ),
+                        )
+
+        # Persistent gap escalation: if a hold has gaps for 3+ consecutive checks
+        for h in hold_summaries:
+            gap_count = h.get("gap_count", 0)
+            if gap_count >= 3:
+                return AgentDecision(
+                    action="escalate_to_scheduler",
+                    arguments={
+                        "issue_type": "persistent_throughput_gap",
+                        "details": (
+                            f"Hold {h.get('hold_id', '?')} has "
+                            f"{gap_count} persistent unresolved gaps — "
+                            f"berth-level rebalancing insufficient"
+                        ),
+                    },
+                    reasoning=(
+                        f"DryRun cycle {self._cycle}: persistent gaps in "
+                        f"{h.get('hold_id', '?')}, escalating to scheduler"
+                    ),
+                )
+
+        # Escalate remaining hold gaps
         for h in hold_summaries:
             if h.get("gap_count", 0) > 0:
                 return AgentDecision(
@@ -842,25 +815,31 @@ class DryRunProvider(LLMProvider):
                     ),
                 )
 
-        # Every 7 cycles: dispatch shared tractors to holds with most remaining work
+        # Every 7 cycles: request tractor rebalance if work remains
         if self._cycle % 7 == 0 and total_remaining > 0:
-            unassigned = shared_pool.get("unassigned", 0)
-            if unassigned > 0 and hold_summaries:
-                busiest = max(hold_summaries, key=lambda h: h.get("moves_remaining", 0))
+            # Find actual imbalance rather than hardcoded holds
+            if len(hold_summaries) >= 2:
+                sorted_holds = sorted(
+                    hold_summaries, key=lambda h: h.get("moves_per_hour", 0)
+                )
+                slowest = sorted_holds[0]
+                fastest = sorted_holds[-1]
                 return AgentDecision(
-                    action="dispatch_shared_tractor",
+                    action="request_tractor_rebalance",
                     arguments={
-                        "to_hold": busiest.get("hold_id", "hold-3"),
+                        "from_hold": fastest.get("hold_id", "hold-1"),
+                        "to_hold": slowest.get("hold_id", "hold-3"),
                         "reason": (
-                            f"Periodic dispatch — {busiest.get('hold_id')} has "
-                            f"{busiest.get('moves_remaining', 0)} moves remaining"
+                            f"Periodic rebalance — {slowest.get('hold_id')} at "
+                            f"{slowest.get('moves_per_hour', 0)} moves/hr vs "
+                            f"{fastest.get('hold_id')} at "
+                            f"{fastest.get('moves_per_hour', 0)} moves/hr"
                         ),
                     },
                     reasoning=(
-                        f"DryRun cycle {self._cycle}: periodic shared tractor dispatch"
+                        f"DryRun cycle {self._cycle}: periodic tractor rebalance"
                     ),
                 )
-            # Fall back to old rebalance request if no unassigned shared tractors
             return AgentDecision(
                 action="request_tractor_rebalance",
                 arguments={
@@ -878,6 +857,27 @@ class DryRunProvider(LLMProvider):
             arguments={"reason": "Monitoring — no summary due, no cross-hold gaps"},
             reasoning=f"DryRun cycle {self._cycle}: berth manager idle, waiting for data",
         )
+
+    @staticmethod
+    def _find_surplus_hold(
+        hold_summaries: list[dict], exclude_hold_id: str, entity_type: str
+    ) -> str | None:
+        """Find a hold with surplus workers/tractors that can donate to another.
+
+        Returns the hold_id of the best donor, or None if no surplus found.
+        """
+        best_hold = None
+        best_surplus = 0
+        for h in hold_summaries:
+            hid = h.get("hold_id", "")
+            if hid == exclude_hold_id:
+                continue
+            count = h.get("worker_counts", {}).get(entity_type, 0)
+            # Consider a hold a surplus source if it has more than 1 of this type
+            if count > 1 and count > best_surplus:
+                best_surplus = count
+                best_hold = hid
+        return best_hold
 
     def _decide_lashing_crew(self, observed_state: dict) -> AgentDecision:
         tasking = observed_state.get("tasking", {})
