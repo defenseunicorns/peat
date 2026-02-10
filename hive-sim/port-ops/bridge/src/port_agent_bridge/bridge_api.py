@@ -536,6 +536,32 @@ BERTH_MANAGER_TOOLS = [
             "required": ["from_hold", "to_hold", "reason"],
         },
     ),
+    ToolShim(
+        name="dispatch_shared_tractor",
+        description=(
+            "Dispatch a shared tractor from the berth-level pool to a specific hold. "
+            "Picks an unassigned shared tractor (or reassigns one from another hold) "
+            "and assigns it to the target hold. Emits tractor_reassigned event."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "to_hold": {
+                    "type": "string",
+                    "description": "Target hold to assign the shared tractor to",
+                },
+                "from_hold": {
+                    "type": "string",
+                    "description": "If reassigning, the hold to pull the tractor from (optional)",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Reason for the dispatch",
+                },
+            },
+            "required": ["to_hold", "reason"],
+        },
+    ),
 ]
 
 # ── Sensor tool definitions ────────────────────────────────────────────────
@@ -1053,13 +1079,19 @@ class BridgeAPI:
 
     def _read_tractor_tasking(self) -> str:
         entity = self._get_entity_doc()
-        tq = self.store.get_document("transport_queues", f"transport_{self.hold_id}")
+        is_shared = entity.get_field("assignment.shared", False) if entity else False
+        hold_assignment = entity.get_field("assignment.hold_assignment") if entity else None
+
+        # For shared tractors, read from the assigned hold's transport queue
+        effective_hold = hold_assignment if is_shared else self.hold_id
         pending_jobs = []
-        if tq:
-            pending_jobs = [
-                j for j in tq.fields.get("pending_jobs", [])
-                if j.get("status") == "PENDING"
-            ]
+        if effective_hold:
+            tq = self.store.get_document("transport_queues", f"transport_{effective_hold}")
+            if tq:
+                pending_jobs = [
+                    j for j in tq.fields.get("pending_jobs", [])
+                    if j.get("status") == "PENDING"
+                ]
         # Get containers specifically assigned to this tractor
         my_assignments = self.store.get_container_assignments_by_role(
             self.hold_id, "assigned_tractor", self.node_id
@@ -1076,12 +1108,26 @@ class BridgeAPI:
             "pending_transport_jobs": pending_jobs[:3],
             "assigned_containers": assigned_discharged,
             "trips_completed": entity.get_field("metrics.trips_completed", 0) if entity else 0,
+            "shared": is_shared,
+            "hold_assignment": hold_assignment,
         }
         if labor_state:
             tasking["labor_constraints"] = labor_state
 
         for evt in self._check_labor_violations(entity):
             self.store.emit_event(evt)
+
+        # Check for reassignment directive (from tractor_reassigned events)
+        if is_shared:
+            reassign_events = self.store.get_events(event_type="tractor_reassigned")
+            for evt in reversed(reassign_events):
+                if evt.get("tractor_id") == self.node_id:
+                    tasking["reassignment_directive"] = {
+                        "to_hold": evt.get("to_hold"),
+                        "from_hold": evt.get("from_hold"),
+                        "reason": evt.get("reason"),
+                    }
+                    break
 
         return json.dumps(tasking, indent=2, default=str)
 
@@ -1188,6 +1234,12 @@ class BridgeAPI:
             gap_count = len(fields.get("gap_analysis", []))
             remaining = fields.get("moves_remaining", 0)
             total_remaining += remaining
+            # Count tractors assigned to this hold (including shared)
+            members = fields.get("team_members", {})
+            tractor_count = sum(
+                1 for m in members.values()
+                if m.get("entity_type") == "yard_tractor"
+            )
             hold_summaries.append({
                 "hold_id": hold_id,
                 "moves_per_hour": moves_per_hour,
@@ -1195,13 +1247,29 @@ class BridgeAPI:
                 "gap_count": gap_count,
                 "moves_remaining": remaining,
                 "moves_completed": fields.get("moves_completed", 0),
+                "tractor_count": tractor_count,
             })
+
+        # Include shared tractor pool status
+        entity = self._get_entity_doc()
+        berth_id = entity.get_field("assignment.berth", "berth-5") if entity else "berth-5"
+        shared_tractors = self.store.get_shared_tractors(berth_id)
+        pool_summary = {
+            "total": len(shared_tractors),
+            "unassigned": sum(1 for t in shared_tractors.values() if t.get("hold_assignment") is None),
+            "assignments": {
+                tid: tdata.get("hold_assignment")
+                for tid, tdata in shared_tractors.items()
+            },
+        }
+
         tasking = {
             "directive": "AGGREGATE_BERTH_STATUS",
-            "berth_id": "berth-5",
+            "berth_id": berth_id,
             "hold_count": len(hold_summaries),
             "hold_summaries": hold_summaries,
             "total_moves_remaining": total_remaining,
+            "shared_tractor_pool": pool_summary,
             "priority": "NORMAL",
         }
         return json.dumps(tasking, indent=2, default=str)
@@ -1246,6 +1314,7 @@ class BridgeAPI:
             "update_berth_summary": self._tool_update_berth_summary,
             "emit_berth_event": self._tool_emit_berth_event,
             "request_tractor_rebalance": self._tool_request_tractor_rebalance,
+            "dispatch_shared_tractor": self._tool_dispatch_shared_tractor,
             # Tractor tools
             "transport_container": self._tool_transport_container,
             "report_position": self._tool_report_position,
@@ -1771,14 +1840,113 @@ class BridgeAPI:
         )
         return f"Tractor rebalance requested: {from_hold} → {to_hold}. Reason: {reason}"
 
+    async def _tool_dispatch_shared_tractor(self, arguments: dict) -> str:
+        to_hold = arguments["to_hold"]
+        from_hold = arguments.get("from_hold")
+        reason = arguments["reason"]
+
+        entity = self._get_entity_doc()
+        berth_id = entity.get_field("assignment.berth", "berth-5") if entity else "berth-5"
+
+        shared_tractors = self.store.get_shared_tractors(berth_id)
+        if not shared_tractors:
+            return "Error: no shared tractor pool found for this berth"
+
+        # Find a tractor to dispatch: prefer unassigned, then from_hold source
+        target_tractor = None
+        for tid, tdata in shared_tractors.items():
+            if tdata.get("hold_assignment") is None:
+                target_tractor = tid
+                break
+        if target_tractor is None and from_hold:
+            for tid, tdata in shared_tractors.items():
+                if tdata.get("hold_assignment") == from_hold:
+                    target_tractor = tid
+                    break
+        if target_tractor is None:
+            return (
+                f"Error: no available shared tractors to dispatch to {to_hold}. "
+                f"All {len(shared_tractors)} shared tractors are assigned."
+            )
+
+        success, prev_hold = await self.store.reassign_shared_tractor(
+            berth_id, target_tractor, to_hold
+        )
+        if not success:
+            return f"Error: failed to reassign {target_tractor} to {to_hold}"
+
+        # Emit tractor_reassigned event (per issue spec)
+        self.store.emit_event({
+            "event_type": "tractor_reassigned",
+            "source": self.node_id,
+            "tractor_id": target_tractor,
+            "from_hold": prev_hold,
+            "to_hold": to_hold,
+            "reason": reason,
+            "aggregation_policy": "IMMEDIATE_PROPAGATE",
+            "priority": "HIGH",
+        })
+
+        # Emit spatial update for viewer
+        spatial_event = {
+            "event_type": "spatial_update",
+            "source": self.node_id,
+            "priority": "HIGH",
+            "details": {
+                "operation": "tractor_reassigned",
+                "tractor_id": target_tractor,
+                "from_hold": prev_hold,
+                "to_hold": to_hold,
+                "reason": reason,
+            },
+        }
+        print(json.dumps(spatial_event), flush=True)
+
+        if entity:
+            rebalances = entity.get_field("metrics.rebalance_requests", 0)
+            entity.update_field("metrics.rebalance_requests", rebalances + 1)
+
+        # Update team_summaries tractor counts for affected holds
+        if prev_hold:
+            prev_team = self.store.get_document("team_summaries", f"team_{prev_hold}")
+            if prev_team:
+                members = prev_team.fields.get("team_members", {})
+                members.pop(target_tractor, None)
+                prev_team.update_field("team_members", members)
+
+        to_team = self.store.get_document("team_summaries", f"team_{to_hold}")
+        if to_team:
+            to_team.update_field(f"team_members.{target_tractor}", {
+                "entity_type": "yard_tractor",
+                "status": "OPERATIONAL",
+                "capabilities": ["CONTAINER_TRANSPORT"],
+                "shared": True,
+            })
+
+        logger.info(
+            f"METRICS: tractor_reassigned node={self.node_id} "
+            f"tractor={target_tractor} {prev_hold}→{to_hold} reason={reason}"
+        )
+        return (
+            f"Shared tractor {target_tractor} dispatched to {to_hold} "
+            f"(was: {prev_hold or 'unassigned'}). Reason: {reason}"
+        )
+
     # ── Tractor tool handlers ────────────────────────────────────────────
 
     async def _tool_transport_container(self, arguments: dict) -> str:
         container_id = arguments["container_id"]
         destination = arguments["destination_block"]
 
+        # Shared tractors use their assigned hold, not the orchestrator hold_id
+        entity = self._get_entity_doc()
+        is_shared = entity.get_field("assignment.shared", False) if entity else False
+        effective_hold = (
+            entity.get_field("assignment.hold_assignment") if is_shared and entity else self.hold_id
+        ) or self.hold_id
+
         claimed = await self.store.claim_transport_job(
-            self.hold_id, container_id, self.node_id
+            effective_hold, container_id, self.node_id
         )
         if not claimed:
             return f"Error: transport job for {container_id} already claimed or not found"

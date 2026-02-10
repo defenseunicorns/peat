@@ -359,6 +359,61 @@ class HiveStateStore:
             breakdown[status] = breakdown.get(status, 0) + 1
         return breakdown
 
+    # ── Shared tractor pool ───────────────────────────────────────────────
+
+    def register_shared_tractor(self, berth_id: str, tractor_id: str) -> None:
+        """Register a shared tractor in the berth-level pool."""
+        pool = self.get_document("shared_tractor_pools", f"pool_{berth_id}")
+        if pool is None:
+            return
+        tractors = pool.fields.get("tractors", {})
+        tractors[tractor_id] = {"hold_assignment": None, "status": "UNASSIGNED"}
+        pool.update_field("tractors", tractors)
+        pool.update_field("total_count", len(tractors))
+        pool.update_field("unassigned_count",
+                          sum(1 for t in tractors.values() if t["hold_assignment"] is None))
+        pool.update_field("assigned_count",
+                          sum(1 for t in tractors.values() if t["hold_assignment"] is not None))
+
+    async def reassign_shared_tractor(
+        self, berth_id: str, tractor_id: str, to_hold: str | None,
+    ) -> tuple[bool, str | None]:
+        """Atomically reassign a shared tractor to a different hold.
+
+        Returns (success, previous_hold).
+        """
+        async with self._queue_lock:
+            pool = self.get_document("shared_tractor_pools", f"pool_{berth_id}")
+            if pool is None:
+                return False, None
+            tractors = pool.fields.get("tractors", {})
+            if tractor_id not in tractors:
+                return False, None
+            prev_hold = tractors[tractor_id]["hold_assignment"]
+            tractors[tractor_id]["hold_assignment"] = to_hold
+            tractors[tractor_id]["status"] = "ASSIGNED" if to_hold else "UNASSIGNED"
+            pool.update_field("tractors", tractors)
+            pool.update_field("unassigned_count",
+                              sum(1 for t in tractors.values() if t["hold_assignment"] is None))
+            pool.update_field("assigned_count",
+                              sum(1 for t in tractors.values() if t["hold_assignment"] is not None))
+
+            # Update the tractor's entity doc hold assignment
+            tractor_doc = self.get_document("node_states", f"sim_doc_{tractor_id}")
+            if tractor_doc:
+                tractor_doc.update_field("assignment.hold", to_hold)
+                tractor_doc.update_field("assignment.shared", True)
+                tractor_doc.update_field("assignment.hold_assignment", to_hold)
+
+            return True, prev_hold
+
+    def get_shared_tractors(self, berth_id: str) -> dict[str, dict]:
+        """Get all shared tractors and their assignments for a berth."""
+        pool = self.get_document("shared_tractor_pools", f"pool_{berth_id}")
+        if pool is None:
+            return {}
+        return pool.fields.get("tractors", {})
+
 
 def create_crane_entity(store: HiveStateStore, node_id: str, config: dict) -> HiveDocument:
     """Initialize a gantry crane entity document in the HIVE state store."""
@@ -668,6 +723,21 @@ def create_transport_queue(store: HiveStateStore, hold_id: str) -> HiveDocument:
             "hold_id": hold_id,
             "pending_jobs": [],  # list of {container_id, destination_block, status, claimed_by}
             "completed_count": 0,
+        },
+    )
+
+
+def create_shared_tractor_pool(store: HiveStateStore, berth_id: str) -> HiveDocument:
+    """Initialize the shared tractor pool at berth level for Phase 2 cross-hold dispatch."""
+    return store.create_document(
+        collection="shared_tractor_pools",
+        doc_id=f"pool_{berth_id}",
+        fields={
+            "berth_id": berth_id,
+            "tractors": {},  # tractor_id → {hold_assignment, status}
+            "total_count": 0,
+            "assigned_count": 0,
+            "unassigned_count": 0,
         },
     )
 

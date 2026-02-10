@@ -56,6 +56,7 @@ class OrchestratorConfig:
     agents: list[AgentSpec] = field(default_factory=list)
     num_holds: int = 1              # 1 = single hold (Phase 1c), 3 = multi-hold (Phase 2)
     hold_nums: list[int] = field(default_factory=lambda: [3])
+    shared_tractor_count: int = 8  # Phase 2: berth-level shared tractor pool
 
 
 # Letter → (role, persona, node_id_pattern)
@@ -222,6 +223,7 @@ class Orchestrator:
             create_transport_queue,
             create_team_state,
             create_sample_containers,
+            create_shared_tractor_pool,
         )
 
         self.store = HiveStateStore()
@@ -444,6 +446,44 @@ class Orchestrator:
                         "capabilities": ["VISUAL_SIGNALING"],
                     })
 
+        # Phase 2: Create shared tractor pool at berth level
+        if self.config.shared_tractor_count > 0:
+            berth_id = self.config.berth
+            create_shared_tractor_pool(self.store, berth_id)
+
+            for i in range(1, self.config.shared_tractor_count + 1):
+                tractor_id = f"shared-tractor-{i}"
+                tractor_config = {
+                    "capacity_tons": 40,
+                    "max_speed_kph": 25,
+                    "hold": None,  # Not assigned to any hold initially
+                    "berth": berth_id,
+                }
+                create_tractor_entity(self.store, tractor_id, tractor_config)
+                # Mark as shared in entity doc
+                tractor_doc = self.store.get_document("node_states", f"sim_doc_{tractor_id}")
+                if tractor_doc:
+                    tractor_doc.update_field("assignment.shared", True)
+                    tractor_doc.update_field("assignment.hold_assignment", None)
+
+                # Register in berth-level pool
+                self.store.register_shared_tractor(berth_id, tractor_id)
+
+                # Add shared tractors as agents so they participate in the simulation
+                self.config.agents.append(AgentSpec(
+                    node_id=tractor_id,
+                    role="tractor",
+                    persona="yard-tractor",
+                    provider=self.config.agents[0].provider if self.config.agents else "dry-run",
+                    model=self.config.agents[0].model if self.config.agents else None,
+                    proficiency="competent",
+                ))
+
+            logger.info(
+                f"Phase 2: {self.config.shared_tractor_count} shared tractors "
+                f"instantiated at berth level ({berth_id})"
+            )
+
         total_agents = len(self.config.agents)
         holds_str = ", ".join(self._hold_id_for(h) for h in self.config.hold_nums)
         logger.info(
@@ -621,5 +661,34 @@ class Orchestrator:
                 if m.contention_retry
             )
             print(f"\n  CONTENTION: {contention_retries} retries (claims beaten by another crane)", flush=True)
+
+            # Shared tractor pool summary
+            pool = self.store.get_document(
+                "shared_tractor_pools", f"pool_{self.config.berth}"
+            )
+            if pool:
+                tractors = pool.fields.get("tractors", {})
+                assigned = sum(1 for t in tractors.values() if t.get("hold_assignment"))
+                unassigned = len(tractors) - assigned
+                print(f"\n  SHARED TRACTOR POOL ({len(tractors)} total):", flush=True)
+                print(f"    assigned:   {assigned}", flush=True)
+                print(f"    unassigned: {unassigned}", flush=True)
+                for tid, tdata in tractors.items():
+                    hold = tdata.get("hold_assignment", "unassigned")
+                    print(f"    {tid}: {hold or 'unassigned'}", flush=True)
+
+            # tractor_reassigned events
+            reassign_events = [
+                e for e in events if e.get("event_type") == "tractor_reassigned"
+            ]
+            if reassign_events:
+                print(f"\n  TRACTOR REASSIGNMENTS ({len(reassign_events)}):", flush=True)
+                for re_evt in reassign_events:
+                    print(
+                        f"    {re_evt.get('tractor_id')}: "
+                        f"{re_evt.get('from_hold', 'none')} → {re_evt.get('to_hold')} "
+                        f"({re_evt.get('reason', '')})",
+                        flush=True,
+                    )
 
         print("\n" + "=" * 60, flush=True)

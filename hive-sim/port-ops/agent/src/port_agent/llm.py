@@ -482,6 +482,36 @@ class DryRunProvider(LLMProvider):
         trips = tasking.get("trips_completed", 0)
         # Phase 2: containers specifically assigned to this tractor
         assigned_containers = tasking.get("assigned_containers", [])
+        is_shared = tasking.get("shared", False)
+        hold_assignment = tasking.get("hold_assignment")
+        reassignment = tasking.get("reassignment_directive")
+
+        # Shared tractors: acknowledge reassignment by reporting new position
+        if is_shared and reassignment:
+            to_hold = reassignment.get("to_hold")
+            return AgentDecision(
+                action="report_position",
+                arguments={
+                    "zone": "berth",
+                    "block": to_hold or "TRANSIT",
+                    "status": "IN_TRANSIT",
+                },
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: shared tractor reassigned to {to_hold}, "
+                    f"moving to new hold"
+                ),
+            )
+
+        # Shared tractors without assignment wait for dispatch
+        if is_shared and hold_assignment is None:
+            return AgentDecision(
+                action="report_position",
+                arguments={"zone": "berth", "block": "STAGING", "status": "IDLE"},
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: shared tractor unassigned, "
+                    f"waiting at berth staging area"
+                ),
+            )
 
         # Battery critical: request charge
         if battery < 30:
@@ -491,8 +521,8 @@ class DryRunProvider(LLMProvider):
                 reasoning=f"DryRun cycle {self._cycle}: battery at {battery}%, requesting charge",
             )
 
-        # Cycle 42+: return to depot (after shift change)
-        if self._cycle >= 42:
+        # Cycle 42+: return to depot (after shift change) — hold-assigned only
+        if not is_shared and self._cycle >= 42:
             return AgentDecision(
                 action="report_position",
                 arguments={"zone": "yard", "block": "DEPOT", "status": "IDLE"},
@@ -501,9 +531,10 @@ class DryRunProvider(LLMProvider):
 
         # Every 10th cycle: report position
         if self._cycle % 10 == 0:
+            zone = "berth" if is_shared else "yard"
             return AgentDecision(
                 action="report_position",
-                arguments={"zone": "yard", "block": f"YB-{chr(65 + (trips % 6))}", "status": "IN_TRANSIT"},
+                arguments={"zone": zone, "block": f"YB-{chr(65 + (trips % 6))}", "status": "IN_TRANSIT"},
                 reasoning=f"DryRun cycle {self._cycle}: periodic position report",
             )
 
@@ -699,11 +730,11 @@ class DryRunProvider(LLMProvider):
         tasking = observed_state.get("tasking", {})
         hold_summaries = tasking.get("hold_summaries", [])
         total_remaining = tasking.get("total_moves_remaining", 0)
+        shared_pool = tasking.get("shared_tractor_pool", {})
 
         # Every 5 cycles: produce a berth summary
         if self._cycle % 5 == 0:
             total_rate = sum(h.get("moves_per_hour", 0) for h in hold_summaries)
-            # Estimate ETA: remaining moves / rate (in minutes)
             eta_minutes = round((total_remaining / max(total_rate, 1)) * 60, 1) if total_remaining > 0 else 0.0
             hold_statuses = {
                 h.get("hold_id", f"hold-{i}"): h.get("status", "UNKNOWN")
@@ -718,7 +749,8 @@ class DryRunProvider(LLMProvider):
                     "summary": (
                         f"{len(hold_summaries)} holds reporting, "
                         f"{total_rate} moves/hr aggregate, "
-                        f"ETA {eta_minutes} min"
+                        f"ETA {eta_minutes} min, "
+                        f"{shared_pool.get('unassigned', 0)} shared tractors available"
                     ),
                 },
                 reasoning=(
@@ -727,25 +759,68 @@ class DryRunProvider(LLMProvider):
                 ),
             )
 
-        # Cross-hold gap: if multiple holds and one is < 80% average rate
+        # Cross-hold gap: dispatch shared tractor to underperforming hold
         if len(hold_summaries) > 1:
             rates = [h.get("moves_per_hour", 0) for h in hold_summaries]
             avg_rate = sum(rates) / len(rates) if rates else 0
             for h in hold_summaries:
                 h_rate = h.get("moves_per_hour", 0)
                 if avg_rate > 0 and h_rate < avg_rate * 0.8:
+                    # If shared tractors available, dispatch one to the underperforming hold
+                    unassigned = shared_pool.get("unassigned", 0)
+                    if unassigned > 0:
+                        return AgentDecision(
+                            action="dispatch_shared_tractor",
+                            arguments={
+                                "to_hold": h.get("hold_id", "hold-1"),
+                                "reason": (
+                                    f"Hold {h.get('hold_id', '?')} at {h_rate} moves/hr "
+                                    f"vs avg {avg_rate:.0f} — dispatching shared tractor"
+                                ),
+                            },
+                            reasoning=(
+                                f"DryRun cycle {self._cycle}: dispatching shared tractor to "
+                                f"underperforming hold {h.get('hold_id')}"
+                            ),
+                        )
+                    # No unassigned — try pulling from overperforming hold
+                    assignments = shared_pool.get("assignments", {})
+                    overperforming = max(hold_summaries, key=lambda x: x.get("moves_per_hour", 0))
+                    over_hold = overperforming.get("hold_id")
+                    has_tractor_from_over = any(
+                        v == over_hold for v in assignments.values()
+                    )
+                    if has_tractor_from_over and over_hold != h.get("hold_id"):
+                        return AgentDecision(
+                            action="dispatch_shared_tractor",
+                            arguments={
+                                "to_hold": h.get("hold_id", "hold-1"),
+                                "from_hold": over_hold,
+                                "reason": (
+                                    f"Rebalancing: {h.get('hold_id')} underperforming "
+                                    f"({h_rate} vs avg {avg_rate:.0f}), "
+                                    f"pulling from {over_hold}"
+                                ),
+                            },
+                            reasoning=(
+                                f"DryRun cycle {self._cycle}: rebalancing shared tractor "
+                                f"from {over_hold} to {h.get('hold_id')}"
+                            ),
+                        )
+                    # Fall back to emit event if no shared tractors to dispatch
                     return AgentDecision(
                         action="emit_berth_event",
                         arguments={
                             "event_type": "cross_hold_gap",
                             "details": (
                                 f"Hold {h.get('hold_id', '?')} at {h_rate} moves/hr "
-                                f"vs avg {avg_rate:.0f} — below 80% threshold"
+                                f"vs avg {avg_rate:.0f} — below 80% threshold, "
+                                f"no shared tractors available"
                             ),
                             "priority": "HIGH",
                         },
                         reasoning=(
-                            f"DryRun cycle {self._cycle}: cross-hold gap detected"
+                            f"DryRun cycle {self._cycle}: cross-hold gap, no shared tractors"
                         ),
                     )
 
@@ -767,8 +842,25 @@ class DryRunProvider(LLMProvider):
                     ),
                 )
 
-        # Every 7 cycles: request tractor rebalance if work remains
+        # Every 7 cycles: dispatch shared tractors to holds with most remaining work
         if self._cycle % 7 == 0 and total_remaining > 0:
+            unassigned = shared_pool.get("unassigned", 0)
+            if unassigned > 0 and hold_summaries:
+                busiest = max(hold_summaries, key=lambda h: h.get("moves_remaining", 0))
+                return AgentDecision(
+                    action="dispatch_shared_tractor",
+                    arguments={
+                        "to_hold": busiest.get("hold_id", "hold-3"),
+                        "reason": (
+                            f"Periodic dispatch — {busiest.get('hold_id')} has "
+                            f"{busiest.get('moves_remaining', 0)} moves remaining"
+                        ),
+                    },
+                    reasoning=(
+                        f"DryRun cycle {self._cycle}: periodic shared tractor dispatch"
+                    ),
+                )
+            # Fall back to old rebalance request if no unassigned shared tractors
             return AgentDecision(
                 action="request_tractor_rebalance",
                 arguments={
