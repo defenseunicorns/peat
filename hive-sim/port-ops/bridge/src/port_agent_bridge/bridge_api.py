@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .hive_state import HiveStateStore
+from .lifecycle import MINIMUM_CREW_PER_CRANE
 
 logger = logging.getLogger(__name__)
 
@@ -883,6 +884,85 @@ class BridgeAPI:
 
         return ReadResourceResultShim(contents=[TextContentShim(text=text)])
 
+    def _get_labor_state(self, entity) -> dict:
+        """Extract labor constraint state from entity doc for tasking context."""
+        if not entity:
+            return {}
+        labor = entity.fields.get("labor", {})
+        if not labor:
+            return {}
+        return {
+            "shift_elapsed_hours": labor.get("shift_elapsed_hours", 0),
+            "consecutive_hours": labor.get("consecutive_hours", 0),
+            "max_consecutive_hours": labor.get("max_consecutive_hours", 6.0),
+            "remaining_shift_hours": labor.get("remaining_shift_hours", 12.0),
+            "break_eligible": labor.get("break_eligible", False),
+            "break_required": labor.get("break_required", False),
+            "on_break": labor.get("on_break", False),
+            "break_duration_min": labor.get("break_duration_min", 30.0),
+            "shift_ended": labor.get("shift_ended", False),
+            "breaks_taken": labor.get("breaks_taken", 0),
+        }
+
+    def _get_crane_crew_count(self) -> int:
+        """Count crew members (operators + signalers) assigned to this crane."""
+        team = self._get_team_doc()
+        if not team:
+            return 0
+        members = team.fields.get("team_members", {})
+        count = 0
+        for mid, mdata in members.items():
+            if mdata.get("entity_type") == "operator":
+                op_doc = self.store.get_document("node_states", f"sim_doc_{mid}")
+                if op_doc and op_doc.get_field("assignment.assigned_to") == self.node_id:
+                    count += 1
+        return count
+
+    def _check_labor_violations(self, entity) -> list[dict]:
+        """Check for labor constraint violations and return events."""
+        if not entity:
+            return []
+        labor = entity.fields.get("labor", {})
+        if not labor:
+            return []
+
+        events = []
+        remaining = labor.get("remaining_shift_hours", 12.0)
+        consecutive = labor.get("consecutive_hours", 0)
+        max_consec = labor.get("max_consecutive_hours", 6.0)
+
+        # Approaching shift end (< 1 hour remaining)
+        if 0 < remaining <= 1.0 and not labor.get("shift_ended"):
+            events.append({
+                "event_type": "labor_constraint_violation",
+                "source": self.node_id,
+                "priority": "HIGH",
+                "details": {
+                    "constraint": "shift_limit_approaching",
+                    "worker_id": self.node_id,
+                    "remaining_shift_hours": round(remaining, 2),
+                    "consecutive_hours": round(consecutive, 2),
+                    "break_eligible": labor.get("break_eligible", False),
+                },
+            })
+
+        # Break overdue
+        if consecutive >= max_consec and not labor.get("on_break") and not labor.get("shift_ended"):
+            events.append({
+                "event_type": "labor_constraint_violation",
+                "source": self.node_id,
+                "priority": "CRITICAL",
+                "details": {
+                    "constraint": "mandatory_break_overdue",
+                    "worker_id": self.node_id,
+                    "consecutive_hours": round(consecutive, 2),
+                    "max_consecutive_hours": max_consec,
+                    "break_eligible": True,
+                },
+            })
+
+        return events
+
     def _read_crane_tasking(self) -> str:
         entity = self._get_entity_doc()
         queue = self._get_queue_doc()
@@ -894,6 +974,14 @@ class BridgeAPI:
             a for a in my_assignments
             if a.get("status") in ("QUEUED", "IN_PROGRESS")
         ]
+        labor_state = self._get_labor_state(entity)
+
+        # Check crew sufficiency for crane
+        crew_count = self._get_crane_crew_count()
+        if labor_state:
+            labor_state["crew_insufficient"] = crew_count < MINIMUM_CREW_PER_CRANE
+            labor_state["current_crew"] = crew_count
+            labor_state["minimum_crew"] = MINIMUM_CREW_PER_CRANE
         tasking = {
             "directive": "PROCESS_CONTAINERS",
             "assignment": entity.fields.get("assignment", {}) if entity else {},
@@ -906,6 +994,13 @@ class BridgeAPI:
             "target_rate": 35,
             "priority": "NORMAL",
         }
+        if labor_state:
+            tasking["labor_constraints"] = labor_state
+
+        # Emit violation events
+        for evt in self._check_labor_violations(entity):
+            self.store.emit_event(evt)
+
         return json.dumps(tasking, indent=2, default=str)
 
     def _read_aggregator_tasking(self) -> str:
@@ -936,6 +1031,7 @@ class BridgeAPI:
         requests = self.store.get_pending_operator_requests(self.hold_id)
         assigned_to = entity.fields.get("assignment", {}).get("assigned_to") if entity else None
         status = entity.fields.get("operational_status", "AVAILABLE") if entity else "UNKNOWN"
+        labor_state = self._get_labor_state(entity)
         tasking = {
             "directive": "OPERATE_CRANE",
             "status": status,
@@ -944,9 +1040,15 @@ class BridgeAPI:
             "instructions": (
                 "Check in as AVAILABLE at shift start. Accept crane assignments when "
                 "pending. Complete assignment after crane move finishes. Report hazmat "
-                "status for hazmat containers. Take breaks as needed."
+                "status for hazmat containers. Take mandatory breaks per union rules."
             ),
         }
+        if labor_state:
+            tasking["labor_constraints"] = labor_state
+
+        for evt in self._check_labor_violations(entity):
+            self.store.emit_event(evt)
+
         return json.dumps(tasking, indent=2, default=str)
 
     def _read_tractor_tasking(self) -> str:
@@ -966,6 +1068,7 @@ class BridgeAPI:
             a["container_id"] for a in my_assignments
             if a.get("status") == "DISCHARGED"
         ]
+        labor_state = self._get_labor_state(entity)
         tasking = {
             "directive": "TRANSPORT_CONTAINERS",
             "position": entity.fields.get("position", {}) if entity else {},
@@ -974,6 +1077,12 @@ class BridgeAPI:
             "assigned_containers": assigned_discharged,
             "trips_completed": entity.get_field("metrics.trips_completed", 0) if entity else 0,
         }
+        if labor_state:
+            tasking["labor_constraints"] = labor_state
+
+        for evt in self._check_labor_violations(entity):
+            self.store.emit_event(evt)
+
         return json.dumps(tasking, indent=2, default=str)
 
     def _read_scheduler_tasking(self) -> str:

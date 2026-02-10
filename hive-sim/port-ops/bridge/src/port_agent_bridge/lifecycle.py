@@ -476,6 +476,172 @@ class GapAnalyzer:
 
 
 # ---------------------------------------------------------------------------
+#  Labor Constraint Tracker (ILA Local 1414 union rules)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class LaborState:
+    """Per-worker labor constraint state."""
+    shift_start_minutes: float = 0.0
+    total_work_minutes: float = 0.0        # total work across all segments
+    consecutive_work_minutes: float = 0.0  # resets after each break
+    on_break: bool = False
+    break_start_minutes: float | None = None
+    breaks_taken: int = 0
+    shift_ended: bool = False
+
+
+class LaborConstraintTracker:
+    """Enforces union labor rules: shift limits, mandatory breaks, crew minimums.
+
+    ILA Local 1414 rules:
+    - max_consecutive_hours before mandatory break
+    - break_duration_min minimum break length
+    - shift_duration_hours max shift length
+    - minimum_crew_per_crane: 1 operator + 1 signaler (2 total)
+    """
+
+    def __init__(
+        self,
+        node_id: str,
+        max_consecutive_hours: float = 6.0,
+        break_duration_min: float = 30.0,
+        shift_duration_hours: float = 12.0,
+        shift_start_minutes: float = 0.0,
+    ):
+        self.node_id = node_id
+        self.max_consecutive_hours = max_consecutive_hours
+        self.break_duration_min = break_duration_min
+        self.shift_duration_hours = shift_duration_hours
+        self.state = LaborState(shift_start_minutes=shift_start_minutes)
+
+    @property
+    def shift_elapsed_hours(self) -> float:
+        """Hours since shift start (total work + break time)."""
+        return (self.state.total_work_minutes + self.state.breaks_taken * self.break_duration_min) / 60.0
+
+    @property
+    def consecutive_work_hours(self) -> float:
+        return self.state.consecutive_work_minutes / 60.0
+
+    @property
+    def remaining_shift_hours(self) -> float:
+        return max(0.0, self.shift_duration_hours - self.shift_elapsed_hours)
+
+    @property
+    def break_eligible(self) -> bool:
+        """Worker can request break (consecutive work nearing limit)."""
+        return self.consecutive_work_hours >= self.max_consecutive_hours * 0.8
+
+    @property
+    def break_required(self) -> bool:
+        """Worker must take break (at consecutive work limit)."""
+        return self.consecutive_work_hours >= self.max_consecutive_hours
+
+    @property
+    def shift_expired(self) -> bool:
+        return self.shift_elapsed_hours >= self.shift_duration_hours
+
+    def tick(self, sim_minutes: float) -> list[dict]:
+        """Advance labor clock, return constraint violation/status events."""
+        events: list[dict] = []
+
+        if self.state.shift_ended:
+            return events
+
+        # Handle active break
+        if self.state.on_break and self.state.break_start_minutes is not None:
+            break_elapsed = sim_minutes - self.state.break_start_minutes
+            if break_elapsed >= self.break_duration_min:
+                self.state.on_break = False
+                self.state.break_start_minutes = None
+                self.state.consecutive_work_minutes = 0.0
+                events.append({
+                    "event_type": "BREAK_COMPLETED",
+                    "source": self.node_id,
+                    "priority": "NORMAL",
+                    "details": {
+                        "worker_id": self.node_id,
+                        "breaks_taken": self.state.breaks_taken,
+                        "remaining_shift_hours": round(self.remaining_shift_hours, 2),
+                    },
+                })
+            return events
+
+        # Accumulate work time
+        self.state.total_work_minutes += sim_minutes
+        self.state.consecutive_work_minutes += sim_minutes
+
+        # Check shift expiry
+        if self.shift_expired:
+            self.state.shift_ended = True
+            events.append({
+                "event_type": "SHIFT_ENDED",
+                "source": self.node_id,
+                "priority": "HIGH",
+                "details": {
+                    "worker_id": self.node_id,
+                    "total_shift_hours": round(self.shift_elapsed_hours, 2),
+                    "breaks_taken": self.state.breaks_taken,
+                },
+            })
+            return events
+
+        # Check mandatory break
+        if self.break_required:
+            events.append({
+                "event_type": "MANDATORY_BREAK_REQUIRED",
+                "source": self.node_id,
+                "priority": "HIGH",
+                "details": {
+                    "worker_id": self.node_id,
+                    "consecutive_hours": round(self.consecutive_work_hours, 2),
+                    "max_consecutive_hours": self.max_consecutive_hours,
+                    "remaining_shift_hours": round(self.remaining_shift_hours, 2),
+                },
+            })
+
+        # Warn approaching break limit (80%+)
+        elif self.break_eligible:
+            events.append({
+                "event_type": "BREAK_APPROACHING",
+                "source": self.node_id,
+                "priority": "NORMAL",
+                "details": {
+                    "worker_id": self.node_id,
+                    "consecutive_hours": round(self.consecutive_work_hours, 2),
+                    "max_consecutive_hours": self.max_consecutive_hours,
+                    "remaining_shift_hours": round(self.remaining_shift_hours, 2),
+                },
+            })
+
+        return events
+
+    def start_break(self, sim_minutes: float) -> list[dict]:
+        """Worker starts a break."""
+        if self.state.on_break or self.state.shift_ended:
+            return []
+        self.state.on_break = True
+        self.state.break_start_minutes = sim_minutes
+        self.state.breaks_taken += 1
+        return [{
+            "event_type": "BREAK_STARTED",
+            "source": self.node_id,
+            "priority": "NORMAL",
+            "details": {
+                "worker_id": self.node_id,
+                "break_number": self.state.breaks_taken,
+                "consecutive_hours_worked": round(self.consecutive_work_hours, 2),
+                "break_duration_min": self.break_duration_min,
+            },
+        }]
+
+
+# Minimum crew to operate a crane (ILA Local 1414)
+MINIMUM_CREW_PER_CRANE = 2  # 1 operator + 1 signaler
+
+
+# ---------------------------------------------------------------------------
 #  Lifecycle Manager (facade)
 # ---------------------------------------------------------------------------
 
@@ -487,24 +653,42 @@ _ROLE_CONFIGS: dict[str, dict] = {
         "resources": None,  # use defaults
         "cert_hours": 120.0,
         "physical_actions": {"complete_container_move", "report_equipment_status"},
+        "labor": {
+            "max_consecutive_hours": 6.0,
+            "break_duration_min": 30.0,
+            "shift_duration_hours": 12.0,
+            "hazmat_cert_required": True,
+            "minimum_crew": MINIMUM_CREW_PER_CRANE,
+        },
     },
     "tractor": {
         "subsystems": {"battery": 0.060, "drivetrain": 0.015, "hydraulic_lift": 0.025},
         "resources": {"battery_pct": {"drain": 5.0, "warning": 30.0, "critical": 10.0}},
         "cert_hours": None,
         "physical_actions": {"transport_container", "report_equipment_status"},
+        "labor": {
+            "max_consecutive_hours": 6.0,
+            "break_duration_min": 30.0,
+            "shift_duration_hours": 12.0,
+        },
     },
     "operator": {
         "subsystems": None,
         "resources": None,
         "cert_hours": 60.0,  # faster expiry for drama
         "physical_actions": set(),
+        "labor": {
+            "max_consecutive_hours": 6.0,
+            "break_duration_min": 30.0,
+            "shift_duration_hours": 12.0,
+        },
     },
     "sensor": {
         "subsystems": {"calibration": 0.008},
         "resources": {"power_pct": {"drain": 0.5, "warning": 20.0, "critical": 5.0}},
         "cert_hours": None,
         "physical_actions": {"emit_reading", "report_calibration"},
+        # sensors have no labor constraints — automated equipment
     },
     "lashing_crew": {
         "subsystems": {"safety_harness": 0.010, "lashing_tools": 0.020},
@@ -525,7 +709,7 @@ class LifecycleManager:
     Returns list of JSON event dicts to print to stdout.
     """
 
-    def __init__(self, node_id: str, role: str = "crane", report_every_n_cycles: int = 10):
+    def __init__(self, node_id: str, role: str = "crane", report_every_n_cycles: int = 10, proficiency: str = "competent", shift_start_minutes: float = 0.0):
         self.node_id = node_id
         self.role = role
         cfg = _ROLE_CONFIGS.get(role, {})
@@ -544,6 +728,19 @@ class LifecycleManager:
         # Certifications (operators and cranes)
         cert_hours = cfg.get("cert_hours")
         self.certs = CertTracker(node_id, cert_hours=cert_hours) if cert_hours else None
+
+        # Labor constraints (ILA Local 1414 union rules)
+        labor_cfg = cfg.get("labor")
+        if labor_cfg:
+            self.labor = LaborConstraintTracker(
+                node_id,
+                max_consecutive_hours=labor_cfg.get("max_consecutive_hours", 6.0),
+                break_duration_min=labor_cfg.get("break_duration_min", 30.0),
+                shift_duration_hours=labor_cfg.get("shift_duration_hours", 12.0),
+                shift_start_minutes=shift_start_minutes,
+            )
+        else:
+            self.labor = None
 
         # Logistics + gap analysis (only if degradation is tracked)
         self.logistics = LogisticsDispatcher(node_id) if self.degradation else None
@@ -601,6 +798,10 @@ class LifecycleManager:
                     cycle, self.degradation, self.resources, self.logistics
                 )
             )
+
+        # 7. Labor constraints
+        if self.labor:
+            events.extend(self.labor.tick(delta_minutes))
 
         # Stamp all events
         ts_us = int(time.time() * 1_000_000)

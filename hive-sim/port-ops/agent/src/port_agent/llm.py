@@ -249,7 +249,81 @@ class DryRunProvider(LLMProvider):
 
     async def decide(self, persona: str, observed_state: dict, available_tools: list[dict]) -> AgentDecision:
         self._cycle += 1
-        await asyncio.sleep(self.DRY_RUN_DELAY_S)
+        # Proficiency-scaled thinking delay
+        await asyncio.sleep(self._BASE_DELAY_S * self._speed_factor)
+
+        # Proficiency-based error: occasionally make wrong tool call
+        if self._error_rate > 0 and random.random() < self._error_rate:
+            return AgentDecision(
+                action="wait",
+                arguments={"reason": f"Hesitation — {self._proficiency} re-evaluating situation"},
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: proficiency error "
+                    f"({self._proficiency}, {self._error_rate:.0%} rate) — delayed response"
+                ),
+                confidence=0.5,
+            )
+
+        # ── Labor constraint checks (applies to worker roles) ────────────
+        labor = observed_state.get("labor_constraints", {})
+        if labor:
+            # Shift expired → worker goes off shift
+            if labor.get("shift_ended"):
+                return AgentDecision(
+                    action="report_available" if self._role == "operator" else "wait",
+                    arguments=(
+                        {"status": "OFF_SHIFT", "details": "Shift ended per ILA Local 1414 rules"}
+                        if self._role == "operator"
+                        else {"reason": "Shift ended — off duty per union contract"}
+                    ),
+                    reasoning=(
+                        f"DryRun cycle {self._cycle}: shift expired "
+                        f"({labor.get('shift_elapsed_hours', 0):.1f}h worked), going off shift"
+                    ),
+                )
+
+            # Mandatory break required → worker takes break
+            if labor.get("break_required"):
+                return AgentDecision(
+                    action="report_available" if self._role == "operator" else "wait",
+                    arguments=(
+                        {"status": "BREAK", "details": f"Mandatory break — {labor.get('consecutive_hours', 0):.1f}h consecutive work"}
+                        if self._role == "operator"
+                        else {"reason": f"Mandatory break — {labor.get('consecutive_hours', 0):.1f}h consecutive (max {labor.get('max_consecutive_hours', 6)}h)"}
+                    ),
+                    reasoning=(
+                        f"DryRun cycle {self._cycle}: mandatory break required "
+                        f"({labor.get('consecutive_hours', 0):.1f}h consecutive, "
+                        f"max {labor.get('max_consecutive_hours', 6)}h)"
+                    ),
+                )
+
+            # On break → wait for break to complete
+            if labor.get("on_break"):
+                return AgentDecision(
+                    action="wait",
+                    arguments={"reason": f"On break ({labor.get('break_duration_min', 30)} min mandatory)"},
+                    reasoning=f"DryRun cycle {self._cycle}: on mandatory break",
+                )
+
+            # Crane: crew insufficient → pause operations
+            if self._role == "crane" and labor.get("crew_insufficient"):
+                return AgentDecision(
+                    action="request_support",
+                    arguments={
+                        "capability_needed": "SIGNALER",
+                        "reason": (
+                            f"Crew below minimum ({labor.get('current_crew', 0)}"
+                            f"/{labor.get('minimum_crew', 2)}) — "
+                            f"ILA Local 1414 requires operator + signaler"
+                        ),
+                    },
+                    reasoning=(
+                        f"DryRun cycle {self._cycle}: crane paused — "
+                        f"crew {labor.get('current_crew', 0)}/{labor.get('minimum_crew', 2)} "
+                        f"below ILA minimum"
+                    ),
+                )
         if self._role == "aggregator":
             return self._decide_aggregator(observed_state)
         elif self._role == "berth_manager":

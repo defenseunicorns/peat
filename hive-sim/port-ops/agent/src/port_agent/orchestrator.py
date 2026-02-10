@@ -250,6 +250,22 @@ class Orchestrator:
             if has_tractors:
                 create_transport_queue(self.store, hold_id)
 
+        # Labor constraint defaults (ILA Local 1414)
+        _LABOR_DEFAULTS = {
+            "shift_start_minutes": 0.0,
+            "shift_elapsed_hours": 0.0,
+            "consecutive_hours": 0.0,
+            "max_consecutive_hours": 6.0,
+            "break_duration_min": 30.0,
+            "shift_duration_hours": 12.0,
+            "remaining_shift_hours": 12.0,
+            "on_break": False,
+            "break_eligible": False,
+            "break_required": False,
+            "shift_ended": False,
+            "breaks_taken": 0,
+        }
+
         # Initialize entity documents for each agent
         for spec in self.config.agents:
             # Determine which hold this agent belongs to
@@ -269,6 +285,14 @@ class Orchestrator:
                     "hazmat_cert_valid": True,
                 }
                 create_crane_entity(self.store, spec.node_id, entity_config)
+                # Add labor constraints to entity doc
+                entity_doc = self.store.get_document("node_states", f"sim_doc_{spec.node_id}")
+                if entity_doc:
+                    entity_doc.update_field("labor", {
+                        **_LABOR_DEFAULTS,
+                        "hazmat_cert_required": True,
+                        "minimum_crew": 2,
+                    })
                 if team_doc:
                     team_doc.update_field(f"team_members.{spec.node_id}", {
                         "entity_type": "gantry_crane",
@@ -294,6 +318,10 @@ class Orchestrator:
                     "berth": self.config.berth,
                 }
                 create_operator_entity(self.store, spec.node_id, op_config)
+                # Add labor constraints to entity doc
+                entity_doc = self.store.get_document("node_states", f"sim_doc_{spec.node_id}")
+                if entity_doc:
+                    entity_doc.update_field("labor", dict(_LABOR_DEFAULTS))
                 if team_doc:
                     team_doc.update_field(f"team_members.{spec.node_id}", {
                         "entity_type": "operator",
@@ -355,6 +383,10 @@ class Orchestrator:
                     "berth": self.config.berth,
                 }
                 create_tractor_entity(self.store, spec.node_id, tractor_config)
+                # Add labor constraints to entity doc
+                entity_doc = self.store.get_document("node_states", f"sim_doc_{spec.node_id}")
+                if entity_doc:
+                    entity_doc.update_field("labor", dict(_LABOR_DEFAULTS))
                 if team_doc:
                     team_doc.update_field(f"team_members.{spec.node_id}", {
                         "entity_type": "yard_tractor",
