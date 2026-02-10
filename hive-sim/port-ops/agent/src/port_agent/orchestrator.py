@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 class AgentSpec:
     """Specification for a single agent in the orchestrator."""
     node_id: str
-    role: str           # "crane" | "aggregator" | "berth_manager" | "operator" | "tractor" | "scheduler" | "sensor"
+    role: str           # "crane" | "aggregator" | "berth_manager" | "toc" | "yard_manager" | "stacking_crane" | "operator" | "tractor" | "scheduler" | "sensor"
     persona: str        # persona filename without .md
     provider: str       # "anthropic" | "ollama" | "dry-run"
     model: str | None = None
@@ -70,6 +70,9 @@ _COMPOSITION_MAP: dict[str, tuple[str, str, str]] = {
     "s": ("scheduler",  "ai-scheduler",     "scheduler-1"),
     "a": ("aggregator", "hold-aggregator",  "hold-agg-3"),
     "b": ("berth_manager", "berth-manager", "berth-mgr-{n}"),
+    "o": ("toc",        "toc",              "toc-1"),
+    "y": ("yard_manager", "yard-manager",   "yard-mgr-{n}"),
+    "k": ("stacking_crane", "stacking-crane", "stk-crane-{n}"),
     "x": ("sensor",     "sensor",           None),  # special: interleave load-cell / rfid
 }
 
@@ -365,6 +368,92 @@ class Orchestrator:
                     "entity_type": "berth_manager",
                     "status": "OPERATIONAL",
                     "capabilities": ["BERTH_AGGREGATION", "TRACTOR_REBALANCE"],
+                })
+
+        elif spec.role == "toc":
+            self.store.create_document(
+                collection="node_states",
+                doc_id=f"sim_doc_{spec.node_id}",
+                fields={
+                    "node_id": spec.node_id,
+                    "entity_type": "terminal_operations_center",
+                    "hive_level": "H4",
+                    "operational_status": "OPERATIONAL",
+                    "assignment": {
+                        "terminal": "POSavannah",
+                        "vessel": self.config.vessel,
+                    },
+                    "metrics": {
+                        "summaries_produced": 0,
+                        "alerts_emitted": 0,
+                        "resource_transfers": 0,
+                        "zone_priority_adjustments": 0,
+                    },
+                },
+            )
+
+        elif spec.role == "yard_manager":
+            self.store.create_document(
+                collection="node_states",
+                doc_id=f"sim_doc_{spec.node_id}",
+                fields={
+                    "node_id": spec.node_id,
+                    "entity_type": "yard_manager",
+                    "hive_level": "H3",
+                    "operational_status": "OPERATIONAL",
+                    "assignment": {
+                        "zone": "yard-north",
+                        "berth": berth_id,
+                        "vessel": self.config.vessel,
+                    },
+                    "metrics": {
+                        "summaries_produced": 0,
+                        "congestion_events": 0,
+                        "tractors_routed": 0,
+                        "crane_rebalances": 0,
+                    },
+                },
+            )
+            if team_doc:
+                team_doc.update_field(f"team_members.{spec.node_id}", {
+                    "entity_type": "yard_manager",
+                    "status": "OPERATIONAL",
+                    "capabilities": ["YARD_AGGREGATION", "TRACTOR_ROUTING", "CRANE_BALANCING"],
+                })
+
+        elif spec.role == "stacking_crane":
+            self.store.create_document(
+                collection="node_states",
+                doc_id=f"sim_doc_{spec.node_id}",
+                fields={
+                    "node_id": spec.node_id,
+                    "entity_type": "stacking_crane",
+                    "hive_level": "H1",
+                    "operational_status": "OPERATIONAL",
+                    "assignment": {
+                        "yard_block": f"YB-{chr(65 + (int(spec.node_id.split('-')[-1]) - 1) % 6) if spec.node_id.split('-')[-1].isdigit() else 'A'}",
+                        "berth": berth_id,
+                    },
+                    "subsystems": {
+                        "hoist": {"kind": "winch", "status": "nominal"},
+                        "trolley": {"kind": "rotary", "status": "nominal"},
+                        "gantry_travel": {"kind": "linear", "status": "nominal"},
+                    },
+                    "position": {"row": 0, "bay": 0},
+                    "hoist_load_kg": 0.0,
+                    "current_task": None,
+                    "metrics": {
+                        "containers_stacked": 0,
+                        "containers_retrieved": 0,
+                        "position_reports": 0,
+                    },
+                },
+            )
+            if team_doc:
+                team_doc.update_field(f"team_members.{spec.node_id}", {
+                    "entity_type": "stacking_crane",
+                    "status": "OPERATIONAL",
+                    "capabilities": ["CONTAINER_STACK", "CONTAINER_RETRIEVE"],
                 })
 
         elif spec.role == "tractor":

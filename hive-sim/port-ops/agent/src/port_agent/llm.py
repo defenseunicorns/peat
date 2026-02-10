@@ -329,7 +329,11 @@ class DryRunProvider(LLMProvider):
                         f"below ILA minimum"
                     ),
                 )
-        if self._role == "aggregator":
+        if self._role == "toc":
+            return self._decide_toc(observed_state)
+        elif self._role == "yard_manager":
+            return self._decide_yard_manager(observed_state)
+        elif self._role == "aggregator":
             return self._decide_aggregator(observed_state)
         elif self._role == "berth_manager":
             return self._decide_berth_manager(observed_state)
@@ -339,6 +343,8 @@ class DryRunProvider(LLMProvider):
             return self._decide_tractor(observed_state)
         elif self._role == "scheduler":
             return self._decide_scheduler(observed_state)
+        elif self._role == "stacking_crane":
+            return self._decide_stacking_crane(observed_state)
         elif self._role == "sensor":
             return self._decide_sensor(observed_state)
         elif self._role == "lashing_crew":
@@ -1264,6 +1270,373 @@ class DryRunProvider(LLMProvider):
                 f"DryRun cycle {self._cycle}: releasing truck with {container_id} "
                 f"(total processed: {trucks_processed + 1})"
             ),
+        )
+
+    def _decide_toc(self, observed_state: dict) -> AgentDecision:
+        tasking = observed_state.get("tasking", {})
+        berth_summaries = tasking.get("berth_summaries", [])
+        total_remaining = tasking.get("total_terminal_moves_remaining", 0)
+
+        # Every 10 cycles: produce terminal summary
+        if self._cycle % 10 == 0:
+            total_rate = sum(b.get("moves_per_hour", 0) for b in berth_summaries)
+            eta_minutes = (
+                round((total_remaining / max(total_rate, 1)) * 60, 1)
+                if total_remaining > 0
+                else 0.0
+            )
+            berth_statuses = {
+                b.get("berth_id", f"berth-{i}"): b.get("status", "UNKNOWN")
+                for i, b in enumerate(berth_summaries)
+            }
+            return AgentDecision(
+                action="update_terminal_summary",
+                arguments={
+                    "total_moves_per_hour": total_rate,
+                    "berth_statuses": berth_statuses,
+                    "completion_eta_minutes": eta_minutes,
+                    "total_moves_remaining": total_remaining,
+                    "summary": (
+                        f"{len(berth_summaries)} zones reporting, "
+                        f"{total_rate} moves/hr aggregate, "
+                        f"ETA {eta_minutes} min, "
+                        f"{total_remaining} moves remaining"
+                    ),
+                },
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: terminal summary — "
+                    f"{total_rate} moves/hr, {total_remaining} remaining"
+                ),
+            )
+
+        # Detect cascading failure: 2+ zones degraded
+        degraded_zones = [
+            b.get("berth_id", "?")
+            for b in berth_summaries
+            if b.get("status") == "DEGRADED"
+        ]
+        if len(degraded_zones) >= 2:
+            return AgentDecision(
+                action="emit_terminal_alert",
+                arguments={
+                    "alert_type": "cascading_failure",
+                    "details": (
+                        f"Cascading failure: {len(degraded_zones)} zones degraded "
+                        f"({', '.join(degraded_zones)})"
+                    ),
+                    "severity": "CRITICAL",
+                    "affected_zones": degraded_zones,
+                },
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: cascading failure in "
+                    f"{degraded_zones}"
+                ),
+            )
+
+        # Cross-zone gap detection
+        if len(berth_summaries) > 1:
+            rates = [b.get("moves_per_hour", 0) for b in berth_summaries]
+            avg_rate = sum(rates) / len(rates) if rates else 0
+            for b in berth_summaries:
+                b_rate = b.get("moves_per_hour", 0)
+                bid = b.get("berth_id", "?")
+                if avg_rate > 0 and b_rate < avg_rate * 0.7:
+                    return AgentDecision(
+                        action="emit_terminal_alert",
+                        arguments={
+                            "alert_type": "cross_zone_gap",
+                            "details": (
+                                f"Zone {bid} at {b_rate} moves/hr "
+                                f"vs terminal avg {avg_rate:.0f} — below 70% threshold"
+                            ),
+                            "severity": "HIGH",
+                            "affected_zones": [bid],
+                        },
+                        reasoning=(
+                            f"DryRun cycle {self._cycle}: cross-zone gap in {bid}"
+                        ),
+                    )
+
+        # Persistent zone gaps -> escalate
+        for b in berth_summaries:
+            gap_count = b.get("gap_count", 0)
+            if gap_count >= 3:
+                return AgentDecision(
+                    action="emit_terminal_alert",
+                    arguments={
+                        "alert_type": "zone_gap_escalation",
+                        "details": (
+                            f"Zone {b.get('berth_id', '?')} has "
+                            f"{gap_count} persistent unresolved gaps"
+                        ),
+                        "severity": "HIGH",
+                        "affected_zones": [b.get("berth_id", "?")],
+                    },
+                    reasoning=(
+                        f"DryRun cycle {self._cycle}: persistent gaps in "
+                        f"{b.get('berth_id', '?')}, escalating to terminal level"
+                    ),
+                )
+
+        return AgentDecision(
+            action="wait",
+            arguments={"reason": "Monitoring — terminal operations nominal"},
+            reasoning=f"DryRun cycle {self._cycle}: TOC idle, all zones nominal",
+        )
+
+    def _decide_yard_manager(self, observed_state: dict) -> AgentDecision:
+        tasking = observed_state.get("tasking", {})
+        block_summaries = tasking.get("block_summaries", [])
+        pending_tractors = tasking.get("pending_tractors", [])
+
+        # Every 5 cycles: produce yard summary
+        if self._cycle % 5 == 0:
+            total_capacity = sum(b.get("capacity_teu", 0) for b in block_summaries)
+            total_used = sum(b.get("used_teu", 0) for b in block_summaries)
+            utilization = total_used / max(total_capacity, 1)
+            return AgentDecision(
+                action="update_yard_summary",
+                arguments={
+                    "zone": tasking.get("zone", "yard-north"),
+                    "block_count": len(block_summaries),
+                    "total_capacity_teu": total_capacity,
+                    "total_used_teu": total_used,
+                    "utilization": round(utilization, 3),
+                    "summary": (
+                        f"{len(block_summaries)} blocks, "
+                        f"{total_used}/{total_capacity} TEU, "
+                        f"{utilization:.0%} utilization"
+                    ),
+                },
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: yard summary — "
+                    f"{total_used}/{total_capacity} TEU"
+                ),
+            )
+
+        # Congestion detection: blocks with queue_depth > 3
+        congested = [
+            b for b in block_summaries
+            if b.get("queue_depth", 0) > 3
+        ]
+        if congested:
+            block = congested[0]
+            return AgentDecision(
+                action="report_congestion",
+                arguments={
+                    "block_id": block.get("block_id", "?"),
+                    "queue_depth": block.get("queue_depth", 0),
+                    "zone": tasking.get("zone", "yard-north"),
+                },
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: congestion in "
+                    f"{block.get('block_id', '?')} (queue {block.get('queue_depth', 0)})"
+                ),
+            )
+
+        # Tractor routing: assign pending tractors to blocks
+        if pending_tractors:
+            tractor = pending_tractors[0]
+            # Pick least-utilized non-congested block
+            candidates = [
+                b for b in block_summaries
+                if b.get("queue_depth", 0) <= 3
+            ]
+            if candidates:
+                candidates.sort(
+                    key=lambda b: b.get("used_teu", 0) / max(b.get("capacity_teu", 1), 1)
+                )
+                best = candidates[0]
+                return AgentDecision(
+                    action="route_tractor",
+                    arguments={
+                        "tractor_id": tractor.get("tractor_id", "tractor-1"),
+                        "target_block": best.get("block_id", "YB-A"),
+                        "container_id": tractor.get("container_id"),
+                    },
+                    reasoning=(
+                        f"DryRun cycle {self._cycle}: routing tractor to "
+                        f"{best.get('block_id', 'YB-A')}"
+                    ),
+                )
+
+        # Crane balancing: detect overloaded / underloaded blocks
+        if self._cycle % 3 == 0 and len(block_summaries) > 1:
+            overloaded = [
+                b for b in block_summaries
+                if b.get("crane_queue", 0) > 5 and b.get("crane_idle", 0) == 0
+            ]
+            underloaded = [
+                b for b in block_summaries
+                if b.get("crane_idle", 0) > 0
+            ]
+            if overloaded and underloaded:
+                return AgentDecision(
+                    action="assign_yard_block",
+                    arguments={
+                        "action": "rebalance_crane",
+                        "from_block": underloaded[0].get("block_id", "?"),
+                        "to_block": overloaded[0].get("block_id", "?"),
+                    },
+                    reasoning=(
+                        f"DryRun cycle {self._cycle}: rebalancing crane from "
+                        f"{underloaded[0].get('block_id')} to {overloaded[0].get('block_id')}"
+                    ),
+                )
+
+        # Escalation: high utilization
+        if block_summaries:
+            total_capacity = sum(b.get("capacity_teu", 0) for b in block_summaries)
+            total_used = sum(b.get("used_teu", 0) for b in block_summaries)
+            utilization = total_used / max(total_capacity, 1)
+            if utilization > 0.85:
+                return AgentDecision(
+                    action="report_congestion",
+                    arguments={
+                        "escalate_to": "toc",
+                        "zone": tasking.get("zone", "yard-north"),
+                        "reasons": [f"yard utilization {utilization:.0%} exceeds 85%"],
+                    },
+                    reasoning=(
+                        f"DryRun cycle {self._cycle}: escalating to TOC — "
+                        f"utilization {utilization:.0%}"
+                    ),
+                )
+
+        return AgentDecision(
+            action="wait",
+            arguments={"reason": "Monitoring — yard operations nominal"},
+            reasoning=f"DryRun cycle {self._cycle}: yard manager idle, all blocks nominal",
+        )
+
+    def _decide_stacking_crane(self, observed_state: dict) -> AgentDecision:
+        tasking = observed_state.get("tasking", {})
+        current_task = tasking.get("current_task")
+        task_queue = tasking.get("task_queue", [])
+        hoist_load = tasking.get("hoist_load_kg", 0.0)
+        position = tasking.get("position", {"row": 0, "bay": 0})
+        yard_block = tasking.get("yard_block", "YB-A")
+
+        # Safety: hoist overload check
+        if hoist_load > 40000:
+            return AgentDecision(
+                action="report_position",
+                arguments={
+                    "crane_id": tasking.get("crane_id", self._role),
+                    "fault": "hoist_overload",
+                    "load_kg": hoist_load,
+                    "yard_block": yard_block,
+                },
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: hoist overload "
+                    f"({hoist_load}kg > 40000kg limit)"
+                ),
+            )
+
+        # Execute current task phases
+        if current_task:
+            task_type = current_task.get("type", "stack")
+            phase = current_task.get("phase", "receive")
+            container_id = current_task.get("container_id", "UNKNOWN")
+
+            if task_type == "stack":
+                if phase == "receive":
+                    return AgentDecision(
+                        action="report_position",
+                        arguments={
+                            "crane_id": tasking.get("crane_id", self._role),
+                            "status": "received",
+                            "container_id": container_id,
+                            "yard_block": yard_block,
+                        },
+                        reasoning=(
+                            f"DryRun cycle {self._cycle}: received container "
+                            f"{container_id} from tractor"
+                        ),
+                    )
+                elif phase in ("travel", "place"):
+                    target = current_task.get("target_slot", {})
+                    return AgentDecision(
+                        action="stack_container",
+                        arguments={
+                            "crane_id": tasking.get("crane_id", self._role),
+                            "container_id": container_id,
+                            "row": target.get("row", position.get("row", 0)),
+                            "bay": target.get("bay", position.get("bay", 0)),
+                            "tier": target.get("tier", 1),
+                            "yard_block": yard_block,
+                        },
+                        reasoning=(
+                            f"DryRun cycle {self._cycle}: stacking {container_id} at "
+                            f"R{target.get('row', 0)}/B{target.get('bay', 0)}/T{target.get('tier', 1)}"
+                        ),
+                    )
+
+            elif task_type == "retrieve":
+                if phase in ("receive", "travel", "pick"):
+                    source = current_task.get("source_slot", {})
+                    return AgentDecision(
+                        action="retrieve_container",
+                        arguments={
+                            "crane_id": tasking.get("crane_id", self._role),
+                            "container_id": container_id,
+                            "row": source.get("row", 0),
+                            "bay": source.get("bay", 0),
+                            "tier": source.get("tier", 0),
+                            "yard_block": yard_block,
+                        },
+                        reasoning=(
+                            f"DryRun cycle {self._cycle}: retrieving {container_id} from "
+                            f"R{source.get('row', 0)}/B{source.get('bay', 0)}"
+                        ),
+                    )
+                elif phase == "deliver":
+                    return AgentDecision(
+                        action="report_position",
+                        arguments={
+                            "crane_id": tasking.get("crane_id", self._role),
+                            "status": "delivered",
+                            "container_id": container_id,
+                            "yard_block": yard_block,
+                        },
+                        reasoning=(
+                            f"DryRun cycle {self._cycle}: delivered {container_id} "
+                            f"to transfer lane"
+                        ),
+                    )
+
+        # Simulate cycling through tasks: stack every even cycle, retrieve every odd
+        if self._cycle % 2 == 0:
+            cid = f"MSCU-{4472891 + (self._cycle % 20)}"
+            row = (self._cycle // 2) % 10
+            bay = (self._cycle // 4) % 20
+            tier = (self._cycle // 6) % 5 + 1
+            return AgentDecision(
+                action="stack_container",
+                arguments={
+                    "crane_id": tasking.get("crane_id", self._role),
+                    "container_id": cid,
+                    "row": row,
+                    "bay": bay,
+                    "tier": tier,
+                    "yard_block": yard_block,
+                },
+                reasoning=(
+                    f"DryRun cycle {self._cycle}: stacking {cid} at "
+                    f"R{row}/B{bay}/T{tier}"
+                ),
+            )
+
+        # Odd cycles: report position (idle)
+        return AgentDecision(
+            action="report_position",
+            arguments={
+                "crane_id": tasking.get("crane_id", self._role),
+                "status": "idle",
+                "position": position,
+                "yard_block": yard_block,
+            },
+            reasoning=f"DryRun cycle {self._cycle}: stacking crane idle, reporting position",
         )
 
     def _decide_aggregator(self, observed_state: dict) -> AgentDecision:

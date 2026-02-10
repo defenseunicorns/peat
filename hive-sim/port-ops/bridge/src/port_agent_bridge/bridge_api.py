@@ -727,6 +727,378 @@ GATE_WORKER_TOOLS = [
     ),
 ]
 
+# ── TOC tool definitions ──────────────────────────────────────────────────
+
+TOC_TOOLS = [
+    ToolShim(
+        name="update_terminal_summary",
+        description=(
+            "Update the terminal-level summary with aggregated metrics from all zones. "
+            "Computes total rate, zone statuses, and terminal-wide completion ETA."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "total_moves_per_hour": {
+                    "type": "number",
+                    "description": "Aggregate moves/hour across all berths",
+                },
+                "berth_statuses": {
+                    "type": "object",
+                    "description": "Mapping of berth_id → status",
+                },
+                "completion_eta_minutes": {
+                    "type": "number",
+                    "description": "Estimated minutes to complete all terminal operations",
+                },
+                "total_moves_remaining": {
+                    "type": "number",
+                    "description": "Total container moves remaining across all berths",
+                },
+                "summary": {
+                    "type": "string",
+                    "description": "Brief human-readable terminal summary",
+                },
+            },
+            "required": ["total_moves_per_hour", "berth_statuses", "completion_eta_minutes", "summary"],
+        },
+    ),
+    ToolShim(
+        name="authorize_resource_transfer",
+        description=(
+            "Authorize a large-scale resource transfer between zones. "
+            "Emits resource_transfer_authorized event with HIGH priority."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "resource_type": {
+                    "type": "string",
+                    "description": "Type of resource (tractor, crew, equipment)",
+                },
+                "from_zone": {
+                    "type": "string",
+                    "description": "Source zone ID",
+                },
+                "to_zone": {
+                    "type": "string",
+                    "description": "Destination zone ID",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Reason for the transfer",
+                },
+            },
+            "required": ["resource_type", "from_zone", "to_zone", "reason"],
+        },
+    ),
+    ToolShim(
+        name="emit_terminal_alert",
+        description=(
+            "Emit a terminal-wide alert (cross-zone gap, cascading failure, zone escalation). "
+            "Alerts propagate to port authority with IMMEDIATE_PROPAGATE policy."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "alert_type": {
+                    "type": "string",
+                    "description": "Alert type (cross_zone_gap, cascading_failure, zone_gap_escalation)",
+                },
+                "details": {
+                    "type": "string",
+                    "description": "Alert details",
+                },
+                "severity": {
+                    "type": "string",
+                    "enum": ["NORMAL", "HIGH", "CRITICAL"],
+                    "description": "Alert severity",
+                },
+                "affected_zones": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of affected zone IDs",
+                },
+            },
+            "required": ["alert_type", "details", "severity"],
+        },
+    ),
+    ToolShim(
+        name="adjust_zone_priority",
+        description=(
+            "Adjust the operational priority of a zone based on terminal constraints. "
+            "Higher-priority zones receive preferential resource allocation."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "zone_id": {
+                    "type": "string",
+                    "description": "Zone ID to adjust priority for",
+                },
+                "priority_level": {
+                    "type": "string",
+                    "enum": ["LOW", "NORMAL", "HIGH", "CRITICAL"],
+                    "description": "New priority level for the zone",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Reason for the priority adjustment",
+                },
+            },
+            "required": ["zone_id", "priority_level", "reason"],
+        },
+    ),
+]
+
+# ── Yard Manager tool definitions ─────────────────────────────────────────
+
+YARD_MANAGER_TOOLS = [
+    ToolShim(
+        name="update_yard_summary",
+        description=(
+            "Publish consolidated yard zone status aggregating all subordinate block summaries. "
+            "Computes total TEU capacity, utilization, and reefer/hazmat status."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "zone": {
+                    "type": "string",
+                    "description": "Yard zone identifier",
+                },
+                "block_count": {
+                    "type": "number",
+                    "description": "Number of yard blocks in this zone",
+                },
+                "total_capacity_teu": {
+                    "type": "number",
+                    "description": "Total TEU capacity across all blocks",
+                },
+                "total_used_teu": {
+                    "type": "number",
+                    "description": "Total TEU currently used",
+                },
+                "utilization": {
+                    "type": "number",
+                    "description": "Utilization ratio (0.0-1.0)",
+                },
+                "summary": {
+                    "type": "string",
+                    "description": "Brief human-readable yard summary",
+                },
+            },
+            "required": ["zone", "utilization", "summary"],
+        },
+    ),
+    ToolShim(
+        name="assign_yard_block",
+        description=(
+            "Direct a container or crane to a specific yard block. "
+            "Also supports crane rebalancing between blocks."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "container_id": {
+                    "type": "string",
+                    "description": "Container ID to assign (optional for rebalance)",
+                },
+                "block_id": {
+                    "type": "string",
+                    "description": "Target yard block ID",
+                },
+                "action": {
+                    "type": "string",
+                    "description": "Action type (assign or rebalance_crane)",
+                },
+                "from_block": {
+                    "type": "string",
+                    "description": "Source block for crane rebalance",
+                },
+                "to_block": {
+                    "type": "string",
+                    "description": "Target block for crane rebalance",
+                },
+            },
+        },
+    ),
+    ToolShim(
+        name="route_tractor",
+        description=(
+            "Set a tractor's routing path through the yard to a target block."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "tractor_id": {
+                    "type": "string",
+                    "description": "Tractor entity ID to route",
+                },
+                "target_block": {
+                    "type": "string",
+                    "description": "Destination yard block ID",
+                },
+                "container_id": {
+                    "type": "string",
+                    "description": "Container being transported (optional)",
+                },
+            },
+            "required": ["tractor_id", "target_block"],
+        },
+    ),
+    ToolShim(
+        name="report_congestion",
+        description=(
+            "Flag a congestion event for mitigation or TOC escalation."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "block_id": {
+                    "type": "string",
+                    "description": "Congested block ID",
+                },
+                "queue_depth": {
+                    "type": "number",
+                    "description": "Number of tractors queued",
+                },
+                "zone": {
+                    "type": "string",
+                    "description": "Yard zone ID",
+                },
+                "escalate_to": {
+                    "type": "string",
+                    "description": "Escalation target (e.g., 'toc')",
+                },
+                "reasons": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Escalation reasons",
+                },
+            },
+            "required": ["zone"],
+        },
+    ),
+]
+
+# ── Stacking Crane tool definitions ───────────────────────────────────────
+
+STACKING_CRANE_TOOLS = [
+    ToolShim(
+        name="stack_container",
+        description=(
+            "Place a container at the assigned row/bay/tier slot in the yard block."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "crane_id": {
+                    "type": "string",
+                    "description": "Stacking crane entity ID",
+                },
+                "container_id": {
+                    "type": "string",
+                    "description": "Container ID to stack",
+                },
+                "row": {
+                    "type": "number",
+                    "description": "Target row in yard block",
+                },
+                "bay": {
+                    "type": "number",
+                    "description": "Target bay in yard block",
+                },
+                "tier": {
+                    "type": "number",
+                    "description": "Target tier (stack height)",
+                },
+                "yard_block": {
+                    "type": "string",
+                    "description": "Yard block ID",
+                },
+            },
+            "required": ["container_id", "row", "bay", "tier", "yard_block"],
+        },
+    ),
+    ToolShim(
+        name="retrieve_container",
+        description=(
+            "Pick up a container from a yard slot for outbound transfer."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "crane_id": {
+                    "type": "string",
+                    "description": "Stacking crane entity ID",
+                },
+                "container_id": {
+                    "type": "string",
+                    "description": "Container ID to retrieve",
+                },
+                "row": {
+                    "type": "number",
+                    "description": "Source row in yard block",
+                },
+                "bay": {
+                    "type": "number",
+                    "description": "Source bay in yard block",
+                },
+                "tier": {
+                    "type": "number",
+                    "description": "Source tier",
+                },
+                "yard_block": {
+                    "type": "string",
+                    "description": "Yard block ID",
+                },
+            },
+            "required": ["container_id", "row", "bay", "tier", "yard_block"],
+        },
+    ),
+    ToolShim(
+        name="report_position",
+        description=(
+            "Broadcast crane position, task status, and subsystem health."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "crane_id": {
+                    "type": "string",
+                    "description": "Stacking crane entity ID",
+                },
+                "status": {
+                    "type": "string",
+                    "description": "Current crane status (idle, received, delivered, fault)",
+                },
+                "position": {
+                    "type": "object",
+                    "description": "Current position {row, bay}",
+                },
+                "yard_block": {
+                    "type": "string",
+                    "description": "Assigned yard block ID",
+                },
+                "container_id": {
+                    "type": "string",
+                    "description": "Container currently being handled (optional)",
+                },
+                "fault": {
+                    "type": "string",
+                    "description": "Fault description if any (optional)",
+                },
+                "load_kg": {
+                    "type": "number",
+                    "description": "Current hoist load in kg (optional)",
+                },
+            },
+            "required": ["crane_id"],
+        },
+    ),
+]
+
 # ── BridgeAPI ────────────────────────────────────────────────────────────────
 
 class BridgeAPI:
@@ -825,7 +1197,13 @@ class BridgeAPI:
                 text = json.dumps({"error": "Transport queue not found"})
 
         elif uri == "hive://tasking":
-            if self.role == "aggregator":
+            if self.role == "toc":
+                text = self._read_toc_tasking()
+            elif self.role == "yard_manager":
+                text = self._read_yard_manager_tasking()
+            elif self.role == "stacking_crane":
+                text = self._read_stacking_crane_tasking()
+            elif self.role == "aggregator":
                 text = self._read_aggregator_tasking()
             elif self.role == "berth_manager":
                 text = self._read_berth_manager_tasking()
@@ -972,6 +1350,60 @@ class BridgeAPI:
         }
         return json.dumps(tasking, indent=2, default=str)
 
+    def _read_toc_tasking(self) -> str:
+        # Aggregate all zone summaries into terminal-level context.
+        # TOC sees ALL zones — no berth filtering.
+        berth_summaries = []
+        total_remaining = 0
+        for doc_id, doc in self.store._collections.get("team_summaries", {}).items():
+            fields = doc.fields
+            hold_id = fields.get("hold_id", doc_id.replace("team_", ""))
+            moves_per_hour = fields.get("moves_per_hour", 0)
+            status = fields.get("status", "UNKNOWN")
+            gap_count = len(fields.get("gap_analysis", []))
+            remaining = fields.get("moves_remaining", 0)
+            total_remaining += remaining
+            berth_summaries.append({
+                "berth_id": hold_id,
+                "moves_per_hour": moves_per_hour,
+                "status": status,
+                "gap_count": gap_count,
+                "moves_remaining": remaining,
+                "moves_completed": fields.get("moves_completed", 0),
+            })
+        tasking = {
+            "directive": "AGGREGATE_TERMINAL_STATUS",
+            "zone_count": len(berth_summaries),
+            "berth_summaries": berth_summaries,
+            "total_terminal_moves_remaining": total_remaining,
+            "priority": "NORMAL",
+        }
+        return json.dumps(tasking, indent=2, default=str)
+
+    def _read_yard_manager_tasking(self) -> str:
+        entity = self._get_entity_doc()
+        tasking = {
+            "directive": "COORDINATE_YARD",
+            "zone": entity.get_field("assignment.zone", "yard-north") if entity else "yard-north",
+            "block_summaries": [],
+            "pending_tractors": [],
+            "congestion_events": [],
+        }
+        return json.dumps(tasking, indent=2, default=str)
+
+    def _read_stacking_crane_tasking(self) -> str:
+        entity = self._get_entity_doc()
+        tasking = {
+            "directive": "STACK_RETRIEVE_CONTAINERS",
+            "crane_id": self.node_id,
+            "yard_block": entity.get_field("assignment.yard_block", "YB-A") if entity else "YB-A",
+            "position": entity.fields.get("position", {"row": 0, "bay": 0}) if entity else {"row": 0, "bay": 0},
+            "hoist_load_kg": entity.get_field("hoist_load_kg", 0.0) if entity else 0.0,
+            "current_task": entity.fields.get("current_task") if entity else None,
+            "task_queue": [],
+        }
+        return json.dumps(tasking, indent=2, default=str)
+
     def _read_berth_manager_tasking(self) -> str:
         # Aggregate hold docs from team_summaries into berth-level context.
         # Each berth manager only sees the hold(s) belonging to its berth.
@@ -1011,7 +1443,13 @@ class BridgeAPI:
 
     async def list_tools(self) -> ListToolsResultShim:
         """Return tools appropriate for this agent's role."""
-        if self.role == "aggregator":
+        if self.role == "toc":
+            return ListToolsResultShim(tools=list(TOC_TOOLS))
+        elif self.role == "yard_manager":
+            return ListToolsResultShim(tools=list(YARD_MANAGER_TOOLS))
+        elif self.role == "stacking_crane":
+            return ListToolsResultShim(tools=list(STACKING_CRANE_TOOLS))
+        elif self.role == "aggregator":
             return ListToolsResultShim(tools=list(AGGREGATOR_TOOLS))
         elif self.role == "berth_manager":
             return ListToolsResultShim(tools=list(BERTH_MANAGER_TOOLS))
@@ -1067,6 +1505,19 @@ class BridgeAPI:
             "verify_documents": self._tool_verify_documents,
             "process_truck": self._tool_process_truck,
             "inspect_seal": self._tool_inspect_seal,
+            # TOC tools
+            "update_terminal_summary": self._tool_update_terminal_summary,
+            "authorize_resource_transfer": self._tool_authorize_resource_transfer,
+            "emit_terminal_alert": self._tool_emit_terminal_alert,
+            "adjust_zone_priority": self._tool_adjust_zone_priority,
+            # Yard Manager tools
+            "update_yard_summary": self._tool_update_yard_summary,
+            "assign_yard_block": self._tool_assign_yard_block,
+            "route_tractor": self._tool_route_tractor,
+            "report_congestion": self._tool_report_congestion,
+            # Stacking Crane tools
+            "stack_container": self._tool_stack_container,
+            "retrieve_container": self._tool_retrieve_container,
         }.get(name)
 
         if handler is None:
@@ -1618,13 +2069,50 @@ class BridgeAPI:
         return f"Container {container_id} transported to {destination}."
 
     async def _tool_report_position(self, arguments: dict) -> str:
-        zone = arguments["zone"]
-        block = arguments["block"]
-        status = arguments["status"]
-
         entity = self._get_entity_doc()
         if not entity:
             return "Error: entity document not found"
+
+        # Stacking crane variant: crane_id, status, position, yard_block
+        if "crane_id" in arguments or self.role == "stacking_crane":
+            crane_id = arguments.get("crane_id", self.node_id)
+            status = arguments.get("status", "idle")
+            position = arguments.get("position", {})
+            yard_block = arguments.get("yard_block", "?")
+            fault = arguments.get("fault")
+            container_id = arguments.get("container_id")
+
+            if position:
+                entity.update_field("position", position)
+            entity.update_field("operational_status", "FAULT" if fault else status.upper())
+
+            reports = entity.get_field("metrics.position_reports", 0)
+            entity.update_field("metrics.position_reports", reports + 1)
+
+            if fault:
+                self.store.emit_event({
+                    "event_type": "crane_fault",
+                    "source": self.node_id,
+                    "fault": fault,
+                    "yard_block": yard_block,
+                    "aggregation_policy": "IMMEDIATE_PROPAGATE",
+                    "priority": "CRITICAL",
+                })
+
+            logger.info(
+                f"METRICS: position_update node={self.node_id} "
+                f"yard_block={yard_block} status={status}"
+                + (f" fault={fault}" if fault else "")
+            )
+            return (
+                f"Position reported: {yard_block}, status={status}."
+                + (f" FAULT: {fault}" if fault else "")
+            )
+
+        # Tractor variant: zone, block, status
+        zone = arguments["zone"]
+        block = arguments["block"]
+        status = arguments["status"]
 
         entity.update_field("position.zone", zone)
         entity.update_field("position.block", block)
@@ -1958,3 +2446,361 @@ class BridgeAPI:
             f"container={container_id} intact={seal_intact} match={seal_match}"
         )
         return f"Seal inspection for {container_id}: {'INTACT' if not compromised else 'COMPROMISED'}."
+
+    # ── TOC tool handlers ────────────────────────────────────────────────
+
+    async def _tool_update_terminal_summary(self, arguments: dict) -> str:
+        total_moves_per_hour = arguments["total_moves_per_hour"]
+        berth_statuses = arguments["berth_statuses"]
+        completion_eta_minutes = arguments["completion_eta_minutes"]
+        summary = arguments["summary"]
+        total_moves_remaining = arguments.get("total_moves_remaining", 0)
+
+        entity = self._get_entity_doc()
+        if entity:
+            summaries = entity.get_field("metrics.summaries_produced", 0)
+            entity.update_field("metrics.summaries_produced", summaries + 1)
+
+        self.store.emit_event({
+            "event_type": "terminal_summary_update",
+            "source": self.node_id,
+            "total_moves_per_hour": total_moves_per_hour,
+            "berth_statuses": berth_statuses,
+            "completion_eta_minutes": completion_eta_minutes,
+            "total_moves_remaining": total_moves_remaining,
+            "summary": summary,
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL",
+        })
+
+        logger.info(
+            f"METRICS: terminal_summary_update node={self.node_id} "
+            f"rate={total_moves_per_hour} eta={completion_eta_minutes}min "
+            f"remaining={total_moves_remaining}"
+        )
+        return (
+            f"Terminal summary updated: {total_moves_per_hour} moves/hr, "
+            f"ETA {completion_eta_minutes} min. {summary}"
+        )
+
+    async def _tool_authorize_resource_transfer(self, arguments: dict) -> str:
+        resource_type = arguments["resource_type"]
+        from_zone = arguments["from_zone"]
+        to_zone = arguments["to_zone"]
+        reason = arguments["reason"]
+
+        entity = self._get_entity_doc()
+        if entity:
+            transfers = entity.get_field("metrics.resource_transfers", 0)
+            entity.update_field("metrics.resource_transfers", transfers + 1)
+
+        self.store.emit_event({
+            "event_type": "resource_transfer_authorized",
+            "source": self.node_id,
+            "resource_type": resource_type,
+            "from_zone": from_zone,
+            "to_zone": to_zone,
+            "reason": reason,
+            "aggregation_policy": "IMMEDIATE_PROPAGATE",
+            "priority": "HIGH",
+        })
+
+        logger.info(
+            f"METRICS: resource_transfer node={self.node_id} "
+            f"type={resource_type} {from_zone}->{to_zone}"
+        )
+        return (
+            f"Resource transfer authorized: {resource_type} from {from_zone} "
+            f"to {to_zone}. Reason: {reason}"
+        )
+
+    async def _tool_emit_terminal_alert(self, arguments: dict) -> str:
+        alert_type = arguments["alert_type"]
+        details = arguments["details"]
+        severity = arguments["severity"]
+        affected_zones = arguments.get("affected_zones", [])
+
+        entity = self._get_entity_doc()
+        if entity:
+            alerts = entity.get_field("metrics.alerts_emitted", 0)
+            entity.update_field("metrics.alerts_emitted", alerts + 1)
+
+        self.store.emit_event({
+            "event_type": f"terminal_alert_{alert_type}",
+            "source": self.node_id,
+            "alert_type": alert_type,
+            "details": details,
+            "severity": severity,
+            "affected_zones": affected_zones,
+            "aggregation_policy": "IMMEDIATE_PROPAGATE",
+            "priority": severity,
+        })
+
+        logger.info(
+            f"METRICS: terminal_alert node={self.node_id} "
+            f"type={alert_type} severity={severity} zones={affected_zones}"
+        )
+        return (
+            f"Terminal alert emitted: {alert_type} ({severity}). {details}"
+        )
+
+    async def _tool_adjust_zone_priority(self, arguments: dict) -> str:
+        zone_id = arguments["zone_id"]
+        priority_level = arguments["priority_level"]
+        reason = arguments["reason"]
+
+        entity = self._get_entity_doc()
+        if entity:
+            adjustments = entity.get_field("metrics.zone_priority_adjustments", 0)
+            entity.update_field("metrics.zone_priority_adjustments", adjustments + 1)
+
+        self.store.emit_event({
+            "event_type": "zone_priority_adjusted",
+            "source": self.node_id,
+            "zone_id": zone_id,
+            "priority_level": priority_level,
+            "reason": reason,
+            "aggregation_policy": "IMMEDIATE_PROPAGATE",
+            "priority": "HIGH",
+        })
+
+        logger.info(
+            f"METRICS: zone_priority node={self.node_id} "
+            f"zone={zone_id} priority={priority_level}"
+        )
+        return (
+            f"Zone priority adjusted: {zone_id} set to {priority_level}. "
+            f"Reason: {reason}"
+        )
+
+    # ── Yard Manager tool handlers ───────────────────────────────────────
+
+    async def _tool_update_yard_summary(self, arguments: dict) -> str:
+        zone = arguments.get("zone", "default")
+        utilization = arguments.get("utilization", 0.0)
+        summary = arguments.get("summary", "")
+
+        entity = self._get_entity_doc()
+        if entity:
+            summaries = entity.get_field("metrics.summaries_produced", 0)
+            entity.update_field("metrics.summaries_produced", summaries + 1)
+
+        self.store.emit_event({
+            "event_type": "yard_summary_update",
+            "source": self.node_id,
+            "zone": zone,
+            "utilization": utilization,
+            "summary": summary,
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL",
+        })
+
+        logger.info(
+            f"METRICS: yard_summary_update node={self.node_id} "
+            f"zone={zone} utilization={utilization}"
+        )
+        return f"Yard summary updated: {zone}, utilization={utilization:.1%}. {summary}"
+
+    async def _tool_assign_yard_block(self, arguments: dict) -> str:
+        container_id = arguments.get("container_id")
+        block_id = arguments.get("block_id")
+        action = arguments.get("action")
+
+        entity = self._get_entity_doc()
+
+        if action == "rebalance_crane":
+            from_block = arguments.get("from_block", "?")
+            to_block = arguments.get("to_block", "?")
+            if entity:
+                rebalances = entity.get_field("metrics.crane_rebalances", 0)
+                entity.update_field("metrics.crane_rebalances", rebalances + 1)
+
+            self.store.emit_event({
+                "event_type": "crane_rebalanced",
+                "source": self.node_id,
+                "from_block": from_block,
+                "to_block": to_block,
+                "aggregation_policy": "AGGREGATE_AT_PARENT",
+                "priority": "NORMAL",
+            })
+
+            logger.info(
+                f"METRICS: crane_rebalanced node={self.node_id} "
+                f"{from_block}->{to_block}"
+            )
+            return f"Crane rebalanced: {from_block} -> {to_block}."
+
+        if container_id and block_id:
+            self.store.emit_event({
+                "event_type": "yard_block_assigned",
+                "source": self.node_id,
+                "container_id": container_id,
+                "block_id": block_id,
+                "aggregation_policy": "AGGREGATE_AT_PARENT",
+                "priority": "NORMAL",
+            })
+
+            logger.info(
+                f"METRICS: yard_block_assigned node={self.node_id} "
+                f"container={container_id} block={block_id}"
+            )
+            return f"Container {container_id} assigned to block {block_id}."
+
+        return "Yard block assignment: no action taken."
+
+    async def _tool_route_tractor(self, arguments: dict) -> str:
+        tractor_id = arguments["tractor_id"]
+        target_block = arguments["target_block"]
+        container_id = arguments.get("container_id")
+
+        entity = self._get_entity_doc()
+        if entity:
+            routed = entity.get_field("metrics.tractors_routed", 0)
+            entity.update_field("metrics.tractors_routed", routed + 1)
+
+        self.store.emit_event({
+            "event_type": "tractor_routed",
+            "source": self.node_id,
+            "tractor_id": tractor_id,
+            "target_block": target_block,
+            "container_id": container_id,
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL",
+        })
+
+        logger.info(
+            f"METRICS: tractor_routed node={self.node_id} "
+            f"tractor={tractor_id} block={target_block}"
+        )
+        return f"Tractor {tractor_id} routed to {target_block}."
+
+    async def _tool_report_congestion(self, arguments: dict) -> str:
+        zone = arguments.get("zone", "unknown")
+        block_id = arguments.get("block_id")
+        queue_depth = arguments.get("queue_depth")
+        escalate_to = arguments.get("escalate_to")
+        reasons = arguments.get("reasons", [])
+
+        entity = self._get_entity_doc()
+        if entity:
+            events = entity.get_field("metrics.congestion_events", 0)
+            entity.update_field("metrics.congestion_events", events + 1)
+
+        priority = "CRITICAL" if escalate_to else "HIGH"
+
+        self.store.emit_event({
+            "event_type": "congestion_reported",
+            "source": self.node_id,
+            "zone": zone,
+            "block_id": block_id,
+            "queue_depth": queue_depth,
+            "escalate_to": escalate_to,
+            "reasons": reasons,
+            "aggregation_policy": "IMMEDIATE_PROPAGATE",
+            "priority": priority,
+        })
+
+        logger.info(
+            f"METRICS: congestion_reported node={self.node_id} "
+            f"zone={zone} block={block_id} escalate={escalate_to}"
+        )
+        if escalate_to:
+            return f"Congestion escalated to {escalate_to}: zone={zone}. Reasons: {', '.join(reasons)}"
+        return f"Congestion reported: block {block_id}, queue depth {queue_depth}."
+
+    # ── Stacking Crane tool handlers ─────────────────────────────────────
+
+    async def _tool_stack_container(self, arguments: dict) -> str:
+        container_id = arguments.get("container_id", "UNKNOWN")
+        row = arguments.get("row", 0)
+        bay = arguments.get("bay", 0)
+        tier = arguments.get("tier", 0)
+        yard_block = arguments.get("yard_block", "?")
+        crane_id = arguments.get("crane_id", self.node_id)
+
+        entity = self._get_entity_doc()
+        if entity:
+            stacked = entity.get_field("metrics.containers_stacked", 0)
+            entity.update_field("metrics.containers_stacked", stacked + 1)
+            entity.update_field("position", {"row": row, "bay": bay})
+            entity.update_field("hoist_load_kg", 0.0)
+            entity.update_field("current_task", None)
+
+        slot_key = f"{yard_block}:{row}:{bay}:{tier}"
+
+        self.store.emit_event({
+            "event_type": "container_stacked",
+            "source": self.node_id,
+            "container_id": container_id,
+            "slot": slot_key,
+            "yard_block": yard_block,
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL",
+        })
+
+        spatial_event = {
+            "event_type": "spatial_update",
+            "source": self.node_id,
+            "priority": "ROUTINE",
+            "details": {
+                "operation": "crane_stack",
+                "crane_id": crane_id,
+                "container_id": container_id,
+                "yard_block": yard_block,
+                "slot": slot_key,
+            },
+        }
+        print(json.dumps(spatial_event), flush=True)
+
+        logger.info(
+            f"METRICS: container_stacked node={self.node_id} "
+            f"container={container_id} slot={slot_key}"
+        )
+        return f"Container {container_id} stacked at {slot_key}."
+
+    async def _tool_retrieve_container(self, arguments: dict) -> str:
+        container_id = arguments.get("container_id", "UNKNOWN")
+        row = arguments.get("row", 0)
+        bay = arguments.get("bay", 0)
+        tier = arguments.get("tier", 0)
+        yard_block = arguments.get("yard_block", "?")
+        crane_id = arguments.get("crane_id", self.node_id)
+
+        entity = self._get_entity_doc()
+        if entity:
+            retrieved = entity.get_field("metrics.containers_retrieved", 0)
+            entity.update_field("metrics.containers_retrieved", retrieved + 1)
+            entity.update_field("position", {"row": row, "bay": bay})
+            entity.update_field("current_task", None)
+
+        slot_key = f"{yard_block}:{row}:{bay}:{tier}"
+
+        self.store.emit_event({
+            "event_type": "container_retrieved",
+            "source": self.node_id,
+            "container_id": container_id,
+            "slot": slot_key,
+            "yard_block": yard_block,
+            "aggregation_policy": "AGGREGATE_AT_PARENT",
+            "priority": "NORMAL",
+        })
+
+        spatial_event = {
+            "event_type": "spatial_update",
+            "source": self.node_id,
+            "priority": "ROUTINE",
+            "details": {
+                "operation": "crane_retrieve",
+                "crane_id": crane_id,
+                "container_id": container_id,
+                "yard_block": yard_block,
+                "slot": slot_key,
+            },
+        }
+        print(json.dumps(spatial_event), flush=True)
+
+        logger.info(
+            f"METRICS: container_retrieved node={self.node_id} "
+            f"container={container_id} slot={slot_key}"
+        )
+        return f"Container {container_id} retrieved from {slot_key}."
