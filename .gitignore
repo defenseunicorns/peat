@@ -31,6 +31,10 @@ cap-protocol/.ditto*
 CLAUDE.md
 .mcp.json
 
+# Python
+__pycache__/
+*.pyc
+
 # Testing
 coverage/
 
