@@ -1,27 +1,33 @@
 import { useState, useMemo } from 'react';
-import { BerthEvent, HoldId } from '../../wire-types';
+import { TerminalEvent, ZoneId } from '../../wire-types';
 
 interface EventStreamProps {
-  events: BerthEvent[];
-  selectedHold?: HoldId;
+  events: TerminalEvent[];
+  selectedZone?: ZoneId;
 }
 
-const typeColors: Record<BerthEvent['type'], string> = {
+const typeColors: Record<TerminalEvent['type'], string> = {
   container_move: '#44ff44',
   crane_cycle: '#00ccff',
   tractor_dispatch: '#ff44aa',
   lashing_complete: '#ffcc00',
   yard_store: '#88aaff',
   status_change: '#888',
+  gate_scan: '#ccaa44',
+  rail_load: '#997733',
+  stacking_crane_cycle: '#44ddbb',
 };
 
-const typeLabels: Record<BerthEvent['type'], string> = {
+const typeLabels: Record<TerminalEvent['type'], string> = {
   container_move: 'MOVE',
   crane_cycle: 'CRANE',
   tractor_dispatch: 'TRCT',
   lashing_complete: 'LASH',
   yard_store: 'YARD',
   status_change: 'STAT',
+  gate_scan: 'GATE',
+  rail_load: 'RAIL',
+  stacking_crane_cycle: 'SC',
 };
 
 function formatTime(ts: number): string {
@@ -29,19 +35,19 @@ function formatTime(ts: number): string {
   return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
 }
 
-export default function EventStream({ events, selectedHold }: EventStreamProps) {
-  const [filterType, setFilterType] = useState<BerthEvent['type'] | 'all'>('all');
+export default function EventStream({ events, selectedZone }: EventStreamProps) {
+  const [filterType, setFilterType] = useState<TerminalEvent['type'] | 'all'>('all');
 
   const filteredEvents = useMemo(() => {
     let result = events;
-    if (selectedHold !== undefined) {
-      result = result.filter(e => e.holdId === selectedHold || e.holdId === undefined);
+    if (selectedZone !== undefined) {
+      result = result.filter(e => e.zoneId === selectedZone || e.zoneId === undefined);
     }
     if (filterType !== 'all') {
       result = result.filter(e => e.type === filterType);
     }
-    return result.slice().reverse(); // newest first
-  }, [events, selectedHold, filterType]);
+    return result.slice().reverse();
+  }, [events, selectedZone, filterType]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -56,7 +62,7 @@ export default function EventStream({ events, selectedHold }: EventStreamProps) 
         <span style={{ color: '#00ffff', fontSize: '12px', fontWeight: 'bold' }}>EVENT STREAM</span>
         <span style={{ color: '#666', fontSize: '10px' }}>
           {filteredEvents.length}/{events.length}
-          {selectedHold !== undefined && ` (Hold ${selectedHold})`}
+          {selectedZone !== undefined && ` (${selectedZone})`}
         </span>
       </div>
 
@@ -74,7 +80,7 @@ export default function EventStream({ events, selectedHold }: EventStreamProps) 
           active={filterType === 'all'}
           onClick={() => setFilterType('all')}
         />
-        {(Object.keys(typeLabels) as BerthEvent['type'][]).map(type => (
+        {(Object.keys(typeLabels) as TerminalEvent['type'][]).map(type => (
           <FilterChip
             key={type}
             label={typeLabels[type]}
@@ -111,6 +117,9 @@ export default function EventStream({ events, selectedHold }: EventStreamProps) 
               }}>
                 {typeLabels[event.type]}
               </span>
+              {event.berthId && (
+                <span style={{ color: '#cc44ff', fontSize: '9px' }}>B{event.berthId}</span>
+              )}
               {event.holdId && (
                 <span style={{ color: '#cc44ff', fontSize: '9px' }}>H{event.holdId}</span>
               )}
@@ -120,7 +129,7 @@ export default function EventStream({ events, selectedHold }: EventStreamProps) 
         ))}
         {filteredEvents.length === 0 && (
           <div style={{ padding: '20px', textAlign: 'center', color: '#555', fontSize: '12px' }}>
-            No events{selectedHold !== undefined ? ` for Hold ${selectedHold}` : ''}
+            No events{selectedZone !== undefined ? ` for ${selectedZone}` : ''}
           </div>
         )}
       </div>
