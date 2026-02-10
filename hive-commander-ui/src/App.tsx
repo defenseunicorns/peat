@@ -1,7 +1,14 @@
 import { useState, useMemo } from 'react';
 import Map3D from './components/Map3D/Map3D';
 import { CapabilityCard } from './components/PieceCard/PieceCard';
+import HierarchyTree from './components/HierarchyTree/HierarchyTree';
+import BerthScene from './components/BerthScene/BerthScene';
+import TeamSummaryHUD from './components/TeamSummaryHUD/TeamSummaryHUD';
+import EventStream from './components/EventStream/EventStream';
 import { TerrainType, Piece, ComposedCapability, Objective, GamePhase } from './types';
+import { HoldId, createPhase2Topology } from './wire-types';
+
+type ViewMode = 'tactical' | 'berth_hierarchy' | 'berth_spatial';
 
 // Generate simple terrain for demo
 function generateTerrain(width: number, height: number): TerrainType[][] {
@@ -158,58 +165,122 @@ function createDemoState() {
 }
 
 export default function App() {
+  const [viewMode, setViewMode] = useState<ViewMode>('berth_hierarchy');
   const [showPieces, setShowPieces] = useState(false);
   const [selectedCapability, setSelectedCapability] = useState<number | undefined>(undefined);
   const [selectedObjective, setSelectedObjective] = useState<number | undefined>(undefined);
+  const [selectedHold, setSelectedHold] = useState<HoldId | undefined>(undefined);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>(undefined);
   const [phase] = useState<GamePhase>('select_objective');
   const [turn] = useState(1);
   const [score] = useState(0);
 
   const demoState = useMemo(() => createDemoState(), []);
+  const berthTopology = useMemo(() => createPhase2Topology(), []);
 
   return (
     <div style={{ display: 'flex', width: '100%', height: '100%' }}>
-      {/* Main 3D Map */}
-      <div style={{ flex: 1, position: 'relative' }}>
-        <Map3D
-          terrain={demoState.terrain}
-          pieces={demoState.pieces}
-          capabilities={demoState.capabilities}
-          objectives={demoState.objectives}
-          showPieces={showPieces}
-          selectedCapability={selectedCapability}
-          selectedObjective={selectedObjective}
-        />
-
-        {/* Overlay controls */}
+      {/* Main view area */}
+      <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column' }}>
+        {/* View mode tabs */}
         <div style={{
-          position: 'absolute',
-          top: '16px',
-          left: '16px',
-          background: 'rgba(0,0,0,0.7)',
-          padding: '12px',
-          borderRadius: '8px',
-          color: 'white',
+          display: 'flex',
+          background: '#0a0a14',
+          borderBottom: '1px solid #333',
+          padding: '0 8px',
         }}>
-          <h2 style={{ margin: 0, fontSize: '18px', color: '#00ffff' }}>HIVE Commander</h2>
-          <div style={{ marginTop: '8px', fontSize: '14px' }}>
-            Turn: {turn} | Score: {score} | Phase: {phase.toUpperCase().replace('_', ' ')}
-          </div>
-          <button
-            onClick={() => setShowPieces(!showPieces)}
-            style={{
-              marginTop: '8px',
-              padding: '8px 16px',
-              background: showPieces ? '#00aaff' : '#333',
-              border: 'none',
-              borderRadius: '4px',
-              color: 'white',
-              cursor: 'pointer',
-            }}
-          >
-            {showPieces ? 'Show Capabilities' : 'Show Pieces'}
-          </button>
+          {([
+            { mode: 'tactical' as ViewMode, label: 'Tactical' },
+            { mode: 'berth_hierarchy' as ViewMode, label: 'Berth Hierarchy' },
+            { mode: 'berth_spatial' as ViewMode, label: 'Berth 3D' },
+          ]).map(tab => (
+            <button
+              key={tab.mode}
+              onClick={() => setViewMode(tab.mode)}
+              style={{
+                padding: '8px 16px',
+                background: viewMode === tab.mode ? '#1a1a3a' : 'transparent',
+                border: 'none',
+                borderBottom: viewMode === tab.mode ? '2px solid #00ffff' : '2px solid transparent',
+                color: viewMode === tab.mode ? '#00ffff' : '#666',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: viewMode === tab.mode ? 'bold' : 'normal',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
+
+        {/* View content */}
+        <div style={{ flex: 1, position: 'relative' }}>
+          {viewMode === 'tactical' && (
+            <>
+              <Map3D
+                terrain={demoState.terrain}
+                pieces={demoState.pieces}
+                capabilities={demoState.capabilities}
+                objectives={demoState.objectives}
+                showPieces={showPieces}
+                selectedCapability={selectedCapability}
+                selectedObjective={selectedObjective}
+              />
+              {/* Overlay controls */}
+              <div style={{
+                position: 'absolute',
+                top: '16px',
+                left: '16px',
+                background: 'rgba(0,0,0,0.7)',
+                padding: '12px',
+                borderRadius: '8px',
+                color: 'white',
+              }}>
+                <h2 style={{ margin: 0, fontSize: '18px', color: '#00ffff' }}>HIVE Commander</h2>
+                <div style={{ marginTop: '8px', fontSize: '14px' }}>
+                  Turn: {turn} | Score: {score} | Phase: {phase.toUpperCase().replace('_', ' ')}
+                </div>
+                <button
+                  onClick={() => setShowPieces(!showPieces)}
+                  style={{
+                    marginTop: '8px',
+                    padding: '8px 16px',
+                    background: showPieces ? '#00aaff' : '#333',
+                    border: 'none',
+                    borderRadius: '4px',
+                    color: 'white',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {showPieces ? 'Show Capabilities' : 'Show Pieces'}
+                </button>
+              </div>
+            </>
+          )}
+
+          {viewMode === 'berth_hierarchy' && (
+            <HierarchyTree
+              topology={berthTopology}
+              selectedHold={selectedHold}
+              selectedNodeId={selectedNodeId}
+              onNodeClick={setSelectedNodeId}
+            />
+          )}
+
+          {viewMode === 'berth_spatial' && (
+            <BerthScene
+              topology={berthTopology}
+              selectedHold={selectedHold}
+            />
+          )}
+        </div>
+
+        {/* Event stream at bottom for berth views */}
+        {viewMode !== 'tactical' && (
+          <div style={{ height: '200px', borderTop: '1px solid #333', background: '#0a0a14' }}>
+            <EventStream events={berthTopology.events} selectedHold={selectedHold} />
+          </div>
+        )}
       </div>
 
       {/* Right sidebar */}
@@ -221,59 +292,69 @@ export default function App() {
         flexDirection: 'column',
         overflow: 'hidden',
       }}>
-        {/* Capabilities panel */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
-          <h3 style={{ color: '#00ffff', margin: '0 0 12px 0', fontSize: '14px' }}>
-            COMPOSED CAPABILITIES
-          </h3>
-          {demoState.capabilities.map((cap) => (
-            <CapabilityCard
-              key={cap.id}
-              capability={cap}
-              isSelected={selectedCapability === cap.id}
-              onClick={() => setSelectedCapability(cap.id === selectedCapability ? undefined : cap.id)}
-            />
-          ))}
-        </div>
-
-        {/* Objectives panel */}
-        <div style={{ borderTop: '1px solid #333', padding: '16px', maxHeight: '40%', overflow: 'auto' }}>
-          <h3 style={{ color: '#ff44ff', margin: '0 0 12px 0', fontSize: '14px' }}>
-            OBJECTIVES
-          </h3>
-          {demoState.objectives.filter(o => !o.completed).map((obj, idx) => (
-            <div
-              key={obj.id}
-              onClick={() => setSelectedObjective(obj.id === selectedObjective ? undefined : obj.id)}
-              style={{
-                background: selectedObjective === obj.id ? '#3a1a4a' : '#1a1a2a',
-                border: selectedObjective === obj.id ? '2px solid #ff44ff' : '1px solid #333',
-                borderRadius: '8px',
-                padding: '10px',
-                marginBottom: '8px',
-                cursor: 'pointer',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <span style={{ color: '#ff44ff', fontWeight: 'bold', fontSize: '13px' }}>
-                  [{idx + 1}] {obj.name}
-                </span>
-                <span style={{ color: '#888', fontSize: '11px' }}>
-                  {obj.points} pts
-                </span>
-              </div>
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>
-                ({obj.x}, {obj.y}) - {obj.description}
-              </div>
-              <div style={{ display: 'flex', gap: '8px', fontSize: '10px' }}>
-                {obj.detectRequired > 0 && <span style={{ color: '#44ff44' }}>DET:{obj.detectRequired}</span>}
-                {obj.trackRequired > 0 && <span style={{ color: '#ffff44' }}>TRK:{obj.trackRequired}</span>}
-                {obj.strikeRequired > 0 && <span style={{ color: '#ff4444' }}>STR:{obj.strikeRequired}</span>}
-                {obj.authorizeRequired > 0 && <span style={{ color: '#ff44ff' }}>AUTH:{obj.authorizeRequired}</span>}
-              </div>
+        {viewMode === 'tactical' ? (
+          <>
+            {/* Capabilities panel */}
+            <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
+              <h3 style={{ color: '#00ffff', margin: '0 0 12px 0', fontSize: '14px' }}>
+                COMPOSED CAPABILITIES
+              </h3>
+              {demoState.capabilities.map((cap) => (
+                <CapabilityCard
+                  key={cap.id}
+                  capability={cap}
+                  isSelected={selectedCapability === cap.id}
+                  onClick={() => setSelectedCapability(cap.id === selectedCapability ? undefined : cap.id)}
+                />
+              ))}
             </div>
-          ))}
-        </div>
+
+            {/* Objectives panel */}
+            <div style={{ borderTop: '1px solid #333', padding: '16px', maxHeight: '40%', overflow: 'auto' }}>
+              <h3 style={{ color: '#ff44ff', margin: '0 0 12px 0', fontSize: '14px' }}>
+                OBJECTIVES
+              </h3>
+              {demoState.objectives.filter(o => !o.completed).map((obj, idx) => (
+                <div
+                  key={obj.id}
+                  onClick={() => setSelectedObjective(obj.id === selectedObjective ? undefined : obj.id)}
+                  style={{
+                    background: selectedObjective === obj.id ? '#3a1a4a' : '#1a1a2a',
+                    border: selectedObjective === obj.id ? '2px solid #ff44ff' : '1px solid #333',
+                    borderRadius: '8px',
+                    padding: '10px',
+                    marginBottom: '8px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ color: '#ff44ff', fontWeight: 'bold', fontSize: '13px' }}>
+                      [{idx + 1}] {obj.name}
+                    </span>
+                    <span style={{ color: '#888', fontSize: '11px' }}>
+                      {obj.points} pts
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>
+                    ({obj.x}, {obj.y}) - {obj.description}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', fontSize: '10px' }}>
+                    {obj.detectRequired > 0 && <span style={{ color: '#44ff44' }}>DET:{obj.detectRequired}</span>}
+                    {obj.trackRequired > 0 && <span style={{ color: '#ffff44' }}>TRK:{obj.trackRequired}</span>}
+                    {obj.strikeRequired > 0 && <span style={{ color: '#ff4444' }}>STR:{obj.strikeRequired}</span>}
+                    {obj.authorizeRequired > 0 && <span style={{ color: '#ff44ff' }}>AUTH:{obj.authorizeRequired}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <TeamSummaryHUD
+            topology={berthTopology}
+            selectedHold={selectedHold}
+            onHoldSelect={setSelectedHold}
+          />
+        )}
       </div>
     </div>
   );
