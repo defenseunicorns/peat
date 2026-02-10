@@ -2,6 +2,7 @@
 # Simple interface for running network simulations and tests
 
 .PHONY: help build clean deploy destroy lab4-24 lab4-48 lab4-96 lab4-384 lab4-start lab4-status lab4-metrics lab4-results lab4-watch lab4-experiment lab4-single lab4-analyze lab4-save-logs lab4-destroy
+.PHONY: clab-deploy-phase2 clab-destroy-phase2 clab-status-phase2
 .PHONY: lab5-packet-loss lab5a-sweep lab5a-collect-latency lab5a-report lab5-intermittent lab5b-sweep lab5b-report lab5-churn lab5c-sweep lab5c-report lab5-knockout lab5-leader-kill lab5-partition lab5-blackout lab5-all lab5-status lab5-inject lab5-recover lab5-recovery-time lab5-verify-consistency lab5-report
 
 # Default target
@@ -446,6 +447,47 @@ lab4-destroy: ## Destroy Lab 4 deployment
 	-docker ps -a --filter "name=clab-lab4" -q | xargs -r docker rm -f 2>/dev/null || true
 	-docker network prune -f 2>/dev/null || true
 	@echo "✓ Lab 4 destroyed"
+
+##@ Phase 2: Port Berth Operation (58-node multi-hold topology)
+
+.PHONY: clab-deploy-phase2 clab-destroy-phase2 clab-status-phase2
+
+clab-deploy-phase2: ## Deploy Phase 2 port berth operation (58 nodes, 3 holds)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Phase 2: Port Berth Operation (58 nodes, 3 holds)        ║"
+	@echo "║  BACKEND=$${BACKEND:-automerge}                            ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@if [ ! -f ../.env ]; then \
+		echo "ERROR: ../.env file required with HIVE_APP_ID, HIVE_SHARED_KEY"; \
+		exit 1; \
+	fi
+	@set -a && . ../.env && set +a && \
+		BACKEND=$${BACKEND:-automerge} \
+		CAP_IN_MEMORY=$${CAP_IN_MEMORY:-true} \
+		containerlab deploy -t topologies/port-berth-operation-58node.yaml --reconfigure --timeout 8m
+	@echo ""
+	@echo "✓ Phase 2 (58 nodes) deployed. Monitor with: make clab-status-phase2"
+
+clab-destroy-phase2: ## Destroy Phase 2 port berth operation deployment
+	@echo "Destroying Phase 2 deployment..."
+	-containerlab destroy -t topologies/port-berth-operation-58node.yaml --cleanup 2>/dev/null || true
+	-docker ps -a --filter "name=clab-port-berth-58n" -q | xargs -r docker rm -f 2>/dev/null || true
+	-docker network prune -f 2>/dev/null || true
+	@echo "✓ Phase 2 destroyed"
+
+clab-status-phase2: ## Show Phase 2 deployment status
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Phase 2: Status                                           ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@TOTAL=$$(docker ps --filter "name=clab-port-berth-58n" -q | wc -l); \
+	RUNNING=$$(docker ps --filter "name=clab-port-berth-58n" --filter "status=running" -q | wc -l); \
+	echo "Containers: $$RUNNING running / $$TOTAL total"
+	@echo ""
+	@echo "Hold aggregators:"
+	@docker stats --no-stream --format "  {{.Name}}: {{.MemUsage}}" 2>/dev/null | grep -E "agg-h|berth-mgr" | head -5 || echo "  (not running)"
+	@echo ""
+	@echo "Errors (if any):"
+	@docker ps --filter "name=clab-port-berth-58n" -q | head -10 | xargs -I{} docker logs {} 2>&1 | grep -iE "error|panic|fatal" | grep -v "No error" | head -5 || echo "  None found"
 
 ##@ Lab 5: Chaos Engineering and Mesh Degradation Testing
 # Requires: Lab 4 deployment running first (make lab4-96 or lab4-384)

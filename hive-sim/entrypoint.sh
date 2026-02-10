@@ -89,7 +89,7 @@ if [ -n "$TCP_CONNECT" ]; then
     echo "[${NODE_ID}] TCP: Will connect to ${TCP_CONNECT}"
 fi
 
-# Apply bandwidth constraints if specified
+# Apply bandwidth constraints if specified (legacy single-param mode)
 if [ -n "$BANDWIDTH" ]; then
     echo "[${NODE_ID}] Applying bandwidth constraint: $BANDWIDTH"
     # Convert bandwidth string to tc format (e.g., "256kbps" -> "256kbit")
@@ -97,6 +97,32 @@ if [ -n "$BANDWIDTH" ]; then
     # Apply Token Bucket Filter (TBF) on eth0
     tc qdisc add dev eth0 root tbf rate "$TC_RATE" burst 32kbit latency 400ms 2>/dev/null || \
         echo "[${NODE_ID}] Warning: Failed to apply bandwidth constraint (may already exist or no permission)"
+fi
+
+# Apply network impairments via netem (Phase 2 multi-hold support)
+# NETEM_DELAY: e.g., "5ms", "50ms"
+# NETEM_LOSS: e.g., "0.1%", "1%"
+# NETEM_RATE: e.g., "10mbit", "1mbit", "500kbit"
+if [ -n "$NETEM_DELAY" ] || [ -n "$NETEM_LOSS" ] || [ -n "$NETEM_RATE" ]; then
+    NETEM_ARGS=""
+    if [ -n "$NETEM_DELAY" ]; then
+        NETEM_ARGS="$NETEM_ARGS delay $NETEM_DELAY"
+    fi
+    if [ -n "$NETEM_LOSS" ]; then
+        NETEM_ARGS="$NETEM_ARGS loss $NETEM_LOSS"
+    fi
+    if [ -n "$NETEM_RATE" ]; then
+        NETEM_ARGS="$NETEM_ARGS rate $NETEM_RATE"
+    fi
+    echo "[${NODE_ID}] Applying netem impairments:$NETEM_ARGS"
+    tc qdisc add dev eth0 root netem $NETEM_ARGS 2>/dev/null || \
+        tc qdisc replace dev eth0 root netem $NETEM_ARGS 2>/dev/null || \
+        echo "[${NODE_ID}] Warning: Failed to apply netem impairments (may need NET_ADMIN capability)"
+fi
+
+# Log multi-hold context if present
+if [ -n "$HOLD_ID" ]; then
+    echo "[${NODE_ID}] Hold: ${HOLD_ID} | Role: ${ROLE:-unknown}"
 fi
 
 # Run the appropriate simulation node

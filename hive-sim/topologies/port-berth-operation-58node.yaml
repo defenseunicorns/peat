@@ -1,0 +1,1585 @@
+# ContainerLab Topology: 58-Node Port Berth Operation (Phase 2)
+#
+# Purpose: Simulate a full berth operation with 3 hold teams working
+# simultaneously on a container vessel, coordinated by a berth manager.
+#
+# Structure (58 nodes total):
+#   3 Hold Teams (14 nodes each = 42):
+#     - 2 cranes (gantry crane operators)
+#     - 3 workers (stevedores / cargo handlers)
+#     - 1 lasher (container lashing crew)
+#     - 1 signaler (crane signaler / ground coordinator)
+#     - 4 tractors (hold-assigned terminal tractors)
+#     - 2 sensors (weight scale + temperature monitor)
+#     - 1 aggregator (hold-level data aggregation)
+#   Shared Resources (16 nodes):
+#     - 1 berth manager (coordinates all holds)
+#     - 8 shared tractors (inter-hold / yard transport pool)
+#     - 4 yard blocks (container stacking areas)
+#     - 1 AI scheduler (optimization / dispatch)
+#     - 2 safety officers (wharf safety / watchstanders)
+#
+# Network Impairments (per ADR-051 §Phase 2):
+#   Crane-to-crane:    5ms delay,  0.1% loss, 10 Mbps (industrial Ethernet)
+#   Worker WiFi:       15ms delay, 1% loss,   1 Mbps  (enterprise WiFi)
+#   Worker BLE mesh:   20ms delay, 2% loss,   500 Kbps (Bluetooth LE mesh)
+#   Tractor cellular:  50ms delay, 0.5% loss, 2 Mbps  (private LTE/5G)
+#   Sensors wired:     1ms delay,  0% loss,   100 Mbps (hardwired Ethernet)
+#   Cross-hold links:  10ms delay, 0.1% loss, 10 Mbps (via berth manager)
+#
+# Impairments are applied via NETEM_DELAY, NETEM_LOSS, NETEM_RATE env vars
+# in the entrypoint, using tc qdisc on eth0.
+#
+# Usage:
+#   containerlab deploy -t hive-sim/topologies/port-berth-operation-58node.yaml --env-file .env
+#   containerlab inspect -t hive-sim/topologies/port-berth-operation-58node.yaml
+#   containerlab destroy -t hive-sim/topologies/port-berth-operation-58node.yaml --cleanup
+
+name: port-berth-58n
+
+mgmt:
+  network: port-berth-58n
+  ipv4-subnet: 172.20.58.0/24
+
+topology:
+  nodes:
+
+    # ==============================================================================
+    # BERTH MANAGER — Top-level coordinator for all hold operations
+    # ==============================================================================
+    berth-mgr:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: berth-mgr
+        ROLE: berth_manager
+        PLATFORM_TYPE: infrastructure
+        NODE_TYPE: infrastructure
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: shared
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "10ms"
+        NETEM_LOSS: "0.1%"
+        NETEM_RATE: "10mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ==============================================================================
+    # HOLD 1 — Forward hold team (14 nodes)
+    # ==============================================================================
+
+    # ----- Hold 1 Aggregator -----
+    agg-h1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: agg-h1
+        ROLE: aggregator
+        PLATFORM_TYPE: infrastructure
+        NODE_TYPE: infrastructure
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-1
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "berth-mgr|clab-port-berth-58n-berth-mgr:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "10ms"
+        NETEM_LOSS: "0.1%"
+        NETEM_RATE: "10mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- Hold 1 Cranes (industrial Ethernet: 5ms, 0.1% loss, 10Mbps) -----
+    crane-h1-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: crane-h1-1
+        ROLE: crane
+        PLATFORM_TYPE: crane
+        NODE_TYPE: crane
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-1
+        UPDATE_RATE_MS: "2000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h1|clab-port-berth-58n-agg-h1:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "5ms"
+        NETEM_LOSS: "0.1%"
+        NETEM_RATE: "10mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    crane-h1-2:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: crane-h1-2
+        ROLE: crane
+        PLATFORM_TYPE: crane
+        NODE_TYPE: crane
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-1
+        UPDATE_RATE_MS: "2000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h1|clab-port-berth-58n-agg-h1:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "5ms"
+        NETEM_LOSS: "0.1%"
+        NETEM_RATE: "10mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- Hold 1 Workers (WiFi: 15ms, 1% loss, 1Mbps) -----
+    worker-h1-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: worker-h1-1
+        ROLE: worker
+        PLATFORM_TYPE: personnel
+        NODE_TYPE: personnel
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-1
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h1|clab-port-berth-58n-agg-h1:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "15ms"
+        NETEM_LOSS: "1%"
+        NETEM_RATE: "1mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    worker-h1-2:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: worker-h1-2
+        ROLE: worker
+        PLATFORM_TYPE: personnel
+        NODE_TYPE: personnel
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-1
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h1|clab-port-berth-58n-agg-h1:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "15ms"
+        NETEM_LOSS: "1%"
+        NETEM_RATE: "1mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    worker-h1-3:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: worker-h1-3
+        ROLE: worker
+        PLATFORM_TYPE: personnel
+        NODE_TYPE: personnel
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-1
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h1|clab-port-berth-58n-agg-h1:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "15ms"
+        NETEM_LOSS: "1%"
+        NETEM_RATE: "1mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- Hold 1 Lasher (BLE mesh: 20ms, 2% loss, 500Kbps) -----
+    lasher-h1-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: lasher-h1-1
+        ROLE: lasher
+        PLATFORM_TYPE: personnel
+        NODE_TYPE: personnel
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-1
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h1|clab-port-berth-58n-agg-h1:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "20ms"
+        NETEM_LOSS: "2%"
+        NETEM_RATE: "500kbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- Hold 1 Signaler (WiFi: 15ms, 1% loss, 1Mbps) -----
+    signaler-h1-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: signaler-h1-1
+        ROLE: signaler
+        PLATFORM_TYPE: personnel
+        NODE_TYPE: personnel
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-1
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h1|clab-port-berth-58n-agg-h1:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "15ms"
+        NETEM_LOSS: "1%"
+        NETEM_RATE: "1mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- Hold 1 Tractors (cellular: 50ms, 0.5% loss, 2Mbps) -----
+    tractor-h1-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: tractor-h1-1
+        ROLE: tractor
+        PLATFORM_TYPE: vehicle
+        NODE_TYPE: vehicle
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-1
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h1|clab-port-berth-58n-agg-h1:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "50ms"
+        NETEM_LOSS: "0.5%"
+        NETEM_RATE: "2mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    tractor-h1-2:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: tractor-h1-2
+        ROLE: tractor
+        PLATFORM_TYPE: vehicle
+        NODE_TYPE: vehicle
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-1
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h1|clab-port-berth-58n-agg-h1:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "50ms"
+        NETEM_LOSS: "0.5%"
+        NETEM_RATE: "2mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    tractor-h1-3:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: tractor-h1-3
+        ROLE: tractor
+        PLATFORM_TYPE: vehicle
+        NODE_TYPE: vehicle
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-1
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h1|clab-port-berth-58n-agg-h1:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "50ms"
+        NETEM_LOSS: "0.5%"
+        NETEM_RATE: "2mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    tractor-h1-4:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: tractor-h1-4
+        ROLE: tractor
+        PLATFORM_TYPE: vehicle
+        NODE_TYPE: vehicle
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-1
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h1|clab-port-berth-58n-agg-h1:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "50ms"
+        NETEM_LOSS: "0.5%"
+        NETEM_RATE: "2mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- Hold 1 Sensors (wired: 1ms, 0% loss, 100Mbps) -----
+    sensor-h1-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: sensor-h1-1
+        ROLE: sensor
+        PLATFORM_TYPE: sensor
+        NODE_TYPE: sensor
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-1
+        UPDATE_RATE_MS: "1000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h1|clab-port-berth-58n-agg-h1:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "1ms"
+        NETEM_RATE: "100mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    sensor-h1-2:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: sensor-h1-2
+        ROLE: sensor
+        PLATFORM_TYPE: sensor
+        NODE_TYPE: sensor
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-1
+        UPDATE_RATE_MS: "1000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h1|clab-port-berth-58n-agg-h1:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "1ms"
+        NETEM_RATE: "100mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ==============================================================================
+    # HOLD 2 — Midship hold team (14 nodes)
+    # ==============================================================================
+
+    # ----- Hold 2 Aggregator -----
+    agg-h2:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: agg-h2
+        ROLE: aggregator
+        PLATFORM_TYPE: infrastructure
+        NODE_TYPE: infrastructure
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-2
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "berth-mgr|clab-port-berth-58n-berth-mgr:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "10ms"
+        NETEM_LOSS: "0.1%"
+        NETEM_RATE: "10mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- Hold 2 Cranes -----
+    crane-h2-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: crane-h2-1
+        ROLE: crane
+        PLATFORM_TYPE: crane
+        NODE_TYPE: crane
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-2
+        UPDATE_RATE_MS: "2000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h2|clab-port-berth-58n-agg-h2:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "5ms"
+        NETEM_LOSS: "0.1%"
+        NETEM_RATE: "10mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    crane-h2-2:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: crane-h2-2
+        ROLE: crane
+        PLATFORM_TYPE: crane
+        NODE_TYPE: crane
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-2
+        UPDATE_RATE_MS: "2000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h2|clab-port-berth-58n-agg-h2:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "5ms"
+        NETEM_LOSS: "0.1%"
+        NETEM_RATE: "10mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- Hold 2 Workers -----
+    worker-h2-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: worker-h2-1
+        ROLE: worker
+        PLATFORM_TYPE: personnel
+        NODE_TYPE: personnel
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-2
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h2|clab-port-berth-58n-agg-h2:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "15ms"
+        NETEM_LOSS: "1%"
+        NETEM_RATE: "1mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    worker-h2-2:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: worker-h2-2
+        ROLE: worker
+        PLATFORM_TYPE: personnel
+        NODE_TYPE: personnel
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-2
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h2|clab-port-berth-58n-agg-h2:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "15ms"
+        NETEM_LOSS: "1%"
+        NETEM_RATE: "1mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    worker-h2-3:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: worker-h2-3
+        ROLE: worker
+        PLATFORM_TYPE: personnel
+        NODE_TYPE: personnel
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-2
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h2|clab-port-berth-58n-agg-h2:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "15ms"
+        NETEM_LOSS: "1%"
+        NETEM_RATE: "1mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- Hold 2 Lasher -----
+    lasher-h2-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: lasher-h2-1
+        ROLE: lasher
+        PLATFORM_TYPE: personnel
+        NODE_TYPE: personnel
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-2
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h2|clab-port-berth-58n-agg-h2:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "20ms"
+        NETEM_LOSS: "2%"
+        NETEM_RATE: "500kbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- Hold 2 Signaler -----
+    signaler-h2-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: signaler-h2-1
+        ROLE: signaler
+        PLATFORM_TYPE: personnel
+        NODE_TYPE: personnel
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-2
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h2|clab-port-berth-58n-agg-h2:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "15ms"
+        NETEM_LOSS: "1%"
+        NETEM_RATE: "1mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- Hold 2 Tractors -----
+    tractor-h2-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: tractor-h2-1
+        ROLE: tractor
+        PLATFORM_TYPE: vehicle
+        NODE_TYPE: vehicle
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-2
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h2|clab-port-berth-58n-agg-h2:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "50ms"
+        NETEM_LOSS: "0.5%"
+        NETEM_RATE: "2mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    tractor-h2-2:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: tractor-h2-2
+        ROLE: tractor
+        PLATFORM_TYPE: vehicle
+        NODE_TYPE: vehicle
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-2
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h2|clab-port-berth-58n-agg-h2:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "50ms"
+        NETEM_LOSS: "0.5%"
+        NETEM_RATE: "2mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    tractor-h2-3:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: tractor-h2-3
+        ROLE: tractor
+        PLATFORM_TYPE: vehicle
+        NODE_TYPE: vehicle
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-2
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h2|clab-port-berth-58n-agg-h2:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "50ms"
+        NETEM_LOSS: "0.5%"
+        NETEM_RATE: "2mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    tractor-h2-4:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: tractor-h2-4
+        ROLE: tractor
+        PLATFORM_TYPE: vehicle
+        NODE_TYPE: vehicle
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-2
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h2|clab-port-berth-58n-agg-h2:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "50ms"
+        NETEM_LOSS: "0.5%"
+        NETEM_RATE: "2mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- Hold 2 Sensors -----
+    sensor-h2-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: sensor-h2-1
+        ROLE: sensor
+        PLATFORM_TYPE: sensor
+        NODE_TYPE: sensor
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-2
+        UPDATE_RATE_MS: "1000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h2|clab-port-berth-58n-agg-h2:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "1ms"
+        NETEM_RATE: "100mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    sensor-h2-2:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: sensor-h2-2
+        ROLE: sensor
+        PLATFORM_TYPE: sensor
+        NODE_TYPE: sensor
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-2
+        UPDATE_RATE_MS: "1000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h2|clab-port-berth-58n-agg-h2:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "1ms"
+        NETEM_RATE: "100mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ==============================================================================
+    # HOLD 3 — Aft hold team (14 nodes)
+    # ==============================================================================
+
+    # ----- Hold 3 Aggregator -----
+    agg-h3:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: agg-h3
+        ROLE: aggregator
+        PLATFORM_TYPE: infrastructure
+        NODE_TYPE: infrastructure
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-3
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "berth-mgr|clab-port-berth-58n-berth-mgr:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "10ms"
+        NETEM_LOSS: "0.1%"
+        NETEM_RATE: "10mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- Hold 3 Cranes -----
+    crane-h3-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: crane-h3-1
+        ROLE: crane
+        PLATFORM_TYPE: crane
+        NODE_TYPE: crane
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-3
+        UPDATE_RATE_MS: "2000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h3|clab-port-berth-58n-agg-h3:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "5ms"
+        NETEM_LOSS: "0.1%"
+        NETEM_RATE: "10mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    crane-h3-2:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: crane-h3-2
+        ROLE: crane
+        PLATFORM_TYPE: crane
+        NODE_TYPE: crane
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-3
+        UPDATE_RATE_MS: "2000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h3|clab-port-berth-58n-agg-h3:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "5ms"
+        NETEM_LOSS: "0.1%"
+        NETEM_RATE: "10mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- Hold 3 Workers -----
+    worker-h3-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: worker-h3-1
+        ROLE: worker
+        PLATFORM_TYPE: personnel
+        NODE_TYPE: personnel
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-3
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h3|clab-port-berth-58n-agg-h3:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "15ms"
+        NETEM_LOSS: "1%"
+        NETEM_RATE: "1mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    worker-h3-2:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: worker-h3-2
+        ROLE: worker
+        PLATFORM_TYPE: personnel
+        NODE_TYPE: personnel
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-3
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h3|clab-port-berth-58n-agg-h3:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "15ms"
+        NETEM_LOSS: "1%"
+        NETEM_RATE: "1mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    worker-h3-3:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: worker-h3-3
+        ROLE: worker
+        PLATFORM_TYPE: personnel
+        NODE_TYPE: personnel
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-3
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h3|clab-port-berth-58n-agg-h3:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "15ms"
+        NETEM_LOSS: "1%"
+        NETEM_RATE: "1mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- Hold 3 Lasher -----
+    lasher-h3-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: lasher-h3-1
+        ROLE: lasher
+        PLATFORM_TYPE: personnel
+        NODE_TYPE: personnel
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-3
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h3|clab-port-berth-58n-agg-h3:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "20ms"
+        NETEM_LOSS: "2%"
+        NETEM_RATE: "500kbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- Hold 3 Signaler -----
+    signaler-h3-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: signaler-h3-1
+        ROLE: signaler
+        PLATFORM_TYPE: personnel
+        NODE_TYPE: personnel
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-3
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h3|clab-port-berth-58n-agg-h3:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "15ms"
+        NETEM_LOSS: "1%"
+        NETEM_RATE: "1mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- Hold 3 Tractors -----
+    tractor-h3-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: tractor-h3-1
+        ROLE: tractor
+        PLATFORM_TYPE: vehicle
+        NODE_TYPE: vehicle
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-3
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h3|clab-port-berth-58n-agg-h3:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "50ms"
+        NETEM_LOSS: "0.5%"
+        NETEM_RATE: "2mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    tractor-h3-2:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: tractor-h3-2
+        ROLE: tractor
+        PLATFORM_TYPE: vehicle
+        NODE_TYPE: vehicle
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-3
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h3|clab-port-berth-58n-agg-h3:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "50ms"
+        NETEM_LOSS: "0.5%"
+        NETEM_RATE: "2mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    tractor-h3-3:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: tractor-h3-3
+        ROLE: tractor
+        PLATFORM_TYPE: vehicle
+        NODE_TYPE: vehicle
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-3
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h3|clab-port-berth-58n-agg-h3:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "50ms"
+        NETEM_LOSS: "0.5%"
+        NETEM_RATE: "2mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    tractor-h3-4:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: tractor-h3-4
+        ROLE: tractor
+        PLATFORM_TYPE: vehicle
+        NODE_TYPE: vehicle
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-3
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h3|clab-port-berth-58n-agg-h3:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "50ms"
+        NETEM_LOSS: "0.5%"
+        NETEM_RATE: "2mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- Hold 3 Sensors -----
+    sensor-h3-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: sensor-h3-1
+        ROLE: sensor
+        PLATFORM_TYPE: sensor
+        NODE_TYPE: sensor
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-3
+        UPDATE_RATE_MS: "1000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h3|clab-port-berth-58n-agg-h3:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "1ms"
+        NETEM_RATE: "100mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    sensor-h3-2:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: sensor-h3-2
+        ROLE: sensor
+        PLATFORM_TYPE: sensor
+        NODE_TYPE: sensor
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: hold-3
+        UPDATE_RATE_MS: "1000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "agg-h3|clab-port-berth-58n-agg-h3:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "1ms"
+        NETEM_RATE: "100mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ==============================================================================
+    # SHARED RESOURCES — Inter-hold and yard operations (16 nodes)
+    # ==============================================================================
+
+    # ----- Shared Tractor Pool (cellular: 50ms, 0.5% loss, 2Mbps) -----
+    shared-tractor-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: shared-tractor-1
+        ROLE: shared_tractor
+        PLATFORM_TYPE: vehicle
+        NODE_TYPE: vehicle
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: shared
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "berth-mgr|clab-port-berth-58n-berth-mgr:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "50ms"
+        NETEM_LOSS: "0.5%"
+        NETEM_RATE: "2mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    shared-tractor-2:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: shared-tractor-2
+        ROLE: shared_tractor
+        PLATFORM_TYPE: vehicle
+        NODE_TYPE: vehicle
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: shared
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "berth-mgr|clab-port-berth-58n-berth-mgr:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "50ms"
+        NETEM_LOSS: "0.5%"
+        NETEM_RATE: "2mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    shared-tractor-3:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: shared-tractor-3
+        ROLE: shared_tractor
+        PLATFORM_TYPE: vehicle
+        NODE_TYPE: vehicle
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: shared
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "berth-mgr|clab-port-berth-58n-berth-mgr:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "50ms"
+        NETEM_LOSS: "0.5%"
+        NETEM_RATE: "2mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    shared-tractor-4:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: shared-tractor-4
+        ROLE: shared_tractor
+        PLATFORM_TYPE: vehicle
+        NODE_TYPE: vehicle
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: shared
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "berth-mgr|clab-port-berth-58n-berth-mgr:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "50ms"
+        NETEM_LOSS: "0.5%"
+        NETEM_RATE: "2mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    shared-tractor-5:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: shared-tractor-5
+        ROLE: shared_tractor
+        PLATFORM_TYPE: vehicle
+        NODE_TYPE: vehicle
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: shared
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "berth-mgr|clab-port-berth-58n-berth-mgr:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "50ms"
+        NETEM_LOSS: "0.5%"
+        NETEM_RATE: "2mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    shared-tractor-6:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: shared-tractor-6
+        ROLE: shared_tractor
+        PLATFORM_TYPE: vehicle
+        NODE_TYPE: vehicle
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: shared
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "berth-mgr|clab-port-berth-58n-berth-mgr:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "50ms"
+        NETEM_LOSS: "0.5%"
+        NETEM_RATE: "2mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    shared-tractor-7:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: shared-tractor-7
+        ROLE: shared_tractor
+        PLATFORM_TYPE: vehicle
+        NODE_TYPE: vehicle
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: shared
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "berth-mgr|clab-port-berth-58n-berth-mgr:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "50ms"
+        NETEM_LOSS: "0.5%"
+        NETEM_RATE: "2mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    shared-tractor-8:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: shared-tractor-8
+        ROLE: shared_tractor
+        PLATFORM_TYPE: vehicle
+        NODE_TYPE: vehicle
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: shared
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "berth-mgr|clab-port-berth-58n-berth-mgr:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "50ms"
+        NETEM_LOSS: "0.5%"
+        NETEM_RATE: "2mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- Yard Blocks (wired: 1ms, 100Mbps) -----
+    yard-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: yard-1
+        ROLE: yard_block
+        PLATFORM_TYPE: infrastructure
+        NODE_TYPE: infrastructure
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: shared
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "berth-mgr|clab-port-berth-58n-berth-mgr:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "1ms"
+        NETEM_RATE: "100mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    yard-2:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: yard-2
+        ROLE: yard_block
+        PLATFORM_TYPE: infrastructure
+        NODE_TYPE: infrastructure
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: shared
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "berth-mgr|clab-port-berth-58n-berth-mgr:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "1ms"
+        NETEM_RATE: "100mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    yard-3:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: yard-3
+        ROLE: yard_block
+        PLATFORM_TYPE: infrastructure
+        NODE_TYPE: infrastructure
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: shared
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "berth-mgr|clab-port-berth-58n-berth-mgr:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "1ms"
+        NETEM_RATE: "100mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    yard-4:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: yard-4
+        ROLE: yard_block
+        PLATFORM_TYPE: infrastructure
+        NODE_TYPE: infrastructure
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: shared
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "berth-mgr|clab-port-berth-58n-berth-mgr:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "1ms"
+        NETEM_RATE: "100mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- AI Scheduler (wired: 1ms, 100Mbps) -----
+    ai-scheduler:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: ai-scheduler
+        ROLE: ai_scheduler
+        PLATFORM_TYPE: infrastructure
+        NODE_TYPE: infrastructure
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: shared
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "berth-mgr|clab-port-berth-58n-berth-mgr:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "1ms"
+        NETEM_RATE: "100mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    # ----- Safety Officers (WiFi: 15ms, 1% loss, 1Mbps) -----
+    safety-1:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: safety-1
+        ROLE: safety_officer
+        PLATFORM_TYPE: personnel
+        NODE_TYPE: personnel
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: shared
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "berth-mgr|clab-port-berth-58n-berth-mgr:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "15ms"
+        NETEM_LOSS: "1%"
+        NETEM_RATE: "1mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"
+
+    safety-2:
+      kind: linux
+      image: hive-sim-node:latest
+      env:
+        NODE_ID: safety-2
+        ROLE: safety_officer
+        PLATFORM_TYPE: personnel
+        NODE_TYPE: personnel
+        MODE: hierarchical
+        BACKEND: ${BACKEND:-automerge}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-true}"
+        HOLD_ID: shared
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "berth-mgr|clab-port-berth-58n-berth-mgr:12345"
+        HIVE_APP_ID: ${HIVE_APP_ID}
+        HIVE_OFFLINE_TOKEN: ${HIVE_OFFLINE_TOKEN}
+        HIVE_SHARED_KEY: ${HIVE_SHARED_KEY}
+        NETEM_DELAY: "15ms"
+        NETEM_LOSS: "1%"
+        NETEM_RATE: "1mbit"
+        CIRCUIT_FAILURE_THRESHOLD: "3"
+        CIRCUIT_FAILURE_WINDOW_SECS: "2"
+        CIRCUIT_OPEN_TIMEOUT_SECS: "2"
+        CIRCUIT_SUCCESS_THRESHOLD: "2"

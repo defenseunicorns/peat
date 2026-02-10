@@ -70,6 +70,14 @@ RUN chmod +x /entrypoint.sh
 # Default environment variables (can be overridden in containerlab topology)
 # Note: Secrets (HIVE_SHARED_KEY, HIVE_SECRET_KEY) should be passed at runtime
 # via docker run -e or containerlab env, not baked into image
+#
+# Multi-hold entrypoint variables (Phase 2):
+#   HOLD_ID: hold assignment (hold-1, hold-2, hold-3, shared)
+#   ROLE: node role (crane, worker, lasher, signaler, tractor, sensor,
+#         aggregator, berth_manager, yard_block, ai_scheduler, etc.)
+#   NETEM_DELAY: network delay (e.g., "5ms")
+#   NETEM_LOSS: packet loss (e.g., "0.1%")
+#   NETEM_RATE: bandwidth limit (e.g., "10mbit")
 ENV NODE_ID="node1" \
     MODE="reader" \
     LOG_LEVEL="info"
