@@ -31,32 +31,32 @@ pub mod sync_persistence;
 pub mod ttl_manager;
 
 // Re-export key types (ungated)
-pub use traits::{Collection, DocumentPredicate, StorageBackend};
 pub use blob_traits::{
     BlobHandle, BlobHash, BlobMetadata, BlobProgress, BlobStorageSummary, BlobStore, BlobStoreExt,
     BlobToken, SharedBlobStore,
 };
-pub use ttl::{EvictionStrategy, OfflineRetentionPolicy, TtlConfig};
 pub use geohash_index::GeohashIndex;
+pub use traits::{Collection, DocumentPredicate, StorageBackend};
+pub use ttl::{EvictionStrategy, OfflineRetentionPolicy, TtlConfig};
 
 // Re-export key types (feature-gated)
 #[cfg(feature = "automerge-backend")]
 pub use automerge_store::AutomergeStore;
-#[cfg(feature = "automerge-backend")]
-pub use iroh_blob_store::{IrohBlobStore, NetworkedIrohBlobStore};
-#[cfg(feature = "automerge-backend")]
-pub use partition_detection::{
-    PartitionConfig, PartitionDetector, PartitionEvent, PeerHeartbeat, PeerPartitionState,
-};
-#[cfg(feature = "automerge-backend")]
-pub use query::{extract_field, Query, SortOrder, Value};
 #[cfg(feature = "automerge-backend")]
 pub use flow_control::{
     BoundedQueue, FlowControlConfig, FlowControlError, FlowControlStats, FlowController,
     PeerResourceTracker, SyncCooldownTracker, TokenBucket,
 };
 #[cfg(feature = "automerge-backend")]
+pub use iroh_blob_store::{IrohBlobStore, NetworkedIrohBlobStore};
+#[cfg(feature = "automerge-backend")]
 pub use negentropy_sync::{NegentropyStats, NegentropySync, ReconcileResult, SyncItem};
+#[cfg(feature = "automerge-backend")]
+pub use partition_detection::{
+    PartitionConfig, PartitionDetector, PartitionEvent, PeerHeartbeat, PeerPartitionState,
+};
+#[cfg(feature = "automerge-backend")]
+pub use query::{extract_field, Query, SortOrder, Value};
 #[cfg(feature = "automerge-backend")]
 pub use sync_persistence::{
     Checkpoint, PersistedSyncState, PersistenceStats, SyncStatePersistence,
