@@ -855,9 +855,7 @@ impl TopologyManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::transport::{
-        MeshConnection as MeshConnectionTrait, MeshTransport, NodeId, Result,
-    };
+    use crate::transport::{MeshConnection as MeshConnectionTrait, MeshTransport, NodeId, Result};
     use std::sync::Arc;
 
     // Mock transport for testing

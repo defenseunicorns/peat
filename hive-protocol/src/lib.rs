@@ -30,6 +30,7 @@ pub mod error;
 pub mod event; // Event routing and aggregation (ADR-027)
 pub mod ffi; // FFI bindings for ATAK and other native consumers (Issue #258)
 pub mod hierarchy;
+pub mod mesh_integration;
 pub mod models;
 pub mod network;
 pub mod policy; // Generic policy engine for conflict resolution
@@ -39,8 +40,7 @@ pub mod storage;
 pub mod sync; // Data synchronization abstraction layer
 pub mod testing;
 pub mod traits;
-pub mod transport; // Backend-agnostic transport abstraction for mesh topology
-pub mod mesh_integration; // HIVE-specific adapters for hive-mesh
+pub mod transport; // Backend-agnostic transport abstraction for mesh topology // HIVE-specific adapters for hive-mesh
 
 pub use error::{Error, Result};
 
