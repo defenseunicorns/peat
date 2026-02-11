@@ -73,9 +73,9 @@ ditto-backend = ["dittolive-ditto"]
 # Automerge/Iroh backend - pure Rust, works on Android
 automerge-backend = ["automerge", "iroh", "iroh-blobs", "redb", "lru", "toml", "mdns-sd", "rand", "futures-lite", "negentropy"]
 # HIVE-Lite transport - UDP-based communication with embedded devices (ADR-035)
-lite-transport = ["log"]
+lite-transport = ["log", "hive-mesh/lite-transport"]
 # Bluetooth LE transport - BLE mesh networking (ADR-032, ADR-039)
-bluetooth = ["hive-btle"]
+bluetooth = ["hive-btle", "hive-mesh/bluetooth"]
 
 [dev-dependencies]
 proptest = { workspace = true }

@@ -14,7 +14,7 @@
 //! ## Example
 //!
 //! ```ignore
-//! use hive_protocol::transport::reconnection::{ReconnectionPolicy, ReconnectionManager};
+//! use hive_mesh::transport::reconnection::{ReconnectionPolicy, ReconnectionManager};
 //!
 //! let policy = ReconnectionPolicy::default();
 //! let mut manager = ReconnectionManager::new(policy);

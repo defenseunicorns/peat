@@ -20,7 +20,7 @@
 //! ## Example
 //!
 //! ```ignore
-//! use hive_protocol::transport::{TransportManager, MessageRequirements, MessagePriority};
+//! use hive_mesh::transport::{TransportManager, MessageRequirements, MessagePriority};
 //!
 //! // Register transports
 //! let mut manager = TransportManager::new(config);
@@ -96,7 +96,7 @@ impl std::fmt::Display for TransportType {
 /// # Example
 ///
 /// ```
-/// use hive_protocol::transport::{TransportCapabilities, TransportType};
+/// use hive_mesh::transport::{TransportCapabilities, TransportType};
 ///
 /// let quic_caps = TransportCapabilities {
 ///     transport_type: TransportType::Quic,
@@ -307,7 +307,7 @@ impl std::fmt::Display for MessagePriority {
 /// # Example
 ///
 /// ```
-/// use hive_protocol::transport::{MessageRequirements, MessagePriority};
+/// use hive_mesh::transport::{MessageRequirements, MessagePriority};
 ///
 /// // High-priority reliable message
 /// let requirements = MessageRequirements {
@@ -623,7 +623,7 @@ impl std::fmt::Display for PaceLevel {
 /// # Example
 ///
 /// ```
-/// use hive_protocol::transport::TransportPolicy;
+/// use hive_mesh::transport::TransportPolicy;
 ///
 /// let policy = TransportPolicy::new("tactical-standard")
 ///     .primary(vec!["iroh-eth0", "iroh-wlan0"])
