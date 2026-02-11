@@ -533,12 +533,12 @@ impl PeerDiscovery for DittoBackend {
 
         match result {
             Ok(Some(())) => Ok(()),
-            Ok(None) => Err(Error::storage_error(
-                "Peer presence channel closed",
-                "wait_for_peer",
-                None,
-            )
-            .into()),
+            Ok(None) => {
+                Err(
+                    Error::storage_error("Peer presence channel closed", "wait_for_peer", None)
+                        .into(),
+                )
+            }
             Err(_) => Err(Error::storage_error(
                 format!("Timeout waiting for peer {}", peer_id_for_error),
                 "wait_for_peer",

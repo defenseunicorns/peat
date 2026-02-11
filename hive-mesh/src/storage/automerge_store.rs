@@ -991,6 +991,41 @@ impl Collection for AutomergeCollection {
     }
 }
 
+// === GcStore trait implementation for AutomergeStore (ADR-034 Phase 3) ===
+//
+// Both GcStore trait and AutomergeStore type are in hive-mesh,
+// so the impl lives here (orphan rule satisfied).
+
+impl crate::qos::GcStore for AutomergeStore {
+    fn get_all_tombstones(&self) -> anyhow::Result<Vec<crate::qos::Tombstone>> {
+        self.get_all_tombstones()
+    }
+
+    fn remove_tombstone(&self, collection: &str, document_id: &str) -> anyhow::Result<bool> {
+        self.remove_tombstone(collection, document_id)
+    }
+
+    fn has_tombstone(&self, collection: &str, document_id: &str) -> anyhow::Result<bool> {
+        self.has_tombstone(collection, document_id)
+    }
+
+    fn get_expired_documents(
+        &self,
+        collection: &str,
+        cutoff: std::time::SystemTime,
+    ) -> anyhow::Result<Vec<String>> {
+        self.get_expired_documents(collection, cutoff)
+    }
+
+    fn hard_delete(&self, collection: &str, document_id: &str) -> anyhow::Result<()> {
+        self.hard_delete(collection, document_id)
+    }
+
+    fn list_collections(&self) -> anyhow::Result<Vec<String>> {
+        self.list_collections()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1268,40 +1303,5 @@ mod tests {
         let loaded = store.get("test-doc").unwrap().unwrap();
         let value = loaded.get(automerge::ROOT, "counter").unwrap().unwrap();
         assert_eq!(value.0.to_i64(), Some(99));
-    }
-}
-
-// === GcStore trait implementation for AutomergeStore (ADR-034 Phase 3) ===
-//
-// Both GcStore trait and AutomergeStore type are in hive-mesh,
-// so the impl lives here (orphan rule satisfied).
-
-impl crate::qos::GcStore for AutomergeStore {
-    fn get_all_tombstones(&self) -> anyhow::Result<Vec<crate::qos::Tombstone>> {
-        self.get_all_tombstones()
-    }
-
-    fn remove_tombstone(&self, collection: &str, document_id: &str) -> anyhow::Result<bool> {
-        self.remove_tombstone(collection, document_id)
-    }
-
-    fn has_tombstone(&self, collection: &str, document_id: &str) -> anyhow::Result<bool> {
-        self.has_tombstone(collection, document_id)
-    }
-
-    fn get_expired_documents(
-        &self,
-        collection: &str,
-        cutoff: std::time::SystemTime,
-    ) -> anyhow::Result<Vec<String>> {
-        self.get_expired_documents(collection, cutoff)
-    }
-
-    fn hard_delete(&self, collection: &str, document_id: &str) -> anyhow::Result<()> {
-        self.hard_delete(collection, document_id)
-    }
-
-    fn list_collections(&self) -> anyhow::Result<Vec<String>> {
-        self.list_collections()
     }
 }

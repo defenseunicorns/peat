@@ -114,9 +114,8 @@ impl Aggregator for PacketAggregator {
         let member_states = member_states?;
 
         // Call StateAggregator from hive-protocol
-        let squad_summary =
-            StateAggregator::aggregate_squad(group_id, leader_id, member_states)
-                .map_err(|e| AggregationError::AggregationFailed(e.to_string()))?;
+        let squad_summary = StateAggregator::aggregate_squad(group_id, leader_id, member_states)
+            .map_err(|e| AggregationError::AggregationFailed(e.to_string()))?;
 
         // Serialize SquadSummary back into DataPacket payload
         let aggregated_payload =
