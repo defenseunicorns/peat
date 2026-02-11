@@ -24,7 +24,7 @@
 //! ## Usage
 //!
 //! ```ignore
-//! use hive_protocol::transport::btle::HiveBleTransport;
+//! use hive_mesh::transport::btle::HiveBleTransport;
 //! use hive_btle::{BleConfig, BluetoothLETransport, platform::StubAdapter};
 //!
 //! // Create hive-btle transport

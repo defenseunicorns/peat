@@ -557,7 +557,7 @@ impl Default for AutomergeBackend {
 
 #[async_trait]
 impl DocumentStore for AutomergeBackend {
-    async fn upsert(&self, collection: &str, mut document: Document) -> Result<DocumentId> {
+    async fn upsert(&self, collection: &str, mut document: Document) -> anyhow::Result<DocumentId> {
         // Generate ID if not present
         let doc_id = document
             .id
@@ -593,7 +593,7 @@ impl DocumentStore for AutomergeBackend {
         Ok(doc_id)
     }
 
-    async fn query(&self, collection: &str, query: &Query) -> Result<Vec<Document>> {
+    async fn query(&self, collection: &str, query: &Query) -> anyhow::Result<Vec<Document>> {
         let docs = self.documents.lock().unwrap();
         let mut results = Vec::new();
 
@@ -625,7 +625,7 @@ impl DocumentStore for AutomergeBackend {
         Ok(results)
     }
 
-    async fn remove(&self, collection: &str, doc_id: &DocumentId) -> Result<()> {
+    async fn remove(&self, collection: &str, doc_id: &DocumentId) -> anyhow::Result<()> {
         let key = Self::doc_key(collection, doc_id);
         let mut docs = self.documents.lock().unwrap();
 
@@ -648,7 +648,7 @@ impl DocumentStore for AutomergeBackend {
         Ok(())
     }
 
-    async fn get(&self, collection: &str, doc_id: &DocumentId) -> Result<Option<Document>> {
+    async fn get(&self, collection: &str, doc_id: &DocumentId) -> anyhow::Result<Option<Document>> {
         let key = Self::doc_key(collection, doc_id);
         let docs = self.documents.lock().unwrap();
 
@@ -660,12 +660,12 @@ impl DocumentStore for AutomergeBackend {
         }
     }
 
-    async fn count(&self, collection: &str, query: &Query) -> Result<usize> {
+    async fn count(&self, collection: &str, query: &Query) -> anyhow::Result<usize> {
         let results = self.query(collection, query).await?;
         Ok(results.len())
     }
 
-    fn observe(&self, collection: &str, query: &Query) -> Result<ChangeStream> {
+    fn observe(&self, collection: &str, query: &Query) -> anyhow::Result<ChangeStream> {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
         // Send initial snapshot of matching documents
@@ -705,7 +705,7 @@ impl DocumentStore for AutomergeBackend {
         collection: &str,
         doc_id: &DocumentId,
         reason: Option<&str>,
-    ) -> Result<crate::qos::DeleteResult> {
+    ) -> anyhow::Result<crate::qos::DeleteResult> {
         let policy = self.deletion_policy(collection);
 
         match policy {
@@ -793,7 +793,7 @@ impl DocumentStore for AutomergeBackend {
         }
     }
 
-    async fn is_deleted(&self, collection: &str, doc_id: &DocumentId) -> Result<bool> {
+    async fn is_deleted(&self, collection: &str, doc_id: &DocumentId) -> anyhow::Result<bool> {
         let key = format!("{}:{}", collection, doc_id);
 
         // Check if there's a tombstone
@@ -815,7 +815,7 @@ impl DocumentStore for AutomergeBackend {
         self.deletion_policy_registry.get(collection)
     }
 
-    async fn get_tombstones(&self, collection: &str) -> Result<Vec<crate::qos::Tombstone>> {
+    async fn get_tombstones(&self, collection: &str) -> anyhow::Result<Vec<crate::qos::Tombstone>> {
         let tombstones = self.tombstones.lock().unwrap();
         let prefix = format!("{}:", collection);
 
@@ -826,7 +826,7 @@ impl DocumentStore for AutomergeBackend {
             .collect())
     }
 
-    async fn apply_tombstone(&self, tombstone: &crate::qos::Tombstone) -> Result<()> {
+    async fn apply_tombstone(&self, tombstone: &crate::qos::Tombstone) -> anyhow::Result<()> {
         let key = format!("{}:{}", tombstone.collection, tombstone.document_id);
 
         // Store the tombstone
@@ -850,29 +850,29 @@ impl DocumentStore for AutomergeBackend {
 
 #[async_trait]
 impl PeerDiscovery for AutomergeBackend {
-    async fn start(&self) -> Result<()> {
+    async fn start(&self) -> anyhow::Result<()> {
         // Manual peer discovery only for initial implementation
         // Full implementation would support mDNS, etc.
         Ok(())
     }
 
-    async fn stop(&self) -> Result<()> {
+    async fn stop(&self) -> anyhow::Result<()> {
         Ok(())
     }
 
-    async fn discovered_peers(&self) -> Result<Vec<PeerInfo>> {
+    async fn discovered_peers(&self) -> anyhow::Result<Vec<PeerInfo>> {
         // Return empty - manual configuration required
         Ok(Vec::new())
     }
 
-    async fn add_peer(&self, _address: &str, _transport: TransportType) -> Result<()> {
+    async fn add_peer(&self, _address: &str, _transport: TransportType) -> anyhow::Result<()> {
         // Manual peer addition not implemented in initial version
         Ok(())
     }
 
-    async fn wait_for_peer(&self, _peer_id: &PeerId, _timeout: Duration) -> Result<()> {
+    async fn wait_for_peer(&self, _peer_id: &PeerId, _timeout: Duration) -> anyhow::Result<()> {
         // Peer waiting not implemented in initial version
-        Err(Error::Internal("wait_for_peer not implemented".into()))
+        Err(Error::Internal("wait_for_peer not implemented".into()).into())
     }
 
     fn on_peer_event(&self, _callback: Box<dyn Fn(PeerEvent) + Send + Sync>) {
@@ -880,7 +880,7 @@ impl PeerDiscovery for AutomergeBackend {
         // Would store in a Vec for future notifications
     }
 
-    async fn get_peer_info(&self, _peer_id: &PeerId) -> Result<Option<PeerInfo>> {
+    async fn get_peer_info(&self, _peer_id: &PeerId) -> anyhow::Result<Option<PeerInfo>> {
         // Peer info lookup not implemented in initial version
         Ok(None)
     }
@@ -892,19 +892,19 @@ impl PeerDiscovery for AutomergeBackend {
 
 #[async_trait]
 impl SyncEngine for AutomergeBackend {
-    async fn start_sync(&self) -> Result<()> {
+    async fn start_sync(&self) -> anyhow::Result<()> {
         // For Automerge, sync is pull-based via generate/receive_sync_message
         // This method indicates we're ready to sync
         Ok(())
     }
 
-    async fn stop_sync(&self) -> Result<()> {
+    async fn stop_sync(&self) -> anyhow::Result<()> {
         // Clean up sync states
         self.sync_states.lock().unwrap().clear();
         Ok(())
     }
 
-    async fn subscribe(&self, collection: &str, _query: &Query) -> Result<SyncSubscription> {
+    async fn subscribe(&self, collection: &str, _query: &Query) -> anyhow::Result<SyncSubscription> {
         // Create subscription handle
         // For Automerge, subscriptions are logical - we track interest
         Ok(SyncSubscription::new(
@@ -915,7 +915,7 @@ impl SyncEngine for AutomergeBackend {
         ))
     }
 
-    async fn is_syncing(&self) -> Result<bool> {
+    async fn is_syncing(&self) -> anyhow::Result<bool> {
         // Always ready to sync with Automerge
         Ok(self.is_ready().await)
     }
@@ -933,10 +933,10 @@ struct AutomergeSubscriptionHandle {
 
 #[async_trait]
 impl DataSyncBackend for AutomergeBackend {
-    async fn initialize(&self, config: BackendConfig) -> Result<()> {
+    async fn initialize(&self, config: BackendConfig) -> anyhow::Result<()> {
         let mut initialized = self.initialized.lock().unwrap();
         if *initialized {
-            return Err(Error::Internal("Already initialized".into()));
+            return Err(Error::Internal("Already initialized".into()).into());
         }
 
         *self.config.lock().unwrap() = Some(config);
@@ -945,7 +945,7 @@ impl DataSyncBackend for AutomergeBackend {
         Ok(())
     }
 
-    async fn shutdown(&self) -> Result<()> {
+    async fn shutdown(&self) -> anyhow::Result<()> {
         self.stop_sync().await?;
         self.documents.lock().unwrap().clear();
         self.sync_states.lock().unwrap().clear();
@@ -1546,7 +1546,7 @@ struct IrohDocumentStore {
 
 #[async_trait]
 impl DocumentStore for IrohDocumentStore {
-    async fn upsert(&self, collection: &str, document: Document) -> Result<DocumentId> {
+    async fn upsert(&self, collection: &str, document: Document) -> anyhow::Result<DocumentId> {
         use crate::storage::traits::StorageBackend;
 
         // Generate ID if not provided
@@ -1588,7 +1588,7 @@ impl DocumentStore for IrohDocumentStore {
         Ok(doc_id)
     }
 
-    async fn query(&self, collection: &str, query: &Query) -> Result<Vec<Document>> {
+    async fn query(&self, collection: &str, query: &Query) -> anyhow::Result<Vec<Document>> {
         use crate::storage::traits::StorageBackend;
 
         let coll = self.backend.collection(collection);
@@ -1624,7 +1624,7 @@ impl DocumentStore for IrohDocumentStore {
         Ok(results)
     }
 
-    async fn remove(&self, collection: &str, doc_id: &DocumentId) -> Result<()> {
+    async fn remove(&self, collection: &str, doc_id: &DocumentId) -> anyhow::Result<()> {
         use crate::storage::traits::StorageBackend;
 
         let coll = self.backend.collection(collection);
@@ -1637,7 +1637,7 @@ impl DocumentStore for IrohDocumentStore {
         Ok(())
     }
 
-    fn observe(&self, collection: &str, query: &Query) -> Result<ChangeStream> {
+    fn observe(&self, collection: &str, query: &Query) -> anyhow::Result<ChangeStream> {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
         // Get initial snapshot
@@ -1860,7 +1860,7 @@ struct IrohPeerDiscovery {
 
 #[async_trait]
 impl PeerDiscovery for IrohPeerDiscovery {
-    async fn start(&self) -> Result<()> {
+    async fn start(&self) -> anyhow::Result<()> {
         // Get formation key for authentication (required)
         let formation_key = self
             .formation_key
@@ -2391,11 +2391,11 @@ impl PeerDiscovery for IrohPeerDiscovery {
         Ok(())
     }
 
-    async fn stop(&self) -> Result<()> {
+    async fn stop(&self) -> anyhow::Result<()> {
         Ok(())
     }
 
-    async fn discovered_peers(&self) -> Result<Vec<PeerInfo>> {
+    async fn discovered_peers(&self) -> anyhow::Result<Vec<PeerInfo>> {
         let mut peers = Vec::new();
 
         // Get connected peers from transport
@@ -2435,7 +2435,7 @@ impl PeerDiscovery for IrohPeerDiscovery {
         Ok(peers)
     }
 
-    async fn add_peer(&self, address: &str, _transport: TransportType) -> Result<()> {
+    async fn add_peer(&self, address: &str, _transport: TransportType) -> anyhow::Result<()> {
         use crate::network::iroh_transport::IrohTransport;
         use crate::network::PeerInfo as NetworkPeerInfo;
 
@@ -2459,7 +2459,8 @@ impl PeerDiscovery for IrohPeerDiscovery {
                 return Err(Error::Internal(format!(
                     "Invalid address format: {}. Expected 'seed|host:port'",
                     address
-                )));
+                ))
+                .into());
             }
             let seed = parts[0];
             let addr = parts[1];
@@ -2517,7 +2518,8 @@ impl PeerDiscovery for IrohPeerDiscovery {
                     message: format!("Peer authentication failed: {}", e),
                     peer_id: Some(address.to_string()),
                     source: None,
-                });
+                }
+                .into());
             }
             // Issue #346: Emit Connected AFTER successful handshake
             self.transport.emit_peer_connected(endpoint_id);
@@ -2527,7 +2529,7 @@ impl PeerDiscovery for IrohPeerDiscovery {
         Ok(())
     }
 
-    async fn wait_for_peer(&self, peer_id: &PeerId, timeout: Duration) -> Result<()> {
+    async fn wait_for_peer(&self, peer_id: &PeerId, timeout: Duration) -> anyhow::Result<()> {
         let start = std::time::Instant::now();
 
         loop {
@@ -2541,7 +2543,8 @@ impl PeerDiscovery for IrohPeerDiscovery {
                     message: format!("Timeout waiting for peer: {}", peer_id),
                     peer_id: Some(peer_id.clone()),
                     source: None,
-                });
+                }
+                .into());
             }
 
             tokio::time::sleep(Duration::from_millis(100)).await;
@@ -2626,7 +2629,7 @@ impl PeerDiscovery for IrohPeerDiscovery {
         }
     }
 
-    async fn get_peer_info(&self, peer_id: &PeerId) -> Result<Option<PeerInfo>> {
+    async fn get_peer_info(&self, peer_id: &PeerId) -> anyhow::Result<Option<PeerInfo>> {
         let peers = self.discovered_peers().await?;
         Ok(peers.into_iter().find(|p| &p.peer_id == peer_id))
     }
@@ -2641,7 +2644,7 @@ struct IrohSyncEngine {
 
 #[async_trait]
 impl SyncEngine for IrohSyncEngine {
-    async fn start_sync(&self) -> Result<()> {
+    async fn start_sync(&self) -> anyhow::Result<()> {
         use crate::storage::capabilities::SyncCapable;
         self.backend.start_sync().map_err(|e| Error::Storage {
             message: format!("Failed to start sync: {}", e),
@@ -2652,7 +2655,7 @@ impl SyncEngine for IrohSyncEngine {
         Ok(())
     }
 
-    async fn stop_sync(&self) -> Result<()> {
+    async fn stop_sync(&self) -> anyhow::Result<()> {
         use crate::storage::capabilities::SyncCapable;
         self.backend.stop_sync().map_err(|e| Error::Storage {
             message: format!("Failed to stop sync: {}", e),
@@ -2663,11 +2666,11 @@ impl SyncEngine for IrohSyncEngine {
         Ok(())
     }
 
-    async fn subscribe(&self, collection: &str, _query: &Query) -> Result<SyncSubscription> {
+    async fn subscribe(&self, collection: &str, _query: &Query) -> anyhow::Result<SyncSubscription> {
         Ok(SyncSubscription::new(collection, ()))
     }
 
-    async fn is_syncing(&self) -> Result<bool> {
+    async fn is_syncing(&self) -> anyhow::Result<bool> {
         use crate::storage::capabilities::SyncCapable;
         let stats = self.backend.sync_stats().map_err(|e| Error::Storage {
             message: format!("Failed to get sync stats: {}", e),
@@ -2682,7 +2685,7 @@ impl SyncEngine for IrohSyncEngine {
     ///
     /// This enables static peer configuration in containerlab and similar environments
     /// where mDNS discovery may not work across network namespaces.
-    async fn connect_to_peer(&self, endpoint_id_hex: &str, addresses: &[String]) -> Result<bool> {
+    async fn connect_to_peer(&self, endpoint_id_hex: &str, addresses: &[String]) -> anyhow::Result<bool> {
         use crate::network::PeerInfo as NetworkPeerInfo;
 
         // Parse the endpoint ID from hex
@@ -2693,7 +2696,8 @@ impl SyncEngine for IrohSyncEngine {
             return Err(Error::Internal(format!(
                 "Invalid endpoint_id_hex length: expected 32 bytes, got {}",
                 endpoint_id_bytes.len()
-            )));
+            ))
+            .into());
         }
 
         // Issue #346: Removed tie-breaking from sync layer
@@ -2771,7 +2775,8 @@ impl SyncEngine for IrohSyncEngine {
                                 message: format!("Peer authentication failed: {}", e),
                                 peer_id: Some(endpoint_id_hex.to_string()),
                                 source: None,
-                            })
+                            }
+                            .into())
                         }
                     }
                 } else {
@@ -2806,7 +2811,8 @@ impl SyncEngine for IrohSyncEngine {
                     message: format!("Failed to connect to peer: {}", e),
                     peer_id: Some(endpoint_id_hex.to_string()),
                     source: None,
-                })
+                }
+                .into())
             }
         }
     }
@@ -2815,7 +2821,7 @@ impl SyncEngine for IrohSyncEngine {
 // DataSyncBackend implementation
 #[async_trait]
 impl DataSyncBackend for AutomergeIrohBackend {
-    async fn initialize(&self, config: BackendConfig) -> Result<()> {
+    async fn initialize(&self, config: BackendConfig) -> anyhow::Result<()> {
         // Require shared_key for peer authentication
         let shared_key = config.shared_key.as_ref().ok_or_else(|| {
             Error::config_error(
@@ -2845,7 +2851,7 @@ impl DataSyncBackend for AutomergeIrohBackend {
         Ok(())
     }
 
-    async fn shutdown(&self) -> Result<()> {
+    async fn shutdown(&self) -> anyhow::Result<()> {
         if self.is_ready().await {
             let _ = self.sync_engine().stop_sync().await;
             let _ = self.peer_discovery().stop().await;

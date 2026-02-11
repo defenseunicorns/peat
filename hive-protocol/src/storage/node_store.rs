@@ -267,7 +267,8 @@ impl<B: DataSyncBackend> NodeStore<B> {
         self.backend
             .document_store()
             .remove(NODE_CONFIG_COLLECTION, &node_id.to_string())
-            .await
+            .await?;
+        Ok(())
     }
 
     /// Delete a node state
@@ -278,7 +279,8 @@ impl<B: DataSyncBackend> NodeStore<B> {
         self.backend
             .document_store()
             .remove(NODE_STATE_COLLECTION, &node_id.to_string())
-            .await
+            .await?;
+        Ok(())
     }
 
     /// Get the underlying backend reference

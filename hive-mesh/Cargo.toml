@@ -22,11 +22,38 @@ futures = "0.3"
 geohash = "0.13"
 uuid = { version = "1.0", features = ["v4", "serde"] }
 
-# Internal dependencies
-hive-discovery = { path = "../hive-discovery" }
-hive-protocol = { path = "../hive-protocol" }
-hive-schema = { path = "../hive-schema" }
+# Transport security (bypass.rs — ADR-042)
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+chacha20poly1305 = "0.10"
+
+# Discovery (ADR-049 Phase 2)
+mdns-sd = "0.11"
+toml = "0.8"
+
+# HIVE-Lite transport (ADR-035, optional)
+hex = { version = "0.4", optional = true }
+log = { version = "0.4", optional = true }
+
+# Bluetooth LE transport (ADR-032/ADR-039, optional)
+hive-btle = { workspace = true, optional = true }
+
+# Automerge backend storage (ADR-049 Phase 3)
+automerge = { version = "0.7.1", optional = true }
+iroh = { version = "0.95", optional = true, features = ["discovery-local-network"] }
+iroh-blobs = { version = "0.97", optional = true }
+redb = { version = "2.4", optional = true }
+lru = { version = "0.12", optional = true }
+negentropy = { version = "0.5", optional = true }
+sha2 = { version = "0.10", optional = true }
+rand = { version = "0.9", optional = true }
+
+[features]
+default = []
+lite-transport = ["hex", "log"]
+bluetooth = ["hive-btle"]
+automerge-backend = ["automerge", "iroh", "iroh-blobs", "redb", "lru", "negentropy", "hex", "sha2", "rand"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "macros"] }
 tracing-subscriber = { workspace = true }
+tempfile = "3.13"

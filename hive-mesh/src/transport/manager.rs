@@ -27,7 +27,7 @@
 //! ## Example
 //!
 //! ```ignore
-//! use hive_protocol::transport::{
+//! use hive_mesh::transport::{
 //!     TransportManager, TransportManagerConfig,
 //!     MessageRequirements, MessagePriority, TransportType,
 //! };
