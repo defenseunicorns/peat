@@ -2808,6 +2808,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "automerge",
+ "base64",
  "chacha20poly1305",
  "chrono",
  "ed25519-dalek 2.2.0",
@@ -2815,6 +2816,8 @@ dependencies = [
  "geohash",
  "hex",
  "hive-btle",
+ "hkdf",
+ "hmac",
  "iroh",
  "iroh-blobs",
  "log",
@@ -2822,10 +2825,12 @@ dependencies = [
  "mdns-sd",
  "negentropy",
  "rand 0.9.2",
+ "rand_core 0.6.4",
  "redb",
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "subtle",
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
@@ -2833,6 +2838,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "x25519-dalek",
 ]
 
 [[package]]
