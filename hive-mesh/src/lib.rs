@@ -1,4 +1,5 @@
 pub mod beacon;
+pub mod discovery;
 pub mod flat_mesh;
 pub mod hierarchy;
 pub mod qos;
