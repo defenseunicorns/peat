@@ -4,6 +4,7 @@ pub mod flat_mesh;
 pub mod hierarchy;
 pub mod qos;
 pub mod routing;
+pub mod security;
 pub mod storage;
 pub mod sync;
 pub mod topology;

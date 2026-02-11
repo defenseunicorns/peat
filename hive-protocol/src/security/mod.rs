@@ -35,19 +35,66 @@
 //! let peer_id = authenticator.verify_response(&response)?;
 //! ```
 
-mod audit;
-mod auth_state;
-mod authenticator;
-mod authorization;
+// Re-export stub submodules (generic primitives now live in hive-mesh)
 mod callsign;
 mod device_id;
 mod encryption;
 mod error;
 mod formation_key;
 mod keypair;
+
+// HIVE-specific security modules (depend on hive-schema / domain types)
+mod audit;
+mod auth_state;
+mod authenticator;
+mod authorization;
 mod membership;
 mod transport;
 mod user_auth;
+
+// --- Generic security primitives re-exported from hive-mesh ---
+
+pub use hive_mesh::security::{
+    // Callsign generation
+    CallsignError,
+    CallsignGenerator,
+    // Device identity
+    DeviceId,
+    DeviceKeypair,
+    // Encryption
+    EncryptedCellMessage,
+    EncryptedData,
+    EncryptedDocument,
+    EncryptionKeypair,
+    EncryptionManager,
+    // Formation key authentication
+    FormationAuthResult,
+    FormationChallenge,
+    FormationChallengeResponse,
+    FormationKey,
+    GroupKey,
+    SecureChannel,
+    SecurityError,
+    SymmetricKey,
+    // Module-level constants
+    CHALLENGE_NONCE_SIZE,
+    DEFAULT_CHALLENGE_TIMEOUT_SECS,
+    // Formation constants
+    FORMATION_CHALLENGE_SIZE,
+    FORMATION_RESPONSE_SIZE,
+    // Constants
+    MAX_CALLSIGN_LENGTH,
+    NATO_ALPHABET,
+    // Encryption constants
+    NONCE_SIZE,
+    PUBLIC_KEY_SIZE,
+    SIGNATURE_SIZE,
+    SYMMETRIC_KEY_SIZE,
+    TOTAL_CALLSIGNS,
+    X25519_PUBLIC_KEY_SIZE,
+};
+
+// --- HIVE-specific exports ---
 
 pub use audit::{
     AuditEventType, AuditLogEntry, AuditLogger, FileAuditLogger, MemoryAuditLogger,
@@ -59,17 +106,6 @@ pub use authorization::{
     CellMembershipContext, DeviceIdentityInfo, DeviceType, HierarchyLevel, Permission, Role,
     UserIdentityInfo,
 };
-pub use device_id::DeviceId;
-pub use encryption::{
-    EncryptedCellMessage, EncryptedData, EncryptedDocument, EncryptionKeypair, EncryptionManager,
-    GroupKey, SecureChannel, SymmetricKey, NONCE_SIZE, SYMMETRIC_KEY_SIZE, X25519_PUBLIC_KEY_SIZE,
-};
-pub use error::SecurityError;
-pub use formation_key::{
-    FormationAuthResult, FormationChallenge, FormationChallengeResponse, FormationKey,
-    FORMATION_CHALLENGE_SIZE, FORMATION_RESPONSE_SIZE,
-};
-pub use keypair::DeviceKeypair;
 pub use transport::{AuthenticatedConnection, AuthenticationChannel, SecureMeshTransport};
 pub use user_auth::{
     AccountStatus, AuthMethod, Credential, LocalUserStore, MilitaryRank, OrganizationUnit,
@@ -81,11 +117,6 @@ pub use user_auth::{
 pub use membership::{
     CertificateRegistry, MemberPermissions, MembershipCertificate, CERTIFICATE_BASE_SIZE,
     MAX_CALLSIGN_LEN, MESH_ID_LEN,
-};
-
-// Callsign generation (ADR-048: Tactical Trust)
-pub use callsign::{
-    CallsignError, CallsignGenerator, MAX_CALLSIGN_LENGTH, NATO_ALPHABET, TOTAL_CALLSIGNS,
 };
 
 // Auth state tracking (ADR-048: Graceful Degradation)
@@ -100,17 +131,12 @@ pub use hive_schema::security::v1::{
     SignedChallengeResponse,
 };
 
-/// Default challenge timeout in seconds
-pub const DEFAULT_CHALLENGE_TIMEOUT_SECS: u64 = 30;
-
-/// Size of challenge nonce in bytes
-pub const CHALLENGE_NONCE_SIZE: usize = 32;
-
-/// Size of Ed25519 public key in bytes
-pub const PUBLIC_KEY_SIZE: usize = 32;
-
-/// Size of Ed25519 signature in bytes
-pub const SIGNATURE_SIZE: usize = 64;
+// Integration with main crate error type (moved from error.rs)
+impl From<hive_mesh::security::SecurityError> for crate::Error {
+    fn from(err: hive_mesh::security::SecurityError) -> Self {
+        crate::Error::Security(err.to_string())
+    }
+}
 
 #[cfg(test)]
 mod tests {
