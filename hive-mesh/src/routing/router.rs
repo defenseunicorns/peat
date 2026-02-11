@@ -577,20 +577,20 @@ impl SelectiveRouter {
     /// - Routing decision is ConsumeAndForward (intermediate node)
     /// - Node is a Leader (squad leader aggregating member data)
     ///
-    /// # Integration with PacketAggregator
+    /// # Integration with Aggregator
     ///
     /// When this returns true, the application should:
     /// 1. Collect telemetry packets from squad members (batching)
-    /// 2. Use PacketAggregator::aggregate_telemetry() to create aggregated packet
+    /// 2. Use `Aggregator::aggregate_telemetry()` to create aggregated packet
     /// 3. Route the aggregated packet upward using this router
     ///
     /// # Example
     ///
     /// ```ignore
-    /// use hive_mesh::routing::{SelectiveRouter, PacketAggregator, DataPacket};
+    /// use hive_mesh::routing::{SelectiveRouter, Aggregator, DataPacket};
     ///
     /// let router = SelectiveRouter::new();
-    /// let aggregator = PacketAggregator::new();
+    /// // let aggregator = MyAggregator::new();
     ///
     /// // Collect telemetry from squad members
     /// let mut squad_telemetry = Vec::new();

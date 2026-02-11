@@ -2,7 +2,7 @@
 //!
 //! This module provides a unified interface for mesh data routing that combines:
 //! - SelectiveRouter for routing decisions
-//! - PacketAggregator for hierarchical telemetry summarization
+//! - Aggregator for hierarchical telemetry summarization
 //! - MeshTransport for packet delivery
 //! - Message deduplication for loop prevention
 //!
@@ -15,7 +15,7 @@
 //! ┌─────────────────────────────────────────────────────────────┐
 //! │                       MeshRouter                            │
 //! │  ┌─────────────────┐  ┌─────────────────┐                  │
-//! │  │ SelectiveRouter │  │ PacketAggregator│                  │
+//! │  │ SelectiveRouter │  │ Aggregator│                  │
 //! │  │  (decisions)    │  │  (aggregation)  │                  │
 //! │  └────────┬────────┘  └────────┬────────┘                  │
 //! │           │                    │                           │
@@ -53,7 +53,7 @@
 //! let decision = router.receive(incoming_packet, &topology_state);
 //! ```
 
-use super::aggregator::PacketAggregator;
+use super::aggregator::{Aggregator, NoOpAggregator};
 use super::packet::DataPacket;
 use super::router::{DeduplicationConfig, RoutingDecision, SelectiveRouter};
 use crate::topology::TopologyState;
@@ -112,20 +112,35 @@ pub struct RouteResult {
 ///
 /// MeshRouter provides a high-level API for routing data through the mesh
 /// hierarchy while handling deduplication and aggregation automatically.
-pub struct MeshRouter {
+///
+/// The type parameter `A` determines which aggregation strategy is used.
+/// Use [`NoOpAggregator`] (the default) when aggregation is not needed.
+pub struct MeshRouter<A: Aggregator = NoOpAggregator> {
     /// Configuration
     config: MeshRouterConfig,
     /// Selective router for routing decisions
     router: SelectiveRouter,
     /// Packet aggregator for telemetry summarization
-    aggregator: PacketAggregator,
+    aggregator: A,
     /// Pending telemetry packets for aggregation (squad_id -> packets)
     pending_aggregation: Arc<std::sync::RwLock<Vec<DataPacket>>>,
 }
 
-impl MeshRouter {
-    /// Create a new mesh router
+impl MeshRouter<NoOpAggregator> {
+    /// Create a new mesh router with no aggregation
     pub fn new(config: MeshRouterConfig) -> Self {
+        Self::with_aggregator(config, NoOpAggregator)
+    }
+
+    /// Create with default configuration and node ID (no aggregation)
+    pub fn with_node_id(node_id: impl Into<String>) -> Self {
+        Self::new(MeshRouterConfig::with_node_id(node_id))
+    }
+}
+
+impl<A: Aggregator> MeshRouter<A> {
+    /// Create a new mesh router with a specific aggregator
+    pub fn with_aggregator(config: MeshRouterConfig, aggregator: A) -> Self {
         let router = if config.deduplication.enabled {
             SelectiveRouter::new_with_deduplication(config.deduplication.clone())
         } else {
@@ -135,14 +150,9 @@ impl MeshRouter {
         Self {
             config,
             router,
-            aggregator: PacketAggregator::new(),
+            aggregator,
             pending_aggregation: Arc::new(std::sync::RwLock::new(Vec::new())),
         }
-    }
-
-    /// Create with default configuration and node ID
-    pub fn with_node_id(node_id: impl Into<String>) -> Self {
-        Self::new(MeshRouterConfig::with_node_id(node_id))
     }
 
     /// Route an incoming packet and determine what to do with it
@@ -247,7 +257,7 @@ impl MeshRouter {
     }
 
     /// Get the underlying aggregator for advanced operations
-    pub fn aggregator(&self) -> &PacketAggregator {
+    pub fn aggregator(&self) -> &A {
         &self.aggregator
     }
 

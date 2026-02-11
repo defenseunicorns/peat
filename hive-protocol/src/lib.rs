@@ -40,6 +40,7 @@ pub mod sync; // Data synchronization abstraction layer
 pub mod testing;
 pub mod traits;
 pub mod transport; // Backend-agnostic transport abstraction for mesh topology
+pub mod mesh_integration; // HIVE-specific adapters for hive-mesh
 
 pub use error::{Error, Result};
 
