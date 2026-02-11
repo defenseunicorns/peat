@@ -60,7 +60,7 @@ mod mesh_router;
 mod packet;
 mod router;
 
-pub use aggregator::{AggregationError, PacketAggregator, TelemetryPayload};
+pub use aggregator::{AggregationError, Aggregator, NoOpAggregator};
 pub use mesh_router::MeshRouter;
 pub use packet::{DataDirection, DataPacket, DataType};
 pub use router::{DeduplicationConfig, RoutingDecision, SelectiveRouter};
