@@ -66,10 +66,7 @@ pub trait Aggregator: Send + Sync {
     /// # Returns
     ///
     /// The raw summary bytes from the aggregated packet
-    fn extract_summary_bytes(
-        &self,
-        packet: &DataPacket,
-    ) -> Result<Vec<u8>, AggregationError> {
+    fn extract_summary_bytes(&self, packet: &DataPacket) -> Result<Vec<u8>, AggregationError> {
         if packet.data_type != DataType::AggregatedTelemetry {
             return Err(AggregationError::InvalidPacketType {
                 expected: "AggregatedTelemetry".to_string(),

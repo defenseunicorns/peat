@@ -904,7 +904,11 @@ impl SyncEngine for AutomergeBackend {
         Ok(())
     }
 
-    async fn subscribe(&self, collection: &str, _query: &Query) -> anyhow::Result<SyncSubscription> {
+    async fn subscribe(
+        &self,
+        collection: &str,
+        _query: &Query,
+    ) -> anyhow::Result<SyncSubscription> {
         // Create subscription handle
         // For Automerge, subscriptions are logical - we track interest
         Ok(SyncSubscription::new(
@@ -2666,7 +2670,11 @@ impl SyncEngine for IrohSyncEngine {
         Ok(())
     }
 
-    async fn subscribe(&self, collection: &str, _query: &Query) -> anyhow::Result<SyncSubscription> {
+    async fn subscribe(
+        &self,
+        collection: &str,
+        _query: &Query,
+    ) -> anyhow::Result<SyncSubscription> {
         Ok(SyncSubscription::new(collection, ()))
     }
 
@@ -2685,7 +2693,11 @@ impl SyncEngine for IrohSyncEngine {
     ///
     /// This enables static peer configuration in containerlab and similar environments
     /// where mDNS discovery may not work across network namespaces.
-    async fn connect_to_peer(&self, endpoint_id_hex: &str, addresses: &[String]) -> anyhow::Result<bool> {
+    async fn connect_to_peer(
+        &self,
+        endpoint_id_hex: &str,
+        addresses: &[String],
+    ) -> anyhow::Result<bool> {
         use crate::network::PeerInfo as NetworkPeerInfo;
 
         // Parse the endpoint ID from hex
