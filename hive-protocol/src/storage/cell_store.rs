@@ -305,7 +305,8 @@ impl<B: DataSyncBackend> CellStore<B> {
         self.backend
             .document_store()
             .remove(CELL_COLLECTION, &cell_id.to_string())
-            .await
+            .await?;
+        Ok(())
     }
 
     /// Get the underlying backend reference

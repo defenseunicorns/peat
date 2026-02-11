@@ -82,7 +82,7 @@ impl Default for DittoBackend {
 
 #[async_trait]
 impl DataSyncBackend for DittoBackend {
-    async fn initialize(&self, config: BackendConfig) -> Result<()> {
+    async fn initialize(&self, config: BackendConfig) -> anyhow::Result<()> {
         // Get offline_token from extra config or environment (via HiveCredentials)
         let offline_token = config.extra.get("offline_token").cloned()
             .or_else(|| {
@@ -121,7 +121,7 @@ impl DataSyncBackend for DittoBackend {
         Ok(())
     }
 
-    async fn shutdown(&self) -> Result<()> {
+    async fn shutdown(&self) -> anyhow::Result<()> {
         if let Some(store) = self.store.lock().unwrap().take() {
             store.stop_sync();
             drop(store);
@@ -168,7 +168,7 @@ impl Clone for DittoBackend {
 
 #[async_trait]
 impl DocumentStore for DittoBackend {
-    async fn upsert(&self, collection: &str, document: Document) -> Result<DocumentId> {
+    async fn upsert(&self, collection: &str, document: Document) -> anyhow::Result<DocumentId> {
         let store = self.get_store()?;
 
         // Convert Document to serde_json::Value
@@ -182,10 +182,10 @@ impl DocumentStore for DittoBackend {
         }
 
         // Use DittoStore's upsert method
-        store.upsert(collection, json_doc).await
+        Ok(store.upsert(collection, json_doc).await?)
     }
 
-    async fn query(&self, collection: &str, query: &Query) -> Result<Vec<Document>> {
+    async fn query(&self, collection: &str, query: &Query) -> anyhow::Result<Vec<Document>> {
         let store = self.get_store()?;
 
         // Convert Query to DQL where clause
@@ -220,12 +220,12 @@ impl DocumentStore for DittoBackend {
             .collect())
     }
 
-    async fn remove(&self, collection: &str, doc_id: &DocumentId) -> Result<()> {
+    async fn remove(&self, collection: &str, doc_id: &DocumentId) -> anyhow::Result<()> {
         let store = self.get_store()?;
-        store.remove(collection, doc_id).await
+        Ok(store.remove(collection, doc_id).await?)
     }
 
-    fn observe(&self, collection: &str, query: &Query) -> Result<ChangeStream> {
+    fn observe(&self, collection: &str, query: &Query) -> anyhow::Result<ChangeStream> {
         let store = self.get_store()?;
         let where_clause = query_to_dql(query);
         let dql_query = format!("SELECT * FROM {} WHERE {}", collection, where_clause);
@@ -343,7 +343,7 @@ impl DocumentStore for DittoBackend {
     /// Get a single document by ID
     ///
     /// Override default implementation to use Ditto's _id field
-    async fn get(&self, collection: &str, doc_id: &DocumentId) -> Result<Option<Document>> {
+    async fn get(&self, collection: &str, doc_id: &DocumentId) -> anyhow::Result<Option<Document>> {
         let query = Query::Eq {
             field: "_id".to_string(), // Ditto uses _id, not id
             value: Value::String(doc_id.clone()),
@@ -437,19 +437,19 @@ fn value_to_dql(value: &Value) -> String {
 
 #[async_trait]
 impl PeerDiscovery for DittoBackend {
-    async fn start(&self) -> Result<()> {
+    async fn start(&self) -> anyhow::Result<()> {
         // Peer discovery starts automatically when sync starts in Ditto
         // So this is a no-op - actual discovery happens in SyncEngine::start_sync
         Ok(())
     }
 
-    async fn stop(&self) -> Result<()> {
+    async fn stop(&self) -> anyhow::Result<()> {
         // Peer discovery stops when sync stops
         // Actual stop happens in DataSyncBackend::shutdown
         Ok(())
     }
 
-    async fn discovered_peers(&self) -> Result<Vec<PeerInfo>> {
+    async fn discovered_peers(&self) -> anyhow::Result<Vec<PeerInfo>> {
         let store = self.get_store()?;
         let presence_graph = store.ditto().presence().graph();
 
@@ -487,7 +487,7 @@ impl PeerDiscovery for DittoBackend {
         Ok(peers)
     }
 
-    async fn add_peer(&self, address: &str, transport: TransportType) -> Result<()> {
+    async fn add_peer(&self, address: &str, transport: TransportType) -> anyhow::Result<()> {
         let store = self.get_store()?;
 
         // Only TCP transport is supported for explicit peer addition in Ditto
@@ -495,7 +495,8 @@ impl PeerDiscovery for DittoBackend {
             return Err(Error::config_error(
                 "Only TCP transport supported for explicit peer addition",
                 Some("transport".to_string()),
-            ));
+            )
+            .into());
         }
 
         // Add TCP server address to Ditto's connect config
@@ -506,7 +507,7 @@ impl PeerDiscovery for DittoBackend {
         Ok(())
     }
 
-    async fn wait_for_peer(&self, peer_id: &PeerId, timeout: Duration) -> Result<()> {
+    async fn wait_for_peer(&self, peer_id: &PeerId, timeout: Duration) -> anyhow::Result<()> {
         let store = self.get_store()?;
         let (tx, mut rx) = mpsc::unbounded_channel();
         let peer_id_clone = peer_id.clone();
@@ -536,12 +537,14 @@ impl PeerDiscovery for DittoBackend {
                 "Peer presence channel closed",
                 "wait_for_peer",
                 None,
-            )),
+            )
+            .into()),
             Err(_) => Err(Error::storage_error(
                 format!("Timeout waiting for peer {}", peer_id_for_error),
                 "wait_for_peer",
                 None,
-            )),
+            )
+            .into()),
         }
     }
 
@@ -577,7 +580,7 @@ impl PeerDiscovery for DittoBackend {
         }
     }
 
-    async fn get_peer_info(&self, peer_id: &PeerId) -> Result<Option<PeerInfo>> {
+    async fn get_peer_info(&self, peer_id: &PeerId) -> anyhow::Result<Option<PeerInfo>> {
         let peers = self.discovered_peers().await?;
         Ok(peers.into_iter().find(|p| &p.peer_id == peer_id))
     }
@@ -585,19 +588,19 @@ impl PeerDiscovery for DittoBackend {
 
 #[async_trait]
 impl SyncEngine for DittoBackend {
-    async fn start_sync(&self) -> Result<()> {
+    async fn start_sync(&self) -> anyhow::Result<()> {
         let store = self.get_store()?;
         eprintln!("DittoBackend::start_sync - Ditto ptr: {:p}", store.ditto());
-        store.start_sync()
+        Ok(store.start_sync()?)
     }
 
-    async fn stop_sync(&self) -> Result<()> {
+    async fn stop_sync(&self) -> anyhow::Result<()> {
         let store = self.get_store()?;
         store.stop_sync();
         Ok(())
     }
 
-    async fn subscribe(&self, collection: &str, query: &Query) -> Result<SyncSubscription> {
+    async fn subscribe(&self, collection: &str, query: &Query) -> anyhow::Result<SyncSubscription> {
         let store = self.get_store()?;
         let where_clause = query_to_dql(query);
         let dql_query = format!("SELECT * FROM {} WHERE {}", collection, where_clause);
@@ -626,7 +629,7 @@ impl SyncEngine for DittoBackend {
         Ok(SyncSubscription::new(collection, sync_sub))
     }
 
-    async fn is_syncing(&self) -> Result<bool> {
+    async fn is_syncing(&self) -> anyhow::Result<bool> {
         // In Ditto, if we have a store and it's initialized, sync is active
         // (it starts when we call start_sync and stops when we call stop_sync)
         Ok(self.store.lock().unwrap().is_some())

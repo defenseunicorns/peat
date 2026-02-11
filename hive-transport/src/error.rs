@@ -36,6 +36,13 @@ pub enum Error {
     Internal(String),
 }
 
+/// Allow `?` on `anyhow::Result` in functions returning this Error
+impl From<anyhow::Error> for Error {
+    fn from(err: anyhow::Error) -> Self {
+        Error::Internal(err.to_string())
+    }
+}
+
 /// Result type alias
 pub type Result<T> = std::result::Result<T, Error>;
 
