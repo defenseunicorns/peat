@@ -17,6 +17,36 @@ use std::fmt;
 use std::time::Instant;
 use tokio::sync::mpsc;
 
+// Submodules moved from hive-protocol (ADR-049 Phase 2)
+pub mod bypass;
+pub mod capabilities;
+pub mod health;
+pub mod manager;
+pub mod reconnection;
+
+#[cfg(feature = "lite-transport")]
+pub mod lite;
+
+#[cfg(feature = "bluetooth")]
+pub mod btle;
+
+// Re-exports from submodules
+pub use bypass::{
+    BypassChannelConfig, BypassCollectionConfig, BypassError, BypassHeader, BypassMessage,
+    BypassMetrics, BypassMetricsSnapshot, BypassTarget, BypassTransport, MessageEncoding,
+    UdpBypassChannel, UdpConfig,
+};
+pub use capabilities::{
+    ConfigurableTransport, DistanceSource, MessagePriority, MessageRequirements, PaceLevel,
+    PeerDistance, RangeMode, RangeModeConfig, Transport, TransportCapabilities, TransportId,
+    TransportInstance, TransportMode, TransportPolicy, TransportType,
+};
+pub use health::{HealthMonitor, HeartbeatConfig};
+pub use manager::{RouteDecision, TransportManager, TransportManagerConfig};
+
+#[cfg(feature = "bluetooth")]
+pub use btle::HiveBleTransport;
+
 // =============================================================================
 // Node Identity
 // =============================================================================

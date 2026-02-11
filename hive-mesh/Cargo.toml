@@ -22,6 +22,25 @@ futures = "0.3"
 geohash = "0.13"
 uuid = { version = "1.0", features = ["v4", "serde"] }
 
+# Transport security (bypass.rs — ADR-042)
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+chacha20poly1305 = "0.10"
+
+# Discovery (ADR-049 Phase 2)
+mdns-sd = "0.11"
+toml = "0.8"
+
+# HIVE-Lite transport (ADR-035, optional)
+hex = { version = "0.4", optional = true }
+log = { version = "0.4", optional = true }
+
+# Bluetooth LE transport (ADR-032/ADR-039, optional)
+hive-btle = { workspace = true, optional = true }
+
+[features]
+default = []
+lite-transport = ["hex", "log"]
+bluetooth = ["hive-btle"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "macros"] }

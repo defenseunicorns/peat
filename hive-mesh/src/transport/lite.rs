@@ -25,7 +25,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use hive_protocol::transport::lite::{LiteMeshTransport, LiteTransportConfig};
+//! use hive_mesh::transport::lite::{LiteMeshTransport, LiteTransportConfig};
 //!
 //! let config = LiteTransportConfig {
 //!     listen_port: 5555,
