@@ -37,7 +37,7 @@
 //! ## Example
 //!
 //! ```ignore
-//! use hive_protocol::transport::bypass::{UdpBypassChannel, BypassChannelConfig};
+//! use hive_mesh::transport::bypass::{UdpBypassChannel, BypassChannelConfig};
 //!
 //! // Create bypass channel
 //! let config = BypassChannelConfig::default();
@@ -338,7 +338,7 @@ impl BypassChannelConfig {
 /// ## Example
 ///
 /// ```rust
-/// use hive_protocol::transport::bypass::BypassSecurityConfig;
+/// use hive_mesh::transport::bypass::BypassSecurityConfig;
 ///
 /// // Minimal security for high-frequency telemetry
 /// let config = BypassSecurityConfig {
