@@ -212,6 +212,12 @@ pub struct ErrorContext {
     pub duration_ms: Option<u64>,
 }
 
+impl From<anyhow::Error> for Error {
+    fn from(err: anyhow::Error) -> Self {
+        Error::Internal(err.to_string())
+    }
+}
+
 /// Helper functions for creating common errors
 impl Error {
     /// Create a storage error with context
