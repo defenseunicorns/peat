@@ -6,7 +6,7 @@
 
 use super::{TopologyBuilder, TopologyConfig, TopologyEvent};
 use crate::routing::DataPacket;
-use hive_protocol::transport::{MeshConnection, MeshTransport, NodeId};
+use crate::transport::{MeshConnection, MeshTransport, NodeId};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
@@ -282,7 +282,7 @@ fn spawn_lateral_connection_retry(
 ///
 /// ```ignore
 /// use hive_mesh::topology::{TopologyManager, TopologyBuilder};
-/// use hive_protocol::transport::MeshTransport;
+/// use hive_mesh::transport::MeshTransport;
 ///
 /// let builder = TopologyBuilder::new(...);
 /// let transport: Arc<dyn MeshTransport> = ...;
@@ -855,7 +855,7 @@ impl TopologyManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hive_protocol::transport::{
+    use crate::transport::{
         MeshConnection as MeshConnectionTrait, MeshTransport, NodeId, Result,
     };
     use std::sync::Arc;
@@ -956,7 +956,7 @@ mod tests {
             self.connections.read().unwrap().clone()
         }
 
-        fn subscribe_peer_events(&self) -> hive_protocol::transport::PeerEventReceiver {
+        fn subscribe_peer_events(&self) -> crate::transport::PeerEventReceiver {
             let (_tx, rx) = tokio::sync::mpsc::channel(256);
             rx
         }

@@ -3,6 +3,7 @@ pub mod flat_mesh;
 pub mod hierarchy;
 pub mod routing;
 pub mod topology;
+pub mod transport;
 
 // Re-export main types
 pub use beacon::{
@@ -14,12 +15,16 @@ pub use hierarchy::{
     HybridHierarchyStrategy, NodeRole, StaticHierarchyStrategy,
 };
 pub use routing::{
-    AggregationError, DataDirection, DataPacket, DataType, DeduplicationConfig, MeshRouter,
-    PacketAggregator, RoutingDecision, SelectiveRouter, TelemetryPayload,
+    AggregationError, Aggregator, DataDirection, DataPacket, DataType, DeduplicationConfig,
+    MeshRouter, NoOpAggregator, RoutingDecision, SelectiveRouter,
 };
 pub use topology::{
     AutonomousOperationHandler, AutonomousState, InMemoryMetricsCollector, MetricsCollector,
     NoOpMetricsCollector, PartitionConfig, PartitionDetector, PartitionEvent, PartitionHandler,
     PeerCandidate, PeerSelector, SelectedPeer, SelectionConfig, TopologyBuilder, TopologyConfig,
     TopologyEvent, TopologyMetricsSnapshot, TopologyState,
+};
+pub use transport::{
+    ConnectionHealth, ConnectionState, DisconnectReason, MeshConnection, MeshTransport, NodeId,
+    PeerEvent, PeerEventReceiver, TransportError,
 };
