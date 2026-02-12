@@ -2,9 +2,11 @@
 pub mod broker;
 
 pub mod beacon;
+pub mod config;
 pub mod discovery;
 pub mod flat_mesh;
 pub mod hierarchy;
+pub mod mesh;
 pub mod qos;
 pub mod routing;
 pub mod security;
@@ -36,3 +38,7 @@ pub use transport::{
     ConnectionHealth, ConnectionState, DisconnectReason, MeshConnection, MeshTransport, NodeId,
     PeerEvent, PeerEventReceiver, TransportError,
 };
+
+// Phase 7 facade re-exports
+pub use config::{MeshConfig, MeshDiscoveryConfig, SecurityConfig};
+pub use mesh::{HiveMesh, HiveMeshBuilder, HiveMeshEvent, MeshError, MeshState, MeshStatus};
