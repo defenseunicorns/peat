@@ -103,4 +103,38 @@ mod tests {
         assert!(json.contains("healthy"));
         assert!(json.contains("node-1"));
     }
+
+    #[test]
+    fn test_health_response_debug() {
+        let resp = HealthResponse {
+            status: "healthy".into(),
+            node_id: "n1".into(),
+        };
+        let debug = format!("{:?}", resp);
+        assert!(debug.contains("HealthResponse"));
+        assert!(debug.contains("healthy"));
+        assert!(debug.contains("n1"));
+    }
+
+    #[test]
+    fn test_health_response_fields() {
+        let resp = HealthResponse {
+            status: "degraded".into(),
+            node_id: "mesh-42".into(),
+        };
+        assert_eq!(resp.status, "degraded");
+        assert_eq!(resp.node_id, "mesh-42");
+    }
+
+    #[test]
+    fn test_health_response_serde_roundtrip() {
+        let resp = HealthResponse {
+            status: "healthy".into(),
+            node_id: "roundtrip-node".into(),
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed["status"], "healthy");
+        assert_eq!(parsed["node_id"], "roundtrip-node");
+    }
 }

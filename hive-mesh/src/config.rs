@@ -1,6 +1,7 @@
 //! Configuration types for the HiveMesh facade.
 
 use crate::topology::TopologyConfig;
+use crate::transport::TransportManagerConfig;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -20,6 +21,8 @@ pub struct MeshConfig {
     pub discovery: MeshDiscoveryConfig,
     /// Security configuration.
     pub security: SecurityConfig,
+    /// Transport manager configuration for multi-transport selection.
+    pub transport_manager: Option<TransportManagerConfig>,
 }
 
 /// Discovery settings for mesh peer discovery.
