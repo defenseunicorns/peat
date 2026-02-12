@@ -236,4 +236,128 @@ mod tests {
         let all_beacons = storage.query_all().await.unwrap();
         assert_eq!(all_beacons.len(), 1);
     }
+
+    #[test]
+    fn test_storage_error_display() {
+        let err = StorageError::SaveFailed("disk full".to_string());
+        assert_eq!(err.to_string(), "Save failed: disk full");
+
+        let err = StorageError::QueryFailed("timeout".to_string());
+        assert_eq!(err.to_string(), "Query failed: timeout");
+
+        let err = StorageError::SubscribeFailed("connection lost".to_string());
+        assert_eq!(err.to_string(), "Subscribe failed: connection lost");
+
+        let inner = std::io::Error::new(std::io::ErrorKind::Other, "io error");
+        let err = StorageError::Other(Box::new(inner));
+        assert!(err.to_string().contains("Storage error"));
+    }
+
+    #[test]
+    fn test_storage_error_source() {
+        // SaveFailed, QueryFailed, SubscribeFailed have no source
+        let err = StorageError::SaveFailed("test".to_string());
+        assert!(err.source().is_none());
+
+        let err = StorageError::QueryFailed("test".to_string());
+        assert!(err.source().is_none());
+
+        let err = StorageError::SubscribeFailed("test".to_string());
+        assert!(err.source().is_none());
+
+        // Other has a source
+        let inner = std::io::Error::new(std::io::ErrorKind::Other, "io error");
+        let err = StorageError::Other(Box::new(inner));
+        assert!(err.source().is_some());
+    }
+
+    #[test]
+    fn test_storage_error_debug() {
+        let err = StorageError::SaveFailed("test".to_string());
+        let debug_str = format!("{:?}", err);
+        assert!(debug_str.contains("SaveFailed"));
+    }
+
+    #[test]
+    fn test_beacon_change_event_variants() {
+        let beacon = GeographicBeacon::new(
+            "node-1".to_string(),
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+        );
+
+        let inserted = BeaconChangeEvent::Inserted(beacon.clone());
+        let updated = BeaconChangeEvent::Updated(beacon);
+        let removed = BeaconChangeEvent::Removed {
+            node_id: "node-1".to_string(),
+        };
+
+        // Verify Debug works
+        let _ = format!("{:?}", inserted);
+        let _ = format!("{:?}", updated);
+        let _ = format!("{:?}", removed);
+    }
+
+    #[tokio::test]
+    async fn test_mock_storage_query_by_geohash_no_match() {
+        let storage = MockBeaconStorage::new();
+
+        let beacon = GeographicBeacon::new(
+            "test-node".to_string(),
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Platform,
+        );
+        storage.save_beacon(&beacon).await.unwrap();
+
+        // Query with a non-matching prefix
+        let result = storage.query_by_geohash("xyz").await.unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_mock_storage_multiple_beacons() {
+        let storage = MockBeaconStorage::new();
+
+        let beacon1 = GeographicBeacon::new(
+            "node-1".to_string(),
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+        );
+        let beacon2 = GeographicBeacon::new(
+            "node-2".to_string(),
+            GeoPosition::new(37.7750, -122.4195),
+            HierarchyLevel::Squad,
+        );
+        let beacon3 = GeographicBeacon::new(
+            "node-3".to_string(),
+            GeoPosition::new(40.7128, -74.0060), // New York
+            HierarchyLevel::Platoon,
+        );
+
+        storage.save_beacon(&beacon1).await.unwrap();
+        storage.save_beacon(&beacon2).await.unwrap();
+        storage.save_beacon(&beacon3).await.unwrap();
+
+        let all = storage.query_all().await.unwrap();
+        assert_eq!(all.len(), 3);
+
+        // Both SF beacons start with "9q8"
+        let sf_beacons = storage.query_by_geohash("9q8").await.unwrap();
+        assert_eq!(sf_beacons.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_mock_storage_subscribe_returns_empty() {
+        let storage = MockBeaconStorage::new();
+        let stream = storage.subscribe().await;
+        assert!(stream.is_ok());
+    }
+
+    #[test]
+    fn test_mock_beacon_storage_default() {
+        let storage = MockBeaconStorage::default();
+        // Should work the same as new()
+        let _ = format!("{:?}", "created storage");
+        assert!(storage.beacons.try_lock().unwrap().is_empty());
+    }
 }

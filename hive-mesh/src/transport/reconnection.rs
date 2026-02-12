@@ -486,4 +486,149 @@ mod tests {
         // Should not be scheduled when disabled
         assert!(!manager.is_pending(&peer_id));
     }
+
+    #[test]
+    fn test_aggressive_policy() {
+        let policy = ReconnectionPolicy::aggressive();
+        assert!(policy.enabled);
+        assert_eq!(policy.initial_delay, Duration::from_millis(100));
+        assert_eq!(policy.max_delay, Duration::from_secs(10));
+        assert_eq!(policy.backoff_multiplier, 1.5);
+        assert_eq!(policy.max_retries, Some(20));
+        assert_eq!(policy.jitter, 0.1);
+    }
+
+    #[test]
+    fn test_conservative_policy() {
+        let policy = ReconnectionPolicy::conservative();
+        assert!(policy.enabled);
+        assert_eq!(policy.initial_delay, Duration::from_secs(5));
+        assert_eq!(policy.max_delay, Duration::from_secs(300));
+        assert_eq!(policy.backoff_multiplier, 2.0);
+        assert_eq!(policy.max_retries, Some(5));
+        assert_eq!(policy.jitter, 0.3);
+    }
+
+    #[test]
+    fn test_policy_accessor() {
+        let policy = ReconnectionPolicy::aggressive();
+        let manager = ReconnectionManager::new(policy);
+        assert_eq!(manager.policy().initial_delay, Duration::from_millis(100));
+        assert!(manager.is_enabled());
+    }
+
+    #[test]
+    fn test_is_enabled_false() {
+        let policy = ReconnectionPolicy::disabled();
+        let manager = ReconnectionManager::new(policy);
+        assert!(!manager.is_enabled());
+    }
+
+    #[test]
+    fn test_clear_pending() {
+        let mut manager = ReconnectionManager::new(ReconnectionPolicy::default());
+        let p1 = NodeId::new("p1".to_string());
+        let p2 = NodeId::new("p2".to_string());
+        manager.schedule_reconnect(p1, true);
+        manager.schedule_reconnect(p2, true);
+        assert_eq!(manager.pending_count(), 2);
+
+        manager.clear();
+        assert_eq!(manager.pending_count(), 0);
+    }
+
+    #[test]
+    fn test_remove_returns_state() {
+        let mut manager = ReconnectionManager::new(ReconnectionPolicy::default());
+        let peer_id = NodeId::new("peer".to_string());
+        manager.schedule_reconnect(peer_id.clone(), true);
+
+        let state = manager.remove(&peer_id);
+        assert!(state.is_some());
+        let s = state.unwrap();
+        assert_eq!(s.attempts, 0);
+        assert!(s.is_static_peer);
+        assert!(s.last_error.is_none());
+
+        // Remove again returns None
+        assert!(manager.remove(&peer_id).is_none());
+    }
+
+    #[test]
+    fn test_pending_peers() {
+        let mut manager = ReconnectionManager::new(ReconnectionPolicy::default());
+        let p1 = NodeId::new("p1".to_string());
+        let p2 = NodeId::new("p2".to_string());
+        manager.schedule_reconnect(p1.clone(), true);
+        manager.schedule_reconnect(p2.clone(), true);
+
+        let peers = manager.pending_peers();
+        assert_eq!(peers.len(), 2);
+        assert!(peers.contains(&p1));
+        assert!(peers.contains(&p2));
+    }
+
+    #[test]
+    fn test_failed_unknown_peer() {
+        let mut manager = ReconnectionManager::new(ReconnectionPolicy::default());
+        let peer_id = NodeId::new("unknown".to_string());
+        // Failing a peer not in pending should return false
+        assert!(!manager.failed(&peer_id, "error".to_string()));
+    }
+
+    #[test]
+    fn test_get_state_with_error() {
+        let mut manager = ReconnectionManager::new(ReconnectionPolicy {
+            max_retries: Some(5),
+            ..Default::default()
+        });
+        let peer_id = NodeId::new("peer".to_string());
+        manager.schedule_reconnect(peer_id.clone(), true);
+
+        manager.failed(&peer_id, "connection refused".to_string());
+        let state = manager.get_state(&peer_id).unwrap();
+        assert_eq!(state.attempts, 1);
+        assert_eq!(state.last_error.as_deref(), Some("connection refused"));
+        assert!(state.is_static_peer);
+    }
+
+    #[test]
+    fn test_reconnection_state_new() {
+        let now = Instant::now();
+        let state = ReconnectionState::new(now, false);
+        assert_eq!(state.attempts, 0);
+        assert_eq!(state.next_attempt, now);
+        assert!(state.last_error.is_none());
+        assert!(!state.is_static_peer);
+    }
+
+    #[test]
+    fn test_reconnected_unknown_peer_noop() {
+        let mut manager = ReconnectionManager::new(ReconnectionPolicy::default());
+        // Should be a no-op, not panic
+        manager.reconnected(&NodeId::new("unknown".to_string()));
+        assert_eq!(manager.pending_count(), 0);
+    }
+
+    #[test]
+    fn test_policy_debug_clone() {
+        let policy = ReconnectionPolicy::default();
+        let cloned = policy.clone();
+        assert_eq!(cloned.enabled, policy.enabled);
+        let _ = format!("{:?}", policy);
+    }
+
+    #[test]
+    fn test_reconnection_state_debug_clone() {
+        let state = ReconnectionState::new(Instant::now(), true);
+        let cloned = state.clone();
+        assert_eq!(cloned.attempts, state.attempts);
+        let _ = format!("{:?}", state);
+    }
+
+    #[test]
+    fn test_manager_debug() {
+        let manager = ReconnectionManager::new(ReconnectionPolicy::default());
+        let _ = format!("{:?}", manager);
+    }
 }

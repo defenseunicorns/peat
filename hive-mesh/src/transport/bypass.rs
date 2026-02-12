@@ -1754,6 +1754,410 @@ mod tests {
     }
 
     #[test]
+    fn test_bypass_error_display_all_variants() {
+        let io_err = BypassError::Io(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "test io",
+        ));
+        assert!(io_err.to_string().contains("IO error"));
+        assert!(io_err.to_string().contains("test io"));
+
+        let encode_err = BypassError::Encode("bad data".to_string());
+        assert!(encode_err.to_string().contains("Encode error"));
+
+        let decode_err = BypassError::Decode("corrupt".to_string());
+        assert!(decode_err.to_string().contains("Decode error"));
+
+        let config_err = BypassError::Config("bad config".to_string());
+        assert!(config_err.to_string().contains("Config error"));
+
+        let not_started = BypassError::NotStarted;
+        assert!(not_started.to_string().contains("not started"));
+
+        let invalid_header = BypassError::InvalidHeader;
+        assert!(invalid_header.to_string().contains("Invalid bypass header"));
+
+        let stale = BypassError::StaleMessage;
+        assert!(stale.to_string().contains("stale"));
+
+        let sig_err = BypassError::InvalidSignature;
+        assert!(sig_err.to_string().contains("Invalid message signature"));
+
+        let decrypt_err = BypassError::DecryptionFailed;
+        assert!(decrypt_err.to_string().contains("decryption failed"));
+
+        let unauth = BypassError::UnauthorizedSource("10.0.0.1".parse().unwrap());
+        assert!(unauth.to_string().contains("10.0.0.1"));
+
+        let replay = BypassError::ReplayDetected { sequence: 42 };
+        assert!(replay.to_string().contains("42"));
+
+        let missing = BypassError::MissingCredential("encryption key".to_string());
+        assert!(missing.to_string().contains("encryption key"));
+    }
+
+    #[test]
+    fn test_bypass_error_source() {
+        let io_err = BypassError::Io(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "test",
+        ));
+        assert!(std::error::Error::source(&io_err).is_some());
+
+        let encode_err = BypassError::Encode("test".into());
+        assert!(std::error::Error::source(&encode_err).is_none());
+
+        let not_started = BypassError::NotStarted;
+        assert!(std::error::Error::source(&not_started).is_none());
+    }
+
+    #[test]
+    fn test_bypass_error_from_io() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "gone");
+        let bypass_err: BypassError = io_err.into();
+        assert!(bypass_err.to_string().contains("gone"));
+    }
+
+    #[test]
+    fn test_message_encoding_display() {
+        assert_eq!(MessageEncoding::Protobuf.to_string(), "protobuf");
+        assert_eq!(MessageEncoding::Json.to_string(), "json");
+        assert_eq!(MessageEncoding::Raw.to_string(), "raw");
+        assert_eq!(MessageEncoding::Cbor.to_string(), "cbor");
+    }
+
+    #[test]
+    fn test_bypass_collection_config_ttl() {
+        let config = BypassCollectionConfig {
+            ttl_ms: 200,
+            ..Default::default()
+        };
+        assert_eq!(config.ttl(), Duration::from_millis(200));
+    }
+
+    #[test]
+    fn test_bypass_collection_config_default() {
+        let config = BypassCollectionConfig::default();
+        assert!(config.collection.is_empty());
+        assert_eq!(config.transport, BypassTransport::Unicast);
+        assert_eq!(config.encoding, MessageEncoding::Protobuf);
+        assert_eq!(config.ttl_ms, 5000);
+        assert_eq!(config.priority, MessagePriority::Normal);
+    }
+
+    #[test]
+    fn test_udp_config_default() {
+        let config = UdpConfig::default();
+        assert_eq!(config.bind_port, 5150);
+        assert_eq!(config.buffer_size, 65536);
+        assert_eq!(config.multicast_ttl, 32);
+    }
+
+    #[test]
+    fn test_bypass_channel_config_default() {
+        let config = BypassChannelConfig::default();
+        assert!(config.collections.is_empty());
+        assert!(!config.multicast_enabled);
+        assert_eq!(config.max_message_size, 0);
+    }
+
+    #[test]
+    fn test_bypass_channel_config_new() {
+        let config = BypassChannelConfig::new();
+        assert!(config.multicast_enabled);
+        assert_eq!(config.max_message_size, 65000);
+    }
+
+    #[test]
+    fn test_bypass_security_config_is_enabled_allowlist() {
+        let config = BypassSecurityConfig {
+            source_allowlist: Some(vec!["10.0.0.1".parse().unwrap()]),
+            ..Default::default()
+        };
+        assert!(config.is_enabled());
+    }
+
+    #[test]
+    fn test_bypass_security_config_is_enabled_replay() {
+        let config = BypassSecurityConfig {
+            replay_protection: true,
+            ..Default::default()
+        };
+        assert!(config.is_enabled());
+    }
+
+    #[test]
+    fn test_bypass_security_credentials_debug() {
+        let creds = BypassSecurityCredentials::new();
+        let debug = format!("{:?}", creds);
+        assert!(debug.contains("has_signing_key"));
+        assert!(debug.contains("false"));
+        assert!(debug.contains("peer_keys_count"));
+    }
+
+    #[test]
+    fn test_bypass_security_credentials_verifying_key() {
+        // Without signing key
+        let creds = BypassSecurityCredentials::new();
+        assert!(creds.verifying_key().is_none());
+
+        // With signing key
+        let seed: [u8; 32] = [42u8; 32];
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&seed);
+        let creds = BypassSecurityCredentials::new().with_signing_key(signing_key.clone());
+        let vk = creds.verifying_key();
+        assert!(vk.is_some());
+        assert_eq!(vk.unwrap(), signing_key.verifying_key());
+    }
+
+    #[test]
+    fn test_bypass_security_credentials_verify_unknown_peer() {
+        let creds = BypassSecurityCredentials::new();
+        let sig = ed25519_dalek::Signature::from_bytes(&[0u8; 64]);
+        let result = creds.verify("unknown-peer", b"message", &sig);
+        assert!(matches!(result, Err(BypassError::MissingCredential(_))));
+    }
+
+    #[test]
+    fn test_bypass_security_credentials_decrypt_no_key() {
+        let creds = BypassSecurityCredentials::new();
+        let result = creds.decrypt(b"ciphertext", &[0u8; 12]);
+        assert!(matches!(result, Err(BypassError::MissingCredential(_))));
+    }
+
+    #[test]
+    fn test_replay_tracker_clear_all() {
+        let tracker = ReplayTracker::new(64);
+        let source1: IpAddr = "192.168.1.1".parse().unwrap();
+        let source2: IpAddr = "192.168.1.2".parse().unwrap();
+
+        tracker.check(&source1, 1).unwrap();
+        tracker.check(&source2, 1).unwrap();
+
+        tracker.clear_all();
+
+        // After clear_all, same sequences should succeed
+        tracker.check(&source1, 1).unwrap();
+        tracker.check(&source2, 1).unwrap();
+    }
+
+    #[test]
+    fn test_bypass_header_is_stale() {
+        let header = BypassHeader::new("test", Duration::from_millis(100), 0);
+        let now = Instant::now();
+
+        // Not stale: sent_at = now, received_at = now
+        assert!(!header.is_stale(now, now));
+
+        // Stale: sent 1 second ago, TTL is 100ms
+        let sent_at = now - Duration::from_secs(1);
+        assert!(header.is_stale(now, sent_at));
+    }
+
+    #[test]
+    fn test_bypass_metrics_snapshot_default() {
+        let snapshot = BypassMetricsSnapshot::default();
+        assert_eq!(snapshot.messages_sent, 0);
+        assert_eq!(snapshot.messages_received, 0);
+        assert_eq!(snapshot.bytes_sent, 0);
+        assert_eq!(snapshot.bytes_received, 0);
+        assert_eq!(snapshot.stale_dropped, 0);
+        assert_eq!(snapshot.invalid_dropped, 0);
+        assert_eq!(snapshot.send_errors, 0);
+        assert_eq!(snapshot.receive_errors, 0);
+    }
+
+    #[tokio::test]
+    async fn test_bypass_channel_subscribe_collection() {
+        let config = BypassChannelConfig::new().with_collection(BypassCollectionConfig {
+            collection: "positions".into(),
+            ..Default::default()
+        });
+
+        let channel = UdpBypassChannel::new(config).await.unwrap();
+        let (hash, _rx) = channel.subscribe_collection("positions");
+        assert_eq!(hash, BypassHeader::hash_collection("positions"));
+    }
+
+    #[tokio::test]
+    async fn test_bypass_channel_get_collection_by_hash() {
+        let config = BypassChannelConfig::new().with_collection(BypassCollectionConfig {
+            collection: "telemetry".into(),
+            ttl_ms: 200,
+            ..Default::default()
+        });
+
+        let channel = UdpBypassChannel::new(config).await.unwrap();
+        let hash = BypassHeader::hash_collection("telemetry");
+        let col_config = channel.get_collection_by_hash(hash);
+        assert!(col_config.is_some());
+        assert_eq!(col_config.unwrap().ttl_ms, 200);
+
+        // Unknown hash
+        assert!(channel.get_collection_by_hash(12345).is_none());
+    }
+
+    #[tokio::test]
+    async fn test_bypass_channel_config_accessor() {
+        let config = BypassChannelConfig {
+            max_message_size: 1024,
+            ..BypassChannelConfig::new()
+        };
+        let channel = UdpBypassChannel::new(config).await.unwrap();
+        assert_eq!(channel.config().max_message_size, 1024);
+    }
+
+    #[tokio::test]
+    async fn test_bypass_send_not_started() {
+        let config = BypassChannelConfig::new();
+        let channel = UdpBypassChannel::new(config).await.unwrap();
+
+        let result = channel
+            .send(
+                BypassTarget::Unicast("127.0.0.1:5000".parse().unwrap()),
+                "test",
+                b"data",
+            )
+            .await;
+        assert!(matches!(result, Err(BypassError::NotStarted)));
+    }
+
+    #[tokio::test]
+    async fn test_bypass_send_message_too_large() {
+        let config = BypassChannelConfig {
+            max_message_size: 10,
+            udp: UdpConfig {
+                bind_port: 0,
+                ..Default::default()
+            },
+            ..BypassChannelConfig::new()
+        };
+        let mut channel = UdpBypassChannel::new(config).await.unwrap();
+        channel.start().await.unwrap();
+
+        let big_data = vec![0u8; 100];
+        let result = channel
+            .send(
+                BypassTarget::Unicast("127.0.0.1:5000".parse().unwrap()),
+                "test",
+                &big_data,
+            )
+            .await;
+        assert!(matches!(
+            result,
+            Err(BypassError::MessageTooLarge { size: 100, max: 10 })
+        ));
+
+        channel.stop();
+    }
+
+    #[tokio::test]
+    async fn test_bypass_send_to_collection_unknown() {
+        let config = BypassChannelConfig {
+            udp: UdpConfig {
+                bind_port: 0,
+                ..Default::default()
+            },
+            ..BypassChannelConfig::new()
+        };
+        let mut channel = UdpBypassChannel::new(config).await.unwrap();
+        channel.start().await.unwrap();
+
+        let result = channel.send_to_collection("unknown", None, b"data").await;
+        assert!(matches!(result, Err(BypassError::Config(_))));
+
+        channel.stop();
+    }
+
+    #[tokio::test]
+    async fn test_bypass_send_to_collection_unicast_no_addr() {
+        let config = BypassChannelConfig {
+            udp: UdpConfig {
+                bind_port: 0,
+                ..Default::default()
+            },
+            collections: vec![BypassCollectionConfig {
+                collection: "test".into(),
+                transport: BypassTransport::Unicast,
+                ..Default::default()
+            }],
+            ..BypassChannelConfig::new()
+        };
+        let mut channel = UdpBypassChannel::new(config).await.unwrap();
+        channel.start().await.unwrap();
+
+        // Unicast without target address should error
+        let result = channel.send_to_collection("test", None, b"data").await;
+        assert!(matches!(result, Err(BypassError::Config(_))));
+
+        channel.stop();
+    }
+
+    #[tokio::test]
+    async fn test_bypass_send_to_collection_broadcast() {
+        let config = BypassChannelConfig {
+            udp: UdpConfig {
+                bind_port: 0,
+                ..Default::default()
+            },
+            collections: vec![BypassCollectionConfig {
+                collection: "bcast".into(),
+                transport: BypassTransport::Broadcast,
+                ..Default::default()
+            }],
+            ..BypassChannelConfig::new()
+        };
+        let mut channel = UdpBypassChannel::new(config).await.unwrap();
+        channel.start().await.unwrap();
+
+        // Broadcast should work without target address
+        // Note: actual broadcast send may fail on some systems, but the path is exercised
+        let _result = channel.send_to_collection("bcast", None, b"data").await;
+
+        channel.stop();
+    }
+
+    #[tokio::test]
+    async fn test_bypass_leave_multicast_no_socket() {
+        let config = BypassChannelConfig::new();
+        let channel = UdpBypassChannel::new(config).await.unwrap();
+
+        // Leaving a group we never joined should be ok
+        let result = channel.leave_multicast("239.1.1.1".parse().unwrap());
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_bypass_transport_serde() {
+        let unicast = BypassTransport::Unicast;
+        let json = serde_json::to_string(&unicast).unwrap();
+        let parsed: BypassTransport = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, BypassTransport::Unicast);
+
+        let multicast = BypassTransport::Multicast {
+            group: "239.1.1.100".parse().unwrap(),
+            port: 5150,
+        };
+        let json = serde_json::to_string(&multicast).unwrap();
+        let parsed: BypassTransport = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, multicast);
+    }
+
+    #[test]
+    fn test_message_encoding_serde() {
+        for encoding in &[
+            MessageEncoding::Protobuf,
+            MessageEncoding::Json,
+            MessageEncoding::Raw,
+            MessageEncoding::Cbor,
+        ] {
+            let json = serde_json::to_string(encoding).unwrap();
+            let parsed: MessageEncoding = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed, *encoding);
+        }
+    }
+
+    #[test]
     fn test_bypass_header_flags() {
         let mut header = BypassHeader::new("test", Duration::from_millis(1000), 0);
 

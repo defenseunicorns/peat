@@ -354,6 +354,7 @@ pub trait MeshConnection: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
 
     #[test]
     fn test_node_id_creation() {
@@ -369,6 +370,12 @@ mod tests {
     }
 
     #[test]
+    fn test_node_id_from_str() {
+        let id: NodeId = NodeId::from("node-789");
+        assert_eq!(id.as_str(), "node-789");
+    }
+
+    #[test]
     fn test_node_id_equality() {
         let id1 = NodeId::new("node-123".to_string());
         let id2 = NodeId::new("node-123".to_string());
@@ -379,14 +386,228 @@ mod tests {
     }
 
     #[test]
-    fn test_transport_error_display() {
-        let err = TransportError::ConnectionFailed("timeout".to_string());
-        assert_eq!(err.to_string(), "Connection failed: timeout");
+    fn test_node_id_hash() {
+        let mut set = HashSet::new();
+        set.insert(NodeId::new("a".into()));
+        set.insert(NodeId::new("a".into()));
+        set.insert(NodeId::new("b".into()));
+        assert_eq!(set.len(), 2);
+    }
 
-        let err = TransportError::PeerNotFound("node-123".to_string());
-        assert_eq!(err.to_string(), "Peer not found: node-123");
+    #[test]
+    fn test_node_id_display() {
+        let id = NodeId::new("display-me".into());
+        assert_eq!(format!("{}", id), "display-me");
+    }
+
+    // --- DisconnectReason ---
+
+    #[test]
+    fn test_disconnect_reason_display() {
+        assert_eq!(DisconnectReason::RemoteClosed.to_string(), "remote closed");
+        assert_eq!(DisconnectReason::Timeout.to_string(), "timeout");
+        assert_eq!(
+            DisconnectReason::NetworkError("reset".into()).to_string(),
+            "network error: reset"
+        );
+        assert_eq!(DisconnectReason::LocalClosed.to_string(), "local closed");
+        assert_eq!(DisconnectReason::IdleTimeout.to_string(), "idle timeout");
+        assert_eq!(
+            DisconnectReason::ApplicationError("bug".into()).to_string(),
+            "application error: bug"
+        );
+        assert_eq!(DisconnectReason::Unknown.to_string(), "unknown");
+    }
+
+    #[test]
+    fn test_disconnect_reason_equality() {
+        assert_eq!(DisconnectReason::Timeout, DisconnectReason::Timeout);
+        assert_ne!(DisconnectReason::Timeout, DisconnectReason::Unknown);
+        assert_eq!(
+            DisconnectReason::NetworkError("x".into()),
+            DisconnectReason::NetworkError("x".into()),
+        );
+    }
+
+    // --- ConnectionState ---
+
+    #[test]
+    fn test_connection_state_display() {
+        assert_eq!(ConnectionState::Healthy.to_string(), "healthy");
+        assert_eq!(ConnectionState::Degraded.to_string(), "degraded");
+        assert_eq!(ConnectionState::Suspect.to_string(), "suspect");
+        assert_eq!(ConnectionState::Dead.to_string(), "dead");
+    }
+
+    #[test]
+    fn test_connection_state_equality() {
+        assert_eq!(ConnectionState::Healthy, ConnectionState::Healthy);
+        assert_ne!(ConnectionState::Healthy, ConnectionState::Dead);
+    }
+
+    // --- ConnectionHealth ---
+
+    #[test]
+    fn test_connection_health_default() {
+        let h = ConnectionHealth::default();
+        assert_eq!(h.rtt_ms, 0);
+        assert_eq!(h.rtt_variance_ms, 0);
+        assert_eq!(h.packet_loss_percent, 0);
+        assert_eq!(h.state, ConnectionState::Healthy);
+    }
+
+    // --- TransportError ---
+
+    #[test]
+    fn test_transport_error_display() {
+        assert_eq!(
+            TransportError::ConnectionFailed("timeout".into()).to_string(),
+            "Connection failed: timeout"
+        );
+        assert_eq!(
+            TransportError::PeerNotFound("node-123".into()).to_string(),
+            "Peer not found: node-123"
+        );
+        assert_eq!(
+            TransportError::AlreadyConnected("node-1".into()).to_string(),
+            "Already connected: node-1"
+        );
+        assert_eq!(
+            TransportError::NotStarted.to_string(),
+            "Transport not started"
+        );
+    }
+
+    #[test]
+    fn test_transport_error_other() {
+        let inner = std::io::Error::new(std::io::ErrorKind::Other, "boom");
+        let err = TransportError::Other(Box::new(inner));
+        assert!(err.to_string().contains("boom"));
+    }
+
+    #[test]
+    fn test_transport_error_source() {
+        use std::error::Error;
 
         let err = TransportError::NotStarted;
-        assert_eq!(err.to_string(), "Transport not started");
+        assert!(err.source().is_none());
+
+        let inner = std::io::Error::new(std::io::ErrorKind::Other, "boom");
+        let err = TransportError::Other(Box::new(inner));
+        assert!(err.source().is_some());
+    }
+
+    // --- PeerEvent construction ---
+
+    #[test]
+    fn test_peer_event_connected() {
+        let evt = PeerEvent::Connected {
+            peer_id: NodeId::new("p1".into()),
+            connected_at: Instant::now(),
+        };
+        if let PeerEvent::Connected { peer_id, .. } = evt {
+            assert_eq!(peer_id.as_str(), "p1");
+        }
+    }
+
+    #[test]
+    fn test_peer_event_disconnected() {
+        let evt = PeerEvent::Disconnected {
+            peer_id: NodeId::new("p1".into()),
+            reason: DisconnectReason::Timeout,
+            connection_duration: std::time::Duration::from_secs(60),
+        };
+        if let PeerEvent::Disconnected {
+            reason,
+            connection_duration,
+            ..
+        } = evt
+        {
+            assert_eq!(reason, DisconnectReason::Timeout);
+            assert_eq!(connection_duration.as_secs(), 60);
+        }
+    }
+
+    #[test]
+    fn test_peer_event_degraded() {
+        let evt = PeerEvent::Degraded {
+            peer_id: NodeId::new("p1".into()),
+            health: ConnectionHealth::default(),
+        };
+        if let PeerEvent::Degraded { health, .. } = evt {
+            assert_eq!(health.state, ConnectionState::Healthy);
+        }
+    }
+
+    #[test]
+    fn test_peer_event_reconnecting() {
+        let evt = PeerEvent::Reconnecting {
+            peer_id: NodeId::new("p1".into()),
+            attempt: 3,
+            max_attempts: Some(5),
+        };
+        if let PeerEvent::Reconnecting {
+            attempt,
+            max_attempts,
+            ..
+        } = evt
+        {
+            assert_eq!(attempt, 3);
+            assert_eq!(max_attempts, Some(5));
+        }
+    }
+
+    #[test]
+    fn test_peer_event_reconnect_failed() {
+        let evt = PeerEvent::ReconnectFailed {
+            peer_id: NodeId::new("p1".into()),
+            attempt: 5,
+            error: "timeout".into(),
+            will_retry: false,
+        };
+        if let PeerEvent::ReconnectFailed {
+            will_retry, error, ..
+        } = evt
+        {
+            assert!(!will_retry);
+            assert_eq!(error, "timeout");
+        }
+    }
+
+    // --- Trait default implementations ---
+
+    struct TestConnection {
+        pid: NodeId,
+        alive: bool,
+    }
+
+    impl MeshConnection for TestConnection {
+        fn peer_id(&self) -> &NodeId {
+            &self.pid
+        }
+        fn is_alive(&self) -> bool {
+            self.alive
+        }
+        fn connected_at(&self) -> Instant {
+            Instant::now()
+        }
+    }
+
+    #[test]
+    fn test_mesh_connection_disconnect_reason_alive() {
+        let conn = TestConnection {
+            pid: NodeId::new("p".into()),
+            alive: true,
+        };
+        assert!(conn.disconnect_reason().is_none());
+    }
+
+    #[test]
+    fn test_mesh_connection_disconnect_reason_dead() {
+        let conn = TestConnection {
+            pid: NodeId::new("p".into()),
+            alive: false,
+        };
+        assert_eq!(conn.disconnect_reason(), Some(DisconnectReason::Unknown));
     }
 }
