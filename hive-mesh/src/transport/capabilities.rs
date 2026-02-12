@@ -1254,7 +1254,10 @@ mod tests {
 
     #[test]
     fn test_transport_type_display_all() {
-        assert_eq!(TransportType::BluetoothClassic.to_string(), "Bluetooth Classic");
+        assert_eq!(
+            TransportType::BluetoothClassic.to_string(),
+            "Bluetooth Classic"
+        );
         assert_eq!(TransportType::WifiDirect.to_string(), "WiFi Direct");
         assert_eq!(TransportType::TacticalRadio.to_string(), "Tactical Radio");
         assert_eq!(TransportType::Satellite.to_string(), "Satellite");
