@@ -518,8 +518,14 @@ mod tests {
     #[test]
     fn test_extract_node_id_no_prefix_match() {
         // Various non-matching prefixes
-        assert_eq!(MdnsDiscovery::extract_node_id("other-node._udp.local."), None);
-        assert_eq!(MdnsDiscovery::extract_node_id("HIVE-upper._udp.local."), None);
+        assert_eq!(
+            MdnsDiscovery::extract_node_id("other-node._udp.local."),
+            None
+        );
+        assert_eq!(
+            MdnsDiscovery::extract_node_id("HIVE-upper._udp.local."),
+            None
+        );
     }
 
     #[tokio::test]
@@ -628,12 +634,8 @@ mod tests {
         };
         discovered.write().await.insert("peer-C".to_string(), peer);
 
-        MdnsDiscovery::handle_removed(
-            &discovered,
-            &events_tx,
-            "hive-peer-C._hive._udp.local.",
-        )
-        .await;
+        MdnsDiscovery::handle_removed(&discovered, &events_tx, "hive-peer-C._hive._udp.local.")
+            .await;
 
         // Peer should be removed from map
         assert!(discovered.read().await.is_empty());
@@ -649,12 +651,8 @@ mod tests {
         let discovered = Arc::new(RwLock::new(HashMap::new()));
         let (events_tx, mut events_rx) = mpsc::channel(10);
 
-        MdnsDiscovery::handle_removed(
-            &discovered,
-            &events_tx,
-            "hive-unknown._hive._udp.local.",
-        )
-        .await;
+        MdnsDiscovery::handle_removed(&discovered, &events_tx, "hive-unknown._hive._udp.local.")
+            .await;
 
         // No event should be sent
         assert!(events_rx.try_recv().is_err());

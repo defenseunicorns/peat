@@ -1755,10 +1755,7 @@ mod tests {
 
     #[test]
     fn test_bypass_error_display_all_variants() {
-        let io_err = BypassError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "test io",
-        ));
+        let io_err = BypassError::Io(std::io::Error::new(std::io::ErrorKind::Other, "test io"));
         assert!(io_err.to_string().contains("IO error"));
         assert!(io_err.to_string().contains("test io"));
 
@@ -1798,10 +1795,7 @@ mod tests {
 
     #[test]
     fn test_bypass_error_source() {
-        let io_err = BypassError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "test",
-        ));
+        let io_err = BypassError::Io(std::io::Error::new(std::io::ErrorKind::Other, "test"));
         assert!(std::error::Error::source(&io_err).is_some());
 
         let encode_err = BypassError::Encode("test".into());

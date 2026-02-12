@@ -2191,9 +2191,10 @@ mod tests {
             let mut fail_count = self.fail_count.write().unwrap();
             if *fail_count > 0 {
                 *fail_count -= 1;
-                return Err(crate::transport::TransportError::ConnectionFailed(
-                    format!("Simulated failure connecting to {}", peer_id),
-                ));
+                return Err(crate::transport::TransportError::ConnectionFailed(format!(
+                    "Simulated failure connecting to {}",
+                    peer_id
+                )));
             }
             self.connections.write().unwrap().push(peer_id.clone());
             Ok(Box::new(MockConnection {
