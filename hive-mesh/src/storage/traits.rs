@@ -300,17 +300,237 @@ pub trait Collection: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
+    use std::sync::RwLock;
 
     // Test that traits are object-safe (can be used as trait objects)
     #[test]
     fn test_storage_backend_is_object_safe() {
-        // This test just needs to compile - it verifies object safety
         fn _assert_object_safe(_: &dyn StorageBackend) {}
     }
 
     #[test]
     fn test_collection_is_object_safe() {
-        // This test just needs to compile - it verifies object safety
         fn _assert_object_safe(_: &dyn Collection) {}
+    }
+
+    // --- In-memory Collection for testing ---
+
+    struct InMemCollection {
+        data: RwLock<HashMap<String, Vec<u8>>>,
+    }
+
+    impl InMemCollection {
+        fn new() -> Self {
+            Self {
+                data: RwLock::new(HashMap::new()),
+            }
+        }
+    }
+
+    impl Collection for InMemCollection {
+        fn upsert(&self, doc_id: &str, data: Vec<u8>) -> Result<()> {
+            self.data.write().unwrap().insert(doc_id.to_string(), data);
+            Ok(())
+        }
+
+        fn get(&self, doc_id: &str) -> Result<Option<Vec<u8>>> {
+            Ok(self.data.read().unwrap().get(doc_id).cloned())
+        }
+
+        fn delete(&self, doc_id: &str) -> Result<()> {
+            self.data.write().unwrap().remove(doc_id);
+            Ok(())
+        }
+
+        fn scan(&self) -> Result<Vec<(String, Vec<u8>)>> {
+            Ok(self
+                .data
+                .read()
+                .unwrap()
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect())
+        }
+
+        fn find(&self, predicate: DocumentPredicate) -> Result<Vec<(String, Vec<u8>)>> {
+            Ok(self
+                .data
+                .read()
+                .unwrap()
+                .iter()
+                .filter(|(_, v)| predicate(v))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect())
+        }
+
+        fn query_geohash_prefix(&self, prefix: &str) -> Result<Vec<(String, Vec<u8>)>> {
+            Ok(self
+                .data
+                .read()
+                .unwrap()
+                .iter()
+                .filter(|(k, _)| k.starts_with(prefix))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect())
+        }
+
+        fn count(&self) -> Result<usize> {
+            Ok(self.data.read().unwrap().len())
+        }
+    }
+
+    #[test]
+    fn test_collection_upsert_and_get() {
+        let col = InMemCollection::new();
+        col.upsert("doc-1", vec![1, 2, 3]).unwrap();
+
+        let result = col.get("doc-1").unwrap();
+        assert_eq!(result, Some(vec![1, 2, 3]));
+    }
+
+    #[test]
+    fn test_collection_get_missing() {
+        let col = InMemCollection::new();
+        assert_eq!(col.get("nonexistent").unwrap(), None);
+    }
+
+    #[test]
+    fn test_collection_upsert_overwrite() {
+        let col = InMemCollection::new();
+        col.upsert("doc-1", vec![1]).unwrap();
+        col.upsert("doc-1", vec![2]).unwrap();
+
+        assert_eq!(col.get("doc-1").unwrap(), Some(vec![2]));
+        assert_eq!(col.count().unwrap(), 1);
+    }
+
+    #[test]
+    fn test_collection_delete() {
+        let col = InMemCollection::new();
+        col.upsert("doc-1", vec![1]).unwrap();
+        col.delete("doc-1").unwrap();
+
+        assert_eq!(col.get("doc-1").unwrap(), None);
+        assert_eq!(col.count().unwrap(), 0);
+    }
+
+    #[test]
+    fn test_collection_delete_nonexistent_noop() {
+        let col = InMemCollection::new();
+        col.delete("nonexistent").unwrap(); // should not error
+    }
+
+    #[test]
+    fn test_collection_scan() {
+        let col = InMemCollection::new();
+        col.upsert("a", vec![1]).unwrap();
+        col.upsert("b", vec![2]).unwrap();
+
+        let mut results = col.scan().unwrap();
+        results.sort_by(|a, b| a.0.cmp(&b.0));
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0], ("a".to_string(), vec![1]));
+        assert_eq!(results[1], ("b".to_string(), vec![2]));
+    }
+
+    #[test]
+    fn test_collection_find() {
+        let col = InMemCollection::new();
+        col.upsert("big", vec![100, 200]).unwrap();
+        col.upsert("small", vec![1]).unwrap();
+
+        let results = col.find(Box::new(|bytes| bytes.len() > 1)).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, "big");
+    }
+
+    #[test]
+    fn test_collection_query_geohash_prefix() {
+        let col = InMemCollection::new();
+        col.upsert("9q8yy_a", vec![1]).unwrap();
+        col.upsert("9q8yy_b", vec![2]).unwrap();
+        col.upsert("u4pru_c", vec![3]).unwrap();
+
+        let results = col.query_geohash_prefix("9q8yy").unwrap();
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn test_collection_count() {
+        let col = InMemCollection::new();
+        assert_eq!(col.count().unwrap(), 0);
+
+        col.upsert("a", vec![1]).unwrap();
+        col.upsert("b", vec![2]).unwrap();
+        assert_eq!(col.count().unwrap(), 2);
+    }
+
+    // --- In-memory StorageBackend for testing ---
+
+    struct InMemBackend {
+        collections: RwLock<HashMap<String, Arc<InMemCollection>>>,
+    }
+
+    impl InMemBackend {
+        fn new() -> Self {
+            Self {
+                collections: RwLock::new(HashMap::new()),
+            }
+        }
+    }
+
+    impl StorageBackend for InMemBackend {
+        fn collection(&self, name: &str) -> Arc<dyn Collection> {
+            let mut cols = self.collections.write().unwrap();
+            cols.entry(name.to_string())
+                .or_insert_with(|| Arc::new(InMemCollection::new()))
+                .clone()
+        }
+
+        fn list_collections(&self) -> Vec<String> {
+            self.collections.read().unwrap().keys().cloned().collect()
+        }
+
+        fn flush(&self) -> Result<()> {
+            Ok(())
+        }
+
+        fn close(self) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_backend_collection_create_and_reuse() {
+        let backend = InMemBackend::new();
+        let col1 = backend.collection("cells");
+        col1.upsert("c1", vec![1]).unwrap();
+
+        let col2 = backend.collection("cells");
+        assert_eq!(col2.get("c1").unwrap(), Some(vec![1]));
+    }
+
+    #[test]
+    fn test_backend_list_collections() {
+        let backend = InMemBackend::new();
+        let _ = backend.collection("cells");
+        let _ = backend.collection("nodes");
+
+        let mut names = backend.list_collections();
+        names.sort();
+        assert_eq!(names, vec!["cells", "nodes"]);
+    }
+
+    #[test]
+    fn test_backend_flush() {
+        let backend = InMemBackend::new();
+        assert!(backend.flush().is_ok());
+    }
+
+    #[test]
+    fn test_backend_close() {
+        let backend = InMemBackend::new();
+        assert!(backend.close().is_ok());
     }
 }

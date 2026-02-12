@@ -363,4 +363,404 @@ mod tests {
         assert_eq!(hybrid.strategy_count(), 0);
         assert!(!hybrid.has_strategy("test"));
     }
+
+    #[test]
+    fn test_default_impl() {
+        let hybrid = HybridDiscovery::default();
+        assert_eq!(hybrid.strategy_count(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_stop_all_when_not_started() {
+        let mut hybrid = HybridDiscovery::new();
+        // Should be a no-op, not error
+        hybrid.stop_all().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_start_all_twice_idempotent() {
+        let mut hybrid = HybridDiscovery::new();
+
+        // Add a strategy
+        let config = DiscoveryConfig {
+            peers: vec![StaticPeerConfig {
+                node_id: "p1".to_string(),
+                addresses: vec!["10.0.0.1:5000".to_string()],
+                relay_url: None,
+                priority: 128,
+                metadata: HashMap::new(),
+            }],
+        };
+        hybrid.add_strategy(
+            "static",
+            Box::new(StaticDiscovery::from_config(config).unwrap()),
+        );
+
+        let _events = hybrid.event_stream().unwrap();
+        hybrid.start_all().await.unwrap();
+
+        // Start again should be idempotent
+        hybrid.start_all().await.unwrap();
+
+        hybrid.stop_all().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_event_stream_consumed_error() {
+        let mut hybrid = HybridDiscovery::new();
+
+        let _stream = hybrid.event_stream().unwrap();
+        let result = hybrid.event_stream();
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            DiscoveryError::EventStreamConsumed
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_all_discovered_peers_initially_empty() {
+        let hybrid = HybridDiscovery::new();
+        let peers = hybrid.all_discovered_peers().await;
+        assert!(peers.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_remove_strategy_returns_value() {
+        let mut hybrid = HybridDiscovery::new();
+        let config = DiscoveryConfig { peers: vec![] };
+        let static_disc = StaticDiscovery::from_config(config).unwrap();
+
+        hybrid.add_strategy("test", Box::new(static_disc));
+        let removed = hybrid.remove_strategy("test");
+        assert!(removed.is_some());
+
+        let removed_again = hybrid.remove_strategy("test");
+        assert!(removed_again.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_has_strategy_false_for_missing() {
+        let hybrid = HybridDiscovery::new();
+        assert!(!hybrid.has_strategy("nonexistent"));
+    }
+
+    #[tokio::test]
+    async fn test_discovery_strategy_trait_implementation() {
+        let mut hybrid = HybridDiscovery::new();
+
+        let config = DiscoveryConfig {
+            peers: vec![StaticPeerConfig {
+                node_id: "trait-peer".to_string(),
+                addresses: vec!["10.0.0.1:5000".to_string()],
+                relay_url: None,
+                priority: 128,
+                metadata: HashMap::new(),
+            }],
+        };
+        hybrid.add_strategy(
+            "static",
+            Box::new(StaticDiscovery::from_config(config).unwrap()),
+        );
+
+        let _events = hybrid.event_stream().unwrap();
+
+        // Use the DiscoveryStrategy trait methods
+        hybrid.start().await.unwrap();
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let peers = hybrid.discovered_peers().await;
+        assert_eq!(peers.len(), 1);
+        assert_eq!(peers[0].node_id, "trait-peer");
+
+        hybrid.stop().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_peer_lost_event_forwarding() {
+        // Strategy that spawns event sending from event_stream (called after start)
+        struct LostPeerStrategy;
+
+        #[async_trait]
+        impl DiscoveryStrategy for LostPeerStrategy {
+            async fn start(&mut self) -> Result<()> {
+                Ok(())
+            }
+            async fn stop(&mut self) -> Result<()> {
+                Ok(())
+            }
+            async fn discovered_peers(&self) -> Vec<PeerInfo> {
+                vec![]
+            }
+            fn event_stream(&mut self) -> Result<mpsc::Receiver<DiscoveryEvent>> {
+                let (tx, rx) = mpsc::channel(100);
+                tokio::spawn(async move {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+                    let peer = PeerInfo {
+                        node_id: "lost-peer".to_string(),
+                        addresses: vec!["10.0.0.1:5000".parse().unwrap()],
+                        relay_url: None,
+                        last_seen: std::time::Instant::now(),
+                        metadata: HashMap::new(),
+                    };
+                    let _ = tx.send(DiscoveryEvent::PeerFound(peer)).await;
+                    tokio::time::sleep(tokio::time::Duration::from_millis(20)).await;
+                    let _ = tx
+                        .send(DiscoveryEvent::PeerLost("lost-peer".to_string()))
+                        .await;
+                });
+                Ok(rx)
+            }
+        }
+
+        let mut hybrid = HybridDiscovery::new();
+        hybrid.add_strategy("lossy", Box::new(LostPeerStrategy));
+
+        let mut events = hybrid.event_stream().unwrap();
+        hybrid.start_all().await.unwrap();
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+        let peers = hybrid.all_discovered_peers().await;
+        assert_eq!(peers.len(), 0);
+
+        let mut found = false;
+        let mut lost = false;
+        while let Ok(event) = events.try_recv() {
+            match event {
+                DiscoveryEvent::PeerFound(p) if p.node_id == "lost-peer" => found = true,
+                DiscoveryEvent::PeerLost(id) if id == "lost-peer" => lost = true,
+                _ => {}
+            }
+        }
+        assert!(found);
+        assert!(lost);
+
+        hybrid.stop_all().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_peer_updated_event_forwarding() {
+        struct UpdateStrategy;
+
+        #[async_trait]
+        impl DiscoveryStrategy for UpdateStrategy {
+            async fn start(&mut self) -> Result<()> {
+                Ok(())
+            }
+            async fn stop(&mut self) -> Result<()> {
+                Ok(())
+            }
+            async fn discovered_peers(&self) -> Vec<PeerInfo> {
+                vec![]
+            }
+            fn event_stream(&mut self) -> Result<mpsc::Receiver<DiscoveryEvent>> {
+                let (tx, rx) = mpsc::channel(100);
+                tokio::spawn(async move {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+                    let peer = PeerInfo {
+                        node_id: "update-peer".to_string(),
+                        addresses: vec!["10.0.0.1:5000".parse().unwrap()],
+                        relay_url: None,
+                        last_seen: std::time::Instant::now(),
+                        metadata: HashMap::new(),
+                    };
+                    let _ = tx.send(DiscoveryEvent::PeerFound(peer.clone())).await;
+                    tokio::time::sleep(tokio::time::Duration::from_millis(20)).await;
+                    let mut updated = peer;
+                    updated.addresses = vec!["10.0.0.2:5000".parse().unwrap()];
+                    let _ = tx.send(DiscoveryEvent::PeerUpdated(updated)).await;
+                });
+                Ok(rx)
+            }
+        }
+
+        let mut hybrid = HybridDiscovery::new();
+        hybrid.add_strategy("updater", Box::new(UpdateStrategy));
+
+        let mut events = hybrid.event_stream().unwrap();
+        hybrid.start_all().await.unwrap();
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+        let peers = hybrid.all_discovered_peers().await;
+        assert_eq!(peers.len(), 1);
+        assert_eq!(peers[0].node_id, "update-peer");
+
+        let mut found = false;
+        let mut updated = false;
+        while let Ok(event) = events.try_recv() {
+            match event {
+                DiscoveryEvent::PeerFound(p) if p.node_id == "update-peer" => found = true,
+                DiscoveryEvent::PeerUpdated(p) if p.node_id == "update-peer" => updated = true,
+                _ => {}
+            }
+        }
+        assert!(found);
+        assert!(updated);
+
+        hybrid.stop_all().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_peer_lost_unknown_not_forwarded() {
+        struct LostUnknownStrategy;
+
+        #[async_trait]
+        impl DiscoveryStrategy for LostUnknownStrategy {
+            async fn start(&mut self) -> Result<()> {
+                Ok(())
+            }
+            async fn stop(&mut self) -> Result<()> {
+                Ok(())
+            }
+            async fn discovered_peers(&self) -> Vec<PeerInfo> {
+                vec![]
+            }
+            fn event_stream(&mut self) -> Result<mpsc::Receiver<DiscoveryEvent>> {
+                let (tx, rx) = mpsc::channel(100);
+                tokio::spawn(async move {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+                    let _ = tx
+                        .send(DiscoveryEvent::PeerLost("never-found".to_string()))
+                        .await;
+                });
+                Ok(rx)
+            }
+        }
+
+        let mut hybrid = HybridDiscovery::new();
+        hybrid.add_strategy("lost-unknown", Box::new(LostUnknownStrategy));
+
+        let mut events = hybrid.event_stream().unwrap();
+        hybrid.start_all().await.unwrap();
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+        assert!(hybrid.all_discovered_peers().await.is_empty());
+
+        let mut lost_forwarded = false;
+        while let Ok(event) = events.try_recv() {
+            if matches!(event, DiscoveryEvent::PeerLost(_)) {
+                lost_forwarded = true;
+            }
+        }
+        assert!(!lost_forwarded);
+
+        hybrid.stop_all().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_peer_updated_unknown_not_forwarded() {
+        struct UpdateUnknownStrategy;
+
+        #[async_trait]
+        impl DiscoveryStrategy for UpdateUnknownStrategy {
+            async fn start(&mut self) -> Result<()> {
+                Ok(())
+            }
+            async fn stop(&mut self) -> Result<()> {
+                Ok(())
+            }
+            async fn discovered_peers(&self) -> Vec<PeerInfo> {
+                vec![]
+            }
+            fn event_stream(&mut self) -> Result<mpsc::Receiver<DiscoveryEvent>> {
+                let (tx, rx) = mpsc::channel(100);
+                tokio::spawn(async move {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+                    let peer = PeerInfo {
+                        node_id: "never-found".to_string(),
+                        addresses: vec!["10.0.0.1:5000".parse().unwrap()],
+                        relay_url: None,
+                        last_seen: std::time::Instant::now(),
+                        metadata: HashMap::new(),
+                    };
+                    let _ = tx.send(DiscoveryEvent::PeerUpdated(peer)).await;
+                });
+                Ok(rx)
+            }
+        }
+
+        let mut hybrid = HybridDiscovery::new();
+        hybrid.add_strategy("update-unknown", Box::new(UpdateUnknownStrategy));
+
+        let mut events = hybrid.event_stream().unwrap();
+        hybrid.start_all().await.unwrap();
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+        assert!(hybrid.all_discovered_peers().await.is_empty());
+
+        let mut updated_forwarded = false;
+        while let Ok(event) = events.try_recv() {
+            if matches!(event, DiscoveryEvent::PeerUpdated(_)) {
+                updated_forwarded = true;
+            }
+        }
+        assert!(!updated_forwarded);
+
+        hybrid.stop_all().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_duplicate_peer_from_two_strategies() {
+        let mut hybrid = HybridDiscovery::new();
+
+        // Two strategies with the same peer
+        let config1 = DiscoveryConfig {
+            peers: vec![StaticPeerConfig {
+                node_id: "shared-peer".to_string(),
+                addresses: vec!["10.0.0.1:5000".to_string()],
+                relay_url: None,
+                priority: 128,
+                metadata: HashMap::new(),
+            }],
+        };
+        let config2 = DiscoveryConfig {
+            peers: vec![StaticPeerConfig {
+                node_id: "shared-peer".to_string(),
+                addresses: vec!["10.0.0.2:5000".to_string()],
+                relay_url: None,
+                priority: 200,
+                metadata: HashMap::new(),
+            }],
+        };
+
+        hybrid.add_strategy(
+            "static-1",
+            Box::new(StaticDiscovery::from_config(config1).unwrap()),
+        );
+        hybrid.add_strategy(
+            "static-2",
+            Box::new(StaticDiscovery::from_config(config2).unwrap()),
+        );
+
+        let mut events = hybrid.event_stream().unwrap();
+        hybrid.start_all().await.unwrap();
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // Should deduplicate — only one peer in combined_peers
+        let peers = hybrid.all_discovered_peers().await;
+        assert_eq!(peers.len(), 1);
+        assert_eq!(peers[0].node_id, "shared-peer");
+
+        // Should receive both PeerFound and PeerUpdated events
+        let mut found_count = 0;
+        let mut updated_count = 0;
+        while let Ok(event) = events.try_recv() {
+            match event {
+                DiscoveryEvent::PeerFound(_) => found_count += 1,
+                DiscoveryEvent::PeerUpdated(_) => updated_count += 1,
+                _ => {}
+            }
+        }
+        // First discovery sends PeerFound, second sends PeerUpdated (duplicate)
+        assert!(found_count >= 1);
+        assert!(updated_count >= 1);
+
+        hybrid.stop_all().await.unwrap();
+    }
 }

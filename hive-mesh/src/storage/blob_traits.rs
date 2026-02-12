@@ -544,4 +544,169 @@ mod tests {
         assert_eq!(parsed.size_bytes, token.size_bytes);
         assert_eq!(parsed.metadata.name, token.metadata.name);
     }
+
+    #[test]
+    fn test_blob_hash_as_hex() {
+        let hash = BlobHash::from_hex("deadbeef");
+        assert_eq!(hash.as_hex(), "deadbeef");
+    }
+
+    #[test]
+    fn test_blob_hash_display_short() {
+        // 16 chars or fewer: display as-is
+        let hash = BlobHash::from_hex("1234567890abcdef");
+        assert_eq!(format!("{}", hash), "1234567890abcdef");
+    }
+
+    #[test]
+    fn test_blob_hash_display_long() {
+        // More than 16 chars: truncate with ...
+        let hash = BlobHash::from_hex("1234567890abcdef0");
+        assert_eq!(format!("{}", hash), "1234567890abcdef...");
+    }
+
+    #[test]
+    fn test_blob_hash_equality() {
+        let h1 = BlobHash::from_hex("abc123");
+        let h2 = BlobHash::from_hex("abc123");
+        let h3 = BlobHash::from_hex("def456");
+
+        assert_eq!(h1, h2);
+        assert_ne!(h1, h3);
+    }
+
+    #[test]
+    fn test_blob_token_medium_size() {
+        // Between 1MB and 100MB: neither small nor large
+        let medium = BlobToken::new(
+            BlobHash::from_hex("abc"),
+            50 * 1024 * 1024, // 50MB
+            BlobMetadata::default(),
+        );
+        assert!(!medium.is_small());
+        assert!(!medium.is_large());
+    }
+
+    #[test]
+    fn test_blob_token_exact_boundary() {
+        // Exactly 1MB: not small (< 1MB), not large
+        let exactly_1mb = BlobToken::new(
+            BlobHash::from_hex("abc"),
+            1024 * 1024,
+            BlobMetadata::default(),
+        );
+        assert!(!exactly_1mb.is_small());
+        assert!(!exactly_1mb.is_large());
+
+        // Exactly 100MB: not small, not large (> 100MB)
+        let exactly_100mb = BlobToken::new(
+            BlobHash::from_hex("abc"),
+            100 * 1024 * 1024,
+            BlobMetadata::default(),
+        );
+        assert!(!exactly_100mb.is_small());
+        assert!(!exactly_100mb.is_large());
+    }
+
+    #[test]
+    fn test_blob_metadata_default() {
+        let meta = BlobMetadata::default();
+        assert!(meta.name.is_none());
+        assert!(meta.content_type.is_none());
+        assert!(meta.custom.is_empty());
+    }
+
+    #[test]
+    fn test_blob_metadata_with_name() {
+        let meta = BlobMetadata::with_name("test.bin");
+        assert_eq!(meta.name, Some("test.bin".to_string()));
+        assert!(meta.content_type.is_none());
+    }
+
+    #[test]
+    fn test_blob_metadata_with_name_and_type() {
+        let meta = BlobMetadata::with_name_and_type("test.jpg", "image/jpeg");
+        assert_eq!(meta.name, Some("test.jpg".to_string()));
+        assert_eq!(meta.content_type, Some("image/jpeg".to_string()));
+        assert!(meta.custom.is_empty());
+    }
+
+    #[test]
+    fn test_blob_metadata_chained_custom_fields() {
+        let meta = BlobMetadata::with_name("model.onnx")
+            .with_custom("version", "1.0")
+            .with_custom("precision", "fp16")
+            .with_custom("framework", "pytorch");
+
+        assert_eq!(meta.custom.len(), 3);
+        assert_eq!(meta.custom.get("version"), Some(&"1.0".to_string()));
+        assert_eq!(meta.custom.get("framework"), Some(&"pytorch".to_string()));
+    }
+
+    #[test]
+    fn test_blob_progress_started_percentage() {
+        let p = BlobProgress::Started { total_bytes: 5000 };
+        assert_eq!(p.percentage(), Some(0.0));
+        assert!(!p.is_complete());
+        assert!(!p.is_failed());
+    }
+
+    #[test]
+    fn test_blob_progress_downloading_zero_total() {
+        let p = BlobProgress::Downloading {
+            downloaded_bytes: 0,
+            total_bytes: 0,
+        };
+        assert_eq!(p.percentage(), Some(100.0));
+    }
+
+    #[test]
+    fn test_blob_progress_downloading_partial() {
+        let p = BlobProgress::Downloading {
+            downloaded_bytes: 250,
+            total_bytes: 1000,
+        };
+        assert_eq!(p.percentage(), Some(25.0));
+        assert!(!p.is_complete());
+        assert!(!p.is_failed());
+    }
+
+    #[test]
+    fn test_blob_progress_completed() {
+        let p = BlobProgress::Completed {
+            local_path: PathBuf::from("/tmp/blob"),
+        };
+        assert_eq!(p.percentage(), Some(100.0));
+        assert!(p.is_complete());
+        assert!(!p.is_failed());
+    }
+
+    #[test]
+    fn test_blob_progress_failed() {
+        let p = BlobProgress::Failed {
+            error: "network error".to_string(),
+        };
+        assert_eq!(p.percentage(), None);
+        assert!(!p.is_complete());
+        assert!(p.is_failed());
+    }
+
+    #[test]
+    fn test_blob_handle_size() {
+        let token = BlobToken::new(BlobHash::from_hex("abc"), 42000, BlobMetadata::default());
+        let handle = BlobHandle::new(token, PathBuf::from("/tmp/blob"));
+        assert_eq!(handle.size(), 42000);
+    }
+
+    #[test]
+    fn test_blob_storage_summary_debug() {
+        let summary = BlobStorageSummary {
+            blob_count: 5,
+            total_bytes: 1024 * 1024,
+            largest_blob: Some(500_000),
+        };
+        let debug_str = format!("{:?}", summary);
+        assert!(debug_str.contains("blob_count"));
+        assert!(debug_str.contains("5"));
+    }
 }

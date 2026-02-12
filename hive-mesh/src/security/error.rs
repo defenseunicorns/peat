@@ -202,12 +202,238 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_error_codes() {
-        let err = SecurityError::InvalidSignature("test".to_string());
-        assert_eq!(err.code(), "INVALID_SIGNATURE");
+    fn test_all_error_codes() {
+        let cases: Vec<(SecurityError, &str)> = vec![
+            (
+                SecurityError::InvalidSignature("x".into()),
+                "INVALID_SIGNATURE",
+            ),
+            (SecurityError::ChallengeExpired(0), "CHALLENGE_EXPIRED"),
+            (
+                SecurityError::NonceMismatch {
+                    expected: "a".into(),
+                    actual: "b".into(),
+                },
+                "NONCE_MISMATCH",
+            ),
+            (
+                SecurityError::InvalidPublicKey("x".into()),
+                "INVALID_PUBLIC_KEY",
+            ),
+            (
+                SecurityError::InvalidDeviceId("x".into()),
+                "INVALID_DEVICE_ID",
+            ),
+            (SecurityError::KeypairError("x".into()), "KEYPAIR_ERROR"),
+            (
+                SecurityError::PeerNotAuthenticated("x".into()),
+                "PEER_NOT_AUTHENTICATED",
+            ),
+            (
+                SecurityError::AuthenticationFailed("x".into()),
+                "AUTH_FAILED",
+            ),
+            (
+                SecurityError::IoError(std::io::Error::new(std::io::ErrorKind::Other, "x")),
+                "IO_ERROR",
+            ),
+            (
+                SecurityError::SerializationError("x".into()),
+                "SERIALIZATION_ERROR",
+            ),
+            (SecurityError::Internal("x".into()), "INTERNAL_ERROR"),
+            (SecurityError::PeerNotFound("x".into()), "PEER_NOT_FOUND"),
+            (
+                SecurityError::PermissionDenied {
+                    permission: "w".into(),
+                    entity_id: "e".into(),
+                    roles: vec!["r".into()],
+                },
+                "PERMISSION_DENIED",
+            ),
+            (
+                SecurityError::CertificateError("x".into()),
+                "CERTIFICATE_ERROR",
+            ),
+            (
+                SecurityError::InvalidCertificateChain("x".into()),
+                "INVALID_CERT_CHAIN",
+            ),
+            (
+                SecurityError::CertificateExpired("x".into()),
+                "CERTIFICATE_EXPIRED",
+            ),
+            (
+                SecurityError::CertificateRevoked("x".into()),
+                "CERTIFICATE_REVOKED",
+            ),
+            (
+                SecurityError::UserNotFound {
+                    username: "u".into(),
+                },
+                "USER_NOT_FOUND",
+            ),
+            (
+                SecurityError::UserAlreadyExists {
+                    username: "u".into(),
+                },
+                "USER_EXISTS",
+            ),
+            (
+                SecurityError::InvalidCredential {
+                    username: "u".into(),
+                },
+                "INVALID_CREDENTIAL",
+            ),
+            (SecurityError::InvalidMfaCode, "INVALID_MFA"),
+            (
+                SecurityError::AccountLocked {
+                    username: "u".into(),
+                },
+                "ACCOUNT_LOCKED",
+            ),
+            (
+                SecurityError::AccountDisabled {
+                    username: "u".into(),
+                },
+                "ACCOUNT_DISABLED",
+            ),
+            (
+                SecurityError::AccountPending {
+                    username: "u".into(),
+                },
+                "ACCOUNT_PENDING",
+            ),
+            (SecurityError::SessionNotFound, "SESSION_NOT_FOUND"),
+            (SecurityError::SessionExpired, "SESSION_EXPIRED"),
+            (
+                SecurityError::UnsupportedAuthMethod { method: "m".into() },
+                "UNSUPPORTED_AUTH",
+            ),
+            (
+                SecurityError::PasswordHashError {
+                    message: "m".into(),
+                },
+                "PASSWORD_HASH_ERROR",
+            ),
+            (
+                SecurityError::TotpError {
+                    message: "m".into(),
+                },
+                "TOTP_ERROR",
+            ),
+            (
+                SecurityError::EncryptionError("x".into()),
+                "ENCRYPTION_ERROR",
+            ),
+            (
+                SecurityError::DecryptionError("x".into()),
+                "DECRYPTION_ERROR",
+            ),
+            (
+                SecurityError::KeyExchangeError("x".into()),
+                "KEY_EXCHANGE_ERROR",
+            ),
+            (
+                SecurityError::NoGroupKey {
+                    cell_id: "c".into(),
+                },
+                "NO_GROUP_KEY",
+            ),
+            (
+                SecurityError::KeyGenerationMismatch {
+                    expected: 1,
+                    actual: 2,
+                },
+                "KEY_GENERATION_MISMATCH",
+            ),
+        ];
 
-        let err = SecurityError::ChallengeExpired(12345);
-        assert_eq!(err.code(), "CHALLENGE_EXPIRED");
-        assert!(err.is_recoverable());
+        for (err, expected_code) in cases {
+            assert_eq!(err.code(), expected_code, "wrong code for {}", err);
+        }
+    }
+
+    #[test]
+    fn test_is_recoverable() {
+        assert!(SecurityError::ChallengeExpired(0).is_recoverable());
+
+        // All others should NOT be recoverable
+        assert!(!SecurityError::InvalidSignature("x".into()).is_recoverable());
+        assert!(!SecurityError::NonceMismatch {
+            expected: "a".into(),
+            actual: "b".into()
+        }
+        .is_recoverable());
+        assert!(!SecurityError::Internal("x".into()).is_recoverable());
+        assert!(!SecurityError::SessionExpired.is_recoverable());
+        assert!(!SecurityError::EncryptionError("x".into()).is_recoverable());
+        assert!(!SecurityError::AccountLocked {
+            username: "u".into()
+        }
+        .is_recoverable());
+    }
+
+    #[test]
+    fn test_error_display_messages() {
+        assert_eq!(
+            SecurityError::InvalidSignature("bad sig".into()).to_string(),
+            "invalid signature: bad sig"
+        );
+        assert_eq!(
+            SecurityError::NonceMismatch {
+                expected: "aaa".into(),
+                actual: "bbb".into()
+            }
+            .to_string(),
+            "nonce mismatch: expected aaa, got bbb"
+        );
+        let pd = SecurityError::PermissionDenied {
+            permission: "write".into(),
+            entity_id: "e1".into(),
+            roles: vec!["admin".into()],
+        };
+        assert!(pd
+            .to_string()
+            .contains("permission denied: write for entity e1"));
+        assert_eq!(
+            SecurityError::UserNotFound {
+                username: "alice".into()
+            }
+            .to_string(),
+            "user not found: alice"
+        );
+        assert_eq!(
+            SecurityError::KeyGenerationMismatch {
+                expected: 3,
+                actual: 5
+            }
+            .to_string(),
+            "key generation mismatch: expected 3, got 5"
+        );
+        assert_eq!(
+            SecurityError::NoGroupKey {
+                cell_id: "cell-1".into()
+            }
+            .to_string(),
+            "no group key for cell: cell-1"
+        );
+        assert_eq!(
+            SecurityError::InvalidMfaCode.to_string(),
+            "invalid MFA code"
+        );
+        assert_eq!(
+            SecurityError::SessionNotFound.to_string(),
+            "session not found"
+        );
+        assert_eq!(SecurityError::SessionExpired.to_string(), "session expired");
+    }
+
+    #[test]
+    fn test_io_error_from() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file missing");
+        let sec_err: SecurityError = io_err.into();
+        assert_eq!(sec_err.code(), "IO_ERROR");
+        assert!(sec_err.to_string().contains("file missing"));
     }
 }

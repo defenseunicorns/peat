@@ -241,4 +241,306 @@ mod tests {
 
         observer.stop().await;
     }
+
+    #[tokio::test]
+    async fn test_observer_start_twice() {
+        let storage = MockBeaconStorage::new();
+        let observer = BeaconObserver::new(Arc::new(storage), "9q8yy9m".to_string());
+
+        observer.start().await;
+        assert!(*observer.running.read().await);
+
+        // Starting again should be a no-op (already running)
+        observer.start().await;
+        assert!(*observer.running.read().await);
+
+        observer.stop().await;
+    }
+
+    #[test]
+    fn test_is_nearby_geohash_all_directions() {
+        let my = "9q8yy9m";
+
+        // Check all 8 neighbors
+        let directions = [
+            geohash::Direction::N,
+            geohash::Direction::NE,
+            geohash::Direction::E,
+            geohash::Direction::SE,
+            geohash::Direction::S,
+            geohash::Direction::SW,
+            geohash::Direction::W,
+            geohash::Direction::NW,
+        ];
+
+        for dir in &directions {
+            let neighbor = geohash::neighbor(my, *dir).unwrap();
+            assert!(
+                BeaconObserver::is_nearby_geohash(my, &neighbor),
+                "Neighbor in direction {:?} should be nearby",
+                dir
+            );
+        }
+    }
+
+    #[test]
+    fn test_is_nearby_geohash_same_hash() {
+        assert!(BeaconObserver::is_nearby_geohash("9q8yy9m", "9q8yy9m"));
+    }
+
+    #[test]
+    fn test_is_nearby_geohash_distant() {
+        // Two very different geohashes should not be nearby
+        assert!(!BeaconObserver::is_nearby_geohash("9q8yy9m", "u4pruyd"));
+        assert!(!BeaconObserver::is_nearby_geohash("9q8yy9m", "s00000"));
+    }
+
+    #[tokio::test]
+    async fn test_observer_with_failing_subscribe() {
+        use crate::beacon::storage::StorageError;
+
+        struct FailingStorage;
+
+        #[async_trait]
+        impl BeaconStorage for FailingStorage {
+            async fn save_beacon(
+                &self,
+                _beacon: &crate::beacon::types::GeographicBeacon,
+            ) -> Result<()> {
+                Ok(())
+            }
+
+            async fn query_by_geohash(
+                &self,
+                _geohash_prefix: &str,
+            ) -> Result<Vec<crate::beacon::types::GeographicBeacon>> {
+                Ok(vec![])
+            }
+
+            async fn query_all(&self) -> Result<Vec<crate::beacon::types::GeographicBeacon>> {
+                Ok(vec![])
+            }
+
+            async fn subscribe(&self) -> Result<BeaconChangeStream> {
+                Err(StorageError::SubscribeFailed("test failure".to_string()))
+            }
+        }
+
+        let observer = BeaconObserver::new(Arc::new(FailingStorage), "9q8yy9m".to_string());
+
+        // Start should handle the subscribe failure gracefully
+        observer.start().await;
+        // After failed subscribe, running should be set back to false
+        assert!(!*observer.running.read().await);
+    }
+
+    #[tokio::test]
+    async fn test_observer_processes_events() {
+        use crate::beacon::types::{GeoPosition, HierarchyLevel};
+
+        struct EventStorage {
+            events: Vec<BeaconChangeEvent>,
+        }
+
+        #[async_trait]
+        impl BeaconStorage for EventStorage {
+            async fn save_beacon(
+                &self,
+                _beacon: &crate::beacon::types::GeographicBeacon,
+            ) -> Result<()> {
+                Ok(())
+            }
+
+            async fn query_by_geohash(
+                &self,
+                _geohash_prefix: &str,
+            ) -> Result<Vec<crate::beacon::types::GeographicBeacon>> {
+                Ok(vec![])
+            }
+
+            async fn query_all(&self) -> Result<Vec<crate::beacon::types::GeographicBeacon>> {
+                Ok(vec![])
+            }
+
+            async fn subscribe(&self) -> Result<BeaconChangeStream> {
+                let events = self.events.clone();
+                Ok(Box::new(stream::iter(events)))
+            }
+        }
+
+        // Create a beacon that is nearby (same geohash)
+        let my_geohash = "9q8yy9m";
+        let beacon = crate::beacon::types::GeographicBeacon::new(
+            "nearby-node".to_string(),
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+        );
+
+        // The beacon's geohash needs to match or be adjacent to my_geohash
+        // We'll use a beacon with the same geohash
+        let mut nearby_beacon = beacon.clone();
+        nearby_beacon.geohash = my_geohash.to_string();
+
+        let storage = EventStorage {
+            events: vec![BeaconChangeEvent::Inserted(nearby_beacon.clone())],
+        };
+
+        let observer = BeaconObserver::new(Arc::new(storage), my_geohash.to_string());
+        observer.start().await;
+
+        // Give the spawned task time to process
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+        let nearby = observer.get_nearby_beacons().await;
+        assert_eq!(nearby.len(), 1);
+        assert_eq!(nearby[0].node_id, "nearby-node");
+
+        observer.stop().await;
+    }
+
+    /// Reusable event-based storage mock for observer tests
+    struct EventStorage {
+        events: Vec<BeaconChangeEvent>,
+    }
+
+    impl EventStorage {
+        fn new(events: Vec<BeaconChangeEvent>) -> Self {
+            Self { events }
+        }
+    }
+
+    #[async_trait]
+    impl BeaconStorage for EventStorage {
+        async fn save_beacon(
+            &self,
+            _beacon: &crate::beacon::types::GeographicBeacon,
+        ) -> Result<()> {
+            Ok(())
+        }
+        async fn query_by_geohash(
+            &self,
+            _geohash_prefix: &str,
+        ) -> Result<Vec<crate::beacon::types::GeographicBeacon>> {
+            Ok(vec![])
+        }
+        async fn query_all(&self) -> Result<Vec<crate::beacon::types::GeographicBeacon>> {
+            Ok(vec![])
+        }
+        async fn subscribe(&self) -> Result<BeaconChangeStream> {
+            let events = self.events.clone();
+            Ok(Box::new(stream::iter(events)))
+        }
+    }
+
+    fn make_nearby_beacon(
+        node_id: &str,
+        geohash: &str,
+    ) -> crate::beacon::types::GeographicBeacon {
+        use crate::beacon::types::{GeoPosition, HierarchyLevel};
+        let mut beacon = crate::beacon::types::GeographicBeacon::new(
+            node_id.to_string(),
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+        );
+        beacon.geohash = geohash.to_string();
+        beacon
+    }
+
+    #[tokio::test]
+    async fn test_observer_processes_removed_event() {
+        let my_geohash = "9q8yy9m";
+        let beacon = make_nearby_beacon("remove-me", my_geohash);
+
+        let storage = EventStorage::new(vec![
+            BeaconChangeEvent::Inserted(beacon),
+            BeaconChangeEvent::Removed {
+                node_id: "remove-me".to_string(),
+            },
+        ]);
+
+        let observer = BeaconObserver::new(Arc::new(storage), my_geohash.to_string());
+        observer.start().await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+        let nearby = observer.get_nearby_beacons().await;
+        assert_eq!(nearby.len(), 0);
+
+        observer.stop().await;
+    }
+
+    #[tokio::test]
+    async fn test_observer_processes_updated_event() {
+        let my_geohash = "9q8yy9m";
+        let beacon = make_nearby_beacon("update-me", my_geohash);
+        let updated = make_nearby_beacon("update-me", my_geohash);
+
+        let storage = EventStorage::new(vec![
+            BeaconChangeEvent::Inserted(beacon),
+            BeaconChangeEvent::Updated(updated),
+        ]);
+
+        let observer = BeaconObserver::new(Arc::new(storage), my_geohash.to_string());
+        observer.start().await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+        let nearby = observer.get_nearby_beacons().await;
+        assert_eq!(nearby.len(), 1);
+        assert_eq!(nearby[0].node_id, "update-me");
+
+        observer.stop().await;
+    }
+
+    #[tokio::test]
+    async fn test_observer_ignores_distant_beacons() {
+        let my_geohash = "9q8yy9m";
+        let distant = make_nearby_beacon("far-away", "u4pruyd");
+
+        let storage = EventStorage::new(vec![BeaconChangeEvent::Inserted(distant)]);
+
+        let observer = BeaconObserver::new(Arc::new(storage), my_geohash.to_string());
+        observer.start().await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+        let nearby = observer.get_nearby_beacons().await;
+        assert_eq!(nearby.len(), 0);
+
+        observer.stop().await;
+    }
+
+    #[tokio::test]
+    async fn test_event_storage_methods() {
+        // Ensure mock storage methods are exercised for coverage
+        use crate::beacon::types::{GeoPosition, HierarchyLevel};
+        let storage = EventStorage::new(vec![]);
+        let beacon = crate::beacon::types::GeographicBeacon::new(
+            "test".to_string(),
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+        );
+        storage.save_beacon(&beacon).await.unwrap();
+        let results = storage.query_by_geohash("9q8").await.unwrap();
+        assert!(results.is_empty());
+        let all = storage.query_all().await.unwrap();
+        assert!(all.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_mock_storage_methods() {
+        use crate::beacon::types::{GeoPosition, HierarchyLevel};
+        let storage = MockBeaconStorage::new();
+        let beacon = crate::beacon::types::GeographicBeacon::new(
+            "test".to_string(),
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+        );
+        storage.save_beacon(&beacon).await.unwrap();
+        let results = storage.query_by_geohash("9q8").await.unwrap();
+        assert_eq!(results.len(), 1);
+        let all = storage.query_all().await.unwrap();
+        assert_eq!(all.len(), 1);
+        // Save again (update path)
+        storage.save_beacon(&beacon).await.unwrap();
+        let all = storage.query_all().await.unwrap();
+        assert_eq!(all.len(), 1);
+    }
 }

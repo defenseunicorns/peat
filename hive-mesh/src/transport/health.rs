@@ -657,6 +657,180 @@ mod tests {
     }
 
     #[test]
+    fn test_heartbeat_config_aggressive() {
+        let config = HeartbeatConfig::aggressive();
+        assert!(config.enabled);
+        assert_eq!(config.interval, Duration::from_secs(2));
+        assert_eq!(config.suspect_threshold, 2);
+        assert_eq!(config.dead_threshold, 3);
+        assert_eq!(config.degraded_rtt_threshold_ms, 500);
+        assert_eq!(config.degraded_loss_threshold_percent, 5);
+    }
+
+    #[test]
+    fn test_heartbeat_config_relaxed() {
+        let config = HeartbeatConfig::relaxed();
+        assert!(config.enabled);
+        assert_eq!(config.interval, Duration::from_secs(15));
+        assert_eq!(config.suspect_threshold, 3);
+        assert_eq!(config.dead_threshold, 6);
+        assert_eq!(config.degraded_rtt_threshold_ms, 2000);
+        assert_eq!(config.degraded_loss_threshold_percent, 20);
+    }
+
+    #[test]
+    fn test_monitor_clear() {
+        let monitor = HealthMonitor::with_default_config();
+        let peer1 = NodeId::new("p1".to_string());
+        let peer2 = NodeId::new("p2".to_string());
+
+        monitor.start_monitoring(peer1);
+        monitor.start_monitoring(peer2);
+        assert_eq!(monitor.monitored_peer_count(), 2);
+
+        monitor.clear();
+        assert_eq!(monitor.monitored_peer_count(), 0);
+    }
+
+    #[test]
+    fn test_subscribe_receives_degraded_event() {
+        let config = HeartbeatConfig {
+            interval: Duration::from_millis(10),
+            suspect_threshold: 100, // high to avoid suspect
+            dead_threshold: 200,
+            degraded_rtt_threshold_ms: 0, // any RTT triggers degraded
+            degraded_loss_threshold_percent: 100, // disable loss-based degradation
+            enabled: true,
+        };
+        let monitor = HealthMonitor::new(config);
+        let peer_id = NodeId::new("test-peer".to_string());
+
+        let (tx, mut rx) = mpsc::channel(16);
+        monitor.subscribe(tx);
+        monitor.start_monitoring(peer_id.clone());
+
+        // Send a ping and receive pong with some RTT
+        let seq = monitor.record_ping_sent(&peer_id).unwrap();
+        std::thread::sleep(Duration::from_millis(5));
+        monitor.record_pong_received(&peer_id, seq);
+
+        // Now check timeouts — RTT > 0 should trigger degraded since threshold is 0
+        monitor.check_timeouts();
+
+        // Try to receive the degraded event
+        if let Ok(PeerEvent::Degraded { peer_id: id, .. }) = rx.try_recv() {
+            assert_eq!(id, peer_id);
+        }
+    }
+
+    #[test]
+    fn test_record_ping_sent_unknown_peer() {
+        let monitor = HealthMonitor::with_default_config();
+        let peer_id = NodeId::new("unknown".to_string());
+        assert!(monitor.record_ping_sent(&peer_id).is_none());
+    }
+
+    #[test]
+    fn test_record_pong_wrong_sequence() {
+        let monitor = HealthMonitor::with_default_config();
+        let peer_id = NodeId::new("p1".to_string());
+
+        monitor.start_monitoring(peer_id.clone());
+        let seq = monitor.record_ping_sent(&peer_id).unwrap();
+
+        // Send pong with wrong sequence number
+        monitor.record_pong_received(&peer_id, seq + 999);
+
+        // RTT should still be 0 since the wrong seq was ignored
+        let health = monitor.get_health(&peer_id).unwrap();
+        assert_eq!(health.rtt_ms, 0);
+    }
+
+    #[test]
+    fn test_peers_needing_ping_skips_dead() {
+        let config = HeartbeatConfig {
+            interval: Duration::from_millis(1),
+            suspect_threshold: 1,
+            dead_threshold: 2,
+            ..Default::default()
+        };
+        let monitor = HealthMonitor::new(config);
+        let peer_id = NodeId::new("dead-peer".to_string());
+
+        monitor.start_monitoring(peer_id.clone());
+
+        // Drive to dead state
+        monitor.record_ping_sent(&peer_id);
+        std::thread::sleep(Duration::from_millis(5));
+        monitor.check_timeouts();
+        monitor.record_ping_sent(&peer_id);
+        std::thread::sleep(Duration::from_millis(5));
+        monitor.check_timeouts();
+
+        let health = monitor.get_health(&peer_id).unwrap();
+        assert_eq!(health.state, ConnectionState::Dead);
+
+        // Dead peers should not need ping
+        let needing_ping = monitor.peers_needing_ping();
+        assert!(!needing_ping.contains(&peer_id));
+    }
+
+    #[test]
+    fn test_check_timeouts_disabled() {
+        let monitor = HealthMonitor::new(HeartbeatConfig::disabled());
+        let result = monitor.check_timeouts();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_peers_needing_ping_disabled() {
+        let monitor = HealthMonitor::new(HeartbeatConfig::disabled());
+        assert!(monitor.peers_needing_ping().is_empty());
+    }
+
+    #[test]
+    fn test_packet_loss_zero_pings() {
+        let state = PeerHealthState::new();
+        assert_eq!(state.packet_loss_percent(), 0);
+    }
+
+    #[test]
+    fn test_rtt_variance_update() {
+        let mut state = PeerHealthState::new();
+        // First sample
+        state.update_rtt(100.0);
+        assert_eq!(state.rtt_variance_ms, 50.0); // initial variance = rtt/2
+
+        // Second sample with different value
+        state.update_rtt(200.0);
+        // variance = (1-0.25)*50 + 0.25*|200-100| = 37.5 + 25 = 62.5
+        assert!((state.rtt_variance_ms - 62.5).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_stop_monitoring_unknown_peer() {
+        let monitor = HealthMonitor::with_default_config();
+        let peer_id = NodeId::new("unknown".to_string());
+        // Should not panic
+        monitor.stop_monitoring(&peer_id);
+        assert_eq!(monitor.monitored_peer_count(), 0);
+    }
+
+    #[test]
+    fn test_get_health_unknown_peer() {
+        let monitor = HealthMonitor::with_default_config();
+        let peer_id = NodeId::new("unknown".to_string());
+        assert!(monitor.get_health(&peer_id).is_none());
+    }
+
+    #[test]
+    fn test_monitor_config_accessor() {
+        let config = HeartbeatConfig::aggressive();
+        let monitor = HealthMonitor::new(config.clone());
+        assert_eq!(monitor.config().interval, Duration::from_secs(2));
+    }
+
+    #[test]
     fn test_recovery_from_suspect() {
         let config = HeartbeatConfig {
             interval: Duration::from_millis(10),

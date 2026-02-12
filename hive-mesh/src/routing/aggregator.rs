@@ -117,4 +117,42 @@ mod tests {
         };
         assert!(err.to_string().contains("Expected Telemetry"));
     }
+
+    #[test]
+    fn test_aggregation_error_from_serde() {
+        let serde_err = serde_json::from_str::<serde_json::Value>("not json").unwrap_err();
+        let err: AggregationError = serde_err.into();
+        assert!(err.to_string().contains("deserialize"));
+    }
+
+    #[test]
+    fn test_noop_aggregator_returns_error() {
+        let agg = NoOpAggregator;
+        let result = agg.aggregate_telemetry("group", "leader", vec![]);
+        assert!(result.is_err());
+        if let Err(AggregationError::AggregationFailed(msg)) = result {
+            assert!(msg.contains("No aggregator configured"));
+        }
+    }
+
+    #[test]
+    fn test_extract_summary_bytes_valid() {
+        let agg = NoOpAggregator;
+        let mut packet = DataPacket::telemetry("src", vec![1, 2, 3]);
+        packet.data_type = DataType::AggregatedTelemetry;
+        let result = agg.extract_summary_bytes(&packet);
+        assert_eq!(result.unwrap(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_extract_summary_bytes_wrong_type() {
+        let agg = NoOpAggregator;
+        let packet = DataPacket::command("src", "dst", vec![]);
+        let result = agg.extract_summary_bytes(&packet);
+        assert!(result.is_err());
+        if let Err(AggregationError::InvalidPacketType { expected, actual }) = result {
+            assert_eq!(expected, "AggregatedTelemetry");
+            assert_eq!(actual, DataType::Command);
+        }
+    }
 }

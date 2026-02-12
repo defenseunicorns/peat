@@ -426,4 +426,266 @@ mod tests {
         assert!(!strategy.can_transition(HierarchyLevel::Platoon, HierarchyLevel::Company));
         assert!(!strategy.can_transition(HierarchyLevel::Platoon, HierarchyLevel::Squad));
     }
+
+    #[test]
+    fn test_same_level_transition_always_allowed() {
+        // Even with all transitions disabled, same-level should be allowed
+        let strategy = HybridHierarchyStrategy::new(
+            HierarchyLevel::Squad,
+            NodeRole::Member,
+            ElectionConfig::default(),
+            TransitionRules {
+                allow_promotion: false,
+                allow_demotion: false,
+                max_promotion_levels: 0,
+                max_demotion_levels: 0,
+                min_peers_for_promotion: 0,
+            },
+        );
+
+        assert!(strategy.can_transition(HierarchyLevel::Squad, HierarchyLevel::Squad));
+        assert!(strategy.can_transition(HierarchyLevel::Platoon, HierarchyLevel::Platoon));
+        assert!(strategy.can_transition(HierarchyLevel::Company, HierarchyLevel::Company));
+    }
+
+    #[test]
+    fn test_should_promote_no_higher_peers_enough_same_level() {
+        let strategy = HybridHierarchyStrategy::with_adaptive_promotion(
+            HierarchyLevel::Squad,
+            NodeRole::Member,
+            ElectionConfig::default(),
+        );
+
+        // Create 2 squad-level peers (no higher-level peers)
+        let peer1 = GeographicBeacon::new(
+            "peer1".to_string(),
+            GeoPosition::new(37.7750, -122.4195),
+            HierarchyLevel::Squad,
+        );
+        let peer2 = GeographicBeacon::new(
+            "peer2".to_string(),
+            GeoPosition::new(37.7751, -122.4196),
+            HierarchyLevel::Squad,
+        );
+
+        assert!(strategy.should_promote(&[peer1, peer2], HierarchyLevel::Squad));
+    }
+
+    #[test]
+    fn test_should_not_promote_when_higher_level_peers_exist() {
+        let strategy = HybridHierarchyStrategy::with_adaptive_promotion(
+            HierarchyLevel::Squad,
+            NodeRole::Member,
+            ElectionConfig::default(),
+        );
+
+        // Include a platoon-level peer (higher level exists)
+        let peer1 = GeographicBeacon::new(
+            "peer1".to_string(),
+            GeoPosition::new(37.7750, -122.4195),
+            HierarchyLevel::Squad,
+        );
+        let platoon_peer = GeographicBeacon::new(
+            "platoon-peer".to_string(),
+            GeoPosition::new(37.7752, -122.4197),
+            HierarchyLevel::Platoon,
+        );
+
+        assert!(!strategy.should_promote(&[peer1, platoon_peer], HierarchyLevel::Squad));
+    }
+
+    #[test]
+    fn test_should_not_promote_when_disabled() {
+        let strategy = HybridHierarchyStrategy::with_static_level_dynamic_role(
+            HierarchyLevel::Squad,
+            ElectionConfig::default(),
+        );
+
+        let peer = GeographicBeacon::new(
+            "peer".to_string(),
+            GeoPosition::new(37.7750, -122.4195),
+            HierarchyLevel::Squad,
+        );
+
+        assert!(!strategy.should_promote(&[peer], HierarchyLevel::Squad));
+    }
+
+    #[test]
+    fn test_should_not_promote_at_highest_level() {
+        let strategy = HybridHierarchyStrategy::with_adaptive_promotion(
+            HierarchyLevel::Company,
+            NodeRole::Leader,
+            ElectionConfig::default(),
+        );
+
+        let peer = GeographicBeacon::new(
+            "peer".to_string(),
+            GeoPosition::new(37.7750, -122.4195),
+            HierarchyLevel::Company,
+        );
+
+        // Company has no parent level, can't promote
+        assert!(!strategy.should_promote(&[peer], HierarchyLevel::Company));
+    }
+
+    #[test]
+    fn test_should_not_promote_insufficient_same_level_peers() {
+        let strategy = HybridHierarchyStrategy::with_adaptive_promotion(
+            HierarchyLevel::Squad,
+            NodeRole::Member,
+            ElectionConfig::default(),
+        );
+        // min_peers_for_promotion is 2, only 1 same-level peer
+        let peer = GeographicBeacon::new(
+            "peer".to_string(),
+            GeoPosition::new(37.7750, -122.4195),
+            HierarchyLevel::Squad,
+        );
+
+        assert!(!strategy.should_promote(&[peer], HierarchyLevel::Squad));
+    }
+
+    #[test]
+    fn test_should_demote_when_multiple_higher_level_peers() {
+        let strategy = HybridHierarchyStrategy::new(
+            HierarchyLevel::Platoon,
+            NodeRole::Leader,
+            ElectionConfig::default(),
+            TransitionRules {
+                allow_promotion: false,
+                allow_demotion: true,
+                max_promotion_levels: 0,
+                max_demotion_levels: 1,
+                min_peers_for_promotion: 0,
+            },
+        );
+
+        // 2+ higher level peers (Company is parent of Platoon)
+        let higher1 = GeographicBeacon::new(
+            "company1".to_string(),
+            GeoPosition::new(37.7750, -122.4195),
+            HierarchyLevel::Company,
+        );
+        let higher2 = GeographicBeacon::new(
+            "company2".to_string(),
+            GeoPosition::new(37.7751, -122.4196),
+            HierarchyLevel::Company,
+        );
+
+        assert!(strategy.should_demote(&[higher1, higher2], HierarchyLevel::Platoon));
+    }
+
+    #[test]
+    fn test_should_not_demote_when_disabled() {
+        let strategy = HybridHierarchyStrategy::with_adaptive_promotion(
+            HierarchyLevel::Platoon,
+            NodeRole::Leader,
+            ElectionConfig::default(),
+        );
+        // allow_demotion is false
+
+        let higher = GeographicBeacon::new(
+            "company".to_string(),
+            GeoPosition::new(37.7750, -122.4195),
+            HierarchyLevel::Company,
+        );
+
+        assert!(!strategy.should_demote(&[higher.clone(), higher], HierarchyLevel::Platoon));
+    }
+
+    #[test]
+    fn test_should_not_demote_at_highest_level() {
+        let strategy = HybridHierarchyStrategy::new(
+            HierarchyLevel::Company,
+            NodeRole::Leader,
+            ElectionConfig::default(),
+            TransitionRules {
+                allow_promotion: false,
+                allow_demotion: true,
+                max_promotion_levels: 0,
+                max_demotion_levels: 1,
+                min_peers_for_promotion: 0,
+            },
+        );
+
+        // Company has no parent, so can't demote
+        let peer = GeographicBeacon::new(
+            "peer".to_string(),
+            GeoPosition::new(37.7750, -122.4195),
+            HierarchyLevel::Company,
+        );
+
+        assert!(!strategy.should_demote(&[peer], HierarchyLevel::Company));
+    }
+
+    #[test]
+    fn test_should_not_demote_with_only_one_higher_peer() {
+        let strategy = HybridHierarchyStrategy::new(
+            HierarchyLevel::Platoon,
+            NodeRole::Leader,
+            ElectionConfig::default(),
+            TransitionRules {
+                allow_promotion: false,
+                allow_demotion: true,
+                max_promotion_levels: 0,
+                max_demotion_levels: 1,
+                min_peers_for_promotion: 0,
+            },
+        );
+
+        // Only 1 higher level peer (need 2+)
+        let higher = GeographicBeacon::new(
+            "company".to_string(),
+            GeoPosition::new(37.7750, -122.4195),
+            HierarchyLevel::Company,
+        );
+
+        assert!(!strategy.should_demote(&[higher], HierarchyLevel::Platoon));
+    }
+
+    #[test]
+    fn test_transition_both_directions_enabled() {
+        let strategy = HybridHierarchyStrategy::new(
+            HierarchyLevel::Platoon,
+            NodeRole::Member,
+            ElectionConfig::default(),
+            TransitionRules {
+                allow_promotion: true,
+                allow_demotion: true,
+                max_promotion_levels: 1,
+                max_demotion_levels: 1,
+                min_peers_for_promotion: 0,
+            },
+        );
+
+        // Can promote one level
+        assert!(strategy.can_transition(HierarchyLevel::Platoon, HierarchyLevel::Company));
+        // Can demote one level
+        assert!(strategy.can_transition(HierarchyLevel::Platoon, HierarchyLevel::Squad));
+        // Can't jump two levels
+        assert!(!strategy.can_transition(HierarchyLevel::Squad, HierarchyLevel::Company));
+    }
+
+    #[test]
+    fn test_transition_rules_default() {
+        let rules = TransitionRules::default();
+        assert!(rules.allow_promotion);
+        assert!(rules.allow_demotion);
+        assert_eq!(rules.max_promotion_levels, 1);
+        assert_eq!(rules.max_demotion_levels, 1);
+        assert_eq!(rules.min_peers_for_promotion, 0);
+    }
+
+    #[test]
+    fn test_determine_level_ignores_profile() {
+        // determine_level always returns baseline_level
+        let strategy = HybridHierarchyStrategy::new(
+            HierarchyLevel::Company,
+            NodeRole::Leader,
+            ElectionConfig::default(),
+            TransitionRules::default(),
+        );
+        let profile = create_test_profile();
+        assert_eq!(strategy.determine_level(&profile), HierarchyLevel::Company);
+    }
 }
