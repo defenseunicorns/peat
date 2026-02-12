@@ -902,4 +902,389 @@ mod tests {
         let result = mgr2.decrypt_document(&encrypted);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_secure_channel_age_secs() {
+        let key = SymmetricKey::from_bytes(&[42u8; 32]);
+        let peer_id = DeviceId::from_bytes([1u8; 16]);
+        let channel = SecureChannel::new(peer_id, key);
+
+        // Channel was just created, so age should be 0 or very small
+        let age = channel.age_secs();
+        assert!(age < 2, "Channel age should be near zero, got {}", age);
+    }
+
+    #[test]
+    fn test_encrypted_data_from_bytes_too_short() {
+        // Less than NONCE_SIZE bytes should fail
+        let short_data = vec![0u8; 5];
+        let result = EncryptedData::from_bytes(&short_data);
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(err_msg.contains("too short"));
+    }
+
+    #[test]
+    fn test_encrypted_data_from_bytes_exact_nonce_size() {
+        // Exactly NONCE_SIZE bytes: valid but empty ciphertext
+        let data = vec![0u8; NONCE_SIZE];
+        let result = EncryptedData::from_bytes(&data);
+        assert!(result.is_ok());
+        let ed = result.unwrap();
+        assert_eq!(ed.nonce, [0u8; NONCE_SIZE]);
+        assert!(ed.ciphertext.is_empty());
+    }
+
+    #[test]
+    fn test_encrypted_cell_message_from_bytes_too_short() {
+        // Less than 12 bytes
+        let short_data = vec![0u8; 8];
+        let result = EncryptedCellMessage::from_bytes(&short_data);
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(err_msg.contains("too short"));
+    }
+
+    #[test]
+    fn test_encrypted_cell_message_from_bytes_truncated() {
+        // Enough bytes for header but cell_id_len points beyond data
+        let mut data = Vec::new();
+        data.extend_from_slice(&100u32.to_le_bytes()); // cell_id_len = 100
+        data.extend_from_slice(&[0u8; 8]); // filler
+        let result = EncryptedCellMessage::from_bytes(&data);
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(err_msg.contains("truncated"));
+    }
+
+    #[test]
+    fn test_encrypted_cell_message_from_bytes_invalid_utf8() {
+        // Create data with invalid UTF-8 in the cell_id region
+        let mut data = Vec::new();
+        let bad_utf8 = [0xFF, 0xFE]; // Invalid UTF-8
+        data.extend_from_slice(&(bad_utf8.len() as u32).to_le_bytes());
+        data.extend_from_slice(&bad_utf8);
+        data.extend_from_slice(&1u64.to_le_bytes()); // generation
+                                                     // Need at least NONCE_SIZE bytes for EncryptedData::from_bytes
+        data.extend_from_slice(&[0u8; NONCE_SIZE]);
+        let result = EncryptedCellMessage::from_bytes(&data);
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_encryption_manager_encrypt_for_peer_no_channel() {
+        let kp = EncryptionKeypair::generate();
+        let device_id = DeviceId::from_bytes([1u8; 16]);
+        let mgr = EncryptionManager::new(kp, device_id);
+
+        let nonexistent_peer = DeviceId::from_bytes([99u8; 16]);
+        let result = mgr.encrypt_for_peer(&nonexistent_peer, b"hello").await;
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(err_msg.contains("no channel"));
+    }
+
+    #[tokio::test]
+    async fn test_encryption_manager_decrypt_from_peer_no_channel() {
+        let kp = EncryptionKeypair::generate();
+        let device_id = DeviceId::from_bytes([1u8; 16]);
+        let mgr = EncryptionManager::new(kp, device_id);
+
+        let nonexistent_peer = DeviceId::from_bytes([99u8; 16]);
+        let fake_encrypted = EncryptedData {
+            nonce: [0u8; NONCE_SIZE],
+            ciphertext: vec![1, 2, 3],
+        };
+        let result = mgr
+            .decrypt_from_peer(&nonexistent_peer, &fake_encrypted)
+            .await;
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(err_msg.contains("no channel"));
+    }
+
+    #[tokio::test]
+    async fn test_encryption_manager_encrypt_for_cell_no_key() {
+        let kp = EncryptionKeypair::generate();
+        let device_id = DeviceId::from_bytes([1u8; 16]);
+        let mgr = EncryptionManager::new(kp, device_id);
+
+        let result = mgr.encrypt_for_cell("nonexistent-cell", b"data").await;
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(err_msg.contains("no key for cell"));
+    }
+
+    #[tokio::test]
+    async fn test_encryption_manager_decrypt_cell_message_no_key() {
+        let kp = EncryptionKeypair::generate();
+        let device_id = DeviceId::from_bytes([1u8; 16]);
+        let mgr = EncryptionManager::new(kp, device_id);
+
+        let fake_message = EncryptedCellMessage {
+            cell_id: "nonexistent-cell".to_string(),
+            generation: 1,
+            encrypted: EncryptedData {
+                nonce: [0u8; NONCE_SIZE],
+                ciphertext: vec![1, 2, 3],
+            },
+        };
+        let result = mgr.decrypt_cell_message(&fake_message).await;
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(err_msg.contains("no key for cell"));
+    }
+
+    #[tokio::test]
+    async fn test_encryption_manager_rotate_cell_key_no_key() {
+        let kp = EncryptionKeypair::generate();
+        let device_id = DeviceId::from_bytes([1u8; 16]);
+        let mgr = EncryptionManager::new(kp, device_id);
+
+        let result = mgr.rotate_cell_key("nonexistent").await;
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(err_msg.contains("no key for cell"));
+    }
+
+    #[tokio::test]
+    async fn test_encryption_manager_rotate_cell_key_success() {
+        let kp = EncryptionKeypair::generate();
+        let device_id = DeviceId::from_bytes([1u8; 16]);
+        let mgr = EncryptionManager::new(kp, device_id);
+
+        // Create a cell key first
+        let key1 = mgr.get_or_create_cell_key("cell-1").await;
+        assert_eq!(key1.generation, 1);
+
+        // Rotate
+        let key2 = mgr.rotate_cell_key("cell-1").await.unwrap();
+        assert_eq!(key2.generation, 2);
+        assert_eq!(key2.cell_id, "cell-1");
+
+        // The stored key should now be the rotated one
+        let stored = mgr.get_cell_key("cell-1").await.unwrap();
+        assert_eq!(stored.generation, 2);
+
+        // Old messages can no longer be decrypted with new key
+        let msg = b"test message";
+        let encrypted = mgr.encrypt_for_cell("cell-1", msg).await.unwrap();
+        assert_eq!(encrypted.generation, 2);
+        let decrypted = mgr.decrypt_cell_message(&encrypted).await.unwrap();
+        assert_eq!(decrypted, msg);
+    }
+
+    #[tokio::test]
+    async fn test_encryption_manager_remove_channel() {
+        let alice_kp = EncryptionKeypair::generate();
+        let bob_kp = EncryptionKeypair::generate();
+
+        let alice_id = DeviceId::from_bytes([1u8; 16]);
+        let bob_id = DeviceId::from_bytes([2u8; 16]);
+
+        let alice_mgr = EncryptionManager::new(alice_kp, alice_id);
+
+        // Establish channel
+        alice_mgr
+            .establish_channel(bob_id, &bob_kp.public_key_bytes())
+            .await
+            .unwrap();
+        assert!(alice_mgr.has_channel(&bob_id).await);
+        assert_eq!(alice_mgr.peer_channel_count().await, 1);
+
+        // Remove channel
+        alice_mgr.remove_channel(&bob_id).await;
+        assert!(!alice_mgr.has_channel(&bob_id).await);
+        assert_eq!(alice_mgr.peer_channel_count().await, 0);
+    }
+
+    #[tokio::test]
+    async fn test_encryption_manager_remove_cell_key() {
+        let kp = EncryptionKeypair::generate();
+        let device_id = DeviceId::from_bytes([1u8; 16]);
+        let mgr = EncryptionManager::new(kp, device_id);
+
+        mgr.get_or_create_cell_key("cell-1").await;
+        assert_eq!(mgr.cell_key_count().await, 1);
+
+        mgr.remove_cell_key("cell-1").await;
+        assert_eq!(mgr.cell_key_count().await, 0);
+        assert!(mgr.get_cell_key("cell-1").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_encryption_manager_set_cell_key() {
+        let kp = EncryptionKeypair::generate();
+        let device_id = DeviceId::from_bytes([1u8; 16]);
+        let mgr = EncryptionManager::new(kp, device_id);
+
+        let key = GroupKey::from_bytes("cell-99".to_string(), &[7u8; SYMMETRIC_KEY_SIZE], 5);
+        mgr.set_cell_key(key).await;
+
+        let stored = mgr.get_cell_key("cell-99").await;
+        assert!(stored.is_some());
+        let stored = stored.unwrap();
+        assert_eq!(stored.cell_id, "cell-99");
+        assert_eq!(stored.generation, 5);
+    }
+
+    #[tokio::test]
+    async fn test_encryption_manager_get_channel() {
+        let alice_kp = EncryptionKeypair::generate();
+        let bob_kp = EncryptionKeypair::generate();
+        let alice_id = DeviceId::from_bytes([1u8; 16]);
+        let bob_id = DeviceId::from_bytes([2u8; 16]);
+
+        let mgr = EncryptionManager::new(alice_kp, alice_id);
+        mgr.establish_channel(bob_id, &bob_kp.public_key_bytes())
+            .await
+            .unwrap();
+
+        // get_channel should return Some
+        let channel = mgr.get_channel(&bob_id).await;
+        assert!(channel.is_some());
+        let channel = channel.unwrap();
+        assert_eq!(channel.peer_id, bob_id);
+
+        // get_channel for non-existent peer
+        let missing = DeviceId::from_bytes([99u8; 16]);
+        assert!(mgr.get_channel(&missing).await.is_none());
+    }
+
+    #[test]
+    fn test_group_key_decrypt_cell_id_mismatch() {
+        let key = GroupKey::generate("cell-1".to_string());
+        let encrypted = key.encrypt(b"test").unwrap();
+
+        // Create a message with wrong cell_id
+        let wrong_msg = EncryptedCellMessage {
+            cell_id: "cell-WRONG".to_string(),
+            generation: encrypted.generation,
+            encrypted: encrypted.encrypted.clone(),
+        };
+        let result = key.decrypt(&wrong_msg);
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(err_msg.contains("cell ID mismatch"));
+    }
+
+    #[test]
+    fn test_group_key_decrypt_generation_mismatch() {
+        let key = GroupKey::generate("cell-1".to_string());
+        let encrypted = key.encrypt(b"test").unwrap();
+
+        // Create a message with wrong generation
+        let wrong_msg = EncryptedCellMessage {
+            cell_id: "cell-1".to_string(),
+            generation: 999,
+            encrypted: encrypted.encrypted.clone(),
+        };
+        let result = key.decrypt(&wrong_msg);
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(err_msg.contains("key generation mismatch"));
+    }
+
+    #[test]
+    fn test_group_key_from_bytes() {
+        let key_bytes = [42u8; SYMMETRIC_KEY_SIZE];
+        let key = GroupKey::from_bytes("cell-x".to_string(), &key_bytes, 10);
+        assert_eq!(key.cell_id, "cell-x");
+        assert_eq!(key.generation, 10);
+        assert_eq!(key.key_bytes(), key_bytes);
+
+        // Verify it can encrypt/decrypt
+        let plaintext = b"from bytes key test";
+        let encrypted = key.encrypt(plaintext).unwrap();
+        let decrypted = key.decrypt(&encrypted).unwrap();
+        assert_eq!(plaintext.as_slice(), decrypted.as_slice());
+    }
+
+    #[test]
+    fn test_group_key_rotation_preserves_cell_id() {
+        let key1 = GroupKey::generate("my-cell".to_string());
+        let key2 = key1.rotate();
+        let key3 = key2.rotate();
+
+        assert_eq!(key1.cell_id, "my-cell");
+        assert_eq!(key2.cell_id, "my-cell");
+        assert_eq!(key3.cell_id, "my-cell");
+        assert_eq!(key1.generation, 1);
+        assert_eq!(key2.generation, 2);
+        assert_eq!(key3.generation, 3);
+
+        // Each key has different bytes
+        assert_ne!(key1.key_bytes(), key2.key_bytes());
+        assert_ne!(key2.key_bytes(), key3.key_bytes());
+    }
+
+    #[test]
+    fn test_keypair_debug_redacts_secret() {
+        let kp = EncryptionKeypair::generate();
+        let debug_str = format!("{:?}", kp);
+        assert!(debug_str.contains("REDACTED"));
+        // The debug output includes field name "secret" but its value is "[REDACTED]"
+        // This verifies the actual secret bytes are not leaked
+        assert!(debug_str.contains("[REDACTED]"));
+    }
+
+    #[test]
+    fn test_symmetric_key_debug_redacts() {
+        let key = SymmetricKey::from_bytes(&[42u8; 32]);
+        let debug_str = format!("{:?}", key);
+        assert!(debug_str.contains("REDACTED"));
+    }
+
+    #[test]
+    fn test_group_key_debug_redacts() {
+        let key = GroupKey::generate("cell-1".to_string());
+        let debug_str = format!("{:?}", key);
+        assert!(debug_str.contains("REDACTED"));
+        assert!(debug_str.contains("cell-1"));
+    }
+
+    #[test]
+    fn test_encryption_manager_debug() {
+        let kp = EncryptionKeypair::generate();
+        let device_id = DeviceId::from_bytes([1u8; 16]);
+        let mgr = EncryptionManager::new(kp, device_id);
+        let debug_str = format!("{:?}", mgr);
+        assert!(debug_str.contains("EncryptionManager"));
+        assert!(debug_str.contains("device_id"));
+        assert!(debug_str.contains("public_key"));
+    }
+
+    #[test]
+    fn test_encrypted_document_new() {
+        let key = SymmetricKey::from_bytes(&[42u8; 32]);
+        let encrypted = key.encrypt(b"doc data").unwrap();
+        let device_id = DeviceId::from_bytes([1u8; 16]);
+        let doc = EncryptedDocument::new(encrypted, device_id);
+
+        assert_eq!(doc.encrypted_by, device_id);
+        assert!(doc.encrypted_at > 0);
+    }
+
+    #[test]
+    fn test_symmetric_key_derive_from_shared_secret() {
+        let alice = EncryptionKeypair::generate();
+        let bob = EncryptionKeypair::generate();
+
+        let shared = alice.dh_exchange(bob.public_key());
+        let key = SymmetricKey::derive_for_peer(&shared);
+
+        // Verify key can encrypt/decrypt
+        let plaintext = b"derived key test";
+        let encrypted = key.encrypt(plaintext).unwrap();
+        let decrypted = key.decrypt(&encrypted).unwrap();
+        assert_eq!(plaintext.as_slice(), decrypted.as_slice());
+    }
+
+    #[test]
+    fn test_symmetric_key_as_bytes_roundtrip() {
+        let original_bytes = [99u8; SYMMETRIC_KEY_SIZE];
+        let key = SymmetricKey::from_bytes(&original_bytes);
+        let extracted = key.as_bytes();
+        assert_eq!(&original_bytes, extracted);
+    }
 }

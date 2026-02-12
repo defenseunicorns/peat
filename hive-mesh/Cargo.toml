@@ -46,6 +46,11 @@ log = { version = "0.4", optional = true }
 # Bluetooth LE transport (ADR-032/ADR-039, optional)
 hive-btle = { workspace = true, optional = true }
 
+# HTTP/WS service broker (ADR-049 Phase 6)
+axum = { version = "0.7", features = ["macros", "ws"], optional = true }
+tower = { version = "0.4", features = ["util"], optional = true }
+tower-http = { version = "0.5", features = ["cors", "trace", "timeout"], optional = true }
+
 # Automerge backend storage (ADR-049 Phase 3)
 automerge = { version = "0.7.1", optional = true }
 iroh = { version = "0.95", optional = true, features = ["discovery-local-network"] }
@@ -60,8 +65,12 @@ default = []
 lite-transport = ["log"]
 bluetooth = ["hive-btle"]
 automerge-backend = ["automerge", "iroh", "iroh-blobs", "redb", "lru", "negentropy", "rand"]
+broker = ["axum", "tower", "tower-http"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "macros"] }
 tracing-subscriber = { workspace = true }
 tempfile = "3.13"
+http-body-util = "0.1"
+tokio-tungstenite = "0.24"
+futures-util = "0.3"

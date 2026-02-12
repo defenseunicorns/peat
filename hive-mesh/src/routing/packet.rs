@@ -265,4 +265,85 @@ mod tests {
         assert!(!DataType::Coordination.requires_aggregation());
         assert!(!DataType::AggregatedTelemetry.requires_aggregation()); // Already aggregated
     }
+
+    #[test]
+    fn test_status_packet_creation() {
+        let packet = DataPacket::status("node-1", vec![10, 20]);
+
+        assert_eq!(packet.source_node_id, "node-1");
+        assert_eq!(packet.data_type, DataType::Status);
+        assert_eq!(packet.direction, DataDirection::Upward);
+        assert!(packet.destination_node_id.is_none());
+        assert_eq!(packet.hop_count, 0);
+        assert_eq!(packet.max_hops, 10);
+        assert_eq!(packet.payload, vec![10, 20]);
+    }
+
+    #[test]
+    fn test_coordination_packet_creation() {
+        let packet = DataPacket::coordination("node-1", "node-2", vec![5]);
+
+        assert_eq!(packet.source_node_id, "node-1");
+        assert_eq!(packet.destination_node_id, Some("node-2".to_string()));
+        assert_eq!(packet.data_type, DataType::Coordination);
+        assert_eq!(packet.direction, DataDirection::Lateral);
+        assert_eq!(packet.max_hops, 3); // Lateral messages have lower max hops
+    }
+
+    #[test]
+    fn test_aggregated_telemetry_packet_creation() {
+        let packet = DataPacket::aggregated_telemetry("leader-1", vec![99]);
+
+        assert_eq!(packet.source_node_id, "leader-1");
+        assert_eq!(packet.data_type, DataType::AggregatedTelemetry);
+        assert_eq!(packet.direction, DataDirection::Upward);
+        assert!(packet.destination_node_id.is_none());
+        assert_eq!(packet.max_hops, 10);
+    }
+
+    #[test]
+    fn test_increment_hop_returns_false_at_max() {
+        let mut packet = DataPacket::coordination("a", "b", vec![]);
+        // max_hops is 3 for coordination
+        assert!(packet.increment_hop()); // hop_count = 1
+        assert!(packet.increment_hop()); // hop_count = 2
+        assert!(!packet.increment_hop()); // hop_count = 3, equals max_hops
+
+        assert!(packet.at_max_hops());
+    }
+
+    #[test]
+    fn test_at_max_hops_initially_false() {
+        let packet = DataPacket::telemetry("node-1", vec![]);
+        assert!(!packet.at_max_hops());
+    }
+
+    #[test]
+    fn test_packet_unique_ids() {
+        let p1 = DataPacket::telemetry("node-1", vec![1]);
+        let p2 = DataPacket::telemetry("node-1", vec![1]);
+
+        // Each packet should get a unique ID
+        assert_ne!(p1.packet_id, p2.packet_id);
+    }
+
+    #[test]
+    fn test_packet_serialization() {
+        let packet = DataPacket::command("hq", "node-1", vec![1, 2, 3]);
+        let json = serde_json::to_string(&packet).unwrap();
+        let deserialized: DataPacket = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.source_node_id, "hq");
+        assert_eq!(deserialized.destination_node_id, Some("node-1".to_string()));
+        assert_eq!(deserialized.data_type, DataType::Command);
+        assert_eq!(deserialized.direction, DataDirection::Downward);
+        assert_eq!(deserialized.payload, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_data_direction_serialization() {
+        let json = serde_json::to_string(&DataDirection::Lateral).unwrap();
+        let deserialized: DataDirection = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, DataDirection::Lateral);
+    }
 }

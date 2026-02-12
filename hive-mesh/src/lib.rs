@@ -1,3 +1,6 @@
+#[cfg(feature = "broker")]
+pub mod broker;
+
 pub mod beacon;
 pub mod discovery;
 pub mod flat_mesh;

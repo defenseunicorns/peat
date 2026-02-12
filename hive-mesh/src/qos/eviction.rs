@@ -752,4 +752,185 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_eviction_config_conservative() {
+        let config = EvictionConfig::conservative();
+        assert_eq!(config.eviction_threshold, 0.95);
+        assert_eq!(config.target_pressure, 0.85);
+        assert!(config.compress_before_eviction);
+        assert_eq!(config.max_evictions_per_cycle, 500);
+        assert_eq!(config.max_cycle_duration_ms, 3000);
+    }
+
+    #[test]
+    fn test_eviction_result_is_success_with_compression_only() {
+        let result = EvictionResult {
+            docs_evicted: 0,
+            compression_savings: 1000,
+            ..Default::default()
+        };
+        assert!(result.is_success());
+    }
+
+    #[test]
+    fn test_eviction_result_freed_target_with_compression() {
+        let result = EvictionResult {
+            bytes_freed: 5_000,
+            compression_savings: 10_000,
+            ..Default::default()
+        };
+        assert!(result.freed_target(15_000));
+        assert!(!result.freed_target(16_000));
+    }
+
+    #[test]
+    fn test_force_eviction_zero_bytes() {
+        let storage = create_test_storage();
+        let audit_log = Arc::new(EvictionAuditLog::new(100));
+        let controller =
+            EvictionController::new(storage.clone(), audit_log).with_config(EvictionConfig {
+                compress_before_eviction: false,
+                ..Default::default()
+            });
+
+        // Force eviction of 0 bytes should return immediately
+        let result = controller.force_eviction(0);
+        assert_eq!(result.docs_evicted, 0);
+        assert_eq!(result.bytes_freed, 0);
+    }
+
+    #[test]
+    fn test_eviction_without_callback() {
+        let storage = create_test_storage();
+        let audit_log = Arc::new(EvictionAuditLog::new(100));
+        let controller =
+            EvictionController::new(storage.clone(), audit_log).with_config(EvictionConfig {
+                compress_before_eviction: false,
+                ..Default::default()
+            });
+
+        // Add a bulk document
+        storage
+            .register_document(StoredDocument::new("bulk-1", QoSClass::Bulk, 20_000).with_age(400));
+
+        // Force eviction without setting callback - evictions should fail
+        let result = controller.force_eviction(10_000);
+        assert_eq!(result.docs_evicted, 0);
+        assert!(result.failures > 0);
+    }
+
+    #[test]
+    fn test_eviction_with_failing_callback() {
+        let storage = create_test_storage();
+        let audit_log = Arc::new(EvictionAuditLog::new(100));
+        let controller =
+            EvictionController::new(storage.clone(), audit_log).with_config(EvictionConfig {
+                compress_before_eviction: false,
+                ..Default::default()
+            });
+
+        storage
+            .register_document(StoredDocument::new("bulk-1", QoSClass::Bulk, 20_000).with_age(400));
+
+        // Set up failing eviction callback
+        controller.set_eviction_callback(Box::new(|_| Err("disk full".to_string())));
+
+        let result = controller.force_eviction(10_000);
+        assert_eq!(result.docs_evicted, 0);
+        assert!(result.failures > 0);
+    }
+
+    #[test]
+    fn test_protected_count() {
+        let controller = create_test_controller();
+
+        assert_eq!(controller.protected_count(), 0);
+
+        controller
+            .storage
+            .register_document(StoredDocument::new("doc-1", QoSClass::Normal, 1000));
+        controller
+            .storage
+            .register_document(StoredDocument::new("doc-2", QoSClass::Normal, 1000));
+
+        controller.mark_protected("doc-1");
+        assert_eq!(controller.protected_count(), 1);
+
+        controller.mark_protected("doc-2");
+        assert_eq!(controller.protected_count(), 2);
+
+        controller.unmark_protected("doc-1");
+        assert_eq!(controller.protected_count(), 1);
+    }
+
+    #[test]
+    fn test_eviction_controller_debug() {
+        let controller = create_test_controller();
+        let debug_str = format!("{:?}", controller);
+        assert!(debug_str.contains("EvictionController"));
+        assert!(debug_str.contains("config"));
+    }
+
+    #[test]
+    fn test_eviction_controller_config_accessor() {
+        let storage = create_test_storage();
+        let audit_log = Arc::new(EvictionAuditLog::new(100));
+        let controller =
+            EvictionController::new(storage, audit_log).with_config(EvictionConfig::aggressive());
+
+        let config = controller.config();
+        assert_eq!(config.eviction_threshold, 0.75);
+        assert_eq!(config.target_pressure, 0.5);
+    }
+
+    #[test]
+    fn test_recent_stats_capped_at_10() {
+        let storage = create_test_storage();
+        let audit_log = Arc::new(EvictionAuditLog::new(100));
+        let controller =
+            EvictionController::new(storage.clone(), audit_log).with_config(EvictionConfig {
+                compress_before_eviction: false,
+                ..Default::default()
+            });
+
+        controller.set_eviction_callback(Box::new(|_| Ok(())));
+
+        // Force 15 eviction cycles
+        for _ in 0..15 {
+            controller.force_eviction(1);
+        }
+
+        // Recent stats should be capped at 10
+        assert!(controller.recent_stats().len() <= 10);
+    }
+
+    #[test]
+    fn test_compression_callback() {
+        // Use a small storage (20KB) to ensure high pressure after filling
+        let storage = Arc::new(QoSAwareStorage::new(20_000));
+        let audit_log = Arc::new(EvictionAuditLog::new(100));
+        let controller =
+            EvictionController::new(storage.clone(), audit_log).with_config(EvictionConfig {
+                compress_before_eviction: true,
+                ..Default::default()
+            });
+
+        // Register documents to create high pressure (>50% for compression threshold)
+        storage.register_document(StoredDocument::new("doc-1", QoSClass::Bulk, 15_000));
+
+        // Set compression callback that "compresses" to half size
+        controller.set_compression_callback(Box::new(|_doc_id| Ok(7_500)));
+
+        controller.set_eviction_callback(Box::new(|_| Ok(())));
+
+        let result = controller.force_eviction(4_000);
+        // With high pressure and compression enabled, at least one action should occur
+        let total_freed = result.bytes_freed + result.compression_savings;
+        assert!(
+            total_freed > 0 || result.docs_evicted > 0,
+            "Expected some space freed or evictions, got bytes_freed={}, compression_savings={}, docs_evicted={}",
+            result.bytes_freed, result.compression_savings, result.docs_evicted
+        );
+    }
 }
