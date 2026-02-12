@@ -100,7 +100,7 @@ fn spawn_peer_connection_retry(
             match transport.connect(&node_id).await {
                 Ok(conn) => {
                     *peer_connection.write().unwrap() = Some(conn);
-                    *selected_peer_id.write().unwrap() = Some(node_id);
+                    *selected_peer_id.write().unwrap() = Some(node_id.clone());
                     peer_retry_state.write().unwrap().take();
                     info!(
                         "Successfully connected to peer {} after {} retries",
@@ -108,7 +108,7 @@ fn spawn_peer_connection_retry(
                     );
 
                     // Flush any buffered telemetry packets now that parent is available
-                    TopologyManager::flush_buffer(&telemetry_buffer);
+                    TopologyManager::flush_buffer(&telemetry_buffer, &transport, &node_id).await;
 
                     return;
                 }
@@ -466,10 +466,10 @@ impl TopologyManager {
         self.lateral_connections.read().unwrap().len()
     }
 
-    /// Send a telemetry packet
+    /// Queue a telemetry packet for delivery.
     ///
-    /// If parent connection is available, sends immediately.
-    /// Otherwise, buffers the packet for later delivery (up to max_telemetry_buffer_size).
+    /// Packets are always buffered and flushed by the async event loop
+    /// when a parent connection is available.
     ///
     /// # Arguments
     ///
@@ -477,51 +477,36 @@ impl TopologyManager {
     ///
     /// # Returns
     ///
-    /// - `Ok(true)` if packet was sent immediately
-    /// - `Ok(false)` if packet was buffered
-    /// - `Err` if buffer is full and buffering is disabled
+    /// - `Ok(false)` — packet was buffered
+    /// - `Err` if buffering is disabled (`max_telemetry_buffer_size == 0`)
     pub fn send_telemetry(&self, packet: DataPacket) -> Result<bool, String> {
-        let has_parent = self.selected_peer_id.read().unwrap().is_some();
+        let max_buffer_size = self.builder.config().max_telemetry_buffer_size;
 
-        if has_parent {
-            // Parent connection available - attempt to send immediately
-            // For now, just return true (actual sending would go through MeshConnection)
-            // TODO: Implement actual packet sending through MeshConnection
-            info!(
-                "Sending telemetry packet {} immediately to parent",
-                packet.packet_id
+        if max_buffer_size == 0 {
+            return Err(
+                "Telemetry buffering is disabled (max_telemetry_buffer_size = 0)".to_string(),
             );
-            Ok(true)
-        } else {
-            // No parent connection - buffer the packet
-            let max_buffer_size = self.builder.config().max_telemetry_buffer_size;
+        }
 
-            if max_buffer_size == 0 {
-                return Err(
-                    "Telemetry buffering is disabled (max_telemetry_buffer_size = 0)".to_string(),
-                );
-            }
+        let mut buffer = self.telemetry_buffer.write().unwrap();
 
-            let mut buffer = self.telemetry_buffer.write().unwrap();
-
-            if buffer.len() >= max_buffer_size {
-                // Buffer is full - drop oldest packet (FIFO)
-                buffer.remove(0);
-                warn!(
-                    "Telemetry buffer full ({}), dropping oldest packet",
-                    max_buffer_size
-                );
-            }
-
-            info!(
-                "Buffering telemetry packet {} (buffer size: {}/{})",
-                packet.packet_id,
-                buffer.len() + 1,
+        if buffer.len() >= max_buffer_size {
+            // Buffer is full - drop oldest packet (FIFO)
+            buffer.remove(0);
+            warn!(
+                "Telemetry buffer full ({}), dropping oldest packet",
                 max_buffer_size
             );
-            buffer.push(packet);
-            Ok(false)
         }
+
+        info!(
+            "Queuing telemetry packet {} for parent (buffer size: {}/{})",
+            packet.packet_id,
+            buffer.len() + 1,
+            max_buffer_size
+        );
+        buffer.push(packet);
+        Ok(false)
     }
 
     /// Get current telemetry buffer size
@@ -529,35 +514,40 @@ impl TopologyManager {
         self.telemetry_buffer.read().unwrap().len()
     }
 
-    /// Flush telemetry buffer (helper for event_loop)
-    fn flush_buffer(telemetry_buffer: &Arc<RwLock<Vec<DataPacket>>>) {
-        let buffer_size = {
-            let buffer = telemetry_buffer.read().unwrap();
-            buffer.len()
-        };
+    /// Drain the telemetry buffer and return packets for async sending.
+    fn drain_buffer(telemetry_buffer: &Arc<RwLock<Vec<DataPacket>>>) -> Vec<DataPacket> {
+        let mut buffer = telemetry_buffer.write().unwrap();
+        buffer.drain(..).collect()
+    }
 
-        if buffer_size == 0 {
+    /// Flush telemetry buffer by sending packets through the transport.
+    async fn flush_buffer(
+        telemetry_buffer: &Arc<RwLock<Vec<DataPacket>>>,
+        transport: &Arc<dyn MeshTransport>,
+        peer_id: &NodeId,
+    ) {
+        let packets = Self::drain_buffer(telemetry_buffer);
+        if packets.is_empty() {
             return;
         }
 
+        let count = packets.len();
         info!(
-            "Flushing {} buffered telemetry packets to new parent",
-            buffer_size
+            "Flushing {} buffered telemetry packets to parent {}",
+            count, peer_id
         );
 
-        // Take all buffered packets
-        let buffered_packets: Vec<DataPacket> = {
-            let mut buffer = telemetry_buffer.write().unwrap();
-            buffer.drain(..).collect()
-        };
-
-        // TODO: Implement actual packet sending through MeshConnection
-        // For now, just log that we would send them
-        for packet in buffered_packets {
-            debug!("Flushing telemetry packet {} to parent", packet.packet_id);
+        for packet in &packets {
+            let data = serde_json::to_vec(packet).unwrap_or_default();
+            if let Err(e) = transport.send_to(peer_id, &data).await {
+                warn!(
+                    "Failed to send telemetry packet {}: {}",
+                    packet.packet_id, e
+                );
+            }
         }
 
-        info!("Successfully flushed {} telemetry packets", buffer_size);
+        info!("Flushed {} telemetry packets", count);
     }
 
     /// Event processing loop
@@ -589,12 +579,12 @@ impl TopologyManager {
                     match transport.connect(&node_id).await {
                         Ok(conn) => {
                             *peer_connection.write().unwrap() = Some(conn);
-                            *selected_peer_id.write().unwrap() = Some(node_id);
+                            *selected_peer_id.write().unwrap() = Some(node_id.clone());
                             peer_retry_state.write().unwrap().take(); // Clear any retry state
                             info!("Successfully connected to peer: {}", new_peer_id);
 
                             // Flush any buffered telemetry packets now that parent is available
-                            Self::flush_buffer(&telemetry_buffer);
+                            Self::flush_buffer(&telemetry_buffer, &transport, &node_id).await;
                         }
                         Err(e) => {
                             warn!("Failed to connect to peer {}: {}", new_peer_id, e);
@@ -650,11 +640,11 @@ impl TopologyManager {
                     match transport.connect(&new_id).await {
                         Ok(conn) => {
                             *peer_connection.write().unwrap() = Some(conn);
-                            *selected_peer_id.write().unwrap() = Some(new_id);
+                            *selected_peer_id.write().unwrap() = Some(new_id.clone());
                             info!("Successfully changed to peer: {}", new_peer_id);
 
                             // Flush any buffered telemetry packets now that new parent is available
-                            Self::flush_buffer(&telemetry_buffer);
+                            Self::flush_buffer(&telemetry_buffer, &transport, &new_id).await;
                         }
                         Err(e) => {
                             warn!("Failed to connect to new peer {}: {}", new_peer_id, e);
@@ -1273,31 +1263,31 @@ mod tests {
     }
 
     // =========================================================================
-    // send_telemetry() — parent present (immediate send path)
+    // send_telemetry() — always buffers for async event-loop delivery
     // =========================================================================
 
     #[test]
-    fn test_send_telemetry_sends_immediately_when_parent_present() {
+    fn test_send_telemetry_buffers_even_when_parent_present() {
         let mgr = make_test_manager();
         // Simulate a parent connection by setting selected_peer_id
         *mgr.selected_peer_id.write().unwrap() = Some(NodeId::new("parent-node".to_string()));
 
         let packet = DataPacket::telemetry("node-1", vec![1, 2, 3]);
         let result = mgr.send_telemetry(packet);
-        assert_eq!(result, Ok(true)); // sent immediately
-        assert_eq!(mgr.telemetry_buffer_size(), 0); // nothing buffered
+        assert_eq!(result, Ok(false)); // always buffered for event loop
+        assert_eq!(mgr.telemetry_buffer_size(), 1);
     }
 
     #[test]
-    fn test_send_telemetry_does_not_buffer_when_parent_present() {
+    fn test_send_telemetry_buffers_multiple_when_parent_present() {
         let mgr = make_test_manager();
         *mgr.selected_peer_id.write().unwrap() = Some(NodeId::new("parent-node".to_string()));
 
         for i in 0..10 {
             let packet = DataPacket::telemetry("node-1", vec![i]);
-            assert_eq!(mgr.send_telemetry(packet), Ok(true));
+            assert_eq!(mgr.send_telemetry(packet), Ok(false));
         }
-        assert_eq!(mgr.telemetry_buffer_size(), 0);
+        assert_eq!(mgr.telemetry_buffer_size(), 10);
     }
 
     // =========================================================================
@@ -1327,11 +1317,11 @@ mod tests {
     }
 
     // =========================================================================
-    // flush_buffer() (static helper)
+    // drain_buffer() / flush_buffer() (static helpers)
     // =========================================================================
 
     #[test]
-    fn test_flush_buffer_clears_all_packets() {
+    fn test_drain_buffer_returns_all_packets() {
         let buffer: Arc<RwLock<Vec<DataPacket>>> = Arc::new(RwLock::new(Vec::new()));
         for i in 0..5 {
             buffer
@@ -1341,14 +1331,42 @@ mod tests {
         }
         assert_eq!(buffer.read().unwrap().len(), 5);
 
-        TopologyManager::flush_buffer(&buffer);
+        let packets = TopologyManager::drain_buffer(&buffer);
+        assert_eq!(packets.len(), 5);
         assert_eq!(buffer.read().unwrap().len(), 0);
     }
 
     #[test]
-    fn test_flush_buffer_noop_on_empty() {
+    fn test_drain_buffer_empty_returns_empty_vec() {
         let buffer: Arc<RwLock<Vec<DataPacket>>> = Arc::new(RwLock::new(Vec::new()));
-        TopologyManager::flush_buffer(&buffer);
+        let packets = TopologyManager::drain_buffer(&buffer);
+        assert!(packets.is_empty());
+        assert_eq!(buffer.read().unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_flush_buffer_sends_via_transport() {
+        let buffer: Arc<RwLock<Vec<DataPacket>>> = Arc::new(RwLock::new(Vec::new()));
+        for i in 0..3 {
+            buffer
+                .write()
+                .unwrap()
+                .push(DataPacket::telemetry("n", vec![i]));
+        }
+        let transport: Arc<dyn MeshTransport> = Arc::new(MockTransport::new());
+        let peer = NodeId::new("parent".into());
+
+        TopologyManager::flush_buffer(&buffer, &transport, &peer).await;
+        assert_eq!(buffer.read().unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_flush_buffer_noop_on_empty() {
+        let buffer: Arc<RwLock<Vec<DataPacket>>> = Arc::new(RwLock::new(Vec::new()));
+        let transport: Arc<dyn MeshTransport> = Arc::new(MockTransport::new());
+        let peer = NodeId::new("parent".into());
+
+        TopologyManager::flush_buffer(&buffer, &transport, &peer).await;
         assert_eq!(buffer.read().unwrap().len(), 0);
     }
 
@@ -2051,8 +2069,8 @@ mod tests {
     // send_telemetry + parent transition scenario
     // =========================================================================
 
-    #[test]
-    fn test_send_telemetry_buffer_then_parent_arrives() {
+    #[tokio::test]
+    async fn test_send_telemetry_buffer_then_parent_arrives() {
         let mgr = make_test_manager();
 
         // Buffer some packets (no parent)
@@ -2063,14 +2081,15 @@ mod tests {
         assert_eq!(mgr.telemetry_buffer_size(), 3);
 
         // Simulate parent arriving — flush buffer
-        TopologyManager::flush_buffer(&mgr.telemetry_buffer);
+        let peer = NodeId::new("parent".into());
+        TopologyManager::flush_buffer(&mgr.telemetry_buffer, &mgr.transport, &peer).await;
         assert_eq!(mgr.telemetry_buffer_size(), 0);
 
-        // Now set parent and send — should be immediate
+        // Now set parent and send — always buffers for event loop delivery
         *mgr.selected_peer_id.write().unwrap() = Some(NodeId::new("parent".to_string()));
         let result = mgr.send_telemetry(DataPacket::telemetry("n", vec![42]));
-        assert_eq!(result, Ok(true));
-        assert_eq!(mgr.telemetry_buffer_size(), 0);
+        assert_eq!(result, Ok(false)); // Always buffered now
+        assert_eq!(mgr.telemetry_buffer_size(), 1);
     }
 
     // =========================================================================

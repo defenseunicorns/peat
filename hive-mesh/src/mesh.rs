@@ -7,7 +7,7 @@
 use crate::config::MeshConfig;
 use crate::hierarchy::HierarchyStrategy;
 use crate::routing::MeshRouter;
-use crate::transport::{MeshTransport, NodeId, TransportError};
+use crate::transport::{MeshTransport, NodeId, TransportError, TransportManager};
 use std::fmt;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
@@ -129,6 +129,7 @@ pub struct HiveMesh {
     node_id: String,
     state: RwLock<MeshState>,
     transport: Option<Arc<dyn MeshTransport>>,
+    transport_manager: Option<TransportManager>,
     hierarchy: Option<Arc<dyn HierarchyStrategy>>,
     router: Option<MeshRouter>,
     event_tx: broadcast::Sender<HiveMeshEvent>,
@@ -150,6 +151,7 @@ impl HiveMesh {
             node_id,
             state: RwLock::new(MeshState::Created),
             transport: None,
+            transport_manager: None,
             hierarchy: None,
             router: None,
             event_tx,
@@ -244,6 +246,16 @@ impl HiveMesh {
     /// Set the transport layer.
     pub fn set_transport(&mut self, transport: Arc<dyn MeshTransport>) {
         self.transport = Some(transport);
+    }
+
+    /// Set the multi-transport manager for PACE-based transport selection.
+    pub fn set_transport_manager(&mut self, tm: TransportManager) {
+        self.transport_manager = Some(tm);
+    }
+
+    /// Get a reference to the transport manager, if set.
+    pub fn transport_manager(&self) -> Option<&TransportManager> {
+        self.transport_manager.as_ref()
     }
 
     /// Set the hierarchy strategy.
@@ -351,6 +363,7 @@ impl crate::broker::state::MeshBrokerState for HiveMesh {
 pub struct HiveMeshBuilder {
     config: MeshConfig,
     transport: Option<Arc<dyn MeshTransport>>,
+    transport_manager: Option<TransportManager>,
     hierarchy: Option<Arc<dyn HierarchyStrategy>>,
     router: Option<MeshRouter>,
 }
@@ -361,14 +374,21 @@ impl HiveMeshBuilder {
         Self {
             config,
             transport: None,
+            transport_manager: None,
             hierarchy: None,
             router: None,
         }
     }
 
-    /// Set the transport layer.
+    /// Set a single transport layer.
     pub fn with_transport(mut self, transport: Arc<dyn MeshTransport>) -> Self {
         self.transport = Some(transport);
+        self
+    }
+
+    /// Set the multi-transport manager for PACE-based transport selection.
+    pub fn with_transport_manager(mut self, tm: TransportManager) -> Self {
+        self.transport_manager = Some(tm);
         self
     }
 
@@ -398,6 +418,7 @@ impl HiveMeshBuilder {
             node_id,
             state: RwLock::new(MeshState::Created),
             transport: self.transport,
+            transport_manager: self.transport_manager,
             hierarchy: self.hierarchy,
             router: self.router,
             event_tx,
@@ -944,6 +965,64 @@ mod tests {
         assert_eq!(mesh.state(), MeshState::Running);
         assert!(mesh.stop().is_ok());
         assert_eq!(mesh.state(), MeshState::Stopped);
+    }
+
+    // ── TransportManager integration ──────────────────────────────
+
+    #[test]
+    fn test_transport_manager_initially_none() {
+        let mesh = HiveMesh::new(MeshConfig::default());
+        assert!(mesh.transport_manager().is_none());
+    }
+
+    #[test]
+    fn test_set_transport_manager() {
+        use crate::transport::TransportManagerConfig;
+        let mut mesh = HiveMesh::new(MeshConfig::default());
+        let tm = TransportManager::new(TransportManagerConfig::default());
+        mesh.set_transport_manager(tm);
+        assert!(mesh.transport_manager().is_some());
+    }
+
+    #[test]
+    fn test_builder_with_transport_manager() {
+        use crate::transport::TransportManagerConfig;
+        let tm = TransportManager::new(TransportManagerConfig::default());
+        let mesh = HiveMeshBuilder::new(MeshConfig::default())
+            .with_transport_manager(tm)
+            .build();
+        assert!(mesh.transport_manager().is_some());
+    }
+
+    #[test]
+    fn test_builder_full_with_transport_manager() {
+        use crate::beacon::HierarchyLevel;
+        use crate::hierarchy::{NodeRole, StaticHierarchyStrategy};
+        use crate::transport::TransportManagerConfig;
+
+        let strategy = StaticHierarchyStrategy {
+            assigned_level: HierarchyLevel::Platoon,
+            assigned_role: NodeRole::Leader,
+        };
+        let peers = vec![NodeId::new("p1".into())];
+        let router = MeshRouter::with_node_id("full");
+        let tm = TransportManager::new(TransportManagerConfig::default());
+
+        let mesh = HiveMeshBuilder::new(MeshConfig {
+            node_id: Some("full-tm-node".to_string()),
+            ..Default::default()
+        })
+        .with_transport(Arc::new(MockTransport::new(peers)))
+        .with_transport_manager(tm)
+        .with_hierarchy(Arc::new(strategy))
+        .with_router(router)
+        .build();
+
+        assert_eq!(mesh.node_id(), "full-tm-node");
+        assert!(mesh.transport().is_some());
+        assert!(mesh.transport_manager().is_some());
+        assert!(mesh.hierarchy().is_some());
+        assert!(mesh.router().is_some());
     }
 }
 

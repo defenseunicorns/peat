@@ -1,7 +1,7 @@
 # ADR-049: hive-mesh Extraction (Open Source Sync Layer)
 
-**Status**: Proposed  
-**Date**: 2025-01-31  
+**Status**: IMPLEMENTED (All 8 Phases Complete — PRs #622-#629)
+**Date**: 2025-01-31 (proposed) / 2026-02-12 (completed)
 **Authors**: Kit Plummer, Claude  
 **Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)  
 **Priority**: URGENT - Blocking for Defense Unicorns transition  
@@ -586,12 +586,21 @@ full = ["iroh", "ble"]
 | 2025-01-31 | Extract hive-mesh as standalone crate | IP clarity for DU transition, open source positioning |
 | 2025-01-31 | Automerge + Iroh as foundation | Already validated in ADR-011, production-ready |
 | 2025-01-31 | Zero HIVE semantics in hive-mesh | Clean separation, general-purpose utility |
-| TBD | API surface design | Team decision needed |
-| TBD | Repository structure | Team decision needed |
-| TBD | Transport ownership | Team decision needed |
+| 2026-02-11 | Phase 0: Break reverse deps (PR #622) | Remove all hive-protocol/hive-schema imports from hive-mesh |
+| 2026-02-11 | Phase 1: Generic trait surface (PR #623) | DocumentStore, SyncEngine, DiscoveryStrategy traits |
+| 2026-02-11 | Phase 2: Transport layer (PR #624) | Multi-transport manager, bypass, health, reconnection |
+| 2026-02-11 | Phase 3: Storage/persistence (PR #625) | Automerge, Iroh blobs, negentropy, query, TTL |
+| 2026-02-11 | Phase 4: QoS framework (PR #626) | 5-level priority, bandwidth, eviction, GC, audit |
+| 2026-02-11 | Phase 5: Security primitives (PR #627) | Ed25519, X25519, ChaCha20, HMAC-SHA256, callsigns |
+| 2026-02-12 | Phase 6: Service broker (PR #628) | Axum HTTP + WebSocket, feature-gated |
+| 2026-02-12 | Phase 7: HiveMesh facade (PR #629) | Unified entry point, builder, lifecycle, events |
+| TBD | API surface design | Clean-sheet Rust-native (not Ditto-compat) |
+| TBD | Repository structure | Currently monorepo workspace, separate repo planned |
+| TBD | Transport ownership | hive-mesh owns transport trait + Iroh default |
 
 ---
 
-**Last Updated**: 2025-01-31  
-**Status**: PROPOSED - URGENT for DU transition  
-**Next Action**: Team review of Open Questions, begin Phase 1 extraction
+**Last Updated**: 2026-02-12
+**Status**: IMPLEMENTED — All 8 phases complete (PRs #622-#629)
+**Result**: 50,124 lines of standalone mesh code, 1,151 unit tests, zero hive-protocol/hive-schema dependencies
+**Next Action**: README, examples, crates.io publish, Collection convenience API
