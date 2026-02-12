@@ -318,6 +318,16 @@ pub trait MeshTransport: Send + Sync {
         self.get_connection(peer_id).is_some()
     }
 
+    /// Send data to a connected peer.
+    ///
+    /// Returns the number of bytes sent.
+    async fn send_to(&self, peer_id: &NodeId, data: &[u8]) -> Result<usize> {
+        let _ = (peer_id, data);
+        Err(TransportError::ConnectionFailed(
+            "send not implemented".into(),
+        ))
+    }
+
     /// Subscribe to peer connection events
     fn subscribe_peer_events(&self) -> PeerEventReceiver;
 
@@ -609,5 +619,50 @@ mod tests {
             alive: false,
         };
         assert_eq!(conn.disconnect_reason(), Some(DisconnectReason::Unknown));
+    }
+
+    // --- MeshTransport::send_to default ---
+
+    struct MinimalTransport;
+
+    #[async_trait::async_trait]
+    impl MeshTransport for MinimalTransport {
+        async fn start(&self) -> Result<()> {
+            Ok(())
+        }
+        async fn stop(&self) -> Result<()> {
+            Ok(())
+        }
+        async fn connect(&self, _: &NodeId) -> Result<Box<dyn MeshConnection>> {
+            Err(TransportError::NotStarted)
+        }
+        async fn disconnect(&self, _: &NodeId) -> Result<()> {
+            Ok(())
+        }
+        fn get_connection(&self, _: &NodeId) -> Option<Box<dyn MeshConnection>> {
+            None
+        }
+        fn peer_count(&self) -> usize {
+            0
+        }
+        fn connected_peers(&self) -> Vec<NodeId> {
+            vec![]
+        }
+        fn subscribe_peer_events(&self) -> PeerEventReceiver {
+            let (_tx, rx) = tokio::sync::mpsc::channel(1);
+            rx
+        }
+    }
+
+    #[tokio::test]
+    async fn test_send_to_default_returns_error() {
+        let transport = MinimalTransport;
+        let peer = NodeId::new("peer-1".into());
+        let result = transport.send_to(&peer, b"hello").await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, TransportError::ConnectionFailed(msg) if msg.contains("send not implemented"))
+        );
     }
 }

@@ -154,4 +154,58 @@ mod tests {
         assert!(beacons.read().await.contains_key("fresh"));
         assert!(!beacons.read().await.contains_key("expired"));
     }
+
+    #[tokio::test]
+    async fn test_janitor_double_start() {
+        let beacons = Arc::new(RwLock::new(HashMap::new()));
+        let janitor =
+            BeaconJanitor::new(beacons, Duration::from_secs(30), Duration::from_millis(100));
+
+        janitor.start().await;
+        assert!(*janitor.running.read().await);
+
+        // Second start is a no-op (already running)
+        janitor.start().await;
+        assert!(*janitor.running.read().await);
+
+        janitor.stop().await;
+    }
+
+    #[tokio::test]
+    async fn test_janitor_stop_before_start() {
+        let beacons = Arc::new(RwLock::new(HashMap::new()));
+        let janitor =
+            BeaconJanitor::new(beacons, Duration::from_secs(30), Duration::from_millis(100));
+
+        // Stop on never-started janitor should not panic
+        janitor.stop().await;
+        assert!(!*janitor.running.read().await);
+    }
+
+    #[tokio::test]
+    async fn test_janitor_construction() {
+        let beacons: Arc<RwLock<HashMap<String, GeographicBeacon>>> =
+            Arc::new(RwLock::new(HashMap::new()));
+        let janitor = BeaconJanitor::new(beacons, Duration::from_secs(60), Duration::from_secs(10));
+        // Verify initial state
+        assert!(!*janitor.running.read().await);
+    }
+
+    #[tokio::test]
+    async fn test_janitor_empty_map_cleanup() {
+        let beacons = Arc::new(RwLock::new(HashMap::new()));
+        let janitor = BeaconJanitor::new(
+            beacons.clone(),
+            Duration::from_secs(5),
+            Duration::from_millis(50),
+        );
+
+        janitor.start().await;
+        // Let cleanup run on empty map
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        janitor.stop().await;
+
+        // Should still be empty, no crash
+        assert_eq!(beacons.read().await.len(), 0);
+    }
 }

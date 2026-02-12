@@ -198,4 +198,71 @@ mod tests {
         assert_eq!(role, NodeRole::Member);
         assert!(!node2.is_leader().await);
     }
+
+    #[test]
+    fn test_flat_mesh_node_id() {
+        let profile = create_test_profile(NodeMobility::Static, 30);
+        let coordinator = FlatMeshCoordinator::new("my-node".to_string(), profile, None);
+        assert_eq!(coordinator.node_id(), "my-node");
+    }
+
+    #[test]
+    fn test_flat_mesh_hierarchy_level() {
+        let profile = create_test_profile(NodeMobility::Static, 30);
+        let coordinator = FlatMeshCoordinator::new("n".to_string(), profile, None);
+        assert_eq!(coordinator.hierarchy_level(), HierarchyLevel::Squad);
+    }
+
+    #[tokio::test]
+    async fn test_flat_mesh_initial_role() {
+        let profile = create_test_profile(NodeMobility::Static, 30);
+        let coordinator = FlatMeshCoordinator::new("n".to_string(), profile, None);
+        assert_eq!(coordinator.current_role().await, NodeRole::Standalone);
+    }
+
+    #[tokio::test]
+    async fn test_flat_mesh_peer_count_empty() {
+        let profile = create_test_profile(NodeMobility::Static, 30);
+        let coordinator = FlatMeshCoordinator::new("n".to_string(), profile, None);
+        assert_eq!(coordinator.peer_count().await, 0);
+    }
+
+    #[tokio::test]
+    async fn test_flat_mesh_role_transition() {
+        // Start as leader (best node, lower cpu)
+        let profile = create_test_profile(NodeMobility::Static, 20);
+        let coordinator = FlatMeshCoordinator::new("node-a".to_string(), profile, None);
+
+        // Worse peer → we are leader
+        let worse_profile = create_test_profile(NodeMobility::Mobile, 70);
+        let worse_beacon =
+            create_test_beacon("node-b", GeoPosition::new(37.775, -122.419), worse_profile);
+        let role = coordinator.update_peers(vec![worse_beacon]).await;
+        assert_eq!(role, NodeRole::Leader);
+
+        // Now a better peer appears → we become member
+        let better_profile = create_test_profile(NodeMobility::Static, 10);
+        let better_beacon =
+            create_test_beacon("node-c", GeoPosition::new(37.776, -122.418), better_profile);
+        let role = coordinator.update_peers(vec![better_beacon]).await;
+        assert_eq!(role, NodeRole::Member);
+    }
+
+    #[tokio::test]
+    async fn test_flat_mesh_custom_election_config() {
+        use crate::hierarchy::ElectionWeights;
+        let profile = create_test_profile(NodeMobility::Static, 30);
+        let custom_config = ElectionConfig {
+            priority_weights: ElectionWeights {
+                mobility: 0.5,
+                resources: 0.3,
+                battery: 0.2,
+            },
+            hysteresis: 0.15,
+        };
+        let coordinator =
+            FlatMeshCoordinator::new("custom".to_string(), profile, Some(custom_config));
+        assert_eq!(coordinator.node_id(), "custom");
+        assert_eq!(coordinator.hierarchy_level(), HierarchyLevel::Squad);
+    }
 }
