@@ -36,7 +36,7 @@ pub use topology::{
 };
 pub use transport::{
     ConnectionHealth, ConnectionState, DisconnectReason, MeshConnection, MeshTransport, NodeId,
-    PeerEvent, PeerEventReceiver, TransportError,
+    PeerEvent, PeerEventReceiver, TransportError, TransportManager, TransportManagerConfig,
 };
 
 // Phase 7 facade re-exports
