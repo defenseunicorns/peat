@@ -432,10 +432,7 @@ mod tests {
         }
     }
 
-    fn make_nearby_beacon(
-        node_id: &str,
-        geohash: &str,
-    ) -> crate::beacon::types::GeographicBeacon {
+    fn make_nearby_beacon(node_id: &str, geohash: &str) -> crate::beacon::types::GeographicBeacon {
         use crate::beacon::types::{GeoPosition, HierarchyLevel};
         let mut beacon = crate::beacon::types::GeographicBeacon::new(
             node_id.to_string(),

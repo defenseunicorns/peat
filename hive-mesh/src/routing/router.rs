@@ -1362,10 +1362,7 @@ mod tests {
             payload: vec![4, 5, 6],
         };
         let decision = router.route(&packet, &state, "member-node");
-        assert!(matches!(
-            decision,
-            RoutingDecision::ForwardMulticast { .. }
-        ));
+        assert!(matches!(decision, RoutingDecision::ForwardMulticast { .. }));
     }
 
     #[test]
@@ -1462,10 +1459,7 @@ mod tests {
         };
         let decision = router.route(&packet, &state, "member-node");
         // Member doesn't consume broadcast commands, just forwards
-        assert!(matches!(
-            decision,
-            RoutingDecision::ForwardMulticast { .. }
-        ));
+        assert!(matches!(decision, RoutingDecision::ForwardMulticast { .. }));
     }
 
     #[test]

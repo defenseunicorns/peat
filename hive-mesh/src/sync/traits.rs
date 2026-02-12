@@ -758,18 +758,10 @@ mod tests {
             ) -> anyhow::Result<Vec<Document>> {
                 Ok(vec![])
             }
-            async fn remove(
-                &self,
-                _collection: &str,
-                _doc_id: &DocumentId,
-            ) -> anyhow::Result<()> {
+            async fn remove(&self, _collection: &str, _doc_id: &DocumentId) -> anyhow::Result<()> {
                 Ok(())
             }
-            fn observe(
-                &self,
-                _collection: &str,
-                _query: &Query,
-            ) -> anyhow::Result<ChangeStream> {
+            fn observe(&self, _collection: &str, _query: &Query) -> anyhow::Result<ChangeStream> {
                 let (_tx, rx) = tokio::sync::mpsc::unbounded_channel();
                 Ok(ChangeStream { receiver: rx })
             }
@@ -854,10 +846,7 @@ mod tests {
     async fn test_document_store_delete_with_none_reason() {
         let store = MockDocStore::new();
         store.insert("col", Document::with_id("d1", HashMap::new()));
-        let result = store
-            .delete("col", &"d1".to_string(), None)
-            .await
-            .unwrap();
+        let result = store.delete("col", &"d1".to_string(), None).await.unwrap();
         assert!(result.deleted);
     }
 
@@ -872,7 +861,10 @@ mod tests {
     async fn test_document_store_is_deleted_with_non_bool_field() {
         let store = MockDocStore::new();
         let mut fields = HashMap::new();
-        fields.insert("_deleted".to_string(), Value::String("not-a-bool".to_string()));
+        fields.insert(
+            "_deleted".to_string(),
+            Value::String("not-a-bool".to_string()),
+        );
         store.insert("col", Document::with_id("d1", fields));
 
         // Value is not a bool, so should return false
@@ -965,18 +957,10 @@ mod tests {
             ) -> anyhow::Result<Vec<Document>> {
                 Ok(vec![])
             }
-            async fn remove(
-                &self,
-                _collection: &str,
-                _doc_id: &DocumentId,
-            ) -> anyhow::Result<()> {
+            async fn remove(&self, _collection: &str, _doc_id: &DocumentId) -> anyhow::Result<()> {
                 Ok(())
             }
-            fn observe(
-                &self,
-                _collection: &str,
-                _query: &Query,
-            ) -> anyhow::Result<ChangeStream> {
+            fn observe(&self, _collection: &str, _query: &Query) -> anyhow::Result<ChangeStream> {
                 let (_tx, rx) = tokio::sync::mpsc::unbounded_channel();
                 Ok(ChangeStream { receiver: rx })
             }
@@ -987,7 +971,10 @@ mod tests {
 
         let store = ImmutableStore::new();
         // Exercise all methods
-        let id = store.upsert("col", Document::with_id("x", HashMap::new())).await.unwrap();
+        let id = store
+            .upsert("col", Document::with_id("x", HashMap::new()))
+            .await
+            .unwrap();
         assert_eq!(id, "id");
         let docs = store.query("col", &Query::All).await.unwrap();
         assert!(docs.is_empty());
@@ -995,7 +982,10 @@ mod tests {
         let _stream = store.observe("col", &Query::All).unwrap();
 
         // Test immutable delete
-        let result = store.delete("col", &"doc1".to_string(), None).await.unwrap();
+        let result = store
+            .delete("col", &"doc1".to_string(), None)
+            .await
+            .unwrap();
         assert!(!result.deleted);
     }
 }
