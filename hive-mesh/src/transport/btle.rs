@@ -284,6 +284,17 @@ impl<A: BleAdapter + Send + Sync + 'static> MeshTransport for HiveBleTransport<A
             .collect()
     }
 
+    async fn send_to(&self, peer_id: &NodeId, data: &[u8]) -> Result<usize> {
+        let btle_peer_id = hive_to_btle_node_id(peer_id).ok_or_else(|| {
+            TransportError::PeerNotFound(format!("Invalid NodeId format: {}", peer_id))
+        })?;
+
+        self.inner
+            .send_to(&btle_peer_id, data)
+            .await
+            .map_err(|e| TransportError::ConnectionFailed(e.to_string()))
+    }
+
     fn subscribe_peer_events(&self) -> PeerEventReceiver {
         let (tx, rx) = mpsc::channel(PEER_EVENT_CHANNEL_CAPACITY);
         self.event_senders.write().unwrap().push(tx);
@@ -438,5 +449,24 @@ mod tests {
         let node_id = transport.node_id();
         let expected = format!("{:08X}", config.node_id.as_u32());
         assert_eq!(node_id.as_str(), expected);
+    }
+
+    #[tokio::test]
+    async fn test_send_to_no_connection() {
+        let transport = create_test_transport();
+        // StubAdapter has no connections, so send_to should fail
+        let result = transport
+            .send_to(&NodeId::new("12345678".to_string()), b"hello")
+            .await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_send_to_invalid_node_id() {
+        let transport = create_test_transport();
+        let result = transport
+            .send_to(&NodeId::new("not_hex".to_string()), b"hello")
+            .await;
+        assert!(result.is_err());
     }
 }

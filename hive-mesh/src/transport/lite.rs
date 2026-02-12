@@ -797,6 +797,29 @@ impl MeshTransport for LiteMeshTransport {
             .collect()
     }
 
+    async fn send_to(&self, peer_id: &NodeId, data: &[u8]) -> Result<usize> {
+        let socket_guard = self.socket.lock().await;
+        let socket = socket_guard.as_ref().ok_or(TransportError::NotStarted)?;
+
+        let addr = {
+            let peers = self.peers.read().unwrap();
+            match peers.get(peer_id.as_str()) {
+                Some(peer_state) => {
+                    let addr = peer_state.read().unwrap().address;
+                    addr
+                }
+                None => return Err(TransportError::PeerNotFound(peer_id.to_string())),
+            }
+        };
+
+        let sent = socket
+            .send_to(data, addr)
+            .await
+            .map_err(|e| TransportError::Other(Box::new(e)))?;
+
+        Ok(sent)
+    }
+
     fn subscribe_peer_events(&self) -> PeerEventReceiver {
         let (tx, rx) = mpsc::channel(PEER_EVENT_CHANNEL_CAPACITY);
         self.event_senders.lock().unwrap().push(tx);
