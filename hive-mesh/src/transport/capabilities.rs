@@ -1219,6 +1219,204 @@ mod tests {
     }
 
     #[test]
+    fn test_wifi_direct_capabilities() {
+        let caps = TransportCapabilities::wifi_direct();
+        assert_eq!(caps.transport_type, TransportType::WifiDirect);
+        assert_eq!(caps.max_range_meters, 200);
+        assert!(caps.reliable);
+        assert!(caps.supports_broadcast);
+        assert!(caps.requires_pairing);
+        assert_eq!(caps.battery_impact, 50);
+    }
+
+    #[test]
+    fn test_lora_all_spreading_factors() {
+        // Test all known spreading factors
+        for sf in [7, 8, 9, 10, 11, 12] {
+            let caps = TransportCapabilities::lora(sf);
+            assert_eq!(caps.transport_type, TransportType::LoRa);
+            assert!(!caps.reliable);
+            assert!(caps.supports_broadcast);
+            assert_eq!(caps.max_message_size, 255);
+        }
+
+        // Test default/unknown SF
+        let caps_default = TransportCapabilities::lora(6);
+        assert_eq!(caps_default.max_bandwidth_bps, 5_000);
+        assert_eq!(caps_default.max_range_meters, 10_000);
+    }
+
+    #[test]
+    fn test_transport_capabilities_default() {
+        let caps = TransportCapabilities::default();
+        assert_eq!(caps.transport_type, TransportType::Quic);
+    }
+
+    #[test]
+    fn test_transport_type_display_all() {
+        assert_eq!(
+            TransportType::BluetoothClassic.to_string(),
+            "Bluetooth Classic"
+        );
+        assert_eq!(TransportType::WifiDirect.to_string(), "WiFi Direct");
+        assert_eq!(TransportType::TacticalRadio.to_string(), "Tactical Radio");
+        assert_eq!(TransportType::Satellite.to_string(), "Satellite");
+    }
+
+    #[test]
+    fn test_range_mode_display() {
+        assert_eq!(RangeMode::Standard.to_string(), "standard");
+        assert_eq!(RangeMode::Extended.to_string(), "extended");
+        assert_eq!(RangeMode::Maximum.to_string(), "maximum");
+        assert_eq!(RangeMode::Custom(42).to_string(), "custom(42)");
+    }
+
+    #[test]
+    fn test_range_mode_default() {
+        assert_eq!(RangeMode::default(), RangeMode::Standard);
+    }
+
+    #[test]
+    fn test_message_priority_display() {
+        assert_eq!(MessagePriority::Background.to_string(), "background");
+        assert_eq!(MessagePriority::Normal.to_string(), "normal");
+        assert_eq!(MessagePriority::High.to_string(), "high");
+        assert_eq!(MessagePriority::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn test_message_priority_default() {
+        assert_eq!(MessagePriority::default(), MessagePriority::Normal);
+    }
+
+    #[test]
+    fn test_pace_level_default() {
+        assert_eq!(PaceLevel::default(), PaceLevel::Primary);
+    }
+
+    #[test]
+    fn test_transport_mode_default() {
+        let mode = TransportMode::default();
+        assert!(matches!(mode, TransportMode::Single));
+    }
+
+    #[test]
+    fn test_transport_mode_bonded() {
+        let mode = TransportMode::Bonded;
+        let _ = format!("{:?}", mode);
+    }
+
+    #[test]
+    fn test_distance_source_all_variants() {
+        let tof = DistanceSource::Tof { precision_ns: 100 };
+        let configured = DistanceSource::Configured;
+        let unknown = DistanceSource::Unknown;
+        let _ = format!("{:?}", tof);
+        let _ = format!("{:?}", configured);
+        let _ = format!("{:?}", unknown);
+    }
+
+    #[test]
+    fn test_peer_distance_construction() {
+        let pd = PeerDistance {
+            peer_id: NodeId::new("test-peer".to_string()),
+            distance_meters: 500,
+            source: DistanceSource::Gps {
+                confidence_meters: 5,
+            },
+            last_updated: Instant::now(),
+        };
+        assert_eq!(pd.distance_meters, 500);
+        let _ = format!("{:?}", pd);
+    }
+
+    #[test]
+    fn test_range_mode_config_current_capabilities() {
+        let modes = vec![
+            (RangeMode::Standard, TransportCapabilities::bluetooth_le()),
+            (
+                RangeMode::Extended,
+                TransportCapabilities {
+                    max_bandwidth_bps: 125_000,
+                    max_range_meters: 200,
+                    ..TransportCapabilities::bluetooth_le()
+                },
+            ),
+        ];
+        let config = RangeModeConfig::new(modes);
+        let caps = config.current_capabilities();
+        assert!(caps.is_some());
+        assert_eq!(caps.unwrap().transport_type, TransportType::BluetoothLE);
+    }
+
+    #[test]
+    fn test_range_mode_config_no_match_for_distance() {
+        let modes = vec![(
+            RangeMode::Standard,
+            TransportCapabilities {
+                max_range_meters: 50,
+                ..TransportCapabilities::bluetooth_le()
+            },
+        )];
+        let config = RangeModeConfig::new(modes);
+        // 1000m exceeds the only mode's 50m range
+        let result = config.recommend_for_distance(1000);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_with_bypass_false() {
+        let req = MessageRequirements::default().with_bypass(false);
+        assert!(!req.bypass_sync);
+        // reliable shouldn't be forced to false when bypass is false
+        assert!(!req.reliable); // default is false
+    }
+
+    #[test]
+    fn test_message_priority_serde() {
+        let priority = MessagePriority::Critical;
+        let json = serde_json::to_string(&priority).unwrap();
+        let deserialized: MessagePriority = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, MessagePriority::Critical);
+    }
+
+    #[test]
+    fn test_transport_policy_at_level_none() {
+        let policy = TransportPolicy::new("test")
+            .primary(vec!["p1"])
+            .alternate(vec!["a1"])
+            .contingency(vec!["c1"])
+            .emergency(vec!["e1"]);
+
+        // PaceLevel::None should return all
+        assert_eq!(policy.at_level(PaceLevel::None).len(), 4);
+    }
+
+    #[test]
+    fn test_estimate_delivery_zero_bandwidth() {
+        let caps = TransportCapabilities {
+            max_bandwidth_bps: 0,
+            typical_latency_ms: 50,
+            ..TransportCapabilities::quic()
+        };
+        // Should just return latency when bandwidth is 0/unlimited
+        assert_eq!(caps.estimate_delivery_ms(1_000_000), 50);
+    }
+
+    #[test]
+    fn test_meets_requirements_all_pass() {
+        let caps = TransportCapabilities::quic();
+        let req = MessageRequirements {
+            reliable: true,
+            min_bandwidth_bps: 1_000,
+            message_size: 100,
+            ..Default::default()
+        };
+        // QUIC caps: max_bandwidth_bps=100M (>1000), reliable=true, max_message_size=0 (unlimited)
+        assert!(caps.meets_requirements(&req));
+    }
+
+    #[test]
     fn test_transport_mode_load_balanced() {
         let mut weights = std::collections::HashMap::new();
         weights.insert("t1".to_string(), 3);

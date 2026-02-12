@@ -716,4 +716,466 @@ mod tests {
         // The tombstone should be collected because it's older than the 24hr TTL
         assert_eq!(result.tombstones_collected, 1);
     }
+
+    #[test]
+    fn test_gc_does_not_collect_fresh_tombstones() {
+        // Create a fresh tombstone (just now)
+        let tombstone = Tombstone::new("node-1", "nodes", "test-node", 1);
+
+        let store = Arc::new(MockGcStore::with_tombstones(vec![tombstone]));
+        let gc = GarbageCollector::new(store, GcConfig::default());
+
+        let result = gc.run_gc().unwrap();
+        // Tombstone is fresh, should NOT be collected
+        assert_eq!(result.tombstones_collected, 0);
+    }
+
+    #[test]
+    fn test_gc_tombstone_batch_size_limit() {
+        // Create many expired tombstones
+        let old_time = SystemTime::now() - Duration::from_secs(86400 * 2);
+        let tombstones: Vec<Tombstone> = (0..10)
+            .map(|i| {
+                let mut t = Tombstone::new(format!("node-{}", i), "nodes", "test-node", i as u64);
+                t.deleted_at = old_time;
+                t
+            })
+            .collect();
+
+        let store = Arc::new(MockGcStore::with_tombstones(tombstones));
+        let config = GcConfig {
+            tombstone_batch_size: 3, // Only process 3 at a time
+            ..Default::default()
+        };
+        let gc = GarbageCollector::new(store, config);
+
+        let result = gc.run_gc().unwrap();
+        // Should only collect up to batch size
+        assert_eq!(result.tombstones_collected, 3);
+    }
+
+    #[test]
+    fn test_gc_stats_accumulate() {
+        let old_time = SystemTime::now() - Duration::from_secs(86400 * 2);
+        let mut tombstone = Tombstone::new("node-1", "nodes", "test-node", 1);
+        tombstone.deleted_at = old_time;
+
+        let store = Arc::new(MockGcStore::with_tombstones(vec![tombstone]));
+        let gc = GarbageCollector::new(store, GcConfig::default());
+
+        gc.run_gc().unwrap();
+        gc.run_gc().unwrap();
+
+        let stats = gc.stats();
+        assert_eq!(stats.total_runs, 2);
+        // First run collects 1, second run the store still returns the same tombstone
+        // (mock doesn't actually remove), so second collects 1 again
+        assert_eq!(stats.total_tombstones_collected, 2);
+    }
+
+    #[test]
+    fn test_gc_is_running_and_stop() {
+        let store = Arc::new(MockGcStore::new());
+        let gc = GarbageCollector::new(store, GcConfig::default());
+
+        assert!(!gc.is_running());
+        gc.stop();
+        assert!(!gc.is_running());
+    }
+
+    #[test]
+    fn test_gc_interval() {
+        let config = GcConfig::with_interval(Duration::from_secs(120));
+        let store = Arc::new(MockGcStore::new());
+        let gc = GarbageCollector::new(store, config);
+
+        assert_eq!(gc.interval(), Duration::from_secs(120));
+    }
+
+    #[test]
+    fn test_gc_with_policy_registry() {
+        let store = Arc::new(MockGcStore::new());
+        let registry = Arc::new(DeletionPolicyRegistry::new());
+        let gc = GarbageCollector::with_policy_registry(store, registry, GcConfig::default());
+
+        let result = gc.run_gc().unwrap();
+        assert!(!result.had_work());
+    }
+
+    #[test]
+    fn test_gc_handle_resurrection() {
+        let store = Arc::new(MockGcStore::new());
+        let gc = GarbageCollector::new(store, GcConfig::default());
+
+        // Test default resurrection policies
+        let policy = gc.handle_resurrection("beacons", "doc-1").unwrap();
+        assert_eq!(policy, ResurrectionPolicy::Allow);
+
+        let policy = gc.handle_resurrection("nodes", "doc-2").unwrap();
+        assert_eq!(policy, ResurrectionPolicy::ReDelete);
+
+        let policy = gc.handle_resurrection("alerts", "doc-3").unwrap();
+        assert_eq!(policy, ResurrectionPolicy::Reject);
+
+        // Stats should accumulate
+        let stats = gc.stats();
+        assert_eq!(stats.total_resurrections, 3);
+    }
+
+    #[test]
+    fn test_gc_handle_resurrection_with_override() {
+        let store = Arc::new(MockGcStore::new());
+        let mut config = GcConfig::default();
+        config.set_resurrection_policy("beacons", ResurrectionPolicy::Reject);
+        let gc = GarbageCollector::new(store, config);
+
+        let policy = gc.handle_resurrection("beacons", "doc-1").unwrap();
+        assert_eq!(policy, ResurrectionPolicy::Reject);
+    }
+
+    #[test]
+    fn test_gc_check_resurrection_with_tombstone() {
+        // When a tombstone exists, check_resurrection should return None
+        let tombstone = Tombstone::new("doc-1", "nodes", "test-node", 1);
+        let store = Arc::new(MockGcStore::with_tombstones(vec![tombstone]));
+        let gc = GarbageCollector::new(store, GcConfig::default());
+
+        let result = gc
+            .check_resurrection("nodes", "doc-1", SystemTime::now())
+            .unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_gc_check_resurrection_without_tombstone() {
+        let store = Arc::new(MockGcStore::new());
+        let gc = GarbageCollector::new(store, GcConfig::default());
+
+        let result = gc
+            .check_resurrection("nodes", "doc-1", SystemTime::now())
+            .unwrap();
+        assert!(result.is_none());
+    }
+
+    // Enhanced mock store that supports expired documents
+    struct MockGcStoreWithCollections {
+        tombstones: Vec<Tombstone>,
+        collections: Vec<String>,
+        expired_docs: HashMap<String, Vec<String>>,
+        hard_delete_fails: bool,
+    }
+
+    impl MockGcStoreWithCollections {
+        fn new(collections: Vec<String>, expired_docs: HashMap<String, Vec<String>>) -> Self {
+            Self {
+                tombstones: Vec::new(),
+                collections,
+                expired_docs,
+                hard_delete_fails: false,
+            }
+        }
+
+        fn with_hard_delete_failure(mut self) -> Self {
+            self.hard_delete_fails = true;
+            self
+        }
+    }
+
+    impl GcStore for MockGcStoreWithCollections {
+        fn get_all_tombstones(&self) -> anyhow::Result<Vec<Tombstone>> {
+            Ok(self.tombstones.clone())
+        }
+
+        fn remove_tombstone(&self, _collection: &str, _document_id: &str) -> anyhow::Result<bool> {
+            Ok(true)
+        }
+
+        fn has_tombstone(&self, _collection: &str, _document_id: &str) -> anyhow::Result<bool> {
+            Ok(false)
+        }
+
+        fn get_expired_documents(
+            &self,
+            collection: &str,
+            _cutoff: SystemTime,
+        ) -> anyhow::Result<Vec<String>> {
+            Ok(self
+                .expired_docs
+                .get(collection)
+                .cloned()
+                .unwrap_or_default())
+        }
+
+        fn hard_delete(&self, _collection: &str, _document_id: &str) -> anyhow::Result<()> {
+            if self.hard_delete_fails {
+                anyhow::bail!("hard delete failed");
+            }
+            Ok(())
+        }
+
+        fn list_collections(&self) -> anyhow::Result<Vec<String>> {
+            Ok(self.collections.clone())
+        }
+    }
+
+    #[test]
+    fn test_gc_collect_expired_documents_from_implicit_ttl() {
+        // "beacons" collection has ImplicitTTL policy in the default registry
+        let mut expired = HashMap::new();
+        expired.insert(
+            "beacons".to_string(),
+            vec!["doc-1".to_string(), "doc-2".to_string()],
+        );
+
+        let store = Arc::new(MockGcStoreWithCollections::new(
+            vec!["beacons".to_string()],
+            expired,
+        ));
+        let gc = GarbageCollector::new(store, GcConfig::default());
+
+        let result = gc.run_gc().unwrap();
+        assert_eq!(result.documents_collected, 2);
+        assert!(result.had_work());
+    }
+
+    #[test]
+    fn test_gc_document_batch_size_limit() {
+        let mut expired = HashMap::new();
+        let docs: Vec<String> = (0..10).map(|i| format!("doc-{}", i)).collect();
+        expired.insert("beacons".to_string(), docs);
+
+        let store = Arc::new(MockGcStoreWithCollections::new(
+            vec!["beacons".to_string()],
+            expired,
+        ));
+        let config = GcConfig {
+            document_batch_size: 3,
+            ..Default::default()
+        };
+        let gc = GarbageCollector::new(store, config);
+
+        let result = gc.run_gc().unwrap();
+        assert_eq!(result.documents_collected, 3);
+    }
+
+    #[test]
+    fn test_gc_hard_delete_failure_continues() {
+        let mut expired = HashMap::new();
+        expired.insert("beacons".to_string(), vec!["doc-1".to_string()]);
+
+        let store = Arc::new(
+            MockGcStoreWithCollections::new(vec!["beacons".to_string()], expired)
+                .with_hard_delete_failure(),
+        );
+        let gc = GarbageCollector::new(store, GcConfig::default());
+
+        // Should not panic, should continue with zero collected
+        let result = gc.run_gc().unwrap();
+        assert_eq!(result.documents_collected, 0);
+    }
+
+    #[test]
+    fn test_gc_non_implicit_ttl_collection_skipped() {
+        // "nodes" has a Tombstone policy, not ImplicitTTL, so documents are not collected
+        let mut expired = HashMap::new();
+        expired.insert("nodes".to_string(), vec!["doc-1".to_string()]);
+
+        let store = Arc::new(MockGcStoreWithCollections::new(
+            vec!["nodes".to_string()],
+            expired,
+        ));
+        let gc = GarbageCollector::new(store, GcConfig::default());
+
+        let result = gc.run_gc().unwrap();
+        assert_eq!(result.documents_collected, 0);
+    }
+
+    // Error-returning mock store
+    struct FailingGcStore;
+
+    impl GcStore for FailingGcStore {
+        fn get_all_tombstones(&self) -> anyhow::Result<Vec<Tombstone>> {
+            anyhow::bail!("tombstone fetch failed")
+        }
+
+        fn remove_tombstone(&self, _: &str, _: &str) -> anyhow::Result<bool> {
+            Ok(false)
+        }
+
+        fn has_tombstone(&self, _: &str, _: &str) -> anyhow::Result<bool> {
+            Ok(false)
+        }
+
+        fn get_expired_documents(&self, _: &str, _: SystemTime) -> anyhow::Result<Vec<String>> {
+            Ok(Vec::new())
+        }
+
+        fn hard_delete(&self, _: &str, _: &str) -> anyhow::Result<()> {
+            Ok(())
+        }
+
+        fn list_collections(&self) -> anyhow::Result<Vec<String>> {
+            anyhow::bail!("collection list failed")
+        }
+    }
+
+    #[test]
+    fn test_gc_run_with_store_errors() {
+        let store = Arc::new(FailingGcStore);
+        let gc = GarbageCollector::new(store, GcConfig::default());
+
+        let result = gc.run_gc().unwrap();
+        // Should complete but with errors recorded
+        assert!(!result.errors.is_empty());
+        assert!(result
+            .errors
+            .iter()
+            .any(|e| e.contains("Tombstone GC error")));
+        assert!(result
+            .errors
+            .iter()
+            .any(|e| e.contains("Document GC error")));
+    }
+
+    #[test]
+    fn test_gc_result_duration() {
+        let store = Arc::new(MockGcStore::new());
+        let gc = GarbageCollector::new(store, GcConfig::default());
+
+        let result = gc.run_gc().unwrap();
+        // Duration should be non-negative (may be 0 for fast operations)
+        // Duration should be valid (non-zero or very small is fine)
+        let _ = result.duration;
+    }
+
+    #[test]
+    fn test_gc_config_no_debug_logging() {
+        let store = Arc::new(MockGcStore::new());
+        let config = GcConfig {
+            debug_logging: false,
+            ..Default::default()
+        };
+        let gc = GarbageCollector::new(store, config);
+        // Should complete without logging
+        let result = gc.run_gc().unwrap();
+        assert!(!result.had_work());
+    }
+
+    #[test]
+    fn test_gc_collect_tombstones_with_no_debug_logging() {
+        let old_time = SystemTime::now() - Duration::from_secs(86400 * 2);
+        let mut tombstone = Tombstone::new("node-1", "nodes", "test-node", 1);
+        tombstone.deleted_at = old_time;
+
+        let store = Arc::new(MockGcStore::with_tombstones(vec![tombstone]));
+        let config = GcConfig {
+            debug_logging: false,
+            ..Default::default()
+        };
+        let gc = GarbageCollector::new(store, config);
+
+        let result = gc.run_gc().unwrap();
+        assert_eq!(result.tombstones_collected, 1);
+    }
+
+    #[test]
+    fn test_gc_stats_default() {
+        let stats = GcStats::default();
+        assert_eq!(stats.total_runs, 0);
+        assert_eq!(stats.total_tombstones_collected, 0);
+        assert_eq!(stats.total_documents_collected, 0);
+        assert_eq!(stats.total_resurrections, 0);
+        assert!(stats.last_run.is_none());
+        assert!(stats.last_duration.is_none());
+    }
+
+    #[test]
+    fn test_gc_result_default_fields() {
+        let result = GcResult::default();
+        assert_eq!(result.tombstones_collected, 0);
+        assert_eq!(result.documents_collected, 0);
+        assert_eq!(result.resurrections_detected, 0);
+        assert_eq!(result.resurrections_redeleted, 0);
+        assert_eq!(result.resurrections_allowed, 0);
+        assert_eq!(result.resurrections_rejected, 0);
+        assert!(result.errors.is_empty());
+    }
+
+    #[test]
+    fn test_gc_config_debug_clone() {
+        let config = GcConfig::default();
+        let cloned = config.clone();
+        assert_eq!(cloned.gc_interval, config.gc_interval);
+        let _ = format!("{:?}", config);
+    }
+
+    #[test]
+    fn test_gc_result_debug_clone() {
+        let result = GcResult {
+            tombstones_collected: 5,
+            documents_collected: 3,
+            resurrections_detected: 1,
+            ..Default::default()
+        };
+        let cloned = result.clone();
+        assert_eq!(cloned.tombstones_collected, 5);
+        let _ = format!("{:?}", result);
+    }
+
+    #[test]
+    fn test_resurrection_policy_serde() {
+        let policy = ResurrectionPolicy::Allow;
+        let json = serde_json::to_string(&policy).unwrap();
+        let deserialized: ResurrectionPolicy = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, ResurrectionPolicy::Allow);
+
+        let policy2 = ResurrectionPolicy::Reject;
+        let json2 = serde_json::to_string(&policy2).unwrap();
+        let deserialized2: ResurrectionPolicy = serde_json::from_str(&json2).unwrap();
+        assert_eq!(deserialized2, ResurrectionPolicy::Reject);
+    }
+
+    #[test]
+    fn test_resurrection_policy_hash() {
+        use std::collections::HashSet;
+        let mut set = HashSet::new();
+        set.insert(ResurrectionPolicy::Allow);
+        set.insert(ResurrectionPolicy::ReDelete);
+        set.insert(ResurrectionPolicy::Reject);
+        assert_eq!(set.len(), 3);
+    }
+
+    #[test]
+    fn test_gc_stats_debug_clone() {
+        let stats = GcStats {
+            total_runs: 5,
+            total_tombstones_collected: 10,
+            total_documents_collected: 3,
+            total_resurrections: 1,
+            last_run: Some(SystemTime::now()),
+            last_duration: Some(Duration::from_millis(50)),
+        };
+        let cloned = stats.clone();
+        assert_eq!(cloned.total_runs, 5);
+        let _ = format!("{:?}", stats);
+    }
+
+    #[test]
+    fn test_resurrection_policy_default_trait() {
+        // ResurrectionPolicy derives Default which should be ReDelete
+        let policy = ResurrectionPolicy::default();
+        assert_eq!(policy, ResurrectionPolicy::ReDelete);
+    }
+
+    #[test]
+    fn test_resurrection_policy_commands_and_contacts() {
+        assert_eq!(
+            ResurrectionPolicy::default_for_collection("commands"),
+            ResurrectionPolicy::ReDelete
+        );
+        assert_eq!(
+            ResurrectionPolicy::default_for_collection("contact_reports"),
+            ResurrectionPolicy::ReDelete
+        );
+    }
 }

@@ -399,4 +399,217 @@ mod tests {
         beacon.parent_priority = 100;
         beacon
     }
+
+    #[test]
+    fn test_tactical_config() {
+        let config = SelectionConfig::tactical();
+        assert_eq!(config.mobility_weight, 0.4);
+        assert_eq!(config.resource_weight, 0.25);
+        assert_eq!(config.battery_weight, 0.15);
+        assert_eq!(config.proximity_weight, 0.2);
+        assert_eq!(config.max_distance_meters, Some(2_000.0));
+        assert_eq!(config.max_children_per_parent, Some(5));
+    }
+
+    #[test]
+    fn test_distributed_config() {
+        let config = SelectionConfig::distributed();
+        assert_eq!(config.mobility_weight, 0.2);
+        assert_eq!(config.resource_weight, 0.4);
+        assert_eq!(config.battery_weight, 0.2);
+        assert_eq!(config.proximity_weight, 0.2);
+        assert!(config.max_distance_meters.is_none());
+        assert_eq!(config.max_children_per_parent, Some(15));
+    }
+
+    #[test]
+    fn test_empty_candidates_returns_none() {
+        let selector = PeerSelector::new(
+            SelectionConfig::default(),
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+        );
+        assert!(selector.select_peer(&[]).is_none());
+    }
+
+    #[test]
+    fn test_can_parent_false_filtered() {
+        let selector = PeerSelector::new(
+            SelectionConfig::default(),
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+        );
+
+        let mut beacon = create_test_beacon(
+            "no-parent",
+            GeoPosition::new(37.7750, -122.4195),
+            HierarchyLevel::Platoon,
+            NodeMobility::Static,
+            30,
+        );
+        beacon.can_parent = false;
+
+        assert!(selector.select_peer(&[beacon]).is_none());
+    }
+
+    #[test]
+    fn test_no_mobility_beacon_scoring() {
+        let selector = PeerSelector::new(
+            SelectionConfig::default(),
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+        );
+
+        let mut beacon = create_test_beacon(
+            "no-mob",
+            GeoPosition::new(37.7750, -122.4195),
+            HierarchyLevel::Platoon,
+            NodeMobility::Static,
+            30,
+        );
+        beacon.mobility = None;
+
+        let result = selector.select_peer(&[beacon]);
+        assert!(result.is_some());
+        // Should still score (default 0.5 * mobility_weight)
+        assert!(result.unwrap().score > 0.0);
+    }
+
+    #[test]
+    fn test_no_resources_beacon_scoring() {
+        let selector = PeerSelector::new(
+            SelectionConfig::default(),
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+        );
+
+        let mut beacon = GeographicBeacon::new(
+            "no-res".to_string(),
+            GeoPosition::new(37.7750, -122.4195),
+            HierarchyLevel::Platoon,
+        );
+        beacon.mobility = Some(NodeMobility::Static);
+        beacon.resources = None;
+        beacon.can_parent = true;
+
+        let result = selector.select_peer(&[beacon]);
+        assert!(result.is_some());
+        assert!(result.unwrap().score > 0.0);
+    }
+
+    #[test]
+    fn test_semi_mobile_scoring() {
+        let selector = PeerSelector::new(
+            SelectionConfig {
+                mobility_weight: 1.0,
+                resource_weight: 0.0,
+                battery_weight: 0.0,
+                proximity_weight: 0.0,
+                ..Default::default()
+            },
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+        );
+
+        let semi = create_test_beacon(
+            "semi",
+            GeoPosition::new(37.7750, -122.4195),
+            HierarchyLevel::Platoon,
+            NodeMobility::SemiMobile,
+            50,
+        );
+
+        let result = selector.select_peer(&[semi]).unwrap();
+        // SemiMobile score = 0.6 * 1.0 = 0.6
+        assert!((result.score - 0.6).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_unlimited_distance_config() {
+        let selector = PeerSelector::new(
+            SelectionConfig {
+                max_distance_meters: None,
+                ..Default::default()
+            },
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+        );
+
+        // Very far away beacon should still be valid
+        let far = create_test_beacon(
+            "far",
+            GeoPosition::new(40.7128, -74.0060), // New York
+            HierarchyLevel::Platoon,
+            NodeMobility::Static,
+            30,
+        );
+
+        assert!(selector.select_peer(&[far]).is_some());
+    }
+
+    #[test]
+    fn test_battery_none_ac_powered() {
+        let selector = PeerSelector::new(
+            SelectionConfig {
+                battery_weight: 1.0,
+                mobility_weight: 0.0,
+                resource_weight: 0.0,
+                proximity_weight: 0.0,
+                ..Default::default()
+            },
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+        );
+
+        let mut beacon = create_test_beacon(
+            "ac",
+            GeoPosition::new(37.7750, -122.4195),
+            HierarchyLevel::Platoon,
+            NodeMobility::Static,
+            50,
+        );
+        // Set battery_percent to None (AC powered = 1.0 score)
+        beacon.resources.as_mut().unwrap().battery_percent = None;
+
+        let result = selector.select_peer(&[beacon]).unwrap();
+        // Battery score = 1.0 * 1.0 = 1.0
+        assert!((result.score - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_default_config() {
+        let config = SelectionConfig::default();
+        assert_eq!(config.mobility_weight, 0.3);
+        assert_eq!(config.resource_weight, 0.3);
+        assert_eq!(config.battery_weight, 0.2);
+        assert_eq!(config.proximity_weight, 0.2);
+        assert_eq!(config.max_distance_meters, Some(10_000.0));
+        assert_eq!(config.max_children_per_parent, Some(10));
+    }
+
+    #[test]
+    fn test_config_debug_clone() {
+        let config = SelectionConfig::default();
+        let cloned = config.clone();
+        assert_eq!(cloned.mobility_weight, config.mobility_weight);
+        let _ = format!("{:?}", config);
+    }
+
+    #[test]
+    fn test_peer_candidate_debug_clone() {
+        let beacon = create_test_beacon(
+            "test",
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Platoon,
+            NodeMobility::Static,
+            50,
+        );
+        let candidate = PeerCandidate {
+            beacon,
+            score: 0.75,
+        };
+        let cloned = candidate.clone();
+        assert_eq!(cloned.score, 0.75);
+        let _ = format!("{:?}", candidate);
+    }
 }

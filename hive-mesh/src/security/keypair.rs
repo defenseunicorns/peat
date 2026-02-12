@@ -217,10 +217,8 @@ mod tests {
 
         let keypair2 = DeviceKeypair::load_from_file(&path).unwrap();
 
-        // Device IDs should match
         assert_eq!(keypair1.device_id(), keypair2.device_id());
 
-        // Signatures should be verifiable across both
         let message = b"test";
         let sig = keypair1.sign(message);
         assert!(keypair2.verify(message, &sig).is_ok());
@@ -236,6 +234,77 @@ mod tests {
     }
 
     #[test]
+    fn test_from_secret_bytes_wrong_length() {
+        let result = DeviceKeypair::from_secret_bytes(&[0u8; 16]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_signing_key() {
+        let key = SigningKey::generate(&mut OsRng);
+        let expected_id = DeviceId::from_public_key(&key.verifying_key());
+
+        let keypair = DeviceKeypair::from_signing_key(key);
+        assert_eq!(keypair.device_id(), expected_id);
+    }
+
+    #[test]
+    fn test_verifying_key() {
+        let keypair = DeviceKeypair::generate();
+        let vk = keypair.verifying_key();
+        // Verify the public key can verify signatures
+        let sig = keypair.sign(b"test");
+        assert!(vk.verify(b"test", &sig).is_ok());
+    }
+
+    #[test]
+    fn test_public_key_bytes() {
+        let keypair = DeviceKeypair::generate();
+        let bytes = keypair.public_key_bytes();
+        assert_eq!(bytes.len(), 32);
+        assert_eq!(bytes, keypair.verifying_key().to_bytes());
+    }
+
+    #[test]
+    fn test_secret_key_bytes() {
+        let keypair = DeviceKeypair::generate();
+        let bytes = keypair.secret_key_bytes();
+        assert_eq!(bytes.len(), 32);
+
+        // Reconstruct from secret bytes and verify identity
+        let keypair2 = DeviceKeypair::from_secret_bytes(&bytes).unwrap();
+        assert_eq!(keypair.device_id(), keypair2.device_id());
+    }
+
+    #[test]
+    fn test_verify_with_key() {
+        let keypair = DeviceKeypair::generate();
+        let message = b"hello";
+        let sig = keypair.sign(message);
+
+        let vk = keypair.verifying_key();
+        assert!(DeviceKeypair::verify_with_key(&vk, message, &sig).is_ok());
+
+        // Wrong message
+        assert!(DeviceKeypair::verify_with_key(&vk, b"wrong", &sig).is_err());
+    }
+
+    #[test]
+    fn test_verifying_key_from_bytes() {
+        let keypair = DeviceKeypair::generate();
+        let pk_bytes = keypair.public_key_bytes();
+
+        let vk = DeviceKeypair::verifying_key_from_bytes(&pk_bytes).unwrap();
+        assert_eq!(vk, keypair.verifying_key());
+    }
+
+    #[test]
+    fn test_verifying_key_from_bytes_wrong_length() {
+        let result = DeviceKeypair::verifying_key_from_bytes(&[0u8; 16]);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_signature_from_bytes_roundtrip() {
         let keypair = DeviceKeypair::generate();
         let signature = keypair.sign(b"test");
@@ -244,5 +313,37 @@ mod tests {
         let parsed = DeviceKeypair::signature_from_bytes(&sig_bytes).unwrap();
 
         assert_eq!(signature, parsed);
+    }
+
+    #[test]
+    fn test_signature_from_bytes_wrong_length() {
+        let result = DeviceKeypair::signature_from_bytes(&[0u8; 32]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_from_nonexistent_file() {
+        let result = DeviceKeypair::load_from_file(Path::new("/nonexistent/key.bin"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_from_file_wrong_length() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("bad_key.bin");
+        std::fs::write(&path, [0u8; 10]).unwrap();
+
+        let result = DeviceKeypair::load_from_file(&path);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_debug_redacts_key() {
+        let keypair = DeviceKeypair::generate();
+        let debug = format!("{:?}", keypair);
+        assert!(debug.contains("DeviceKeypair"));
+        assert!(debug.contains("REDACTED"));
+        // Should NOT contain raw key bytes
+        assert!(!debug.contains("signing_key"));
     }
 }

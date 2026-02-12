@@ -1278,6 +1278,241 @@ mod tests {
     }
 
     #[test]
+    fn test_verbose_router() {
+        let router = SelectiveRouter::new_verbose();
+        let state = create_test_state(HierarchyLevel::Squad, NodeRole::Member, true, 0, 0);
+        let packet = DataPacket::telemetry("sensor-1", vec![1, 2, 3]);
+
+        // Should work the same as non-verbose, just with logging
+        let decision = router.route(&packet, &state, "this-node");
+        assert!(matches!(
+            decision,
+            RoutingDecision::ConsumeAndForward { .. }
+        ));
+    }
+
+    #[test]
+    fn test_verbose_max_hops_drop() {
+        let router = SelectiveRouter::new_verbose();
+        let state = create_test_state(HierarchyLevel::Squad, NodeRole::Member, true, 0, 0);
+        let mut packet = DataPacket::telemetry("sensor-1", vec![1, 2, 3]);
+        for _ in 0..10 {
+            packet.increment_hop();
+        }
+        let decision = router.route(&packet, &state, "this-node");
+        assert_eq!(decision, RoutingDecision::Drop);
+    }
+
+    #[test]
+    fn test_verbose_own_packet_drop() {
+        let router = SelectiveRouter::new_verbose();
+        let state = create_test_state(HierarchyLevel::Squad, NodeRole::Member, true, 0, 0);
+        let packet = DataPacket::telemetry("this-node", vec![1, 2, 3]);
+        let decision = router.route(&packet, &state, "this-node");
+        assert_eq!(decision, RoutingDecision::Drop);
+    }
+
+    #[test]
+    fn test_verbose_consume_only() {
+        let router = SelectiveRouter::new_verbose();
+        let state = create_test_state(HierarchyLevel::Company, NodeRole::Leader, false, 3, 0);
+        let packet = DataPacket::telemetry("sensor-1", vec![1, 2, 3]);
+        let decision = router.route(&packet, &state, "hq-node");
+        assert_eq!(decision, RoutingDecision::Consume);
+    }
+
+    #[test]
+    fn test_verbose_consume_and_forward() {
+        let router = SelectiveRouter::new_verbose();
+        let state = create_test_state(HierarchyLevel::Platoon, NodeRole::Leader, true, 3, 0);
+        let packet = DataPacket::telemetry("sensor-1", vec![1, 2, 3]);
+        let decision = router.route(&packet, &state, "platoon-leader");
+        assert!(matches!(
+            decision,
+            RoutingDecision::ConsumeAndForward { .. }
+        ));
+    }
+
+    #[test]
+    fn test_verbose_consume_and_multicast() {
+        let router = SelectiveRouter::new_verbose();
+        let state = create_test_state(HierarchyLevel::Platoon, NodeRole::Leader, true, 4, 0);
+        let packet = DataPacket::command("hq", "platoon-leader", vec![4, 5, 6]);
+        let decision = router.route(&packet, &state, "platoon-leader");
+        assert!(matches!(
+            decision,
+            RoutingDecision::ConsumeAndForwardMulticast { .. }
+        ));
+    }
+
+    #[test]
+    fn test_verbose_forward_multicast() {
+        let router = SelectiveRouter::new_verbose();
+        // Member (not leader) with lateral peers and broadcast lateral packet
+        let state = create_test_state(HierarchyLevel::Platoon, NodeRole::Member, true, 3, 0);
+        // Downward broadcast from hq - member doesn't consume, should forward to children
+        let packet = DataPacket {
+            packet_id: uuid::Uuid::new_v4().to_string(),
+            source_node_id: "hq".to_string(),
+            destination_node_id: None,
+            data_type: DataType::Command,
+            direction: DataDirection::Downward,
+            hop_count: 0,
+            max_hops: 10,
+            payload: vec![4, 5, 6],
+        };
+        let decision = router.route(&packet, &state, "member-node");
+        assert!(matches!(decision, RoutingDecision::ForwardMulticast { .. }));
+    }
+
+    #[test]
+    fn test_verbose_forward_unicast() {
+        let router = SelectiveRouter::new_verbose();
+        let state = create_test_state(HierarchyLevel::Platoon, NodeRole::Member, true, 1, 0);
+        let packet = DataPacket {
+            packet_id: uuid::Uuid::new_v4().to_string(),
+            source_node_id: "hq".to_string(),
+            destination_node_id: None,
+            data_type: DataType::Command,
+            direction: DataDirection::Downward,
+            hop_count: 0,
+            max_hops: 10,
+            payload: vec![4, 5, 6],
+        };
+        let decision = router.route(&packet, &state, "member-node");
+        assert!(matches!(decision, RoutingDecision::Forward { .. }));
+    }
+
+    #[test]
+    fn test_verbose_forward_no_next_hop_drop() {
+        let router = SelectiveRouter::new_verbose();
+        // Member with lateral peer but packet directed to unknown lateral
+        let state = create_test_state(HierarchyLevel::Platoon, NodeRole::Member, false, 0, 1);
+        let packet = DataPacket {
+            packet_id: uuid::Uuid::new_v4().to_string(),
+            source_node_id: "other".to_string(),
+            destination_node_id: Some("lateral-peer-0".to_string()),
+            data_type: DataType::Coordination,
+            direction: DataDirection::Lateral,
+            hop_count: 0,
+            max_hops: 3,
+            payload: vec![7, 8, 9],
+        };
+        // Member doesn't consume lateral (not addressed to us), but does forward
+        let decision = router.route(&packet, &state, "member-node");
+        assert!(matches!(decision, RoutingDecision::Forward { .. }));
+    }
+
+    #[test]
+    fn test_verbose_drop_not_for_us() {
+        let router = SelectiveRouter::new_verbose();
+        let state = create_test_state(HierarchyLevel::Squad, NodeRole::Member, false, 0, 0);
+        // Lateral packet not addressed to us, no lateral peers
+        let packet = DataPacket {
+            packet_id: uuid::Uuid::new_v4().to_string(),
+            source_node_id: "other".to_string(),
+            destination_node_id: Some("someone-else".to_string()),
+            data_type: DataType::Coordination,
+            direction: DataDirection::Lateral,
+            hop_count: 0,
+            max_hops: 3,
+            payload: vec![7, 8, 9],
+        };
+        let decision = router.route(&packet, &state, "member-node");
+        assert_eq!(decision, RoutingDecision::Drop);
+    }
+
+    #[test]
+    fn test_verbose_dedup_drop() {
+        let config = DeduplicationConfig {
+            enabled: true,
+            ttl: Duration::from_secs(300),
+            max_entries: 100,
+        };
+        let router = SelectiveRouter {
+            verbose: true,
+            dedup_config: config,
+            seen_packets: Arc::new(RwLock::new(HashMap::new())),
+        };
+        let state = create_test_state(HierarchyLevel::Squad, NodeRole::Member, true, 0, 0);
+        let packet = DataPacket::telemetry("sensor-1", vec![1, 2, 3]);
+
+        let _ = router.route(&packet, &state, "this-node");
+        let decision2 = router.route(&packet, &state, "this-node");
+        assert_eq!(decision2, RoutingDecision::Drop);
+    }
+
+    #[test]
+    fn test_forward_only_no_consume_member_downward() {
+        // Member with children receiving non-addressed broadcast command
+        let router = SelectiveRouter::new();
+        let state = create_test_state(HierarchyLevel::Platoon, NodeRole::Member, true, 2, 0);
+        let packet = DataPacket {
+            packet_id: uuid::Uuid::new_v4().to_string(),
+            source_node_id: "hq".to_string(),
+            destination_node_id: None,
+            data_type: DataType::Command,
+            direction: DataDirection::Downward,
+            hop_count: 0,
+            max_hops: 10,
+            payload: vec![4, 5, 6],
+        };
+        let decision = router.route(&packet, &state, "member-node");
+        // Member doesn't consume broadcast commands, just forwards
+        assert!(matches!(decision, RoutingDecision::ForwardMulticast { .. }));
+    }
+
+    #[test]
+    fn test_should_forward_no_next_hop_returns_drop() {
+        let router = SelectiveRouter::new();
+        // Member with no linked peers, no lateral peers, downward packet addressed to unknown
+        let state = create_test_state(HierarchyLevel::Squad, NodeRole::Member, false, 0, 0);
+        let packet = DataPacket {
+            packet_id: uuid::Uuid::new_v4().to_string(),
+            source_node_id: "hq".to_string(),
+            destination_node_id: None,
+            data_type: DataType::Command,
+            direction: DataDirection::Downward,
+            hop_count: 0,
+            max_hops: 10,
+            payload: vec![4, 5, 6],
+        };
+        let decision = router.route(&packet, &state, "squad-member");
+        assert_eq!(decision, RoutingDecision::Drop);
+    }
+
+    #[test]
+    fn test_next_hop_downward_targeted_not_found() {
+        let router = SelectiveRouter::new();
+        let state = create_test_state(HierarchyLevel::Platoon, NodeRole::Leader, true, 3, 0);
+        // Addressed to a peer not in linked_peers
+        let packet = DataPacket::command("hq", "unknown-child", vec![4, 5, 6]);
+
+        let next_hop = router.next_hop(&packet, &state);
+        // Should return first linked peer as fallback
+        assert!(next_hop.is_some());
+        assert!(next_hop.unwrap().starts_with("linked-peer-"));
+    }
+
+    #[test]
+    fn test_next_hop_lateral_unknown_peer() {
+        let router = SelectiveRouter::new();
+        let state = create_test_state(HierarchyLevel::Platoon, NodeRole::Leader, true, 0, 3);
+        let packet = DataPacket::coordination("source", "unknown-lateral", vec![7, 8, 9]);
+
+        let next_hop = router.next_hop(&packet, &state);
+        // Should return first lateral peer as fallback
+        assert!(next_hop.is_some());
+        assert!(next_hop.unwrap().starts_with("lateral-peer-"));
+    }
+
+    #[test]
+    fn test_default_router() {
+        let router = SelectiveRouter::default();
+        assert_eq!(router.dedup_cache_size(), 0);
+    }
+
+    #[test]
     fn test_deduplication_max_entries_eviction() {
         let config = DeduplicationConfig {
             enabled: true,

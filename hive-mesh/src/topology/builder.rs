@@ -745,4 +745,791 @@ mod tests {
             _ => panic!("Expected PeerRemoved event"),
         }
     }
+
+    // --- Additional coverage tests ---
+
+    #[tokio::test]
+    async fn test_get_state_initial_values() {
+        let storage = Arc::new(MockBeaconStorage::new());
+        let observer = Arc::new(BeaconObserver::new(storage, "9q8yy".to_string()));
+
+        let builder = TopologyBuilder::new(
+            TopologyConfig::default(),
+            "node-1".to_string(),
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+            None,
+            observer,
+        );
+
+        let state = builder.get_state();
+        assert!(state.selected_peer.is_none());
+        assert!(state.linked_peers.is_empty());
+        assert!(state.lateral_peers.is_empty());
+        assert_eq!(state.hierarchy_level, HierarchyLevel::Squad);
+        assert_eq!(state.role, crate::hierarchy::NodeRole::Standalone);
+    }
+
+    #[tokio::test]
+    async fn test_get_selected_peer_returns_none_initially() {
+        let storage = Arc::new(MockBeaconStorage::new());
+        let observer = Arc::new(BeaconObserver::new(storage, "9q8yy".to_string()));
+
+        let builder = TopologyBuilder::new(
+            TopologyConfig::default(),
+            "node-1".to_string(),
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+            None,
+            observer,
+        );
+
+        assert!(builder.get_selected_peer().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_config_returns_the_config() {
+        let storage = Arc::new(MockBeaconStorage::new());
+        let observer = Arc::new(BeaconObserver::new(storage, "9q8yy".to_string()));
+
+        let config = TopologyConfig {
+            peer_change_cooldown: Duration::from_secs(120),
+            peer_timeout: Duration::from_secs(300),
+            max_retries: 5,
+            ..Default::default()
+        };
+
+        let builder = TopologyBuilder::new(
+            config,
+            "node-1".to_string(),
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+            None,
+            observer,
+        );
+
+        let cfg = builder.config();
+        assert_eq!(cfg.peer_change_cooldown, Duration::from_secs(120));
+        assert_eq!(cfg.peer_timeout, Duration::from_secs(300));
+        assert_eq!(cfg.max_retries, 5);
+    }
+
+    #[tokio::test]
+    async fn test_stop_aborts_task_handle() {
+        let storage = Arc::new(MockBeaconStorage::new());
+        let observer = Arc::new(BeaconObserver::new(storage, "9q8yy".to_string()));
+
+        let builder = TopologyBuilder::new(
+            TopologyConfig::default(),
+            "node-1".to_string(),
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+            None,
+            observer,
+        );
+
+        // Stop before start should be a no-op (no panic)
+        builder.stop().await;
+
+        // Start, then stop
+        builder.start().await;
+        // task_handle should be set
+        assert!(builder.task_handle.lock().unwrap().is_some());
+
+        builder.stop().await;
+        // task_handle should be taken (None)
+        assert!(builder.task_handle.lock().unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_start_is_idempotent() {
+        let storage = Arc::new(MockBeaconStorage::new());
+        let observer = Arc::new(BeaconObserver::new(storage, "9q8yy".to_string()));
+
+        let builder = TopologyBuilder::new(
+            TopologyConfig::default(),
+            "node-1".to_string(),
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+            None,
+            observer,
+        );
+
+        builder.start().await;
+        // Calling start a second time should be a no-op (not spawn a second task)
+        builder.start().await;
+        assert!(builder.task_handle.lock().unwrap().is_some());
+
+        builder.stop().await;
+    }
+
+    #[tokio::test]
+    async fn test_reevaluate_peer_no_candidates() {
+        let storage = Arc::new(MockBeaconStorage::new());
+        let observer = Arc::new(BeaconObserver::new(storage, "9q8yy".to_string()));
+
+        let builder = TopologyBuilder::new(
+            TopologyConfig::default(),
+            "node-1".to_string(),
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+            None,
+            observer,
+        );
+
+        // No beacons in observer, so reevaluate should not select any peer
+        builder.reevaluate_peer().await;
+        assert!(builder.get_selected_peer().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_reevaluate_peer_cooldown_not_elapsed() {
+        let storage = Arc::new(MockBeaconStorage::new());
+        let observer = Arc::new(BeaconObserver::new(storage, "9q8yy".to_string()));
+
+        let config = TopologyConfig {
+            peer_change_cooldown: Duration::from_secs(3600), // Very long cooldown
+            ..Default::default()
+        };
+
+        let builder = TopologyBuilder::new(
+            config,
+            "node-1".to_string(),
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+            None,
+            observer,
+        );
+
+        // Manually set a selected peer via update_selected_peer
+        let beacon = create_test_beacon("peer-A", HierarchyLevel::Platoon);
+        {
+            let mut state = builder.state.lock().unwrap();
+            TopologyBuilder::update_selected_peer(&mut state, &builder.event_tx, beacon);
+        }
+        assert_eq!(builder.get_selected_peer().unwrap().node_id, "peer-A");
+
+        // Even if reevaluate is called, cooldown hasn't elapsed so peer should not change
+        builder.reevaluate_peer().await;
+        assert_eq!(builder.get_selected_peer().unwrap().node_id, "peer-A");
+    }
+
+    #[test]
+    fn test_check_peer_status_no_selected_peer() {
+        let mut state = TopologyState::default();
+        let config = TopologyConfig::default();
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+
+        let nearby: Vec<GeographicBeacon> = vec![];
+
+        // With no selected peer, check_peer_status should return true (needs peer)
+        let needs_peer =
+            TopologyBuilder::check_peer_status(&mut state, &config, &nearby, &event_tx);
+        assert!(needs_peer);
+    }
+
+    #[test]
+    fn test_check_peer_status_peer_still_visible() {
+        let mut state = TopologyState::default();
+        let config = TopologyConfig::default();
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+
+        // Set a selected peer
+        let beacon = create_test_beacon("peer-A", HierarchyLevel::Platoon);
+        state.selected_peer = Some(SelectedPeer {
+            node_id: "peer-A".to_string(),
+            beacon: beacon.clone(),
+            selected_at: Instant::now(),
+        });
+
+        // Peer is still visible in nearby beacons
+        let nearby = vec![beacon];
+        let needs_peer =
+            TopologyBuilder::check_peer_status(&mut state, &config, &nearby, &event_tx);
+        assert!(!needs_peer);
+        assert!(state.selected_peer.is_some()); // Still selected
+    }
+
+    #[test]
+    fn test_check_peer_status_peer_lost_after_timeout() {
+        let mut state = TopologyState::default();
+        let config = TopologyConfig {
+            peer_timeout: Duration::from_millis(50),
+            ..Default::default()
+        };
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        // Set a selected peer with an old selected_at time
+        let beacon = create_test_beacon("peer-A", HierarchyLevel::Platoon);
+        state.selected_peer = Some(SelectedPeer {
+            node_id: "peer-A".to_string(),
+            beacon,
+            selected_at: Instant::now() - Duration::from_millis(200),
+        });
+
+        // Peer is NOT in nearby beacons and timeout has passed
+        let nearby: Vec<GeographicBeacon> = vec![];
+        let needs_peer =
+            TopologyBuilder::check_peer_status(&mut state, &config, &nearby, &event_tx);
+        assert!(needs_peer);
+        assert!(state.selected_peer.is_none()); // Cleared
+
+        // Should have emitted PeerLost event
+        let event = event_rx.try_recv().unwrap();
+        match event {
+            TopologyEvent::PeerLost { lost_peer_id } => {
+                assert_eq!(lost_peer_id, "peer-A");
+            }
+            _ => panic!("Expected PeerLost event"),
+        }
+    }
+
+    #[test]
+    fn test_check_peer_status_peer_not_visible_but_not_timed_out() {
+        let mut state = TopologyState::default();
+        let config = TopologyConfig {
+            peer_timeout: Duration::from_secs(3600), // Very long timeout
+            ..Default::default()
+        };
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+
+        // Set a recently selected peer
+        let beacon = create_test_beacon("peer-A", HierarchyLevel::Platoon);
+        state.selected_peer = Some(SelectedPeer {
+            node_id: "peer-A".to_string(),
+            beacon,
+            selected_at: Instant::now(),
+        });
+
+        // Peer is NOT in nearby beacons, but timeout has not elapsed
+        let nearby: Vec<GeographicBeacon> = vec![];
+        let needs_peer =
+            TopologyBuilder::check_peer_status(&mut state, &config, &nearby, &event_tx);
+        assert!(!needs_peer); // Still within timeout, don't need new peer yet
+        assert!(state.selected_peer.is_some()); // Not cleared
+    }
+
+    #[test]
+    fn test_update_selected_peer_first_selection() {
+        let mut state = TopologyState::default();
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        let beacon = create_test_beacon("peer-A", HierarchyLevel::Platoon);
+        TopologyBuilder::update_selected_peer(&mut state, &event_tx, beacon);
+
+        // State should have the selected peer
+        let selected = state.selected_peer.as_ref().unwrap();
+        assert_eq!(selected.node_id, "peer-A");
+
+        // Should have emitted PeerSelected event
+        let event = event_rx.try_recv().unwrap();
+        match event {
+            TopologyEvent::PeerSelected {
+                selected_peer_id,
+                peer_beacon,
+            } => {
+                assert_eq!(selected_peer_id, "peer-A");
+                assert_eq!(peer_beacon.node_id, "peer-A");
+            }
+            _ => panic!("Expected PeerSelected event"),
+        }
+    }
+
+    #[test]
+    fn test_update_selected_peer_change_event() {
+        let mut state = TopologyState::default();
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        // Set initial peer
+        let beacon_a = create_test_beacon("peer-A", HierarchyLevel::Platoon);
+        TopologyBuilder::update_selected_peer(&mut state, &event_tx, beacon_a);
+        let _ = event_rx.try_recv(); // Consume PeerSelected event
+
+        // Now change to a different peer
+        let beacon_b = create_test_beacon("peer-B", HierarchyLevel::Platoon);
+        TopologyBuilder::update_selected_peer(&mut state, &event_tx, beacon_b);
+
+        // State should have the new peer
+        assert_eq!(state.selected_peer.as_ref().unwrap().node_id, "peer-B");
+
+        // Should have emitted PeerChanged event
+        let event = event_rx.try_recv().unwrap();
+        match event {
+            TopologyEvent::PeerChanged {
+                old_peer_id,
+                new_peer_id,
+                new_peer_beacon,
+            } => {
+                assert_eq!(old_peer_id, "peer-A");
+                assert_eq!(new_peer_id, "peer-B");
+                assert_eq!(new_peer_beacon.node_id, "peer-B");
+            }
+            _ => panic!("Expected PeerChanged event"),
+        }
+    }
+
+    #[test]
+    fn test_update_lateral_peers_discovery() {
+        let mut state = TopologyState::default();
+        let config = TopologyConfig::default();
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        // Create beacons at the same level (Platoon) as our own level
+        let lateral_beacon = create_test_beacon("lateral-1", HierarchyLevel::Platoon);
+
+        // Also create a beacon at a different level (should be ignored)
+        let different_level_beacon = create_test_beacon("lower-1", HierarchyLevel::Squad);
+
+        let nearby = vec![lateral_beacon.clone(), different_level_beacon];
+
+        TopologyBuilder::update_lateral_peers(
+            &mut state,
+            &config,
+            &nearby,
+            HierarchyLevel::Platoon,
+            &event_tx,
+        );
+
+        // Only the same-level peer should be tracked
+        assert_eq!(state.lateral_peers.len(), 1);
+        assert!(state.lateral_peers.contains_key("lateral-1"));
+
+        // Check LateralPeerDiscovered event
+        let event = event_rx.try_recv().unwrap();
+        match event {
+            TopologyEvent::LateralPeerDiscovered {
+                peer_id,
+                peer_beacon,
+            } => {
+                assert_eq!(peer_id, "lateral-1");
+                assert_eq!(peer_beacon.node_id, "lateral-1");
+            }
+            _ => panic!("Expected LateralPeerDiscovered event"),
+        }
+
+        // No more events
+        assert!(event_rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn test_update_lateral_peers_refresh_existing() {
+        let mut state = TopologyState::default();
+        let config = TopologyConfig::default();
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        // Pre-insert a lateral peer with an old timestamp
+        let old_time = Instant::now() - Duration::from_secs(60);
+        state
+            .lateral_peers
+            .insert("lateral-1".to_string(), old_time);
+
+        // Beacon is still visible
+        let lateral_beacon = create_test_beacon("lateral-1", HierarchyLevel::Platoon);
+        let nearby = vec![lateral_beacon];
+
+        TopologyBuilder::update_lateral_peers(
+            &mut state,
+            &config,
+            &nearby,
+            HierarchyLevel::Platoon,
+            &event_tx,
+        );
+
+        // Peer should still exist and last_seen should be refreshed (more recent than old_time)
+        assert_eq!(state.lateral_peers.len(), 1);
+        let last_seen = state.lateral_peers.get("lateral-1").unwrap();
+        assert!(*last_seen > old_time);
+
+        // No discovery event since peer was already known
+        assert!(event_rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn test_update_lateral_peers_expiry() {
+        let mut state = TopologyState::default();
+        let config = TopologyConfig {
+            peer_timeout: Duration::from_millis(50),
+            ..Default::default()
+        };
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        // Pre-insert a lateral peer with an old timestamp (past timeout)
+        let old_time = Instant::now() - Duration::from_millis(200);
+        state
+            .lateral_peers
+            .insert("stale-lateral".to_string(), old_time);
+
+        // Empty nearby beacons
+        let nearby: Vec<GeographicBeacon> = vec![];
+
+        TopologyBuilder::update_lateral_peers(
+            &mut state,
+            &config,
+            &nearby,
+            HierarchyLevel::Platoon,
+            &event_tx,
+        );
+
+        // Stale peer should be removed
+        assert!(state.lateral_peers.is_empty());
+
+        // Check LateralPeerLost event
+        let event = event_rx.try_recv().unwrap();
+        match event {
+            TopologyEvent::LateralPeerLost { peer_id } => {
+                assert_eq!(peer_id, "stale-lateral");
+            }
+            _ => panic!("Expected LateralPeerLost event"),
+        }
+    }
+
+    #[test]
+    fn test_update_lateral_peers_not_expired_within_timeout() {
+        let mut state = TopologyState::default();
+        let config = TopologyConfig {
+            peer_timeout: Duration::from_secs(3600), // Very long timeout
+            ..Default::default()
+        };
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        // Pre-insert a lateral peer with a recent timestamp
+        state
+            .lateral_peers
+            .insert("recent-lateral".to_string(), Instant::now());
+
+        // Empty nearby beacons (peer not visible), but timeout not elapsed
+        let nearby: Vec<GeographicBeacon> = vec![];
+
+        TopologyBuilder::update_lateral_peers(
+            &mut state,
+            &config,
+            &nearby,
+            HierarchyLevel::Platoon,
+            &event_tx,
+        );
+
+        // Peer should NOT be removed (within timeout)
+        assert_eq!(state.lateral_peers.len(), 1);
+        assert!(event_rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn test_topology_config_default_values() {
+        let config = TopologyConfig::default();
+
+        assert_eq!(config.reevaluation_interval, Some(Duration::from_secs(30)));
+        assert_eq!(config.peer_change_cooldown, Duration::from_secs(60));
+        assert_eq!(config.peer_timeout, Duration::from_secs(180));
+        assert!(config.hierarchy_strategy.is_none());
+        assert_eq!(config.max_lateral_connections, Some(10));
+        assert_eq!(config.max_retries, 3);
+        assert_eq!(config.initial_backoff, Duration::from_secs(1));
+        assert_eq!(config.max_backoff, Duration::from_secs(60));
+        assert_eq!(config.backoff_multiplier, 2.0);
+        assert_eq!(config.max_telemetry_buffer_size, 100);
+        assert!(config.metrics_collector.is_none());
+        assert!(config.partition_detector.is_none());
+    }
+
+    #[test]
+    fn test_topology_state_default_values() {
+        let state = TopologyState::default();
+
+        assert!(state.selected_peer.is_none());
+        assert!(state.linked_peers.is_empty());
+        assert!(state.lateral_peers.is_empty());
+        assert_eq!(state.role, crate::hierarchy::NodeRole::Standalone);
+        assert_eq!(state.hierarchy_level, HierarchyLevel::Squad);
+    }
+
+    #[test]
+    fn test_topology_event_enum_variants() {
+        // Verify all event variants can be constructed and debug-printed
+        let beacon = create_test_beacon("peer-1", HierarchyLevel::Platoon);
+
+        let events: Vec<TopologyEvent> = vec![
+            TopologyEvent::PeerSelected {
+                selected_peer_id: "peer-1".to_string(),
+                peer_beacon: beacon.clone(),
+            },
+            TopologyEvent::PeerChanged {
+                old_peer_id: "peer-old".to_string(),
+                new_peer_id: "peer-new".to_string(),
+                new_peer_beacon: beacon.clone(),
+            },
+            TopologyEvent::PeerLost {
+                lost_peer_id: "peer-lost".to_string(),
+            },
+            TopologyEvent::PeerAdded {
+                linked_peer_id: "linked-1".to_string(),
+            },
+            TopologyEvent::PeerRemoved {
+                linked_peer_id: "linked-1".to_string(),
+            },
+            TopologyEvent::LateralPeerDiscovered {
+                peer_id: "lateral-1".to_string(),
+                peer_beacon: beacon.clone(),
+            },
+            TopologyEvent::LateralPeerLost {
+                peer_id: "lateral-1".to_string(),
+            },
+            TopologyEvent::RoleChanged {
+                old_role: crate::hierarchy::NodeRole::Standalone,
+                new_role: crate::hierarchy::NodeRole::Leader,
+            },
+            TopologyEvent::LevelChanged {
+                old_level: HierarchyLevel::Squad,
+                new_level: HierarchyLevel::Platoon,
+            },
+        ];
+
+        // All variants should be Debug-printable and Clone-able
+        for event in &events {
+            let debug_str = format!("{:?}", event);
+            assert!(!debug_str.is_empty());
+            let _cloned = event.clone();
+        }
+        assert_eq!(events.len(), 9);
+    }
+
+    #[test]
+    fn test_selected_peer_struct() {
+        let beacon = create_test_beacon("peer-1", HierarchyLevel::Platoon);
+        let now = Instant::now();
+
+        let selected = SelectedPeer {
+            node_id: "peer-1".to_string(),
+            beacon: beacon.clone(),
+            selected_at: now,
+        };
+
+        assert_eq!(selected.node_id, "peer-1");
+        assert_eq!(selected.beacon.node_id, "peer-1");
+        // selected_at should be very recent
+        assert!(selected.selected_at.elapsed() < Duration::from_secs(1));
+
+        // Verify Clone and Debug
+        let cloned = selected.clone();
+        assert_eq!(cloned.node_id, "peer-1");
+        let debug_str = format!("{:?}", selected);
+        assert!(debug_str.contains("peer-1"));
+    }
+
+    #[test]
+    fn test_linked_peer_refresh_existing() {
+        let mut state = TopologyState::default();
+        let config = TopologyConfig::default();
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        // Pre-insert a linked peer with an old timestamp
+        let old_time = Instant::now() - Duration::from_secs(60);
+        state
+            .linked_peers
+            .insert("linked-peer".to_string(), old_time);
+
+        // Create a beacon that qualifies as a linked peer (lower level than ours)
+        let mut beacon = GeographicBeacon::new(
+            "linked-peer".to_string(),
+            GeoPosition::new(37.7750, -122.4195),
+            HierarchyLevel::Platform,
+        );
+        beacon.can_parent = false;
+        let nearby = vec![beacon];
+
+        TopologyBuilder::update_linked_peers(
+            &mut state,
+            &config,
+            &nearby,
+            HierarchyLevel::Platoon, // We are Platoon, beacon is Platform
+            &event_tx,
+        );
+
+        // Peer should still be tracked, but with refreshed last_seen
+        assert_eq!(state.linked_peers.len(), 1);
+        let last_seen = state.linked_peers.get("linked-peer").unwrap();
+        assert!(*last_seen > old_time);
+
+        // No event should be emitted (peer was already known)
+        assert!(event_rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn test_linked_peer_not_expired_within_timeout() {
+        let mut state = TopologyState::default();
+        let config = TopologyConfig {
+            peer_timeout: Duration::from_secs(3600),
+            ..Default::default()
+        };
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        // Pre-insert a linked peer with a recent timestamp
+        state
+            .linked_peers
+            .insert("recent-linked".to_string(), Instant::now());
+
+        // Empty nearby (peer disappeared) but timeout not elapsed
+        let nearby: Vec<GeographicBeacon> = vec![];
+
+        TopologyBuilder::update_linked_peers(
+            &mut state,
+            &config,
+            &nearby,
+            HierarchyLevel::Platoon,
+            &event_tx,
+        );
+
+        // Peer should NOT be removed (within timeout)
+        assert_eq!(state.linked_peers.len(), 1);
+        assert!(event_rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn test_linked_peers_higher_level_not_tracked() {
+        let mut state = TopologyState::default();
+        let config = TopologyConfig::default();
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        // Create a beacon at a HIGHER level than ours -- should NOT be tracked as linked peer
+        let mut beacon = GeographicBeacon::new(
+            "higher-peer".to_string(),
+            GeoPosition::new(37.7750, -122.4195),
+            HierarchyLevel::Company,
+        );
+        beacon.can_parent = true;
+        let nearby = vec![beacon];
+
+        TopologyBuilder::update_linked_peers(
+            &mut state,
+            &config,
+            &nearby,
+            HierarchyLevel::Platoon, // We are Platoon, beacon is Company (higher)
+            &event_tx,
+        );
+
+        // Should not be tracked as a linked peer
+        assert!(state.linked_peers.is_empty());
+        assert!(event_rx.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn test_clone_topology_builder() {
+        let storage = Arc::new(MockBeaconStorage::new());
+        let observer = Arc::new(BeaconObserver::new(storage, "9q8yy".to_string()));
+
+        let builder = TopologyBuilder::new(
+            TopologyConfig::default(),
+            "node-1".to_string(),
+            GeoPosition::new(37.7749, -122.4194),
+            HierarchyLevel::Squad,
+            None,
+            observer,
+        );
+
+        let cloned = builder.clone();
+
+        // Cloned builder should share the same state (Arc)
+        assert!(cloned.get_selected_peer().is_none());
+        assert!(cloned.get_state().linked_peers.is_empty());
+
+        // Clone's event_rx should be None (not cloned)
+        assert!(cloned.subscribe().is_none());
+
+        // Original's subscribe should still work (if not already taken)
+        let rx = builder.subscribe();
+        assert!(rx.is_some());
+    }
+
+    #[test]
+    fn test_update_lateral_peers_multiple_peers() {
+        let mut state = TopologyState::default();
+        let config = TopologyConfig::default();
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        let lateral_a = create_test_beacon("lateral-A", HierarchyLevel::Platoon);
+        let lateral_b = create_test_beacon("lateral-B", HierarchyLevel::Platoon);
+        let nearby = vec![lateral_a, lateral_b];
+
+        TopologyBuilder::update_lateral_peers(
+            &mut state,
+            &config,
+            &nearby,
+            HierarchyLevel::Platoon,
+            &event_tx,
+        );
+
+        assert_eq!(state.lateral_peers.len(), 2);
+        assert!(state.lateral_peers.contains_key("lateral-A"));
+        assert!(state.lateral_peers.contains_key("lateral-B"));
+
+        // Two discovery events
+        let mut discovered_ids: Vec<String> = Vec::new();
+        while let Ok(event) = event_rx.try_recv() {
+            match event {
+                TopologyEvent::LateralPeerDiscovered { peer_id, .. } => {
+                    discovered_ids.push(peer_id);
+                }
+                _ => panic!("Expected LateralPeerDiscovered events"),
+            }
+        }
+        discovered_ids.sort();
+        assert_eq!(discovered_ids, vec!["lateral-A", "lateral-B"]);
+    }
+
+    #[test]
+    fn test_update_linked_peers_multiple_additions() {
+        let mut state = TopologyState::default();
+        let config = TopologyConfig::default();
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        // Two beacons at lower levels
+        let mut beacon_a = GeographicBeacon::new(
+            "linked-A".to_string(),
+            GeoPosition::new(37.7750, -122.4195),
+            HierarchyLevel::Platform,
+        );
+        beacon_a.can_parent = false;
+
+        let mut beacon_b = GeographicBeacon::new(
+            "linked-B".to_string(),
+            GeoPosition::new(37.7751, -122.4196),
+            HierarchyLevel::Squad,
+        );
+        beacon_b.can_parent = false;
+
+        let nearby = vec![beacon_a, beacon_b];
+
+        TopologyBuilder::update_linked_peers(
+            &mut state,
+            &config,
+            &nearby,
+            HierarchyLevel::Company, // We are Company, both Platform and Squad are lower
+            &event_tx,
+        );
+
+        assert_eq!(state.linked_peers.len(), 2);
+
+        let mut added_ids: Vec<String> = Vec::new();
+        while let Ok(event) = event_rx.try_recv() {
+            match event {
+                TopologyEvent::PeerAdded { linked_peer_id } => {
+                    added_ids.push(linked_peer_id);
+                }
+                _ => panic!("Expected PeerAdded events"),
+            }
+        }
+        added_ids.sort();
+        assert_eq!(added_ids, vec!["linked-A", "linked-B"]);
+    }
+
+    /// Helper to create a test beacon with sensible defaults
+    fn create_test_beacon(node_id: &str, level: HierarchyLevel) -> GeographicBeacon {
+        let mut beacon = GeographicBeacon::new(
+            node_id.to_string(),
+            GeoPosition::new(37.7750, -122.4195),
+            level,
+        );
+        beacon.can_parent = true;
+        beacon.parent_priority = 100;
+        beacon
+    }
 }

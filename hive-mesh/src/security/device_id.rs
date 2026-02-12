@@ -199,4 +199,74 @@ mod tests {
         let result = DeviceId::from_hex("00112233"); // too short
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_from_public_key_bytes() {
+        let key = SigningKey::generate(&mut OsRng);
+        let pk_bytes = key.verifying_key().to_bytes();
+
+        let id = DeviceId::from_public_key_bytes(&pk_bytes).unwrap();
+        let expected = DeviceId::from_public_key(&key.verifying_key());
+        assert_eq!(id, expected);
+    }
+
+    #[test]
+    fn test_from_public_key_bytes_wrong_length() {
+        let result = DeviceId::from_public_key_bytes(&[0u8; 16]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_bytes_and_as_bytes() {
+        let raw = [1u8; 16];
+        let id = DeviceId::from_bytes(raw);
+        assert_eq!(id.as_bytes(), &raw);
+    }
+
+    #[test]
+    fn test_display() {
+        let id = DeviceId::from_bytes([0xab; 16]);
+        let s = format!("{}", id);
+        assert_eq!(s, "abababababababababababababababab");
+    }
+
+    #[test]
+    fn test_debug() {
+        let id = DeviceId::from_bytes([0xcd; 16]);
+        let s = format!("{:?}", id);
+        assert!(s.starts_with("DeviceId("));
+        assert!(s.contains("cdcdcdcd"));
+    }
+
+    #[test]
+    fn test_try_from_node_id() {
+        let key = SigningKey::generate(&mut OsRng);
+        let device_id = DeviceId::from_public_key(&key.verifying_key());
+        let node_id: NodeId = device_id.into();
+
+        let back: DeviceId = (&node_id).try_into().unwrap();
+        assert_eq!(back, device_id);
+    }
+
+    #[test]
+    fn test_try_from_invalid_node_id() {
+        let node_id = NodeId::new("not-hex".into());
+        let result: Result<DeviceId, _> = (&node_id).try_into();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_hex_decode_invalid_chars() {
+        assert!(hex_decode("zz").is_err());
+        assert!(hex_decode("gg").is_err());
+    }
+
+    #[test]
+    fn test_hex_roundtrip() {
+        let bytes = vec![0x00, 0xff, 0x0a, 0xb5];
+        let encoded = hex_encode(&bytes);
+        assert_eq!(encoded, "00ff0ab5");
+        let decoded = hex_decode(&encoded).unwrap();
+        assert_eq!(decoded, bytes);
+    }
 }
