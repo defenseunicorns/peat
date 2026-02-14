@@ -42,7 +42,10 @@ pub use capabilities::{
     TransportInstance, TransportMode, TransportPolicy, TransportType,
 };
 pub use health::{HealthMonitor, HeartbeatConfig};
-pub use manager::{RouteDecision, TransportManager, TransportManagerConfig};
+pub use manager::{
+    CollectionRouteConfig, CollectionRouteTable, CollectionTransportRoute, RouteDecision,
+    TransportManager, TransportManagerConfig,
+};
 
 #[cfg(feature = "bluetooth")]
 pub use btle::HiveBleTransport;
