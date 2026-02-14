@@ -139,7 +139,7 @@ the transport layer into `hive-mesh`. Much of the original M4 work is now comple
 | ~~Collection transport routing config~~ | DONE | `CollectionRouteTable`, `CollectionTransportRoute` in `manager.rs` |
 | ~~`route_message()` supports per-collection transport~~ | DONE | `route_collection()` + `RouteDecision::TransportInstance` |
 | ~~PACE as transport config option~~ | DONE | `CollectionTransportRoute::Pace` with optional policy override |
-| Create FFI bootstrap for dual-active transport | TODO | `hive-ffi`: construct `TransportManager` with both Iroh + BLE |
+| ~~Create FFI bootstrap for dual-active transport~~ | DONE | `hive-ffi`: construct `TransportManager` with both Iroh + BLE |
 | Android bootstrap: Kotlin -> JNI -> HiveBleTransport | TODO | Instantiate `AndroidBleDelegate`, pass through JNI |
 | Integration test: dual-active (Iroh + BLE concurrent) | TODO | Both transports active, different collections routed to each |
 | CannedMessage round-trip over BLE | TODO | Carried from M1 — requires encryption + hive-lite-sync |
@@ -150,7 +150,7 @@ the transport layer into `hive-mesh`. Much of the original M4 work is now comple
 - [x] BLE translation layer bridges CRDTs to Automerge
 - [x] Per-collection transport routing (explicit or autopace)
 - [ ] Both Iroh and BLE active simultaneously
-- [ ] FFI bootstrap creates dual-active TransportManager
+- [x] FFI bootstrap creates dual-active TransportManager
 - [ ] Android bootstrap wires Kotlin delegate through JNI
 
 ---
