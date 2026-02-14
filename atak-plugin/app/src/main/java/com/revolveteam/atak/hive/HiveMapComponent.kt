@@ -1129,18 +1129,18 @@ class HiveMapComponent : DropDownMapComponent() {
      * Update connection status based on HIVE node availability and peer count
      */
     private fun updateConnectionStatus() {
-        val node = HivePluginLifecycle.getInstance()?.getHiveNodeJni()
-        val ffiPeerCount = peerCount  // FFI mesh peers
-        val blePeerCount = HivePluginLifecycle.getInstance()?.getHiveBleManager()
-            ?.peers?.value?.count { it.isConnected } ?: 0
-        val totalPeerCount = ffiPeerCount + blePeerCount
+        val lifecycle = HivePluginLifecycle.getInstance()
+        val node = lifecycle?.getHiveNodeJni()
+        val irohPeerCount = lifecycle?.getPeerCount() ?: 0
+        val blePeerCount = lifecycle?.getBlePeerCount() ?: 0
+        val totalPeerCount = irohPeerCount + blePeerCount
 
         _connectionStatus = when {
             node == null -> ConnectionStatus.DISCONNECTED
             totalPeerCount > 0 -> ConnectionStatus.CONNECTED
             else -> ConnectionStatus.CONNECTING  // Node exists but no peers
         }
-        Log.d(TAG, "Connection status: $_connectionStatus (ffi=$ffiPeerCount, ble=$blePeerCount)")
+        Log.d(TAG, "Connection status: $_connectionStatus (iroh=$irohPeerCount, ble=$blePeerCount)")
     }
 
     /**

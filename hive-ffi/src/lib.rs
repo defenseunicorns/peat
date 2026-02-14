@@ -2403,6 +2403,70 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_bleRemovePeerJni(
     }
 }
 
+/// JNI: Query whether BLE transport is available (started)
+///
+/// Called by Kotlin to check if BLE transport is active for UI display.
+/// Returns true if BLE transport has been started via bleSetStartedJni.
+///
+/// Kotlin signature: external fun bleIsAvailableJni(handle: Long): Boolean
+#[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
+#[no_mangle]
+pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_bleIsAvailableJni(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: i64,
+) -> jboolean {
+    if handle == 0 {
+        android_log("bleIsAvailableJni: Invalid handle (0)");
+        return 0;
+    }
+
+    use hive_protocol::transport::Transport;
+
+    let guard = ANDROID_BLE_TRANSPORT.lock().unwrap();
+    let result = match guard.as_ref() {
+        Some(t) => {
+            if t.is_available() {
+                1
+            } else {
+                0
+            }
+        }
+        None => 0,
+    };
+
+    android_log(&format!("bleIsAvailableJni: {}", result != 0));
+    result
+}
+
+/// JNI: Get the number of reachable BLE peers
+///
+/// Called by Kotlin to get BLE peer count for unified UI display.
+/// Returns the number of peers added via bleAddPeerJni.
+///
+/// Kotlin signature: external fun blePeerCountJni(handle: Long): Int
+#[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
+#[no_mangle]
+pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_blePeerCountJni(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: i64,
+) -> jint {
+    if handle == 0 {
+        android_log("blePeerCountJni: Invalid handle (0)");
+        return 0;
+    }
+
+    let guard = ANDROID_BLE_TRANSPORT.lock().unwrap();
+    let count = match guard.as_ref() {
+        Some(t) => t.reachable_peer_count() as jint,
+        None => 0,
+    };
+
+    android_log(&format!("blePeerCountJni: {}", count));
+    count
+}
+
 /// JNI: Get all cells as JSON array string
 ///
 /// Kotlin signature: external fun getCellsJni(handle: Long): String
@@ -2807,6 +2871,18 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_nativeInit(
             sig: "(JLjava/lang/String;)V".into(),
             fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_bleRemovePeerJni as *mut c_void,
         },
+        #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
+        NativeMethod {
+            name: "bleIsAvailableJni".into(),
+            sig: "(J)Z".into(),
+            fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_bleIsAvailableJni as *mut c_void,
+        },
+        #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
+        NativeMethod {
+            name: "blePeerCountJni".into(),
+            sig: "(J)I".into(),
+            fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_blePeerCountJni as *mut c_void,
+        },
     ];
 
     // Register native methods - the class is passed in from Kotlin so it's valid
@@ -3005,6 +3081,18 @@ pub extern "C" fn JNI_OnLoad(vm: *mut JavaVM, _reserved: *mut c_void) -> jint {
                     name: "bleRemovePeerJni".into(),
                     sig: "(JLjava/lang/String;)V".into(),
                     fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_bleRemovePeerJni as *mut c_void,
+                },
+                #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
+                NativeMethod {
+                    name: "bleIsAvailableJni".into(),
+                    sig: "(J)Z".into(),
+                    fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_bleIsAvailableJni as *mut c_void,
+                },
+                #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
+                NativeMethod {
+                    name: "blePeerCountJni".into(),
+                    sig: "(J)I".into(),
+                    fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_blePeerCountJni as *mut c_void,
                 },
             ];
 

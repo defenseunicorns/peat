@@ -182,6 +182,11 @@ impl<A: BleAdapter + Send + Sync + 'static> HiveBleTransport<A> {
         &self.inner
     }
 
+    /// Get the count of reachable peers (discovered via BLE scan)
+    pub fn reachable_peer_count(&self) -> usize {
+        self.reachable_peers.read().unwrap().len()
+    }
+
     /// Get the node ID of this transport
     pub fn node_id(&self) -> NodeId {
         btle_to_hive_node_id(self.inner.node_id())
@@ -409,6 +414,21 @@ mod tests {
 
         transport.remove_reachable_peer(&peer);
         assert!(!transport.can_reach(&peer));
+    }
+
+    #[test]
+    fn test_reachable_peer_count() {
+        let transport = create_test_transport();
+        assert_eq!(transport.reachable_peer_count(), 0);
+
+        transport.add_reachable_peer(NodeId::new("11111111".to_string()));
+        assert_eq!(transport.reachable_peer_count(), 1);
+
+        transport.add_reachable_peer(NodeId::new("22222222".to_string()));
+        assert_eq!(transport.reachable_peer_count(), 2);
+
+        transport.remove_reachable_peer(&NodeId::new("11111111".to_string()));
+        assert_eq!(transport.reachable_peer_count(), 1);
     }
 
     #[test]
