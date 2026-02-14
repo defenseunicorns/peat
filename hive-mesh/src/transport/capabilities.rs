@@ -49,7 +49,8 @@ use super::{MeshTransport, NodeId, Result, TransportError};
 /// Type of transport technology
 ///
 /// Used to identify and categorize transports for selection and configuration.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum TransportType {
     /// QUIC over IP (Iroh) - primary mesh transport
     Quic,
@@ -631,7 +632,7 @@ impl std::fmt::Display for PaceLevel {
 ///     .contingency(vec!["lora-primary"])
 ///     .emergency(vec!["ble-mesh"]);
 /// ```
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct TransportPolicy {
     /// Policy name for reference
     pub name: String,
