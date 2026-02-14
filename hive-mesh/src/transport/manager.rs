@@ -908,10 +908,7 @@ impl TransportManager {
         requirements: &MessageRequirements,
         policy_override: Option<&TransportPolicy>,
     ) -> Option<TransportId> {
-        let policy = match policy_override.or(self.config.default_policy.as_ref()) {
-            Some(p) => p,
-            None => return None,
-        };
+        let policy = policy_override.or(self.config.default_policy.as_ref())?;
 
         let instances = self.transport_instances.read().unwrap();
         let available_for_peer: HashSet<_> = instances
