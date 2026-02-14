@@ -60,13 +60,15 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 
-use super::bypass::{BypassMessage, BypassTarget, BypassTransport, MessageEncoding, UdpBypassChannel};
+use super::bypass::{
+    BypassMessage, BypassTarget, BypassTransport, MessageEncoding, UdpBypassChannel,
+};
 use super::capabilities::{
     MessagePriority, MessageRequirements, PaceLevel, PeerDistance, RangeMode, Transport,
     TransportId, TransportInstance, TransportMode, TransportPolicy, TransportType,
 };
-use serde::{Deserialize, Serialize};
 use super::{NodeId, Result, TransportError};
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use tokio::sync::broadcast;
 use tokio::sync::RwLock as TokioRwLock;
@@ -3207,8 +3209,7 @@ mod tests {
             TransportType::Quic,
             TransportCapabilities::quic(),
         );
-        let t =
-            Arc::new(MockTransport::new(TransportCapabilities::quic()).with_peer(peer.clone()));
+        let t = Arc::new(MockTransport::new(TransportCapabilities::quic()).with_peer(peer.clone()));
         manager.register_instance(inst, t);
 
         let requirements = MessageRequirements::default();
@@ -3300,10 +3301,7 @@ mod tests {
         );
         assert_ne!(decision, RouteDecision::Bypass);
         assert_ne!(decision, RouteDecision::NoRoute);
-        assert_ne!(
-            decision,
-            RouteDecision::Transport(TransportType::Quic)
-        );
+        assert_ne!(decision, RouteDecision::Transport(TransportType::Quic));
     }
 
     #[test]
