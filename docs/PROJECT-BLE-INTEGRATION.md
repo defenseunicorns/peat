@@ -136,9 +136,9 @@ the transport layer into `hive-mesh`. Much of the original M4 work is now comple
 | ~~`HiveBleTransport` implements Transport trait~~ | DONE | `hive-mesh/src/transport/btle.rs` |
 | ~~TransportManager supports BLE registration~~ | DONE | `register_instance()` API |
 | ~~BLE-to-Automerge translation layer~~ | DONE | `ble_translation.rs` — BleTranslator |
-| Collection transport routing config | TODO | Generalize `BypassCollectionConfig` pattern to all transports |
-| `route_message()` supports per-collection transport | TODO | Extend `RouteDecision` to consult collection config |
-| PACE as transport config option | TODO | Collections can opt into PACE scoring instead of fixed transport |
+| ~~Collection transport routing config~~ | DONE | `CollectionRouteTable`, `CollectionTransportRoute` in `manager.rs` |
+| ~~`route_message()` supports per-collection transport~~ | DONE | `route_collection()` + `RouteDecision::TransportInstance` |
+| ~~PACE as transport config option~~ | DONE | `CollectionTransportRoute::Pace` with optional policy override |
 | Create FFI bootstrap for dual-active transport | TODO | `hive-ffi`: construct `TransportManager` with both Iroh + BLE |
 | Android bootstrap: Kotlin -> JNI -> HiveBleTransport | TODO | Instantiate `AndroidBleDelegate`, pass through JNI |
 | Integration test: dual-active (Iroh + BLE concurrent) | TODO | Both transports active, different collections routed to each |
@@ -148,7 +148,7 @@ the transport layer into `hive-mesh`. Much of the original M4 work is now comple
 - [x] `HiveBleTransport` implements full Transport trait surface
 - [x] TransportManager can register and select BLE transport
 - [x] BLE translation layer bridges CRDTs to Automerge
-- [ ] Per-collection transport routing (explicit or autopace)
+- [x] Per-collection transport routing (explicit or autopace)
 - [ ] Both Iroh and BLE active simultaneously
 - [ ] FFI bootstrap creates dual-active TransportManager
 - [ ] Android bootstrap wires Kotlin delegate through JNI
@@ -215,6 +215,7 @@ Final cleanup and documentation.
 | 2026-02-13 | Released hive-btle v0.1.1 | Added `send_to()` primitives, crates.io + Maven Central |
 | 2026-02-13 | ADR-049 transport extraction merged | `HiveBleTransport` now in `hive-mesh/src/transport/btle.rs` |
 | 2026-02-13 | M4 re-evaluated against hive-mesh | Most transport wiring already done by ADR-049 |
+| 2026-02-14 | Per-collection transport routing | `CollectionRouteTable`, `route_collection()`, PACE config option |
 
 ---
 
