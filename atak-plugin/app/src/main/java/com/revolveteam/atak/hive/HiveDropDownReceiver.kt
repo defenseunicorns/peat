@@ -273,14 +273,11 @@ class HiveDropDownReceiver(
             HiveMapComponent.ConnectionStatus.CONNECTING -> Color.parseColor("#FFC107")
             else -> Color.parseColor("#F44336")
         }
-        // BLE peer count (deduplicated by nodeId to handle address rotation)
-        val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
-        val totalPeers = if (bleManager?.isRunning?.value == true) {
-            bleManager.peers.value
-                ?.filter { it.isConnected }
-                ?.distinctBy { it.nodeId }
-                ?.size ?: 0
-        } else 0
+        // Unified peer count: Iroh peers + BLE peers
+        val lifecycle = HivePluginLifecycle.getInstance()
+        val irohPeerCount = lifecycle?.getPeerCount() ?: 0
+        val blePeerCount = lifecycle?.getBlePeerCount() ?: 0
+        val totalPeers = irohPeerCount + blePeerCount
         val status = TextView(pluginContext).apply {
             text = "${mapComponent.connectionStatus.name} ($totalPeers peers)"
             textSize = 12f

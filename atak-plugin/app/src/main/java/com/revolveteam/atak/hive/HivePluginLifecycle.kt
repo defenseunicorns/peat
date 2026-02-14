@@ -115,10 +115,9 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
         val prefs = context.getSharedPreferences("hive_prefs", Context.MODE_PRIVATE)
         val unifiedBleEnabled = prefs.getBoolean("enable_ble", true)
 
-        // For now, still initialize HiveBleManager as fallback since Android
-        // BLE adapter callbacks in hive-btle are not yet complete.
-        // TODO(#558): Remove this once Android BLE adapter integration is complete
-        // and unified transport fully handles BLE on Android.
+        // M5 Migration: HiveBleManager is deprecated. Features will migrate to
+        // HiveNodeJni unified transport. BLE mesh still runs via HiveBleManager
+        // during the transition period until chat/markers/canned messages migrate.
         try {
             // Get mesh ID from preferences, system properties, or use default
             val meshId = prefs.getString("mesh_id", null)
@@ -282,9 +281,25 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
 
     fun getHiveBleManager(): HiveBleManager? = hiveBleManager
 
-    fun isBleAvailable(): Boolean = hiveBleManager?.isRunning?.value == true
+    fun isBleAvailable(): Boolean {
+        // Prefer unified transport query via JNI (M5)
+        try {
+            val unified = hiveNodeJni?.bleIsAvailable()
+            if (unified == true) return true
+        } catch (_: Exception) { }
+        // Fall back to legacy HiveBleManager during transition
+        return hiveBleManager?.isRunning?.value == true
+    }
 
-    fun getBlePeerCount(): Int = hiveBleManager?.connectedPeerCount?.value ?: 0
+    fun getBlePeerCount(): Int {
+        // Prefer unified transport query via JNI (M5)
+        try {
+            val unified = hiveNodeJni?.blePeerCount() ?: 0
+            if (unified > 0) return unified
+        } catch (_: Exception) { }
+        // Fall back to legacy HiveBleManager during transition
+        return hiveBleManager?.connectedPeerCount?.value ?: 0
+    }
 
     fun startBleMesh(): Boolean {
         return hiveBleManager?.start() ?: false
