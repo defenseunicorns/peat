@@ -2724,9 +2724,9 @@ dependencies = [
 
 [[package]]
 name = "hive-btle"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86160a1bdb202a39e32a6d01b1c5caf7d7ba57fd4b9cccb311dddc5b2fe64fa7"
+checksum = "bd14f41c85cc68ec37ab843571829ef581eec4f66a6ff092a53a0f6eaaefe625"
 dependencies = [
  "android_logger",
  "async-trait",
