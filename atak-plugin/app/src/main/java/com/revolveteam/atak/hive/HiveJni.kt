@@ -185,6 +185,37 @@ object HiveJni {
     @JvmStatic
     external fun publishPlatformJni(handle: Long, platformJson: String): Boolean
 
+    // ========================================================================
+    // BLE Transport JNI Methods (ADR-047 Android Bootstrap)
+    // ========================================================================
+
+    /**
+     * Signal BLE transport started/stopped.
+     * Makes is_available() return true/false for PACE routing.
+     * @param handle Node handle from createNodeJni
+     * @param started true to start, false to stop
+     */
+    @JvmStatic
+    external fun bleSetStartedJni(handle: Long, started: Boolean)
+
+    /**
+     * Add a reachable BLE peer.
+     * Makes can_reach(peer) return true for PACE routing.
+     * @param handle Node handle from createNodeJni
+     * @param peerId Peer ID as 8-char hex string (e.g. "0A1B2C3D")
+     */
+    @JvmStatic
+    external fun bleAddPeerJni(handle: Long, peerId: String)
+
+    /**
+     * Remove a reachable BLE peer.
+     * Makes can_reach(peer) return false for PACE routing.
+     * @param handle Node handle from createNodeJni
+     * @param peerId Peer ID as 8-char hex string (e.g. "0A1B2C3D")
+     */
+    @JvmStatic
+    external fun bleRemovePeerJni(handle: Long, peerId: String)
+
     /**
      * Test if JNI bindings are working.
      * @return true if JNI is functional
@@ -379,6 +410,28 @@ class HiveNodeJni private constructor(private val handle: Long) : AutoCloseable 
      * @return true if published successfully
      */
     fun publishPlatform(platformJson: String): Boolean = HiveJni.publishPlatformJni(handle, platformJson)
+
+    // ========================================================================
+    // BLE Transport Methods (ADR-047 Android Bootstrap)
+    // ========================================================================
+
+    /**
+     * Signal BLE transport started/stopped to Rust TransportManager.
+     * @param started true when BLE stack is ready, false on shutdown
+     */
+    fun bleSetStarted(started: Boolean) = HiveJni.bleSetStartedJni(handle, started)
+
+    /**
+     * Add a reachable BLE peer for PACE routing.
+     * @param peerId Peer ID as 8-char hex string (e.g. "0A1B2C3D")
+     */
+    fun bleAddPeer(peerId: String) = HiveJni.bleAddPeerJni(handle, peerId)
+
+    /**
+     * Remove a reachable BLE peer from PACE routing.
+     * @param peerId Peer ID as 8-char hex string (e.g. "0A1B2C3D")
+     */
+    fun bleRemovePeer(peerId: String) = HiveJni.bleRemovePeerJni(handle, peerId)
 
     /**
      * Free the native node resources.
