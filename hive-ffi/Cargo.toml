@@ -68,5 +68,8 @@ hive-btle = { workspace = true, features = ["macos"], optional = true }
 [target.'cfg(target_os = "windows")'.dependencies]
 hive-btle = { workspace = true, features = ["windows"], optional = true }
 
+[target.'cfg(target_os = "android")'.dependencies]
+hive-btle = { workspace = true, features = ["android"], optional = true }
+
 [build-dependencies]
 uniffi = { version = "0.28", features = ["build"] }
