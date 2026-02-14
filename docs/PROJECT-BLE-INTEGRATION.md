@@ -161,14 +161,19 @@ Migrate ATAK plugin from dual-system to unified transport.
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Update `HivePluginLifecycle` to use unified transport | TODO | |
-| Remove direct `HiveBleManager` usage | TODO | Use TransportManager |
-| Update `HiveDropDownReceiver` UI | TODO | Single peer list |
-| Test WearTAK interoperability | TODO | Genesis sync via BleTranslator |
-| Add deprecation warnings for old API | TODO | Smooth transition |
+| Add BLE state query JNI methods (`bleIsAvailable`, `blePeerCount`) | DONE | Rust + Kotlin, registered in nativeInit/JNI_OnLoad |
+| Add `reachable_peer_count()` to `HiveBleTransport` | DONE | Public accessor for JNI |
+| Add deprecation warnings for old API | DONE | `@Deprecated` on `HiveBleManager`, M5 migration comments |
+| Update `HiveDropDownReceiver` UI | DONE | Unified peer count (Iroh + BLE) |
+| Update `HiveMapComponent` connection status | DONE | Uses `lifecycle.getBlePeerCount()` |
+| Update `HivePluginLifecycle` to use unified transport | IN PROGRESS | `isBleAvailable`/`getBlePeerCount` prefer JNI, fall back to legacy |
+| Remove direct `HiveBleManager` usage | TODO | Requires chat/markers/canned message migration |
+| Test WearTAK interoperability | TODO | Requires device testing |
 
 **Deliverables**:
-- [ ] ATAK plugin uses single HiveNode API
+- [x] BLE state queryable through HiveNodeJni (unified API)
+- [x] Unified peer count display in UI
+- [ ] ATAK plugin uses single HiveNode API for all features
 - [ ] WearTAK devices sync via unified transport
 - [ ] No regression in functionality
 
@@ -217,6 +222,9 @@ Final cleanup and documentation.
 | 2026-02-13 | M4 re-evaluated against hive-mesh | Most transport wiring already done by ADR-049 |
 | 2026-02-14 | Per-collection transport routing | `CollectionRouteTable`, `route_collection()`, PACE config option |
 | 2026-02-14 | Android bootstrap: Kotlin -> JNI -> HiveBleTransport | AndroidAdapter Ok(()), 3 JNI methods, Kotlin peer bridge |
+| 2026-02-14 | M5: BLE state query JNI methods | `bleIsAvailableJni`, `blePeerCountJni` + `reachable_peer_count()` |
+| 2026-02-14 | M5: Unified peer count in UI | HiveDropDownReceiver + HiveMapComponent show Iroh + BLE combined |
+| 2026-02-14 | M5: HiveBleManager deprecation | `@Deprecated` annotation, M5 migration comments in lifecycle |
 
 ---
 

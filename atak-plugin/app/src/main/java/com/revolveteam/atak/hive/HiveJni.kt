@@ -217,6 +217,22 @@ object HiveJni {
     external fun bleRemovePeerJni(handle: Long, peerId: String)
 
     /**
+     * Query whether BLE transport is available (started).
+     * @param handle Node handle from createNodeJni
+     * @return true if BLE transport has been started
+     */
+    @JvmStatic
+    external fun bleIsAvailableJni(handle: Long): Boolean
+
+    /**
+     * Get the number of reachable BLE peers.
+     * @param handle Node handle from createNodeJni
+     * @return Number of BLE peers added via bleAddPeerJni
+     */
+    @JvmStatic
+    external fun blePeerCountJni(handle: Long): Int
+
+    /**
      * Test if JNI bindings are working.
      * @return true if JNI is functional
      */
@@ -432,6 +448,18 @@ class HiveNodeJni private constructor(private val handle: Long) : AutoCloseable 
      * @param peerId Peer ID as 8-char hex string (e.g. "0A1B2C3D")
      */
     fun bleRemovePeer(peerId: String) = HiveJni.bleRemovePeerJni(handle, peerId)
+
+    /**
+     * Query whether BLE transport is available (started) in Rust TransportManager.
+     * @return true if BLE transport is active
+     */
+    fun bleIsAvailable(): Boolean = HiveJni.bleIsAvailableJni(handle)
+
+    /**
+     * Get the number of reachable BLE peers known to Rust TransportManager.
+     * @return Number of BLE peers
+     */
+    fun blePeerCount(): Int = HiveJni.blePeerCountJni(handle)
 
     /**
      * Free the native node resources.
