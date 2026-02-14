@@ -65,7 +65,8 @@ use hive_protocol::sync::{BackendConfig, DataSyncBackend, TransportConfig};
 use hive_protocol::transport::btle::HiveBleTransport;
 #[cfg(feature = "sync")]
 use hive_protocol::transport::{
-    iroh::IrohMeshTransport, Transport, TransportManager, TransportManagerConfig,
+    iroh::IrohMeshTransport, CollectionRouteTable, Transport, TransportCapabilities,
+    TransportInstance, TransportManager, TransportManagerConfig, TransportPolicy, TransportType,
 };
 #[cfg(feature = "sync")]
 use std::net::SocketAddr;
@@ -226,6 +227,10 @@ pub struct TransportConfigFFI {
     /// List of transport names in order of preference, e.g., ["iroh", "ble", "lora"]
     /// Used by TransportManager's PACE policy for transport selection
     pub transport_preference: Option<Vec<String>>,
+    /// Per-collection transport routing (optional)
+    /// JSON-encoded CollectionRouteTable for explicit collection->transport bindings.
+    /// Collections not listed fall through to PACE/legacy scoring.
+    pub collection_routes_json: Option<String>,
 }
 
 /// Configuration for creating a HiveNode
@@ -956,8 +961,30 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
     let storage_backend = sync_backend.storage_backend();
 
     // Create TransportManager for multi-transport coordination (ADR-032, #555)
-    // This enables future BLE transport integration via the same manager
-    let mut transport_manager = TransportManager::new(TransportManagerConfig::default());
+    // Build TransportManagerConfig from FFI config (PACE policy + collection routes)
+    let mut tm_config = TransportManagerConfig::default();
+
+    if let Some(ref transport_config) = config.transport {
+        // Build PACE policy from transport_preference
+        if let Some(ref prefs) = transport_config.transport_preference {
+            let policy = TransportPolicy::new("ffi-config").primary(prefs.clone());
+            tm_config.default_policy = Some(policy);
+        }
+
+        // Parse collection routes from JSON
+        if let Some(ref routes_json) = transport_config.collection_routes_json {
+            match serde_json::from_str::<CollectionRouteTable>(routes_json) {
+                Ok(table) => {
+                    tm_config.collection_routes = table;
+                }
+                Err(e) => {
+                    eprintln!("[HIVE] Failed to parse collection_routes_json: {}", e);
+                }
+            }
+        }
+    }
+
+    let mut transport_manager = TransportManager::new(tm_config);
 
     // Create IrohMeshTransport wrapper and register with TransportManager
     // This allows the transport to be selected via PACE policy alongside future transports
@@ -970,7 +997,17 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
         peers: Vec::new(),
     };
     let iroh_mesh_transport = Arc::new(IrohMeshTransport::new(Arc::clone(&transport), peer_config));
-    transport_manager.register(iroh_mesh_transport as Arc<dyn Transport>);
+    let iroh_as_transport: Arc<dyn Transport> = iroh_mesh_transport.clone();
+    transport_manager.register(iroh_as_transport.clone());
+
+    // Register as PACE instance for collection routing
+    let iroh_instance = TransportInstance::new(
+        "iroh-primary",
+        TransportType::Quic,
+        TransportCapabilities::quic(),
+    )
+    .with_description("Primary Iroh/QUIC transport");
+    transport_manager.register_instance(iroh_instance, iroh_as_transport);
 
     // Initialize BLE transport if enabled (ADR-039, #556)
     #[cfg(feature = "bluetooth")]
@@ -1006,8 +1043,20 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
                         Ok(adapter) => {
                             let btle = BluetoothLETransport::new(ble_config, adapter);
                             let ble_transport = Arc::new(HiveBleTransport::new(btle));
-                            transport_manager.register(ble_transport as Arc<dyn Transport>);
-                            eprintln!("[HIVE] BLE transport initialized (Linux/BlueZ)");
+                            let ble_as_transport: Arc<dyn Transport> = ble_transport.clone();
+                            transport_manager.register(ble_as_transport.clone());
+
+                            // Register as PACE instance for collection routing
+                            let ble_instance = TransportInstance::new(
+                                "ble-primary",
+                                TransportType::BluetoothLE,
+                                TransportCapabilities::bluetooth_le(),
+                            )
+                            .with_description("Primary BLE transport");
+                            transport_manager.register_instance(ble_instance, ble_as_transport);
+                            eprintln!(
+                                "[HIVE] BLE transport registered as PACE instance 'ble-primary'"
+                            );
                         }
                         Err(e) => {
                             eprintln!("[HIVE] Failed to initialize BLE adapter: {} (continuing without BLE)", e);
@@ -1970,6 +2019,7 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_createNodeWithConf
             ble_mesh_id: None, // Use app_id as mesh ID
             ble_power_profile: power_profile,
             transport_preference: None,
+            collection_routes_json: None,
         })
     } else {
         None
