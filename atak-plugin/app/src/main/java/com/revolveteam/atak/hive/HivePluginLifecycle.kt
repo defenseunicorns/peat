@@ -137,6 +137,24 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
             if (hiveBleManager?.hasPermissions() == true) {
                 val started = hiveBleManager?.start() ?: false
                 Log.i(TAG, "HIVE BLE mesh started (fallback): $started [unified BLE requested: $unifiedBleEnabled]")
+
+                // Bridge BLE peer discovery to Rust TransportManager (ADR-047)
+                // This makes PACE routing aware of BLE-reachable peers
+                hiveBleManager?.setPeerEventCallback { peer, _ ->
+                    try {
+                        val nodeId = peer.nodeId
+                        if (nodeId != null) {
+                            val peerId = String.format("%08X", nodeId)
+                            if (peer.isConnected) {
+                                hiveNodeJni?.bleAddPeer(peerId)
+                            } else {
+                                hiveNodeJni?.bleRemovePeer(peerId)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Error bridging BLE peer event to Rust: ${e.message}")
+                    }
+                }
             } else {
                 Log.w(TAG, "BLE permissions not granted - mesh not started. " +
                     "Required: ${hiveBleManager?.getRequiredPermissions()?.joinToString()}")
@@ -207,6 +225,16 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
                 val nodeId = hiveNodeJni?.nodeId() ?: "unknown"
                 Log.i(TAG, "HIVE node created - ID: ${nodeId.take(16)}... (unified transport, BLE: $enableBle)")
 
+                // Signal BLE transport as started if BLE is enabled (ADR-047)
+                if (enableBle) {
+                    try {
+                        hiveNodeJni?.bleSetStarted(true)
+                        Log.i(TAG, "BLE transport signaled as started for PACE routing")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to signal BLE started (may not be compiled with bluetooth feature): ${e.message}")
+                    }
+                }
+
                 // Start sync
                 val syncStarted = hiveNodeJni?.startSync() ?: false
                 Log.i(TAG, "HIVE sync started: $syncStarted, peer count: ${hiveNodeJni?.peerCount() ?: 0}")
@@ -264,6 +292,10 @@ class HivePluginLifecycle(serviceController: IServiceController) : AbstractPlugi
 
     fun stopBleMesh() {
         hiveBleManager?.stop()
+        // Signal BLE transport stopped to Rust TransportManager (ADR-047)
+        try {
+            hiveNodeJni?.bleSetStarted(false)
+        } catch (_: Exception) { }
     }
 
     fun getCurrentMeshId(): String {

@@ -47,6 +47,14 @@ static PEER_EVENT_MANAGER_CLASS: LazyLock<Mutex<Option<GlobalRef>>> =
 #[cfg(feature = "sync")]
 static GLOBAL_NODE_HANDLE: LazyLock<Mutex<i64>> = LazyLock::new(|| Mutex::new(0));
 
+// Global BLE transport reference for Android JNI access
+// Kotlin signals BLE state (started/stopped, peer discovery) into this transport
+// which makes TransportManager aware of BLE availability for PACE routing.
+#[cfg(all(feature = "bluetooth", target_os = "android"))]
+static ANDROID_BLE_TRANSPORT: LazyLock<
+    Mutex<Option<Arc<HiveBleTransport<hive_btle::platform::android::AndroidAdapter>>>>,
+> = LazyLock::new(|| Mutex::new(None));
+
 use hive_protocol::cot::{
     CotEncoder, Position as CotPosition, TrackUpdate, Velocity as CotVelocity,
 };
@@ -1014,9 +1022,33 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
     if let Some(ref transport_config) = config.transport {
         if transport_config.enable_ble {
             #[cfg(target_os = "android")]
-            android_log(
-                "BLE transport requested - Android adapter initialization deferred to JNI callback",
-            );
+            {
+                use hive_btle::platform::android::AndroidAdapter;
+                use hive_btle::{BleConfig, BluetoothLETransport};
+
+                android_log("BLE transport requested - initializing AndroidAdapter stub");
+
+                let ble_config = BleConfig::default();
+                let adapter = AndroidAdapter::new_stub();
+                let btle = BluetoothLETransport::new(ble_config, adapter);
+                let ble_transport = Arc::new(HiveBleTransport::new(btle));
+                let ble_as_transport: Arc<dyn Transport> = ble_transport.clone();
+                transport_manager.register(ble_as_transport.clone());
+
+                // Register as PACE instance for collection routing
+                let ble_instance = TransportInstance::new(
+                    "ble-primary",
+                    TransportType::BluetoothLE,
+                    TransportCapabilities::bluetooth_le(),
+                )
+                .with_description("Primary BLE transport (Android)");
+                transport_manager.register_instance(ble_instance, ble_as_transport);
+
+                // Store in global for JNI access
+                *ANDROID_BLE_TRANSPORT.lock().unwrap() = Some(ble_transport);
+
+                android_log("BLE transport registered as PACE instance 'ble-primary'");
+            }
 
             #[cfg(not(target_os = "android"))]
             {
@@ -2231,11 +2263,143 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_freeNodeJni(
         // Give the background task a moment to exit
         std::thread::sleep(std::time::Duration::from_millis(100));
 
+        // Clear Android BLE transport global to prevent dangling refs
+        #[cfg(all(feature = "bluetooth", target_os = "android"))]
+        {
+            *ANDROID_BLE_TRANSPORT.lock().unwrap() = None;
+            android_log("freeNodeJni: Cleared ANDROID_BLE_TRANSPORT");
+        }
+
         // Drop the node - this should release the database
         drop(node);
 
         #[cfg(target_os = "android")]
         android_log("freeNodeJni: Node dropped");
+    }
+}
+
+// =============================================================================
+// BLE Transport JNI Methods (Android)
+// =============================================================================
+
+/// JNI: Signal BLE transport started/stopped
+///
+/// Called by Kotlin when the Android BLE stack is ready or shutting down.
+/// This makes `is_available()` return true/false for PACE routing.
+///
+/// Kotlin signature: external fun bleSetStartedJni(handle: Long, started: Boolean)
+#[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
+#[no_mangle]
+pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_bleSetStartedJni(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: i64,
+    started: jboolean,
+) {
+    if handle == 0 {
+        android_log("bleSetStartedJni: Invalid handle (0)");
+        return;
+    }
+
+    let node = unsafe { Arc::from_raw(handle as *const HiveNode) };
+
+    use hive_protocol::transport::MeshTransport;
+
+    let guard = ANDROID_BLE_TRANSPORT.lock().unwrap();
+    if let Some(ref ble_transport) = *guard {
+        if started != 0 {
+            match node.runtime.block_on(ble_transport.start()) {
+                Ok(()) => android_log("bleSetStartedJni: BLE transport started"),
+                Err(e) => android_log(&format!("bleSetStartedJni: start failed: {}", e)),
+            }
+        } else {
+            match node.runtime.block_on(ble_transport.stop()) {
+                Ok(()) => android_log("bleSetStartedJni: BLE transport stopped"),
+                Err(e) => android_log(&format!("bleSetStartedJni: stop failed: {}", e)),
+            }
+        }
+    } else {
+        android_log("bleSetStartedJni: No BLE transport registered");
+    }
+    drop(guard);
+
+    // Don't drop the Arc - we're just borrowing
+    std::mem::forget(node);
+}
+
+/// JNI: Add a reachable BLE peer
+///
+/// Called by Kotlin when a BLE peer is discovered/connected.
+/// This makes `can_reach(peer)` return true for PACE routing.
+///
+/// Kotlin signature: external fun bleAddPeerJni(handle: Long, peerId: String)
+#[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
+#[no_mangle]
+pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_bleAddPeerJni(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: i64,
+    peer_id: JString,
+) {
+    if handle == 0 {
+        android_log("bleAddPeerJni: Invalid handle (0)");
+        return;
+    }
+
+    let peer_id_str: String = match env.get_string(&peer_id) {
+        Ok(s) => s.into(),
+        Err(_) => {
+            android_log("bleAddPeerJni: Failed to get peer_id string");
+            return;
+        }
+    };
+
+    android_log(&format!("bleAddPeerJni: Adding peer {}", peer_id_str));
+
+    let guard = ANDROID_BLE_TRANSPORT.lock().unwrap();
+    if let Some(ref ble_transport) = *guard {
+        use hive_protocol::transport::NodeId;
+        ble_transport.add_reachable_peer(NodeId::new(peer_id_str));
+    } else {
+        android_log("bleAddPeerJni: No BLE transport registered");
+    }
+}
+
+/// JNI: Remove a reachable BLE peer
+///
+/// Called by Kotlin when a BLE peer is disconnected/lost.
+/// This makes `can_reach(peer)` return false for PACE routing.
+///
+/// Kotlin signature: external fun bleRemovePeerJni(handle: Long, peerId: String)
+#[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
+#[no_mangle]
+pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_bleRemovePeerJni(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: i64,
+    peer_id: JString,
+) {
+    if handle == 0 {
+        android_log("bleRemovePeerJni: Invalid handle (0)");
+        return;
+    }
+
+    let peer_id_str: String = match env.get_string(&peer_id) {
+        Ok(s) => s.into(),
+        Err(_) => {
+            android_log("bleRemovePeerJni: Failed to get peer_id string");
+            return;
+        }
+    };
+
+    android_log(&format!("bleRemovePeerJni: Removing peer {}", peer_id_str));
+
+    let guard = ANDROID_BLE_TRANSPORT.lock().unwrap();
+    if let Some(ref ble_transport) = *guard {
+        use hive_protocol::transport::NodeId;
+        ble_transport.remove_reachable_peer(&NodeId::new(peer_id_str));
+    } else {
+        android_log("bleRemovePeerJni: No BLE transport registered");
     }
 }
 
@@ -2625,6 +2789,24 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_nativeInit(
             sig: "(JLjava/lang/String;)Z".into(),
             fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_publishPlatformJni as *mut c_void,
         },
+        #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
+        NativeMethod {
+            name: "bleSetStartedJni".into(),
+            sig: "(JZ)V".into(),
+            fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_bleSetStartedJni as *mut c_void,
+        },
+        #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
+        NativeMethod {
+            name: "bleAddPeerJni".into(),
+            sig: "(JLjava/lang/String;)V".into(),
+            fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_bleAddPeerJni as *mut c_void,
+        },
+        #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
+        NativeMethod {
+            name: "bleRemovePeerJni".into(),
+            sig: "(JLjava/lang/String;)V".into(),
+            fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_bleRemovePeerJni as *mut c_void,
+        },
     ];
 
     // Register native methods - the class is passed in from Kotlin so it's valid
@@ -2805,6 +2987,24 @@ pub extern "C" fn JNI_OnLoad(vm: *mut JavaVM, _reserved: *mut c_void) -> jint {
                     sig: "(JLjava/lang/String;)Z".into(),
                     fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_publishPlatformJni
                         as *mut c_void,
+                },
+                #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
+                NativeMethod {
+                    name: "bleSetStartedJni".into(),
+                    sig: "(JZ)V".into(),
+                    fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_bleSetStartedJni as *mut c_void,
+                },
+                #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
+                NativeMethod {
+                    name: "bleAddPeerJni".into(),
+                    sig: "(JLjava/lang/String;)V".into(),
+                    fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_bleAddPeerJni as *mut c_void,
+                },
+                #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
+                NativeMethod {
+                    name: "bleRemovePeerJni".into(),
+                    sig: "(JLjava/lang/String;)V".into(),
+                    fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_bleRemovePeerJni as *mut c_void,
                 },
             ];
 

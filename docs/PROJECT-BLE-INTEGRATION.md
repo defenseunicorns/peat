@@ -140,7 +140,7 @@ the transport layer into `hive-mesh`. Much of the original M4 work is now comple
 | ~~`route_message()` supports per-collection transport~~ | DONE | `route_collection()` + `RouteDecision::TransportInstance` |
 | ~~PACE as transport config option~~ | DONE | `CollectionTransportRoute::Pace` with optional policy override |
 | ~~Create FFI bootstrap for dual-active transport~~ | DONE | `hive-ffi`: construct `TransportManager` with both Iroh + BLE |
-| Android bootstrap: Kotlin -> JNI -> HiveBleTransport | TODO | Instantiate `AndroidBleDelegate`, pass through JNI |
+| Android bootstrap: Kotlin -> JNI -> HiveBleTransport | DONE | AndroidAdapter stub, 3 JNI methods, Kotlin wiring |
 | ~~Integration test: dual-active (Iroh + BLE concurrent)~~ | DONE | `dual_active_transport_e2e.rs` (mock) + `dual_active_simultaneous.rs` (real Iroh) |
 | ~~CannedMessage round-trip over BLE~~ | DONE | `canned_message_sync.rs` — 3 tests with encrypted BLE round-trip |
 
@@ -151,7 +151,7 @@ the transport layer into `hive-mesh`. Much of the original M4 work is now comple
 - [x] Per-collection transport routing (explicit or autopace)
 - [x] Both Iroh and BLE active simultaneously
 - [x] FFI bootstrap creates dual-active TransportManager
-- [ ] Android bootstrap wires Kotlin delegate through JNI
+- [x] Android bootstrap wires Kotlin delegate through JNI
 
 ---
 
@@ -216,6 +216,7 @@ Final cleanup and documentation.
 | 2026-02-13 | ADR-049 transport extraction merged | `HiveBleTransport` now in `hive-mesh/src/transport/btle.rs` |
 | 2026-02-13 | M4 re-evaluated against hive-mesh | Most transport wiring already done by ADR-049 |
 | 2026-02-14 | Per-collection transport routing | `CollectionRouteTable`, `route_collection()`, PACE config option |
+| 2026-02-14 | Android bootstrap: Kotlin -> JNI -> HiveBleTransport | AndroidAdapter Ok(()), 3 JNI methods, Kotlin peer bridge |
 
 ---
 
