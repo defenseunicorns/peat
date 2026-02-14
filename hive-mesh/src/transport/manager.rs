@@ -60,12 +60,15 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 
-use super::bypass::{BypassMessage, BypassTarget, UdpBypassChannel};
+use super::bypass::{
+    BypassMessage, BypassTarget, BypassTransport, MessageEncoding, UdpBypassChannel,
+};
 use super::capabilities::{
-    MessageRequirements, PaceLevel, PeerDistance, RangeMode, Transport, TransportId,
-    TransportInstance, TransportMode, TransportPolicy, TransportType,
+    MessagePriority, MessageRequirements, PaceLevel, PeerDistance, RangeMode, Transport,
+    TransportId, TransportInstance, TransportMode, TransportPolicy, TransportType,
 };
 use super::{NodeId, Result, TransportError};
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use tokio::sync::broadcast;
 use tokio::sync::RwLock as TokioRwLock;
@@ -99,6 +102,13 @@ pub struct TransportManagerConfig {
 
     /// Transport mode (Single, Redundant, Bonded, LoadBalanced)
     pub transport_mode: TransportMode,
+
+    /// Per-collection transport routing table
+    ///
+    /// Collections listed here are routed to their configured transport
+    /// instead of going through legacy scoring. Collections not in this
+    /// table fall through to `route_message()`.
+    pub collection_routes: CollectionRouteTable,
 }
 
 impl Default for TransportManagerConfig {
@@ -115,6 +125,7 @@ impl Default for TransportManagerConfig {
             switch_threshold: 10,
             default_policy: None,
             transport_mode: TransportMode::Single,
+            collection_routes: CollectionRouteTable::default(),
         }
     }
 }
@@ -824,6 +835,104 @@ impl TransportManager {
         Ok(bypass.read().await.subscribe_collection(collection))
     }
 
+    // =========================================================================
+    // Per-Collection Transport Routing (M4 / ADR-032)
+    // =========================================================================
+
+    /// Route a message for a specific collection
+    ///
+    /// Looks up the collection in the route table and returns the appropriate
+    /// routing decision. If the collection is not configured, falls through
+    /// to `route_message()` for legacy scoring.
+    ///
+    /// # Arguments
+    ///
+    /// * `collection` - Collection name
+    /// * `peer_id` - Target peer
+    /// * `requirements` - Message requirements
+    ///
+    /// # Returns
+    ///
+    /// Routing decision for this collection's messages
+    pub fn route_collection(
+        &self,
+        collection: &str,
+        peer_id: &NodeId,
+        requirements: &MessageRequirements,
+    ) -> RouteDecision {
+        let route_config = match self.config.collection_routes.get(collection) {
+            Some(config) => config,
+            None => return self.route_message(peer_id, requirements),
+        };
+
+        match &route_config.route {
+            CollectionTransportRoute::Bypass { .. } => {
+                if self.bypass_channel.is_some() {
+                    RouteDecision::Bypass
+                } else {
+                    RouteDecision::NoRoute
+                }
+            }
+            CollectionTransportRoute::Fixed { transport_type } => {
+                // Check if the fixed transport is registered and can reach the peer
+                if let Some(transport) = self.transports.get(transport_type) {
+                    if transport.is_available() && transport.can_reach(peer_id) {
+                        RouteDecision::Transport(*transport_type)
+                    } else {
+                        RouteDecision::NoRoute
+                    }
+                } else {
+                    RouteDecision::NoRoute
+                }
+            }
+            CollectionTransportRoute::Pace { policy_override } => {
+                match self.select_transport_pace_with_policy(
+                    peer_id,
+                    requirements,
+                    policy_override.as_ref(),
+                ) {
+                    Some(id) => RouteDecision::TransportInstance(id),
+                    None => RouteDecision::NoRoute,
+                }
+            }
+        }
+    }
+
+    /// Select a transport instance using a specific or default PACE policy
+    ///
+    /// If `policy_override` is `Some`, uses that policy. Otherwise falls back
+    /// to the default policy from config.
+    fn select_transport_pace_with_policy(
+        &self,
+        peer_id: &NodeId,
+        requirements: &MessageRequirements,
+        policy_override: Option<&TransportPolicy>,
+    ) -> Option<TransportId> {
+        let policy = policy_override.or(self.config.default_policy.as_ref())?;
+
+        let instances = self.transport_instances.read().unwrap();
+        let available_for_peer: HashSet<_> = instances
+            .iter()
+            .filter(|(_, (inst, transport))| {
+                inst.available
+                    && transport.is_available()
+                    && transport.can_reach(peer_id)
+                    && transport.capabilities().meets_requirements(requirements)
+            })
+            .map(|(id, _)| id.clone())
+            .collect();
+
+        policy
+            .ordered()
+            .find(|id| available_for_peer.contains(*id))
+            .cloned()
+    }
+
+    /// Get the route configuration for a collection
+    pub fn get_collection_route(&self, collection: &str) -> Option<&CollectionRouteConfig> {
+        self.config.collection_routes.get(collection)
+    }
+
     /// Route a message based on requirements
     ///
     /// If `requirements.bypass_sync` is `true` and bypass channel is available,
@@ -861,10 +970,133 @@ impl TransportManager {
 pub enum RouteDecision {
     /// Use UDP bypass channel
     Bypass,
-    /// Use specified transport
+    /// Use specified transport type (legacy scoring)
     Transport(TransportType),
+    /// Use a specific transport instance (PACE selection result)
+    TransportInstance(TransportId),
     /// No suitable route available
     NoRoute,
+}
+
+// =============================================================================
+// Per-Collection Transport Routing (M4 / ADR-032)
+// =============================================================================
+
+/// Routing strategy for a specific collection
+///
+/// Determines how messages for a collection are routed to a transport.
+/// This generalizes the `BypassCollectionConfig` pattern to all transports.
+///
+/// # Variants
+///
+/// - `Fixed` — Always use a specific transport type (e.g., Quic, BluetoothLE)
+/// - `Bypass` — Route via UDP bypass channel
+/// - `Pace` — Use PACE-based dynamic selection with optional policy override
+///
+/// # Example
+///
+/// ```
+/// use hive_mesh::transport::{CollectionTransportRoute, TransportType};
+///
+/// // Fixed route to BLE
+/// let ble_route = CollectionTransportRoute::Fixed {
+///     transport_type: TransportType::BluetoothLE,
+/// };
+///
+/// // PACE route with default policy
+/// let pace_route = CollectionTransportRoute::Pace {
+///     policy_override: None,
+/// };
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "transport", rename_all = "snake_case")]
+pub enum CollectionTransportRoute {
+    /// Always use a specific transport type (e.g., Quic, BluetoothLE)
+    Fixed { transport_type: TransportType },
+    /// Route via UDP bypass channel
+    Bypass {
+        encoding: MessageEncoding,
+        ttl_ms: u64,
+        bypass_transport: BypassTransport,
+    },
+    /// Use PACE-based dynamic selection
+    Pace {
+        policy_override: Option<TransportPolicy>,
+    },
+}
+
+/// Per-collection routing entry
+///
+/// Binds a collection name to a routing strategy and message priority.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CollectionRouteConfig {
+    /// Collection name (e.g., "position_updates", "sensor_data")
+    pub collection: String,
+    /// Routing strategy for this collection
+    pub route: CollectionTransportRoute,
+    /// Default message priority for this collection
+    pub priority: MessagePriority,
+}
+
+/// Lookup table for per-collection transport routing
+///
+/// Maps collection names to their transport routing configuration.
+/// Collections not in this table fall through to legacy scoring
+/// via `route_message()`.
+///
+/// # Example
+///
+/// ```
+/// use hive_mesh::transport::{
+///     CollectionRouteTable, CollectionRouteConfig, CollectionTransportRoute,
+///     TransportType, MessagePriority,
+/// };
+///
+/// let table = CollectionRouteTable::new()
+///     .with_collection(CollectionRouteConfig {
+///         collection: "telemetry".to_string(),
+///         route: CollectionTransportRoute::Fixed {
+///             transport_type: TransportType::BluetoothLE,
+///         },
+///         priority: MessagePriority::Normal,
+///     });
+///
+/// assert!(table.has_collection("telemetry"));
+/// assert!(!table.has_collection("unknown"));
+/// ```
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CollectionRouteTable {
+    collections: Vec<CollectionRouteConfig>,
+}
+
+impl CollectionRouteTable {
+    /// Create an empty route table
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a collection route configuration (builder pattern)
+    pub fn with_collection(mut self, config: CollectionRouteConfig) -> Self {
+        self.collections.push(config);
+        self
+    }
+
+    /// Get the route config for a collection
+    pub fn get(&self, collection: &str) -> Option<&CollectionRouteConfig> {
+        self.collections.iter().find(|c| c.collection == collection)
+    }
+
+    /// Check if a collection has a route configured
+    pub fn has_collection(&self, collection: &str) -> bool {
+        self.collections.iter().any(|c| c.collection == collection)
+    }
+
+    /// Check if a collection is configured for bypass routing
+    pub fn is_bypass(&self, collection: &str) -> bool {
+        self.get(collection)
+            .map(|c| matches!(c.route, CollectionTransportRoute::Bypass { .. }))
+            .unwrap_or(false)
+    }
 }
 
 impl std::fmt::Debug for TransportManager {
@@ -2563,5 +2795,558 @@ mod tests {
 
         let result = manager.subscribe_bypass_collection("test").await;
         assert!(result.is_err());
+    }
+
+    // =========================================================================
+    // CollectionRouteTable Tests
+    // =========================================================================
+
+    #[test]
+    fn test_route_table_empty_returns_none() {
+        let table = CollectionRouteTable::new();
+        assert!(table.get("anything").is_none());
+        assert!(!table.has_collection("anything"));
+        assert!(!table.is_bypass("anything"));
+    }
+
+    #[test]
+    fn test_route_table_builder_and_lookup() {
+        let table = CollectionRouteTable::new()
+            .with_collection(CollectionRouteConfig {
+                collection: "telemetry".to_string(),
+                route: CollectionTransportRoute::Fixed {
+                    transport_type: TransportType::BluetoothLE,
+                },
+                priority: MessagePriority::Normal,
+            })
+            .with_collection(CollectionRouteConfig {
+                collection: "position".to_string(),
+                route: CollectionTransportRoute::Bypass {
+                    encoding: MessageEncoding::Raw,
+                    ttl_ms: 200,
+                    bypass_transport: BypassTransport::Broadcast,
+                },
+                priority: MessagePriority::High,
+            });
+
+        assert!(table.has_collection("telemetry"));
+        assert!(table.has_collection("position"));
+        assert!(!table.has_collection("unknown"));
+
+        let telemetry = table.get("telemetry").unwrap();
+        assert!(matches!(
+            telemetry.route,
+            CollectionTransportRoute::Fixed {
+                transport_type: TransportType::BluetoothLE
+            }
+        ));
+        assert_eq!(telemetry.priority, MessagePriority::Normal);
+
+        let position = table.get("position").unwrap();
+        assert_eq!(position.priority, MessagePriority::High);
+    }
+
+    #[test]
+    fn test_route_table_is_bypass() {
+        let table = CollectionRouteTable::new()
+            .with_collection(CollectionRouteConfig {
+                collection: "bypass_col".to_string(),
+                route: CollectionTransportRoute::Bypass {
+                    encoding: MessageEncoding::Raw,
+                    ttl_ms: 100,
+                    bypass_transport: BypassTransport::Unicast,
+                },
+                priority: MessagePriority::Normal,
+            })
+            .with_collection(CollectionRouteConfig {
+                collection: "fixed_col".to_string(),
+                route: CollectionTransportRoute::Fixed {
+                    transport_type: TransportType::Quic,
+                },
+                priority: MessagePriority::Normal,
+            })
+            .with_collection(CollectionRouteConfig {
+                collection: "pace_col".to_string(),
+                route: CollectionTransportRoute::Pace {
+                    policy_override: None,
+                },
+                priority: MessagePriority::Normal,
+            });
+
+        assert!(table.is_bypass("bypass_col"));
+        assert!(!table.is_bypass("fixed_col"));
+        assert!(!table.is_bypass("pace_col"));
+        assert!(!table.is_bypass("nonexistent"));
+    }
+
+    // =========================================================================
+    // CollectionTransportRoute Serde Tests
+    // =========================================================================
+
+    #[test]
+    fn test_serde_fixed_route() {
+        let route = CollectionTransportRoute::Fixed {
+            transport_type: TransportType::BluetoothLE,
+        };
+        let json = serde_json::to_string(&route).unwrap();
+        let roundtrip: CollectionTransportRoute = serde_json::from_str(&json).unwrap();
+        assert!(matches!(
+            roundtrip,
+            CollectionTransportRoute::Fixed {
+                transport_type: TransportType::BluetoothLE
+            }
+        ));
+    }
+
+    #[test]
+    fn test_serde_bypass_route() {
+        let route = CollectionTransportRoute::Bypass {
+            encoding: MessageEncoding::Raw,
+            ttl_ms: 500,
+            bypass_transport: BypassTransport::Broadcast,
+        };
+        let json = serde_json::to_string(&route).unwrap();
+        let roundtrip: CollectionTransportRoute = serde_json::from_str(&json).unwrap();
+        if let CollectionTransportRoute::Bypass {
+            encoding,
+            ttl_ms,
+            bypass_transport,
+        } = roundtrip
+        {
+            assert_eq!(encoding, MessageEncoding::Raw);
+            assert_eq!(ttl_ms, 500);
+            assert_eq!(bypass_transport, BypassTransport::Broadcast);
+        } else {
+            panic!("Expected Bypass variant");
+        }
+    }
+
+    #[test]
+    fn test_serde_pace_route() {
+        let route = CollectionTransportRoute::Pace {
+            policy_override: None,
+        };
+        let json = serde_json::to_string(&route).unwrap();
+        let roundtrip: CollectionTransportRoute = serde_json::from_str(&json).unwrap();
+        assert!(matches!(
+            roundtrip,
+            CollectionTransportRoute::Pace {
+                policy_override: None
+            }
+        ));
+    }
+
+    #[test]
+    fn test_serde_pace_route_with_policy() {
+        let policy = TransportPolicy::new("custom")
+            .primary(vec!["ble-hci0"])
+            .alternate(vec!["iroh-wlan0"]);
+        let route = CollectionTransportRoute::Pace {
+            policy_override: Some(policy),
+        };
+        let json = serde_json::to_string(&route).unwrap();
+        let roundtrip: CollectionTransportRoute = serde_json::from_str(&json).unwrap();
+        if let CollectionTransportRoute::Pace {
+            policy_override: Some(p),
+        } = roundtrip
+        {
+            assert_eq!(p.name, "custom");
+            assert_eq!(p.primary, vec!["ble-hci0"]);
+            assert_eq!(p.alternate, vec!["iroh-wlan0"]);
+        } else {
+            panic!("Expected Pace with policy_override");
+        }
+    }
+
+    #[test]
+    fn test_serde_collection_route_config() {
+        let config = CollectionRouteConfig {
+            collection: "sensors".to_string(),
+            route: CollectionTransportRoute::Fixed {
+                transport_type: TransportType::LoRa,
+            },
+            priority: MessagePriority::High,
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        let roundtrip: CollectionRouteConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(roundtrip.collection, "sensors");
+        assert_eq!(roundtrip.priority, MessagePriority::High);
+    }
+
+    #[test]
+    fn test_serde_collection_route_table() {
+        let table = CollectionRouteTable::new()
+            .with_collection(CollectionRouteConfig {
+                collection: "a".to_string(),
+                route: CollectionTransportRoute::Fixed {
+                    transport_type: TransportType::Quic,
+                },
+                priority: MessagePriority::Normal,
+            })
+            .with_collection(CollectionRouteConfig {
+                collection: "b".to_string(),
+                route: CollectionTransportRoute::Bypass {
+                    encoding: MessageEncoding::Json,
+                    ttl_ms: 1000,
+                    bypass_transport: BypassTransport::Unicast,
+                },
+                priority: MessagePriority::Critical,
+            });
+
+        let json = serde_json::to_string(&table).unwrap();
+        let roundtrip: CollectionRouteTable = serde_json::from_str(&json).unwrap();
+        assert!(roundtrip.has_collection("a"));
+        assert!(roundtrip.has_collection("b"));
+        assert!(roundtrip.is_bypass("b"));
+        assert!(!roundtrip.is_bypass("a"));
+    }
+
+    #[test]
+    fn test_serde_transport_type() {
+        // Verify all variants round-trip through JSON
+        let types = vec![
+            TransportType::Quic,
+            TransportType::BluetoothClassic,
+            TransportType::BluetoothLE,
+            TransportType::WifiDirect,
+            TransportType::LoRa,
+            TransportType::TacticalRadio,
+            TransportType::Satellite,
+            TransportType::Custom(42),
+        ];
+        for tt in types {
+            let json = serde_json::to_string(&tt).unwrap();
+            let roundtrip: TransportType = serde_json::from_str(&json).unwrap();
+            assert_eq!(roundtrip, tt, "Failed round-trip for {:?}", tt);
+        }
+    }
+
+    // =========================================================================
+    // route_collection() Tests
+    // =========================================================================
+
+    #[test]
+    fn test_route_collection_unknown_falls_through() {
+        let config = TransportManagerConfig::default();
+        let mut manager = TransportManager::new(config);
+
+        let peer = NodeId::new("peer-1".to_string());
+        let quic =
+            Arc::new(MockTransport::new(TransportCapabilities::quic()).with_peer(peer.clone()));
+        manager.register(quic);
+
+        let requirements = MessageRequirements::default();
+        // Unknown collection falls through to route_message()
+        let decision = manager.route_collection("unknown", &peer, &requirements);
+        assert_eq!(decision, RouteDecision::Transport(TransportType::Quic));
+    }
+
+    #[test]
+    fn test_route_collection_fixed_routes_correctly() {
+        let table = CollectionRouteTable::new().with_collection(CollectionRouteConfig {
+            collection: "telemetry".to_string(),
+            route: CollectionTransportRoute::Fixed {
+                transport_type: TransportType::BluetoothLE,
+            },
+            priority: MessagePriority::Normal,
+        });
+
+        let config = TransportManagerConfig {
+            collection_routes: table,
+            ..Default::default()
+        };
+        let mut manager = TransportManager::new(config);
+
+        let peer = NodeId::new("peer-1".to_string());
+        let ble = Arc::new(
+            MockTransport::new(TransportCapabilities::bluetooth_le()).with_peer(peer.clone()),
+        );
+        manager.register(ble);
+
+        let requirements = MessageRequirements::default();
+        let decision = manager.route_collection("telemetry", &peer, &requirements);
+        assert_eq!(
+            decision,
+            RouteDecision::Transport(TransportType::BluetoothLE)
+        );
+    }
+
+    #[test]
+    fn test_route_collection_fixed_unavailable_returns_no_route() {
+        let table = CollectionRouteTable::new().with_collection(CollectionRouteConfig {
+            collection: "telemetry".to_string(),
+            route: CollectionTransportRoute::Fixed {
+                transport_type: TransportType::BluetoothLE,
+            },
+            priority: MessagePriority::Normal,
+        });
+
+        let config = TransportManagerConfig {
+            collection_routes: table,
+            ..Default::default()
+        };
+        let mut manager = TransportManager::new(config);
+
+        let peer = NodeId::new("peer-1".to_string());
+
+        // Register BLE but make it unavailable
+        let ble = Arc::new(
+            MockTransport::new(TransportCapabilities::bluetooth_le())
+                .with_peer(peer.clone())
+                .unavailable(),
+        );
+        manager.register(ble);
+
+        let requirements = MessageRequirements::default();
+        let decision = manager.route_collection("telemetry", &peer, &requirements);
+        assert_eq!(decision, RouteDecision::NoRoute);
+    }
+
+    #[test]
+    fn test_route_collection_fixed_not_registered_returns_no_route() {
+        let table = CollectionRouteTable::new().with_collection(CollectionRouteConfig {
+            collection: "telemetry".to_string(),
+            route: CollectionTransportRoute::Fixed {
+                transport_type: TransportType::BluetoothLE,
+            },
+            priority: MessagePriority::Normal,
+        });
+
+        let config = TransportManagerConfig {
+            collection_routes: table,
+            ..Default::default()
+        };
+        let manager = TransportManager::new(config);
+
+        let peer = NodeId::new("peer-1".to_string());
+        // No transports registered at all
+        let requirements = MessageRequirements::default();
+        let decision = manager.route_collection("telemetry", &peer, &requirements);
+        assert_eq!(decision, RouteDecision::NoRoute);
+    }
+
+    #[tokio::test]
+    async fn test_route_collection_bypass_with_channel() {
+        let table = CollectionRouteTable::new().with_collection(CollectionRouteConfig {
+            collection: "position".to_string(),
+            route: CollectionTransportRoute::Bypass {
+                encoding: MessageEncoding::Raw,
+                ttl_ms: 200,
+                bypass_transport: BypassTransport::Broadcast,
+            },
+            priority: MessagePriority::High,
+        });
+
+        let config = TransportManagerConfig {
+            collection_routes: table,
+            ..Default::default()
+        };
+        let mut manager = TransportManager::new(config);
+
+        // Set up bypass channel
+        let bypass_config = BypassChannelConfig::new();
+        let bypass = UdpBypassChannel::new(bypass_config).await.unwrap();
+        manager.set_bypass_channel(bypass);
+
+        let peer = NodeId::new("peer-1".to_string());
+        let requirements = MessageRequirements::default();
+        let decision = manager.route_collection("position", &peer, &requirements);
+        assert_eq!(decision, RouteDecision::Bypass);
+    }
+
+    #[test]
+    fn test_route_collection_bypass_without_channel() {
+        let table = CollectionRouteTable::new().with_collection(CollectionRouteConfig {
+            collection: "position".to_string(),
+            route: CollectionTransportRoute::Bypass {
+                encoding: MessageEncoding::Raw,
+                ttl_ms: 200,
+                bypass_transport: BypassTransport::Broadcast,
+            },
+            priority: MessagePriority::High,
+        });
+
+        let config = TransportManagerConfig {
+            collection_routes: table,
+            ..Default::default()
+        };
+        let manager = TransportManager::new(config);
+
+        let peer = NodeId::new("peer-1".to_string());
+        let requirements = MessageRequirements::default();
+        // No bypass channel configured
+        let decision = manager.route_collection("position", &peer, &requirements);
+        assert_eq!(decision, RouteDecision::NoRoute);
+    }
+
+    #[test]
+    fn test_route_collection_pace_routes_correctly() {
+        let policy = TransportPolicy::new("test").primary(vec!["iroh-eth0"]);
+
+        let table = CollectionRouteTable::new().with_collection(CollectionRouteConfig {
+            collection: "sync_data".to_string(),
+            route: CollectionTransportRoute::Pace {
+                policy_override: None,
+            },
+            priority: MessagePriority::Normal,
+        });
+
+        let config = TransportManagerConfig {
+            collection_routes: table,
+            default_policy: Some(policy),
+            ..Default::default()
+        };
+        let manager = TransportManager::new(config);
+
+        let peer = NodeId::new("peer-1".to_string());
+
+        // Register the PACE instance
+        let inst = TransportInstance::new(
+            "iroh-eth0",
+            TransportType::Quic,
+            TransportCapabilities::quic(),
+        );
+        let t = Arc::new(MockTransport::new(TransportCapabilities::quic()).with_peer(peer.clone()));
+        manager.register_instance(inst, t);
+
+        let requirements = MessageRequirements::default();
+        let decision = manager.route_collection("sync_data", &peer, &requirements);
+        assert_eq!(
+            decision,
+            RouteDecision::TransportInstance("iroh-eth0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_route_collection_pace_no_available_returns_no_route() {
+        let policy = TransportPolicy::new("test").primary(vec!["iroh-eth0"]);
+
+        let table = CollectionRouteTable::new().with_collection(CollectionRouteConfig {
+            collection: "sync_data".to_string(),
+            route: CollectionTransportRoute::Pace {
+                policy_override: None,
+            },
+            priority: MessagePriority::Normal,
+        });
+
+        let config = TransportManagerConfig {
+            collection_routes: table,
+            default_policy: Some(policy),
+            ..Default::default()
+        };
+        let manager = TransportManager::new(config);
+
+        let peer = NodeId::new("peer-1".to_string());
+        // No instances registered
+        let requirements = MessageRequirements::default();
+        let decision = manager.route_collection("sync_data", &peer, &requirements);
+        assert_eq!(decision, RouteDecision::NoRoute);
+    }
+
+    #[test]
+    fn test_route_collection_pace_with_policy_override() {
+        // Default policy points to non-existent transport
+        let default_policy = TransportPolicy::new("default").primary(vec!["nonexistent"]);
+
+        // Override policy points to available transport
+        let override_policy = TransportPolicy::new("override").primary(vec!["ble-hci0"]);
+
+        let table = CollectionRouteTable::new().with_collection(CollectionRouteConfig {
+            collection: "ble_data".to_string(),
+            route: CollectionTransportRoute::Pace {
+                policy_override: Some(override_policy),
+            },
+            priority: MessagePriority::Normal,
+        });
+
+        let config = TransportManagerConfig {
+            collection_routes: table,
+            default_policy: Some(default_policy),
+            ..Default::default()
+        };
+        let manager = TransportManager::new(config);
+
+        let peer = NodeId::new("peer-1".to_string());
+        let inst = TransportInstance::new(
+            "ble-hci0",
+            TransportType::BluetoothLE,
+            TransportCapabilities::bluetooth_le(),
+        );
+        let t = Arc::new(
+            MockTransport::new(TransportCapabilities::bluetooth_le()).with_peer(peer.clone()),
+        );
+        manager.register_instance(inst, t);
+
+        let requirements = MessageRequirements::default();
+        let decision = manager.route_collection("ble_data", &peer, &requirements);
+        assert_eq!(
+            decision,
+            RouteDecision::TransportInstance("ble-hci0".to_string())
+        );
+    }
+
+    // =========================================================================
+    // RouteDecision::TransportInstance Tests
+    // =========================================================================
+
+    #[test]
+    fn test_route_decision_transport_instance_variant() {
+        let decision = RouteDecision::TransportInstance("iroh-eth0".to_string());
+        assert_eq!(
+            decision,
+            RouteDecision::TransportInstance("iroh-eth0".to_string())
+        );
+        assert_ne!(decision, RouteDecision::Bypass);
+        assert_ne!(decision, RouteDecision::NoRoute);
+        assert_ne!(decision, RouteDecision::Transport(TransportType::Quic));
+    }
+
+    #[test]
+    fn test_route_decision_transport_instance_debug() {
+        let decision = RouteDecision::TransportInstance("ble-hci0".to_string());
+        let debug = format!("{:?}", decision);
+        assert!(debug.contains("TransportInstance"));
+        assert!(debug.contains("ble-hci0"));
+    }
+
+    #[test]
+    fn test_route_decision_transport_instance_clone() {
+        let original = RouteDecision::TransportInstance("iroh-wlan0".to_string());
+        let cloned = original.clone();
+        assert_eq!(original, cloned);
+    }
+
+    // =========================================================================
+    // get_collection_route() Tests
+    // =========================================================================
+
+    #[test]
+    fn test_get_collection_route_found() {
+        let table = CollectionRouteTable::new().with_collection(CollectionRouteConfig {
+            collection: "telemetry".to_string(),
+            route: CollectionTransportRoute::Fixed {
+                transport_type: TransportType::Quic,
+            },
+            priority: MessagePriority::High,
+        });
+
+        let config = TransportManagerConfig {
+            collection_routes: table,
+            ..Default::default()
+        };
+        let manager = TransportManager::new(config);
+
+        let route = manager.get_collection_route("telemetry");
+        assert!(route.is_some());
+        assert_eq!(route.unwrap().collection, "telemetry");
+        assert_eq!(route.unwrap().priority, MessagePriority::High);
+    }
+
+    #[test]
+    fn test_get_collection_route_not_found() {
+        let config = TransportManagerConfig::default();
+        let manager = TransportManager::new(config);
+
+        assert!(manager.get_collection_route("nonexistent").is_none());
     }
 }

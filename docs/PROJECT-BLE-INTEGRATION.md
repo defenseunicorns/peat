@@ -3,7 +3,7 @@
 **Created**: 2026-01-28
 **Status**: Active
 **Related ADRs**: ADR-039, ADR-047
-**Branch**: `feat/ble-cell-mapping`
+**Related PRs**: #634 (send_to overrides), #635 (Pi-to-Pi test results)
 
 ---
 
@@ -87,22 +87,71 @@ Create the Kotlin-side BLE implementation that handles Android radio operations.
 
 ---
 
-### Milestone 4: ADR-047 Phase 3 - TransportManager Integration
+### Milestone 4: ADR-047 Phase 3 - Dual-Active Transport Integration
 
-Integrate the hybrid BLE transport into the unified TransportManager.
+Run Iroh and BLE simultaneously with per-collection transport routing.
+
+**Design**: Both transports are always active. Each collection/document/subscription
+declares its transport requirements — either explicit transport binding or autopace
+(let the system select based on PACE scoring and availability). This is **not** a
+failover model; it's a dual-active model where different data flows use different
+transports concurrently.
+
+**Per-collection routing options**:
+- `transport: iroh` — always use Iroh (large payloads, reliable)
+- `transport: ble` — always use BLE (WearTAK, offline proximity)
+- `transport: bypass` — UDP bypass channel (low-latency ephemeral)
+- `transport: pace` — PACE-based selection (score transports, pick best available)
+
+PACE is a configuration option, not the default behavior. Collections that specify
+a transport get that transport; collections that specify `pace` get dynamic selection.
+
+**Example**:
+```
+Collection "beacons"     -> transport: pace (scores Iroh vs BLE, picks best)
+Collection "positions"   -> transport: bypass (low-latency ephemeral UDP)
+Collection "canned_msgs" -> transport: ble (BLE-only, WearTAK sync)
+Collection "documents"   -> transport: iroh (large payloads, reliable)
+```
+
+**Precedent**: `BypassCollectionConfig` in `bypass.rs` already binds collections to
+specific transport settings (transport mode, encoding, TTL, priority). The same pattern
+generalizes to all transports with PACE as one of the routing strategies.
+
+**Post-ADR-049 Status**: The ADR-049 refactor (phases 0-7, merged 2026-02-13) moved
+the transport layer into `hive-mesh`. Much of the original M4 work is now complete:
+
+- `HiveBleTransport<A>` lives in `hive-mesh/src/transport/btle.rs` and fully implements
+  both `MeshTransport` and `Transport` traits
+- `bluetooth` feature flag exists in both `hive-mesh` and `hive-protocol` Cargo.toml
+- `TransportManager` supports PACE-based registration via `register_instance()`
+- `BleTranslator` in `hive-protocol/src/sync/ble_translation.rs` (764 lines) bridges
+  hive-btle CRDTs to Automerge documents for WearTAK
+- `hive-ffi` already imports `HiveBleTransport` under `#[cfg(feature = "bluetooth")]`
+- `BypassCollectionConfig` already demonstrates per-collection transport binding
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Add `bluetooth` feature flag to hive-ffi | TODO | Cargo.toml |
-| Create `create_with_ble_transport` FFI function | TODO | hive-ffi/src/lib.rs |
-| Register HiveBleTransport with TransportManager | TODO | Unified transport |
-| Expose via UniFFI/JNI | TODO | Kotlin bindings |
-| Integration test with dual transport | TODO | Iroh + BLE |
+| ~~Add `bluetooth` feature flag~~ | DONE | `hive-mesh` and `hive-protocol` |
+| ~~`HiveBleTransport` implements Transport trait~~ | DONE | `hive-mesh/src/transport/btle.rs` |
+| ~~TransportManager supports BLE registration~~ | DONE | `register_instance()` API |
+| ~~BLE-to-Automerge translation layer~~ | DONE | `ble_translation.rs` — BleTranslator |
+| ~~Collection transport routing config~~ | DONE | `CollectionRouteTable`, `CollectionTransportRoute` in `manager.rs` |
+| ~~`route_message()` supports per-collection transport~~ | DONE | `route_collection()` + `RouteDecision::TransportInstance` |
+| ~~PACE as transport config option~~ | DONE | `CollectionTransportRoute::Pace` with optional policy override |
+| Create FFI bootstrap for dual-active transport | TODO | `hive-ffi`: construct `TransportManager` with both Iroh + BLE |
+| Android bootstrap: Kotlin -> JNI -> HiveBleTransport | TODO | Instantiate `AndroidBleDelegate`, pass through JNI |
+| Integration test: dual-active (Iroh + BLE concurrent) | TODO | Both transports active, different collections routed to each |
+| CannedMessage round-trip over BLE | TODO | Carried from M1 — requires encryption + hive-lite-sync |
 
 **Deliverables**:
-- [ ] Single `HiveNode` API with BLE transport
-- [ ] TransportManager routes data to both transports
-- [ ] PACE policy selects appropriate transport
+- [x] `HiveBleTransport` implements full Transport trait surface
+- [x] TransportManager can register and select BLE transport
+- [x] BLE translation layer bridges CRDTs to Automerge
+- [x] Per-collection transport routing (explicit or autopace)
+- [ ] Both Iroh and BLE active simultaneously
+- [ ] FFI bootstrap creates dual-active TransportManager
+- [ ] Android bootstrap wires Kotlin delegate through JNI
 
 ---
 
@@ -115,7 +164,7 @@ Migrate ATAK plugin from dual-system to unified transport.
 | Update `HivePluginLifecycle` to use unified transport | TODO | |
 | Remove direct `HiveBleManager` usage | TODO | Use TransportManager |
 | Update `HiveDropDownReceiver` UI | TODO | Single peer list |
-| Test WearTAK interoperability | TODO | Genesis sync |
+| Test WearTAK interoperability | TODO | Genesis sync via BleTranslator |
 | Add deprecation warnings for old API | TODO | Smooth transition |
 
 **Deliverables**:
@@ -163,6 +212,10 @@ Final cleanup and documentation.
 | 2026-02-13 | Fixed anonymous receive for unencrypted docs | `on_ble_data_received_anonymous` now handles both |
 | 2026-02-13 | Released hive-btle v0.1.0 | crates.io + Maven Central |
 | 2026-02-13 | Updated hive workspace to hive-btle 0.1.0 | From 0.1.0-rc.30 |
+| 2026-02-13 | Released hive-btle v0.1.1 | Added `send_to()` primitives, crates.io + Maven Central |
+| 2026-02-13 | ADR-049 transport extraction merged | `HiveBleTransport` now in `hive-mesh/src/transport/btle.rs` |
+| 2026-02-13 | M4 re-evaluated against hive-mesh | Most transport wiring already done by ADR-049 |
+| 2026-02-14 | Per-collection transport routing | `CollectionRouteTable`, `route_collection()`, PACE config option |
 
 ---
 
@@ -179,7 +232,7 @@ Final cleanup and documentation.
 ## Dependencies
 
 ### External
-- hive-btle v0.1.0 (crates.io / Maven Central `com.revolveteam:hive:0.1.0`)
+- hive-btle v0.1.1 (crates.io / Maven Central `com.revolveteam:hive:0.1.1`)
 - hive-lite (path: `../hive-lite`)
 
 ### Hardware
@@ -193,6 +246,7 @@ Final cleanup and documentation.
 
 - [ADR-039: HIVE-BTLE Mesh Transport](adr/039-hive-btle-mesh-transport.md)
 - [ADR-047: Android BLE Hybrid Integration](adr/047-android-ble-hybrid-integration.md)
+- [ADR-049: hive-mesh Extraction](adr/049-hive-mesh-extraction.md) - Transport layer refactor
 - [ROADMAP.md](../ROADMAP.md) - High-level HIVE Protocol roadmap
 - [hive-btle on crates.io](https://crates.io/crates/hive-btle)
 - [hive-btle on Radicle](https://app.radicle.xyz/nodes/rosa.radicle.xyz/rad:z458mp9Um3AYNQQFMdHaNEUtmiohq)
