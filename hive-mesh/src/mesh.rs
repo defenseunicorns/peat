@@ -133,6 +133,8 @@ pub struct HiveMesh {
     hierarchy: Option<Arc<dyn HierarchyStrategy>>,
     router: Option<MeshRouter>,
     event_tx: broadcast::Sender<HiveMeshEvent>,
+    #[cfg(feature = "broker")]
+    broker_event_tx: broadcast::Sender<crate::broker::state::MeshEvent>,
     started_at: RwLock<Option<Instant>>,
 }
 
@@ -146,6 +148,8 @@ impl HiveMesh {
             .clone()
             .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
         let (event_tx, _) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
+        #[cfg(feature = "broker")]
+        let (broker_event_tx, _) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
         Self {
             config,
             node_id,
@@ -155,6 +159,8 @@ impl HiveMesh {
             hierarchy: None,
             router: None,
             event_tx,
+            #[cfg(feature = "broker")]
+            broker_event_tx,
             started_at: RwLock::new(None),
         }
     }
@@ -180,6 +186,12 @@ impl HiveMesh {
             .event_tx
             .send(HiveMeshEvent::StateChanged(MeshState::Running));
 
+        #[cfg(feature = "broker")]
+        self.emit_broker_event(crate::broker::state::MeshEvent::TopologyChanged {
+            new_role: "standalone".to_string(),
+            peer_count: 0,
+        });
+
         Ok(())
     }
 
@@ -200,6 +212,12 @@ impl HiveMesh {
         let _ = self
             .event_tx
             .send(HiveMeshEvent::StateChanged(MeshState::Stopped));
+
+        #[cfg(feature = "broker")]
+        self.emit_broker_event(crate::broker::state::MeshEvent::TopologyChanged {
+            new_role: "stopped".to_string(),
+            peer_count: 0,
+        });
 
         Ok(())
     }
@@ -277,6 +295,17 @@ impl HiveMesh {
     pub fn router(&self) -> Option<&MeshRouter> {
         self.router.as_ref()
     }
+
+    /// Emit a broker event for WebSocket subscribers.
+    #[cfg(feature = "broker")]
+    pub fn emit_mesh_event(&self, event: crate::broker::state::MeshEvent) {
+        let _ = self.broker_event_tx.send(event);
+    }
+
+    #[cfg(feature = "broker")]
+    fn emit_broker_event(&self, event: crate::broker::state::MeshEvent) {
+        let _ = self.broker_event_tx.send(event);
+    }
 }
 
 // ─── Feature-gated MeshBrokerState impl ──────────────────────────────────────
@@ -349,11 +378,7 @@ impl crate::broker::state::MeshBrokerState for HiveMesh {
     }
 
     fn subscribe_events(&self) -> broadcast::Receiver<crate::broker::state::MeshEvent> {
-        // Return a receiver from a dropped sender — no events will be delivered.
-        // A future integration step can bridge HiveMeshEvent → MeshEvent.
-        let (tx, rx) = broadcast::channel(1);
-        drop(tx);
-        rx
+        self.broker_event_tx.subscribe()
     }
 }
 
@@ -412,6 +437,8 @@ impl HiveMeshBuilder {
             .clone()
             .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
         let (event_tx, _) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
+        #[cfg(feature = "broker")]
+        let (broker_event_tx, _) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
 
         HiveMesh {
             config: self.config,
@@ -422,6 +449,8 @@ impl HiveMeshBuilder {
             hierarchy: self.hierarchy,
             router: self.router,
             event_tx,
+            #[cfg(feature = "broker")]
+            broker_event_tx,
             started_at: RwLock::new(None),
         }
     }
@@ -1086,5 +1115,58 @@ mod broker_tests {
         let mesh = HiveMesh::new(MeshConfig::default());
         let _rx = MeshBrokerState::subscribe_events(&mesh);
         // Receiver is valid (won't panic)
+    }
+
+    #[test]
+    fn test_broker_event_bridge() {
+        use crate::broker::state::MeshEvent;
+
+        let mesh = HiveMesh::new(MeshConfig::default());
+        let mut rx = MeshBrokerState::subscribe_events(&mesh);
+
+        // Emit a broker event via the public API
+        mesh.emit_mesh_event(MeshEvent::PeerConnected {
+            peer_id: "test-peer".into(),
+        });
+
+        // Receiver should get it
+        let event = rx.try_recv().unwrap();
+        assert!(matches!(
+            event,
+            MeshEvent::PeerConnected { ref peer_id } if peer_id == "test-peer"
+        ));
+    }
+
+    #[test]
+    fn test_broker_event_bridge_start_emits_topology() {
+        use crate::broker::state::MeshEvent;
+
+        let mesh = HiveMesh::new(MeshConfig::default());
+        let mut rx = MeshBrokerState::subscribe_events(&mesh);
+
+        mesh.start().unwrap();
+
+        let event = rx.try_recv().unwrap();
+        assert!(matches!(
+            event,
+            MeshEvent::TopologyChanged { ref new_role, peer_count: 0 } if new_role == "standalone"
+        ));
+    }
+
+    #[test]
+    fn test_broker_event_bridge_stop_emits_topology() {
+        use crate::broker::state::MeshEvent;
+
+        let mesh = HiveMesh::new(MeshConfig::default());
+        mesh.start().unwrap();
+
+        let mut rx = MeshBrokerState::subscribe_events(&mesh);
+        mesh.stop().unwrap();
+
+        let event = rx.try_recv().unwrap();
+        assert!(matches!(
+            event,
+            MeshEvent::TopologyChanged { ref new_role, peer_count: 0 } if new_role == "stopped"
+        ));
     }
 }
