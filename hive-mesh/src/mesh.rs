@@ -132,6 +132,20 @@ pub struct HiveMesh {
     transport_manager: Option<TransportManager>,
     hierarchy: Option<Arc<dyn HierarchyStrategy>>,
     router: Option<MeshRouter>,
+    // ── QoS ──
+    bandwidth: Option<crate::qos::BandwidthAllocation>,
+    preemption: Option<crate::qos::PreemptionController>,
+    // ── Security ──
+    device_keypair: Option<crate::security::DeviceKeypair>,
+    formation_key: Option<crate::security::FormationKey>,
+    // ── Discovery ──
+    discovery: RwLock<Option<Box<dyn crate::discovery::DiscoveryStrategy>>>,
+    // ── Beacon ──
+    beacon_broadcaster: Option<crate::beacon::BeaconBroadcaster>,
+    beacon_observer: Option<Arc<crate::beacon::BeaconObserver>>,
+    beacon_janitor: Option<crate::beacon::BeaconJanitor>,
+    // ── Topology ──
+    topology_manager: Option<crate::topology::TopologyManager>,
     event_tx: broadcast::Sender<HiveMeshEvent>,
     #[cfg(feature = "broker")]
     broker_event_tx: broadcast::Sender<crate::broker::state::MeshEvent>,
@@ -158,6 +172,15 @@ impl HiveMesh {
             transport_manager: None,
             hierarchy: None,
             router: None,
+            bandwidth: None,
+            preemption: None,
+            device_keypair: None,
+            formation_key: None,
+            discovery: RwLock::new(None),
+            beacon_broadcaster: None,
+            beacon_observer: None,
+            beacon_janitor: None,
+            topology_manager: None,
             event_tx,
             #[cfg(feature = "broker")]
             broker_event_tx,
@@ -296,6 +319,110 @@ impl HiveMesh {
         self.router.as_ref()
     }
 
+    // ── QoS policies ────────────────────────────────────────────
+
+    /// Set the bandwidth allocation policy.
+    pub fn set_bandwidth(&mut self, bw: crate::qos::BandwidthAllocation) {
+        self.bandwidth = Some(bw);
+    }
+
+    /// Get a reference to the bandwidth allocation, if set.
+    pub fn bandwidth(&self) -> Option<&crate::qos::BandwidthAllocation> {
+        self.bandwidth.as_ref()
+    }
+
+    /// Set the preemption controller.
+    pub fn set_preemption(&mut self, pc: crate::qos::PreemptionController) {
+        self.preemption = Some(pc);
+    }
+
+    /// Get a reference to the preemption controller, if set.
+    pub fn preemption(&self) -> Option<&crate::qos::PreemptionController> {
+        self.preemption.as_ref()
+    }
+
+    // ── Security primitives ─────────────────────────────────────
+
+    /// Set the device keypair (Ed25519).
+    pub fn set_device_keypair(&mut self, kp: crate::security::DeviceKeypair) {
+        self.device_keypair = Some(kp);
+    }
+
+    /// Get a reference to the device keypair, if set.
+    pub fn device_keypair(&self) -> Option<&crate::security::DeviceKeypair> {
+        self.device_keypair.as_ref()
+    }
+
+    /// Set the formation key (HMAC-SHA256).
+    pub fn set_formation_key(&mut self, fk: crate::security::FormationKey) {
+        self.formation_key = Some(fk);
+    }
+
+    /// Get a reference to the formation key, if set.
+    pub fn formation_key(&self) -> Option<&crate::security::FormationKey> {
+        self.formation_key.as_ref()
+    }
+
+    // ── Discovery ───────────────────────────────────────────────
+
+    /// Set the discovery strategy.
+    ///
+    /// Takes `&self` (not `&mut self`) because the field uses interior
+    /// mutability (`RwLock`) — `DiscoveryStrategy::start()` requires
+    /// `&mut self`.
+    pub fn set_discovery(&self, strategy: Box<dyn crate::discovery::DiscoveryStrategy>) {
+        *self.discovery.write().unwrap() = Some(strategy);
+    }
+
+    /// Get a reference to the discovery RwLock.
+    pub fn discovery(&self) -> &RwLock<Option<Box<dyn crate::discovery::DiscoveryStrategy>>> {
+        &self.discovery
+    }
+
+    // ── Beacon ──────────────────────────────────────────────────
+
+    /// Set the beacon broadcaster.
+    pub fn set_beacon_broadcaster(&mut self, bb: crate::beacon::BeaconBroadcaster) {
+        self.beacon_broadcaster = Some(bb);
+    }
+
+    /// Get a reference to the beacon broadcaster, if set.
+    pub fn beacon_broadcaster(&self) -> Option<&crate::beacon::BeaconBroadcaster> {
+        self.beacon_broadcaster.as_ref()
+    }
+
+    /// Set the beacon observer (Arc-wrapped for sharing with TopologyBuilder).
+    pub fn set_beacon_observer(&mut self, bo: Arc<crate::beacon::BeaconObserver>) {
+        self.beacon_observer = Some(bo);
+    }
+
+    /// Get a reference to the beacon observer, if set.
+    pub fn beacon_observer(&self) -> Option<&Arc<crate::beacon::BeaconObserver>> {
+        self.beacon_observer.as_ref()
+    }
+
+    /// Set the beacon janitor.
+    pub fn set_beacon_janitor(&mut self, bj: crate::beacon::BeaconJanitor) {
+        self.beacon_janitor = Some(bj);
+    }
+
+    /// Get a reference to the beacon janitor, if set.
+    pub fn beacon_janitor(&self) -> Option<&crate::beacon::BeaconJanitor> {
+        self.beacon_janitor.as_ref()
+    }
+
+    // ── Topology ────────────────────────────────────────────────
+
+    /// Set the topology manager.
+    pub fn set_topology_manager(&mut self, tm: crate::topology::TopologyManager) {
+        self.topology_manager = Some(tm);
+    }
+
+    /// Get a reference to the topology manager, if set.
+    pub fn topology_manager(&self) -> Option<&crate::topology::TopologyManager> {
+        self.topology_manager.as_ref()
+    }
+
     /// Emit a broker event for WebSocket subscribers.
     #[cfg(feature = "broker")]
     pub fn emit_mesh_event(&self, event: crate::broker::state::MeshEvent) {
@@ -391,6 +518,15 @@ pub struct HiveMeshBuilder {
     transport_manager: Option<TransportManager>,
     hierarchy: Option<Arc<dyn HierarchyStrategy>>,
     router: Option<MeshRouter>,
+    bandwidth: Option<crate::qos::BandwidthAllocation>,
+    preemption: Option<crate::qos::PreemptionController>,
+    device_keypair: Option<crate::security::DeviceKeypair>,
+    formation_key: Option<crate::security::FormationKey>,
+    discovery: Option<Box<dyn crate::discovery::DiscoveryStrategy>>,
+    beacon_broadcaster: Option<crate::beacon::BeaconBroadcaster>,
+    beacon_observer: Option<Arc<crate::beacon::BeaconObserver>>,
+    beacon_janitor: Option<crate::beacon::BeaconJanitor>,
+    topology_manager: Option<crate::topology::TopologyManager>,
 }
 
 impl HiveMeshBuilder {
@@ -402,6 +538,15 @@ impl HiveMeshBuilder {
             transport_manager: None,
             hierarchy: None,
             router: None,
+            bandwidth: None,
+            preemption: None,
+            device_keypair: None,
+            formation_key: None,
+            discovery: None,
+            beacon_broadcaster: None,
+            beacon_observer: None,
+            beacon_janitor: None,
+            topology_manager: None,
         }
     }
 
@@ -429,6 +574,63 @@ impl HiveMeshBuilder {
         self
     }
 
+    /// Set the bandwidth allocation policy.
+    pub fn with_bandwidth(mut self, bw: crate::qos::BandwidthAllocation) -> Self {
+        self.bandwidth = Some(bw);
+        self
+    }
+
+    /// Set the preemption controller.
+    pub fn with_preemption(mut self, pc: crate::qos::PreemptionController) -> Self {
+        self.preemption = Some(pc);
+        self
+    }
+
+    /// Set the device keypair.
+    pub fn with_device_keypair(mut self, kp: crate::security::DeviceKeypair) -> Self {
+        self.device_keypair = Some(kp);
+        self
+    }
+
+    /// Set the formation key.
+    pub fn with_formation_key(mut self, fk: crate::security::FormationKey) -> Self {
+        self.formation_key = Some(fk);
+        self
+    }
+
+    /// Set the discovery strategy.
+    pub fn with_discovery(
+        mut self,
+        strategy: Box<dyn crate::discovery::DiscoveryStrategy>,
+    ) -> Self {
+        self.discovery = Some(strategy);
+        self
+    }
+
+    /// Set the beacon broadcaster.
+    pub fn with_beacon_broadcaster(mut self, bb: crate::beacon::BeaconBroadcaster) -> Self {
+        self.beacon_broadcaster = Some(bb);
+        self
+    }
+
+    /// Set the beacon observer.
+    pub fn with_beacon_observer(mut self, bo: Arc<crate::beacon::BeaconObserver>) -> Self {
+        self.beacon_observer = Some(bo);
+        self
+    }
+
+    /// Set the beacon janitor.
+    pub fn with_beacon_janitor(mut self, bj: crate::beacon::BeaconJanitor) -> Self {
+        self.beacon_janitor = Some(bj);
+        self
+    }
+
+    /// Set the topology manager.
+    pub fn with_topology_manager(mut self, tm: crate::topology::TopologyManager) -> Self {
+        self.topology_manager = Some(tm);
+        self
+    }
+
     /// Build the [`HiveMesh`] instance.
     pub fn build(self) -> HiveMesh {
         let node_id = self
@@ -448,6 +650,15 @@ impl HiveMeshBuilder {
             transport_manager: self.transport_manager,
             hierarchy: self.hierarchy,
             router: self.router,
+            bandwidth: self.bandwidth,
+            preemption: self.preemption,
+            device_keypair: self.device_keypair,
+            formation_key: self.formation_key,
+            discovery: RwLock::new(self.discovery),
+            beacon_broadcaster: self.beacon_broadcaster,
+            beacon_observer: self.beacon_observer,
+            beacon_janitor: self.beacon_janitor,
+            topology_manager: self.topology_manager,
             event_tx,
             #[cfg(feature = "broker")]
             broker_event_tx,
@@ -1052,6 +1263,294 @@ mod tests {
         assert!(mesh.transport_manager().is_some());
         assert!(mesh.hierarchy().is_some());
         assert!(mesh.router().is_some());
+    }
+
+    // ── Gap 5: QoS policies ────────────────────────────────────────
+
+    #[test]
+    fn test_bandwidth_initially_none() {
+        let mesh = HiveMesh::new(MeshConfig::default());
+        assert!(mesh.bandwidth().is_none());
+    }
+
+    #[test]
+    fn test_set_bandwidth() {
+        let mut mesh = HiveMesh::new(MeshConfig::default());
+        mesh.set_bandwidth(crate::qos::BandwidthAllocation::new(1_000_000));
+        assert!(mesh.bandwidth().is_some());
+    }
+
+    #[test]
+    fn test_preemption_initially_none() {
+        let mesh = HiveMesh::new(MeshConfig::default());
+        assert!(mesh.preemption().is_none());
+    }
+
+    #[test]
+    fn test_set_preemption() {
+        let mut mesh = HiveMesh::new(MeshConfig::default());
+        mesh.set_preemption(crate::qos::PreemptionController::new());
+        assert!(mesh.preemption().is_some());
+    }
+
+    #[test]
+    fn test_builder_with_bandwidth() {
+        let mesh = HiveMeshBuilder::new(MeshConfig::default())
+            .with_bandwidth(crate::qos::BandwidthAllocation::default_tactical())
+            .build();
+        assert!(mesh.bandwidth().is_some());
+    }
+
+    #[test]
+    fn test_builder_with_preemption() {
+        let mesh = HiveMeshBuilder::new(MeshConfig::default())
+            .with_preemption(crate::qos::PreemptionController::new())
+            .build();
+        assert!(mesh.preemption().is_some());
+    }
+
+    // ── Gap 6: Security primitives ─────────────────────────────────
+
+    #[test]
+    fn test_device_keypair_initially_none() {
+        let mesh = HiveMesh::new(MeshConfig::default());
+        assert!(mesh.device_keypair().is_none());
+    }
+
+    #[test]
+    fn test_set_device_keypair() {
+        let mut mesh = HiveMesh::new(MeshConfig::default());
+        mesh.set_device_keypair(crate::security::DeviceKeypair::generate());
+        assert!(mesh.device_keypair().is_some());
+    }
+
+    #[test]
+    fn test_formation_key_initially_none() {
+        let mesh = HiveMesh::new(MeshConfig::default());
+        assert!(mesh.formation_key().is_none());
+    }
+
+    #[test]
+    fn test_set_formation_key() {
+        let mut mesh = HiveMesh::new(MeshConfig::default());
+        mesh.set_formation_key(crate::security::FormationKey::new(
+            "test-formation",
+            &[0u8; 32],
+        ));
+        assert!(mesh.formation_key().is_some());
+    }
+
+    #[test]
+    fn test_builder_with_device_keypair() {
+        let mesh = HiveMeshBuilder::new(MeshConfig::default())
+            .with_device_keypair(crate::security::DeviceKeypair::generate())
+            .build();
+        assert!(mesh.device_keypair().is_some());
+    }
+
+    #[test]
+    fn test_builder_with_formation_key() {
+        let mesh = HiveMeshBuilder::new(MeshConfig::default())
+            .with_formation_key(crate::security::FormationKey::new("f1", &[1u8; 32]))
+            .build();
+        assert!(mesh.formation_key().is_some());
+    }
+
+    // ── Gap 3: Discovery strategy ──────────────────────────────────
+
+    #[test]
+    fn test_discovery_initially_none() {
+        let mesh = HiveMesh::new(MeshConfig::default());
+        assert!(mesh.discovery().read().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_set_discovery() {
+        let mesh = HiveMesh::new(MeshConfig::default());
+        let strategy = crate::discovery::HybridDiscovery::new();
+        mesh.set_discovery(Box::new(strategy));
+        assert!(mesh.discovery().read().unwrap().is_some());
+    }
+
+    #[test]
+    fn test_builder_with_discovery() {
+        let strategy = crate::discovery::HybridDiscovery::new();
+        let mesh = HiveMeshBuilder::new(MeshConfig::default())
+            .with_discovery(Box::new(strategy))
+            .build();
+        assert!(mesh.discovery().read().unwrap().is_some());
+    }
+
+    // ── Gap 2: Beacon system ───────────────────────────────────────
+
+    fn mock_storage() -> Arc<dyn crate::beacon::BeaconStorage> {
+        Arc::new(crate::beacon::MockBeaconStorage::new())
+    }
+
+    #[test]
+    fn test_beacon_broadcaster_initially_none() {
+        let mesh = HiveMesh::new(MeshConfig::default());
+        assert!(mesh.beacon_broadcaster().is_none());
+    }
+
+    #[test]
+    fn test_set_beacon_broadcaster() {
+        use crate::beacon::{BeaconBroadcaster, GeoPosition, HierarchyLevel};
+
+        let mut mesh = HiveMesh::new(MeshConfig::default());
+        let bb = BeaconBroadcaster::new(
+            mock_storage(),
+            "test-node".to_string(),
+            GeoPosition {
+                lat: 0.0,
+                lon: 0.0,
+                alt: None,
+            },
+            HierarchyLevel::Squad,
+            None,
+            Duration::from_secs(5),
+        );
+        mesh.set_beacon_broadcaster(bb);
+        assert!(mesh.beacon_broadcaster().is_some());
+    }
+
+    #[test]
+    fn test_beacon_observer_initially_none() {
+        let mesh = HiveMesh::new(MeshConfig::default());
+        assert!(mesh.beacon_observer().is_none());
+    }
+
+    #[test]
+    fn test_set_beacon_observer() {
+        use crate::beacon::BeaconObserver;
+
+        let mut mesh = HiveMesh::new(MeshConfig::default());
+        let bo = Arc::new(BeaconObserver::new(mock_storage(), "s00000".to_string()));
+        mesh.set_beacon_observer(bo);
+        assert!(mesh.beacon_observer().is_some());
+    }
+
+    #[test]
+    fn test_beacon_janitor_initially_none() {
+        let mesh = HiveMesh::new(MeshConfig::default());
+        assert!(mesh.beacon_janitor().is_none());
+    }
+
+    #[test]
+    fn test_set_beacon_janitor() {
+        use crate::beacon::BeaconJanitor;
+        use std::collections::HashMap;
+
+        let mut mesh = HiveMesh::new(MeshConfig::default());
+        let nearby = Arc::new(tokio::sync::RwLock::new(HashMap::new()));
+        let bj = BeaconJanitor::new(nearby, Duration::from_secs(60), Duration::from_secs(10));
+        mesh.set_beacon_janitor(bj);
+        assert!(mesh.beacon_janitor().is_some());
+    }
+
+    #[test]
+    fn test_builder_with_beacon_broadcaster() {
+        use crate::beacon::{BeaconBroadcaster, GeoPosition, HierarchyLevel};
+
+        let bb = BeaconBroadcaster::new(
+            mock_storage(),
+            "builder-node".to_string(),
+            GeoPosition {
+                lat: 1.0,
+                lon: 2.0,
+                alt: None,
+            },
+            HierarchyLevel::Platoon,
+            None,
+            Duration::from_secs(5),
+        );
+        let mesh = HiveMeshBuilder::new(MeshConfig::default())
+            .with_beacon_broadcaster(bb)
+            .build();
+        assert!(mesh.beacon_broadcaster().is_some());
+    }
+
+    #[test]
+    fn test_builder_with_beacon_observer() {
+        use crate::beacon::BeaconObserver;
+
+        let bo = Arc::new(BeaconObserver::new(mock_storage(), "s00000".to_string()));
+        let mesh = HiveMeshBuilder::new(MeshConfig::default())
+            .with_beacon_observer(bo)
+            .build();
+        assert!(mesh.beacon_observer().is_some());
+    }
+
+    #[test]
+    fn test_builder_with_beacon_janitor() {
+        use crate::beacon::BeaconJanitor;
+        use std::collections::HashMap;
+
+        let nearby = Arc::new(tokio::sync::RwLock::new(HashMap::new()));
+        let bj = BeaconJanitor::new(nearby, Duration::from_secs(60), Duration::from_secs(10));
+        let mesh = HiveMeshBuilder::new(MeshConfig::default())
+            .with_beacon_janitor(bj)
+            .build();
+        assert!(mesh.beacon_janitor().is_some());
+    }
+
+    // ── Gap 1: Topology manager ────────────────────────────────────
+
+    #[test]
+    fn test_topology_manager_initially_none() {
+        let mesh = HiveMesh::new(MeshConfig::default());
+        assert!(mesh.topology_manager().is_none());
+    }
+
+    #[test]
+    fn test_set_topology_manager() {
+        use crate::beacon::{BeaconObserver, GeoPosition, HierarchyLevel};
+        use crate::topology::{TopologyBuilder, TopologyConfig, TopologyManager};
+
+        let mut mesh = HiveMesh::new(MeshConfig::default());
+        let observer = Arc::new(BeaconObserver::new(mock_storage(), "s00000".to_string()));
+        let builder = TopologyBuilder::new(
+            TopologyConfig::default(),
+            "topo-node".to_string(),
+            GeoPosition {
+                lat: 0.0,
+                lon: 0.0,
+                alt: None,
+            },
+            HierarchyLevel::Squad,
+            None,
+            observer,
+        );
+        let transport: Arc<dyn MeshTransport> = Arc::new(MockTransport::empty());
+        let tm = TopologyManager::new(builder, transport);
+        mesh.set_topology_manager(tm);
+        assert!(mesh.topology_manager().is_some());
+    }
+
+    #[test]
+    fn test_builder_with_topology_manager() {
+        use crate::beacon::{BeaconObserver, GeoPosition, HierarchyLevel};
+        use crate::topology::{TopologyBuilder, TopologyConfig, TopologyManager};
+
+        let observer = Arc::new(BeaconObserver::new(mock_storage(), "s00000".to_string()));
+        let builder = TopologyBuilder::new(
+            TopologyConfig::default(),
+            "topo-builder-node".to_string(),
+            GeoPosition {
+                lat: 0.0,
+                lon: 0.0,
+                alt: None,
+            },
+            HierarchyLevel::Squad,
+            None,
+            observer,
+        );
+        let transport: Arc<dyn MeshTransport> = Arc::new(MockTransport::empty());
+        let tm = TopologyManager::new(builder, transport);
+        let mesh = HiveMeshBuilder::new(MeshConfig::default())
+            .with_topology_manager(tm)
+            .build();
+        assert!(mesh.topology_manager().is_some());
     }
 }
 
