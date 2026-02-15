@@ -2746,6 +2746,75 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_publishPlatformJni
     result
 }
 
+/// Connect to a known peer by node ID and address (bypasses mDNS).
+///
+/// Kotlin signature: external fun connectPeerJni(handle: Long, nodeId: String, address: String): Boolean
+/// Used by the dual-transport test to connect Android to rpi-ci2 over QUIC
+/// when mDNS is unreliable.
+#[cfg(feature = "sync")]
+#[no_mangle]
+pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_connectPeerJni(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: i64,
+    node_id: JString,
+    address: JString,
+) -> jboolean {
+    if handle == 0 {
+        #[cfg(target_os = "android")]
+        android_log("connectPeerJni: Invalid handle (0)");
+        return 0;
+    }
+
+    let node_id_str: String = match env.get_string(&node_id) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            #[cfg(target_os = "android")]
+            android_log(&format!("connectPeerJni: Failed to get nodeId: {:?}", e));
+            return 0;
+        }
+    };
+
+    let addr_str: String = match env.get_string(&address) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            #[cfg(target_os = "android")]
+            android_log(&format!("connectPeerJni: Failed to get address: {:?}", e));
+            return 0;
+        }
+    };
+
+    #[cfg(target_os = "android")]
+    android_log(&format!(
+        "connectPeerJni: Connecting to node={}, addr={}",
+        node_id_str, addr_str
+    ));
+
+    let peer_info = PeerInfo {
+        name: "quic-peer".to_string(),
+        node_id: node_id_str,
+        addresses: vec![addr_str],
+        relay_url: None,
+    };
+
+    let node = unsafe { Arc::from_raw(handle as *const HiveNode) };
+    let result = match node.connect_peer(peer_info) {
+        Ok(()) => {
+            #[cfg(target_os = "android")]
+            android_log("connectPeerJni: Connected successfully");
+            1
+        }
+        Err(e) => {
+            #[cfg(target_os = "android")]
+            android_log(&format!("connectPeerJni: Failed to connect: {:?}", e));
+            0
+        }
+    };
+
+    std::mem::forget(node);
+    result
+}
+
 // =============================================================================
 // JNI Native Method Registration
 // =============================================================================
@@ -2852,6 +2921,19 @@ pub extern "system" fn Java_com_revolveteam_atak_hive_HiveJni_nativeInit(
             name: "publishPlatformJni".into(),
             sig: "(JLjava/lang/String;)Z".into(),
             fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_publishPlatformJni as *mut c_void,
+        },
+        #[cfg(feature = "sync")]
+        NativeMethod {
+            name: "connectPeerJni".into(),
+            sig: "(JLjava/lang/String;Ljava/lang/String;)Z".into(),
+            fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_connectPeerJni as *mut c_void,
+        },
+        #[cfg(feature = "sync")]
+        NativeMethod {
+            name: "createNodeWithConfigJni".into(),
+            sig: "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)J"
+                .into(),
+            fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_createNodeWithConfigJni as *mut c_void,
         },
         #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
         NativeMethod {
@@ -3062,6 +3144,20 @@ pub extern "C" fn JNI_OnLoad(vm: *mut JavaVM, _reserved: *mut c_void) -> jint {
                     name: "publishPlatformJni".into(),
                     sig: "(JLjava/lang/String;)Z".into(),
                     fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_publishPlatformJni
+                        as *mut c_void,
+                },
+                #[cfg(feature = "sync")]
+                NativeMethod {
+                    name: "connectPeerJni".into(),
+                    sig: "(JLjava/lang/String;Ljava/lang/String;)Z".into(),
+                    fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_connectPeerJni as *mut c_void,
+                },
+                #[cfg(feature = "sync")]
+                NativeMethod {
+                    name: "createNodeWithConfigJni".into(),
+                    sig: "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)J"
+                        .into(),
+                    fn_ptr: Java_com_revolveteam_atak_hive_HiveJni_createNodeWithConfigJni
                         as *mut c_void,
                 },
                 #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
