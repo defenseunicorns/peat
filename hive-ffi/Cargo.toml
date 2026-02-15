@@ -18,6 +18,11 @@ name = "hive_tak_client"
 path = "examples/hive_tak_client.rs"
 required-features = ["sync"]
 
+[[example]]
+name = "iroh_test_peer"
+path = "examples/iroh_test_peer.rs"
+required-features = ["sync"]
+
 [features]
 default = ["sync"]
 sync = ["hive-protocol/automerge-backend"]
