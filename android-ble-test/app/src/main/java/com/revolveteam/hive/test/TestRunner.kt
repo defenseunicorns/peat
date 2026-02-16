@@ -246,65 +246,58 @@ class TestRunner(
     // QUIC Phases (dual-transport mode only, phases 6-8)
     // ========================================================================
 
-    // Phase 7: Discover QUIC peer — try mDNS first, fall back to direct connect
+    // Phase 7: Discover QUIC peer — try mDNS first, fall back to direct connect, keep polling
     private fun phase7PeerDiscovery(): Boolean {
         return try {
             val expectedNodeId = quicNodeId
 
-            // Try mDNS discovery first (10s)
             var found = false
             var foundPeerId = ""
             var peers = 0
             var method = "mDNS"
-            log("  Trying mDNS discovery (10s)...")
-            for (i in 1..20) {
+
+            // Phase 1: mDNS discovery (15s) — Pi's deferred mDNS takes a few seconds
+            log("  Trying mDNS discovery (15s)...")
+            for (i in 1..30) {
                 Thread.sleep(500)
                 peers = HiveJni.peerCountJni(nodeHandle)
                 if (peers > 0) {
-                    val peersJson = HiveJni.connectedPeersJni(nodeHandle)
-                    try {
-                        val arr = JSONArray(peersJson)
-                        for (j in 0 until arr.length()) {
-                            val peerId = arr.getString(j)
-                            if (expectedNodeId != null && peerId == expectedNodeId) {
-                                found = true
-                                foundPeerId = peerId
-                                break
-                            } else if (expectedNodeId == null && peerId.isNotEmpty()) {
-                                found = true
-                                foundPeerId = peerId
-                                break
-                            }
-                        }
-                    } catch (_: Throwable) {}
-                    if (found) break
+                    found = checkForExpectedPeer(expectedNodeId)
+                    if (found) { foundPeerId = expectedNodeId ?: "unknown"; break }
                 }
                 if (i % 10 == 0) {
                     log("  mDNS polling... ${i / 2}s, peers=$peers")
                 }
             }
 
-            // Fallback: use connectPeer with known address
+            // Phase 2: Try direct connect (non-blocking) then continue polling
             if (!found && !quicAddress.isNullOrEmpty() && !expectedNodeId.isNullOrEmpty()) {
-                log("  mDNS not available, using direct connect to $quicAddress...")
+                log("  mDNS not available, trying direct connect to $quicAddress...")
                 method = "direct"
-                val connected = HiveJni.connectPeerJni(nodeHandle, expectedNodeId, quicAddress)
-                if (connected) {
-                    // Poll for peer to appear (up to 15s)
-                    for (i in 1..30) {
-                        Thread.sleep(500)
-                        peers = HiveJni.peerCountJni(nodeHandle)
-                        if (peers > 0) {
-                            found = true
-                            foundPeerId = expectedNodeId
-                            break
-                        }
-                        if (i % 10 == 0) {
-                            log("  Waiting for connection... ${i / 2}s, peers=$peers")
+                // Fire and forget — connectPeer may fail but still trigger discovery
+                try {
+                    HiveJni.connectPeerJni(nodeHandle, expectedNodeId, quicAddress)
+                } catch (_: Throwable) {}
+
+                // Keep polling — retry direct connect every 5s if still disconnected
+                log("  Polling for peer connection (25s)...")
+                for (i in 1..50) {
+                    Thread.sleep(500)
+                    peers = HiveJni.peerCountJni(nodeHandle)
+                    if (peers > 0) {
+                        found = checkForExpectedPeer(expectedNodeId)
+                        if (found) { foundPeerId = expectedNodeId; break }
+                    }
+                    if (i % 10 == 0) {
+                        log("  Waiting for connection... ${i / 2}s, peers=$peers")
+                        // Retry direct connect if still no peers
+                        if (peers == 0) {
+                            log("  Retrying direct connect to $quicAddress...")
+                            try {
+                                HiveJni.connectPeerJni(nodeHandle, expectedNodeId, quicAddress)
+                            } catch (_: Throwable) {}
                         }
                     }
-                } else {
-                    log("  connectPeer returned false")
                 }
             }
 
@@ -314,6 +307,19 @@ class TestRunner(
         } catch (e: Throwable) {
             recordPhase(7, "QUIC Peer Connect", false, "${e.javaClass.simpleName}: ${e.message}")
         }
+    }
+
+    private fun checkForExpectedPeer(expectedNodeId: String?): Boolean {
+        val peersJson = HiveJni.connectedPeersJni(nodeHandle)
+        return try {
+            val arr = JSONArray(peersJson)
+            for (j in 0 until arr.length()) {
+                val peerId = arr.getString(j)
+                if (expectedNodeId != null && peerId == expectedNodeId) return true
+                if (expectedNodeId == null && peerId.isNotEmpty()) return true
+            }
+            false
+        } catch (_: Throwable) { false }
     }
 
     // Phase 6: Publish our platform via QUIC (before connecting, so it's in local store for sync)
