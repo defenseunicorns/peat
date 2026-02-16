@@ -1,21 +1,19 @@
 name: Android Build
 
-# Manual trigger only - not ready for CI yet
-# When ready, uncomment push/pull_request triggers
 on:
   workflow_dispatch:
-  # push:
-  #   branches: [ main, develop ]
-  #   paths:
-  #     - 'hive-ffi/**'
-  #     - 'hive-protocol/**'
-  #     - '.github/workflows/android.yml'
-  # pull_request:
-  #   branches: [ main, develop ]
-  #   paths:
-  #     - 'hive-ffi/**'
-  #     - 'hive-protocol/**'
-  #     - '.github/workflows/android.yml'
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'hive-ffi/**'
+      - 'hive-protocol/**'
+      - '.github/workflows/android.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'hive-ffi/**'
+      - 'hive-protocol/**'
+      - '.github/workflows/android.yml'
 
 env:
   CARGO_TERM_COLOR: always
