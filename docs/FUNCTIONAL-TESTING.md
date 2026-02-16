@@ -319,6 +319,123 @@ ssh kit@rpi-ci 'tail -f ~/dual_test_peer.log'
 
 ---
 
+## CI / Lab Station Setup
+
+Functional tests require physical BLE radios and real devices — they cannot run on cloud-hosted CI runners. This section describes how to set up a dedicated test station that can be triggered by any CI system (GitHub Actions, Radicle CI, Jenkins, etc.).
+
+### Lab Station Requirements
+
+The test station is a single machine (or VM with USB passthrough) that has:
+
+| Requirement | Why | Notes |
+|-------------|-----|-------|
+| SSH access to a Raspberry Pi 5 | Deploys and runs `dual_test_peer` | Pi must have BlueZ 5.68+, Ubuntu 22.04+ |
+| ADB access to an Android device | Deploys APK, launches test, reads logcat | USB cable; device must have BLE and WiFi |
+| Bluetooth range | BLE GATT sync between Pi and Android | Devices within ~10m, no RF-shielded enclosures |
+| IP connectivity | QUIC transport between Pi and Android | Same LAN; mDNS optional (direct connect fallback) |
+| Docker | `cross` uses Docker for aarch64 cross-compilation | Docker Engine or Podman with docker CLI compat |
+| Rust toolchain | Builds native libraries | `rustup`, stable channel |
+| Android SDK + NDK | Builds test APK via Gradle | `$ANDROID_HOME` set, NDK r26+ |
+| `cross` | Cross-compiles for aarch64 | `cargo install cross` |
+
+### Setting Up a New Lab Station
+
+1. **Provision the Pi:**
+   ```bash
+   # On the Pi (Ubuntu 24.04 arm64 recommended)
+   sudo apt-get install -y bluez dbus
+   # Verify BLE works
+   bluetoothctl show   # should list adapter with address
+   ```
+
+2. **Configure SSH access:**
+   ```bash
+   # On the lab station
+   ssh-copy-id <user>@<pi-hostname>
+   # Verify passwordless SSH
+   ssh <user>@<pi-hostname> 'echo ok'
+   ```
+
+3. **Connect the Android device:**
+   ```bash
+   # Plug in via USB, enable USB debugging on device
+   adb devices   # should show device serial
+   ```
+
+4. **Verify the toolchain:**
+   ```bash
+   rustc --version
+   cross --version
+   docker info
+   adb version
+   $ANDROID_HOME/ndk/*/ndk-build --version  # or check NDK path
+   ```
+
+5. **Run the test with your station's values:**
+   ```bash
+   make dual-transport-test \
+       BLE_TEST_PI=<pi-hostname> \
+       BLE_TEST_PI_USER=<ssh-user> \
+       BLE_TEST_PI_IP=<pi-ip-address>
+   ```
+
+### CI Integration
+
+The entire test pipeline is a single `make` target with configurable variables. Any CI system that can run shell commands on the lab station can trigger it.
+
+**GitHub Actions (self-hosted runner):**
+
+```yaml
+# .github/workflows/functional-test.yml
+name: Functional Test
+
+on:
+  workflow_dispatch:        # manual trigger
+  release:
+    types: [created]        # run on release
+
+jobs:
+  dual-transport:
+    runs-on: [self-hosted, ble-lab]   # label for your lab station
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run dual-transport test
+        run: |
+          make dual-transport-test \
+              BLE_TEST_PI=${{ vars.BLE_TEST_PI }} \
+              BLE_TEST_PI_USER=${{ vars.BLE_TEST_PI_USER }} \
+              BLE_TEST_PI_IP=${{ vars.BLE_TEST_PI_IP }}
+```
+
+Register the self-hosted runner on the lab station:
+```bash
+# Download runner from GitHub → Settings → Actions → Runners → New self-hosted runner
+./config.sh --url https://github.com/<org>/hive --token <TOKEN> --labels ble-lab
+./run.sh   # or install as systemd service
+```
+
+**Generic CI (SSH trigger):**
+
+For CI systems without native runner support, trigger the test remotely:
+```bash
+ssh <lab-user>@<lab-station> \
+    'cd /path/to/hive && git pull && make dual-transport-test'
+```
+
+### Release Gate
+
+To require functional tests before release:
+
+1. Add the `functional-test.yml` workflow (above) to the repo
+2. In GitHub → Settings → Branches → Branch protection for `main`:
+   - Require status checks: `dual-transport`
+3. The release process cannot merge without a passing functional test
+
+For non-GitHub workflows, the same gate can be enforced by scripting: check that the last `make dual-transport-test` on the release commit exited 0 before tagging.
+
+---
+
 ## File Map
 
 | File | Purpose |
