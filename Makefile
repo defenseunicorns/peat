@@ -1,8 +1,7 @@
 .PHONY: help clean clean-ditto build test test-unit test-integration test-e2e test-fast fmt clippy check pre-commit ci \
-       build-ble-responder deploy-ble-responder start-ble-responder stop-ble-responder \
-       build-ble-test-app deploy-ble-test-app ble-test ble-test-logs ble-responder-logs clean-ble-test \
-       build-iroh-test-peer deploy-iroh-test-peer start-iroh-test-peer stop-iroh-test-peer \
-       dual-transport-test iroh-test-peer-logs
+       build-ble-test-app deploy-ble-test-app ble-test ble-test-logs clean-ble-test \
+       build-dual-test-peer deploy-dual-test-peer start-dual-test-peer stop-dual-test-peer \
+       dual-transport-test dual-test-peer-logs
 
 # ============================================
 # HIVE Protocol Development Makefile
@@ -63,21 +62,17 @@ help:
 	@echo "  clean-android            - Clean Android build artifacts"
 	@echo ""
 	@echo "BLE Functional Test (Pi-to-Android):"
-	@echo "  build-ble-responder      - Cross-compile ble_responder for Pi (aarch64)"
-	@echo "  deploy-ble-responder     - Deploy ble_responder to rpi-ci"
-	@echo "  start-ble-responder      - Start ble_responder on rpi-ci"
-	@echo "  stop-ble-responder       - Stop ble_responder on rpi-ci"
 	@echo "  build-ble-test-app       - Build Android BLE test APK (includes native libs)"
 	@echo "  deploy-ble-test-app      - Deploy BLE test APK to connected Android device"
-	@echo "  ble-test                 - Full pipeline: build + deploy all + start responder"
+	@echo "  ble-test                 - Full pipeline: build + deploy all + start peer"
 	@echo "  ble-test-logs            - Show logcat from running BLE test"
 	@echo "  clean-ble-test           - Clean BLE test build artifacts"
 	@echo ""
-	@echo "Dual-Transport Test (BLE + QUIC on same Pi):"
-	@echo "  build-iroh-test-peer     - Cross-compile iroh_test_peer for Pi (aarch64)"
-	@echo "  deploy-iroh-test-peer    - Deploy iroh_test_peer to rpi-ci"
-	@echo "  start-iroh-test-peer     - Start iroh_test_peer on rpi-ci"
-	@echo "  stop-iroh-test-peer      - Stop iroh_test_peer on rpi-ci"
+	@echo "Dual-Transport Test (BLE + QUIC in single Pi binary):"
+	@echo "  build-dual-test-peer     - Cross-compile dual_test_peer for Pi (aarch64)"
+	@echo "  deploy-dual-test-peer    - Deploy dual_test_peer to rpi-ci"
+	@echo "  start-dual-test-peer     - Start dual_test_peer on rpi-ci"
+	@echo "  stop-dual-test-peer      - Stop dual_test_peer on rpi-ci"
 	@echo "  dual-transport-test      - Full dual-transport pipeline (BLE + QUIC)"
 	@echo ""
 	@echo "Legacy E-Series Tests (for reference):"
@@ -448,8 +443,8 @@ clean-android:
 # ============================================
 # BLE Functional Test (Pi-to-Android)
 # ============================================
-# Proves dual-transport (Iroh QUIC + BLE) with Pi running ble_responder
-# and Android device running the BLE test app.
+# Proves dual-transport (Iroh QUIC + BLE) with Pi running dual_test_peer
+# (single binary, both transports) and Android running the BLE test app.
 #
 # Prerequisites:
 #   - cross (cargo install cross)
@@ -458,52 +453,12 @@ clean-android:
 #   - Android device connected via ADB
 #   - ANDROID_HOME or Android SDK at ~/Android/Sdk
 
-HIVE_BTLE_DIR ?= $(HOME)/Code/revolve/hive-btle
 BLE_TEST_PI ?= rpi-ci
 BLE_TEST_PI_USER ?= kit
-BLE_TEST_MESH_ID ?= FUNCTEST
-BLE_TEST_CALLSIGN ?= PI-RESP
 
-# QUIC test peer (iroh_test_peer) runs on the SAME Pi as ble_responder
-# Both coexist: BLE uses BlueZ D-Bus, QUIC uses the network stack
+# dual_test_peer runs both BLE + QUIC in a single process on the Pi
 IROH_TEST_PORT ?= 42009
 BLE_TEST_PI_IP ?= 192.168.228.13
-
-# Cross-compile ble_responder for Raspberry Pi (aarch64)
-build-ble-responder:
-	@echo "╔════════════════════════════════════════════════════════════╗"
-	@echo "║  Building ble_responder for aarch64 (Raspberry Pi)        ║"
-	@echo "╚════════════════════════════════════════════════════════════╝"
-	@command -v cross >/dev/null 2>&1 || { echo "Error: cross not found. Install with: cargo install cross"; exit 1; }
-	cd $(HIVE_BTLE_DIR) && cross build --release \
-		--target aarch64-unknown-linux-gnu \
-		--features linux \
-		--example ble_responder
-	@echo "✓ ble_responder built:"
-	@ls -la $(HIVE_BTLE_DIR)/target/aarch64-unknown-linux-gnu/release/examples/ble_responder
-
-# Deploy ble_responder binary to Pi
-deploy-ble-responder: build-ble-responder
-	@echo "Deploying ble_responder to $(BLE_TEST_PI_USER)@$(BLE_TEST_PI)..."
-	scp $(HIVE_BTLE_DIR)/target/aarch64-unknown-linux-gnu/release/examples/ble_responder \
-		$(BLE_TEST_PI_USER)@$(BLE_TEST_PI):~/ble_responder
-	@echo "✓ Deployed to $(BLE_TEST_PI):~/ble_responder"
-
-# Start ble_responder on Pi (backgrounded, logs to ~/ble_responder.log)
-start-ble-responder:
-	@echo "Starting ble_responder on $(BLE_TEST_PI)..."
-	@ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'pkill -x ble_responder 2>/dev/null || true'
-	@sleep 1
-	ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) \
-		'nohup ~/ble_responder --mesh-id $(BLE_TEST_MESH_ID) --callsign $(BLE_TEST_CALLSIGN) \
-		> ~/ble_responder.log 2>&1 & echo $$!'
-	@sleep 2
-	@ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'pgrep -x ble_responder >/dev/null && echo "✓ ble_responder running (PID: $$(pgrep -x ble_responder))" || echo "✗ ble_responder failed to start"'
-
-# Stop ble_responder on Pi
-stop-ble-responder:
-	@echo "Stopping ble_responder on $(BLE_TEST_PI)..."
-	@ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'pkill -x ble_responder 2>/dev/null && echo "✓ Stopped" || echo "Not running"'
 
 # Build Android BLE test APK (cross-compile libhive_ffi + Gradle build)
 build-ble-test-app: build-android
@@ -526,20 +481,20 @@ deploy-ble-test-app:
 	@echo "✓ Deployed to device"
 	@echo "Launch with: adb shell am start -n com.revolveteam.hive.test/.MainActivity"
 
-# Full BLE test pipeline: build everything, deploy, start responder
-ble-test: deploy-ble-responder build-ble-test-app deploy-ble-test-app start-ble-responder
+# Full BLE test pipeline: build everything, deploy, start dual_test_peer (BLE-only mode)
+ble-test: deploy-dual-test-peer build-ble-test-app deploy-ble-test-app start-dual-test-peer
 	@echo ""
 	@echo "╔════════════════════════════════════════════════════════════╗"
 	@echo "║  BLE Functional Test Ready                                ║"
 	@echo "╠════════════════════════════════════════════════════════════╣"
-	@echo "║  Pi:      ble_responder running on $(BLE_TEST_PI)"
+	@echo "║  Pi:      dual_test_peer running on $(BLE_TEST_PI)"
 	@echo "║  Android: BLE test app installed"
 	@echo "║                                                            ║"
 	@echo "║  Launching test automatically...                          ║"
 	@echo "║                                                            ║"
 	@echo "║  Monitor:                                                  ║"
 	@echo "║    make ble-test-logs        (Android logcat)             ║"
-	@echo "║    make ble-responder-logs   (Pi responder log)           ║"
+	@echo "║    make dual-test-peer-logs  (Pi peer log)                ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	adb shell am start -n com.revolveteam.hive.test/.MainActivity \
 		--ez auto_run true
@@ -548,68 +503,63 @@ ble-test: deploy-ble-responder build-ble-test-app deploy-ble-test-app start-ble-
 ble-test-logs:
 	adb logcat -s HiveTest:V BleGattClient:V HiveJni:V HiveNativeLoader:V
 
-# Show Pi responder logs
-ble-responder-logs:
-	ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'tail -f ~/ble_responder.log'
-
 # Clean BLE test artifacts
-clean-ble-test: stop-ble-responder
+clean-ble-test: stop-dual-test-peer
 	@echo "Cleaning BLE test artifacts..."
 	@rm -rf android-ble-test/app/build
 	@rm -rf android-ble-test/app/src/main/jniLibs/arm64-v8a/libhive_ffi.so
 	@echo "✓ BLE test artifacts cleaned"
 
 # ============================================
-# Dual-Transport Test (BLE + QUIC via iroh_test_peer)
+# Dual-Transport Test (BLE + QUIC via dual_test_peer)
 # ============================================
 # Proves simultaneous BLE + QUIC data sync with Android using ONE Pi.
-# Both binaries run on the same Pi (rpi-ci):
-#   - ble_responder: BLE GATT advertising + document sync (BlueZ D-Bus)
-#   - iroh_test_peer: QUIC/mDNS peer + Automerge platform sync (network)
-# Android discovers both: BLE advertisements + mDNS peer.
+# A single binary runs both transports on the same Pi (rpi-ci):
+#   - dual_test_peer: BLE (BlueZ D-Bus) + QUIC (Iroh) via create_node(enable_ble=true)
+# This matches the Android architecture (one node, both transports).
 
-# Cross-compile iroh_test_peer for Raspberry Pi (aarch64)
-build-iroh-test-peer:
+# Cross-compile dual_test_peer for Raspberry Pi (aarch64)
+build-dual-test-peer:
 	@echo "╔════════════════════════════════════════════════════════════╗"
-	@echo "║  Building iroh_test_peer for aarch64 (Raspberry Pi)       ║"
+	@echo "║  Building dual_test_peer for aarch64 (Raspberry Pi)       ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@command -v cross >/dev/null 2>&1 || { echo "Error: cross not found. Install with: cargo install cross"; exit 1; }
 	CXXFLAGS="-include cstdint" cross build --release \
 		--target aarch64-unknown-linux-gnu \
-		--example iroh_test_peer \
-		-p hive-ffi --features sync
-	@echo "✓ iroh_test_peer built:"
-	@ls -la target/aarch64-unknown-linux-gnu/release/examples/iroh_test_peer
+		--example dual_test_peer \
+		-p hive-ffi --features sync,bluetooth
+	@echo "✓ dual_test_peer built:"
+	@ls -la target/aarch64-unknown-linux-gnu/release/examples/dual_test_peer
 
-# Deploy iroh_test_peer binary to Pi (same host as ble_responder)
-deploy-iroh-test-peer: build-iroh-test-peer
-	@echo "Deploying iroh_test_peer to $(BLE_TEST_PI_USER)@$(BLE_TEST_PI)..."
-	scp target/aarch64-unknown-linux-gnu/release/examples/iroh_test_peer \
-		$(BLE_TEST_PI_USER)@$(BLE_TEST_PI):~/iroh_test_peer
-	@echo "✓ Deployed to $(BLE_TEST_PI):~/iroh_test_peer"
+# Deploy dual_test_peer binary to Pi
+deploy-dual-test-peer: build-dual-test-peer
+	@echo "Deploying dual_test_peer to $(BLE_TEST_PI_USER)@$(BLE_TEST_PI)..."
+	scp target/aarch64-unknown-linux-gnu/release/examples/dual_test_peer \
+		$(BLE_TEST_PI_USER)@$(BLE_TEST_PI):~/dual_test_peer
+	@echo "✓ Deployed to $(BLE_TEST_PI):~/dual_test_peer"
 
-# Start iroh_test_peer on Pi (backgrounded, logs to ~/iroh_test_peer.log)
-start-iroh-test-peer:
-	@echo "Starting iroh_test_peer on $(BLE_TEST_PI)..."
-	@ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'pkill -x iroh_test_peer 2>/dev/null || true'
+# Start dual_test_peer on Pi (backgrounded, logs to ~/dual_test_peer.log)
+start-dual-test-peer:
+	@echo "Starting dual_test_peer on $(BLE_TEST_PI)..."
+	@ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'pkill -x dual_test_peer 2>/dev/null || true'
 	@sleep 1
 	ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) \
-		'nohup ~/iroh_test_peer > ~/iroh_test_peer.log 2>&1 & echo $$!'
+		'nohup ~/dual_test_peer > ~/dual_test_peer.log 2>&1 & echo $$!'
 	@sleep 3
-	@ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'pgrep -x iroh_test_peer >/dev/null && echo "✓ iroh_test_peer running (PID: $$(pgrep -x iroh_test_peer))" || echo "✗ iroh_test_peer failed to start"'
+	@ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'pgrep -x dual_test_peer >/dev/null && echo "✓ dual_test_peer running (PID: $$(pgrep -x dual_test_peer))" || echo "✗ dual_test_peer failed to start"'
 
-# Stop iroh_test_peer on Pi
-stop-iroh-test-peer:
-	@echo "Stopping iroh_test_peer on $(BLE_TEST_PI)..."
-	@ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'pkill -x iroh_test_peer 2>/dev/null && echo "✓ Stopped" || echo "Not running"'
+# Stop dual_test_peer on Pi
+stop-dual-test-peer:
+	@echo "Stopping dual_test_peer on $(BLE_TEST_PI)..."
+	@ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'pkill -x dual_test_peer 2>/dev/null && echo "✓ Stopped" || echo "Not running"'
 
-# Full dual-transport test pipeline (both peers on same Pi)
-dual-transport-test: deploy-ble-responder deploy-iroh-test-peer build-ble-test-app deploy-ble-test-app start-ble-responder start-iroh-test-peer
+# Full dual-transport test pipeline (single binary on Pi)
+dual-transport-test: deploy-dual-test-peer build-ble-test-app deploy-ble-test-app start-dual-test-peer
 	@echo ""
-	@echo "Capturing iroh_test_peer node ID from $(BLE_TEST_PI)..."
-	$(eval QUIC_NODE_ID := $(shell ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'grep PEER_NODE_ID ~/iroh_test_peer.log | head -1 | cut -d= -f2'))
+	@echo "Capturing dual_test_peer node ID from $(BLE_TEST_PI)..."
+	$(eval QUIC_NODE_ID := $(shell ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'grep PEER_NODE_ID ~/dual_test_peer.log | head -1 | cut -d= -f2'))
 	@if [ -z "$(QUIC_NODE_ID)" ]; then \
-		echo "✗ Failed to capture PEER_NODE_ID from iroh_test_peer log"; \
+		echo "✗ Failed to capture PEER_NODE_ID from dual_test_peer log"; \
 		exit 1; \
 	fi
 	@echo "✓ QUIC peer node ID: $(QUIC_NODE_ID)"
@@ -617,22 +567,25 @@ dual-transport-test: deploy-ble-responder deploy-iroh-test-peer build-ble-test-a
 	@echo "╔════════════════════════════════════════════════════════════╗"
 	@echo "║  Dual-Transport Test Ready (BLE + QUIC)                   ║"
 	@echo "╠════════════════════════════════════════════════════════════╣"
-	@echo "║  Pi:      $(BLE_TEST_PI) running ble_responder + iroh_test_peer"
+	@echo "║  Pi:      $(BLE_TEST_PI) running dual_test_peer (BLE + QUIC)"
 	@echo "║  Android: BLE test app installed                          ║"
 	@echo "║                                                            ║"
 	@echo "║  Android discovers Pi via:                                ║"
 	@echo "║    - BLE advertisements (GATT sync)                       ║"
-	@echo "║    - mDNS (QUIC platform sync)                           ║"
+	@echo "║    - mDNS/direct (QUIC platform sync)                    ║"
 	@echo "║                                                            ║"
 	@echo "║  Launching test with QUIC peer info...                    ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
+	@adb shell am force-stop com.revolveteam.hive.test 2>/dev/null || true
+	@adb logcat -c 2>/dev/null || true
+	@sleep 1
 	adb shell am start -n com.revolveteam.hive.test/.MainActivity \
 		--es quic_node_id "$(QUIC_NODE_ID)" \
 		--es quic_address "$(BLE_TEST_PI_IP):$(IROH_TEST_PORT)" \
 		--ez auto_run true
 	@echo ""
-	@echo "Waiting for Android test to complete..."
-	@for i in $$(seq 1 90); do \
+	@echo "Waiting for Android test to complete (up to 120s)..."
+	@for i in $$(seq 1 120); do \
 		if adb logcat -d -s HiveTest 2>/dev/null | grep -q "^.*RESULT:"; then \
 			break; \
 		fi; \
@@ -644,9 +597,9 @@ dual-transport-test: deploy-ble-responder deploy-iroh-test-peer build-ble-test-a
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@adb logcat -d -s HiveTest 2>/dev/null | grep -E "Phase|RESULT" || echo "  (no output captured)"
 	@echo ""
-	@echo "Waiting for Pi iroh_test_peer to finish (up to 30s)..."
+	@echo "Waiting for Pi dual_test_peer to finish (up to 30s)..."
 	@for i in $$(seq 1 30); do \
-		if ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'test ! -e /proc/$$(pgrep -x iroh_test_peer 2>/dev/null || echo 0)/status 2>/dev/null'; then \
+		if ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'test ! -e /proc/$$(pgrep -x dual_test_peer 2>/dev/null || echo 0)/status 2>/dev/null'; then \
 			break; \
 		fi; \
 		sleep 1; \
@@ -655,25 +608,25 @@ dual-transport-test: deploy-ble-responder deploy-iroh-test-peer build-ble-test-a
 	@echo "╔════════════════════════════════════════════════════════════╗"
 	@echo "║  Pi Results                                               ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
-	@ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'cat ~/iroh_test_peer.log' 2>/dev/null | grep -E "PEER_NODE_ID|Received|PASSED|FAILED" || echo "  (no output captured)"
+	@ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'cat ~/dual_test_peer.log' 2>/dev/null | grep -E "PEER_NODE_ID|Received|PASSED|FAILED" || echo "  (no output captured)"
 	@echo ""
 	@echo "╔════════════════════════════════════════════════════════════╗"
 	@echo "║  Final Verdict                                            ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
-	@ANDROID_OK=$$(adb logcat -d -s HiveTest 2>/dev/null | grep -c "RESULT:.*PASSED"); \
-	PI_OK=$$(ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'grep -c "Test PASSED" ~/iroh_test_peer.log 2>/dev/null' || echo 0); \
-	if [ "$$ANDROID_OK" -ge 1 ] && [ "$$PI_OK" -ge 1 ]; then \
+	@ANDROID_RESULT=$$(adb logcat -d -s HiveTest 2>/dev/null | grep "RESULT:.*PASSED" || true); \
+	PI_RESULT=$$(ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'grep "Test PASSED" ~/dual_test_peer.log 2>/dev/null' || true); \
+	if [ -n "$$ANDROID_RESULT" ] && [ -n "$$PI_RESULT" ]; then \
 		echo "  ✓ BOTH SIDES PASSED — dual-transport verified"; \
 	else \
 		echo "  ✗ TEST FAILED"; \
-		[ "$$ANDROID_OK" -lt 1 ] && echo "    Android: FAILED"; \
-		[ "$$PI_OK" -lt 1 ] && echo "    Pi:      FAILED"; \
+		[ -z "$$ANDROID_RESULT" ] && echo "    Android: FAILED"; \
+		[ -z "$$PI_RESULT" ] && echo "    Pi:      FAILED"; \
 		exit 1; \
 	fi
 
-# Show iroh_test_peer logs from Pi
-iroh-test-peer-logs:
-	ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'tail -f ~/iroh_test_peer.log'
+# Show dual_test_peer logs from Pi
+dual-test-peer-logs:
+	ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'tail -f ~/dual_test_peer.log'
 
 # ============================================
 # Legacy E-Series Tests (kept for compatibility)
