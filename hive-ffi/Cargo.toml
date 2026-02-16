@@ -23,6 +23,11 @@ name = "iroh_test_peer"
 path = "examples/iroh_test_peer.rs"
 required-features = ["sync"]
 
+[[example]]
+name = "dual_test_peer"
+path = "examples/dual_test_peer.rs"
+required-features = ["sync", "bluetooth"]
+
 [features]
 default = ["sync"]
 sync = ["hive-protocol/automerge-backend"]
