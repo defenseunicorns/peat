@@ -1,0 +1,24 @@
+name: Functional Test (BLE Lab)
+
+on:
+  workflow_dispatch:
+  release:
+    types: [ created ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  dual-transport-test:
+    name: Dual Transport (BLE + QUIC)
+    runs-on: [self-hosted, ble-lab]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run dual-transport test
+        env:
+          BLE_TEST_PI: ${{ vars.BLE_TEST_PI || 'rpi-ci' }}
+          BLE_TEST_PI_USER: ${{ vars.BLE_TEST_PI_USER || 'kit' }}
+          BLE_TEST_PI_IP: ${{ vars.BLE_TEST_PI_IP || '192.168.228.13' }}
+        run: make dual-transport-test BLE_TEST_PI=$BLE_TEST_PI BLE_TEST_PI_USER=$BLE_TEST_PI_USER BLE_TEST_PI_IP=$BLE_TEST_PI_IP

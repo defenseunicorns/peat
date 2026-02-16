@@ -1,0 +1,34 @@
+name: Simulation Smoke Test
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'hive-sim/**'
+      - 'hive-protocol/**'
+      - '.github/workflows/simulation.yml'
+  schedule:
+    - cron: '0 6 * * 0'  # Sunday 06:00 UTC
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  simulation:
+    name: 24-Node Smoke Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ContainerLab
+        run: |
+          curl -sL https://get.containerlab.dev | sudo bash
+
+      - name: Build Docker image
+        run: docker build -f hive-sim/Dockerfile -t hive-sim-node:latest .
+
+      - name: Run validation
+        working-directory: hive-sim
+        run: ./simple-validate.sh
