@@ -1,0 +1,47 @@
+name: Benchmarks
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'hive-protocol/**'
+      - '.github/workflows/benchmarks.yml'
+  schedule:
+    - cron: '0 6 * * 0'  # Sunday 06:00 UTC
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  benchmarks:
+    name: Run Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h
+
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler mold clang libdbus-1-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: benchmarks
+
+      - name: Run cap_benchmarks
+        run: cargo bench --bench cap_benchmarks -p hive-protocol
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: criterion-results
+          path: target/criterion/
+          retention-days: 90
