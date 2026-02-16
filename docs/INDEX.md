@@ -22,6 +22,7 @@
 | Set up a development environment | [DEVELOPMENT.md](../DEVELOPMENT.md) |
 | See why decisions were made | [ADRs](adr/) |
 | Write tests | [TESTING_STRATEGY.md](TESTING_STRATEGY.md) |
+| Run or extend functional tests | [FUNCTIONAL-TESTING.md](FUNCTIONAL-TESTING.md) |
 | Understand IP strategy | [IP_OVERVIEW.md](IP_OVERVIEW.md) |
 
 ---
@@ -95,6 +96,7 @@ Comprehensive testing strategy and implementation guides.
 | Document | Scope | Purpose |
 |----------|-------|---------|
 | [TESTING_STRATEGY.md](TESTING_STRATEGY.md) | Workspace-wide | Testing philosophy, pyramid, and E2E requirements |
+| [FUNCTIONAL-TESTING.md](FUNCTIONAL-TESTING.md) | Transport layer | Hardware functional tests (BLE + QUIC), feature-to-phase mapping, platform extension guide |
 | [hive-protocol/docs/testing/e2e-cell-formation.md](../hive-protocol/docs/testing/e2e-cell-formation.md) | Cell Formation E2E | Detailed E2E test scenarios and matrix |
 
 ### Key Testing Concepts
