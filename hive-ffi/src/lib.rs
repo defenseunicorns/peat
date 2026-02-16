@@ -73,7 +73,7 @@ use hive_protocol::sync::{BackendConfig, DataSyncBackend, TransportConfig};
 use hive_protocol::transport::btle::HiveBleTransport;
 #[cfg(feature = "sync")]
 use hive_protocol::transport::{
-    iroh::IrohMeshTransport, CollectionRouteTable, Transport, TransportCapabilities,
+    iroh::IrohMeshTransport, CollectionRouteTable, MeshTransport, Transport, TransportCapabilities,
     TransportInstance, TransportManager, TransportManagerConfig, TransportPolicy, TransportType,
 };
 #[cfg(feature = "sync")]
@@ -421,8 +421,9 @@ impl HiveNode {
 
     /// Start sync operations
     ///
-    /// This starts the sync coordination - peer discovery and accept loop are already
-    /// running from node creation. We just need to ensure the sync engine is started.
+    /// The authenticated accept loop (with formation handshake) is already running
+    /// from sync_backend.initialize() in create_node(). This method starts the
+    /// sync coordination layer: event-based and polling-based sync handlers.
     pub fn start_sync(&self) -> Result<(), HiveError> {
         #[cfg(target_os = "android")]
         android_log("start_sync: called");
@@ -444,6 +445,12 @@ impl HiveNode {
             // CRITICAL: Call start_sync() on the ACTUAL storage_backend instance,
             // NOT on sync_backend.sync_engine() which returns a CLONED instance
             // that doesn't have the transport event subscriptions set up!
+            //
+            // Note: The authenticated accept loop (with formation handshake and
+            // Connected event emission) is already running — it was started by
+            // sync_backend.initialize() in create_node(). The storage_backend's
+            // start_sync() will see the accept loop as already running and skip
+            // starting the plain (unauthenticated) accept loop.
             self.storage_backend
                 .start_sync()
                 .map_err(|e| HiveError::SyncError { msg: e.to_string() })
@@ -484,7 +491,10 @@ impl HiveNode {
         })
     }
 
-    /// Connect to a peer node
+    /// Connect to a peer node with formation handshake
+    ///
+    /// Establishes a QUIC connection, performs formation-key authentication,
+    /// and emits a Connected event to trigger immediate sync handler spawning.
     pub fn connect_peer(&self, peer: PeerInfo) -> Result<(), HiveError> {
         let hive_peer = HivePeerInfo {
             name: peer.name,
@@ -493,11 +503,40 @@ impl HiveNode {
             relay_url: peer.relay_url,
         };
 
+        let _guard = self.runtime.enter();
+
         self.runtime.block_on(async {
-            self.iroh_transport
+            let conn_opt = self
+                .iroh_transport
                 .connect_peer(&hive_peer)
                 .await
                 .map_err(|e| HiveError::ConnectionError { msg: e.to_string() })?;
+
+            // If we got a new connection, perform formation handshake and emit Connected
+            if let Some(conn) = conn_opt {
+                let peer_id = conn.remote_id();
+
+                if let Some(formation_key) = self.sync_backend.formation_key() {
+                    use hive_protocol::network::perform_initiator_handshake;
+                    match perform_initiator_handshake(&conn, &formation_key).await {
+                        Ok(()) => {
+                            // Emit Connected to trigger immediate sync handler spawning
+                            self.iroh_transport.emit_peer_connected(peer_id);
+                        }
+                        Err(e) => {
+                            conn.close(1u32.into(), b"authentication failed");
+                            self.iroh_transport.disconnect(&peer_id).ok();
+                            return Err(HiveError::ConnectionError {
+                                msg: format!("Formation handshake failed: {}", e),
+                            });
+                        }
+                    }
+                } else {
+                    // No formation key — emit Connected without handshake (backward compat)
+                    self.iroh_transport.emit_peer_connected(peer_id);
+                }
+            }
+            // If None, accept path is handling the connection
 
             Ok(())
         })
@@ -1057,7 +1096,7 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
                 #[cfg(target_os = "linux")]
                 {
                     use hive_btle::platform::linux::BluerAdapter;
-                    use hive_btle::{BleConfig, BluetoothLETransport, PowerProfile};
+                    use hive_btle::{BleAdapter, BleConfig, BluetoothLETransport, PowerProfile};
 
                     // Parse power profile from config
                     let power_profile = match transport_config.ble_power_profile.as_deref() {
@@ -1066,17 +1105,35 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
                         _ => PowerProfile::Balanced,
                     };
 
-                    // Create BLE config with power profile
+                    // Create BLE config with power profile and mesh ID
                     let mut ble_config = BleConfig::default();
                     ble_config.power_profile = power_profile;
+                    if let Some(ref mesh_id) = transport_config.ble_mesh_id {
+                        ble_config.mesh.mesh_id = mesh_id.clone();
+                    }
 
                     // Create BLE transport with BluerAdapter
-                    match runtime_arc.block_on(async { BluerAdapter::new().await }) {
+                    match runtime_arc.block_on(async {
+                        let mut adapter = BluerAdapter::new().await?;
+
+                        // Initialize adapter with config (stores node ID, mesh ID, etc.)
+                        adapter.init(&ble_config).await?;
+
+                        // Register GATT service with BlueZ so peers can connect
+                        adapter.register_gatt_service().await?;
+
+                        Ok::<_, hive_btle::BleError>(adapter)
+                    }) {
                         Ok(adapter) => {
                             let btle = BluetoothLETransport::new(ble_config, adapter);
                             let ble_transport = Arc::new(HiveBleTransport::new(btle));
                             let ble_as_transport: Arc<dyn Transport> = ble_transport.clone();
                             transport_manager.register(ble_as_transport.clone());
+
+                            // Start advertising and scanning
+                            if let Err(e) = runtime_arc.block_on(ble_transport.start()) {
+                                eprintln!("[HIVE] Failed to start BLE transport: {} (continuing without BLE)", e);
+                            }
 
                             // Register as PACE instance for collection routing
                             let ble_instance = TransportInstance::new(

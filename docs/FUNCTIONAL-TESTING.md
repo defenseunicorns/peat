@@ -22,10 +22,10 @@ The test infrastructure is designed for extension. Each platform (Android, macOS
 │                    Test Orchestrator                      │
 │                    (make dual-transport-test)             │
 │                                                          │
-│  1. Cross-compile Pi binaries (aarch64)                  │
+│  1. Cross-compile dual_test_peer (aarch64)               │
 │  2. Build platform test app (APK / .app / .exe)          │
 │  3. Deploy all binaries                                  │
-│  4. Start Pi services                                    │
+│  4. Start dual_test_peer on Pi                           │
 │  5. Launch platform test client with peer info            │
 │  6. Collect results from BOTH sides                      │
 │  7. Report final verdict                                 │
@@ -36,15 +36,14 @@ The test infrastructure is designed for extension. Each platform (Android, macOS
 │   Raspberry Pi       │          │   Test Client            │
 │   (rpi-ci)           │          │   (platform under test)  │
 │                      │          │                          │
-│  ble_responder       │◄──BLE──►│  BLE: scan, GATT sync    │
-│  (hive-btle, BlueZ)  │          │                          │
-│                      │          │                          │
-│  iroh_test_peer      │◄─QUIC──►│  QUIC: Iroh Automerge    │
-│  (hive-ffi, Iroh)    │          │       platform sync      │
+│  dual_test_peer      │◄──BLE──►│  BLE: scan, GATT sync    │
+│  (hive-ffi,          │          │                          │
+│   BLE + QUIC in      │◄─QUIC──►│  QUIC: Iroh Automerge    │
+│   single process)    │          │       platform sync      │
 └─────────────────────┘          └─────────────────────────┘
 ```
 
-Both Pi services run on the **same Raspberry Pi** (rpi-ci). BLE uses the BlueZ D-Bus stack; QUIC uses the network stack. They do not conflict.
+A single `dual_test_peer` binary runs on **rpi-ci**, using `create_node()` with `enable_ble=true` to initialize both BLE (BlueZ D-Bus) and QUIC (Iroh) transports in one process. This matches the Android architecture exactly.
 
 ### Key Principles
 
@@ -63,12 +62,11 @@ Both Pi services run on the **same Raspberry Pi** (rpi-ci). BLE uses the BlueZ D
 |------|------|----|-----|----|
 | rpi-ci | BLE responder + QUIC peer | Ubuntu 24.04, BlueZ 5.72 | D8:3A:DD:F5:FD:53 | 192.168.228.13 |
 
-**Services running during test:**
+**Binary running during test:**
 
 | Binary | Source | Transport | What It Does |
 |--------|--------|-----------|-------------|
-| `ble_responder` | hive-btle `examples/ble_responder.rs` | BLE GATT | Advertises HIVE service, accepts GATT connections, exchanges HiveDocument (GCounter + callsign) |
-| `iroh_test_peer` | hive-ffi `examples/iroh_test_peer.rs` | QUIC/Iroh | Publishes "PI-QUIC" platform, waits for client's platform via Automerge sync |
+| `dual_test_peer` | hive-ffi `examples/dual_test_peer.rs` | BLE + QUIC | Single process: BLE advertising (BlueZ) + QUIC platform sync (Iroh). Publishes "PI-DUAL" platform, waits for client's platform via either transport. |
 
 ### Build Requirements
 
@@ -128,8 +126,7 @@ The Pi independently verifies it received data from the client:
 
 | Check | What | Pass Criteria |
 |-------|------|---------------|
-| iroh_test_peer | Received client platform | "ANDROID-DUAL" (or equivalent) appears within 60s |
-| ble_responder | Accepted GATT sync | Log shows connection + data exchange |
+| dual_test_peer | Received client platform | "ANDROID-DUAL" (or equivalent) appears within 90s |
 
 ---
 
@@ -165,19 +162,18 @@ make dual-transport-test
 ```
 
 This single command:
-1. Cross-compiles `ble_responder` (aarch64) from hive-btle
-2. Cross-compiles `iroh_test_peer` (aarch64) from hive-ffi
-3. Deploys both to rpi-ci via scp
-4. Builds Android native lib (`libhive_ffi.so` with `--features bluetooth`)
-5. Builds Android test APK via Gradle
-6. Deploys APK to connected Android device
-7. Starts both Pi services
-8. Captures `PEER_NODE_ID` from iroh_test_peer log
-9. Launches Android app with `--ez auto_run true --es quic_node_id <id> --es quic_address <ip:port>`
-10. Waits for Android test completion (up to 90s)
-11. Waits for Pi iroh_test_peer to finish (up to 30s)
-12. Reports results from **both** sides
-13. Final verdict: PASS only if both sides passed
+1. Cross-compiles `dual_test_peer` (aarch64) from hive-ffi with `--features sync,bluetooth`
+2. Deploys to rpi-ci via scp
+3. Builds Android native lib (`libhive_ffi.so` with `--features bluetooth`)
+4. Builds Android test APK via Gradle
+5. Deploys APK to connected Android device
+6. Starts `dual_test_peer` on Pi (BLE + QUIC in one process)
+7. Captures `PEER_NODE_ID` from dual_test_peer log
+8. Launches Android app with `--ez auto_run true --es quic_node_id <id> --es quic_address <ip:port>`
+9. Waits for Android test completion (up to 90s)
+10. Waits for Pi dual_test_peer to finish (up to 30s)
+11. Reports results from **both** sides
+12. Final verdict: PASS only if both sides passed
 
 ### BLE-Only Test
 
@@ -190,22 +186,16 @@ Runs phases 1-7 (BLE only, no QUIC peer info passed to Android).
 ### Individual Targets
 
 ```bash
-make build-ble-responder       # Cross-compile ble_responder
-make deploy-ble-responder      # scp to Pi
-make start-ble-responder       # Start on Pi (backgrounded)
-make stop-ble-responder        # Kill on Pi
-
-make build-iroh-test-peer      # Cross-compile iroh_test_peer
-make deploy-iroh-test-peer     # scp to Pi
-make start-iroh-test-peer      # Start on Pi (backgrounded)
-make stop-iroh-test-peer       # Kill on Pi
+make build-dual-test-peer      # Cross-compile dual_test_peer (BLE + QUIC)
+make deploy-dual-test-peer     # scp to Pi
+make start-dual-test-peer      # Start on Pi (backgrounded)
+make stop-dual-test-peer       # Kill on Pi
 
 make build-ble-test-app        # Build Android APK
 make deploy-ble-test-app       # Install APK via adb
 
 make ble-test-logs             # Android logcat (filtered)
-make ble-responder-logs        # Pi ble_responder log
-make iroh-test-peer-logs       # Pi iroh_test_peer log
+make dual-test-peer-logs       # Pi dual_test_peer log
 
 make clean-ble-test            # Remove build artifacts
 ```
@@ -216,13 +206,10 @@ Makefile variables (override with `make VAR=value`):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `HIVE_BTLE_DIR` | `$(HOME)/Code/revolve/hive-btle` | Path to hive-btle repo |
 | `BLE_TEST_PI` | `rpi-ci` | Pi hostname |
 | `BLE_TEST_PI_USER` | `kit` | SSH user |
 | `BLE_TEST_PI_IP` | `192.168.228.13` | Pi IP (for QUIC direct connect) |
-| `BLE_TEST_MESH_ID` | `FUNCTEST` | BLE mesh formation ID |
-| `BLE_TEST_CALLSIGN` | `PI-RESP` | ble_responder callsign |
-| `IROH_TEST_PORT` | `42009` | iroh_test_peer bind port |
+| `IROH_TEST_PORT` | `42009` | dual_test_peer bind port |
 
 ---
 
@@ -264,10 +251,10 @@ build-<platform>-test-client:
 deploy-<platform>-test-client:
 
 # Full test pipeline
-<platform>-dual-transport-test: deploy-ble-responder deploy-iroh-test-peer \
+<platform>-dual-transport-test: deploy-dual-test-peer \
     build-<platform>-test-client deploy-<platform>-test-client \
-    start-ble-responder start-iroh-test-peer
-	# 1. Capture PEER_NODE_ID from iroh_test_peer log
+    start-dual-test-peer
+	# 1. Capture PEER_NODE_ID from dual_test_peer log
 	# 2. Launch test client with peer info
 	# 3. Wait for completion
 	# 4. Check BOTH sides
@@ -299,10 +286,9 @@ All test participants use the same FUNCTEST formation credentials:
 |-----------|-------|---------|
 | App ID / Mesh ID | `FUNCTEST` | All participants |
 | Shared Key | `[0x01..0x20]` (base64: `AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=`) | QUIC sync (Iroh) |
-| BLE Callsign (Pi) | `PI-RESP` | ble_responder |
 | BLE Callsign (Client) | `ANDROID-TEST` (or platform equivalent) | Test client |
-| QUIC Platform (Pi) | `PI-QUIC` (id: `pi-quic-test`) | iroh_test_peer |
-| QUIC Platform (Client) | `ANDROID-DUAL` (id: `android-dual-test`) | Test client |
+| Platform (Pi) | `PI-DUAL` (id: `pi-dual-test`) | dual_test_peer |
+| Platform (Client) | `ANDROID-DUAL` (id: `android-dual-test`) | Test client |
 
 When adding a new platform, keep the same formation credentials. Only change the client's callsign and platform name to identify the platform (e.g., `MACOS-DUAL`, `macos-dual-test`).
 
@@ -314,11 +300,11 @@ When adding a new platform, keep the same formation credentials. Only change the
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `Text file busy` on scp | Binary still running on Pi | `make stop-ble-responder stop-iroh-test-peer` before deploy |
+| `Text file busy` on scp | Binary still running on Pi | `make stop-dual-test-peer` before deploy |
 | BLE GATT status 133 | Transient Android BLE error | Retry; toggle Bluetooth on Pi if persistent |
 | mDNS discovery fails (0 peers) | Enterprise WiFi blocking multicast | Test falls back to `connectPeerJni` with direct address |
 | Pi never receives client platform | Client disconnected before sync completed | Phase 11 (Sync Hold) keeps connection alive 15s |
-| iroh_test_peer "failed to start" | Previous instance still running | `ssh kit@rpi-ci 'pkill -x iroh_test_peer'` |
+| dual_test_peer "failed to start" | Previous instance still running | `ssh kit@rpi-ci 'pkill -x dual_test_peer'` |
 | `protoc` too old in cross container | Ubuntu 16.04 has protoc 2.6.1 | Cross.toml downloads protoc v25.1 from GitHub releases |
 
 ### Logs
@@ -327,11 +313,8 @@ When adding a new platform, keep the same formation credentials. Only change the
 # Android test phases
 adb logcat -s HiveTest:V BleGattClient:V HiveJni:V
 
-# Pi BLE responder
-ssh kit@rpi-ci 'tail -f ~/ble_responder.log'
-
-# Pi QUIC peer
-ssh kit@rpi-ci 'tail -f ~/iroh_test_peer.log'
+# Pi dual-transport peer (BLE + QUIC)
+ssh kit@rpi-ci 'tail -f ~/dual_test_peer.log'
 ```
 
 ---
@@ -340,9 +323,10 @@ ssh kit@rpi-ci 'tail -f ~/iroh_test_peer.log'
 
 | File | Purpose |
 |------|---------|
-| `Makefile` (lines 449-677) | Test orchestration targets |
+| `Makefile` | Test orchestration targets |
 | `Cross.toml` | aarch64 cross-compilation config (protoc, libdbus) |
-| `hive-ffi/examples/iroh_test_peer.rs` | Pi-side QUIC test peer |
+| `hive-ffi/examples/dual_test_peer.rs` | Pi-side dual-transport test peer (BLE + QUIC) |
+| `hive-ffi/examples/iroh_test_peer.rs` | Legacy QUIC-only test peer (kept for reference) |
 | `hive-ffi/Cargo.toml` | Example + feature definitions |
 | `hive-ffi/src/lib.rs` | JNI bindings (connectPeerJni, etc.) |
 | `android-ble-test/.../test/TestRunner.kt` | Android 11-phase test orchestrator |
