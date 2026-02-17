@@ -1067,7 +1067,15 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
 
                 android_log("BLE transport requested - initializing AndroidAdapter stub");
 
-                let ble_config = BleConfig::default();
+                // Derive BLE node ID from Iroh endpoint key (same as Linux path)
+                let iroh_key_bytes = transport.endpoint_id().as_bytes();
+                let ble_node_id = hive_btle::NodeId::new(u32::from_be_bytes([
+                    iroh_key_bytes[28],
+                    iroh_key_bytes[29],
+                    iroh_key_bytes[30],
+                    iroh_key_bytes[31],
+                ]));
+                let ble_config = BleConfig::new(ble_node_id);
                 let adapter = AndroidAdapter::new_stub();
                 let btle = BluetoothLETransport::new(ble_config, adapter);
                 let ble_transport = Arc::new(HiveBleTransport::new(btle));
@@ -1105,8 +1113,18 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
                         _ => PowerProfile::Balanced,
                     };
 
-                    // Create BLE config with power profile and mesh ID
-                    let mut ble_config = BleConfig::default();
+                    // Derive a 32-bit BLE node ID from the Iroh endpoint's public key
+                    // Use last 4 bytes of the 32-byte key for a unique-enough identifier
+                    let iroh_key_bytes = transport.endpoint_id().as_bytes();
+                    let ble_node_id = hive_btle::NodeId::new(u32::from_be_bytes([
+                        iroh_key_bytes[28],
+                        iroh_key_bytes[29],
+                        iroh_key_bytes[30],
+                        iroh_key_bytes[31],
+                    ]));
+
+                    // Create BLE config with node ID, power profile, and mesh ID
+                    let mut ble_config = BleConfig::new(ble_node_id);
                     ble_config.power_profile = power_profile;
                     if let Some(ref mesh_id) = transport_config.ble_mesh_id {
                         ble_config.mesh.mesh_id = mesh_id.clone();
