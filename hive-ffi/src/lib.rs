@@ -1068,7 +1068,8 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
                 android_log("BLE transport requested - initializing AndroidAdapter stub");
 
                 // Derive BLE node ID from Iroh endpoint key (same as Linux path)
-                let iroh_key_bytes = transport.endpoint_id().as_bytes();
+                let iroh_endpoint_id = transport.endpoint_id();
+                let iroh_key_bytes = iroh_endpoint_id.as_bytes();
                 let ble_node_id = hive_btle::NodeId::new(u32::from_be_bytes([
                     iroh_key_bytes[28],
                     iroh_key_bytes[29],
