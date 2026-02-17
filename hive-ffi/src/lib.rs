@@ -812,10 +812,9 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
             (result, store_start.elapsed().as_millis())
         });
 
-        // FAST STARTUP: Create transport WITHOUT mDNS discovery
-        // mDNS will be enabled later via enable_mdns_discovery()
+        // Create transport WITH mDNS discovery wired into the endpoint
         let transport_future = async {
-            let result = IrohTransport::from_seed_at_addr(&seed, bind_addr).await;
+            let result = IrohTransport::from_seed_with_discovery_at_addr(&seed, bind_addr).await;
             (result, transport_start.elapsed().as_millis())
         };
 
@@ -832,7 +831,7 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
 
         let (transport_inner, transport_elapsed) = transport_result;
         let transport = transport_inner.map_err(|e| HiveError::ConnectionError {
-            msg: format!("Failed to create transport (fast mode, no mDNS): {}", e),
+            msg: format!("Failed to create transport with mDNS: {}", e),
         })?;
 
         Ok::<_, HiveError>((
@@ -848,7 +847,7 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
     {
         android_log(&format!("[TIMING] Store open: {}ms", store_ms));
         android_log(&format!(
-            "[TIMING] Transport create (no mDNS): {}ms",
+            "[TIMING] Transport create (with mDNS): {}ms",
             transport_ms
         ));
         android_log(&format!(
@@ -860,7 +859,7 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
     {
         eprintln!("[HIVE TIMING] Store open: {}ms", store_ms);
         eprintln!(
-            "[HIVE TIMING] Transport create (no mDNS): {}ms",
+            "[HIVE TIMING] Transport create (with mDNS): {}ms",
             transport_ms
         );
         eprintln!(
@@ -924,31 +923,6 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
 
     // Clone transport for the cleanup task
     let transport_for_cleanup = Arc::clone(&transport);
-
-    // DEFERRED mDNS DISCOVERY: Enable mDNS in background after startup completes
-    // This keeps the initial startup fast while still enabling LAN peer discovery.
-    // The transport was created with from_seed_at_addr() (no mDNS) for fast startup.
-    let transport_for_mdns = Arc::clone(&transport);
-    runtime_arc.spawn(async move {
-        // Small delay to ensure critical startup path completes first
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-
-        match transport_for_mdns.enable_mdns_discovery().await {
-            Ok(()) => {
-                #[cfg(target_os = "android")]
-                android_log("Deferred mDNS discovery enabled successfully");
-                #[cfg(not(target_os = "android"))]
-                eprintln!("[HIVE] Deferred mDNS discovery enabled successfully");
-            }
-            Err(e) => {
-                // Not critical - static peer config still works
-                #[cfg(target_os = "android")]
-                android_log(&format!("Failed to enable deferred mDNS discovery: {}", e));
-                #[cfg(not(target_os = "android"))]
-                eprintln!("[HIVE] Failed to enable deferred mDNS discovery: {} (static peer config still works)", e);
-            }
-        }
-    });
 
     // Log that we're starting the peer event listener
     #[cfg(target_os = "android")]
