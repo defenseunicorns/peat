@@ -9,6 +9,8 @@ import android.util.Base64
 import android.util.Log
 import com.revolveteam.atak.hive.HiveJni
 import org.json.JSONArray
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 /**
  * Test orchestration for Pi-to-Android BLE functional test.
@@ -79,13 +81,18 @@ class TestRunner(
 
     suspend fun runAll(): List<PhaseResult> {
         results.clear()
+        val now = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+        val buildInfo = "v${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_BRANCH}@${BuildConfig.GIT_COMMIT})"
+
         log("================================================")
         if (isDualTransport) {
             log("HIVE Dual-Transport Test (BLE + QUIC)")
+            log("  Run: $now  Build: $buildInfo")
             log("  Expected QUIC peer: ${quicNodeId?.take(16)}...")
             log("  Discovery: BLE advertisements + mDNS")
         } else {
             log("HIVE Pi-to-Android BLE Functional Test")
+            log("  Run: $now  Build: $buildInfo")
         }
         log("================================================")
 
