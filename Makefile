@@ -606,7 +606,7 @@ dual-transport-test: deploy-dual-test-peer build-ble-test-app deploy-ble-test-ap
 	@echo "╔════════════════════════════════════════════════════════════╗"
 	@echo "║  Android Results                                          ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
-	@adb logcat -d -s HiveTest 2>/dev/null | grep -E "Phase|RESULT" || echo "  (no output captured)"
+	@adb logcat -d -s HiveTest 2>/dev/null | grep -E "Phase|RESULT|HIVE |Run:|Build:|====| " || echo "  (no output captured)"
 	@echo ""
 	@echo "Waiting for Pi dual_test_peer to finish (up to 30s)..."
 	@for i in $$(seq 1 30); do \
