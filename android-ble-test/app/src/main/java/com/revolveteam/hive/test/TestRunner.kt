@@ -9,11 +9,13 @@ import android.util.Base64
 import android.util.Log
 import com.revolveteam.atak.hive.HiveJni
 import org.json.JSONArray
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 /**
  * Test orchestration for Pi-to-Android BLE functional test.
  *
- * When quicNodeId/quicAddress are provided, runs 11-phase dual-transport test
+ * When quicNodeId/quicAddress are provided, runs 12-phase dual-transport test
  * (BLE via rpi-ci + QUIC via rpi-ci2). Otherwise falls back to BLE-only 7-phase test.
  */
 class TestRunner(
@@ -53,6 +55,7 @@ class TestRunner(
     private var bleClient: BleGattClient? = null
     private var discoveredDevice: BleGattClient.DiscoveredDevice? = null
     private var quicPlatformReceived = false
+    private var mdnsDiscovered = false
 
     fun setLogCallback(callback: LogCallback) {
         logCallback = callback
@@ -79,13 +82,18 @@ class TestRunner(
 
     suspend fun runAll(): List<PhaseResult> {
         results.clear()
+        val now = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+        val buildInfo = "v${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_BRANCH}@${BuildConfig.GIT_COMMIT})"
+
         log("================================================")
         if (isDualTransport) {
             log("HIVE Dual-Transport Test (BLE + QUIC)")
+            log("  Run: $now  Build: $buildInfo")
             log("  Expected QUIC peer: ${quicNodeId?.take(16)}...")
             log("  Discovery: BLE advertisements + mDNS")
         } else {
             log("HIVE Pi-to-Android BLE Functional Test")
+            log("  Run: $now  Build: $buildInfo")
         }
         log("================================================")
 
@@ -99,15 +107,17 @@ class TestRunner(
             if (isDualTransport) {
                 // Publish platform first so it's in local store before sync
                 if (!phase6PublishPlatform()) return results
-                // Connect to QUIC peer (sync will exchange data both ways)
-                if (!phase7PeerDiscovery()) return results
+                // mDNS discovery — records pass/fail but doesn't abort
+                phase7MdnsDiscovery()
+                // QUIC peer connect — direct connect fallback if mDNS failed
+                if (!phase8PeerConnect()) return results
                 // Verify we received the Pi's platform
-                if (!phase8QuicDataReceived()) return results
-                // BLE state + verification (9-10)
-                if (!phase9SignalBleState()) return results
-                if (!phase10DualTransportVerified()) return results
+                if (!phase9QuicDataReceived()) return results
+                // BLE state + verification (10-11)
+                if (!phase10SignalBleState()) return results
+                if (!phase11DualTransportVerified()) return results
                 // Hold connection so remote peer can sync our data
-                phase11HoldForSync()
+                phase12HoldForSync()
             } else {
                 // BLE-only flow (original phases 6-7)
                 if (!phase6SignalBleState()) return results
@@ -124,6 +134,7 @@ class TestRunner(
         val total = results.size
         log("================================================")
         log("RESULT: $passed/$total PASSED")
+        log("  Run: $now  Build: $buildInfo")
         log("================================================")
 
         return results
@@ -243,54 +254,67 @@ class TestRunner(
     }
 
     // ========================================================================
-    // QUIC Phases (dual-transport mode only, phases 6-8)
+    // QUIC Phases (dual-transport mode only, phases 6-9)
     // ========================================================================
 
-    // Phase 7: Discover QUIC peer — try mDNS first, fall back to direct connect, keep polling
-    private fun phase7PeerDiscovery(): Boolean {
+    // Phase 7: mDNS discovery (records pass/fail but doesn't abort — phase 8 handles fallback)
+    private fun phase7MdnsDiscovery(): Boolean {
         return try {
             val expectedNodeId = quicNodeId
-
-            var found = false
-            var foundPeerId = ""
             var peers = 0
-            var method = "mDNS"
 
-            // Phase 1: mDNS discovery (15s) — Pi's deferred mDNS takes a few seconds
             log("  Trying mDNS discovery (15s)...")
             for (i in 1..30) {
                 Thread.sleep(500)
                 peers = HiveJni.peerCountJni(nodeHandle)
                 if (peers > 0) {
-                    found = checkForExpectedPeer(expectedNodeId)
-                    if (found) { foundPeerId = expectedNodeId ?: "unknown"; break }
+                    val found = checkForExpectedPeer(expectedNodeId)
+                    if (found) {
+                        mdnsDiscovered = true
+                        return recordPhase(7, "mDNS Discovery", true,
+                            "peer=${expectedNodeId?.take(16)}..., iroh_peers=$peers")
+                    }
                 }
                 if (i % 10 == 0) {
                     log("  mDNS polling... ${i / 2}s, peers=$peers")
                 }
             }
 
-            // Phase 2: Try direct connect (non-blocking) then continue polling
-            if (!found && !quicAddress.isNullOrEmpty() && !expectedNodeId.isNullOrEmpty()) {
-                log("  mDNS not available, trying direct connect to $quicAddress...")
-                method = "direct"
-                // Fire and forget — connectPeer may fail but still trigger discovery
+            recordPhase(7, "mDNS Discovery", false,
+                "peer not found via mDNS within 15s (peers=$peers)")
+        } catch (e: Throwable) {
+            recordPhase(7, "mDNS Discovery", false, "${e.javaClass.simpleName}: ${e.message}")
+        }
+    }
+
+    // Phase 8: QUIC peer connect — skips if mDNS already found peer, otherwise tries direct connect
+    private fun phase8PeerConnect(): Boolean {
+        return try {
+            if (mdnsDiscovered) {
+                return recordPhase(8, "QUIC Peer Connect", true,
+                    "already connected via mDNS")
+            }
+
+            val expectedNodeId = quicNodeId
+            var found = false
+            var peers = 0
+
+            if (!quicAddress.isNullOrEmpty() && !expectedNodeId.isNullOrEmpty()) {
+                log("  Trying direct connect to $quicAddress...")
                 try {
                     HiveJni.connectPeerJni(nodeHandle, expectedNodeId, quicAddress)
                 } catch (_: Throwable) {}
 
-                // Keep polling — retry direct connect every 5s if still disconnected
                 log("  Polling for peer connection (25s)...")
                 for (i in 1..50) {
                     Thread.sleep(500)
                     peers = HiveJni.peerCountJni(nodeHandle)
                     if (peers > 0) {
                         found = checkForExpectedPeer(expectedNodeId)
-                        if (found) { foundPeerId = expectedNodeId; break }
+                        if (found) break
                     }
                     if (i % 10 == 0) {
                         log("  Waiting for connection... ${i / 2}s, peers=$peers")
-                        // Retry direct connect if still no peers
                         if (peers == 0) {
                             log("  Retrying direct connect to $quicAddress...")
                             try {
@@ -301,11 +325,11 @@ class TestRunner(
                 }
             }
 
-            recordPhase(7, "QUIC Peer Connect", found,
-                if (found) "peer=${foundPeerId.take(16)}..., method=$method, iroh_peers=$peers"
+            recordPhase(8, "QUIC Peer Connect", found,
+                if (found) "peer=${expectedNodeId?.take(16)}..., method=direct, iroh_peers=$peers"
                 else "QUIC peer not reachable (peers=$peers)")
         } catch (e: Throwable) {
-            recordPhase(7, "QUIC Peer Connect", false, "${e.javaClass.simpleName}: ${e.message}")
+            recordPhase(8, "QUIC Peer Connect", false, "${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
@@ -347,8 +371,8 @@ class TestRunner(
         }
     }
 
-    // Phase 8: Poll for PI-QUIC platform from rpi-ci2 (up to 30s)
-    private fun phase8QuicDataReceived(): Boolean {
+    // Phase 9: Poll for PI-QUIC platform from rpi-ci2 (up to 30s)
+    private fun phase9QuicDataReceived(): Boolean {
         return try {
             var found = false
             var platformName = ""
@@ -373,16 +397,16 @@ class TestRunner(
             }
 
             quicPlatformReceived = found
-            recordPhase(8, "QUIC Data Received", found,
+            recordPhase(9, "QUIC Data Received", found,
                 if (found) "platform \"$platformName\" via QUIC/mDNS"
                 else "PI-QUIC platform not received within 30s")
         } catch (e: Throwable) {
-            recordPhase(8, "QUIC Data Received", false, "${e.javaClass.simpleName}: ${e.message}")
+            recordPhase(9, "QUIC Data Received", false, "${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
-    // Phase 9: Signal BLE state (dual-transport mode)
-    private fun phase9SignalBleState(): Boolean {
+    // Phase 10: Signal BLE state (dual-transport mode)
+    private fun phase10SignalBleState(): Boolean {
         return try {
             HiveJni.bleSetStartedJni(nodeHandle, true)
 
@@ -394,25 +418,25 @@ class TestRunner(
             val peerCount = HiveJni.blePeerCountJni(nodeHandle)
 
             val passed = available && (peerNodeIdHex.isEmpty() || peerCount >= 1)
-            recordPhase(9, "BLE State Signaled", passed,
+            recordPhase(10, "BLE State Signaled", passed,
                 "available=$available, peers=$peerCount")
         } catch (e: Throwable) {
-            recordPhase(9, "BLE State Signaled", false, "${e.javaClass.simpleName}: ${e.message}")
+            recordPhase(10, "BLE State Signaled", false, "${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
-    // Phase 10: Verify both transports carried data
-    private fun phase10DualTransportVerified(): Boolean {
+    // Phase 11: Verify both transports carried data
+    private fun phase11DualTransportVerified(): Boolean {
         return try {
             val irohPeers = HiveJni.peerCountJni(nodeHandle)
             val blePeers = HiveJni.blePeerCountJni(nodeHandle)
             val bleAvailable = HiveJni.bleIsAvailableJni(nodeHandle)
 
             val passed = irohPeers >= 1 && blePeers >= 1 && quicPlatformReceived && bleAvailable
-            recordPhase(10, "Dual Transport Verified", passed,
+            recordPhase(11, "Dual Transport Verified", passed,
                 "iroh=$irohPeers, ble=$blePeers, quic_data=${if (quicPlatformReceived) "OK" else "MISSING"}")
         } catch (e: Throwable) {
-            recordPhase(10, "Dual Transport Verified", false, "${e.javaClass.simpleName}: ${e.message}")
+            recordPhase(11, "Dual Transport Verified", false, "${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
@@ -458,8 +482,8 @@ class TestRunner(
         }
     }
 
-    // Phase 11: Hold connection open so the remote peer can sync our published data
-    private fun phase11HoldForSync(): Boolean {
+    // Phase 12: Hold connection open so the remote peer can sync our published data
+    private fun phase12HoldForSync(): Boolean {
         return try {
             log("  Holding connection for remote peer sync (15s)...")
             // Stay connected so the Pi can receive our ANDROID-DUAL platform
@@ -470,15 +494,15 @@ class TestRunner(
                     log("  Sync hold... ${i}s, peers=$peers")
                 }
             }
-            recordPhase(11, "Sync Hold", true, "held connection 15s for remote sync")
+            recordPhase(12, "Sync Hold", true, "held connection 15s for remote sync")
         } catch (e: Throwable) {
-            recordPhase(11, "Sync Hold", false, "${e.javaClass.simpleName}: ${e.message}")
+            recordPhase(12, "Sync Hold", false, "${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
     // Cleanup (runs after all phases)
     private fun cleanupPhase() {
-        val phaseNum = if (isDualTransport) 12 else 8
+        val phaseNum = if (isDualTransport) 13 else 8
         log("Phase $phaseNum: Cleanup")
         try {
             bleClient?.disconnect()

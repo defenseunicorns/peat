@@ -17,6 +17,15 @@ android {
         ndk {
             abiFilters += listOf("arm64-v8a")
         }
+
+        buildConfigField("String", "GIT_BRANCH",
+            "\"${providers.exec { commandLine("git", "rev-parse", "--abbrev-ref", "HEAD") }.standardOutput.asText.get().trim()}\"")
+        buildConfigField("String", "GIT_COMMIT",
+            "\"${providers.exec { commandLine("git", "rev-parse", "--short", "HEAD") }.standardOutput.asText.get().trim()}\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
