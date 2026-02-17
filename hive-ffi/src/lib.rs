@@ -1115,7 +1115,8 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
 
                     // Derive a 32-bit BLE node ID from the Iroh endpoint's public key
                     // Use last 4 bytes of the 32-byte key for a unique-enough identifier
-                    let iroh_key_bytes = transport.endpoint_id().as_bytes();
+                    let iroh_endpoint_id = transport.endpoint_id();
+                    let iroh_key_bytes = iroh_endpoint_id.as_bytes();
                     let ble_node_id = hive_btle::NodeId::new(u32::from_be_bytes([
                         iroh_key_bytes[28],
                         iroh_key_bytes[29],
