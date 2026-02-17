@@ -543,6 +543,10 @@ start-dual-test-peer:
 	@echo "Starting dual_test_peer on $(BLE_TEST_PI)..."
 	@ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'pkill -x dual_test_peer 2>/dev/null || true'
 	@sleep 1
+	@echo "Resetting BLE adapter on $(BLE_TEST_PI) to clear stale state..."
+	@ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) \
+		'bluetoothctl power off 2>/dev/null; sleep 1; bluetoothctl power on 2>/dev/null; sleep 1'
+	@echo "✓ BLE adapter reset"
 	ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) \
 		'nohup ~/dual_test_peer > ~/dual_test_peer.log 2>&1 & echo $$!'
 	@sleep 3
@@ -552,6 +556,9 @@ start-dual-test-peer:
 stop-dual-test-peer:
 	@echo "Stopping dual_test_peer on $(BLE_TEST_PI)..."
 	@ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'pkill -x dual_test_peer 2>/dev/null && echo "✓ Stopped" || echo "Not running"'
+	@echo "Resetting BLE adapter on $(BLE_TEST_PI)..."
+	@ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) \
+		'bluetoothctl power off 2>/dev/null; sleep 1; bluetoothctl power on 2>/dev/null' || true
 
 # Full dual-transport test pipeline (single binary on Pi)
 dual-transport-test: deploy-dual-test-peer build-ble-test-app deploy-ble-test-app start-dual-test-peer
@@ -578,7 +585,11 @@ dual-transport-test: deploy-dual-test-peer build-ble-test-app deploy-ble-test-ap
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@adb shell am force-stop com.revolveteam.hive.test 2>/dev/null || true
 	@adb logcat -c 2>/dev/null || true
-	@sleep 1
+	@echo "Dropping parasitic BLE connections on $(BLE_TEST_PI) to free connection slots..."
+	@ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) \
+		'for addr in $$(hcitool con 2>/dev/null | grep "LE " | awk "{print \$$3}"); do \
+			bluetoothctl disconnect $$addr 2>/dev/null || true; \
+		done; echo "✓ BLE connections cleared"'
 	adb shell am start -n com.revolveteam.hive.test/.MainActivity \
 		--es quic_node_id "$(QUIC_NODE_ID)" \
 		--es quic_address "$(BLE_TEST_PI_IP):$(IROH_TEST_PORT)" \
