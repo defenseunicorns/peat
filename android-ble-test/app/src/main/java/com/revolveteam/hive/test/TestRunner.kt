@@ -131,6 +131,7 @@ class TestRunner(
         val total = results.size
         log("================================================")
         log("RESULT: $passed/$total PASSED")
+        log("  Run: $now  Build: $buildInfo")
         log("================================================")
 
         return results
