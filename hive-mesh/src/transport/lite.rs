@@ -1233,4 +1233,30 @@ mod tests {
         assert!(bridge.accepts_inbound("lite_sensors"));
         assert!(!bridge.accepts_inbound("lite_events")); // Not in list
     }
+
+    #[tokio::test]
+    async fn test_send_to_not_started() {
+        let transport = LiteMeshTransport::new(LiteTransportConfig::default(), 0x12345678);
+        let result =
+            MeshTransport::send_to(&transport, &NodeId::new("AABBCCDD".to_string()), b"hello")
+                .await;
+        assert!(matches!(result, Err(TransportError::NotStarted)));
+    }
+
+    #[tokio::test]
+    async fn test_send_to_unknown_peer() {
+        let config = LiteTransportConfig {
+            listen_port: 0, // OS-assigned port
+            ..Default::default()
+        };
+        let transport = LiteMeshTransport::new(config, 0x12345678);
+        transport.start().await.unwrap();
+
+        let result =
+            MeshTransport::send_to(&transport, &NodeId::new("AABBCCDD".to_string()), b"hello")
+                .await;
+        assert!(matches!(result, Err(TransportError::PeerNotFound(_))));
+
+        transport.stop().await.unwrap();
+    }
 }
