@@ -31,12 +31,13 @@ jobs:
         include:
           - target: aarch64-linux-android
             abi: arm64-v8a
+            cc: aarch64-linux-android24-clang
           - target: armv7-linux-androideabi
             abi: armeabi-v7a
+            cc: armv7a-linux-androideabi24-clang
           - target: x86_64-linux-android
             abi: x86_64
-          - target: i686-linux-android
-            abi: x86
+            cc: x86_64-linux-android24-clang
 
     steps:
       - uses: actions/checkout@v4
@@ -57,24 +58,26 @@ jobs:
           add-to-path: true
 
       - name: Configure cargo for Android
+        env:
+          NDK_TOOLCHAIN: ${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64
         run: |
+          # Add NDK toolchain bin to PATH so cc-rs can find {target}-clang
+          echo "${NDK_TOOLCHAIN}/bin" >> $GITHUB_PATH
+
           mkdir -p ~/.cargo
           cat >> ~/.cargo/config.toml << EOF
           [target.aarch64-linux-android]
-          linker = "${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
-          ar = "${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+          linker = "${NDK_TOOLCHAIN}/bin/aarch64-linux-android24-clang"
+          ar = "${NDK_TOOLCHAIN}/bin/llvm-ar"
 
           [target.armv7-linux-androideabi]
-          linker = "${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi24-clang"
-          ar = "${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+          linker = "${NDK_TOOLCHAIN}/bin/armv7a-linux-androideabi24-clang"
+          ar = "${NDK_TOOLCHAIN}/bin/llvm-ar"
 
           [target.x86_64-linux-android]
-          linker = "${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android24-clang"
-          ar = "${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+          linker = "${NDK_TOOLCHAIN}/bin/x86_64-linux-android24-clang"
+          ar = "${NDK_TOOLCHAIN}/bin/llvm-ar"
 
-          [target.i686-linux-android]
-          linker = "${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/i686-linux-android24-clang"
-          ar = "${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
           EOF
 
       - uses: Swatinem/rust-cache@v2
@@ -83,6 +86,9 @@ jobs:
           key: android-${{ matrix.target }}
 
       - name: Build hive-ffi for Android
+        env:
+          CC: ${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.cc }}
+          AR: ${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
         run: |
           cargo build -p hive-ffi --release --target ${{ matrix.target }}
 
@@ -101,8 +107,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install protobuf compiler
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler mold
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -148,14 +154,12 @@ jobs:
           mkdir -p android/jniLibs/arm64-v8a
           mkdir -p android/jniLibs/armeabi-v7a
           mkdir -p android/jniLibs/x86_64
-          mkdir -p android/jniLibs/x86
           mkdir -p android/kotlin
 
           # Copy native libraries
           cp artifacts/libhive_ffi-arm64-v8a/libhive_ffi.so android/jniLibs/arm64-v8a/
           cp artifacts/libhive_ffi-armeabi-v7a/libhive_ffi.so android/jniLibs/armeabi-v7a/
           cp artifacts/libhive_ffi-x86_64/libhive_ffi.so android/jniLibs/x86_64/
-          cp artifacts/libhive_ffi-x86/libhive_ffi.so android/jniLibs/x86/
 
           # Copy Kotlin bindings
           cp -r artifacts/kotlin-bindings/* android/kotlin/
