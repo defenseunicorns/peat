@@ -13,7 +13,6 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import com.revolveteam.hive.HiveBtle
-import com.revolveteam.hive.HiveChat
 import com.revolveteam.hive.HiveDocument
 import com.revolveteam.hive.HiveEventType
 import com.revolveteam.hive.HiveLocation
@@ -115,7 +114,6 @@ class HiveBleManager(
     private var peerEventCallback: ((HivePeer, HiveEventType) -> Unit)? = null
     private var documentSyncCallback: ((HiveDocument) -> Unit)? = null
     private var markerSyncCallback: ((HivePeer, HiveMarker) -> Unit)? = null
-    private var chatSyncCallback: ((HiveChat, HivePeer) -> Unit)? = null
     private var cannedMessageCallback: ((CannedMessageAckEventData) -> Unit)? = null
 
     // Storage for canned message documents (key = sourceNode:timestamp)
@@ -414,44 +412,11 @@ class HiveBleManager(
     }
 
     /**
-     * Set callback for chat sync events.
-     */
-    fun setChatSyncCallback(callback: ((HiveChat, HivePeer) -> Unit)?) {
-        chatSyncCallback = callback
-    }
-
-    /**
      * Set callback for canned message events.
      * Called when a canned message document is received and merged.
      */
     fun setCannedMessageCallback(callback: ((CannedMessageAckEventData) -> Unit)?) {
         cannedMessageCallback = callback
-    }
-
-    /**
-     * Send a chat message to all connected peers.
-     * @param sender Sender callsign (max 16 chars)
-     * @param message Message text (max 140 chars)
-     */
-    fun sendChat(sender: String, message: String) {
-        hiveBtle?.sendChat(sender, message)
-    }
-
-    /**
-     * Send a chat message to all connected peers.
-     * @param chat The chat message to send
-     */
-    fun sendChat(chat: HiveChat) {
-        hiveBtle?.sendChat(chat)
-    }
-
-    /**
-     * Get chat messages from the CRDT since a given timestamp.
-     * @param sinceTimestamp Only return messages newer than this timestamp (0 for all)
-     * @return List of HiveChat messages from the mesh CRDT
-     */
-    fun getChatMessagesSince(sinceTimestamp: Long): List<HiveChat> {
-        return hiveBtle?.getChatMessagesSince(sinceTimestamp) ?: emptyList()
     }
 
     // ========================================================================
@@ -628,13 +593,6 @@ class HiveBleManager(
             Log.i(TAG, "Marker synced from ${peer.displayName()}: ${marker.uid} " +
                     "type=${marker.type} at (${marker.lat}, ${marker.lon}) callsign=${marker.callsign}")
             markerSyncCallback?.invoke(peer, marker)
-        }
-    }
-
-    override fun onChatReceived(chat: HiveChat, fromPeer: HivePeer) {
-        mainHandler.post {
-            Log.d(TAG, "Chat received from ${fromPeer.displayName()}: ${chat.sender} says '${chat.message}'")
-            chatSyncCallback?.invoke(chat, fromPeer)
         }
     }
 

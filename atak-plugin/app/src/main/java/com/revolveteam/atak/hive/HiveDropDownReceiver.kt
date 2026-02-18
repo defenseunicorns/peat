@@ -25,7 +25,6 @@ import com.revolveteam.atak.hive.model.HivePlatform
 import com.revolveteam.atak.hive.model.HiveRole
 import com.revolveteam.atak.hive.model.HiveTrack
 import com.revolveteam.atak.hive.model.CommsQuality
-import com.revolveteam.hive.HiveChat
 import com.revolveteam.hive.HiveMarker
 import com.revolveteam.hive.HivePeer as BlePeer
 import uniffi.hive_lite_android.CannedMessageType
@@ -92,11 +91,6 @@ class HiveDropDownReceiver(
 
         // Register for marker received events
         mapComponent.onMarkerReceived = { _, _ ->
-            refreshContentOnMainThread()
-        }
-
-        // Register for chat received events
-        mapComponent.onChatReceived = { _, _ ->
             refreshContentOnMainThread()
         }
 
@@ -393,7 +387,6 @@ class HiveDropDownReceiver(
 
         // Canned Messages section (only in cell detail view)
         if (selectedCellId != null) {
-            val chatMessages = mapComponent.chatMessages
             val chatTitle = TextView(pluginContext).apply {
                 text = "Quick Messages"
                 textSize = 16f
@@ -404,32 +397,6 @@ class HiveDropDownReceiver(
 
             // Canned message buttons organized by category
             container.addView(createCannedMessageSection())
-            container.addView(createSpacer(16))
-
-            // Recent messages section
-            val recentTitle = TextView(pluginContext).apply {
-                text = "Recent (${chatMessages.size})"
-                textSize = 14f
-                setTextColor(Color.parseColor("#888888"))
-            }
-            container.addView(recentTitle)
-            container.addView(createSpacer(8))
-
-            // Chat messages (most recent at top)
-            if (chatMessages.isEmpty()) {
-                val noChat = TextView(pluginContext).apply {
-                    text = "No messages yet"
-                    textSize = 14f
-                    setTextColor(Color.GRAY)
-                }
-                container.addView(noChat)
-            } else {
-                // Show most recent first (reversed)
-                chatMessages.reversed().take(10).forEach { cachedChat ->
-                    container.addView(createChatMessageCard(cachedChat))
-                    container.addView(createSpacer(4))
-                }
-            }
 
             container.addView(createSpacer(24))
         }
@@ -597,7 +564,7 @@ class HiveDropDownReceiver(
 
         // Tap hint
         val tapHint = TextView(pluginContext).apply {
-            text = "Tap for chat + details →"
+            text = "Tap for messages + details →"
             textSize = 10f
             setTextColor(Color.parseColor("#666666"))
             gravity = Gravity.END
@@ -765,72 +732,6 @@ class HiveDropDownReceiver(
             cotType.startsWith("b-m-r") -> "Route"
             else -> cotType.take(10)
         }
-    }
-
-    private fun createChatMessageCard(cachedChat: HiveMapComponent.CachedChat): View {
-        val chat = cachedChat.chat
-        val isSelf = cachedChat.isSelf
-
-        val card = LinearLayout(pluginContext).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(if (isSelf) Color.parseColor("#1a3d1a") else Color.parseColor("#2d2d2d"))
-            setPadding(16, 12, 16, 12)
-        }
-
-        // Header row: sender + time
-        val headerRow = LinearLayout(pluginContext).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val senderText = TextView(pluginContext).apply {
-            text = chat.sender
-            textSize = 12f
-            setTextColor(if (isSelf) Color.parseColor("#8BC34A") else Color.parseColor("#64B5F6"))
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-        headerRow.addView(senderText)
-
-        val ageSec = (System.currentTimeMillis() - chat.timestamp) / 1000
-        val timeText = TextView(pluginContext).apply {
-            text = when {
-                ageSec < 60 -> "${ageSec}s"
-                ageSec < 3600 -> "${ageSec / 60}m"
-                else -> "${ageSec / 3600}h"
-            }
-            textSize = 10f
-            setTextColor(Color.parseColor("#666666"))
-        }
-        headerRow.addView(timeText)
-        card.addView(headerRow)
-
-        // Message text
-        val msgTextView = TextView(pluginContext).apply {
-            text = chat.message
-            textSize = 14f
-            setTextColor(Color.WHITE)
-        }
-        card.addView(msgTextView)
-
-        // ACK status row (for sent messages)
-        if (isSelf && cachedChat.acks.isNotEmpty()) {
-            val ackRow = LinearLayout(pluginContext).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.END or Gravity.CENTER_VERTICAL
-                setPadding(0, 4, 0, 0)
-            }
-
-            val ackNames = cachedChat.acks.joinToString(", ") { it.sender }
-            val ackText = TextView(pluginContext).apply {
-                text = "ACK: $ackNames"
-                textSize = 10f
-                setTextColor(Color.parseColor("#4CAF50"))  // Green for ACKs
-            }
-            ackRow.addView(ackText)
-            card.addView(ackRow)
-        }
-
-        return card
     }
 
     /**
