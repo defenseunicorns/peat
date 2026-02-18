@@ -19,7 +19,6 @@ import com.revolveteam.atak.hive.model.HiveTrack
 import com.revolveteam.atak.hive.overlay.HiveCellOverlay
 import com.revolveteam.atak.hive.overlay.HivePlatformOverlay
 import com.revolveteam.atak.hive.overlay.HiveTrackOverlay
-import com.revolveteam.hive.HiveChat
 import com.revolveteam.hive.HiveDocument
 import com.revolveteam.hive.HiveEventType
 import com.revolveteam.hive.HiveMarker
@@ -197,74 +196,6 @@ class HiveMapComponent : DropDownMapComponent() {
     /** Callback for when a marker is received (for UI/map display) */
     var onMarkerReceived: ((marker: HiveMarker, sourcePeer: HivePeer) -> Unit)? = null
 
-    /**
-     * ACK info for tracking who acknowledged a message.
-     */
-    data class ChatAck(
-        val sender: String,         // Callsign of the acker
-        val timestamp: Long         // When the ACK was sent
-    )
-
-    /**
-     * Chat message with ACK associations for UI display.
-     */
-    data class CachedChat(
-        val chat: HiveChat,
-        val isSelf: Boolean,        // True if sent by this device
-        val acks: List<ChatAck> = emptyList()
-    ) {
-        /** Get the message ID string for correlation (format: "XXXXXXXX:timestamp") */
-        fun messageId(): String = chat.messageIdString()
-    }
-
-    /**
-     * Get chat messages from the mesh CRDT with ACK associations.
-     * Returns messages sorted by timestamp, with ACKs associated to their parent messages.
-     */
-    val chatMessages: List<CachedChat>
-        get() {
-            val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager() ?: return emptyList()
-            val myNodeId = bleManager.getNodeId() ?: 0L
-
-            // Get all messages from CRDT
-            val allMessages = bleManager.getChatMessagesSince(0)
-
-            // Separate regular messages from ACK replies
-            val regularMessages = mutableListOf<HiveChat>()
-            val ackMessages = mutableListOf<HiveChat>()
-
-            for (msg in allMessages) {
-                val isAckReply = msg.isReply() && msg.message.equals("ACK", ignoreCase = true)
-                if (isAckReply) {
-                    ackMessages.add(msg)
-                } else {
-                    regularMessages.add(msg)
-                }
-            }
-
-            // Build ACK associations
-            val acksByMessageId = ackMessages.groupBy { it.replyToIdString() }
-
-            // Build CachedChat list with ACKs
-            return regularMessages
-                .sortedBy { it.timestamp }
-                .map { msg ->
-                    val messageId = msg.messageIdString()
-                    val acks = acksByMessageId[messageId]?.map { ack ->
-                        ChatAck(sender = ack.sender, timestamp = ack.timestamp)
-                    } ?: emptyList()
-
-                    CachedChat(
-                        chat = msg,
-                        isSelf = msg.originNode == myNodeId,
-                        acks = acks
-                    )
-                }
-        }
-
-    /** Callback for when a chat message is received (for UI refresh) */
-    var onChatReceived: ((chat: HiveChat, fromPeer: HivePeer) -> Unit)? = null
-
     private var _connectionStatus = ConnectionStatus.DISCONNECTED
     val connectionStatus: ConnectionStatus get() = _connectionStatus
 
@@ -330,9 +261,6 @@ class HiveMapComponent : DropDownMapComponent() {
 
         // Register BLE marker callback for mesh-synced map markers
         registerBleMarkerCallback()
-
-        // Register BLE chat callback for mesh chat messages
-        registerBleChatCallback()
 
         // Register observer for BLE peer connectivity changes to update cell composition immediately
         registerBlePeerConnectivityObserver()
@@ -505,25 +433,6 @@ class HiveMapComponent : DropDownMapComponent() {
     }
 
     /**
-     * Register callback for BLE chat messages.
-     */
-    private fun registerBleChatCallback() {
-        try {
-            val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
-            if (bleManager != null) {
-                bleManager.setChatSyncCallback { chat, fromPeer ->
-                    onBleChatReceived(chat, fromPeer)
-                }
-                Log.i(TAG, "BLE chat callback registered")
-            } else {
-                Log.w(TAG, "BLE manager not available for chat callback")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error registering BLE chat callback: ${e.message}", e)
-        }
-    }
-
-    /**
      * Register observer for BLE peer connectivity changes.
      * This triggers immediate cell composition updates when peers connect/disconnect,
      * ensuring cell capabilities reflect current operational state.
@@ -550,61 +459,6 @@ class HiveMapComponent : DropDownMapComponent() {
         } catch (e: Exception) {
             Log.e(TAG, "Error registering BLE connectivity observer: ${e.message}", e)
         }
-    }
-
-    /**
-     * Handle chat message received from BLE mesh peer.
-     * The CRDT handles storage and deduplication - we just notify the UI.
-     */
-    private fun onBleChatReceived(chat: HiveChat, fromPeer: HivePeer) {
-        refreshHandler.post {
-            Log.i(TAG, "Chat from ${fromPeer.displayName()}: '${chat.sender}' says '${chat.message}'")
-
-            // Notify UI to refresh (CRDT handles storage)
-            onChatReceived?.invoke(chat, fromPeer)
-        }
-    }
-
-    /**
-     * Send a chat message to all connected BLE mesh peers.
-     * The CRDT handles storage - message will appear in chatMessages after sync.
-     * @param message Message text (max 140 chars)
-     */
-    fun sendChat(message: String) {
-        val bleManager = HivePluginLifecycle.getInstance()?.getHiveBleManager()
-        if (bleManager == null) {
-            Log.w(TAG, "Cannot send chat - BLE manager not available")
-            return
-        }
-
-        val nodeId = bleManager.getNodeId()
-        if (nodeId == null || nodeId == 0L) {
-            Log.e(TAG, "Cannot send chat - mesh not initialized")
-            return
-        }
-
-        if (!bleManager.isRunning.value) {
-            Log.e(TAG, "Cannot send chat - mesh not running")
-            return
-        }
-
-        // Get callsign from self marker
-        val selfCallsign = mapView.selfMarker?.getMetaString("callsign", null)
-            ?: mapView.selfMarker?.title
-            ?: "ATAK"
-
-        // Create and send chat - CRDT handles storage and sync
-        val chat = HiveChat(
-            sender = selfCallsign,
-            message = message,
-            timestamp = System.currentTimeMillis(),
-            originNode = nodeId,
-            isBroadcast = true,
-            requiresAck = false
-        )
-
-        bleManager.sendChat(chat)
-        Log.i(TAG, "Sent chat: '$selfCallsign' says '$message'")
     }
 
     /**
