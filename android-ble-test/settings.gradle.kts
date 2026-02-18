@@ -11,6 +11,9 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        flatDir {
+            dirs("${rootDir}/../../hive-btle/android/build/outputs/aar")
+        }
     }
 }
 
