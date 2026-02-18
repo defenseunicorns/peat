@@ -7,7 +7,6 @@ members = [
     "hive-persistence",
     "hive-sim",
     "hive-discovery",
-    "hive-mesh",
     "hive-ffi",
     "hive-commander",
     "hive-inference",
@@ -25,6 +24,9 @@ license = "MIT"
 repository = "https://github.com/kitplummer/hive"
 
 [workspace.dependencies]
+# Mesh networking
+hive-mesh = "0.1.0"
+
 # BLE mesh transport (ADR-039)
 hive-btle = "0.1.2"
 
