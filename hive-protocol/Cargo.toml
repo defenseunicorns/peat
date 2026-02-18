@@ -9,7 +9,7 @@ repository.workspace = true
 [dependencies]
 # CAP dependencies
 hive-schema = { path = "../hive-schema" }
-hive-mesh = { path = "../hive-mesh" }
+hive-mesh = { workspace = true }
 
 # Ditto is optional - only needed for DittoBackend (not for CoT/FFI)
 dittolive-ditto = { workspace = true, optional = true }
