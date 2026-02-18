@@ -54,10 +54,14 @@ android {
 }
 
 dependencies {
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.22")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:2.2.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
     implementation("androidx.activity:activity-ktx:1.8.1")
+
+    // hive-btle UniFFI bindings (AAR includes libhive_btle.so + generated Kotlin)
+    implementation(":hive-release@aar")
+    implementation("net.java.dev.jna:jna:5.14.0@aar")
 }

@@ -74,12 +74,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkPermissions(): Boolean {
-        val perms = mutableListOf(
-            Manifest.permission.ACCESS_FINE_LOCATION
-        )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            perms.add(Manifest.permission.BLUETOOTH_SCAN)
-            perms.add(Manifest.permission.BLUETOOTH_CONNECT)
+        val perms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // Android 12+: BLE scan/connect only (neverForLocation in manifest)
+            listOf(
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT
+            )
+        } else {
+            listOf(Manifest.permission.ACCESS_FINE_LOCATION)
         }
         return perms.all {
             ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
@@ -87,14 +89,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestPermissions() {
-        val perms = mutableListOf(
-            Manifest.permission.ACCESS_FINE_LOCATION
-        )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            perms.add(Manifest.permission.BLUETOOTH_SCAN)
-            perms.add(Manifest.permission.BLUETOOTH_CONNECT)
+        val perms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT
+            )
+        } else {
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
         }
-        ActivityCompat.requestPermissions(this, perms.toTypedArray(), PERMISSION_REQUEST_CODE)
+        ActivityCompat.requestPermissions(this, perms, PERMISSION_REQUEST_CODE)
     }
 
     override fun onRequestPermissionsResult(
@@ -117,34 +120,54 @@ class MainActivity : AppCompatActivity() {
         tvLog.text = ""
         btnRun.isEnabled = false
 
-        // Accept QUIC peer info from intent extras (for dual-transport test)
-        val quicNodeId = intent.getStringExtra("quic_node_id")
-        val quicAddress = intent.getStringExtra("quic_address")
-
-        val runner = TestRunner(applicationContext, quicNodeId, quicAddress)
-        runner.setLogCallback { message, isError ->
+        // Shared log callback for both test suites
+        val logCb = { message: String, isError: Boolean ->
             runOnUiThread {
                 appendLog(message, isError)
             }
         }
 
+        // Accept QUIC peer info from intent extras (for dual-transport test)
+        val quicNodeId = intent.getStringExtra("quic_node_id")
+        val quicAddress = intent.getStringExtra("quic_address")
+
         lifecycleScope.launch {
             try {
-                val results = withContext(Dispatchers.IO) {
+                // --- UniFFI manager tests (pure logic, no BLE) ---
+                val uniffiTests = UniFFIManagerTests()
+                uniffiTests.setLogCallback(logCb)
+
+                val uniffiResults = withContext(Dispatchers.IO) {
+                    uniffiTests.runAll()
+                }
+
+                // --- BLE functional tests ---
+                val runner = TestRunner(applicationContext, quicNodeId, quicAddress)
+                runner.setLogCallback(logCb)
+
+                val bleResults = withContext(Dispatchers.IO) {
                     runner.runAll()
                 }
 
+                // --- Combined summary ---
                 withContext(Dispatchers.Main) {
-                    val passed = results.count { it.passed }
-                    val total = results.size
-                    val allPassed = passed == total
+                    val uniffiPassed = uniffiResults.count { it.passed }
+                    val uniffiTotal = uniffiResults.size
+                    val blePassed = bleResults.count { it.passed }
+                    val bleTotal = bleResults.size
+                    val totalPassed = uniffiPassed + blePassed
+                    val totalAll = uniffiTotal + bleTotal
+                    val allPassed = totalPassed == totalAll
 
                     appendLog("", false)
                     if (allPassed) {
-                        appendLog("ALL TESTS PASSED ($passed/$total)", false, Color.GREEN)
+                        appendLog("ALL TESTS PASSED ($totalPassed/$totalAll)", false, Color.GREEN)
                     } else {
-                        appendLog("TESTS FAILED ($passed/$total passed)", true)
-                        results.filter { !it.passed }.forEach {
+                        appendLog("TESTS FAILED ($totalPassed/$totalAll passed)", true)
+                        uniffiResults.filter { !it.passed }.forEach {
+                            appendLog("  FAILED: Phase ${it.phase} - ${it.name}: ${it.detail}", true)
+                        }
+                        bleResults.filter { !it.passed }.forEach {
                             appendLog("  FAILED: Phase ${it.phase} - ${it.name}: ${it.detail}", true)
                         }
                     }
