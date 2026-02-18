@@ -18,6 +18,7 @@
 //! │  │   hive-btle Position ←──────────→ TrackInfo document           ││
 //! │  │   hive-btle HealthStatus ←──────→ Platform health fields       ││
 //! │  │   hive-btle EmergencyEvent ←────→ Alert document               ││
+//! │  │   hive-btle CannedMessage ←─────→ CannedMessage document      ││
 //! │  │   hive-btle GCounter ←──────────→ Automerge counter            ││
 //! │  └─────────────────────────────────────────────────────────────────┘│
 //! │            ▲                                    ▲                   │
@@ -57,6 +58,8 @@ pub struct TranslationConfig {
     pub platforms_collection: String,
     /// Collection name for alerts/emergencies (default: "alerts")
     pub alerts_collection: String,
+    /// Collection name for canned messages (default: "canned_messages")
+    pub canned_messages_collection: String,
     /// Default classification for BLE-originated tracks
     pub default_classification: String,
     /// ID prefix for BLE-originated documents
@@ -69,6 +72,7 @@ impl Default for TranslationConfig {
             tracks_collection: "tracks".to_string(),
             platforms_collection: "platforms".to_string(),
             alerts_collection: "alerts".to_string(),
+            canned_messages_collection: "canned_messages".to_string(),
             default_classification: "a-f-G-U-C".to_string(), // Friendly ground unit
             ble_id_prefix: "ble-".to_string(),
         }
@@ -131,6 +135,62 @@ pub struct BleEmergencyEvent {
     pub timestamp: u64,
     /// ACK status for each known peer (node_id -> acked)
     pub acks: HashMap<u32, bool>,
+}
+
+/// BLE canned message (mirrors hive_lite::CannedMessageAckEvent)
+///
+/// Represents a pre-defined message from a WearTAK device, with ACK tracking.
+/// The ACK map uses OR-set CRDT semantics: each acker_node maps to its ack_timestamp.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BleCannedMessage {
+    /// Message code (0x00-0xFF, maps to hive-lite CannedMessage enum)
+    pub message_code: u8,
+    /// Human-readable message name
+    pub message_name: String,
+    /// Source node ID that sent this message
+    pub source_node: u32,
+    /// Target node (None for broadcast)
+    pub target_node: Option<u32>,
+    /// Timestamp when sent (ms since epoch)
+    pub timestamp: u64,
+    /// Sequence number for deduplication
+    pub sequence: u32,
+    /// ACK tracking: acker_node_id -> ack_timestamp (OR-set CRDT)
+    pub acks: HashMap<u32, u64>,
+}
+
+/// Map a hive-lite CannedMessage code to its human-readable name.
+///
+/// Covers all 20 defined codes from hive-lite v0.0.4 plus a fallback for unknown codes.
+pub fn message_name_from_code(code: u8) -> &'static str {
+    match code {
+        // Acknowledgments (0x00-0x0F)
+        0x00 => "Ack",
+        0x01 => "Ack Wilco",
+        0x02 => "Ack Negative",
+        0x03 => "Say Again",
+        // Status (0x10-0x1F)
+        0x10 => "Check In",
+        0x11 => "Moving",
+        0x12 => "Holding",
+        0x13 => "On Station",
+        0x14 => "Returning",
+        0x15 => "Complete",
+        // Alerts (0x20-0x2F)
+        0x20 => "Emergency",
+        0x21 => "Alert",
+        0x22 => "All Clear",
+        0x23 => "Contact",
+        0x24 => "Under Fire",
+        // Requests (0x30-0x3F)
+        0x30 => "Need Extract",
+        0x31 => "Need Support",
+        0x32 => "Need Medic",
+        0x33 => "Need Resupply",
+        // Reserved
+        0xFF => "Custom",
+        _ => "Unknown",
+    }
 }
 
 /// BLE peripheral data (mirrors hive_btle::Peripheral)
@@ -518,6 +578,120 @@ impl BleTranslator {
     }
 
     // =========================================================================
+    // CannedMessage <-> Document Translation
+    // =========================================================================
+
+    /// Convert BLE canned message to Automerge document JSON
+    ///
+    /// Convenience wrapper that does not set cell_id.
+    /// Use `canned_message_to_doc_in_cell` to include cell membership.
+    pub fn canned_message_to_doc(
+        &self,
+        message: &BleCannedMessage,
+        callsign: Option<&str>,
+    ) -> Value {
+        self.canned_message_to_doc_in_cell(message, callsign, None)
+    }
+
+    /// Convert BLE canned message to Automerge document JSON with cell membership
+    ///
+    /// The `mesh_id` parameter (from BLE mesh configuration) is used as the cell_id,
+    /// allowing BLE-originated canned messages to be associated with HIVE cells.
+    ///
+    /// # Arguments
+    /// * `message` - The BLE canned message data
+    /// * `callsign` - Optional callsign for the source
+    /// * `mesh_id` - Optional BLE mesh ID to use as cell_id
+    pub fn canned_message_to_doc_in_cell(
+        &self,
+        message: &BleCannedMessage,
+        callsign: Option<&str>,
+        mesh_id: Option<&str>,
+    ) -> Value {
+        let doc_id = format!(
+            "{}canned-{:08X}-{}",
+            self.config.ble_id_prefix, message.source_node, message.timestamp
+        );
+
+        let default_source = format!("{:08X}", message.source_node);
+        let source = callsign.unwrap_or(&default_source);
+
+        // Convert acks to JSON-friendly format (hex node IDs)
+        let acks: HashMap<String, u64> = message
+            .acks
+            .iter()
+            .map(|(k, v)| (format!("{:08X}", k), *v))
+            .collect();
+
+        let mut doc = json!({
+            "id": doc_id,
+            "type": "canned_message",
+            "message_code": message.message_code,
+            "message_name": message.message_name,
+            "source": source,
+            "source_node": format!("{:08X}", message.source_node),
+            "target_node": message.target_node.map(|n| format!("{:08X}", n)),
+            "timestamp": message.timestamp,
+            "sequence": message.sequence,
+            "acks": acks,
+            "ack_count": message.acks.len(),
+            "ble_origin": true
+        });
+
+        if let Some(cell_id) = mesh_id {
+            doc["cell_id"] = json!(cell_id);
+        }
+
+        doc
+    }
+
+    /// Extract BLE canned message from document JSON
+    ///
+    /// Returns None if the document doesn't have `type: "canned_message"`.
+    pub fn doc_to_canned_message(&self, doc: &Value) -> Option<BleCannedMessage> {
+        if doc.get("type").and_then(|v| v.as_str()) != Some("canned_message") {
+            return None;
+        }
+
+        let message_code = doc.get("message_code")?.as_u64()? as u8;
+
+        let source_node_str = doc.get("source_node")?.as_str()?;
+        let source_node = u32::from_str_radix(source_node_str.trim_start_matches("0x"), 16).ok()?;
+
+        let target_node = doc
+            .get("target_node")
+            .and_then(|v| v.as_str())
+            .and_then(|s| u32::from_str_radix(s.trim_start_matches("0x"), 16).ok());
+
+        let timestamp = doc.get("timestamp")?.as_u64()?;
+        let sequence = doc.get("sequence").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+
+        let acks: HashMap<u32, u64> = doc
+            .get("acks")
+            .and_then(|v| v.as_object())
+            .map(|obj| {
+                obj.iter()
+                    .filter_map(|(k, v)| {
+                        let node_id = u32::from_str_radix(k.trim_start_matches("0x"), 16).ok()?;
+                        let ts = v.as_u64()?;
+                        Some((node_id, ts))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        Some(BleCannedMessage {
+            message_code,
+            message_name: message_name_from_code(message_code).to_string(),
+            source_node,
+            target_node,
+            timestamp,
+            sequence,
+            acks,
+        })
+    }
+
+    // =========================================================================
     // Utility Methods
     // =========================================================================
 
@@ -556,6 +730,11 @@ impl BleTranslator {
     /// Get the collection name for alerts
     pub fn alerts_collection(&self) -> &str {
         &self.config.alerts_collection
+    }
+
+    /// Get the collection name for canned messages
+    pub fn canned_messages_collection(&self) -> &str {
+        &self.config.canned_messages_collection
     }
 }
 
@@ -759,5 +938,182 @@ mod tests {
         let platform = translator.peripheral_to_platform_in_cell(&peripheral, Some("ALPHA-SQUAD"));
         assert_eq!(platform["cell_id"], "ALPHA-SQUAD");
         assert_eq!(platform["ble_origin"], true);
+    }
+
+    // =========================================================================
+    // CannedMessage Translation Tests
+    // =========================================================================
+
+    fn test_canned_message() -> BleCannedMessage {
+        let mut acks = HashMap::new();
+        acks.insert(0xDEADBEEF, 1706234567000u64); // source auto-ack
+        acks.insert(0x11111111, 1706234568000u64); // peer ack
+
+        BleCannedMessage {
+            message_code: 0x20, // Emergency
+            message_name: "Emergency".to_string(),
+            source_node: 0xDEADBEEF,
+            target_node: None,
+            timestamp: 1706234567000,
+            sequence: 42,
+            acks,
+        }
+    }
+
+    #[test]
+    fn test_canned_message_to_doc_roundtrip() {
+        let translator = test_translator();
+        let original = test_canned_message();
+
+        let doc = translator.canned_message_to_doc(&original, Some("ALPHA-1"));
+        let recovered = translator.doc_to_canned_message(&doc).unwrap();
+
+        assert_eq!(recovered.message_code, original.message_code);
+        assert_eq!(recovered.message_name, "Emergency");
+        assert_eq!(recovered.source_node, original.source_node);
+        assert_eq!(recovered.target_node, original.target_node);
+        assert_eq!(recovered.timestamp, original.timestamp);
+        assert_eq!(recovered.sequence, original.sequence);
+        assert_eq!(recovered.acks.len(), original.acks.len());
+        assert_eq!(recovered.acks.get(&0x11111111), Some(&1706234568000u64));
+    }
+
+    #[test]
+    fn test_canned_message_fields() {
+        let translator = test_translator();
+        let msg = test_canned_message();
+
+        let doc = translator.canned_message_to_doc(&msg, Some("ALPHA-1"));
+
+        assert_eq!(doc["id"], "ble-canned-DEADBEEF-1706234567000");
+        assert_eq!(doc["type"], "canned_message");
+        assert_eq!(doc["message_code"], 0x20);
+        assert_eq!(doc["message_name"], "Emergency");
+        assert_eq!(doc["source"], "ALPHA-1");
+        assert_eq!(doc["source_node"], "DEADBEEF");
+        assert!(doc["target_node"].is_null());
+        assert_eq!(doc["timestamp"], 1706234567000u64);
+        assert_eq!(doc["sequence"], 42);
+        assert_eq!(doc["ack_count"], 2);
+        assert_eq!(doc["ble_origin"], true);
+    }
+
+    #[test]
+    fn test_canned_message_ack_map() {
+        let translator = test_translator();
+        let msg = test_canned_message();
+
+        let doc = translator.canned_message_to_doc(&msg, None);
+
+        // Verify hex-encoded ack keys survive the roundtrip
+        let acks_obj = doc["acks"].as_object().unwrap();
+        assert!(acks_obj.contains_key("DEADBEEF"));
+        assert!(acks_obj.contains_key("11111111"));
+        assert_eq!(acks_obj["11111111"], 1706234568000u64);
+
+        let recovered = translator.doc_to_canned_message(&doc).unwrap();
+        assert_eq!(recovered.acks.get(&0xDEADBEEF), Some(&1706234567000u64));
+        assert_eq!(recovered.acks.get(&0x11111111), Some(&1706234568000u64));
+    }
+
+    #[test]
+    fn test_canned_message_no_target() {
+        let translator = test_translator();
+        let msg = test_canned_message(); // target_node = None
+
+        let doc = translator.canned_message_to_doc(&msg, None);
+        assert!(doc["target_node"].is_null());
+
+        let recovered = translator.doc_to_canned_message(&doc).unwrap();
+        assert_eq!(recovered.target_node, None);
+
+        // Now test with a target
+        let mut directed = msg;
+        directed.target_node = Some(0xAABBCCDD);
+        let doc = translator.canned_message_to_doc(&directed, None);
+        assert_eq!(doc["target_node"], "AABBCCDD");
+
+        let recovered = translator.doc_to_canned_message(&doc).unwrap();
+        assert_eq!(recovered.target_node, Some(0xAABBCCDD));
+    }
+
+    #[test]
+    fn test_canned_message_with_cell_id() {
+        let translator = test_translator();
+        let msg = test_canned_message();
+
+        // Without mesh_id - no cell_id
+        let doc = translator.canned_message_to_doc(&msg, None);
+        assert!(doc.get("cell_id").is_none());
+
+        // With mesh_id - cell_id set
+        let doc = translator.canned_message_to_doc_in_cell(&msg, None, Some("SQUAD-A"));
+        assert_eq!(doc["cell_id"], "SQUAD-A");
+    }
+
+    #[test]
+    fn test_canned_message_name_from_code() {
+        // Acknowledgments
+        assert_eq!(message_name_from_code(0x00), "Ack");
+        assert_eq!(message_name_from_code(0x01), "Ack Wilco");
+        assert_eq!(message_name_from_code(0x02), "Ack Negative");
+        assert_eq!(message_name_from_code(0x03), "Say Again");
+        // Status
+        assert_eq!(message_name_from_code(0x10), "Check In");
+        assert_eq!(message_name_from_code(0x11), "Moving");
+        assert_eq!(message_name_from_code(0x12), "Holding");
+        assert_eq!(message_name_from_code(0x13), "On Station");
+        assert_eq!(message_name_from_code(0x14), "Returning");
+        assert_eq!(message_name_from_code(0x15), "Complete");
+        // Alerts
+        assert_eq!(message_name_from_code(0x20), "Emergency");
+        assert_eq!(message_name_from_code(0x21), "Alert");
+        assert_eq!(message_name_from_code(0x22), "All Clear");
+        assert_eq!(message_name_from_code(0x23), "Contact");
+        assert_eq!(message_name_from_code(0x24), "Under Fire");
+        // Requests
+        assert_eq!(message_name_from_code(0x30), "Need Extract");
+        assert_eq!(message_name_from_code(0x31), "Need Support");
+        assert_eq!(message_name_from_code(0x32), "Need Medic");
+        assert_eq!(message_name_from_code(0x33), "Need Resupply");
+        // Reserved
+        assert_eq!(message_name_from_code(0xFF), "Custom");
+        // Unknown fallback
+        assert_eq!(message_name_from_code(0x99), "Unknown");
+        assert_eq!(message_name_from_code(0x04), "Unknown");
+    }
+
+    #[test]
+    fn test_canned_message_wrong_type() {
+        let translator = test_translator();
+
+        // Emergency alert doc should NOT parse as canned message
+        let emergency = BleEmergencyEvent {
+            source_node: 0xDEADBEEF,
+            timestamp: 1700000000000,
+            acks: HashMap::new(),
+        };
+        let alert_doc = translator.emergency_to_alert(&emergency, Some("ALPHA-1"));
+        assert!(translator.doc_to_canned_message(&alert_doc).is_none());
+
+        // Doc with no type field
+        let no_type = json!({"message_code": 0x10, "source_node": "DEADBEEF"});
+        assert!(translator.doc_to_canned_message(&no_type).is_none());
+
+        // Doc with wrong type
+        let wrong_type = json!({"type": "track", "message_code": 0x10});
+        assert!(translator.doc_to_canned_message(&wrong_type).is_none());
+    }
+
+    #[test]
+    fn test_canned_message_accessor() {
+        let translator = test_translator();
+        assert_eq!(translator.canned_messages_collection(), "canned_messages");
+
+        let custom = BleTranslator::new(TranslationConfig {
+            canned_messages_collection: "my_messages".to_string(),
+            ..TranslationConfig::default()
+        });
+        assert_eq!(custom.canned_messages_collection(), "my_messages");
     }
 }
