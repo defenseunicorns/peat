@@ -3,9 +3,9 @@ name = "hive-transport"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-authors = ["Kit Plummer <kitplummer@gmail.com>"]
-description = "HTTP/REST API transport layer for CAP Protocol external integration"
-repository = "https://github.com/kitplummer/cap"
+authors.workspace = true
+description = "HTTP/REST API transport layer for HIVE Protocol external integration"
+repository.workspace = true
 
 [dependencies]
 # CAP dependencies
