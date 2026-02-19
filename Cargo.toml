@@ -25,7 +25,7 @@ exclude = ["hive-lite", "examples/m5stack-core2-hive"]
 version = "0.1.0"
 edition = "2021"
 authors = ["Kit Plummer <kit@revolveteam.com>"]
-license = "MIT"
+license = "Apache-2.0"
 repository = "https://github.com/kitplummer/hive"
 
 [workspace.dependencies]
