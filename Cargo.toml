@@ -7,7 +7,6 @@ members = [
     "hive-persistence",
     "hive-sim",
     "hive-discovery",
-    "hive-mesh",
     "hive-ffi",
     "hive-commander",
     "hive-inference",
@@ -17,6 +16,11 @@ members = [
 # hive-lite and ESP32 examples are excluded because they require ESP32 toolchain
 exclude = ["hive-lite", "examples/m5stack-core2-hive"]
 
+# For local development, uncomment to use local checkouts:
+# [patch.crates-io]
+# hive-mesh = { path = "../hive-mesh" }
+# hive-btle = { path = "../hive-btle" }
+
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
@@ -25,6 +29,9 @@ license = "MIT"
 repository = "https://github.com/kitplummer/hive"
 
 [workspace.dependencies]
+# Mesh networking
+hive-mesh = "0.1.0"
+
 # BLE mesh transport (ADR-039)
 hive-btle = "0.1.2"
 

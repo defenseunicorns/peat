@@ -10,7 +10,7 @@ repository.workspace = true
 automerge-backend = ["hive-protocol/automerge-backend"]
 
 [dependencies]
-hive-mesh = { path = "../hive-mesh" }
+hive-mesh = { workspace = true }
 hive-protocol = { path = "../hive-protocol" }
 hive-schema = { path = "../hive-schema" }
 tokio = { workspace = true }

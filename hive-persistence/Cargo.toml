@@ -11,7 +11,7 @@ repository = "https://github.com/kitplummer/cap"
 # CAP dependencies
 hive-schema = { path = "../hive-schema" }
 hive-protocol = { path = "../hive-protocol" }
-hive-mesh = { path = "../hive-mesh" }
+hive-mesh = { workspace = true }
 
 # Async runtime
 tokio = { workspace = true, features = ["full"] }
