@@ -17,8 +17,8 @@ members = [
 exclude = ["hive-lite", "examples/m5stack-core2-hive"]
 
 # For local development, uncomment to use local checkouts:
-# [patch.crates-io]
-# hive-mesh = { path = "../hive-mesh" }
+[patch.crates-io]
+hive-mesh = { path = "../hive-mesh" }
 # hive-btle = { path = "../hive-btle" }
 
 [workspace.package]

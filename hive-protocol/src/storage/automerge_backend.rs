@@ -84,6 +84,8 @@ use crate::network::iroh_transport::IrohTransport;
 #[cfg(feature = "automerge-backend")]
 use anyhow::Result;
 #[cfg(feature = "automerge-backend")]
+use hive_mesh::storage::sync_transport::SyncTransport;
+#[cfg(feature = "automerge-backend")]
 use iroh::EndpointId;
 #[cfg(feature = "automerge-backend")]
 use prost::Message as ProstMessage;
@@ -118,8 +120,10 @@ pub struct AutomergeBackend {
     store: Arc<AutomergeStore>,
     /// Cache of known collection names
     collections: Arc<RwLock<HashMap<String, Arc<dyn Collection>>>>,
-    /// Optional Iroh transport for P2P sync (Phase 5)
-    transport: Option<Arc<IrohTransport>>,
+    /// Optional Iroh transport for P2P sync (Phase 5) — concrete type for protocol-specific features
+    iroh_transport: Option<Arc<IrohTransport>>,
+    /// Transport as trait object for sync coordinator
+    transport: Option<Arc<dyn SyncTransport>>,
     /// Optional sync coordinator (Phase 5)
     sync_coordinator: Option<Arc<AutomergeSyncCoordinator>>,
     /// Sync state tracking
@@ -168,6 +172,7 @@ impl AutomergeBackend {
         Self {
             store,
             collections: Arc::new(RwLock::new(HashMap::new())),
+            iroh_transport: None,
             transport: None,
             sync_coordinator: None,
             sync_active: Arc::new(AtomicBool::new(false)),
@@ -202,15 +207,18 @@ impl AutomergeBackend {
     /// let backend = AutomergeBackend::with_transport(store, transport);
     /// ```
     pub fn with_transport(store: Arc<AutomergeStore>, transport: Arc<IrohTransport>) -> Self {
+        let transport_trait: Arc<dyn SyncTransport> =
+            Arc::clone(&transport) as Arc<dyn SyncTransport>;
         let coordinator = Arc::new(AutomergeSyncCoordinator::new(
             Arc::clone(&store),
-            Arc::clone(&transport),
+            Arc::clone(&transport_trait),
         ));
 
         Self {
             store,
             collections: Arc::new(RwLock::new(HashMap::new())),
-            transport: Some(transport),
+            iroh_transport: Some(transport),
+            transport: Some(transport_trait),
             sync_coordinator: Some(coordinator),
             sync_active: Arc::new(AtomicBool::new(false)),
             bytes_sent: Arc::new(AtomicU64::new(0)),
@@ -256,7 +264,7 @@ impl AutomergeBackend {
     /// The function is idempotent - if a handler already exists for this peer, it does nothing.
     fn spawn_sync_handler_for_peer(
         peer_id: EndpointId,
-        transport: &Arc<IrohTransport>,
+        transport: &Arc<dyn SyncTransport>,
         coordinator: &Arc<AutomergeSyncCoordinator>,
         sync_active: &Arc<AtomicBool>,
         active_handlers: &Arc<RwLock<HashSet<EndpointId>>>,
@@ -546,7 +554,7 @@ impl SyncCapable for AutomergeBackend {
         }
 
         // Phase 6.1: Start accept loop to receive incoming connections
-        if let Some(transport) = &self.transport {
+        if let Some(transport) = &self.iroh_transport {
             // Only start if not already running (may have been started by initialize())
             if !transport.is_accept_loop_running() {
                 transport.start_accept_loop()?;
@@ -578,6 +586,7 @@ impl SyncCapable for AutomergeBackend {
         // Issue #346: Use event-based handler spawning to avoid race conditions.
         // Previously, we only polled every 100ms which could miss sync messages
         // sent immediately after connection establishment.
+        let iroh_for_events = self.iroh_transport.clone().unwrap();
         let transport = self.transport.clone().unwrap();
         let coordinator = self.sync_coordinator.clone().unwrap();
         let sync_active = Arc::clone(&self.sync_active);
@@ -587,7 +596,7 @@ impl SyncCapable for AutomergeBackend {
         // Subscribe to connection events and spawn handlers IMMEDIATELY when peers connect.
         // This eliminates the race condition where sync messages arrive before the
         // polling-based handler has a chance to run.
-        let transport_events = transport.subscribe_peer_events();
+        let transport_events = iroh_for_events.subscribe_peer_events();
         let transport_for_events = Arc::clone(&transport);
         let coordinator_for_events = Arc::clone(&coordinator);
         let sync_active_for_events = Arc::clone(&sync_active);
@@ -999,7 +1008,7 @@ impl SyncCapable for AutomergeBackend {
         // state. The reconnection manager handles automatic reconnection.
         let recycle_interval = crate::network::iroh_transport::CONNECTION_RECYCLE_INTERVAL_SECS;
         if recycle_interval > 0 {
-            let transport_for_recycle = self.transport.clone().unwrap();
+            let transport_for_recycle = self.iroh_transport.clone().unwrap();
             let sync_active_recycle = Arc::clone(&self.sync_active);
 
             tokio::spawn(async move {
@@ -1040,7 +1049,7 @@ impl SyncCapable for AutomergeBackend {
         }
 
         // Phase 6.1: Stop accept loop
-        if let Some(transport) = &self.transport {
+        if let Some(transport) = &self.iroh_transport {
             // Ignore error if accept loop already stopped
             let _ = transport.stop_accept_loop();
         }
@@ -1059,7 +1068,11 @@ impl SyncCapable for AutomergeBackend {
     }
 
     fn sync_stats(&self) -> Result<SyncStats> {
-        let peer_count = self.transport.as_ref().map(|t| t.peer_count()).unwrap_or(0);
+        let peer_count = self
+            .iroh_transport
+            .as_ref()
+            .map(|t| t.peer_count())
+            .unwrap_or(0);
 
         // Get statistics from sync coordinator if available
         let (bytes_sent, bytes_received, last_sync) =

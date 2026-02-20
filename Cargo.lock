@@ -2846,8 +2846,6 @@ dependencies = [
 [[package]]
 name = "hive-mesh"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53f2c72df7986d97922b57c3ba656b68f1ce70152c232694799778fcd8ec8bc0"
 dependencies = [
  "anyhow",
  "async-trait",

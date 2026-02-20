@@ -326,6 +326,60 @@ impl HierarchicalRouter {
     }
 }
 
+// Implement SyncRouter trait for HierarchicalRouter (hive-mesh abstraction)
+#[cfg(feature = "automerge-backend")]
+#[async_trait::async_trait]
+impl hive_mesh::storage::sync_transport::SyncRouter for HierarchicalRouter {
+    async fn get_targets(
+        &self,
+        direction: hive_mesh::storage::automerge_sync::SyncDirection,
+        connected: &[iroh::EndpointId],
+    ) -> Vec<iroh::EndpointId> {
+        use hive_mesh::storage::automerge_sync::SyncDirection;
+
+        match direction {
+            SyncDirection::Broadcast => connected.to_vec(),
+            SyncDirection::Lateral => {
+                let valid = self.valid_targets().await;
+                let has_cell_peers = valid.iter().any(|t| !t.starts_with("zone:"));
+                if has_cell_peers {
+                    connected.to_vec()
+                } else {
+                    connected.to_vec()
+                }
+            }
+            SyncDirection::Upward => {
+                if self.is_leader().await {
+                    let valid = self.valid_targets().await;
+                    let has_zone_targets = valid.iter().any(|t| t.starts_with("zone:"));
+                    if has_zone_targets {
+                        tracing::debug!("Upward sync from leader - zone sync not yet implemented");
+                        Vec::new()
+                    } else {
+                        connected.to_vec()
+                    }
+                } else {
+                    connected.to_vec()
+                }
+            }
+            SyncDirection::Downward => {
+                if self.is_leader().await {
+                    connected.to_vec()
+                } else {
+                    tracing::debug!(
+                        "Non-leader ignoring downward sync (commands flow from leader)"
+                    );
+                    Vec::new()
+                }
+            }
+        }
+    }
+
+    async fn is_leader(&self) -> bool {
+        self.is_leader().await
+    }
+}
+
 /// Statistics about the router's current state
 #[derive(Debug, Clone)]
 pub struct RouterStats {

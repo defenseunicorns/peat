@@ -1533,6 +1533,19 @@ impl IrohTransport {
     }
 }
 
+// Implement SyncTransport trait for IrohTransport (hive-mesh abstraction)
+#[cfg(feature = "automerge-backend")]
+#[async_trait::async_trait]
+impl hive_mesh::storage::sync_transport::SyncTransport for IrohTransport {
+    fn get_connection(&self, peer_id: &EndpointId) -> Option<Connection> {
+        self.get_connection(peer_id)
+    }
+
+    fn connected_peers(&self) -> Vec<EndpointId> {
+        self.connected_peers()
+    }
+}
+
 #[cfg(all(test, feature = "automerge-backend"))]
 mod tests {
     use super::*;
