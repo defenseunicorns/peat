@@ -371,7 +371,7 @@ class TestRunner(
         }
     }
 
-    // Phase 9: Poll for PI-QUIC platform from rpi-ci2 (up to 30s)
+    // Phase 9: Poll for PI-DUAL platform from rpi-ci (up to 30s)
     private fun phase9QuicDataReceived(): Boolean {
         return try {
             var found = false
@@ -384,7 +384,7 @@ class TestRunner(
                     for (j in 0 until arr.length()) {
                         val p = arr.getJSONObject(j)
                         val name = p.optString("name", "")
-                        if (name == "PI-QUIC" || p.optString("id", "") == "pi-quic-test") {
+                        if (name == "PI-DUAL" || name == "PI-QUIC" || p.optString("id", "") == "pi-quic-test") {
                             found = true
                             platformName = name
                             break
@@ -399,7 +399,7 @@ class TestRunner(
             quicPlatformReceived = found
             recordPhase(9, "QUIC Data Received", found,
                 if (found) "platform \"$platformName\" via QUIC/mDNS"
-                else "PI-QUIC platform not received within 30s")
+                else "PI-DUAL platform not received within 30s")
         } catch (e: Throwable) {
             recordPhase(9, "QUIC Data Received", false, "${e.javaClass.simpleName}: ${e.message}")
         }
