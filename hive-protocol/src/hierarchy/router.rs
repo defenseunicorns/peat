@@ -340,13 +340,8 @@ impl hive_mesh::storage::sync_transport::SyncRouter for HierarchicalRouter {
         match direction {
             SyncDirection::Broadcast => connected.to_vec(),
             SyncDirection::Lateral => {
-                let valid = self.valid_targets().await;
-                let has_cell_peers = valid.iter().any(|t| !t.starts_with("zone:"));
-                if has_cell_peers {
-                    connected.to_vec()
-                } else {
-                    connected.to_vec()
-                }
+                // TODO: filter to cell peers once zone routing is implemented
+                connected.to_vec()
             }
             SyncDirection::Upward => {
                 if self.is_leader().await {
