@@ -24,12 +24,16 @@ esp_bootloader_esp_idf::esp_app_desc!();
 // Import HIVE-Lite
 use hive_lite::prelude::*;
 
+// OTA support
+#[cfg(feature = "ota")]
+use hive_lite::ota::{OtaReceiver, OtaState, ota_error_to_result_code};
+
 // WiFi credentials from environment at compile time
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PWD");
 
-// UDP broadcast port for HIVE mesh
-const HIVE_UDP_PORT: u16 = 5555;
+// UDP port — canonical value from the shared protocol crate.
+use hive_lite_protocol::DEFAULT_PORT as HIVE_UDP_PORT;
 
 // Display support
 #[cfg(feature = "m5stack-core2")]
@@ -415,6 +419,11 @@ fn main() -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
+    // Boot validation check — must run early, before any network activity.
+    // If a pending OTA update has exceeded max boot attempts, this rolls back and reboots.
+    #[cfg(feature = "ota")]
+    hive_lite::ota::boot_validation_check();
+
     esp_println::println!("========================================");
     esp_println::println!("  HIVE-Lite v{} (WiFi)", env!("CARGO_PKG_VERSION"));
     esp_println::println!("  Protocol version: {}", PROTOCOL_VERSION);
@@ -702,6 +711,12 @@ fn main() -> ! {
     #[cfg(feature = "m5stack-core2")]
     let mut current_battery: u8 = 0;
 
+    // OTA receiver state
+    #[cfg(feature = "ota")]
+    let mut ota_receiver = OtaReceiver::new();
+    #[cfg(feature = "ota")]
+    let mut ota_last_progress: u8 = 0;
+
     esp_println::println!("Node ID: 0x{:08X}", node_id);
     esp_println::println!("Capabilities: {:?}", capabilities);
 
@@ -734,6 +749,11 @@ fn main() -> ! {
         if let Ok(len) = announce_msg.encode(&mut pkt_buf) {
             let _ = udp_socket.send(broadcast_addr.into(), HIVE_UDP_PORT, &pkt_buf[..len]);
             esp_println::println!("[TX] ANNOUNCE sent ({} bytes)", len);
+
+            // First successful announce TX — mark firmware as validated.
+            // This clears the pending validation record so rollback won't trigger.
+            #[cfg(feature = "ota")]
+            hive_lite::ota::ota_mark_validated();
         }
     }
 
@@ -1049,6 +1069,158 @@ fn main() -> ! {
                         MessageType::Heartbeat => {
                             // Suppress heartbeat logging to reduce noise
                             // esp_println::println!("[RX] HEARTBEAT from {:08X}", msg.node_id);
+                        }
+                        #[cfg(feature = "ota")]
+                        MessageType::OtaOffer => {
+                            esp_println::println!("[OTA] Offer received from {:08X}", msg.node_id);
+                            match ota_receiver.handle_offer(&msg.payload) {
+                                Ok(session_id) => {
+                                    // Send OtaAccept
+                                    let accept = Message::ota_accept(node_id, session_id, 0);
+                                    let mut pkt_buf = [0u8; MAX_PACKET_SIZE];
+                                    if let Ok(len) = accept.encode(&mut pkt_buf) {
+                                        let _ = udp_socket.send(src_ip.into(), HIVE_UDP_PORT, &pkt_buf[..len]);
+                                        esp_println::println!("[OTA] Accept sent for session {}", session_id);
+                                    }
+                                    ota_last_progress = 0;
+
+                                    // Show OTA banner on display
+                                    #[cfg(feature = "m5stack-core2")]
+                                    {
+                                        let alert_style = MonoTextStyle::new(&FONT_9X15_BOLD, Rgb565::WHITE);
+                                        Rectangle::new(Point::new(0, 200), Size::new(320, 40))
+                                            .into_styled(PrimitiveStyle::with_fill(Rgb565::new(0, 0, 31))) // Blue
+                                            .draw(&mut display)
+                                            .unwrap();
+                                        let ver = ota_receiver.offer.as_ref()
+                                            .map(|o| o.version_str())
+                                            .unwrap_or("???");
+                                        let mut buf = heapless::String::<48>::new();
+                                        let _ = core::write!(buf, "OTA: {} 0%", ver);
+                                        Text::new(&buf, Point::new(30, 225), alert_style)
+                                            .draw(&mut display)
+                                            .unwrap();
+                                    }
+                                }
+                                Err(e) => {
+                                    esp_println::println!("[OTA] Offer rejected: {:?}", e);
+                                    // Send OtaResult with rejection code so sender knows why
+                                    let result_code = ota_error_to_result_code(&e);
+                                    let result_msg = Message::ota_result(node_id, 0, result_code);
+                                    let mut pkt_buf = [0u8; MAX_PACKET_SIZE];
+                                    if let Ok(len) = result_msg.encode(&mut pkt_buf) {
+                                        let _ = udp_socket.send(src_ip.into(), HIVE_UDP_PORT, &pkt_buf[..len]);
+                                    }
+                                }
+                            }
+                        }
+                        #[cfg(feature = "ota")]
+                        MessageType::OtaData => {
+                            match ota_receiver.handle_data(&msg.payload) {
+                                Ok(chunk_num) => {
+                                    // Send OtaAck
+                                    let ack = Message::ota_ack(node_id, ota_receiver.session_id, chunk_num);
+                                    let mut pkt_buf = [0u8; MAX_PACKET_SIZE];
+                                    if let Ok(len) = ack.encode(&mut pkt_buf) {
+                                        let _ = udp_socket.send(src_ip.into(), HIVE_UDP_PORT, &pkt_buf[..len]);
+                                    }
+
+                                    // Update progress display every 5%
+                                    let progress = ota_receiver.progress_percent();
+                                    if progress >= ota_last_progress + 5 || progress == 100 {
+                                        ota_last_progress = progress;
+                                        esp_println::println!("[OTA] Progress: {}% ({}/{})",
+                                            progress, ota_receiver.chunks_received,
+                                            ota_receiver.offer.as_ref().map(|o| o.total_chunks).unwrap_or(0));
+
+                                        #[cfg(feature = "m5stack-core2")]
+                                        {
+                                            let alert_style = MonoTextStyle::new(&FONT_9X15_BOLD, Rgb565::WHITE);
+                                            Rectangle::new(Point::new(0, 200), Size::new(320, 40))
+                                                .into_styled(PrimitiveStyle::with_fill(Rgb565::new(0, 0, 31)))
+                                                .draw(&mut display)
+                                                .unwrap();
+                                            // Progress bar
+                                            let bar_width = (progress as u32 * 280) / 100;
+                                            Rectangle::new(Point::new(20, 230), Size::new(bar_width, 6))
+                                                .into_styled(PrimitiveStyle::with_fill(Rgb565::new(0, 63, 0)))
+                                                .draw(&mut display)
+                                                .unwrap();
+                                            let ver = ota_receiver.offer.as_ref()
+                                                .map(|o| o.version_str())
+                                                .unwrap_or("???");
+                                            let mut buf = heapless::String::<48>::new();
+                                            let _ = core::write!(buf, "OTA: {} {}%", ver, progress);
+                                            Text::new(&buf, Point::new(30, 220), alert_style)
+                                                .draw(&mut display)
+                                                .unwrap();
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    esp_println::println!("[OTA] Data error: {:?}", e);
+                                    // Send abort
+                                    let abort = Message::ota_abort(node_id, ota_receiver.session_id, 0x02);
+                                    let mut pkt_buf = [0u8; MAX_PACKET_SIZE];
+                                    if let Ok(len) = abort.encode(&mut pkt_buf) {
+                                        let _ = udp_socket.send(src_ip.into(), HIVE_UDP_PORT, &pkt_buf[..len]);
+                                    }
+                                    ota_receiver.reset();
+                                }
+                            }
+                        }
+                        #[cfg(feature = "ota")]
+                        MessageType::OtaComplete => {
+                            let result_code = ota_receiver.handle_complete(&msg.payload);
+                            // Send OtaResult
+                            let result_msg = Message::ota_result(node_id, ota_receiver.session_id, result_code);
+                            let mut pkt_buf = [0u8; MAX_PACKET_SIZE];
+                            if let Ok(len) = result_msg.encode(&mut pkt_buf) {
+                                let _ = udp_socket.send(src_ip.into(), HIVE_UDP_PORT, &pkt_buf[..len]);
+                            }
+
+                            if ota_receiver.state == OtaState::ReadyToReboot {
+                                esp_println::println!("[OTA] SUCCESS! Rebooting in 2 seconds...");
+
+                                #[cfg(feature = "m5stack-core2")]
+                                {
+                                    let alert_style = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
+                                    Rectangle::new(Point::new(0, 200), Size::new(320, 40))
+                                        .into_styled(PrimitiveStyle::with_fill(Rgb565::new(0, 63, 0)))
+                                        .draw(&mut display)
+                                        .unwrap();
+                                    Text::new("OTA Complete! Rebooting...", Point::new(20, 225), alert_style)
+                                        .draw(&mut display)
+                                        .unwrap();
+                                }
+
+                                // Brief delay to let the result message send
+                                let reboot_start = Instant::now();
+                                while reboot_start.elapsed() < Duration::from_secs(2) {
+                                    stack.work();
+                                }
+
+                                esp_hal::system::software_reset();
+                            } else {
+                                esp_println::println!("[OTA] Update failed: result_code={}", result_code);
+                                ota_receiver.reset();
+                            }
+                        }
+                        #[cfg(feature = "ota")]
+                        MessageType::OtaAbort => {
+                            ota_receiver.handle_abort(&msg.payload);
+
+                            #[cfg(feature = "m5stack-core2")]
+                            {
+                                let alert_style = MonoTextStyle::new(&FONT_9X15_BOLD, Rgb565::WHITE);
+                                Rectangle::new(Point::new(0, 200), Size::new(320, 40))
+                                    .into_styled(PrimitiveStyle::with_fill(Rgb565::new(31, 0, 0)))
+                                    .draw(&mut display)
+                                    .unwrap();
+                                Text::new("OTA Aborted", Point::new(100, 225), alert_style)
+                                    .draw(&mut display)
+                                    .unwrap();
+                            }
                         }
                         _ => {}
                     }
