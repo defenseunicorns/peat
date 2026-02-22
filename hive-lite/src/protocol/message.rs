@@ -3,46 +3,11 @@
 //! Compact binary message format for gossip protocol.
 
 use super::capabilities::NodeCapabilities;
-use super::{MAGIC, PROTOCOL_VERSION};
+use hive_lite_protocol::{Header, decode_header, encode_header, HEADER_SIZE, MAX_PAYLOAD_SIZE};
 use heapless::Vec;
 
-/// Maximum packet size (fits in single UDP datagram)
-pub const MAX_PACKET_SIZE: usize = 512;
-
-/// Maximum payload size (packet - header)
-pub const MAX_PAYLOAD_SIZE: usize = MAX_PACKET_SIZE - 16;
-
-/// Message types for the gossip protocol
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum MessageType {
-    /// Announce presence and capabilities
-    Announce = 0x01,
-    /// Heartbeat / keep-alive
-    Heartbeat = 0x02,
-    /// Data update (CRDT state)
-    Data = 0x03,
-    /// Query for specific state
-    Query = 0x04,
-    /// Acknowledge receipt
-    Ack = 0x05,
-    /// Leave notification
-    Leave = 0x06,
-}
-
-impl MessageType {
-    pub fn from_u8(v: u8) -> Option<Self> {
-        match v {
-            0x01 => Some(Self::Announce),
-            0x02 => Some(Self::Heartbeat),
-            0x03 => Some(Self::Data),
-            0x04 => Some(Self::Query),
-            0x05 => Some(Self::Ack),
-            0x06 => Some(Self::Leave),
-            _ => None,
-        }
-    }
-}
+// Re-export shared types so existing `use super::message::*` keeps working.
+pub use hive_lite_protocol::{CrdtType, MAX_PACKET_SIZE, MessageError, MessageType};
 
 /// Protocol message
 ///
@@ -104,95 +69,79 @@ impl Message {
         msg
     }
 
+    /// Create an OTA accept message
+    pub fn ota_accept(node_id: u32, session_id: u16, resume_chunk: u16) -> Self {
+        let mut msg = Self::new(MessageType::OtaAccept, node_id, 0);
+        msg.payload.extend_from_slice(&session_id.to_le_bytes()).ok();
+        msg.payload.extend_from_slice(&resume_chunk.to_le_bytes()).ok();
+        msg
+    }
+
+    /// Create an OTA ACK message
+    pub fn ota_ack(node_id: u32, session_id: u16, acked_chunk: u16) -> Self {
+        let mut msg = Self::new(MessageType::OtaAck, node_id, 0);
+        msg.payload.extend_from_slice(&session_id.to_le_bytes()).ok();
+        msg.payload.extend_from_slice(&acked_chunk.to_le_bytes()).ok();
+        msg
+    }
+
+    /// Create an OTA result message
+    pub fn ota_result(node_id: u32, session_id: u16, result_code: u8) -> Self {
+        let mut msg = Self::new(MessageType::OtaResult, node_id, 0);
+        msg.payload.extend_from_slice(&session_id.to_le_bytes()).ok();
+        msg.payload.push(result_code).ok();
+        msg.payload.push(0).ok(); // reserved
+        msg
+    }
+
+    /// Create an OTA abort message
+    pub fn ota_abort(node_id: u32, session_id: u16, reason: u8) -> Self {
+        let mut msg = Self::new(MessageType::OtaAbort, node_id, 0);
+        msg.payload.extend_from_slice(&session_id.to_le_bytes()).ok();
+        msg.payload.push(reason).ok();
+        msg.payload.push(0).ok(); // reserved
+        msg
+    }
+
     /// Encode message to bytes
     pub fn encode(&self, buf: &mut [u8]) -> Result<usize, MessageError> {
-        let total_len = 16 + self.payload.len();
+        let total_len = HEADER_SIZE + self.payload.len();
         if buf.len() < total_len {
             return Err(MessageError::BufferTooSmall);
         }
 
-        // Header
-        buf[0..4].copy_from_slice(&MAGIC);
-        buf[4] = PROTOCOL_VERSION;
-        buf[5] = self.msg_type as u8;
-        buf[6..8].copy_from_slice(&self.flags.to_le_bytes());
-        buf[8..12].copy_from_slice(&self.node_id.to_le_bytes());
-        buf[12..16].copy_from_slice(&self.seq_num.to_le_bytes());
+        let header = Header {
+            msg_type: self.msg_type,
+            flags: self.flags,
+            node_id: self.node_id,
+            seq_num: self.seq_num,
+        };
+        encode_header(&header, buf)?;
 
         // Payload
-        buf[16..16 + self.payload.len()].copy_from_slice(&self.payload);
+        buf[HEADER_SIZE..HEADER_SIZE + self.payload.len()].copy_from_slice(&self.payload);
 
         Ok(total_len)
     }
 
     /// Decode message from bytes
     pub fn decode(buf: &[u8]) -> Result<Self, MessageError> {
-        if buf.len() < 16 {
-            return Err(MessageError::TooShort);
-        }
-
-        // Check magic
-        if buf[0..4] != MAGIC {
-            return Err(MessageError::InvalidMagic);
-        }
-
-        // Check version
-        if buf[4] != PROTOCOL_VERSION {
-            return Err(MessageError::UnsupportedVersion);
-        }
-
-        let msg_type = MessageType::from_u8(buf[5]).ok_or(MessageError::InvalidMessageType)?;
-        let flags = u16::from_le_bytes(buf[6..8].try_into().unwrap());
-        let node_id = u32::from_le_bytes(buf[8..12].try_into().unwrap());
-        let seq_num = u32::from_le_bytes(buf[12..16].try_into().unwrap());
+        let (header, payload_bytes) = decode_header(buf)?;
 
         let mut payload = Vec::new();
-        if buf.len() > 16 {
+        if !payload_bytes.is_empty() {
             payload
-                .extend_from_slice(&buf[16..])
+                .extend_from_slice(payload_bytes)
                 .map_err(|_| MessageError::PayloadTooLarge)?;
         }
 
         Ok(Self {
-            msg_type,
-            flags,
-            node_id,
-            seq_num,
+            msg_type: header.msg_type,
+            flags: header.flags,
+            node_id: header.node_id,
+            seq_num: header.seq_num,
             payload,
         })
-    }
-}
-
-/// Message encoding/decoding errors
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MessageError {
-    BufferTooSmall,
-    TooShort,
-    InvalidMagic,
-    UnsupportedVersion,
-    InvalidMessageType,
-    PayloadTooLarge,
-}
-
-/// CRDT type identifiers for Data messages
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum CrdtType {
-    LwwRegister = 0x01,
-    GCounter = 0x02,
-    PnCounter = 0x03,
-    OrSet = 0x04,
-}
-
-impl CrdtType {
-    pub fn from_u8(v: u8) -> Option<Self> {
-        match v {
-            0x01 => Some(Self::LwwRegister),
-            0x02 => Some(Self::GCounter),
-            0x03 => Some(Self::PnCounter),
-            0x04 => Some(Self::OrSet),
-            _ => None,
-        }
     }
 }
 
