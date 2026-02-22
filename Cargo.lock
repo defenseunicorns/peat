@@ -2895,9 +2895,9 @@ dependencies = [
 
 [[package]]
 name = "hive-mesh"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18f85d4700c4aefc98fac14b52be2ef8a46597f8974e065462bc707550be50aa"
+checksum = "009685787623e4cc62ec47e8419ea6bc61d00e823a2c1a018806bbea90ce33a2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2927,6 +2927,7 @@ dependencies = [
  "subtle",
  "thiserror 1.0.69",
  "tokio",
+ "tokio-stream",
  "toml 0.8.23",
  "tracing",
  "uuid",
