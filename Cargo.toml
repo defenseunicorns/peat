@@ -34,7 +34,7 @@ repository = "https://github.com/kitplummer/hive"
 hive-mesh = "0.2.0"
 
 # BLE mesh transport (ADR-039)
-hive-btle = "0.1.2"
+hive-btle = "0.1.3"
 
 # CRDT synchronization
 dittolive-ditto = "=4.11.5"
