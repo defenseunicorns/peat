@@ -259,6 +259,11 @@ class BleGattClient(private val context: Context) {
                 // Delay for connection to stabilize
                 delay(500)
 
+                // Clear GATT cache to avoid stale service discovery results
+                // (Android caches GATT services per MAC address)
+                refreshGattCache(gatt)
+                delay(200)
+
                 // Discover services (with 10s timeout)
                 val service = withTimeout(10_000) {
                     suspendCancellableCoroutine<BluetoothGattService> { cont ->
@@ -440,6 +445,17 @@ class BleGattClient(private val context: Context) {
             bytesRead = peerState.size,
             latencyMs = latency
         )
+    }
+
+    /** Clear Android's GATT service cache via hidden BluetoothGatt.refresh() API */
+    private fun refreshGattCache(gatt: BluetoothGatt): Boolean {
+        return try {
+            val method = gatt.javaClass.getMethod("refresh")
+            method.invoke(gatt) as? Boolean ?: false
+        } catch (e: Exception) {
+            Log.w(TAG, "GATT cache refresh not available: ${e.message}")
+            false
+        }
     }
 
     fun disconnect() {

@@ -26,6 +26,10 @@ use hive_ffi::{create_node, NodeConfig, TransportConfigFFI};
 use std::sync::Arc;
 
 fn main() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .format_timestamp_millis()
+        .init();
+
     println!("=== Dual-Transport Test Peer (BLE + QUIC) ===\n");
 
     let storage_path =
@@ -105,8 +109,8 @@ fn main() {
     }
     println!("Sync started, waiting for Android peer...\n");
 
-    // Poll for Android's platform (up to 90s — allows time for BLE discovery + QUIC handshake)
-    let timeout = std::time::Duration::from_secs(90);
+    // Poll for Android's platform (up to 180s — allows time for BLE retries + QUIC handshake)
+    let timeout = std::time::Duration::from_secs(180);
     let start = std::time::Instant::now();
     let poll_interval = std::time::Duration::from_secs(2);
     let mut found = false;
@@ -140,9 +144,14 @@ fn main() {
     println!();
     if found {
         println!("Test PASSED");
+        // Stay alive so Android can complete remaining test phases (mDNS, QUIC, platform sync).
+        // The platform may arrive via BLE before mDNS/QUIC establishes — exiting immediately
+        // would kill the Iroh endpoint and mDNS service before the Android test finishes.
+        println!("Staying alive for 60s to allow remaining test phases...");
+        std::thread::sleep(std::time::Duration::from_secs(60));
         std::process::exit(0);
     } else {
-        println!("Test FAILED — Android platform not received within 90s");
+        println!("Test FAILED — Android platform not received within 180s");
         std::process::exit(1);
     }
 }
