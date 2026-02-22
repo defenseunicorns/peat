@@ -2894,6 +2894,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "hive-lite-protocol"
+version = "0.1.0"
+
+[[package]]
 name = "hive-mesh"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
