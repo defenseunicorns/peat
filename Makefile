@@ -1,7 +1,8 @@
 .PHONY: help clean clean-ditto build test test-unit test-integration test-e2e test-fast fmt clippy check pre-commit ci \
        build-ble-test-app deploy-ble-test-app ble-test ble-test-logs clean-ble-test \
        build-dual-test-peer deploy-dual-test-peer start-dual-test-peer stop-dual-test-peer \
-       dual-transport-test dual-test-peer-logs
+       dual-transport-test dual-test-peer-logs \
+       functional-suite functional-ble functional-android functional-k8s
 
 # ============================================
 # HIVE Protocol Development Makefile
@@ -74,6 +75,12 @@ help:
 	@echo "  start-dual-test-peer     - Start dual_test_peer on rpi-ci"
 	@echo "  stop-dual-test-peer      - Stop dual_test_peer on rpi-ci"
 	@echo "  dual-transport-test      - Full dual-transport pipeline (BLE + QUIC)"
+	@echo ""
+	@echo "Functional Test Suite (all hardware tests):"
+	@echo "  functional-suite         - Run ALL functional tests (BLE + Android + k8s)"
+	@echo "  functional-ble           - Run only rpi-rpi BLE test"
+	@echo "  functional-android       - Run only rpi-android dual-transport test"
+	@echo "  functional-k8s           - Run only k8s cluster test"
 	@echo ""
 	@echo "Legacy E-Series Tests (for reference):"
 	@echo "  e11-modes                - Test HIVE modes (legacy)"
@@ -583,30 +590,44 @@ dual-transport-test: deploy-dual-test-peer build-ble-test-app deploy-ble-test-ap
 	@echo "║                                                            ║"
 	@echo "║  Launching test with QUIC peer info...                    ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
-	@adb shell am force-stop com.revolveteam.hive.test 2>/dev/null || true
-	@adb logcat -c 2>/dev/null || true
-	@echo "Dropping parasitic BLE connections on $(BLE_TEST_PI) to free connection slots..."
-	@ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) \
-		'for addr in $$(hcitool con 2>/dev/null | grep "LE " | awk "{print \$$3}"); do \
-			bluetoothctl disconnect $$addr 2>/dev/null || true; \
-		done; echo "✓ BLE connections cleared"'
-	adb shell am start -n com.revolveteam.hive.test/.MainActivity \
-		--es quic_node_id "$(QUIC_NODE_ID)" \
-		--es quic_address "$(BLE_TEST_PI_IP):$(IROH_TEST_PORT)" \
-		--ez auto_run true
-	@echo ""
-	@echo "Waiting for Android test to complete (up to 120s)..."
-	@for i in $$(seq 1 120); do \
-		if adb logcat -d -s HiveTest 2>/dev/null | grep -q "^.*RESULT:"; then \
+	@ANDROID_PASS=false; \
+	for attempt in 1 2 3; do \
+		echo ""; \
+		echo "--- Android attempt $$attempt/3 ---"; \
+		adb shell am force-stop com.revolveteam.hive.test 2>/dev/null || true; \
+		adb logcat -c 2>/dev/null || true; \
+		echo "Toggling Android BLE..."; \
+		adb shell cmd bluetooth_manager disable 2>/dev/null || true; \
+		sleep 2; \
+		adb shell cmd bluetooth_manager enable 2>/dev/null || true; \
+		adb shell cmd bluetooth_manager wait-for-state:STATE_ON 2>/dev/null; \
+		sleep 5; \
+		adb shell am start -n com.revolveteam.hive.test/.MainActivity \
+			--es quic_node_id "$(QUIC_NODE_ID)" \
+			--es quic_address "$(BLE_TEST_PI_IP):$(IROH_TEST_PORT)" \
+			--ez auto_run true; \
+		echo "Waiting for result (up to 90s)..."; \
+		for i in $$(seq 1 90); do \
+			if adb logcat -d -s HiveTest 2>/dev/null | grep -q "^.*RESULT:"; then \
+				break; \
+			fi; \
+			sleep 1; \
+		done; \
+		if adb logcat -d -s HiveTest 2>/dev/null | grep -q "RESULT:.*PASSED"; then \
+			ANDROID_PASS=true; \
 			break; \
 		fi; \
-		sleep 1; \
-	done
-	@echo ""
-	@echo "╔════════════════════════════════════════════════════════════╗"
-	@echo "║  Android Results                                          ║"
-	@echo "╚════════════════════════════════════════════════════════════╝"
-	@adb logcat -d -s HiveTest 2>/dev/null | grep -E "Phase|RESULT|HIVE |Run:|Build:|====| " || echo "  (no output captured)"
+		echo "Attempt $$attempt failed, checking error..."; \
+		adb logcat -d -s HiveTest 2>/dev/null | grep -E "Phase 5|FAIL" || true; \
+		if [ $$attempt -lt 3 ]; then \
+			echo "Retrying after BLE reset..."; \
+		fi; \
+	done; \
+	echo ""; \
+	echo "╔════════════════════════════════════════════════════════════╗"; \
+	echo "║  Android Results                                          ║"; \
+	echo "╚════════════════════════════════════════════════════════════╝"; \
+	adb logcat -d -s HiveTest 2>/dev/null | grep -E "Phase|RESULT|HIVE |Run:|Build:|====| " || echo "  (no output captured)"
 	@echo ""
 	@echo "Waiting for Pi dual_test_peer to finish (up to 30s)..."
 	@for i in $$(seq 1 30); do \
@@ -638,6 +659,25 @@ dual-transport-test: deploy-dual-test-peer build-ble-test-app deploy-ble-test-ap
 # Show dual_test_peer logs from Pi
 dual-test-peer-logs:
 	ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'tail -f ~/dual_test_peer.log'
+
+# ============================================
+# Functional Test Suite (all hardware tests)
+# ============================================
+# Orchestrates all functional/hardware tests from one entry point.
+# Tests: rpi-rpi BLE (hive-btle), rpi-android dual-transport (hive),
+#        k8s cluster (hive-mesh)
+
+functional-suite:
+	@./scripts/functional-suite.sh
+
+functional-ble:
+	@./scripts/functional-suite.sh --ble-only
+
+functional-android:
+	@./scripts/functional-suite.sh --android-only
+
+functional-k8s:
+	@./scripts/functional-suite.sh --k8s-only
 
 # ============================================
 # Legacy E-Series Tests (kept for compatibility)

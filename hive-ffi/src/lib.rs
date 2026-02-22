@@ -757,8 +757,10 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
     let phase_start = Instant::now();
 
     // Create a dedicated Tokio runtime for this node
+    // Use 4 worker threads to avoid starving BLE D-Bus tasks when Iroh
+    // background tasks (discovery, relay, pkarr) are running concurrently.
     let runtime = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
+        .worker_threads(4)
         .enable_all()
         .build()
         .map_err(|e| HiveError::SyncError {
@@ -1107,6 +1109,12 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
                     }
 
                     // Create BLE transport with BluerAdapter
+                    // IMPORTANT: All async BLE operations (create adapter, init, register
+                    // GATT, start advertising/scanning) MUST happen in a single block_on().
+                    // Splitting into two block_on() calls suspends the tokio runtime between
+                    // them, which can cause the GATT ApplicationHandle's D-Bus registration
+                    // to be dropped before advertising starts — making the GATT service
+                    // intermittently invisible to remote devices.
                     match runtime_arc.block_on(async {
                         let mut adapter = BluerAdapter::new().await?;
 
@@ -1116,18 +1124,23 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<HiveNode>, HiveError> {
                         // Register GATT service with BlueZ so peers can connect
                         adapter.register_gatt_service().await?;
 
-                        Ok::<_, hive_btle::BleError>(adapter)
+                        // Wrap in transport layers
+                        let btle = BluetoothLETransport::new(ble_config, adapter);
+                        let ble_transport = Arc::new(HiveBleTransport::new(btle));
+
+                        // Start advertising and scanning in the same async context
+                        ble_transport.start().await.map_err(|e| {
+                            hive_btle::BleError::PlatformError(format!(
+                                "Failed to start BLE transport: {}",
+                                e
+                            ))
+                        })?;
+
+                        Ok::<_, hive_btle::BleError>(ble_transport)
                     }) {
-                        Ok(adapter) => {
-                            let btle = BluetoothLETransport::new(ble_config, adapter);
-                            let ble_transport = Arc::new(HiveBleTransport::new(btle));
+                        Ok(ble_transport) => {
                             let ble_as_transport: Arc<dyn Transport> = ble_transport.clone();
                             transport_manager.register(ble_as_transport.clone());
-
-                            // Start advertising and scanning
-                            if let Err(e) = runtime_arc.block_on(ble_transport.start()) {
-                                eprintln!("[HIVE] Failed to start BLE transport: {} (continuing without BLE)", e);
-                            }
 
                             // Register as PACE instance for collection routing
                             let ble_instance = TransportInstance::new(
