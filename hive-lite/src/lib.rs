@@ -32,6 +32,8 @@
 
 pub mod crdt;
 pub mod protocol;
+#[cfg(feature = "ota")]
+pub mod ota;
 
 /// Prelude for convenient imports
 pub mod prelude {

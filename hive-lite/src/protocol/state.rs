@@ -82,6 +82,8 @@ impl GossipState {
             MessageType::Query => self.handle_query(msg, from_addr, from_port),
             MessageType::Ack => HandleResult::Ok,
             MessageType::Leave => self.handle_leave(msg),
+            // OTA messages are handled directly in wifi_main.rs, not via GossipState
+            _ => HandleResult::Ok,
         }
     }
 
