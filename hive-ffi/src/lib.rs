@@ -73,7 +73,7 @@ use hive_protocol::sync::{BackendConfig, DataSyncBackend, TransportConfig};
 use hive_protocol::transport::btle::HiveBleTransport;
 #[cfg(feature = "sync")]
 use hive_protocol::transport::{
-    iroh::IrohMeshTransport, CollectionRouteTable, MeshTransport, Transport, TransportCapabilities,
+    iroh::IrohMeshTransport, CollectionRouteTable, Transport, TransportCapabilities,
     TransportInstance, TransportManager, TransportManagerConfig, TransportPolicy, TransportType,
 };
 #[cfg(feature = "sync")]
