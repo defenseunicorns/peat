@@ -147,12 +147,15 @@ async fn test_observer_receives_beacon_events_from_ditto() {
     );
     broadcaster.start().await;
 
-    // Wait for beacon to be broadcast and propagated
-    tokio::time::sleep(Duration::from_millis(500)).await;
-
-    // Verify beacon was persisted and propagated via query
-    // (Event streaming has timing complexities with CRDT eventual consistency)
-    let nearby = observer.get_nearby_beacons().await;
+    // Poll for beacon propagation (Ditto CRDT eventual consistency may need time)
+    let mut nearby = Vec::new();
+    for _ in 0..20 {
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        nearby = observer.get_nearby_beacons().await;
+        if !nearby.is_empty() {
+            break;
+        }
+    }
     assert_eq!(nearby.len(), 1, "Should see one nearby beacon");
     assert_eq!(nearby[0].node_id, "node-1");
     assert_eq!(nearby[0].hierarchy_level, HierarchyLevel::Squad);
