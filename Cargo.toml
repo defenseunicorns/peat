@@ -12,10 +12,8 @@ members = [
     "hive-inference",
     "hive-tak-bridge",
     "hive-ble-test",
-    "hive-lite-protocol",
 ]
-# hive-lite and ESP32 examples are excluded because they require ESP32 toolchain
-exclude = ["hive-lite", "examples/m5stack-core2-hive"]
+exclude = ["examples/m5stack-core2-hive"]
 
 # For local development, uncomment to use local checkouts:
 # [patch.crates-io]
