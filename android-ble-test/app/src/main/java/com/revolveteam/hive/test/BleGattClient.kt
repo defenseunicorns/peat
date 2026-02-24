@@ -256,8 +256,9 @@ class BleGattClient(private val context: Context) {
 
                 val gatt = connectGatt(device)
 
-                // Delay for connection to stabilize
-                delay(500)
+                // Delay for connection to stabilize — 1500ms gives BlueZ GATT
+                // registration time to complete on the Pi side (status=133 fix)
+                delay(1500)
 
                 // Clear GATT cache to avoid stale service discovery results
                 // (Android caches GATT services per MAC address)
@@ -294,56 +295,60 @@ class BleGattClient(private val context: Context) {
     }
 
     private suspend fun connectGatt(device: BluetoothDevice): BluetoothGatt {
-        return suspendCancellableCoroutine { cont ->
-            val connectCallback = object : BluetoothGattCallback() {
-                override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
-                    gattCallback.onConnectionStateChange(g, status, newState)
-                    when (newState) {
-                        BluetoothProfile.STATE_CONNECTED -> {
-                            Log.i(TAG, "Connected to ${device.address}")
-                            bluetoothGatt = g
-                            if (cont.isActive) cont.resume(g)
-                        }
-                        BluetoothProfile.STATE_DISCONNECTED -> {
-                            val err = RuntimeException("Connection failed (status=$status)")
-                            if (cont.isActive) {
-                                cont.resumeWithException(err)
+        return withTimeout(15_000) {
+            suspendCancellableCoroutine { cont ->
+                val connectCallback = object : BluetoothGattCallback() {
+                    override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
+                        gattCallback.onConnectionStateChange(g, status, newState)
+                        when (newState) {
+                            BluetoothProfile.STATE_CONNECTED -> {
+                                Log.i(TAG, "Connected to ${device.address}")
+                                bluetoothGatt = g
+                                if (cont.isActive) cont.resume(g)
                             }
-                            // Cancel any pending operations if disconnected after connect
-                            pendingServiceDiscovery?.let { if (it.isActive) it.resumeWithException(err) }
-                            pendingServiceDiscovery = null
-                            pendingCharRead?.let { if (it.isActive) it.resumeWithException(err) }
-                            pendingCharRead = null
-                            pendingCharWrite?.let { if (it.isActive) it.resumeWithException(err) }
-                            pendingCharWrite = null
+                            BluetoothProfile.STATE_DISCONNECTED -> {
+                                val err = RuntimeException("Connection failed (status=$status)")
+                                if (cont.isActive) {
+                                    cont.resumeWithException(err)
+                                }
+                                // Cancel any pending operations if disconnected after connect
+                                pendingServiceDiscovery?.let { if (it.isActive) it.resumeWithException(err) }
+                                pendingServiceDiscovery = null
+                                pendingCharRead?.let { if (it.isActive) it.resumeWithException(err) }
+                                pendingCharRead = null
+                                pendingCharWrite?.let { if (it.isActive) it.resumeWithException(err) }
+                                pendingCharWrite = null
+                            }
                         }
+                    }
+
+                    override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
+                        gattCallback.onServicesDiscovered(g, status)
+                    }
+
+                    @Suppress("DEPRECATION")
+                    override fun onCharacteristicRead(
+                        g: BluetoothGatt,
+                        characteristic: BluetoothGattCharacteristic,
+                        status: Int
+                    ) {
+                        gattCallback.onCharacteristicRead(g, characteristic, status)
+                    }
+
+                    override fun onCharacteristicWrite(
+                        g: BluetoothGatt,
+                        characteristic: BluetoothGattCharacteristic,
+                        status: Int
+                    ) {
+                        gattCallback.onCharacteristicWrite(g, characteristic, status)
                     }
                 }
 
-                override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
-                    gattCallback.onServicesDiscovered(g, status)
-                }
-
-                @Suppress("DEPRECATION")
-                override fun onCharacteristicRead(
-                    g: BluetoothGatt,
-                    characteristic: BluetoothGattCharacteristic,
-                    status: Int
-                ) {
-                    gattCallback.onCharacteristicRead(g, characteristic, status)
-                }
-
-                override fun onCharacteristicWrite(
-                    g: BluetoothGatt,
-                    characteristic: BluetoothGattCharacteristic,
-                    status: Int
-                ) {
-                    gattCallback.onCharacteristicWrite(g, characteristic, status)
-                }
+                // autoConnect=true lets Android's BLE stack manage connection timing,
+                // avoiding immediate status=133 when the remote GATT service isn't ready yet
+                device.connectGatt(context, true, connectCallback, BluetoothDevice.TRANSPORT_LE)
+                cont.invokeOnCancellation { bluetoothGatt?.disconnect() }
             }
-
-            device.connectGatt(context, false, connectCallback, BluetoothDevice.TRANSPORT_LE)
-            cont.invokeOnCancellation { bluetoothGatt?.disconnect() }
         }
     }
 
