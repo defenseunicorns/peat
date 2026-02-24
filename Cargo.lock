@@ -2894,10 +2894,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "hive-mesh"
-version = "0.2.1"
+name = "hive-lite-protocol"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "009685787623e4cc62ec47e8419ea6bc61d00e823a2c1a018806bbea90ce33a2"
+checksum = "7e21f6e1444c0dbc33d72eb9dc09e55cba32492e29b259c302b2f1897525a651"
+
+[[package]]
+name = "hive-mesh"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8bd85f1be0372643c7b223a87f4ce2f94f92c4fc1a27923dd148a18fe8ed5ec"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2910,6 +2916,7 @@ dependencies = [
  "geohash",
  "hex",
  "hive-btle",
+ "hive-lite-protocol",
  "hkdf",
  "hmac",
  "iroh",
