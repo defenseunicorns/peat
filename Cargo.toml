@@ -30,7 +30,7 @@ repository = "https://github.com/kitplummer/hive"
 
 [workspace.dependencies]
 # Mesh networking
-hive-mesh = "0.2.1"
+hive-mesh = "0.2.2"
 
 # BLE mesh transport (ADR-039)
 hive-btle = "0.1.3"
