@@ -8,6 +8,7 @@ import android.content.Context
 import android.util.Base64
 import android.util.Log
 import com.revolveteam.atak.hive.HiveJni
+import kotlinx.coroutines.delay
 import org.json.JSONArray
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -231,6 +232,9 @@ class TestRunner(
 
             val device = discoveredDevice
                 ?: return recordPhase(5, "GATT Sync", false, "No discovered device from phase 4")
+
+            // Let the Pi's GATT service fully register before connecting (status=133 fix)
+            delay(1000)
 
             // Connect and discover services
             val (gatt, service) = client.connectAndDiscover(device.device)
