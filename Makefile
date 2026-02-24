@@ -596,6 +596,11 @@ dual-transport-test: deploy-dual-test-peer build-ble-test-app deploy-ble-test-ap
 		echo "--- Android attempt $$attempt/3 ---"; \
 		adb shell am force-stop com.revolveteam.hive.test 2>/dev/null || true; \
 		adb logcat -c 2>/dev/null || true; \
+		if [ $$attempt -gt 1 ]; then \
+			echo "Resetting Pi BLE adapter and restarting dual_test_peer..."; \
+			ssh $(BLE_TEST_PI_USER)@$(BLE_TEST_PI) 'pkill -x dual_test_peer 2>/dev/null || true; sleep 1; bluetoothctl power off 2>/dev/null; sleep 1; bluetoothctl power on 2>/dev/null; sleep 1; nohup ~/dual_test_peer > ~/dual_test_peer.log 2>&1 &'; \
+			sleep 3; \
+		fi; \
 		echo "Toggling Android BLE..."; \
 		adb shell cmd bluetooth_manager disable 2>/dev/null || true; \
 		sleep 2; \
