@@ -196,13 +196,13 @@ pub trait LoRaLink: Send + Sync {
 
 ### Over-the-Air Frame Format
 
-Both backends use the same frame format on the wire. The frame wraps an eche-lite protocol payload (ADR-035) with a minimal header:
+Both backends use the same frame format on the wire. The frame wraps a peat-lite protocol payload (ADR-035) with a minimal header:
 
 ```rust
 /// LoRa over-the-air frame format
 ///
 /// Header (3 bytes):
-///   [0]     Marker byte (0xEC — "eche")
+///   [0]     Marker byte (0xEC — "peat")
 ///   [1]     Flags (1 byte)
 ///             bit 0:   fragmented (1 = fragment, 0 = complete)
 ///             bit 1:   encrypted (1 = app-layer encryption)
@@ -212,7 +212,7 @@ Both backends use the same frame format on the wire. The frame wraps an eche-lit
 ///   [2]     Payload length (1 byte, max 252)
 ///
 /// Payload (up to 249 bytes unfragmented, or per-fragment):
-///   eche-lite protocol header (16 bytes, ADR-035) + CRDT data
+///   peat-lite protocol header (16 bytes, ADR-035) + CRDT data
 ///
 /// Total: max 252 bytes (matching mLRS serial frame limit)
 ///
@@ -544,7 +544,7 @@ LoRa links in HIVE are point-to-point, not mesh. A Linux gateway node bridges Lo
 │  Remote Sensor   │                    │  Gateway Node    │
 │  (ESP32+SX1262)  │   LoRa frames     │  (Linux+mLRS)    │
 │  ┌─────────────┐ │◄─────────────────►│ ┌─────────────┐  │
-│  │ eche-lite   │ │                    │ │ hive-lora    │  │
+│  │ peat-lite   │ │                    │ │ hive-lora    │  │
 │  │ hive-lora   │ │                    │ │ (mlrs-serial)│  │
 │  │ (lora-phy)  │ │                    │ └──────┬───────┘  │
 │  └─────────────┘ │                    │        │          │
@@ -572,7 +572,7 @@ Multiple remote nodes can each have a dedicated LoRa link to the gateway (separa
 /// Beacon frame payload (fits in a single LoRa frame)
 ///
 ///   [0-15]   Node ID (16 bytes)
-///   [16]     Capabilities bitfield (NodeCapabilities from eche-lite)
+///   [16]     Capabilities bitfield (NodeCapabilities from peat-lite)
 ///   [17-18]  Beacon sequence number (2 bytes, big-endian)
 ///   [19]     TX power (dBm, signed)
 ///
@@ -616,7 +616,7 @@ pub fn encrypt_payload(plaintext: &[u8], psk: &[u8; 32]) -> Result<Vec<u8>, LoRa
 }
 ```
 
-Note: The 12-byte nonce + 16-byte AEAD tag adds 28 bytes of overhead per frame. With a 249-byte payload limit, this leaves 221 bytes for the eche-lite protocol header + CRDT data when encryption is enabled.
+Note: The 12-byte nonce + 16-byte AEAD tag adds 28 bytes of overhead per frame. With a 249-byte payload limit, this leaves 221 bytes for the peat-lite protocol header + CRDT data when encryption is enabled.
 
 ### Duty Cycle Compliance
 
@@ -881,7 +881,7 @@ pub struct TransportConfigFFI {
 
 ### Option 3: Meshtastic
 **Pros**: Popular open-source LoRa mesh, large community, built-in mesh routing
-**Cons**: Opinionated protocol (protobuf-based, own message types), not a transparent bridge, mesh routing adds latency and complexity, would require adapting HIVE protocol to Meshtastic's message format rather than using native eche-lite framing
+**Cons**: Opinionated protocol (protobuf-based, own message types), not a transparent bridge, mesh routing adds latency and complexity, would require adapting HIVE protocol to Meshtastic's message format rather than using native peat-lite framing
 **Decision**: mLRS's transparent serial passthrough lets HIVE use its own frame format directly. Meshtastic's mesh layer would conflict with HIVE's own routing and sync logic.
 
 ### Option 4: Integrate into hive-btle
@@ -898,7 +898,7 @@ pub struct TransportConfigFFI {
 3. [Semtech SX1262 Datasheet](https://www.semtech.com/products/wireless-rf/lora-connect/sx1262) - Target LoRa transceiver
 4. [LoRa Alliance — LoRa Technology Overview](https://lora-alliance.org/about-lorawan/) - LoRa modulation background
 5. ADR-032: Pluggable Transport Abstraction
-6. ADR-035: HIVE-Lite Embedded Nodes (eche-lite protocol)
+6. ADR-035: HIVE-Lite Embedded Nodes (peat-lite protocol)
 7. ADR-039: HIVE-BTLE Mesh Transport Crate
 8. ADR-041: Multi-Transport Embedded Integration
 9. ADR-051: HIVE-SBD Satellite Transport
