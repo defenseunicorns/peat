@@ -54,7 +54,7 @@ A 10-second PTT message at Opus 16kbps mono is ~20 KB — smaller than many CRDT
 | `.onion` address as identity | Cryptographic node ID |
 | PTT model (record → send) | Audio blob → CRDT document → mesh sync |
 | App-layer encryption (independent of transport) | ChaCha20-Poly1305 (ADR-044) |
-| Simple line protocol over Tor | eche-lite frame format over any transport (ADR-035) |
+| Simple line protocol over Tor | peat-lite frame format over any transport (ADR-035) |
 | Tor as anonymous transport | Noted as future transport possibility |
 | `opusenc`/`opusdec` for audio | Opus codec (or Codec2 for constrained links) |
 
@@ -316,7 +316,7 @@ A purpose-built field audio device running HIVE for transport:
 │  └────────────┬────────────────────┘  │
 │               │                       │
 │  ┌────────────▼────────────────────┐  │
-│  │  HIVE Node (eche-lite)          │  │
+│  │  HIVE Node (peat-lite)          │  │
 │  │  AudioMessage doc + BlobStore   │  │
 │  └────────────┬────────────────────┘  │
 │               │                       │
@@ -400,7 +400,7 @@ The "Peat" concept demonstrates that HIVE can subsume the role of a tactical rad
 | ADR-021 (Document-Oriented Architecture) | AudioMessage follows one-document-per-entity pattern |
 | ADR-025 (Blob Transfer Protocol) | Audio stored as content-addressed blobs via BlobStore trait |
 | ADR-032 (Transport Abstraction) | Transport bandwidth drives codec selection |
-| ADR-035 (eche-lite Embedded Nodes) | Embedded node constraints for audio on ESP32 |
+| ADR-035 (peat-lite Embedded Nodes) | Embedded node constraints for audio on ESP32 |
 | ADR-037 (Resource-Constrained Devices) | Codec2 selection for constrained nodes |
 | ADR-039 (BLE Transport) | BLE bandwidth constraints for audio quality |
 | ADR-044 (Encryption) | ChaCha20-Poly1305 app-layer encryption for audio blobs |
@@ -419,7 +419,7 @@ The "Peat" concept demonstrates that HIVE can subsume the role of a tactical rad
 6. ADR-021: Document-Oriented Architecture and Update Semantics
 7. ADR-025: Blob Transfer Protocol
 8. ADR-032: Pluggable Transport Abstraction
-9. ADR-035: HIVE-Lite Embedded Nodes (eche-lite protocol)
+9. ADR-035: HIVE-Lite Embedded Nodes (peat-lite protocol)
 10. ADR-044: Application-Layer Encryption
 11. ADR-051: HIVE-SBD Satellite Transport
 12. ADR-052: HIVE-LoRa Long-Range Radio Transport
