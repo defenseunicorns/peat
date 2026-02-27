@@ -48,6 +48,9 @@ local.properties
 # Shadow simulator
 shadow.data/
 
+# Stale binaries
+peat-sim/hive-sim
+
 # ContainerLab / Simulation
 peat-sim/topologies/clab-*/
 peat-sim/test-results-*/
