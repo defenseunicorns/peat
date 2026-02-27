@@ -6,7 +6,7 @@ This file contains the initial issues for Sprint 1. Use the GitHub CLI or copy/p
 
 ```bash
 # Set repo
-REPO="kitplummer/hive"
+REPO="defenseunicorns/peat"
 
 # Core Team Issues
 gh issue create --repo $REPO \
@@ -17,7 +17,7 @@ gh issue create --repo $REPO \
 **Phase**: Phase 1 - Initialization & Capability Advertisement
 
 ### Purpose
-Define the JSON schema for AI model capability advertisements that flow from edge nodes (Jetson) through the HIVE hierarchy to C2.
+Define the JSON schema for AI model capability advertisements that flow from edge nodes (Jetson) through the PEAT hierarchy to C2.
 
 ### Required Fields
 - platform_id
@@ -44,7 +44,7 @@ gh issue create --repo $REPO \
 **Phase**: Phase 3 - Active Tracking
 
 ### Purpose
-Define the JSON schema for track updates that flow from AI inference (Jetson) through HIVE to C2/TAK.
+Define the JSON schema for track updates that flow from AI inference (Jetson) through PEAT to C2/TAK.
 
 ### Required Fields
 - track_id
@@ -75,7 +75,7 @@ gh issue create --repo $REPO \
 **Phase**: Phase 2 - Mission Tasking
 
 ### Purpose
-Define the JSON schema for mission tasks that flow downward from C2 (via TAK) through HIVE to teams.
+Define the JSON schema for mission tasks that flow downward from C2 (via TAK) through PEAT to teams.
 
 ### Required Fields
 - task_id
@@ -102,7 +102,7 @@ gh issue create --repo $REPO \
   --body "## Feature: Automerge Document Sync
 
 ### Purpose
-Implement the foundational Automerge + Iroh sync mechanism for HIVE Protocol documents.
+Implement the foundational Automerge + Iroh sync mechanism for PEAT Protocol documents.
 
 ### Requirements
 - [ ] Create/open Automerge documents
@@ -125,7 +125,7 @@ gh issue create --repo $REPO \
   --body "## Feature: Schema Validation Library
 
 ### Purpose
-Provide a validation function/library that all teams can use to validate messages against HIVE schemas.
+Provide a validation function/library that all teams can use to validate messages against PEAT schemas.
 
 ### Requirements
 - [ ] validate_capability(json) -> Result
@@ -134,7 +134,7 @@ Provide a validation function/library that all teams can use to validate message
 - [ ] Clear error messages for validation failures
 
 ### Deliverable
-\`hive-core/src/validate.rs\` or similar
+\`peat-core/src/validate.rs\` or similar
 
 ### Acceptance Criteria
 - [ ] Valid messages pass
@@ -161,17 +161,17 @@ Set up the Android development environment for ATAK plugin development.
 - [ ] Plugin loads in ATAK"
 
 gh issue create --repo $REPO \
-  --title "[CONTRACT] Define CoT ↔ HIVE message mapping" \
+  --title "[CONTRACT] Define CoT ↔ PEAT message mapping" \
   --label "team/atak,type/contract,type/integration,priority/p1-critical" \
-  --body "## Contract: CoT ↔ HIVE Mapping
+  --body "## Contract: CoT ↔ PEAT Mapping
 
 ### Purpose
-Define the mapping between HIVE Protocol messages and Cursor-on-Target (CoT) XML.
+Define the mapping between PEAT Protocol messages and Cursor-on-Target (CoT) XML.
 
 ### Mappings Needed
-1. TrackUpdate (HIVE) → Position Event (CoT)
-2. CapabilityAdvertisement (HIVE) → Registration (CoT)
-3. Mission Task (CoT) → MissionTask (HIVE)
+1. TrackUpdate (PEAT) → Position Event (CoT)
+2. CapabilityAdvertisement (PEAT) → Registration (CoT)
+3. Mission Task (CoT) → MissionTask (PEAT)
 
 ### Deliverable
 Mapping table in contract document
@@ -182,16 +182,16 @@ Mapping table in contract document
 - CoT specification"
 
 gh issue create --repo $REPO \
-  --title "[FEATURE] Scaffold HIVE-TAK Bridge application" \
+  --title "[FEATURE] Scaffold PEAT-TAK Bridge application" \
   --label "team/atak,type/enhancement,component/tak-bridge,priority/p1-critical" \
-  --body "## Feature: HIVE-TAK Bridge Scaffold
+  --body "## Feature: PEAT-TAK Bridge Scaffold
 
 ### Purpose
-Create the skeleton application for the HIVE-TAK Bridge that will translate between protocols.
+Create the skeleton application for the PEAT-TAK Bridge that will translate between protocols.
 
 ### Requirements
 - [ ] Application structure
-- [ ] HIVE client connection (placeholder)
+- [ ] PEAT client connection (placeholder)
 - [ ] TAK Server connection (CoT/TCP)
 - [ ] Configuration file support
 
@@ -205,7 +205,7 @@ gh issue create --repo $REPO \
   --body "## Integration: Bridge → TAK Server
 
 ### Purpose
-Establish connection from HIVE-TAK Bridge to TAK Server and send/receive CoT.
+Establish connection from PEAT-TAK Bridge to TAK Server and send/receive CoT.
 
 ### Requirements
 - [ ] Connect to TAK Server (CoT/TCP)
@@ -236,7 +236,7 @@ Create the Containerlab topology file that defines the demo network infrastructu
 - Network B (Bravo team: operator, UAV, Jetson)
 
 ### Deliverable
-\`hive-demo.clab.yml\`
+\`peat-demo.clab.yml\`
 
 ### Acceptance Criteria
 - [ ] \`clab deploy\` succeeds
@@ -408,11 +408,11 @@ If you prefer to create issues manually, use the following information:
 - Labels: `team/atak`, `type/enhancement`, `priority/p1-critical`
 - Milestone: Sprint 1
 
-**Issue 7: [CONTRACT] Define CoT ↔ HIVE message mapping**
+**Issue 7: [CONTRACT] Define CoT ↔ PEAT message mapping**
 - Labels: `team/atak`, `type/contract`, `type/integration`, `priority/p1-critical`
 - Milestone: Sprint 1
 
-**Issue 8: [FEATURE] Scaffold HIVE-TAK Bridge application**
+**Issue 8: [FEATURE] Scaffold PEAT-TAK Bridge application**
 - Labels: `team/atak`, `type/enhancement`, `component/tak-bridge`, `priority/p1-critical`
 - Milestone: Sprint 1
 

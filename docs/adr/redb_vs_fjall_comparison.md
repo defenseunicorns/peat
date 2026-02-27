@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-For HIVE Protocol's Automerge + Iroh implementation, **redb is the recommended choice**, primarily because Iroh already uses redb for its storage layer. This provides:
+For PEAT Protocol's Automerge + Iroh implementation, **redb is the recommended choice**, primarily because Iroh already uses redb for its storage layer. This provides:
 - Proven integration patterns with CRDT-sync use cases
 - Battle-tested async/sync bridging patterns documented by Iroh team
 - Ecosystem alignment with your primary networking dependency
@@ -181,7 +181,7 @@ However, fjall offers compelling advantages for write-heavy scenarios and should
 
 ---
 
-## HIVE-Specific Considerations
+## PEAT-Specific Considerations
 
 ### Iroh Integration (Critical Factor)
 
@@ -196,11 +196,11 @@ The Iroh team has documented their async/sync bridging patterns:
 // for bridging async Tokio tasks with sync redb operations
 ```
 
-This means proven patterns exist for the exact use case HIVE needs.
+This means proven patterns exist for the exact use case PEAT needs.
 
 ### CRDT Workload Analysis
 
-For HIVE's Automerge document sync:
+For PEAT's Automerge document sync:
 
 | Workload Pattern | Better Choice | Reasoning |
 |-----------------|---------------|-----------|
@@ -239,7 +239,7 @@ For HIVE's Automerge document sync:
 
 ---
 
-## Recommendation for HIVE
+## Recommendation for PEAT
 
 ### Primary: redb
 
@@ -251,7 +251,7 @@ For HIVE's Automerge document sync:
 
 ### When to Consider fjall
 
-- If HIVE workload becomes heavily write-dominated
+- If PEAT workload becomes heavily write-dominated
 - If storage efficiency becomes critical constraint
 - If batch sync operations dominate over individual updates
 - If deletion-heavy patterns emerge (TTL expiration)
@@ -265,7 +265,7 @@ For HIVE's Automerge document sync:
 use redb::{Database, TableDefinition};
 use tokio::sync::mpsc;
 
-// HIVE storage actor pattern (similar to Iroh)
+// PEAT storage actor pattern (similar to Iroh)
 struct StorageActor {
     db: Database,
     rx: mpsc::Receiver<StorageCommand>,

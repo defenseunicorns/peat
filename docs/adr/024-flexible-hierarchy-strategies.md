@@ -114,7 +114,7 @@ ADR-017 focused exclusively on **vertical hierarchy** (parent-child relationship
 ### Core Abstraction
 
 ```rust
-// File: hive-mesh/src/hierarchy/mod.rs
+// File: peat-mesh/src/hierarchy/mod.rs
 
 /// Node role within its hierarchy level
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -184,7 +184,7 @@ pub trait HierarchyStrategy: Send + Sync + std::fmt::Debug {
 **Use Case**: Pre-planned military operations with defined command structure
 
 ```rust
-// File: hive-mesh/src/hierarchy/static_strategy.rs
+// File: peat-mesh/src/hierarchy/static_strategy.rs
 
 /// Static hierarchy strategy with fixed assignments
 ///
@@ -251,7 +251,7 @@ impl HierarchyStrategy for StaticHierarchyStrategy {
 **Use Case**: Ad-hoc networks, disaster response, autonomous adaptation
 
 ```rust
-// File: hive-mesh/src/hierarchy/dynamic_strategy.rs
+// File: peat-mesh/src/hierarchy/dynamic_strategy.rs
 
 /// Election configuration weights for multi-factor scoring
 #[derive(Debug, Clone)]
@@ -461,7 +461,7 @@ impl HierarchyStrategy for DynamicHierarchyStrategy {
 **Use Case**: Organizational structure with adaptation needs
 
 ```rust
-// File: hive-mesh/src/hierarchy/hybrid_strategy.rs
+// File: peat-mesh/src/hierarchy/hybrid_strategy.rs
 
 /// Transition rules for hybrid strategy
 #[derive(Debug, Clone)]
@@ -644,7 +644,7 @@ impl HierarchyStrategy for HybridHierarchyStrategy {
 ### TopologyBuilder Integration
 
 ```rust
-// File: hive-mesh/src/topology/builder.rs
+// File: peat-mesh/src/topology/builder.rs
 
 pub struct TopologyConfig {
     // ... existing fields ...
@@ -706,7 +706,7 @@ impl TopologyBuilder {
 **Solution**: Track same-level peers and emit discovery events
 
 ```rust
-// File: hive-mesh/src/topology/builder.rs
+// File: peat-mesh/src/topology/builder.rs
 
 impl TopologyBuilder {
     /// Update lateral peers (same hierarchy level)
@@ -790,7 +790,7 @@ pub enum TopologyEvent {
 
 ### Completed (PR #140 - Merged 2025-11-22)
 
-**Core Abstractions** (`hive-mesh/src/hierarchy/mod.rs`, 90 lines):
+**Core Abstractions** (`peat-mesh/src/hierarchy/mod.rs`, 90 lines):
 - ✅ `HierarchyStrategy` trait with Send + Sync + Debug bounds
 - ✅ `NodeRole` enum (Leader, Member, Standalone)
 - ✅ Public exports for all hierarchy types
@@ -838,7 +838,7 @@ pub enum TopologyEvent {
 - ✅ test_role_stability_with_hysteresis
 
 **Test Results**:
-- All 49 hive-mesh unit tests passing ✅
+- All 49 peat-mesh unit tests passing ✅
 - All 8 E2E tests passing ✅
 - No regressions in existing test suite
 
@@ -849,9 +849,9 @@ pub enum TopologyEvent {
 ### Example 1: Static Military Organization
 
 ```rust
-use hive_mesh::hierarchy::{StaticHierarchyStrategy, NodeRole};
-use hive_mesh::beacon::HierarchyLevel;
-use hive_mesh::topology::{TopologyBuilder, TopologyConfig};
+use peat_mesh::hierarchy::{StaticHierarchyStrategy, NodeRole};
+use peat_mesh::beacon::HierarchyLevel;
+use peat_mesh::topology::{TopologyBuilder, TopologyConfig};
 
 // Mission planning: Platoon leader node
 let strategy = Arc::new(StaticHierarchyStrategy {
@@ -871,7 +871,7 @@ let builder = TopologyBuilder::new(config, observer, node_id);
 ### Example 2: Dynamic Disaster Response
 
 ```rust
-use hive_mesh::hierarchy::{DynamicHierarchyStrategy, ElectionConfig};
+use peat_mesh::hierarchy::{DynamicHierarchyStrategy, ElectionConfig};
 
 // First responders with varying capabilities
 let strategy = Arc::new(DynamicHierarchyStrategy::new(
@@ -893,7 +893,7 @@ let builder = TopologyBuilder::new(config, observer, node_id);
 ### Example 3: Hybrid with Adaptive Promotion
 
 ```rust
-use hive_mesh::hierarchy::{HybridHierarchyStrategy, ElectionConfig, NodeRole};
+use peat_mesh::hierarchy::{HybridHierarchyStrategy, ElectionConfig, NodeRole};
 
 // Squad node that can promote to Platoon if no Platoon leader available
 let strategy = Arc::new(HybridHierarchyStrategy::with_adaptive_promotion(
@@ -915,7 +915,7 @@ let builder = TopologyBuilder::new(config, observer, node_id);
 ### Example 4: Custom Strategy for Specialized Use Case
 
 ```rust
-use hive_mesh::hierarchy::{HierarchyStrategy, NodeRole};
+use peat_mesh::hierarchy::{HierarchyStrategy, NodeRole};
 
 // Custom strategy for IoT sensor network
 #[derive(Debug, Clone)]

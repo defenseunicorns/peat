@@ -1,0 +1,211 @@
+all:
+  vars:
+    # The generated inventory is assumed to be used from the clab host.
+    # Hence no http proxy should be used. Therefore we make sure the http
+    # module does not attempt using any global http proxy.
+    ansible_httpapi_use_proxy: false
+  children:
+    linux:
+      hosts:
+        clab-lab4-96n-company-1-commander:
+          ansible_host: 172.20.20.71
+        clab-lab4-96n-company-1-platoon-1-leader:
+          ansible_host: 172.20.20.8
+        clab-lab4-96n-company-1-platoon-1-squad-1-leader:
+          ansible_host: 172.20.20.10
+        clab-lab4-96n-company-1-platoon-1-squad-1-soldier-1:
+          ansible_host: 172.20.20.56
+        clab-lab4-96n-company-1-platoon-1-squad-1-soldier-2:
+          ansible_host: 172.20.20.33
+        clab-lab4-96n-company-1-platoon-1-squad-1-soldier-3:
+          ansible_host: 172.20.20.6
+        clab-lab4-96n-company-1-platoon-1-squad-1-soldier-4:
+          ansible_host: 172.20.20.75
+        clab-lab4-96n-company-1-platoon-1-squad-1-soldier-5:
+          ansible_host: 172.20.20.38
+        clab-lab4-96n-company-1-platoon-1-squad-1-soldier-6:
+          ansible_host: 172.20.20.4
+        clab-lab4-96n-company-1-platoon-1-squad-1-soldier-7:
+          ansible_host: 172.20.20.79
+        clab-lab4-96n-company-1-platoon-1-squad-2-leader:
+          ansible_host: 172.20.20.68
+        clab-lab4-96n-company-1-platoon-1-squad-2-soldier-1:
+          ansible_host: 172.20.20.28
+        clab-lab4-96n-company-1-platoon-1-squad-2-soldier-2:
+          ansible_host: 172.20.20.94
+        clab-lab4-96n-company-1-platoon-1-squad-2-soldier-3:
+          ansible_host: 172.20.20.55
+        clab-lab4-96n-company-1-platoon-1-squad-2-soldier-4:
+          ansible_host: 172.20.20.91
+        clab-lab4-96n-company-1-platoon-1-squad-2-soldier-5:
+          ansible_host: 172.20.20.9
+        clab-lab4-96n-company-1-platoon-1-squad-2-soldier-6:
+          ansible_host: 172.20.20.19
+        clab-lab4-96n-company-1-platoon-1-squad-2-soldier-7:
+          ansible_host: 172.20.20.43
+        clab-lab4-96n-company-1-platoon-1-squad-3-leader:
+          ansible_host: 172.20.20.59
+        clab-lab4-96n-company-1-platoon-1-squad-3-soldier-1:
+          ansible_host: 172.20.20.58
+        clab-lab4-96n-company-1-platoon-1-squad-3-soldier-2:
+          ansible_host: 172.20.20.100
+        clab-lab4-96n-company-1-platoon-1-squad-3-soldier-3:
+          ansible_host: 172.20.20.84
+        clab-lab4-96n-company-1-platoon-1-squad-3-soldier-4:
+          ansible_host: 172.20.20.54
+        clab-lab4-96n-company-1-platoon-1-squad-3-soldier-5:
+          ansible_host: 172.20.20.69
+        clab-lab4-96n-company-1-platoon-1-squad-3-soldier-6:
+          ansible_host: 172.20.20.53
+        clab-lab4-96n-company-1-platoon-1-squad-3-soldier-7:
+          ansible_host: 172.20.20.29
+        clab-lab4-96n-company-1-platoon-2-leader:
+          ansible_host: 172.20.20.17
+        clab-lab4-96n-company-1-platoon-2-squad-1-leader:
+          ansible_host: 172.20.20.76
+        clab-lab4-96n-company-1-platoon-2-squad-1-soldier-1:
+          ansible_host: 172.20.20.62
+        clab-lab4-96n-company-1-platoon-2-squad-1-soldier-2:
+          ansible_host: 172.20.20.92
+        clab-lab4-96n-company-1-platoon-2-squad-1-soldier-3:
+          ansible_host: 172.20.20.24
+        clab-lab4-96n-company-1-platoon-2-squad-1-soldier-4:
+          ansible_host: 172.20.20.2
+        clab-lab4-96n-company-1-platoon-2-squad-1-soldier-5:
+          ansible_host: 172.20.20.5
+        clab-lab4-96n-company-1-platoon-2-squad-1-soldier-6:
+          ansible_host: 172.20.20.39
+        clab-lab4-96n-company-1-platoon-2-squad-1-soldier-7:
+          ansible_host: 172.20.20.25
+        clab-lab4-96n-company-1-platoon-2-squad-2-leader:
+          ansible_host: 172.20.20.81
+        clab-lab4-96n-company-1-platoon-2-squad-2-soldier-1:
+          ansible_host: 172.20.20.14
+        clab-lab4-96n-company-1-platoon-2-squad-2-soldier-2:
+          ansible_host: 172.20.20.16
+        clab-lab4-96n-company-1-platoon-2-squad-2-soldier-3:
+          ansible_host: 172.20.20.37
+        clab-lab4-96n-company-1-platoon-2-squad-2-soldier-4:
+          ansible_host: 172.20.20.15
+        clab-lab4-96n-company-1-platoon-2-squad-2-soldier-5:
+          ansible_host: 172.20.20.60
+        clab-lab4-96n-company-1-platoon-2-squad-2-soldier-6:
+          ansible_host: 172.20.20.49
+        clab-lab4-96n-company-1-platoon-2-squad-2-soldier-7:
+          ansible_host: 172.20.20.48
+        clab-lab4-96n-company-1-platoon-2-squad-3-leader:
+          ansible_host: 172.20.20.21
+        clab-lab4-96n-company-1-platoon-2-squad-3-soldier-1:
+          ansible_host: 172.20.20.98
+        clab-lab4-96n-company-1-platoon-2-squad-3-soldier-2:
+          ansible_host: 172.20.20.93
+        clab-lab4-96n-company-1-platoon-2-squad-3-soldier-3:
+          ansible_host: 172.20.20.73
+        clab-lab4-96n-company-1-platoon-2-squad-3-soldier-4:
+          ansible_host: 172.20.20.11
+        clab-lab4-96n-company-1-platoon-2-squad-3-soldier-5:
+          ansible_host: 172.20.20.30
+        clab-lab4-96n-company-1-platoon-2-squad-3-soldier-6:
+          ansible_host: 172.20.20.63
+        clab-lab4-96n-company-1-platoon-2-squad-3-soldier-7:
+          ansible_host: 172.20.20.31
+        clab-lab4-96n-company-1-platoon-3-leader:
+          ansible_host: 172.20.20.27
+        clab-lab4-96n-company-1-platoon-3-squad-1-leader:
+          ansible_host: 172.20.20.42
+        clab-lab4-96n-company-1-platoon-3-squad-1-soldier-1:
+          ansible_host: 172.20.20.70
+        clab-lab4-96n-company-1-platoon-3-squad-1-soldier-2:
+          ansible_host: 172.20.20.72
+        clab-lab4-96n-company-1-platoon-3-squad-1-soldier-3:
+          ansible_host: 172.20.20.87
+        clab-lab4-96n-company-1-platoon-3-squad-1-soldier-4:
+          ansible_host: 172.20.20.65
+        clab-lab4-96n-company-1-platoon-3-squad-1-soldier-5:
+          ansible_host: 172.20.20.78
+        clab-lab4-96n-company-1-platoon-3-squad-1-soldier-6:
+          ansible_host: 172.20.20.44
+        clab-lab4-96n-company-1-platoon-3-squad-1-soldier-7:
+          ansible_host: 172.20.20.26
+        clab-lab4-96n-company-1-platoon-3-squad-2-leader:
+          ansible_host: 172.20.20.23
+        clab-lab4-96n-company-1-platoon-3-squad-2-soldier-1:
+          ansible_host: 172.20.20.7
+        clab-lab4-96n-company-1-platoon-3-squad-2-soldier-2:
+          ansible_host: 172.20.20.89
+        clab-lab4-96n-company-1-platoon-3-squad-2-soldier-3:
+          ansible_host: 172.20.20.88
+        clab-lab4-96n-company-1-platoon-3-squad-2-soldier-4:
+          ansible_host: 172.20.20.64
+        clab-lab4-96n-company-1-platoon-3-squad-2-soldier-5:
+          ansible_host: 172.20.20.35
+        clab-lab4-96n-company-1-platoon-3-squad-2-soldier-6:
+          ansible_host: 172.20.20.97
+        clab-lab4-96n-company-1-platoon-3-squad-2-soldier-7:
+          ansible_host: 172.20.20.34
+        clab-lab4-96n-company-1-platoon-3-squad-3-leader:
+          ansible_host: 172.20.20.80
+        clab-lab4-96n-company-1-platoon-3-squad-3-soldier-1:
+          ansible_host: 172.20.20.90
+        clab-lab4-96n-company-1-platoon-3-squad-3-soldier-2:
+          ansible_host: 172.20.20.74
+        clab-lab4-96n-company-1-platoon-3-squad-3-soldier-3:
+          ansible_host: 172.20.20.83
+        clab-lab4-96n-company-1-platoon-3-squad-3-soldier-4:
+          ansible_host: 172.20.20.85
+        clab-lab4-96n-company-1-platoon-3-squad-3-soldier-5:
+          ansible_host: 172.20.20.3
+        clab-lab4-96n-company-1-platoon-3-squad-3-soldier-6:
+          ansible_host: 172.20.20.99
+        clab-lab4-96n-company-1-platoon-3-squad-3-soldier-7:
+          ansible_host: 172.20.20.36
+        clab-lab4-96n-company-1-platoon-4-leader:
+          ansible_host: 172.20.20.12
+        clab-lab4-96n-company-1-platoon-4-squad-1-leader:
+          ansible_host: 172.20.20.57
+        clab-lab4-96n-company-1-platoon-4-squad-1-soldier-1:
+          ansible_host: 172.20.20.46
+        clab-lab4-96n-company-1-platoon-4-squad-1-soldier-2:
+          ansible_host: 172.20.20.61
+        clab-lab4-96n-company-1-platoon-4-squad-1-soldier-3:
+          ansible_host: 172.20.20.52
+        clab-lab4-96n-company-1-platoon-4-squad-1-soldier-4:
+          ansible_host: 172.20.20.96
+        clab-lab4-96n-company-1-platoon-4-squad-1-soldier-5:
+          ansible_host: 172.20.20.102
+        clab-lab4-96n-company-1-platoon-4-squad-1-soldier-6:
+          ansible_host: 172.20.20.50
+        clab-lab4-96n-company-1-platoon-4-squad-1-soldier-7:
+          ansible_host: 172.20.20.86
+        clab-lab4-96n-company-1-platoon-4-squad-2-leader:
+          ansible_host: 172.20.20.82
+        clab-lab4-96n-company-1-platoon-4-squad-2-soldier-1:
+          ansible_host: 172.20.20.95
+        clab-lab4-96n-company-1-platoon-4-squad-2-soldier-2:
+          ansible_host: 172.20.20.51
+        clab-lab4-96n-company-1-platoon-4-squad-2-soldier-3:
+          ansible_host: 172.20.20.32
+        clab-lab4-96n-company-1-platoon-4-squad-2-soldier-4:
+          ansible_host: 172.20.20.47
+        clab-lab4-96n-company-1-platoon-4-squad-2-soldier-5:
+          ansible_host: 172.20.20.18
+        clab-lab4-96n-company-1-platoon-4-squad-2-soldier-6:
+          ansible_host: 172.20.20.13
+        clab-lab4-96n-company-1-platoon-4-squad-2-soldier-7:
+          ansible_host: 172.20.20.41
+        clab-lab4-96n-company-1-platoon-4-squad-3-leader:
+          ansible_host: 172.20.20.45
+        clab-lab4-96n-company-1-platoon-4-squad-3-soldier-1:
+          ansible_host: 172.20.20.101
+        clab-lab4-96n-company-1-platoon-4-squad-3-soldier-2:
+          ansible_host: 172.20.20.67
+        clab-lab4-96n-company-1-platoon-4-squad-3-soldier-3:
+          ansible_host: 172.20.20.77
+        clab-lab4-96n-company-1-platoon-4-squad-3-soldier-4:
+          ansible_host: 172.20.20.66
+        clab-lab4-96n-company-1-platoon-4-squad-3-soldier-5:
+          ansible_host: 172.20.20.40
+        clab-lab4-96n-company-1-platoon-4-squad-3-soldier-6:
+          ansible_host: 172.20.20.20
+        clab-lab4-96n-company-1-platoon-4-squad-3-soldier-7:
+          ansible_host: 172.20.20.22

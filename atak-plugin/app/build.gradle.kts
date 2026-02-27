@@ -21,11 +21,11 @@ fun getLocalProperty(key: String, defaultValue: String = ""): String {
 }
 
 android {
-    namespace = "com.atakmap.android.hive.plugin"
+    namespace = "com.atakmap.android.peat.plugin"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.atakmap.android.hive.plugin"
+        applicationId = "com.atakmap.android.peat.plugin"
         minSdk = 26  // Android 8.0 (ATAK minimum)
         targetSdk = 34
         versionCode = 1
@@ -35,7 +35,7 @@ android {
         manifestPlaceholders["atakApiVersion"] = "5.5"
 
         ndk {
-            // Build for all Android architectures supported by hive-ffi
+            // Build for all Android architectures supported by peat-ffi
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
         }
     }
@@ -110,7 +110,7 @@ android {
         kotlinCompilerExtensionVersion = "1.5.4"
     }
 
-    // Location of pre-built native libraries from hive-ffi
+    // Location of pre-built native libraries from peat-ffi
     sourceSets {
         getByName("main") {
             jniLibs.srcDirs("libs")
@@ -153,15 +153,15 @@ dependencies {
     // ATAK Compose helper library
     implementation("com.dittofederal:atak-compose:0.0.4")
 
-    // HIVE FFI Kotlin bindings (copy from kotlin-test or generate)
+    // PEAT FFI Kotlin bindings (copy from kotlin-test or generate)
     // The bindings and native .so files will be copied to this module
-    // implementation(project(":hive-bindings"))
+    // implementation(project(":peat-bindings"))
 
-    // HIVE BLE mesh transport (for WearTAK sync)
+    // PEAT BLE mesh transport (for WearTAK sync)
     // 0.0.10 adds field-level delta sync for bandwidth efficiency
-    implementation("com.revolveteam:hive:0.0.10")
+    implementation("com.revolveteam:peat:0.0.10")
 
-    // HIVE-Lite for canned message encoding/decoding (Kotlin bindings copied directly)
+    // PEAT-Lite for canned message encoding/decoding (Kotlin bindings copied directly)
     // Native libs in libs/arm64-v8a, libs/armeabi-v7a, libs/x86_64
     implementation("net.java.dev.jna:jna:5.14.0@aar")  // Required by UniFFI
 
@@ -171,32 +171,32 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
 }
 
-// Task to copy native libraries from hive-ffi build
-tasks.register<Copy>("copyHiveNativeLibs") {
-    description = "Copy hive-ffi native libraries to jniLibs"
+// Task to copy native libraries from peat-ffi build
+tasks.register<Copy>("copyPeatNativeLibs") {
+    description = "Copy peat-ffi native libraries to jniLibs"
 
-    val hiveFfiDir = rootProject.file("../target")
+    val peatFfiDir = rootProject.file("../target")
 
-    from("$hiveFfiDir/aarch64-linux-android/release/libhive_ffi.so") {
+    from("$peatFfiDir/aarch64-linux-android/release/libpeat_ffi.so") {
         into("arm64-v8a")
     }
-    from("$hiveFfiDir/armv7-linux-androideabi/release/libhive_ffi.so") {
+    from("$peatFfiDir/armv7-linux-androideabi/release/libpeat_ffi.so") {
         into("armeabi-v7a")
     }
-    from("$hiveFfiDir/x86_64-linux-android/release/libhive_ffi.so") {
+    from("$peatFfiDir/x86_64-linux-android/release/libpeat_ffi.so") {
         into("x86_64")
     }
-    from("$hiveFfiDir/i686-linux-android/release/libhive_ffi.so") {
+    from("$peatFfiDir/i686-linux-android/release/libpeat_ffi.so") {
         into("x86")
     }
 
     into("$projectDir/libs")
 }
 
-// Task to copy Kotlin bindings from hive-ffi
-tasks.register<Copy>("copyHiveBindings") {
-    description = "Copy hive-ffi Kotlin bindings"
+// Task to copy Kotlin bindings from peat-ffi
+tasks.register<Copy>("copyPeatBindings") {
+    description = "Copy peat-ffi Kotlin bindings"
 
-    from(rootProject.file("../bindings/kotlin/uniffi/hive_ffi"))
-    into("$projectDir/src/main/java/uniffi/hive_ffi")
+    from(rootProject.file("../bindings/kotlin/uniffi/peat_ffi"))
+    into("$projectDir/src/main/java/uniffi/peat_ffi")
 }

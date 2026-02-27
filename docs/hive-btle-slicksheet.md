@@ -1,4 +1,4 @@
-# HIVE-BTLE
+# PEAT-BTLE
 
 **Tactical BLE Mesh Networking for Disconnected Operations**
 
@@ -6,7 +6,7 @@
 
 ## What It Is
 
-HIVE-BTLE is a Bluetooth Low Energy mesh networking library that enables secure, resilient communication between devices when traditional infrastructure is unavailable. Built for tactical and field operations where connectivity cannot be guaranteed.
+PEAT-BTLE is a Bluetooth Low Energy mesh networking library that enables secure, resilient communication between devices when traditional infrastructure is unavailable. Built for tactical and field operations where connectivity cannot be guaranteed.
 
 ---
 
@@ -43,7 +43,7 @@ HIVE-BTLE is a Bluetooth Low Energy mesh networking library that enables secure,
 ┌─────────────────────────────────────────────────────────┐
 │                    Application Layer                     │
 ├─────────────────────────────────────────────────────────┤
-│  HiveMesh API  │  Chat CRDT  │  Location  │  Emergency  │
+│  PeatMesh API  │  Chat CRDT  │  Location  │  Emergency  │
 ├─────────────────────────────────────────────────────────┤
 │         Document Sync (CRDT)  │  Delta Encoding         │
 ├─────────────────────────────────────────────────────────┤
@@ -81,13 +81,13 @@ HIVE-BTLE is a Bluetooth Low Energy mesh networking library that enables secure,
 
 **Android (Gradle)**
 ```kotlin
-implementation("com.revolveteam:hive:0.1.0-rc7")
+implementation("com.revolveteam:peat:0.1.0-rc7")
 ```
 
 **Rust**
 ```toml
 [dependencies]
-hive-btle = { version = "0.1.0", features = ["linux"] }
+peat-btle = { version = "0.1.0", features = ["linux"] }
 ```
 
 ---
@@ -96,7 +96,7 @@ hive-btle = { version = "0.1.0", features = ["linux"] }
 
 ```kotlin
 // Initialize mesh with encryption
-val mesh = HiveMesh.createWithIdentity(nodeId, "ALPHA-1", "SQUAD", secret)
+val mesh = PeatMesh.createWithIdentity(nodeId, "ALPHA-1", "SQUAD", secret)
 
 // Set location and broadcast
 mesh.updateLocation(lat, lon, alt)
@@ -128,4 +128,4 @@ Apache 2.0 License
 
 ---
 
-*HIVE-BTLE: Mesh when it matters.*
+*PEAT-BTLE: Mesh when it matters.*

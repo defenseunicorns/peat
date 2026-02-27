@@ -1,0 +1,5512 @@
+name: traditional-battalion-500node
+
+# Battalion 1: 500 nodes
+# Independent topology with dedicated management network
+
+mgmt:
+  network: battalion-1-net
+  ipv4-subnet: 172.21.0.0/16
+  ipv6-subnet: 3fff:172:21::/48
+
+topology:
+  nodes:
+    battalion-1-hq:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: battalion-1-hq
+        ROLE: battalion_commander
+        PLATFORM_TYPE: soldier
+        MODE: writer
+        TCP_LISTEN: '12345'
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-1
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-2:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-2
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-3:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-3
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-4:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-4
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-5:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-5
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-6:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-6
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-7:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-7
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-8:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-8
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-9:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-9
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-10:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-10
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-11:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-11
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-12:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-12
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-13:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-13
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-14:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-14
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-15:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-15
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-16:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-16
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-17:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-17
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-18:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-18
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-19:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-19
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-20:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-20
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-21:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-21
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-22:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-22
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-23:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-23
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-24:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-24
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-25:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-25
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-26:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-26
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-27:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-27
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-28:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-28
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-29:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-29
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-30:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-30
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-31:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-31
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-32:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-32
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-33:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-33
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-34:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-34
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-35:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-35
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-36:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-36
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-37:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-37
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-38:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-38
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-39:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-39
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-40:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-40
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-41:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-41
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-42:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-42
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-43:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-43
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-44:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-44
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-45:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-45
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-46:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-46
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-47:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-47
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-48:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-48
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-49:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-49
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-50:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-50
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-51:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-51
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-52:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-52
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-53:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-53
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-54:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-54
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-55:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-55
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-56:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-56
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-57:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-57
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-58:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-58
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-59:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-59
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-60:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-60
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-61:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-61
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-62:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-62
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-63:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-63
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-64:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-64
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-65:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-65
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-66:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-66
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-67:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-67
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-68:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-68
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-69:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-69
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-70:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-70
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-71:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-71
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-72:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-72
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-73:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-73
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-74:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-74
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-75:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-75
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-76:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-76
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-77:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-77
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-78:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-78
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-79:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-79
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-80:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-80
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-81:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-81
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-82:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-82
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-83:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-83
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-84:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-84
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-85:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-85
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-86:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-86
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-87:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-87
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-88:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-88
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-89:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-89
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-90:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-90
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-91:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-91
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-92:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-92
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-93:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-93
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-94:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-94
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-95:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-95
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-96:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-96
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-97:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-97
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-98:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-98
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-99:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-99
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-100:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-100
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-101:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-101
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-102:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-102
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-103:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-103
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-104:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-104
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-105:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-105
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-106:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-106
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-107:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-107
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-108:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-108
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-109:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-109
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-110:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-110
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-111:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-111
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-112:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-112
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-113:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-113
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-114:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-114
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-115:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-115
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-116:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-116
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-117:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-117
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-118:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-118
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-119:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-119
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-120:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-120
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-121:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-121
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-122:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-122
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-123:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-123
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-124:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-124
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-125:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-125
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-126:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-126
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-127:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-127
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-128:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-128
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-129:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-129
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-130:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-130
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-131:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-131
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-132:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-132
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-133:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-133
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-134:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-134
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-135:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-135
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-136:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-136
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-137:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-137
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-138:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-138
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-139:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-139
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-140:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-140
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-141:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-141
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-142:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-142
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-143:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-143
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-144:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-144
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-145:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-145
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-146:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-146
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-147:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-147
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-148:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-148
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-149:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-149
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-150:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-150
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-151:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-151
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-152:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-152
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-153:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-153
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-154:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-154
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-155:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-155
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-156:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-156
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-157:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-157
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-158:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-158
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-159:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-159
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-160:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-160
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-161:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-161
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-162:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-162
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-163:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-163
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-164:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-164
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-165:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-165
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-166:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-166
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-167:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-167
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-168:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-168
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-169:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-169
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-170:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-170
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-171:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-171
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-172:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-172
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-173:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-173
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-174:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-174
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-175:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-175
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-176:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-176
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-177:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-177
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-178:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-178
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-179:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-179
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-180:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-180
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-181:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-181
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-182:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-182
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-183:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-183
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-184:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-184
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-185:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-185
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-186:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-186
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-187:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-187
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-188:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-188
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-189:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-189
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-190:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-190
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-191:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-191
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-192:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-192
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-193:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-193
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-194:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-194
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-195:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-195
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-196:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-196
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-197:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-197
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-198:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-198
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-199:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-199
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-200:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-200
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-201:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-201
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-202:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-202
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-203:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-203
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-204:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-204
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-205:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-205
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-206:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-206
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-207:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-207
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-208:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-208
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-209:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-209
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-210:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-210
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-211:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-211
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-212:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-212
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-213:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-213
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-214:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-214
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-215:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-215
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-216:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-216
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-217:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-217
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-218:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-218
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-219:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-219
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-220:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-220
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-221:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-221
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-222:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-222
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-223:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-223
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-224:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-224
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-225:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-225
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-226:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-226
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-227:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-227
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-228:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-228
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-229:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-229
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-230:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-230
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-231:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-231
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-232:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-232
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-233:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-233
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-234:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-234
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-235:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-235
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-236:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-236
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-237:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-237
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-238:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-238
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-239:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-239
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-240:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-240
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-241:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-241
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-242:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-242
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-243:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-243
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-244:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-244
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-245:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-245
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-246:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-246
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-247:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-247
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-248:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-248
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-249:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-249
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-250:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-250
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-251:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-251
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-252:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-252
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-253:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-253
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-254:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-254
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-255:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-255
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-256:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-256
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-257:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-257
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-258:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-258
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-259:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-259
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-260:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-260
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-261:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-261
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-262:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-262
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-263:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-263
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-264:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-264
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-265:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-265
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-266:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-266
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-267:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-267
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-268:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-268
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-269:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-269
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-270:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-270
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-271:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-271
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-272:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-272
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-273:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-273
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-274:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-274
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-275:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-275
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-276:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-276
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-277:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-277
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-278:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-278
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-279:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-279
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-280:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-280
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-281:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-281
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-282:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-282
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-283:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-283
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-284:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-284
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-285:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-285
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-286:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-286
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-287:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-287
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-288:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-288
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-289:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-289
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-290:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-290
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-291:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-291
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-292:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-292
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-293:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-293
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-294:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-294
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-295:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-295
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-296:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-296
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-297:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-297
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-298:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-298
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-299:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-299
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-300:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-300
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-301:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-301
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-302:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-302
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-303:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-303
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-304:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-304
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-305:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-305
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-306:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-306
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-307:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-307
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-308:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-308
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-309:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-309
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-310:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-310
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-311:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-311
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-312:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-312
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-313:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-313
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-314:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-314
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-315:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-315
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-316:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-316
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-317:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-317
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-318:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-318
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-319:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-319
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-320:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-320
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-321:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-321
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-322:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-322
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-323:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-323
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-324:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-324
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-325:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-325
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-326:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-326
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-327:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-327
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-328:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-328
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-329:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-329
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-330:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-330
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-331:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-331
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-332:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-332
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-333:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-333
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-334:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-334
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-335:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-335
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-336:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-336
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-337:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-337
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-338:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-338
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-339:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-339
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-340:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-340
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-341:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-341
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-342:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-342
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-343:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-343
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-344:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-344
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-345:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-345
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-346:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-346
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-347:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-347
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-348:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-348
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-349:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-349
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-350:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-350
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-351:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-351
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-352:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-352
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-353:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-353
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-354:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-354
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-355:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-355
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-356:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-356
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-357:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-357
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-358:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-358
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-359:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-359
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-360:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-360
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-361:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-361
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-362:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-362
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-363:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-363
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-364:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-364
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-365:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-365
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-366:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-366
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-367:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-367
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-368:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-368
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-369:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-369
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-370:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-370
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-371:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-371
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-372:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-372
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-373:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-373
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-374:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-374
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-375:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-375
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-376:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-376
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-377:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-377
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-378:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-378
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-379:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-379
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-380:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-380
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-381:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-381
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-382:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-382
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-383:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-383
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-384:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-384
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-385:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-385
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-386:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-386
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-387:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-387
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-388:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-388
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-389:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-389
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-390:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-390
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-391:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-391
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-392:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-392
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-393:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-393
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-394:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-394
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-395:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-395
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-396:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-396
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-397:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-397
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-398:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-398
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-399:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-399
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-400:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-400
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-401:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-401
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-402:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-402
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-403:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-403
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-404:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-404
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-405:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-405
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-406:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-406
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-407:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-407
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-408:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-408
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-409:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-409
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-410:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-410
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-411:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-411
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-412:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-412
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-413:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-413
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-414:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-414
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-415:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-415
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-416:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-416
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-417:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-417
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-418:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-418
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-419:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-419
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-420:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-420
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-421:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-421
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-422:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-422
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-423:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-423
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-424:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-424
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-425:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-425
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-426:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-426
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-427:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-427
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-428:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-428
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-429:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-429
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-430:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-430
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-431:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-431
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-432:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-432
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-433:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-433
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-434:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-434
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-435:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-435
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-436:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-436
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-437:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-437
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-438:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-438
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-439:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-439
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-440:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-440
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-441:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-441
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-442:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-442
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-443:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-443
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-444:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-444
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-445:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-445
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-446:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-446
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-447:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-447
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-448:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-448
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-449:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-449
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-450:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-450
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-451:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-451
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-452:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-452
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-453:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-453
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-454:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-454
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-455:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-455
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-456:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-456
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-457:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-457
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-458:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-458
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-459:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-459
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-460:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-460
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-461:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-461
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-462:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-462
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-463:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-463
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-464:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-464
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-465:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-465
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-466:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-466
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-467:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-467
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-468:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-468
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-469:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-469
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-470:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-470
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-471:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-471
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-472:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-472
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-473:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-473
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-474:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-474
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-475:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-475
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-476:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-476
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-477:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-477
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-478:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-478
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-479:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-479
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-480:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-480
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-481:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-481
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-482:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-482
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-483:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-483
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-484:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-484
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-485:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-485
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-486:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-486
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-487:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-487
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-488:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-488
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-489:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-489
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-490:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-490
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-491:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-491
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-492:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-492
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-493:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-493
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-494:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-494
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-495:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-495
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-496:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-496
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-497:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-497
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-498:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-498
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'
+    b1-soldier-499:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: b1-soldier-499
+        ROLE: soldier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: battalion-1-hq:12345
+        USE_TRADITIONAL: 'true'
+        UPDATE_FREQUENCY_SECS: '0.5'

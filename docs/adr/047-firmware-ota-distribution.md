@@ -1,18 +1,18 @@
-# ADR-047: Firmware OTA Distribution via HIVE Mesh
+# ADR-047: Firmware OTA Distribution via PEAT Mesh
 
 **Status**: Accepted
 **Date**: 2026-02-22
 **Authors**: Kit Plummer, Codex
-**Relates to**: ADR-013 (Distributed Software Ops), ADR-022 (Edge MLOps), ADR-025 (Blob Transfer), ADR-026 (Software Orchestration), ADR-035 (HIVE-Lite), ADR-045 (Zarf/UDS Integration)
+**Relates to**: ADR-013 (Distributed Software Ops), ADR-022 (Edge MLOps), ADR-025 (Blob Transfer), ADR-026 (Software Orchestration), ADR-035 (PEAT-Lite), ADR-045 (Zarf/UDS Integration)
 
 ## Context
 
 ### The Missing Middle
 
-HIVE has strong coverage for two ends of the software delivery spectrum:
+PEAT has strong coverage for two ends of the software delivery spectrum:
 
-- **Server/K8s workloads** — Zarf packages containers, HIVE coordinates deployment (ADR-045)
-- **Sensor/MCU nodes** — HIVE-Lite enables ESP32-class devices to participate in the mesh (ADR-035)
+- **Server/K8s workloads** — Zarf packages containers, PEAT coordinates deployment (ADR-045)
+- **Sensor/MCU nodes** — PEAT-Lite enables ESP32-class devices to participate in the mesh (ADR-035)
 
 Between these sits a large class of platforms that need **firmware updates** but don't run Kubernetes:
 
@@ -81,19 +81,19 @@ Defense and intelligence customers are asking for:
 
 ## Decision
 
-### Extend HIVE's Distribution Layer to Firmware Targets
+### Extend PEAT's Distribution Layer to Firmware Targets
 
-Add firmware as a first-class artifact type alongside containers (Zarf), AI models (ONNX), and configuration (CRDT), using the same HIVE protocol primitives for coordination.
+Add firmware as a first-class artifact type alongside containers (Zarf), AI models (ONNX), and configuration (CRDT), using the same PEAT protocol primitives for coordination.
 
 ### Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                        HIVE Protocol Layer                            │
-│  BlobStore, DeploymentDirective, CapabilityAdvertisement, HiveEvent  │
+│                        PEAT Protocol Layer                            │
+│  BlobStore, DeploymentDirective, CapabilityAdvertisement, PeatEvent  │
 │  Convergence Tracking, QoS, Hierarchical Distribution                │
 ├───────────┬───────────┬───────────┬──────────────┬───────────────────┤
-│ Zarf      │ Firmware  │ AI Model  │ Config       │ HIVE-Lite         │
+│ Zarf      │ Firmware  │ AI Model  │ Config       │ PEAT-Lite         │
 │ Adapter   │ OTA Agent │ Runtime   │ Sync         │ Gossip            │
 │           │           │           │              │                   │
 │ K8s/K3s   │ Embedded  │ GPU/NPU   │ All nodes    │ MCU sensors       │
@@ -232,15 +232,15 @@ The update lifecycle is more complex than container or model deployment because 
 
 **State definitions:**
 
-| State | Description | HIVE Action |
+| State | Description | PEAT Action |
 |-------|-------------|-------------|
-| `AVAILABLE` | Firmware manifest received via HIVE sync | Node evaluates hardware compatibility |
-| `DOWNLOADING` | Blob transfer in progress via BlobStore | Progress reported via HiveEvent |
+| `AVAILABLE` | Firmware manifest received via PEAT sync | Node evaluates hardware compatibility |
+| `DOWNLOADING` | Blob transfer in progress via BlobStore | Progress reported via PeatEvent |
 | `STAGED` | Firmware written to inactive partition/slot | Awaiting activation trigger |
 | `ACTIVATING` | Reboot initiated (or hot-swap in progress) | Node goes temporarily offline |
 | `VERIFYING` | New firmware booted, running health checks | Boot verification timer started |
 | `COMMITTED` | Health checks passed, new firmware is active | CapabilityAdvertisement updated |
-| `ROLLBACK` | Boot verification failed, reverted to previous | HiveEvent with failure details |
+| `ROLLBACK` | Boot verification failed, reverted to previous | PeatEvent with failure details |
 | `FAILED` | Unrecoverable failure at any stage | Alert event, manual intervention needed |
 
 ### 3. Firmware OTA Agent
@@ -251,17 +251,17 @@ A lightweight agent that runs on (or alongside) firmware targets:
 /// Firmware OTA Agent — runs on the target platform or its companion processor
 ///
 /// Responsibilities:
-/// - Receive deployment directives via HIVE mesh
+/// - Receive deployment directives via PEAT mesh
 /// - Download firmware blobs via BlobStore
 /// - Manage partition staging and activation
-/// - Report status through HIVE events
+/// - Report status through PEAT events
 ///
 /// The agent is transport-agnostic — it works over QUIC, BLE, or UDP
 /// depending on what the platform supports.
 
 pub struct FirmwareOtaAgent {
-    /// HIVE mesh connection (may be QUIC, BLE, or UDP)
-    hive_node: Arc<dyn HiveNode>,
+    /// PEAT mesh connection (may be QUIC, BLE, or UDP)
+    peat_node: Arc<dyn PeatNode>,
 
     /// Local firmware partition manager
     partition_mgr: Box<dyn PartitionManager>,
@@ -332,7 +332,7 @@ impl FirmwareOtaAgent {
         self.advertise_hardware().await?;
 
         // 2. Watch for firmware deployment directives targeting this node
-        let mut directives = self.hive_node
+        let mut directives = self.peat_node
             .subscribe_directives("firmware_deployments")
             .await?;
 
@@ -385,7 +385,7 @@ impl FirmwareOtaAgent {
         self.update_state(FirmwareOtaState::Downloading).await;
         self.report_status(directive_id, "DOWNLOADING").await?;
 
-        let blob = self.hive_node.blob_store()
+        let blob = self.peat_node.blob_store()
             .fetch_blob(&manifest.blob_hash, |progress| {
                 // Report download progress periodically
             }).await?;
@@ -473,7 +473,7 @@ impl FirmwareOtaAgent {
 
 ### 4. Hardware Capability Advertisement
 
-Firmware targets advertise their hardware identity and current firmware state through HIVE's existing `CapabilityAdvertisement`:
+Firmware targets advertise their hardware identity and current firmware state through PEAT's existing `CapabilityAdvertisement`:
 
 ```protobuf
 message FirmwareCapability {
@@ -510,7 +510,7 @@ This enables the control plane to:
 
 ### 5. Delta/Differential Firmware Updates
 
-For bandwidth-constrained tactical networks, full firmware image transfers are expensive. HIVE supports differential firmware updates using binary diff algorithms:
+For bandwidth-constrained tactical networks, full firmware image transfers are expensive. PEAT supports differential firmware updates using binary diff algorithms:
 
 ```
 Full PX4 firmware image:     2.1 MB
@@ -567,7 +567,7 @@ The OTA agent checks its current version, selects the appropriate delta if avail
 
 ### 6. Multi-Artifact Coordinated Updates
 
-For platforms that carry multiple firmware images and models, HIVE supports coordinated deployment:
+For platforms that carry multiple firmware images and models, PEAT supports coordinated deployment:
 
 ```protobuf
 message PlatformUpdateBundle {
@@ -682,7 +682,7 @@ enum RollbackScope {
 
 ### 7. Fleet Firmware Management
 
-Firmware state for all devices aggregates through HIVE's hierarchy:
+Firmware state for all devices aggregates through PEAT's hierarchy:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -715,7 +715,7 @@ Firmware state for all devices aggregates through HIVE's hierarchy:
 This is implemented using the same convergence tracking pattern from ADR-013:
 
 ```rust
-/// Fleet firmware status — aggregated through HIVE hierarchy
+/// Fleet firmware status — aggregated through PEAT hierarchy
 pub struct FleetFirmwareStatus {
     pub firmware_id: String,
     pub target_version: String,
@@ -741,20 +741,20 @@ pub struct FleetFirmwareStatus {
 
 ### 8. Transport Considerations for Firmware Targets
 
-Firmware targets may connect to the HIVE mesh via different transports:
+Firmware targets may connect to the PEAT mesh via different transports:
 
 | Transport | Bandwidth | Use Case | Blob Transfer |
 |-----------|-----------|----------|---------------|
 | QUIC (via companion CPU) | High | Drone companion computer, vehicle gateway | Full-speed blob transfer |
 | BLE (direct) | Low (≈100KB/s) | Close-range maintenance, sensor payloads | Small firmware only |
-| UDP/HIVE-Lite | Medium | WiFi-connected embedded Linux | Chunked blob transfer |
+| UDP/PEAT-Lite | Medium | WiFi-connected embedded Linux | Chunked blob transfer |
 | Serial bridge | Low | MCUs behind a gateway | Gateway proxies blob download |
 
-For devices that can't directly participate in HIVE mesh (bare-metal MCUs with no network stack), a **companion/gateway pattern** is used:
+For devices that can't directly participate in PEAT mesh (bare-metal MCUs with no network stack), a **companion/gateway pattern** is used:
 
 ```
 ┌─────────────┐     Serial/SPI     ┌──────────────┐     QUIC     ┌──────────┐
-│  MCU with   │◄──────────────────▶│  Companion   │◄────────────▶│  HIVE    │
+│  MCU with   │◄──────────────────▶│  Companion   │◄────────────▶│  PEAT    │
 │  firmware   │   flash commands   │  processor   │  mesh peer   │  Mesh    │
 │  (target)   │                    │  (OTA agent) │              │          │
 └─────────────┘                    └──────────────┘              └──────────┘
@@ -764,7 +764,7 @@ The OTA agent runs on the companion processor and manages the MCU's firmware via
 
 ### 9. Safety and Security
 
-Firmware updates are safety-critical. Additional safeguards beyond standard HIVE security (ADR-006):
+Firmware updates are safety-critical. Additional safeguards beyond standard PEAT security (ADR-006):
 
 **Pre-flight checks before activation:**
 - Battery level above threshold (prevents bricking during flash)
@@ -784,24 +784,24 @@ Firmware updates are safety-critical. Additional safeguards beyond standard HIVE
 - A/B partition scheme ensures one known-good slot at all times
 - Boot verification timer — if health checks don't pass within timeout, automatic rollback
 - Golden image — if both A and B slots fail, fall back to factory firmware in protected storage
-- All state transitions logged as HIVE events for audit trail
+- All state transitions logged as PEAT events for audit trail
 
-## Implementation: HIVE-Lite ESP32 OTA (Phase 0)
+## Implementation: PEAT-Lite ESP32 OTA (Phase 0)
 
-The first concrete implementation of firmware OTA in the HIVE ecosystem targets HIVE-Lite on ESP32 (M5Stack Core2). This validates the core protocol and A/B partition update lifecycle end-to-end over the existing UDP gossip transport.
+The first concrete implementation of firmware OTA in the PEAT ecosystem targets PEAT-Lite on ESP32 (M5Stack Core2). This validates the core protocol and A/B partition update lifecycle end-to-end over the existing UDP gossip transport.
 
 ### Wire Protocol
 
-OTA messages extend the existing HIVE-Lite packet format (ADR-035). All messages share the standard 16-byte header:
+OTA messages extend the existing PEAT-Lite packet format (ADR-035). All messages share the standard 16-byte header:
 
 ```
 ┌──────────┬─────────┬──────────┬──────────┬──────────┬──────────────┐
 │  MAGIC   │ Version │   Type   │  Flags   │  NodeID  │   SeqNum     │
-│ "HIVE"   │  0x01   │  0x10-16 │  2 bytes │  4 bytes │   4 bytes    │
+│ "PEAT"   │  0x01   │  0x10-16 │  2 bytes │  4 bytes │   4 bytes    │
 └──────────┴─────────┴──────────┴──────────┴──────────┴──────────────┘
 ```
 
-Seven OTA message types are defined in `hive-lite-protocol`:
+Seven OTA message types are defined in `peat-lite-protocol`:
 
 | Type | Code | Direction | Payload |
 |------|------|-----------|---------|
@@ -891,7 +891,7 @@ OTA_SIGNING_PUBKEY="<64 hex chars>" cargo +esp build ...
 
 ### Receiver Implementation
 
-The OTA receiver (`hive-lite/src/ota.rs`) is a state machine:
+The OTA receiver (`peat-lite/src/ota.rs`) is a state machine:
 
 ```
 Idle → WaitingForData → Receiving → Verifying → ReadyToReboot
@@ -928,7 +928,7 @@ Features:
 Tested 2026-02-22 on M5Stack Core2 (ESP32, rev v3.1) over WiFi:
 
 ```
-Firmware:   580,960 bytes (hive-lite-wifi with m5stack-core2-wifi,ota features)
+Firmware:   580,960 bytes (peat-lite-wifi with m5stack-core2-wifi,ota features)
 Chunks:     1,297 × 448 bytes
 Transfer:   46.5 seconds at 12.2 KB/s
 SHA256:     Verified on-device (streaming hash)
@@ -956,8 +956,8 @@ Got IP: 192.168.1.116
 
 | Crate | OTA Contribution |
 |-------|-----------------|
-| `hive-lite-protocol` | Wire constants (`OTA_CHUNK_DATA_SIZE`, result/abort codes, `OTA_FLAG_SIGNED`) and `MessageType` variants (0x10-0x16) |
-| `hive-lite` | `ota` module (receiver state machine, flash operations, validation record, signature verification); `build.rs` (pubkey codegen); `wifi_main.rs` (OTA message dispatch) |
+| `peat-lite-protocol` | Wire constants (`OTA_CHUNK_DATA_SIZE`, result/abort codes, `OTA_FLAG_SIGNED`) and `MessageType` variants (0x10-0x16) |
+| `peat-lite` | `ota` module (receiver state machine, flash operations, validation record, signature verification); `build.rs` (pubkey codegen); `wifi_main.rs` (OTA message dispatch) |
 | `scripts/ota-sender.py` | Test sender tool (Python, no Rust deps) |
 
 ### Build Commands
@@ -976,20 +976,20 @@ make flash SSID=MyNet WIFI_PWD=secret PORT=/dev/ttyACM1
 make build-image SSID=MyNet WIFI_PWD=secret
 
 # Send OTA update to a running device
-python3 scripts/ota-sender.py hive-lite/ota_firmware.bin --target <device-ip>
+python3 scripts/ota-sender.py peat-lite/ota_firmware.bin --target <device-ip>
 ```
 
 ## Implementation Phases
 
 ### Phase 1: Foundation (Months 1-2)
 
-- Define `FirmwareManifest` and `FirmwareCapability` protobuf schemas in hive-schema
+- Define `FirmwareManifest` and `FirmwareCapability` protobuf schemas in peat-schema
 - Add `FirmwareFormat` as artifact type to existing `DeploymentDirective`
 - Implement hardware compatibility matching logic
 - Add firmware status tracking to convergence monitoring
 
 **Success criteria:**
-- Can publish firmware manifest to HIVE mesh
+- Can publish firmware manifest to PEAT mesh
 - Devices advertise hardware capabilities
 - Compatibility matching prevents wrong firmware from being deployed
 
@@ -1001,7 +1001,7 @@ python3 scripts/ota-sender.py hive-lite/ota_firmware.bin --target <device-ip>
 - Safety constraint checking
 
 **Success criteria:**
-- Can update firmware on Raspberry Pi via HIVE mesh
+- Can update firmware on Raspberry Pi via PEAT mesh
 - Automatic rollback on boot verification failure
 - Safety constraints enforced
 
@@ -1024,7 +1024,7 @@ python3 scripts/ota-sender.py hive-lite/ota_firmware.bin --target <device-ip>
 - Integration with existing OTA tools (SWUpdate, RAUC) as backends
 
 **Success criteria:**
-- Can update STM32-based autopilot firmware via HIVE mesh
+- Can update STM32-based autopilot firmware via PEAT mesh
 - BLE-based firmware update for sensor payloads
 - SWUpdate/RAUC used as partition manager backend
 
@@ -1048,7 +1048,7 @@ python3 scripts/ota-sender.py hive-lite/ota_firmware.bin --target <device-ip>
 - Zarf handles K8s workloads
 - Firmware OTA handles embedded platforms
 - AI model delivery handles GPU/NPU nodes
-- HIVE-Lite handles sensor mesh
+- PEAT-Lite handles sensor mesh
 - All coordinated through a single protocol
 
 **Safety:**
@@ -1060,7 +1060,7 @@ python3 scripts/ota-sender.py hive-lite/ota_firmware.bin --target <device-ip>
 ### Negative
 
 **Complexity:**
-- Another adapter type to maintain alongside Zarf, model delivery, HIVE-Lite
+- Another adapter type to maintain alongside Zarf, model delivery, PEAT-Lite
 - Platform-specific PartitionManager implementations needed for each hardware target
 - Safety-critical code requires higher testing standards
 - Multi-artifact coordination adds state machine complexity
@@ -1080,7 +1080,7 @@ python3 scripts/ota-sender.py hive-lite/ota_firmware.bin --target <device-ip>
 - PlatformUpdateBundle is optional — single-artifact updates work standalone
 
 **Hardware Diversity:**
-- Maintain compatibility database as HIVE collection (auto-synced)
+- Maintain compatibility database as PEAT collection (auto-synced)
 - Community-contributed PartitionManager implementations
 - Companion processor pattern abstracts MCU differences behind serial/SPI interface
 
@@ -1103,19 +1103,19 @@ python3 scripts/ota-sender.py hive-lite/ota_firmware.bin --target <device-ip>
 - Resumable transfers over unreliable links
 - Progress tracking for large firmware images
 
-### With ADR-035 (HIVE-Lite)
-- HIVE-Lite nodes can receive firmware updates via gossip/BLE
+### With ADR-035 (PEAT-Lite)
+- PEAT-Lite nodes can receive firmware updates via gossip/BLE
 - ESP32 OTA is a special case of firmware update
-- HIVE-Lite capability flags indicate OTA support
+- PEAT-Lite capability flags indicate OTA support
 
 ### With ADR-045 (Zarf/UDS Integration)
 - Firmware OTA extends UDS delivery to non-K8s targets
-- Same metadata backplane (HIVE) coordinates both Zarf and firmware deployments
+- Same metadata backplane (PEAT) coordinates both Zarf and firmware deployments
 - Fleet view spans both K8s workloads and firmware targets
 
 ### With ADR-006 (Security)
-- Firmware signature verification uses HIVE PKI
-- Deployment authorization through HIVE RBAC
+- Firmware signature verification uses PEAT PKI
+- Deployment authorization through PEAT RBAC
 - Hardware root of trust for bootloader verification
 - Audit trail for all firmware operations
 
@@ -1125,7 +1125,7 @@ python3 scripts/ota-sender.py hive-lite/ota_firmware.bin --target <device-ip>
 - ADR-022: Edge MLOps Architecture
 - ADR-025: Blob Transfer Abstraction Layer
 - ADR-026: Reference Implementation - Software Orchestration
-- ADR-035: HIVE-Lite Embedded Sensor Nodes
+- ADR-035: PEAT-Lite Embedded Sensor Nodes
 - ADR-045: Zarf/UDS Integration
 - [SWUpdate](https://sbabic.github.io/swupdate/) — Software Update for Embedded Linux
 - [RAUC](https://rauc.io/) — Safe and Secure OTA Updates for Embedded Linux
@@ -1137,4 +1137,4 @@ python3 scripts/ota-sender.py hive-lite/ota_firmware.bin --target <device-ip>
 
 ---
 
-**This ADR extends HIVE's distribution capabilities to firmware targets, enabling unified software delivery across the full spectrum from cloud/K8s through embedded platforms, all coordinated through a single mesh protocol.**
+**This ADR extends PEAT's distribution capabilities to firmware targets, enabling unified software delivery across the full spectrum from cloud/K8s through embedded platforms, all coordinated through a single mesh protocol.**

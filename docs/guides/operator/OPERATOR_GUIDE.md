@@ -1,4 +1,4 @@
-# HIVE Operator Guide
+# PEAT Operator Guide
 
 > **Version**: 1.0
 > **Last Updated**: 2025-12-08
@@ -25,9 +25,9 @@
 
 ## 1. Introduction
 
-### 1.1 What is HIVE?
+### 1.1 What is PEAT?
 
-HIVE (Hierarchical Intelligence for Versatile Entities) is a protocol for scalable coordination of autonomous nodes (100+ nodes) using CRDTs with O(n log n) message complexity. It enables autonomous systems to coordinate without centralized control through:
+PEAT (Hierarchical Intelligence for Versatile Entities) is a protocol for scalable coordination of autonomous nodes (100+ nodes) using CRDTs with O(n log n) message complexity. It enables autonomous systems to coordinate without centralized control through:
 
 - **Three-phase protocol**: Discovery → Cell Formation → Hierarchical Operations
 - **CRDT-based state**: Eventual consistency via distributed data structures
@@ -38,7 +38,7 @@ HIVE (Hierarchical Intelligence for Versatile Entities) is a protocol for scalab
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         HIVE Network                            │
+│                         PEAT Network                            │
 │                                                                 │
 │  ┌──────────┐    ┌──────────┐    ┌──────────┐                  │
 │  │  Zone 1  │    │  Zone 2  │    │  Zone 3  │   Hierarchical   │
@@ -59,14 +59,14 @@ HIVE (Hierarchical Intelligence for Versatile Entities) is a protocol for scalab
 
 | Component | Description | Crate |
 |-----------|-------------|-------|
-| **Protocol Core** | Three-phase protocol, capabilities, composition | `hive-protocol` |
-| **Mesh Layer** | P2P mesh topology and beacon management | `hive-mesh` |
-| **Transport** | HTTP/REST API for external integration | `hive-transport` |
-| **Discovery** | Peer discovery (mDNS, static, hybrid) | `hive-discovery` |
-| **Persistence** | Storage abstraction for state | `hive-persistence` |
-| **Simulator** | Network simulation and testing | `hive-sim` |
-| **FFI** | Mobile bindings (Kotlin/Swift) | `hive-ffi` |
-| **Inference** | Edge AI/ML inference pipeline | `hive-inference` |
+| **Protocol Core** | Three-phase protocol, capabilities, composition | `peat-protocol` |
+| **Mesh Layer** | P2P mesh topology and beacon management | `peat-mesh` |
+| **Transport** | HTTP/REST API for external integration | `peat-transport` |
+| **Discovery** | Peer discovery (mDNS, static, hybrid) | `peat-discovery` |
+| **Persistence** | Storage abstraction for state | `peat-persistence` |
+| **Simulator** | Network simulation and testing | `peat-sim` |
+| **FFI** | Mobile bindings (Kotlin/Swift) | `peat-ffi` |
+| **Inference** | Edge AI/ML inference pipeline | `peat-inference` |
 
 ### 1.4 Supported Platforms
 
@@ -83,7 +83,7 @@ HIVE (Hierarchical Intelligence for Versatile Entities) is a protocol for scalab
 
 ## 2. Quick Start
 
-Get HIVE running in 10 minutes.
+Get PEAT running in 10 minutes.
 
 ### 2.1 Prerequisites
 
@@ -96,8 +96,8 @@ Get HIVE running in 10 minutes.
 
 ```bash
 # Clone the repository
-git clone https://github.com/kitplummer/hive.git
-cd hive
+git clone https://github.com/defenseunicorns/peat.git
+cd peat
 
 # Build the project (first build takes 5-10 minutes)
 cargo build --release
@@ -107,12 +107,12 @@ cargo build --release
 
 ```bash
 # Run the network simulator
-cargo run --release --bin hive-sim
+cargo run --release --bin peat-sim
 ```
 
 Expected output:
 ```
-[INFO] HIVE Simulator starting...
+[INFO] PEAT Simulator starting...
 [INFO] Creating 10 nodes with random capabilities
 [INFO] Phase 1: Discovery starting...
 [INFO] Node UAV-001 discovered 9 peers
@@ -185,15 +185,15 @@ cargo --version
 #### Standard Build (Ditto Backend)
 
 ```bash
-git clone https://github.com/kitplummer/hive.git
-cd hive
+git clone https://github.com/defenseunicorns/peat.git
+cd peat
 
 # Build all crates
 cargo build --release
 
 # Binaries located at:
-# - target/release/hive-sim
-# - target/release/hive-commander (if available)
+# - target/release/peat-sim
+# - target/release/peat-commander (if available)
 ```
 
 #### Build with Automerge Backend (Pure OSS)
@@ -210,7 +210,7 @@ cargo build --release --no-default-features --features automerge-backend
 # See .cargo/config.toml for toolchain configuration
 
 # Build FFI library for Android
-cd hive-ffi
+cd peat-ffi
 cargo build --release --target aarch64-linux-android
 ```
 
@@ -220,9 +220,9 @@ Pre-built binaries are available for releases:
 
 ```bash
 # Download latest release (example)
-curl -LO https://github.com/kitplummer/hive/releases/latest/download/hive-sim-linux-x86_64.tar.gz
-tar -xzf hive-sim-linux-x86_64.tar.gz
-./hive-sim
+curl -LO https://github.com/defenseunicorns/peat/releases/latest/download/peat-sim-linux-x86_64.tar.gz
+tar -xzf peat-sim-linux-x86_64.tar.gz
+./peat-sim
 ```
 
 ### 3.5 Container Deployment
@@ -236,14 +236,14 @@ RUN cargo build --release
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /app/target/release/hive-sim /usr/local/bin/
-ENTRYPOINT ["hive-sim"]
+COPY --from=builder /app/target/release/peat-sim /usr/local/bin/
+ENTRYPOINT ["peat-sim"]
 ```
 
 Build and run:
 ```bash
-docker build -t hive-sim .
-docker run --rm -it hive-sim
+docker build -t peat-sim .
+docker run --rm -it peat-sim
 ```
 
 ### 3.6 Development Tools (Optional)
@@ -283,26 +283,26 @@ sudo apt install mold
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `RUST_LOG` | Log level configuration | `info` |
-| `HIVE_NODE_ID` | Unique node identifier | Auto-generated UUID |
-| `HIVE_CELL_SIZE` | Target cell size | `5` |
-| `HIVE_DISCOVERY_TIMEOUT` | Discovery phase timeout (seconds) | `30` |
-| `HIVE_LEADER_ELECTION_TIMEOUT` | Leader election timeout (seconds) | `10` |
+| `PEAT_NODE_ID` | Unique node identifier | Auto-generated UUID |
+| `PEAT_CELL_SIZE` | Target cell size | `5` |
+| `PEAT_DISCOVERY_TIMEOUT` | Discovery phase timeout (seconds) | `30` |
+| `PEAT_LEADER_ELECTION_TIMEOUT` | Leader election timeout (seconds) | `10` |
 
 #### Network Configuration
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `HIVE_BIND_ADDRESS` | Address to bind for incoming connections | `0.0.0.0` |
-| `HIVE_BIND_PORT` | Port for P2P communication | `4040` |
-| `HIVE_HTTP_PORT` | Port for HTTP API | `8080` |
-| `HIVE_DISCOVERY_MODE` | Discovery mode: `mdns`, `static`, `hybrid` | `mdns` |
+| `PEAT_BIND_ADDRESS` | Address to bind for incoming connections | `0.0.0.0` |
+| `PEAT_BIND_PORT` | Port for P2P communication | `4040` |
+| `PEAT_HTTP_PORT` | Port for HTTP API | `8080` |
+| `PEAT_DISCOVERY_MODE` | Discovery mode: `mdns`, `static`, `hybrid` | `mdns` |
 
 ### 4.2 Configuration File
 
-Create `hive.toml` for file-based configuration:
+Create `peat.toml` for file-based configuration:
 
 ```toml
-# hive.toml - HIVE Configuration
+# peat.toml - PEAT Configuration
 
 [node]
 id = "node-001"                    # Optional: auto-generated if not set
@@ -339,13 +339,13 @@ tls_enabled = true
 
 [storage]
 backend = "ditto"                  # ditto or automerge
-persistence_dir = "/var/lib/hive/data"
+persistence_dir = "/var/lib/peat/data"
 max_state_size_mb = 100
 
 [logging]
 level = "info"                     # trace, debug, info, warn, error
 format = "json"                    # json or pretty
-file = "/var/log/hive/hive.log"   # Optional: log to file
+file = "/var/log/peat/peat.log"   # Optional: log to file
 
 [capabilities]
 # Define node capabilities
@@ -416,10 +416,10 @@ cargo build --release --features onnx-inference
 
 ```bash
 # All debug logs
-RUST_LOG=debug cargo run --bin hive-sim
+RUST_LOG=debug cargo run --bin peat-sim
 
 # Specific module tracing
-RUST_LOG=hive_protocol::discovery=trace,hive_protocol::cell=debug cargo run
+RUST_LOG=peat_protocol::discovery=trace,peat_protocol::cell=debug cargo run
 
 # Production logging (info + warnings/errors)
 RUST_LOG=info cargo run --release
@@ -429,12 +429,12 @@ RUST_LOG=info cargo run --release
 
 Set `format = "json"` in configuration or:
 ```bash
-HIVE_LOG_FORMAT=json cargo run --release
+PEAT_LOG_FORMAT=json cargo run --release
 ```
 
 Output example:
 ```json
-{"timestamp":"2025-12-08T10:30:00Z","level":"INFO","target":"hive_protocol::cell","message":"Cell formed","cell_id":"alpha","member_count":5}
+{"timestamp":"2025-12-08T10:30:00Z","level":"INFO","target":"peat_protocol::cell","message":"Cell formed","cell_id":"alpha","member_count":5}
 ```
 
 ---
@@ -447,10 +447,10 @@ For development and testing on a single machine:
 
 ```bash
 # Start the simulator with default configuration
-cargo run --release --bin hive-sim
+cargo run --release --bin peat-sim
 
 # Or with custom node count
-HIVE_NODE_COUNT=20 cargo run --release --bin hive-sim
+PEAT_NODE_COUNT=20 cargo run --release --bin peat-sim
 ```
 
 ### 5.2 Multi-Node Production
@@ -460,20 +460,20 @@ Deploy across multiple machines for production testing:
 #### Node 1 (Seed Node)
 ```bash
 # Set as discovery seed
-export HIVE_NODE_ID="seed-001"
-export HIVE_DISCOVERY_MODE="hybrid"
-export HIVE_BIND_ADDRESS="0.0.0.0"
-export HIVE_BIND_PORT="4040"
+export PEAT_NODE_ID="seed-001"
+export PEAT_DISCOVERY_MODE="hybrid"
+export PEAT_BIND_ADDRESS="0.0.0.0"
+export PEAT_BIND_PORT="4040"
 
-./hive-sim --seed
+./peat-sim --seed
 ```
 
 #### Nodes 2-N (Joining Nodes)
 ```bash
-export HIVE_NODE_ID="node-002"
-export HIVE_STATIC_PEERS="192.168.1.10:4040"
+export PEAT_NODE_ID="node-002"
+export PEAT_STATIC_PEERS="192.168.1.10:4040"
 
-./hive-sim
+./peat-sim
 ```
 
 ### 5.3 Edge Device Deployment
@@ -487,10 +487,10 @@ cargo build --release \
     --features automerge-backend
 
 # Deploy binary
-scp target/release/hive-sim edge-device:/opt/hive/
+scp target/release/peat-sim edge-device:/opt/peat/
 
 # Run with reduced resource usage
-ssh edge-device "cd /opt/hive && HIVE_CELL_SIZE=3 ./hive-sim"
+ssh edge-device "cd /opt/peat && PEAT_CELL_SIZE=3 ./peat-sim"
 ```
 
 ### 5.4 Containerized Deployment
@@ -502,53 +502,53 @@ ssh edge-device "cd /opt/hive && HIVE_CELL_SIZE=3 ./hive-sim"
 version: '3.8'
 
 services:
-  hive-seed:
-    image: hive-sim:latest
+  peat-seed:
+    image: peat-sim:latest
     environment:
-      - HIVE_NODE_ID=seed-001
-      - HIVE_DISCOVERY_MODE=static
+      - PEAT_NODE_ID=seed-001
+      - PEAT_DISCOVERY_MODE=static
       - RUST_LOG=info
     ports:
       - "4040:4040"
       - "8080:8080"
     volumes:
-      - hive-data-seed:/var/lib/hive
+      - peat-data-seed:/var/lib/peat
     networks:
-      - hive-net
+      - peat-net
 
-  hive-node-1:
-    image: hive-sim:latest
+  peat-node-1:
+    image: peat-sim:latest
     environment:
-      - HIVE_NODE_ID=node-001
-      - HIVE_STATIC_PEERS=hive-seed:4040
+      - PEAT_NODE_ID=node-001
+      - PEAT_STATIC_PEERS=peat-seed:4040
       - RUST_LOG=info
     depends_on:
-      - hive-seed
+      - peat-seed
     volumes:
-      - hive-data-1:/var/lib/hive
+      - peat-data-1:/var/lib/peat
     networks:
-      - hive-net
+      - peat-net
 
-  hive-node-2:
-    image: hive-sim:latest
+  peat-node-2:
+    image: peat-sim:latest
     environment:
-      - HIVE_NODE_ID=node-002
-      - HIVE_STATIC_PEERS=hive-seed:4040
+      - PEAT_NODE_ID=node-002
+      - PEAT_STATIC_PEERS=peat-seed:4040
       - RUST_LOG=info
     depends_on:
-      - hive-seed
+      - peat-seed
     volumes:
-      - hive-data-2:/var/lib/hive
+      - peat-data-2:/var/lib/peat
     networks:
-      - hive-net
+      - peat-net
 
 volumes:
-  hive-data-seed:
-  hive-data-1:
-  hive-data-2:
+  peat-data-seed:
+  peat-data-1:
+  peat-data-2:
 
 networks:
-  hive-net:
+  peat-net:
     driver: bridge
 ```
 
@@ -561,42 +561,42 @@ docker-compose logs -f
 ### 5.5 Kubernetes Deployment
 
 ```yaml
-# hive-deployment.yaml
+# peat-deployment.yaml
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: hive-node
+  name: peat-node
 spec:
-  serviceName: hive
+  serviceName: peat
   replicas: 5
   selector:
     matchLabels:
-      app: hive
+      app: peat
   template:
     metadata:
       labels:
-        app: hive
+        app: peat
     spec:
       containers:
-      - name: hive
-        image: hive-sim:latest
+      - name: peat
+        image: peat-sim:latest
         ports:
         - containerPort: 4040
           name: p2p
         - containerPort: 8080
           name: http
         env:
-        - name: HIVE_NODE_ID
+        - name: PEAT_NODE_ID
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        - name: HIVE_DISCOVERY_MODE
+        - name: PEAT_DISCOVERY_MODE
           value: "static"
-        - name: HIVE_STATIC_PEERS
-          value: "hive-node-0.hive:4040"
+        - name: PEAT_STATIC_PEERS
+          value: "peat-node-0.peat:4040"
         volumeMounts:
         - name: data
-          mountPath: /var/lib/hive
+          mountPath: /var/lib/peat
   volumeClaimTemplates:
   - metadata:
       name: data
@@ -609,11 +609,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: hive
+  name: peat
 spec:
   clusterIP: None
   selector:
-    app: hive
+    app: peat
   ports:
   - port: 4040
     name: p2p
@@ -659,10 +659,10 @@ sudo firewall-cmd --reload
 
 ### 6.3 NAT Traversal
 
-HIVE uses Iroh for NAT traversal when using the Automerge backend:
+PEAT uses Iroh for NAT traversal when using the Automerge backend:
 
 ```toml
-# hive.toml
+# peat.toml
 [network]
 nat_traversal = true
 relay_servers = [
@@ -675,7 +675,7 @@ stun_servers = [
 
 ### 6.4 Bandwidth Considerations
 
-HIVE is designed for constrained networks:
+PEAT is designed for constrained networks:
 
 | Profile | Bandwidth | Use Case |
 |---------|-----------|----------|
@@ -694,7 +694,7 @@ qos_enabled = true
 
 ### 6.5 Network Partition Handling
 
-HIVE automatically handles network partitions:
+PEAT automatically handles network partitions:
 
 1. **Detection**: Heartbeat timeout (configurable, default 30s)
 2. **Recovery**: Exponential backoff reconnection (2s, 4s, 8s, 16s...)
@@ -719,7 +719,7 @@ openssl rand -base64 32
 # Example: K7j+3Zp8mN2xYtR5qW1vL9cF4hD6gB0nM8aE2sU7iO4=
 
 # Set in environment
-export HIVE_FORMATION_KEY="K7j+3Zp8mN2xYtR5qW1vL9cF4hD6gB0nM8aE2sU7iO4="
+export PEAT_FORMATION_KEY="K7j+3Zp8mN2xYtR5qW1vL9cF4hD6gB0nM8aE2sU7iO4="
 ```
 
 Or in configuration:
@@ -735,9 +735,9 @@ For production deployments with device certificates:
 ```toml
 [security.pki]
 enabled = true
-ca_cert = "/etc/hive/certs/ca.crt"
-node_cert = "/etc/hive/certs/node.crt"
-node_key = "/etc/hive/certs/node.key"
+ca_cert = "/etc/peat/certs/ca.crt"
+node_cert = "/etc/peat/certs/node.crt"
+node_key = "/etc/peat/certs/node.key"
 verify_peer = true
 ```
 
@@ -745,17 +745,17 @@ Generate certificates:
 ```bash
 # Generate CA
 openssl genrsa -out ca.key 4096
-openssl req -new -x509 -days 365 -key ca.key -out ca.crt -subj "/CN=HIVE CA"
+openssl req -new -x509 -days 365 -key ca.key -out ca.crt -subj "/CN=PEAT CA"
 
 # Generate node certificate
 openssl genrsa -out node.key 2048
-openssl req -new -key node.key -out node.csr -subj "/CN=hive-node-001"
+openssl req -new -key node.key -out node.csr -subj "/CN=peat-node-001"
 openssl x509 -req -days 365 -in node.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out node.crt
 ```
 
 ### 7.3 Encryption
 
-HIVE uses ChaCha20-Poly1305 for symmetric encryption:
+PEAT uses ChaCha20-Poly1305 for symmetric encryption:
 
 ```toml
 [security]
@@ -770,7 +770,7 @@ Devices authenticate using ED25519 signatures:
 ```toml
 [security.device_auth]
 enabled = true
-key_file = "/etc/hive/device.key"
+key_file = "/etc/peat/device.key"
 ```
 
 #### User Authentication (for HTTP API)
@@ -788,7 +788,7 @@ password_hash_algorithm = "argon2"
 3. **Rotate credentials** regularly
 4. **Use PKI** for device authentication in secure environments
 5. **Audit logs** for security events
-6. **Network segmentation** for HIVE traffic
+6. **Network segmentation** for PEAT traffic
 
 ---
 
@@ -809,7 +809,7 @@ curl http://localhost:8080/ready
 
 ### 8.2 Metrics
 
-HIVE exposes Prometheus-compatible metrics:
+PEAT exposes Prometheus-compatible metrics:
 
 ```bash
 curl http://localhost:8080/metrics
@@ -818,13 +818,13 @@ curl http://localhost:8080/metrics
 Key metrics:
 | Metric | Description |
 |--------|-------------|
-| `hive_peers_connected` | Number of connected peers |
-| `hive_cell_size` | Current cell membership count |
-| `hive_messages_sent_total` | Total messages sent |
-| `hive_messages_received_total` | Total messages received |
-| `hive_sync_latency_seconds` | CRDT sync latency histogram |
-| `hive_bandwidth_bytes_total` | Bandwidth usage |
-| `hive_leader_elections_total` | Leader election count |
+| `peat_peers_connected` | Number of connected peers |
+| `peat_cell_size` | Current cell membership count |
+| `peat_messages_sent_total` | Total messages sent |
+| `peat_messages_received_total` | Total messages received |
+| `peat_sync_latency_seconds` | CRDT sync latency histogram |
+| `peat_bandwidth_bytes_total` | Bandwidth usage |
+| `peat_leader_elections_total` | Leader election count |
 
 ### 8.3 Logging
 
@@ -838,10 +838,10 @@ Key metrics:
 #### Structured Logging
 ```bash
 # Enable JSON logging
-HIVE_LOG_FORMAT=json ./hive-sim
+PEAT_LOG_FORMAT=json ./peat-sim
 
 # Example output
-{"timestamp":"2025-12-08T10:30:00.123Z","level":"INFO","target":"hive_protocol::cell","fields":{"cell_id":"alpha","event":"member_joined","node_id":"node-005"}}
+{"timestamp":"2025-12-08T10:30:00.123Z","level":"INFO","target":"peat_protocol::cell","fields":{"cell_id":"alpha","event":"member_joined","node_id":"node-005"}}
 ```
 
 ### 8.4 Distributed Tracing
@@ -852,7 +852,7 @@ Enable OpenTelemetry tracing:
 [telemetry]
 tracing_enabled = true
 otlp_endpoint = "http://jaeger:4317"
-service_name = "hive-node"
+service_name = "peat-node"
 ```
 
 ### 8.5 Alerting Recommendations
@@ -871,23 +871,23 @@ service_name = "hive-node"
 
 ### 9.1 Overview
 
-HIVE integrates with Team Awareness Kit (TAK) via Cursor-on-Target (CoT) protocol translation:
+PEAT integrates with Team Awareness Kit (TAK) via Cursor-on-Target (CoT) protocol translation:
 
 ```
 ┌─────────┐      ┌───────────────┐      ┌──────────┐
-│  HIVE   │ ←──→ │ CoT Translator│ ←──→ │  ATAK    │
-│ Network │      │   (hive-cot)  │      │  Devices │
+│  PEAT   │ ←──→ │ CoT Translator│ ←──→ │  ATAK    │
+│ Network │      │   (peat-cot)  │      │  Devices │
 └─────────┘      └───────────────┘      └──────────┘
 ```
 
 ### 9.2 ATAK Plugin Installation
 
-1. Download the HIVE ATAK plugin APK
+1. Download the PEAT ATAK plugin APK
 2. Install on Android device with ATAK
 3. Configure connection settings
 
 ```
-Settings → Tool Preferences → HIVE
+Settings → Tool Preferences → PEAT
 - Server: 192.168.1.100
 - Port: 8087
 - Formation Key: [your-key]
@@ -903,7 +903,7 @@ bind_port = 8087
 protocol = "tcp"  # tcp, udp, or multicast
 
 [cot.translation]
-# Map HIVE capabilities to CoT types
+# Map PEAT capabilities to CoT types
 platform_uav = "a-f-A-M-F-Q"      # UAV
 platform_ugv = "a-f-G-U-C"        # UGV
 platform_usv = "a-f-S-X-L"        # USV
@@ -912,25 +912,25 @@ sensor_eo_ir = "b-m-p-s-m"        # Sensor point
 
 ### 9.4 CoT Message Examples
 
-HIVE automatically translates to CoT XML:
+PEAT automatically translates to CoT XML:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<event version="2.0" uid="HIVE-UAV-001" type="a-f-A-M-F-Q"
+<event version="2.0" uid="PEAT-UAV-001" type="a-f-A-M-F-Q"
        time="2025-12-08T10:30:00Z" start="2025-12-08T10:30:00Z"
        stale="2025-12-08T10:35:00Z" how="m-g">
   <point lat="38.8977" lon="-77.0365" hae="100" ce="10" le="10"/>
   <detail>
     <contact callsign="UAV-001"/>
     <__group name="Alpha" role="Team Lead"/>
-    <hive:capability type="EO_IR" range="10000"/>
+    <peat:capability type="EO_IR" range="10000"/>
   </detail>
 </event>
 ```
 
 ### 9.5 Bidirectional Integration
 
-HIVE receives commands from TAK/ATAK:
+PEAT receives commands from TAK/ATAK:
 - Position updates from ATAK users
 - Mission waypoints
 - Target designations
@@ -951,11 +951,11 @@ command_authority = "C2_ONLY"  # or "ANY_TAK_USER"
 
 ### 10.1 State Persistence
 
-HIVE persists state to disk for recovery:
+PEAT persists state to disk for recovery:
 
 ```toml
 [storage]
-persistence_dir = "/var/lib/hive/data"
+persistence_dir = "/var/lib/peat/data"
 snapshot_interval_seconds = 60
 max_snapshots = 10
 ```
@@ -965,24 +965,24 @@ max_snapshots = 10
 #### Manual Backup
 ```bash
 # Stop the node gracefully
-kill -SIGTERM $(pgrep hive-sim)
+kill -SIGTERM $(pgrep peat-sim)
 
 # Backup state directory
-tar -czf hive-backup-$(date +%Y%m%d).tar.gz /var/lib/hive/data
+tar -czf peat-backup-$(date +%Y%m%d).tar.gz /var/lib/peat/data
 
 # Restart the node
-./hive-sim
+./peat-sim
 ```
 
 #### Automated Backup
 ```bash
 #!/bin/bash
-# /etc/cron.daily/hive-backup
-BACKUP_DIR=/var/backups/hive
+# /etc/cron.daily/peat-backup
+BACKUP_DIR=/var/backups/peat
 mkdir -p $BACKUP_DIR
-tar -czf $BACKUP_DIR/hive-$(date +%Y%m%d%H%M).tar.gz /var/lib/hive/data
+tar -czf $BACKUP_DIR/peat-$(date +%Y%m%d%H%M).tar.gz /var/lib/peat/data
 # Keep last 7 days
-find $BACKUP_DIR -name "hive-*.tar.gz" -mtime +7 -delete
+find $BACKUP_DIR -name "peat-*.tar.gz" -mtime +7 -delete
 ```
 
 ### 10.3 Recovery Procedures
@@ -990,23 +990,23 @@ find $BACKUP_DIR -name "hive-*.tar.gz" -mtime +7 -delete
 #### From Backup
 ```bash
 # Stop the node
-kill -SIGTERM $(pgrep hive-sim)
+kill -SIGTERM $(pgrep peat-sim)
 
 # Restore state
-rm -rf /var/lib/hive/data/*
-tar -xzf hive-backup-20251208.tar.gz -C /
+rm -rf /var/lib/peat/data/*
+tar -xzf peat-backup-20251208.tar.gz -C /
 
 # Restart
-./hive-sim
+./peat-sim
 ```
 
 #### From Clean State
 ```bash
 # Remove corrupted state
-rm -rf /var/lib/hive/data/*
+rm -rf /var/lib/peat/data/*
 
 # Node will rejoin network and sync state from peers
-./hive-sim
+./peat-sim
 ```
 
 ### 10.4 Disaster Recovery
@@ -1072,11 +1072,11 @@ ping -c 10 peer-node
 **Diagnosis**:
 ```bash
 # Check process memory
-ps aux | grep hive
-top -p $(pgrep hive-sim)
+ps aux | grep peat
+top -p $(pgrep peat-sim)
 
 # Check state size
-du -sh /var/lib/hive/data/
+du -sh /var/lib/peat/data/
 ```
 
 **Solutions**:
@@ -1137,12 +1137,12 @@ netstat -tuln
 ss -tuln
 
 # Process information
-ps aux | grep hive
-lsof -p $(pgrep hive-sim)
+ps aux | grep peat
+lsof -p $(pgrep peat-sim)
 
 # Log analysis
-journalctl -u hive -f
-tail -f /var/log/hive/hive.log | jq .
+journalctl -u peat -f
+tail -f /var/log/peat/peat.log | jq .
 
 # API health
 curl -s localhost:8080/health | jq .
@@ -1154,7 +1154,7 @@ curl -s localhost:8080/api/v1/status | jq .
 Enable verbose logging for debugging:
 
 ```bash
-RUST_LOG=trace RUST_BACKTRACE=1 ./hive-sim 2>&1 | tee debug.log
+RUST_LOG=trace RUST_BACKTRACE=1 ./peat-sim 2>&1 | tee debug.log
 ```
 
 ### 11.4 Support Escalation
@@ -1168,7 +1168,7 @@ If issues persist:
    ```
 
 2. Include:
-   - HIVE version (`cargo --version`, git commit)
+   - PEAT version (`cargo --version`, git commit)
    - Configuration (sanitized, no keys)
    - Logs from issue timeframe
    - Network topology diagram
@@ -1183,8 +1183,8 @@ If issues persist:
 ### 12.1 CLI Reference
 
 ```bash
-# hive-sim options
-hive-sim [OPTIONS]
+# peat-sim options
+peat-sim [OPTIONS]
 
 OPTIONS:
     --config <FILE>          Configuration file path
@@ -1243,13 +1243,13 @@ make pre-commit        # Pre-commit checks
 cargo build --release
 
 # Run
-cargo run --release --bin hive-sim
+cargo run --release --bin peat-sim
 
 # Test
 make test-fast
 
 # Logs
-RUST_LOG=debug ./hive-sim
+RUST_LOG=debug ./peat-sim
 
 # Health check
 curl localhost:8080/health
@@ -1261,7 +1261,7 @@ curl localhost:8080/health
 # Minimum environment
 export DITTO_APP_ID="your-app-id"
 export DITTO_OFFLINE_TOKEN="your-token"
-export HIVE_FORMATION_KEY="your-formation-key"
+export PEAT_FORMATION_KEY="your-formation-key"
 ```
 
 ### Essential Ports
@@ -1276,4 +1276,4 @@ export HIVE_FORMATION_KEY="your-formation-key"
 
 **Document Version**: 1.0
 **Last Updated**: 2025-12-08
-**Maintainer**: HIVE Operations Team
+**Maintainer**: PEAT Operations Team

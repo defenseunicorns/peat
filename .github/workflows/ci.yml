@@ -50,11 +50,11 @@ jobs:
           cache-on-failure: true
           shared-key: clippy
 
-      # Exclude hive-ffi: its cdylib conflicts with dittoffi symbols during linking
-      # Exclude hive-inference: has platform-specific features (GStreamer, CUDA) requiring system libs
-      - run: cargo clippy --all-targets --all-features --workspace --exclude hive-ffi --exclude hive-inference -- -D warnings
-      # Run clippy on hive-inference without optional features (no GStreamer/CUDA deps)
-      - run: cargo clippy -p hive-inference --all-targets -- -D warnings
+      # Exclude peat-ffi: its cdylib conflicts with dittoffi symbols during linking
+      # Exclude peat-inference: has platform-specific features (GStreamer, CUDA) requiring system libs
+      - run: cargo clippy --all-targets --all-features --workspace --exclude peat-ffi --exclude peat-inference -- -D warnings
+      # Run clippy on peat-inference without optional features (no GStreamer/CUDA deps)
+      - run: cargo clippy -p peat-inference --all-targets -- -D warnings
 
   # ============================================
   # Unit & Integration Tests (excludes E2E, ~5 min)
@@ -85,12 +85,12 @@ jobs:
 
       - name: Run unit & integration tests
         env:
-          HIVE_APP_ID: ${{ secrets.HIVE_APP_ID }}
-          HIVE_SHARED_KEY: ${{ secrets.HIVE_SHARED_KEY }}
-          HIVE_OFFLINE_TOKEN: ${{ secrets.HIVE_OFFLINE_TOKEN }}
+          PEAT_APP_ID: ${{ secrets.PEAT_APP_ID }}
+          PEAT_SHARED_KEY: ${{ secrets.PEAT_SHARED_KEY }}
+          PEAT_OFFLINE_TOKEN: ${{ secrets.PEAT_OFFLINE_TOKEN }}
         run: |
-          cargo nextest run --all-features --workspace --exclude hive-ffi --exclude hive-inference -E 'not test(e2e)'
-          cargo nextest run -p hive-inference -E 'not test(e2e)'
+          cargo nextest run --all-features --workspace --exclude peat-ffi --exclude peat-inference -E 'not test(e2e)'
+          cargo nextest run -p peat-inference -E 'not test(e2e)'
 
   # ============================================
   # E2E Tests (parallel job, ~3 min)
@@ -121,8 +121,8 @@ jobs:
 
       - name: Run E2E tests
         env:
-          HIVE_APP_ID: ${{ secrets.HIVE_APP_ID }}
-          HIVE_SHARED_KEY: ${{ secrets.HIVE_SHARED_KEY }}
-          HIVE_OFFLINE_TOKEN: ${{ secrets.HIVE_OFFLINE_TOKEN }}
+          PEAT_APP_ID: ${{ secrets.PEAT_APP_ID }}
+          PEAT_SHARED_KEY: ${{ secrets.PEAT_SHARED_KEY }}
+          PEAT_OFFLINE_TOKEN: ${{ secrets.PEAT_OFFLINE_TOKEN }}
         run: |
-          cargo nextest run --all-features --workspace --exclude hive-ffi --exclude hive-inference -E 'test(e2e)'
+          cargo nextest run --all-features --workspace --exclude peat-ffi --exclude peat-inference -E 'test(e2e)'

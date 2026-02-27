@@ -1,8 +1,8 @@
-// HIVE Protocol - Command Dissemination
+// PEAT Protocol - Command Dissemination
 // Specification Version: 0.1.0
 // License: CC0 1.0 Universal (Public Domain)
 //
-// This file defines the command dissemination model for HIVE Protocol.
+// This file defines the command dissemination model for PEAT Protocol.
 // Commands flow downward through the hierarchy (company -> platoon -> squad -> node)
 // while acknowledgments flow upward.
 

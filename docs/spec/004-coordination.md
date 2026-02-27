@@ -1,6 +1,6 @@
-# HIVE Protocol Specification: Coordination Protocol
+# PEAT Protocol Specification: Coordination Protocol
 
-**Spec ID**: HIVE-SPEC-004
+**Spec ID**: PEAT-SPEC-004
 **Status**: Draft
 **Version**: 0.1.0
 **Date**: 2025-01-07
@@ -8,7 +8,7 @@
 
 ## Abstract
 
-This document specifies the coordination protocol for HIVE. It defines cell formation, leader election, hierarchical organization, and inter-cell coordination mechanisms.
+This document specifies the coordination protocol for PEAT. It defines cell formation, leader election, hierarchical organization, and inter-cell coordination mechanisms.
 
 ## Table of Contents
 
@@ -30,7 +30,7 @@ This document specifies the coordination protocol for HIVE. It defines cell form
 
 ### 1.1 Purpose
 
-The HIVE coordination protocol enables autonomous and semi-autonomous systems to form dynamic teams ("cells") that operate effectively without centralized control. It provides mechanisms for:
+The PEAT coordination protocol enables autonomous and semi-autonomous systems to form dynamic teams ("cells") that operate effectively without centralized control. It provides mechanisms for:
 - Discovering and joining cells
 - Electing leaders based on capabilities and authority
 - Organizing hierarchically (team → group → formation)
@@ -360,7 +360,7 @@ enum BindingStatus {
 
 ### 6.3 Capability Aggregation and Emergent Behavior
 
-A core principle of HIVE is that **cells exhibit emergent capabilities** greater than the sum of their individual members. Capability aggregation flows upward through the hierarchy, enabling higher echelons to understand and task based on collective capabilities.
+A core principle of PEAT is that **cells exhibit emergent capabilities** greater than the sum of their individual members. Capability aggregation flows upward through the hierarchy, enabling higher echelons to understand and task based on collective capabilities.
 
 #### 6.3.1 Capability Flow Model
 
@@ -403,7 +403,7 @@ Individual platforms → Group capabilities → Formation emergent → Cluster e
 Emergent capabilities arise from the **composition** of individual platform capabilities:
 
 ```rust
-/// Emergent capability patterns recognized by HIVE
+/// Emergent capability patterns recognized by PEAT
 pub enum EmergentCapability {
     /// Multiple sensors with overlapping coverage → Wide-area observation
     WideAreaObservation {
@@ -618,7 +618,7 @@ pub enum CapabilitySummaryMode {
 
 ### 6.4 Bidirectional Flow Model
 
-HIVE operates as a **full-duplex hierarchical synchronization system**:
+PEAT operates as a **full-duplex hierarchical synchronization system**:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -657,7 +657,7 @@ HIVE operates as a **full-duplex hierarchical synchronization system**:
 
 #### 6.4.1 Policy-Based Routing
 
-Events carry routing policies that HIVE enforces:
+Events carry routing policies that PEAT enforces:
 
 ```rust
 pub struct EventRoutingPolicy {

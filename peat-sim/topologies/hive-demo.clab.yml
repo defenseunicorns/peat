@@ -1,0 +1,224 @@
+# PEAT Demo Topology (Issue #293)
+#
+# Three-network demo topology for PEAT protocol demonstration:
+# - C2 Network: Command and control systems (TAK Server, WebTAK, MLOps)
+# - Network A (Alpha): Tactical team with operator, UGV, Jetson
+# - Network B (Bravo): Tactical team with operator, UAV, Jetson
+#
+# The Coordinator node bridges all networks, enabling cross-network
+# communication while maintaining network separation.
+#
+# Usage:
+#   containerlab deploy -t peat-sim/topologies/peat-demo.clab.yml
+#   containerlab inspect -t peat-sim/topologies/peat-demo.clab.yml
+#   containerlab destroy -t peat-sim/topologies/peat-demo.clab.yml
+
+name: peat-demo
+
+mgmt:
+  network: peat-demo
+  ipv4-subnet: 172.100.0.0/16
+  ipv6-subnet: 3fff:172:100::/48
+
+topology:
+  kinds:
+    linux:
+      image: peat-sim-node:latest
+
+  nodes:
+    # =========================================================================
+    # C2 NETWORK - Command and Control Systems
+    # =========================================================================
+
+    # TAK Server - Provides situational awareness and C2 coordination
+    tak-server:
+      kind: linux
+      env:
+        NODE_ID: tak-server
+        NODE_TYPE: tak_server
+        ROLE: c2_server
+        MODE: hierarchical
+        BACKEND: automerge
+        NETWORK: c2
+        TCP_LISTEN: "12345"
+        DITTO_APP_ID: peat-demo
+        PEAT_SECRET_KEY: aGl2ZS1kZW1vLXNlY3JldC1rZXktMDAwMDAwMDAwMDA=
+
+    # WebTAK - Web-based TAK client for browser access
+    webtak:
+      kind: linux
+      env:
+        NODE_ID: webtak
+        NODE_TYPE: webtak_client
+        ROLE: c2_client
+        MODE: hierarchical
+        BACKEND: automerge
+        NETWORK: c2
+        TCP_LISTEN: "12346"
+        TCP_CONNECT: "tak-server|clab-peat-demo-tak-server:12345"
+        DITTO_APP_ID: peat-demo
+        PEAT_SECRET_KEY: aGl2ZS1kZW1vLXNlY3JldC1rZXktMDAwMDAwMDAwMDA=
+
+    # MLOps Server - Machine learning operations platform
+    mlops:
+      kind: linux
+      env:
+        NODE_ID: mlops
+        NODE_TYPE: mlops_server
+        ROLE: analytics
+        MODE: hierarchical
+        BACKEND: automerge
+        NETWORK: c2
+        TCP_LISTEN: "12347"
+        TCP_CONNECT: "tak-server|clab-peat-demo-tak-server:12345"
+        DITTO_APP_ID: peat-demo
+        PEAT_SECRET_KEY: aGl2ZS1kZW1vLXNlY3JldC1rZXktMDAwMDAwMDAwMDA=
+
+    # =========================================================================
+    # COORDINATOR - Bridge Node (connects all networks)
+    # =========================================================================
+
+    # Coordinator bridges C2 <-> Alpha <-> Bravo networks
+    coordinator:
+      kind: linux
+      env:
+        NODE_ID: coordinator
+        NODE_TYPE: bridge
+        ROLE: coordinator
+        MODE: hierarchical
+        BACKEND: automerge
+        NETWORK: bridge
+        TCP_LISTEN: "12350"
+        TCP_CONNECT: "tak-server|clab-peat-demo-tak-server:12345"
+        DITTO_APP_ID: peat-demo
+        PEAT_SECRET_KEY: aGl2ZS1kZW1vLXNlY3JldC1rZXktMDAwMDAwMDAwMDA=
+
+    # =========================================================================
+    # NETWORK A (ALPHA TEAM) - Ground tactical team
+    # =========================================================================
+
+    # Alpha Operator - Human operator with EUD
+    alpha-operator:
+      kind: linux
+      env:
+        NODE_ID: alpha-operator
+        NODE_TYPE: operator
+        ROLE: team_lead
+        MODE: hierarchical
+        BACKEND: automerge
+        NETWORK: alpha
+        TEAM_ID: alpha
+        TCP_LISTEN: "12360"
+        TCP_CONNECT: "coordinator|clab-peat-demo-coordinator:12350"
+        DITTO_APP_ID: peat-demo
+        PEAT_SECRET_KEY: aGl2ZS1kZW1vLXNlY3JldC1rZXktMDAwMDAwMDAwMDA=
+
+    # Alpha UGV - Unmanned Ground Vehicle
+    alpha-ugv:
+      kind: linux
+      env:
+        NODE_ID: alpha-ugv
+        NODE_TYPE: ugv
+        PLATFORM_TYPE: ugv
+        ROLE: platform
+        MODE: hierarchical
+        BACKEND: automerge
+        NETWORK: alpha
+        TEAM_ID: alpha
+        TCP_LISTEN: "12361"
+        TCP_CONNECT: "alpha-operator|clab-peat-demo-alpha-operator:12360"
+        DITTO_APP_ID: peat-demo
+        PEAT_SECRET_KEY: aGl2ZS1kZW1vLXNlY3JldC1rZXktMDAwMDAwMDAwMDA=
+
+    # Alpha Jetson - Edge compute device for AI/ML inference
+    alpha-jetson:
+      kind: linux
+      env:
+        NODE_ID: alpha-jetson
+        NODE_TYPE: jetson
+        PLATFORM_TYPE: compute
+        ROLE: edge_compute
+        MODE: hierarchical
+        BACKEND: automerge
+        NETWORK: alpha
+        TEAM_ID: alpha
+        TCP_LISTEN: "12362"
+        TCP_CONNECT: "alpha-operator|clab-peat-demo-alpha-operator:12360"
+        DITTO_APP_ID: peat-demo
+        PEAT_SECRET_KEY: aGl2ZS1kZW1vLXNlY3JldC1rZXktMDAwMDAwMDAwMDA=
+
+    # =========================================================================
+    # NETWORK B (BRAVO TEAM) - Air tactical team
+    # =========================================================================
+
+    # Bravo Operator - Human operator with EUD
+    bravo-operator:
+      kind: linux
+      env:
+        NODE_ID: bravo-operator
+        NODE_TYPE: operator
+        ROLE: team_lead
+        MODE: hierarchical
+        BACKEND: automerge
+        NETWORK: bravo
+        TEAM_ID: bravo
+        TCP_LISTEN: "12370"
+        TCP_CONNECT: "coordinator|clab-peat-demo-coordinator:12350"
+        DITTO_APP_ID: peat-demo
+        PEAT_SECRET_KEY: aGl2ZS1kZW1vLXNlY3JldC1rZXktMDAwMDAwMDAwMDA=
+
+    # Bravo UAV - Unmanned Aerial Vehicle
+    bravo-uav:
+      kind: linux
+      env:
+        NODE_ID: bravo-uav
+        NODE_TYPE: uav
+        PLATFORM_TYPE: uav
+        ROLE: platform
+        MODE: hierarchical
+        BACKEND: automerge
+        NETWORK: bravo
+        TEAM_ID: bravo
+        TCP_LISTEN: "12371"
+        TCP_CONNECT: "bravo-operator|clab-peat-demo-bravo-operator:12370"
+        DITTO_APP_ID: peat-demo
+        PEAT_SECRET_KEY: aGl2ZS1kZW1vLXNlY3JldC1rZXktMDAwMDAwMDAwMDA=
+
+    # Bravo Jetson - Edge compute device for AI/ML inference
+    bravo-jetson:
+      kind: linux
+      env:
+        NODE_ID: bravo-jetson
+        NODE_TYPE: jetson
+        PLATFORM_TYPE: compute
+        ROLE: edge_compute
+        MODE: hierarchical
+        BACKEND: automerge
+        NETWORK: bravo
+        TEAM_ID: bravo
+        TCP_LISTEN: "12372"
+        TCP_CONNECT: "bravo-operator|clab-peat-demo-bravo-operator:12370"
+        DITTO_APP_ID: peat-demo
+        PEAT_SECRET_KEY: aGl2ZS1kZW1vLXNlY3JldC1rZXktMDAwMDAwMDAwMDA=
+
+  # Network links define the physical topology
+  # ContainerLab creates virtual ethernet pairs between nodes
+  links:
+    # C2 Network internal links
+    - endpoints: ["tak-server:eth1", "webtak:eth1"]
+    - endpoints: ["tak-server:eth2", "mlops:eth1"]
+
+    # Coordinator bridges to all networks
+    - endpoints: ["coordinator:eth1", "tak-server:eth3"]      # C2 network
+    - endpoints: ["coordinator:eth2", "alpha-operator:eth1"]  # Alpha network
+    - endpoints: ["coordinator:eth3", "bravo-operator:eth1"]  # Bravo network
+
+    # Alpha team internal links
+    - endpoints: ["alpha-operator:eth2", "alpha-ugv:eth1"]
+    - endpoints: ["alpha-operator:eth3", "alpha-jetson:eth1"]
+    - endpoints: ["alpha-ugv:eth2", "alpha-jetson:eth2"]      # UGV-Jetson direct link
+
+    # Bravo team internal links
+    - endpoints: ["bravo-operator:eth2", "bravo-uav:eth1"]
+    - endpoints: ["bravo-operator:eth3", "bravo-jetson:eth1"]
+    - endpoints: ["bravo-uav:eth2", "bravo-jetson:eth2"]      # UAV-Jetson direct link

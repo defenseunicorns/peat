@@ -2,14 +2,14 @@
 
 **Created**: 2026-02-15
 **Status**: Active
-**Related ADRs**: ADR-039 (HIVE-BTLE Mesh Transport), ADR-047 (Android BLE Hybrid Integration)
+**Related ADRs**: ADR-039 (PEAT-BTLE Mesh Transport), ADR-047 (Android BLE Hybrid Integration)
 **Related Docs**: [PROJECT-BLE-INTEGRATION.md](PROJECT-BLE-INTEGRATION.md), [TESTING_STRATEGY.md](TESTING_STRATEGY.md)
 
 ---
 
 ## Overview
 
-This document describes the functional test infrastructure for HIVE's transport layer. Functional tests validate **real hardware** running real protocol stacks over real radios and networks — they are not simulations or mocks.
+This document describes the functional test infrastructure for PEAT's transport layer. Functional tests validate **real hardware** running real protocol stacks over real radios and networks — they are not simulations or mocks.
 
 The test infrastructure is designed for extension. Each platform (Android, macOS, iOS, Windows, Linux) gets its own test harness that exercises the same feature set through the same phases. Adding a new platform means implementing a test client for that platform and adding corresponding Makefile targets.
 
@@ -37,7 +37,7 @@ The test infrastructure is designed for extension. Each platform (Android, macOS
 │   (rpi-ci)           │          │   (platform under test)  │
 │                      │          │                          │
 │  dual_test_peer      │◄──BLE──►│  BLE: scan, GATT sync    │
-│  (hive-ffi,          │          │                          │
+│  (peat-ffi,          │          │                          │
 │   BLE + QUIC in      │◄─QUIC──►│  QUIC: Iroh Automerge    │
 │   single process)    │          │       platform sync      │
 └─────────────────────┘          └─────────────────────────┘
@@ -66,7 +66,7 @@ A single `dual_test_peer` binary runs on **rpi-ci**, using `create_node()` with 
 
 | Binary | Source | Transport | What It Does |
 |--------|--------|-----------|-------------|
-| `dual_test_peer` | hive-ffi `examples/dual_test_peer.rs` | BLE + QUIC | Single process: BLE advertising (BlueZ) + QUIC platform sync (Iroh). Publishes "PI-DUAL" platform, waits for client's platform via either transport. |
+| `dual_test_peer` | peat-ffi `examples/dual_test_peer.rs` | BLE + QUIC | Single process: BLE advertising (BlueZ) + QUIC platform sync (Iroh). Publishes "PI-DUAL" platform, waits for client's platform via either transport. |
 
 ### Build Requirements
 
@@ -94,10 +94,10 @@ Each phase validates a specific feature. The mapping below shows which capabilit
 
 | Phase | Name | Feature Under Test | Transport | Pass Criteria | Required |
 |-------|------|--------------------|-----------|---------------|----------|
-| 1 | JNI Init | Native library loading, JNI binding | — | `hiveVersion()` returns non-empty | Yes |
+| 1 | JNI Init | Native library loading, JNI binding | — | `peatVersion()` returns non-empty | Yes |
 | 2 | Dual Node Created | Node creation with BLE + QUIC | Both | Node handle != 0, node ID non-empty | Yes |
 | 3 | Iroh Active | QUIC transport initialization | QUIC | Node ID valid, handle active | Yes |
-| 4 | BLE Discovery | BLE scanning, advertisement parsing | BLE | HIVE service UUID found within 15s | Yes |
+| 4 | BLE Discovery | BLE scanning, advertisement parsing | BLE | PEAT service UUID found within 15s | Yes |
 | 5 | BLE GATT Sync | GATT connect, characteristic R/W, document exchange | BLE | Bytes received > 0, peer node ID parsed | Yes |
 | 6 | Publish Platform | Automerge document creation, local store write | QUIC | `publishPlatformJni` returns true | Yes |
 | 7 | QUIC Peer Connect | Iroh peer discovery (mDNS or direct connect) | QUIC | Peer count > 0 within 25s | Yes |
@@ -115,7 +115,7 @@ When QUIC peer info is not provided, the test falls back to BLE-only mode:
 | 1 | JNI Init | Native library loading | — | Version non-empty |
 | 2 | Dual Node Created | Node creation with BLE | Both | Handle != 0 |
 | 3 | Iroh Active | QUIC transport init | QUIC | Node ID valid |
-| 4 | BLE Discovery | BLE scanning | BLE | HIVE service found |
+| 4 | BLE Discovery | BLE scanning | BLE | PEAT service found |
 | 5 | BLE GATT Sync | GATT document exchange | BLE | Bytes received > 0 |
 | 6 | BLE State Signaled | TransportManager bridge | BLE | Available + peers |
 | 7 | Dual Transport | Both transports active | Both | Iroh active + BLE peers >= 1 |
@@ -162,9 +162,9 @@ make dual-transport-test
 ```
 
 This single command:
-1. Cross-compiles `dual_test_peer` (aarch64) from hive-ffi with `--features sync,bluetooth`
+1. Cross-compiles `dual_test_peer` (aarch64) from peat-ffi with `--features sync,bluetooth`
 2. Deploys to rpi-ci via scp
-3. Builds Android native lib (`libhive_ffi.so` with `--features bluetooth`)
+3. Builds Android native lib (`libpeat_ffi.so` with `--features bluetooth`)
 4. Builds Android test APK via Gradle
 5. Deploys APK to connected Android device
 6. Starts `dual_test_peer` on Pi (BLE + QUIC in one process)
@@ -227,7 +227,7 @@ Create a test client that implements the same phases as the Android `TestRunner.
 - Print a summary line: `RESULT: N/N PASSED`
 - Exit with code 0 on success, 1 on failure
 
-**Reference implementation**: `android-ble-test/app/src/main/java/com/revolveteam/hive/test/TestRunner.kt`
+**Reference implementation**: `android-ble-test/app/src/main/java/com/revolveteam/peat/test/TestRunner.kt`
 
 **Platform-specific concerns:**
 
@@ -263,14 +263,14 @@ deploy-<platform>-test-client:
 
 ### 3. Feature Flag Wiring
 
-The test client links against `libhive_ffi` with appropriate features:
+The test client links against `libpeat_ffi` with appropriate features:
 
 ```toml
 # Cargo.toml (for Rust-based clients) or build.gradle (Android) etc.
-hive-ffi = { features = ["sync", "bluetooth"] }
+peat-ffi = { features = ["sync", "bluetooth"] }
 ```
 
-Platform-specific BLE adapter is selected automatically via `cfg(target_os)` in hive-ffi/Cargo.toml.
+Platform-specific BLE adapter is selected automatically via `cfg(target_os)` in peat-ffi/Cargo.toml.
 
 ### 4. Update Coverage Matrix
 
@@ -311,7 +311,7 @@ When adding a new platform, keep the same formation credentials. Only change the
 
 ```bash
 # Android test phases
-adb logcat -s HiveTest:V BleGattClient:V HiveJni:V
+adb logcat -s PeatTest:V BleGattClient:V PeatJni:V
 
 # Pi dual-transport peer (BLE + QUIC)
 ssh kit@rpi-ci 'tail -f ~/dual_test_peer.log'
@@ -411,7 +411,7 @@ jobs:
 Register the self-hosted runner on the lab station:
 ```bash
 # Download runner from GitHub → Settings → Actions → Runners → New self-hosted runner
-./config.sh --url https://github.com/<org>/hive --token <TOKEN> --labels ble-lab
+./config.sh --url https://github.com/<org>/peat --token <TOKEN> --labels ble-lab
 ./run.sh   # or install as systemd service
 ```
 
@@ -420,7 +420,7 @@ Register the self-hosted runner on the lab station:
 For CI systems without native runner support, trigger the test remotely:
 ```bash
 ssh <lab-user>@<lab-station> \
-    'cd /path/to/hive && git pull && make dual-transport-test'
+    'cd /path/to/peat && git pull && make dual-transport-test'
 ```
 
 ### Release Gate
@@ -442,11 +442,11 @@ For non-GitHub workflows, the same gate can be enforced by scripting: check that
 |------|---------|
 | `Makefile` | Test orchestration targets |
 | `Cross.toml` | aarch64 cross-compilation config (protoc, libdbus) |
-| `hive-ffi/examples/dual_test_peer.rs` | Pi-side dual-transport test peer (BLE + QUIC) |
-| `hive-ffi/examples/iroh_test_peer.rs` | Legacy QUIC-only test peer (kept for reference) |
-| `hive-ffi/Cargo.toml` | Example + feature definitions |
-| `hive-ffi/src/lib.rs` | JNI bindings (connectPeerJni, etc.) |
+| `peat-ffi/examples/dual_test_peer.rs` | Pi-side dual-transport test peer (BLE + QUIC) |
+| `peat-ffi/examples/iroh_test_peer.rs` | Legacy QUIC-only test peer (kept for reference) |
+| `peat-ffi/Cargo.toml` | Example + feature definitions |
+| `peat-ffi/src/lib.rs` | JNI bindings (connectPeerJni, etc.) |
 | `android-ble-test/.../test/TestRunner.kt` | Android 11-phase test orchestrator |
 | `android-ble-test/.../test/MainActivity.kt` | Android UI + auto-run support |
 | `android-ble-test/.../test/BleGattClient.kt` | Android BLE scan + GATT client |
-| `android-ble-test/.../atak/hive/HiveJni.kt` | JNI declarations |
+| `android-ble-test/.../atak/peat/PeatJni.kt` | JNI declarations |

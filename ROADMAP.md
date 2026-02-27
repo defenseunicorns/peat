@@ -1,14 +1,14 @@
-# HIVE Protocol Development Roadmap
+# PEAT Protocol Development Roadmap
 
 **Last Updated**: November 21, 2025
-**GitHub Issues**: [View All Epics](https://github.com/kitplummer/hive/labels/epic)
-**Timeline Visualization**: [Issue #118](https://github.com/kitplummer/hive/issues/118)
+**GitHub Issues**: [View All Epics](https://github.com/defenseunicorns/peat/labels/epic)
+**Timeline Visualization**: [Issue #118](https://github.com/defenseunicorns/peat/issues/118)
 
 ---
 
 ## 🎯 Executive Summary
 
-The HIVE Protocol has a clear 12-month development pathway to achieve:
+The PEAT Protocol has a clear 12-month development pathway to achieve:
 - **O(n log n) hierarchical coordination** at tactical scale (200+ nodes)
 - **95%+ bandwidth reduction** through differential updates and aggregation
 - **Security-ready tactical deployment** with PKI and encryption
@@ -47,7 +47,7 @@ The HIVE Protocol has a clear 12-month development pathway to achieve:
 ### Immediate Priority (Next 3 Months)
 
 #### ⚠️ EPIC 2: P2P Mesh Intelligence Layer - **CRITICAL PATH**
-**GitHub**: [#105](https://github.com/kitplummer/hive/issues/105)
+**GitHub**: [#105](https://github.com/defenseunicorns/peat/issues/105)
 **Priority**: P0 (Blocks Everything)
 **Timeline**: 12 weeks
 **Status**: 0% Complete (NEW WORK)
@@ -60,11 +60,11 @@ The HIVE Protocol has a clear 12-month development pathway to achieve:
 - Mesh healing and failover
 
 **Detailed Tasks**:
-- [#113: Discovery Strategies Implementation](https://github.com/kitplummer/hive/issues/113) (Weeks 1-2)
-- [#114: Geographic Beacon System](https://github.com/kitplummer/hive/issues/114) (Weeks 3-4)
-- [#115: Hierarchical Topology Management](https://github.com/kitplummer/hive/issues/115) (Weeks 5-7)
-- [#116: Data Flow Control & Routing](https://github.com/kitplummer/hive/issues/116) (Weeks 8-10)
-- [#117: Mesh Healing & Resilience](https://github.com/kitplummer/hive/issues/117) (Weeks 11-12)
+- [#113: Discovery Strategies Implementation](https://github.com/defenseunicorns/peat/issues/113) (Weeks 1-2)
+- [#114: Geographic Beacon System](https://github.com/defenseunicorns/peat/issues/114) (Weeks 3-4)
+- [#115: Hierarchical Topology Management](https://github.com/defenseunicorns/peat/issues/115) (Weeks 5-7)
+- [#116: Data Flow Control & Routing](https://github.com/defenseunicorns/peat/issues/116) (Weeks 8-10)
+- [#117: Mesh Healing & Resilience](https://github.com/defenseunicorns/peat/issues/117) (Weeks 11-12)
 
 **Success Criteria**:
 - 100 nodes form 4-level hierarchy automatically
@@ -75,7 +75,7 @@ The HIVE Protocol has a clear 12-month development pathway to achieve:
 ---
 
 #### EPIC 1: Backend Strategy & Parity Validation
-**GitHub**: [#104](https://github.com/kitplummer/hive/issues/104)
+**GitHub**: [#104](https://github.com/defenseunicorns/peat/issues/104)
 **Priority**: P0 (Foundation)
 **Timeline**: 2-4 weeks
 **Status**: 70% Complete
@@ -85,7 +85,7 @@ The HIVE Protocol has a clear 12-month development pathway to achieve:
 ---
 
 #### EPIC 3: Security & Authorization Framework
-**GitHub**: [#106](https://github.com/kitplummer/hive/issues/106)
+**GitHub**: [#106](https://github.com/defenseunicorns/peat/issues/106)
 **Priority**: P1 (Required for Tactical Deployment)
 **Timeline**: 16 weeks
 **Status**: 0% Complete (Can parallelize with EPIC 2)
@@ -97,7 +97,7 @@ The HIVE Protocol has a clear 12-month development pathway to achieve:
 ### Short-Term (3-6 Months)
 
 #### EPIC 4: AI Model Capability Advertisement
-**GitHub**: [#107](https://github.com/kitplummer/hive/issues/107)
+**GitHub**: [#107](https://github.com/defenseunicorns/peat/issues/107)
 **Priority**: P1 (Customer Requirement)
 **Timeline**: 8 weeks
 **Depends On**: EPIC 2
@@ -107,7 +107,7 @@ The HIVE Protocol has a clear 12-month development pathway to achieve:
 ---
 
 #### EPIC 5: Quality of Service & Data Prioritization
-**GitHub**: [#108](https://github.com/kitplummer/hive/issues/108)
+**GitHub**: [#108](https://github.com/defenseunicorns/peat/issues/108)
 **Priority**: P1 (Customer Requirement)
 **Timeline**: 10 weeks
 **Depends On**: EPIC 2
@@ -117,7 +117,7 @@ The HIVE Protocol has a clear 12-month development pathway to achieve:
 ---
 
 #### EPIC 7: Advanced Networking & Transport Optimization
-**GitHub**: [#110](https://github.com/kitplummer/hive/issues/110)
+**GitHub**: [#110](https://github.com/defenseunicorns/peat/issues/110)
 **Priority**: P2
 **Timeline**: 8 weeks
 **Depends On**: EPIC 2
@@ -129,17 +129,17 @@ The HIVE Protocol has a clear 12-month development pathway to achieve:
 ### Medium-Term (6-12 Months)
 
 #### EPIC 6: TAK & Cursor-on-Target Integration
-**GitHub**: [#109](https://github.com/kitplummer/hive/issues/109)
+**GitHub**: [#109](https://github.com/defenseunicorns/peat/issues/109)
 **Priority**: P2 (AUKUS Requirement)
 **Timeline**: 12 weeks
 **Depends On**: EPIC 2, EPIC 5
 
-**Value**: HIVE-coordinated assets visible in ATAK, operators can control via TAK
+**Value**: PEAT-coordinated assets visible in ATAK, operators can control via TAK
 
 ---
 
 #### EPIC 8: Validation & Scaling Proof
-**GitHub**: [#111](https://github.com/kitplummer/hive/issues/111)
+**GitHub**: [#111](https://github.com/defenseunicorns/peat/issues/111)
 **Priority**: P2
 **Timeline**: 8 weeks (ongoing)
 **Depends On**: EPIC 2
@@ -149,7 +149,7 @@ The HIVE Protocol has a clear 12-month development pathway to achieve:
 ---
 
 #### EPIC 9: NATO STANAG Standardization
-**GitHub**: [#112](https://github.com/kitplummer/hive/issues/112)
+**GitHub**: [#112](https://github.com/defenseunicorns/peat/issues/112)
 **Priority**: P3
 **Timeline**: 12-24 months
 **Depends On**: All technical epics
@@ -166,9 +166,9 @@ The HIVE Protocol has a clear 12-month development pathway to achieve:
 - **Iroh provides ~20%**: Point-to-point QUIC connections, multi-path networking
 - **EPIC 2 provides ~80%**: Discovery, topology, routing, aggregation, healing
 
-**Without EPIC 2**: HIVE is just an all-to-all mesh (O(n²)) - defeats the entire purpose
+**Without EPIC 2**: PEAT is just an all-to-all mesh (O(n²)) - defeats the entire purpose
 
-**With EPIC 2**: HIVE becomes true hierarchical coordination (O(n log n)) - transformational
+**With EPIC 2**: PEAT becomes true hierarchical coordination (O(n log n)) - transformational
 
 ### Dependency Chain
 
@@ -200,7 +200,7 @@ EPIC 2 (Mesh)
 
 ### Operational Capability
 - [ ] Complete ISR mission scenario (100 platforms)
-- [ ] TAK integration allowing ATAK control of HIVE assets
+- [ ] TAK integration allowing ATAK control of PEAT assets
 - [ ] Model capability queries and intelligent tasking
 - [ ] Network partition tolerance demonstrated
 - [ ] Tactical radio network validated (25% packet loss)
@@ -260,7 +260,7 @@ EPIC 2 (Mesh)
 ### On P2P Mesh Intelligence (EPIC 2)
 **This is not "nice to have" - it's existential**
 
-Per ADR-017: Iroh provides excellent transport, but HIVE's value proposition is **hierarchical coordination intelligence**. Without EPIC 2:
+Per ADR-017: Iroh provides excellent transport, but PEAT's value proposition is **hierarchical coordination intelligence**. Without EPIC 2:
 - No geographic-based squad formation
 - No automatic parent/child relationships
 - No hierarchical aggregation (stuck at O(n²))
@@ -285,7 +285,7 @@ This de-risks both technology and licensing/procurement paths.
 ## 📚 References
 
 ### ADR Mapping
-- **ADR-001**: HIVE Protocol POC Architecture → Foundation for all work
+- **ADR-001**: PEAT Protocol POC Architecture → Foundation for all work
 - **ADR-002**: Beacon Storage Architecture → Used in EPIC 2 (Geographic Beacons)
 - **ADR-005**: Data Sync Abstraction Layer → Backend switching capability
 - **ADR-006**: Security, Authentication, Authorization → EPIC 3
@@ -305,8 +305,8 @@ This de-risks both technology and licensing/procurement paths.
 - **ADR-022**: Edge MLOps Architecture → AI model lifecycle
 
 ### GitHub Project
-- **Epics**: https://github.com/kitplummer/hive/labels/epic
-- **Timeline**: https://github.com/kitplummer/hive/issues/118
+- **Epics**: https://github.com/defenseunicorns/peat/labels/epic
+- **Timeline**: https://github.com/defenseunicorns/peat/issues/118
 - **Critical Path Issues**: #113, #114, #115, #116, #117
 
 ---
@@ -374,4 +374,4 @@ This de-risks both technology and licensing/procurement paths.
 
 ---
 
-**Questions?** Review [Issue #118](https://github.com/kitplummer/hive/issues/118) for detailed timeline and dependency graphs.
+**Questions?** Review [Issue #118](https://github.com/defenseunicorns/peat/issues/118) for detailed timeline and dependency graphs.

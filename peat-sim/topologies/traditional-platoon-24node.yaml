@@ -1,0 +1,405 @@
+# ContainerLab Topology: 24-Node Platoon - Traditional IoT Baseline (Client-Server)
+#
+# Purpose: Traditional IoT architecture comparison (NO CRDT, periodic full messages)
+# Architecture: All nodes connect to central server (star topology)
+# Transmission: Full state messages every 5 seconds
+# Comparison: Baseline for measuring CRDT overhead and CAP filtering benefits
+#
+# Network: All nodes → platoon-leader (centralized)
+# Structure: 1 platoon leader + 3 squad leaders + 20 squad members = 24 nodes
+# Use: containerlab deploy -t topologies/traditional-platoon-24node.yaml
+
+name: traditional-platoon-24node
+
+topology:
+  nodes:
+    # Central Server
+    platoon-leader:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: platoon-leader
+        ROLE: platoon_leader
+        PLATFORM_TYPE: soldier
+        MODE: writer
+        TCP_LISTEN: "12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: server
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+      ports:
+        - "12345:12345"
+
+    # Squad Leaders (clients)
+    squad-alpha-leader:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: squad-alpha-leader
+        ROLE: squad_leader
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    squad-bravo-leader:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: squad-bravo-leader
+        ROLE: squad_leader
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    squad-charlie-leader:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: squad-charlie-leader
+        ROLE: squad_leader
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    # Alpha Squad (4 soldiers + 1 UAV + 1 UGV)
+    alpha-soldier-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: alpha-soldier-1
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    alpha-soldier-2:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: alpha-soldier-2
+        ROLE: grenadier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    alpha-soldier-3:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: alpha-soldier-3
+        ROLE: automatic_rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    alpha-soldier-4:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: alpha-soldier-4
+        ROLE: team_leader
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    alpha-uav-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: alpha-uav-1
+        ROLE: reconnaissance
+        PLATFORM_TYPE: uav
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    alpha-ugv-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: alpha-ugv-1
+        ROLE: resupply_isr
+        PLATFORM_TYPE: ugv
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    # Bravo Squad (5 soldiers + 1 UAV + 1 UGV)
+    bravo-soldier-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: bravo-soldier-1
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    bravo-soldier-2:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: bravo-soldier-2
+        ROLE: grenadier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    bravo-soldier-3:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: bravo-soldier-3
+        ROLE: automatic_rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    bravo-soldier-4:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: bravo-soldier-4
+        ROLE: team_leader
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    bravo-soldier-5:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: bravo-soldier-5
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    bravo-uav-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: bravo-uav-1
+        ROLE: reconnaissance
+        PLATFORM_TYPE: uav
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    bravo-ugv-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: bravo-ugv-1
+        ROLE: resupply_isr
+        PLATFORM_TYPE: ugv
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    # Charlie Squad (5 soldiers + 1 UAV + 1 UGV)
+    charlie-soldier-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: charlie-soldier-1
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    charlie-soldier-2:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: charlie-soldier-2
+        ROLE: grenadier
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    charlie-soldier-3:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: charlie-soldier-3
+        ROLE: automatic_rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    charlie-soldier-4:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: charlie-soldier-4
+        ROLE: team_leader
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    charlie-soldier-5:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: charlie-soldier-5
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    charlie-uav-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: charlie-uav-1
+        ROLE: reconnaissance
+        PLATFORM_TYPE: uav
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    charlie-ugv-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: charlie-ugv-1
+        ROLE: resupply_isr
+        PLATFORM_TYPE: ugv
+        MODE: reader
+        TCP_CONNECT: "platoon-leader:12345"
+        USE_TRADITIONAL: "true"
+        UPDATE_FREQUENCY_SECS: "0.5"
+        NODE_TYPE: client
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}

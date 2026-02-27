@@ -9,7 +9,7 @@
 
 ### The Event Flow Problem
 
-HIVE Protocol enables distributed autonomous systems to coordinate through hierarchical state synchronization. ADR-012 defines the **schemas** for events, capabilities, and commands. This ADR defines the **protocol behavior** - how events flow through the hierarchy and how aggregation policies are enforced.
+PEAT Protocol enables distributed autonomous systems to coordinate through hierarchical state synchronization. ADR-012 defines the **schemas** for events, capabilities, and commands. This ADR defines the **protocol behavior** - how events flow through the hierarchy and how aggregation policies are enforced.
 
 **Core Challenge:**
 
@@ -24,9 +24,9 @@ In a 1000-node company formation with 4 echelons (platform → squad → platoon
 - Operators overwhelmed with undifferentiated data
 - Higher echelons have no situational awareness
 
-**HIVE's Solution:**
+**PEAT's Solution:**
 
-Events carry `AggregationPolicy` metadata that tells HIVE *how* to route them:
+Events carry `AggregationPolicy` metadata that tells PEAT *how* to route them:
 - **Critical anomalies**: Immediate propagation, preempt other traffic
 - **Routine detections**: Aggregate into summaries at squad level
 - **Telemetry**: Store locally, respond to queries
@@ -38,14 +38,14 @@ This ADR specifies the protocol behavior that enforces these policies.
 
 | ADR | Defines | This ADR's Relationship |
 |-----|---------|------------------------|
-| ADR-012 | Event schemas (HiveEvent, AggregationPolicy) | **Uses** these schemas |
+| ADR-012 | Event schemas (PeatEvent, AggregationPolicy) | **Uses** these schemas |
 | ADR-009 | Bidirectional flow concepts | **Implements** upward event flow |
 | ADR-019 | QoS framework | **Integrates** priority enforcement |
 | ADR-001 | Hierarchical architecture | **Operates within** this structure |
 
 ### Design Principles
 
-1. **Policy-Driven**: Event producers declare routing intent; HIVE enforces
+1. **Policy-Driven**: Event producers declare routing intent; PEAT enforces
 2. **Hierarchical**: Events flow through formation structure, not arbitrary mesh
 3. **Bandwidth-Aware**: Aggregation reduces traffic at each echelon
 4. **Priority-Respecting**: Critical events preempt routine traffic
@@ -97,12 +97,12 @@ When software on a platform produces an event:
 pub struct EventEmitter {
     node_id: String,
     formation_id: String,
-    outbound_queue: PriorityQueue<HiveEvent>,
+    outbound_queue: PriorityQueue<PeatEvent>,
 }
 
 impl EventEmitter {
     /// Emit an event with routing policy
-    pub fn emit(&mut self, event: HiveEvent) {
+    pub fn emit(&mut self, event: PeatEvent) {
         // Validate event has required fields
         assert!(!event.event_id.is_empty());
         assert!(event.routing.is_some());
@@ -122,7 +122,7 @@ impl EventEmitter {
     }
     
     /// Store event locally (for QUERY mode or LOCAL mode)
-    fn store_local(&self, event: &HiveEvent) {
+    fn store_local(&self, event: &PeatEvent) {
         // Store in local event log with TTL
         // Queryable by higher echelons
     }
@@ -137,7 +137,7 @@ Events are transmitted based on priority:
 /// Priority-based event transmission
 pub struct EventTransmitter {
     /// Events queued by priority
-    queues: [VecDeque<HiveEvent>; 4],  // CRITICAL, HIGH, NORMAL, LOW
+    queues: [VecDeque<PeatEvent>; 4],  // CRITICAL, HIGH, NORMAL, LOW
     
     /// Bandwidth allocation per priority (configurable)
     bandwidth_allocation: BandwidthAllocation,
@@ -197,7 +197,7 @@ pub struct EchelonAggregator {
     windows: HashMap<(EventClass, String), AggregationWindow>,
     
     /// Events to forward without aggregation
-    passthrough_queue: PriorityQueue<HiveEvent>,
+    passthrough_queue: PriorityQueue<PeatEvent>,
     
     /// Outbound to parent echelon
     parent_emitter: EventEmitter,
@@ -210,7 +210,7 @@ pub struct AggregationWindow {
     window_start: Instant,
     
     /// Events collected in this window
-    events: Vec<HiveEvent>,
+    events: Vec<PeatEvent>,
     
     /// Source nodes that contributed
     source_nodes: HashSet<String>,
@@ -218,7 +218,7 @@ pub struct AggregationWindow {
 
 impl EchelonAggregator {
     /// Process incoming event from subordinate
-    pub fn receive(&mut self, event: HiveEvent) {
+    pub fn receive(&mut self, event: PeatEvent) {
         let routing = event.routing.as_ref().unwrap();
         
         match routing.propagation {
@@ -262,8 +262,8 @@ impl EchelonAggregator {
     }
     
     /// Generate summary from aggregation window
-    fn generate_summary(window: &AggregationWindow) -> HiveEvent {
-        HiveEvent {
+    fn generate_summary(window: &AggregationWindow) -> PeatEvent {
+        PeatEvent {
             event_id: uuid::Uuid::new_v4().to_string(),
             timestamp: Some(chrono::Utc::now().into()),
             source_node_id: self.echelon_id.clone(),
@@ -302,7 +302,7 @@ pub trait SummaryStrategy: Send + Sync {
     fn event_type(&self) -> &str;
     
     /// Generate summary payload from collected events
-    fn summarize(&self, events: &[HiveEvent]) -> prost_types::Any;
+    fn summarize(&self, events: &[PeatEvent]) -> prost_types::Any;
 }
 
 /// Detection event summary: count by type, confidence histogram
@@ -313,7 +313,7 @@ impl SummaryStrategy for DetectionSummaryStrategy {
         "detection"
     }
     
-    fn summarize(&self, events: &[HiveEvent]) -> prost_types::Any {
+    fn summarize(&self, events: &[PeatEvent]) -> prost_types::Any {
         let mut counts_by_type: HashMap<String, u32> = HashMap::new();
         let mut confidence_histogram = [0u32; 10];
         
@@ -344,7 +344,7 @@ impl SummaryStrategy for TelemetrySummaryStrategy {
         "telemetry"
     }
     
-    fn summarize(&self, events: &[HiveEvent]) -> prost_types::Any {
+    fn summarize(&self, events: &[PeatEvent]) -> prost_types::Any {
         let mut metrics: HashMap<String, MetricStats> = HashMap::new();
         
         for event in events {
@@ -443,7 +443,7 @@ pub struct EventFilters {
 pub struct EventQueryResponse {
     pub query_id: String,
     pub responder_id: String,
-    pub events: Vec<HiveEvent>,
+    pub events: Vec<PeatEvent>,
     pub total_matching: u32,  // May be > events.len() if limited
     pub truncated: bool,
 }
@@ -560,19 +560,19 @@ impl EventTTLEnforcer {
 
 ### Wire Protocol
 
-Events are transmitted using the standard HIVE transport (ADR-010):
+Events are transmitted using the standard PEAT transport (ADR-010):
 
 ```protobuf
 syntax = "proto3";
-package hive.event.wire.v1;
+package peat.event.wire.v1;
 
-import "hive/event/v1/event.proto";
+import "peat/event/v1/event.proto";
 
 // Event transmission message
 message EventTransmission {
   oneof payload {
     // Single event
-    hive.event.v1.HiveEvent event = 1;
+    peat.event.v1.PeatEvent event = 1;
     
     // Batch of events (efficiency optimization)
     EventBatch batch = 2;
@@ -586,7 +586,7 @@ message EventTransmission {
 }
 
 message EventBatch {
-  repeated hive.event.v1.HiveEvent events = 1;
+  repeated peat.event.v1.PeatEvent events = 1;
 }
 
 message EventQuery {
@@ -606,7 +606,7 @@ message QueryScope {
 }
 
 message EventFilters {
-  optional hive.event.v1.EventClass event_class = 1;
+  optional peat.event.v1.EventClass event_class = 1;
   optional string event_type = 2;
   optional google.protobuf.Timestamp after = 3;
   optional google.protobuf.Timestamp before = 4;
@@ -616,7 +616,7 @@ message EventFilters {
 message EventQueryResponse {
   string query_id = 1;
   string responder_id = 2;
-  repeated hive.event.v1.HiveEvent events = 3;
+  repeated peat.event.v1.PeatEvent events = 3;
   uint32 total_matching = 4;
   bool truncated = 5;
 }
@@ -642,9 +642,9 @@ message EventQueryResponse {
 Capability advertisements (ADR-012) follow the same routing:
 
 ```rust
-impl From<CapabilityAdvertisement> for HiveEvent {
+impl From<CapabilityAdvertisement> for PeatEvent {
     fn from(cap: CapabilityAdvertisement) -> Self {
-        HiveEvent {
+        PeatEvent {
             event_id: uuid::Uuid::new_v4().to_string(),
             timestamp: cap.advertised_at,
             source_node_id: cap.node_id.clone(),
@@ -750,10 +750,10 @@ Capability summaries are generated at each echelon using `FormationCapabilitySum
 ## References
 
 ### Related ADRs
-- ADR-012: Schema Definition (HiveEvent, AggregationPolicy schemas)
+- ADR-012: Schema Definition (PeatEvent, AggregationPolicy schemas)
 - ADR-009: Bidirectional Hierarchical Flows
 - ADR-019: QoS and Data Prioritization
-- ADR-001: HIVE Protocol PoC
+- ADR-001: PEAT Protocol PoC
 
 ### Algorithms
 - Weighted Fair Queuing (WFQ)
@@ -767,4 +767,4 @@ Capability summaries are generated at each echelon using `FormationCapabilitySum
 
 ---
 
-**This ADR specifies how HIVE Protocol routes events through the hierarchy, enforces aggregation policies, and enables bandwidth-efficient distributed coordination.**
+**This ADR specifies how PEAT Protocol routes events through the hierarchy, enforces aggregation policies, and enables bandwidth-efficient distributed coordination.**

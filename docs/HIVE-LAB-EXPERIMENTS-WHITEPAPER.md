@@ -1,16 +1,16 @@
-# HIVE Protocol Lab Experiments Whitepaper
+# PEAT Protocol Lab Experiments Whitepaper
 
 **Empirical Validation of CRDT-Based Tactical Mesh Networking**
 
 **Version:** 1.0
 **Date:** January 2026
-**Authors:** HIVE Protocol Experiments Team
+**Authors:** PEAT Protocol Experiments Team
 
 ---
 
 ## Executive Summary
 
-This whitepaper presents the empirical findings from the HIVE Protocol laboratory experiments (E11-E13), which validate the architectural advantages of CRDT-based mesh networking over traditional IoT architectures for tactical edge deployments. Testing was conducted at scales from 2 to 1000 nodes on single-machine infrastructure.
+This whitepaper presents the empirical findings from the PEAT Protocol laboratory experiments (E11-E13), which validate the architectural advantages of CRDT-based mesh networking over traditional IoT architectures for tactical edge deployments. Testing was conducted at scales from 2 to 1000 nodes on single-machine infrastructure.
 
 **Key Findings:**
 
@@ -24,11 +24,11 @@ This whitepaper presents the empirical findings from the HIVE Protocol laborator
 
 ---
 
-## 1. Introduction to HIVE Protocol
+## 1. Introduction to PEAT Protocol
 
-### 1.1 What is HIVE?
+### 1.1 What is PEAT?
 
-HIVE (Hierarchical Information Vector Exchange) Protocol is an open-source tactical mesh networking protocol designed for disconnected, intermittent, and limited (DIL) environments. It provides:
+PEAT (Hierarchical Information Vector Exchange) Protocol is an open-source tactical mesh networking protocol designed for disconnected, intermittent, and limited (DIL) environments. It provides:
 
 - **CRDT-based synchronization** - Conflict-free replicated data types ensure eventual consistency without coordination
 - **P2P mesh topology** - No central server dependency; every node can route and relay
@@ -39,7 +39,7 @@ HIVE (Hierarchical Information Vector Exchange) Protocol is an open-source tacti
 
 Traditional IoT and client-server architectures face fundamental challenges in tactical environments:
 
-| Challenge | Traditional Approach | HIVE Approach |
+| Challenge | Traditional Approach | PEAT Approach |
 |-----------|---------------------|---------------|
 | **Network Partitions** | Fails without server | Continues operating locally |
 | **Bandwidth Constraints** | Full-state replication (O(n^2)) | Differential sync (O(delta)) |
@@ -49,7 +49,7 @@ Traditional IoT and client-server architectures face fundamental challenges in t
 
 ### 1.3 Core Architectural Claims
 
-The HIVE Protocol makes three fundamental claims that required empirical validation:
+The PEAT Protocol makes three fundamental claims that required empirical validation:
 
 1. **Claim 1: CRDT Differential Sync** reduces bandwidth 60-95% vs traditional full-message IoT
 2. **Claim 2: P2P Mesh Routing** reduces latency 50-90% vs centralized client-server
@@ -90,11 +90,11 @@ Tactical networks operate under four distinct bandwidth regimes:
 
 **Why Bandwidth Matters:**
 
-An architecture that works at 1 Gbps may completely fail at 256 Kbps. Our experiments validate behavior across all four regimes to ensure HIVE remains operational at the tactical edge.
+An architecture that works at 1 Gbps may completely fail at 256 Kbps. Our experiments validate behavior across all four regimes to ensure PEAT remains operational at the tactical edge.
 
 ### 2.3 Backend Comparison: Ditto vs AutomergeIroh
 
-HIVE Protocol supports pluggable CRDT backends. We compare two implementations:
+PEAT Protocol supports pluggable CRDT backends. We compare two implementations:
 
 | Aspect | Ditto | AutomergeIroh |
 |--------|-------|---------------|
@@ -363,7 +363,7 @@ Initial E12 measurements showed Ditto P90 latency of 3,128ms. Investigation reve
 
 - **Maximum tested scale:** 1000 nodes (Linux bridge hard limit at 1023)
 - **Real radio testing:** Not yet conducted (simulated bandwidth constraints only)
-- **Bluetooth LE:** Platform integration ongoing (hive-btle v0.0.4)
+- **Bluetooth LE:** Platform integration ongoing (peat-btle v0.0.4)
 - **Multi-machine distributed:** Required for 1000+ node testing
 
 ### 6.3 Future Work
@@ -372,7 +372,7 @@ Initial E12 measurements showed Ditto P90 latency of 3,128ms. Investigation reve
 2. **Large-scale distributed:** Multi-machine testing at 500+ nodes
 3. **Real tactical radios:** Trellisware, Harris integration testing
 4. **ATAK integration:** Field validation with Android Team Awareness Kit
-5. **BLE mesh:** hive-btle integration for short-range mesh
+5. **BLE mesh:** peat-btle integration for short-range mesh
 
 ---
 
@@ -388,39 +388,39 @@ Initial E12 measurements showed Ditto P90 latency of 3,128ms. Investigation reve
 ## Appendix B: Test Artifacts
 
 **Results Directories:**
-- `hive-sim/scaling-results-48node-*` - 48-node baseline (4 runs)
-- `hive-sim/scaling-results-96node-*` - 96-node battalion (4 runs)
-- `hive-sim/scaling-results-192node-*` - 192-node tests (4 runs)
-- `hive-sim/scaling-results-384node-*` - 384-node tests (4 runs)
-- `hive-sim/scaling-results-500node-*` - 500-node tests (4 runs)
-- `hive-sim/scaling-results-750node-*` - 750-node tests (4 runs)
-- `hive-sim/scaling-results-1000node-*` - 1000-node maximum (4 runs)
-- `hive-sim/automerge-flat-mesh-*` - AutomergeIroh backend results
-- `hive-sim/hive-flat-mesh-*` - Ditto backend results
-- `hive-sim/hive-hierarchical-*` - Hierarchical mode results
+- `peat-sim/scaling-results-48node-*` - 48-node baseline (4 runs)
+- `peat-sim/scaling-results-96node-*` - 96-node battalion (4 runs)
+- `peat-sim/scaling-results-192node-*` - 192-node tests (4 runs)
+- `peat-sim/scaling-results-384node-*` - 384-node tests (4 runs)
+- `peat-sim/scaling-results-500node-*` - 500-node tests (4 runs)
+- `peat-sim/scaling-results-750node-*` - 750-node tests (4 runs)
+- `peat-sim/scaling-results-1000node-*` - 1000-node maximum (4 runs)
+- `peat-sim/automerge-flat-mesh-*` - AutomergeIroh backend results
+- `peat-sim/peat-flat-mesh-*` - Ditto backend results
+- `peat-sim/peat-hierarchical-*` - Hierarchical mode results
 - `labs/e11-*/test-bandwidth-suite-*` - E11 bandwidth results
 - `labs/e12-*/e12-comprehensive-results-*` - E12 results
 - `labs/e12-*/e13v2-p2p-mesh-*` - E13v2 validation
 
 **Analysis Scripts:**
-- `hive-sim/analyze_metrics.py` - Metrics aggregation
-- `hive-sim/analyze-three-way-comparison.py` - Architecture comparison
+- `peat-sim/analyze_metrics.py` - Metrics aggregation
+- `peat-sim/analyze-three-way-comparison.py` - Architecture comparison
 - `labs/e12-*/scripts/analyze-comprehensive-results.py` - E12 analysis
 
 ## Appendix C: Reproduction Instructions
 
 ```bash
 # Clone repository
-git clone https://github.com/kitplummer/hive.git
-cd hive
+git clone https://github.com/defenseunicorns/peat.git
+cd peat
 
 # Build Docker image (Automerge backend)
-docker build -f hive-sim/Dockerfile \
+docker build -f peat-sim/Dockerfile \
   --build-arg FEATURES="automerge-backend" \
-  -t hive-sim-node:automerge .
+  -t peat-sim-node:automerge .
 
 # Run 24-node platoon test
-cd hive-sim
+cd peat-sim
 ./run-topology.sh topologies/platoon-24node-mesh-mode4.yaml
 
 # Analyze results
@@ -435,4 +435,4 @@ python3 analyze_metrics.py results-*/
 
 ---
 
-*HIVE Protocol is an open-source project. Contributions welcome at https://github.com/kitplummer/hive*
+*PEAT Protocol is an open-source project. Contributions welcome at https://github.com/defenseunicorns/peat*

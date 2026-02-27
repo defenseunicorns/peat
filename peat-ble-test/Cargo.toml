@@ -1,0 +1,40 @@
+[package]
+name = "peat-ble-test"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "BLE mesh transport test application for Peat Protocol"
+
+[[bin]]
+name = "peat-ble-test"
+path = "src/main.rs"
+
+[dependencies]
+# PEAT dependencies
+peat-protocol = { path = "../peat-protocol", default-features = false, features = ["bluetooth", "automerge-backend"] }
+
+# Async runtime
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal"] }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+
+# Error handling
+anyhow = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+peat-btle = { workspace = true, features = ["linux"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+peat-btle = { workspace = true, features = ["macos"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+peat-btle = { workspace = true, features = ["windows"] }
+
+[features]
+default = []

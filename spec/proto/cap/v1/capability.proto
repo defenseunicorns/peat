@@ -1,8 +1,8 @@
-// HIVE Protocol - Capability Model
+// PEAT Protocol - Capability Model
 // Specification Version: 0.1.0
 // License: CC0 1.0 Universal (Public Domain)
 //
-// This file defines the capability model for HIVE Protocol.
+// This file defines the capability model for PEAT Protocol.
 // Capabilities represent what a node or cell can do (sense, compute, move, etc.)
 // and are fundamental to the composition and matching algorithms.
 

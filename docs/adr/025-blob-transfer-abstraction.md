@@ -9,7 +9,7 @@
 
 ### The File Transfer Gap
 
-HIVE Protocol has comprehensive architecture for distributed AI model operations (ADR-013, ADR-022) and capability advertisement (ADR-018), but lacks the foundational primitive: **backend-agnostic binary file transfer through the mesh**.
+PEAT Protocol has comprehensive architecture for distributed AI model operations (ADR-013, ADR-022) and capability advertisement (ADR-018), but lacks the foundational primitive: **backend-agnostic binary file transfer through the mesh**.
 
 **Current State:**
 - `StorageBackend` and `Collection` traits handle document CRUD (`storage/traits.rs`)
@@ -113,7 +113,7 @@ while let Some(chunk) = reader.next().await {
 
 ### Gap Analysis
 
-| Feature | Ditto | iroh-blobs | HIVE (Current) |
+| Feature | Ditto | iroh-blobs | PEAT (Current) |
 |---------|-------|------------|----------------|
 | Content-addressed storage | Yes | Yes | No |
 | Progress tracking | Yes | Yes | No |
@@ -131,7 +131,7 @@ Introduce a `BlobStore` trait parallel to `StorageBackend`, acknowledging that b
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    HIVE Protocol Layer                       │
+│                    PEAT Protocol Layer                       │
 │                                                              │
 │  ┌─────────────────┐           ┌─────────────────────────┐  │
 │  │ ModelDistribution│           │  SoftwareDistribution   │  │
@@ -926,7 +926,7 @@ impl BlobStore for IrohBlobStore {
 
 ### ADR-022 (Edge MLOps)
 - Model registry stores blob tokens
-- `HiveMLRuntime` uses `fetch_blob()` to load models
+- `PeatMLRuntime` uses `fetch_blob()` to load models
 - Variant selection uses blob metadata
 
 ### ADR-018 (AI Model Capability Advertisement)
@@ -997,7 +997,7 @@ These questions must be answered before implementing Phase 4:
 10. **API Abstraction Depth**:
     - Thin wrapper over FileDistribution (minimal model-specific logic)?
     - Rich model-specific API (variant selection, convergence tracking)?
-    - How much should be in hive-protocol vs inference runtime integration?
+    - How much should be in peat-protocol vs inference runtime integration?
 
 11. **NodeCapabilities Schema**: What capabilities should nodes advertise?
     ```rust
@@ -1014,4 +1014,4 @@ These questions must be answered before implementing Phase 4:
 
 ---
 
-**This ADR establishes the foundational file transfer abstraction enabling AI model distribution and software operations across the HIVE mesh network.**
+**This ADR establishes the foundational file transfer abstraction enabling AI model distribution and software operations across the PEAT mesh network.**

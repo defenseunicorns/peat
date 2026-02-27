@@ -99,7 +99,7 @@ Traditional Machine Learning Operations (MLOps) architectures assume:
 - Continuous monitoring telemetry → Central dashboards
 - Model registry as source of truth
 
-**HIVE Enables:**
+**PEAT Enables:**
 - Edge-first inference with local model execution
 - Hierarchical model distribution via differential sync
 - Aggregated performance monitoring through hierarchy
@@ -108,14 +108,14 @@ Traditional Machine Learning Operations (MLOps) architectures assume:
 
 **Design Philosophy:**
 - **Models run at the edge** where decisions are made
-- **Model updates propagate hierarchically** using HIVE's differential sync
+- **Model updates propagate hierarchically** using PEAT's differential sync
 - **Performance metrics aggregate upward** through command hierarchy
 - **Training happens offline** or via federated learning
 - **Capability, not inventory** is the operational metric
 
 ### Model Format Standards: ONNX as Foundation
 
-**HIVE uses ONNX (Open Neural Network Exchange) as the standard model interchange format** for edge AI operations. This decision provides critical benefits for military edge deployments:
+**PEAT uses ONNX (Open Neural Network Exchange) as the standard model interchange format** for edge AI operations. This decision provides critical benefits for military edge deployments:
 
 #### Why ONNX for Tactical Edge
 
@@ -162,10 +162,10 @@ Traditional Machine Learning Operations (MLOps) architectures assume:
 - Integration with MLOps tools (MLflow, Azure ML)
 - Active development and governance (LF AI & Data)
 
-#### ONNX Integration in HIVE
+#### ONNX Integration in PEAT
 
 ```python
-# Example: ONNX model in HIVE registry
+# Example: ONNX model in PEAT registry
 {
   "model_id": "target_recognition_yolov8",
   "version": "4.2.1",
@@ -244,15 +244,15 @@ Traditional Machine Learning Operations (MLOps) architectures assume:
 }
 ```
 
-**HIVE's ONNX Runtime Integration:**
+**PEAT's ONNX Runtime Integration:**
 
 ```python
-class HiveMLRuntime:
+class PeatMLRuntime:
     """ONNX-first ML runtime for edge platforms"""
     
-    def __init__(self, platform_id: str, hive_sync: HiveSyncEngine):
+    def __init__(self, platform_id: str, peat_sync: PeatSyncEngine):
         self.platform_id = platform_id
-        self.hive_sync = hive_sync
+        self.peat_sync = peat_sync
         self.sessions = {}
         
         # Detect available hardware and execution providers
@@ -275,8 +275,8 @@ class HiveMLRuntime:
         
     def load_model(self, model_spec: ModelSpec):
         """Load ONNX model with automatic variant selection"""
-        # Fetch model metadata from HIVE
-        model_metadata = self.hive_sync.get_artifact_metadata(
+        # Fetch model metadata from PEAT
+        model_metadata = self.peat_sync.get_artifact_metadata(
             collection="models.registry",
             artifact_id=f"{model_spec.model_id}:{model_spec.version}"
         )
@@ -288,8 +288,8 @@ class HiveMLRuntime:
             self.get_hardware_capabilities()
         )
         
-        # Fetch ONNX model file via HIVE differential sync
-        onnx_model_path = self.hive_sync.fetch_artifact(
+        # Fetch ONNX model file via PEAT differential sync
+        onnx_model_path = self.peat_sync.fetch_artifact(
             artifact_id=variant.file,
             priority="normal"
         )
@@ -318,8 +318,8 @@ class HiveMLRuntime:
             "loaded_at": datetime.now()
         }
         
-        # Update capability state in HIVE
-        self.hive_sync.update_capability_state(
+        # Update capability state in PEAT
+        self.peat_sync.update_capability_state(
             platform_id=self.platform_id,
             capability=model_spec.model_id,
             status="operational",
@@ -402,7 +402,7 @@ ONNX's structured format enables intelligent differential sync:
 }
 ```
 
-**Benefits for HIVE:**
+**Benefits for PEAT:**
 - ONNX graph structure enables semantic chunking (by layer/operator)
 - Changed weights identified at granular level
 - Architecture changes (nodes/edges) detected separately
@@ -452,27 +452,27 @@ Each platform runs models locally with instrumentation:
 
 ```python
 # Edge platform ML runtime
-class HiveMLRuntime:
-    def __init__(self, platform_id: str, hive_sync: HiveSyncEngine):
+class PeatMLRuntime:
+    def __init__(self, platform_id: str, peat_sync: PeatSyncEngine):
         self.platform_id = platform_id
-        self.hive_sync = hive_sync
+        self.peat_sync = peat_sync
         self.models = {}
         self.performance_metrics = {}
         
     def load_model(self, model_spec: ModelSpec):
-        """Load model from HIVE-synced model registry"""
+        """Load model from PEAT-synced model registry"""
         model_id = model_spec.model_id
         version = model_spec.version
         
-        # Check if model available in local HIVE state
-        model_artifact = self.hive_sync.get_artifact(
+        # Check if model available in local PEAT state
+        model_artifact = self.peat_sync.get_artifact(
             collection="models.registry",
             artifact_id=f"{model_id}:{version}"
         )
         
         if model_artifact is None:
-            # Request from parent via HIVE sync
-            self.hive_sync.request_artifact(
+            # Request from parent via PEAT sync
+            self.peat_sync.request_artifact(
                 artifact_id=f"{model_id}:{version}",
                 priority="normal"
             )
@@ -492,8 +492,8 @@ class HiveMLRuntime:
             "inference_count": 0
         }
         
-        # Update capability state in HIVE
-        self.hive_sync.update_capability_state(
+        # Update capability state in PEAT
+        self.peat_sync.update_capability_state(
             platform_id=self.platform_id,
             capability=model_id,
             status="operational",
@@ -551,15 +551,15 @@ class HiveMLRuntime:
         metrics["inference_count"] += 1
         metrics["last_updated"] = datetime.now()
         
-        # Periodically sync performance metrics up through HIVE
+        # Periodically sync performance metrics up through PEAT
         if metrics["inference_count"] % 100 == 0:
             self.sync_performance_metrics(model_id)
             
     def sync_performance_metrics(self, model_id: str):
-        """Aggregate performance metrics into HIVE state"""
+        """Aggregate performance metrics into PEAT state"""
         metrics = self.performance_metrics[model_id]
         
-        self.hive_sync.update_capability_state(
+        self.peat_sync.update_capability_state(
             platform_id=self.platform_id,
             capability=model_id,
             performance={
@@ -691,7 +691,7 @@ impl ModelDistribution {
         
         // Companies automatically propagate to Platoons
         // Platoons to Squads, Squads to Platforms
-        // All via HIVE sync protocol
+        // All via PEAT sync protocol
         
         // Step 5: Monitor convergence
         let convergence = self.monitor_convergence(
@@ -733,7 +733,7 @@ impl ModelDistribution {
 
 #### 3. Hierarchical Performance Monitoring
 
-Performance metrics aggregate up through HIVE hierarchy:
+Performance metrics aggregate up through PEAT hierarchy:
 
 ```javascript
 // Platform-level performance (raw)
@@ -908,9 +908,9 @@ class TrainingDataCollector:
         # Store locally
         self.local_storage.store(metadata)
         
-        # Metadata propagates up via HIVE (small)
+        # Metadata propagates up via PEAT (small)
         # Raw data stays local until platform returns to base
-        self.hive_sync.log_training_metadata(metadata)
+        self.peat_sync.log_training_metadata(metadata)
 ```
 
 **Bulk data collection when connectivity permits:**
@@ -967,8 +967,8 @@ class FederatedLearningClient:
         compressed_delta = compress(weight_delta)
         signed_delta = self.sign_update(compressed_delta)
         
-        # Send delta up via HIVE (much smaller than raw data)
-        self.hive_sync.send_federated_update(
+        # Send delta up via PEAT (much smaller than raw data)
+        self.peat_sync.send_federated_update(
             model_id=model_id,
             delta=signed_delta,
             training_samples=len(training_data),
@@ -1005,7 +1005,7 @@ class FederatedLearningAggregator:
         validation_results = self.validate_model(updated_model)
         
         if validation_results.meets_criteria():
-            # Publish new version via HIVE
+            # Publish new version via PEAT
             new_version = self.model_registry.publish(
                 model=updated_model,
                 validation=validation_results,
@@ -1065,36 +1065,36 @@ class SyntheticDataGenerator:
 
 #### 5. Agent Context Integration (MCP Bridge)
 
-HIVE-synced state becomes context for AI agents:
+PEAT-synced state becomes context for AI agents:
 
 ```python
-class HiveMCPBridge:
-    """Bridge between HIVE distributed state and MCP agent context"""
+class PeatMCPBridge:
+    """Bridge between PEAT distributed state and MCP agent context"""
     
-    def __init__(self, hive_sync: HiveSyncEngine):
-        self.hive_sync = hive_sync
+    def __init__(self, peat_sync: PeatSyncEngine):
+        self.peat_sync = peat_sync
         self.mcp_server = MCPServer()
         
-        # Register HIVE collections as MCP resources
-        self.register_hive_resources()
+        # Register PEAT collections as MCP resources
+        self.register_peat_resources()
         
-    def register_hive_resources(self):
-        """Expose HIVE state as MCP resources for agents"""
+    def register_peat_resources(self):
+        """Expose PEAT state as MCP resources for agents"""
         
         # Resource: Current model registry
         @self.mcp_server.resource("models://registry")
         def get_model_registry():
-            return self.hive_sync.query_collection("models.registry")
+            return self.peat_sync.query_collection("models.registry")
             
         # Resource: Platform capabilities
         @self.mcp_server.resource("capabilities://platforms")
         def get_platform_capabilities():
-            return self.hive_sync.query_collection("platforms.capabilities")
+            return self.peat_sync.query_collection("platforms.capabilities")
             
         # Resource: Aggregated performance metrics
         @self.mcp_server.resource("performance://aggregated")
         def get_performance_metrics():
-            return self.hive_sync.query_aggregated_state(
+            return self.peat_sync.query_aggregated_state(
                 "platforms.performance",
                 aggregation_level=self.get_echelon()
             )
@@ -1103,17 +1103,17 @@ class HiveMCPBridge:
         @self.mcp_server.resource("mission://context")
         def get_mission_context():
             return {
-                "roe": self.hive_sync.get("company.orders", "current_roe"),
-                "objectives": self.hive_sync.get("platoon.taskings", "objectives"),
-                "no_strike_zones": self.hive_sync.get("shared.no_strike_zones"),
-                "threat_assessment": self.hive_sync.get("shared.enemy_disposition")
+                "roe": self.peat_sync.get("company.orders", "current_roe"),
+                "objectives": self.peat_sync.get("platoon.taskings", "objectives"),
+                "no_strike_zones": self.peat_sync.get("shared.no_strike_zones"),
+                "threat_assessment": self.peat_sync.get("shared.enemy_disposition")
             }
             
         # Tool: Request model update
         @self.mcp_server.tool("request_model_update")
         def request_model_update(model_id: str, target_version: str, justification: str):
-            """Agent can request model updates through HIVE"""
-            return self.hive_sync.request_model_update(
+            """Agent can request model updates through PEAT"""
+            return self.peat_sync.request_model_update(
                 model_id=model_id,
                 target_version=target_version,
                 requested_by=self.agent_id,
@@ -1123,8 +1123,8 @@ class HiveMCPBridge:
         # Tool: Report model performance issue
         @self.mcp_server.tool("report_performance_issue")
         def report_performance_issue(model_id: str, issue_type: str, details: dict):
-            """Agent can report degradation through HIVE"""
-            return self.hive_sync.log_performance_issue(
+            """Agent can report degradation through PEAT"""
+            return self.peat_sync.log_performance_issue(
                 model_id=model_id,
                 issue_type=issue_type,
                 details=details,
@@ -1132,16 +1132,16 @@ class HiveMCPBridge:
             )
 
 class EdgeAgent:
-    """AI agent using HIVE-synced context via MCP"""
+    """AI agent using PEAT-synced context via MCP"""
     
     def __init__(self, agent_id: str, mcp_client: MCPClient):
         self.agent_id = agent_id
         self.mcp = mcp_client
         
     async def make_decision(self, situation: Situation):
-        """Agent decision-making with HIVE context"""
+        """Agent decision-making with PEAT context"""
         
-        # Get current context from HIVE via MCP
+        # Get current context from PEAT via MCP
         model_registry = await self.mcp.get_resource("models://registry")
         capabilities = await self.mcp.get_resource("capabilities://platforms")
         mission_context = await self.mcp.get_resource("mission://context")
@@ -1172,8 +1172,8 @@ class EdgeAgent:
 │  AI Agent (ReAct, function calling) │
 │         ↕ [MCP Protocol]            │
 │  MCP Server (Context Provider)      │
-│         ↕ [HIVE Bridge]             │
-│  HIVE Sync Engine                   │
+│         ↕ [PEAT Bridge]             │
+│  PEAT Sync Engine                   │
 │    • Model Registry                 │
 │    • Capability State               │
 │    • Performance Metrics            │
@@ -1185,8 +1185,8 @@ class EdgeAgent:
 
 **Value Proposition:**
 - **MCP standardizes** agent-to-context interface
-- **HIVE ensures** context is available, current, consistent in DIL environments
-- **Separation of concerns**: MCP = local API, HIVE = distributed state
+- **PEAT ensures** context is available, current, consistent in DIL environments
+- **Separation of concerns**: MCP = local API, PEAT = distributed state
 - **Agents reason over hierarchically-appropriate context** (platform sees squad, squad sees platoon, etc.)
 
 ### Implementation Phases
@@ -1194,7 +1194,7 @@ class EdgeAgent:
 #### Phase 1: Foundation (Months 1-3)
 - **Model distribution infrastructure** using ADR-013 differential propagation
 - **Edge runtime instrumentation** for performance tracking
-- **Basic performance aggregation** through HIVE hierarchy
+- **Basic performance aggregation** through PEAT hierarchy
 - **Content-addressed model storage** with signature verification
 
 **Success Criteria:**
@@ -1225,15 +1225,15 @@ class EdgeAgent:
 - Model performance improves from operational feedback
 
 #### Phase 4: Agent Integration (Months 9-12)
-- **MCP bridge** exposing HIVE state to agents
+- **MCP bridge** exposing PEAT state to agents
 - **Hierarchical agent architecture** (agents at each echelon)
-- **Agent-driven model requests** through HIVE
+- **Agent-driven model requests** through PEAT
 - **Multi-echelon agentic coordination**
 
 **Success Criteria:**
-- Agents can query HIVE-synced context via MCP
+- Agents can query PEAT-synced context via MCP
 - Agents at different echelons see appropriate abstraction levels
-- Agent decisions propagate through HIVE hierarchy
+- Agent decisions propagate through PEAT hierarchy
 
 ## Consequences
 
@@ -1265,9 +1265,9 @@ class EdgeAgent:
 
 **Agent Enablement:**
 - MCP provides standard interface for agent context
-- HIVE ensures context availability in disconnected environments
+- PEAT ensures context availability in disconnected environments
 - Hierarchical abstraction matches agent decision scope
-- Agents can request updates through HIVE infrastructure
+- Agents can request updates through PEAT infrastructure
 
 ### Negative
 
@@ -1332,7 +1332,7 @@ class EdgeAgent:
 ### With ADR-006 (Security, Authentication, Authorization)
 - **Model provenance:** Signature chains for model verification
 - **Federated learning:** Cryptographic verification of gradient updates
-- **Agent authorization:** MCP tools respect HIVE authorization model
+- **Agent authorization:** MCP tools respect PEAT authorization model
 - **Training data:** Encryption of sensitive training metadata
 
 ### With ADR-007 (Automerge-Based Sync Engine)
@@ -1401,12 +1401,12 @@ class EdgeAgent:
 - Not designed for contested environments
 - Heavy resource requirements for edge
 
-**Why HIVE Edge MLOps:**
+**Why PEAT Edge MLOps:**
 - **Hierarchical by design:** Matches military organization
 - **Offline-first:** Works in DIL environments
 - **Differential propagation:** Optimal for bandwidth constraints
 - **Capability focus:** Operational assessment, not just inventory
-- **Integrated:** Leverages existing HIVE infrastructure for distribution, monitoring, and coordination
+- **Integrated:** Leverages existing PEAT infrastructure for distribution, monitoring, and coordination
 
 ## References
 
@@ -1458,7 +1458,7 @@ class EdgeAgent:
 
 ## Appendix A: Model Format Comparison for Tactical Edge
 
-This appendix compares the three primary model formats considered for HIVE edge deployments: **ONNX**, **TensorFlow Lite (TFLite)**, and **Native Framework Formats** (PyTorch .pt/.pth, TensorFlow SavedModel).
+This appendix compares the three primary model formats considered for PEAT edge deployments: **ONNX**, **TensorFlow Lite (TFLite)**, and **Native Framework Formats** (PyTorch .pt/.pth, TensorFlow SavedModel).
 
 ### Evaluation Criteria for Military Edge
 
@@ -1494,7 +1494,7 @@ This appendix compares the three primary model formats considered for HIVE edge 
 
 **Tactical Edge Suitability:** ⭐⭐⭐⭐⭐ (5/5)
 
-**HIVE Integration:**
+**PEAT Integration:**
 ```python
 # ONNX as standard format
 model_variants = {
@@ -1504,7 +1504,7 @@ model_variants = {
 }
 
 # Differential sync: 16MB delta between versions vs 487MB full model
-# HIVE distributes only changed weights using ONNX graph structure
+# PEAT distributes only changed weights using ONNX graph structure
 ```
 
 **Size Analysis:**
@@ -1544,9 +1544,9 @@ model_variants = {
 
 **Tactical Edge Suitability:** ⭐⭐⭐ (3/5)
 
-**HIVE Integration Challenges:**
+**PEAT Integration Challenges:**
 ```python
-# TFLite more difficult to integrate into HIVE
+# TFLite more difficult to integrate into PEAT
 # - Conversion from PyTorch requires TF intermediate step
 # - Less semantic structure for differential sync
 # - Fewer hardware backend options
@@ -1581,9 +1581,9 @@ model_variants = {
 
 **Tactical Edge Suitability:** ⭐⭐ (2/5)
 
-**HIVE Integration Challenges:**
+**PEAT Integration Challenges:**
 ```python
-# Native formats problematic for HIVE
+# Native formats problematic for PEAT
 # - Large runtime dependencies (PyTorch 700MB + model 500MB = 1.2GB)
 # - Vendor lock-in unacceptable for government procurement
 # - Security: PyTorch uses pickle (arbitrary code execution risk)
@@ -1616,9 +1616,9 @@ model_variants = {
 | **Extremely constrained** | TFLite | When <10MB total footprint required |
 | **Research/experimentation** | Native | Rapid iteration, full operator support |
 
-### HIVE Architecture Decision
+### PEAT Architecture Decision
 
-**HIVE adopts ONNX as the standard model format** for the following reasons:
+**PEAT adopts ONNX as the standard model format** for the following reasons:
 
 1. **Vendor Neutrality:** Critical for government procurement and multi-vendor ecosystem
 2. **Security:** Auditable graph structure enables malware detection and operator whitelisting
@@ -1637,7 +1637,7 @@ Traditional PyTorch Deployment:
 - 200 platforms = 140GB runtime + 100GB models = 240GB total
 - Update: 100GB for new model version
 
-HIVE with ONNX:
+PEAT with ONNX:
 - Runtime: 15MB per platform (ONNX Runtime)
 - Model: 125MB INT8 per model
 - 200 platforms = 3GB runtime + 25GB models = 28GB total (88% reduction)
@@ -1671,12 +1671,12 @@ def verify_onnx_security(model_path: str) -> bool:
 ```
 
 **NATO Standardization Argument:**
-> "HIVE uses ONNX as the standard model interchange format, enabling allied forces to share AI capabilities without vendor lock-in. A US-trained ONNX model can deploy to UK, Australian, or Canadian platforms via HIVE's hierarchical distribution, supporting coalition operations and AUKUS Pillar II technology sharing objectives."
+> "PEAT uses ONNX as the standard model interchange format, enabling allied forces to share AI capabilities without vendor lock-in. A US-trained ONNX model can deploy to UK, Australian, or Canadian platforms via PEAT's hierarchical distribution, supporting coalition operations and AUKUS Pillar II technology sharing objectives."
 
 ### Future Considerations
 
 **Multi-Format Support:**
-While ONNX is the standard, HIVE architecture allows for alternative formats when operationally necessary:
+While ONNX is the standard, PEAT architecture allows for alternative formats when operationally necessary:
 - TFLite for extremely constrained platforms (<100MB storage)
 - Native formats for experimental/research deployments
 - Emerging formats (e.g., MLIR, StableHLO) as they mature
@@ -1693,11 +1693,11 @@ Quantization (FP16/INT8)
     ↓
 AFRL AI Passport Validation
     ↓
-HIVE Model Registry
+PEAT Model Registry
     ↓
 Hierarchical Distribution to Tactical Edge
 ```
 
 ---
 
-**This ADR establishes HIVE as the enabling infrastructure for edge-first ML operations in contested tactical environments, supporting the full model lifecycle from distribution through training while maintaining operational capability focus throughout the hierarchy.**
+**This ADR establishes PEAT as the enabling infrastructure for edge-first ML operations in contested tactical environments, supporting the full model lifecycle from distribution through training while maintaining operational capability focus throughout the hierarchy.**

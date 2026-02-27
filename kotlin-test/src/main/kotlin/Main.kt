@@ -1,19 +1,19 @@
-import uniffi.hive_ffi.*
+import uniffi.peat_ffi.*
 import java.io.File
 import java.util.UUID
 
 /**
- * HIVE Kotlin FFI Test Application
+ * PEAT Kotlin FFI Test Application
  *
- * Tests the UniFFI bindings to the Rust hive-ffi crate.
+ * Tests the UniFFI bindings to the Rust peat-ffi crate.
  */
 fun main() {
-    println("=== HIVE Kotlin FFI Test ===\n")
+    println("=== PEAT Kotlin FFI Test ===\n")
 
     // Test 1: Get library version
-    println("1. Testing hiveVersion()...")
-    val version = hiveVersion()
-    println("   HIVE library version: $version")
+    println("1. Testing peatVersion()...")
+    val version = peatVersion()
+    println("   PEAT library version: $version")
     check(version.isNotEmpty()) { "Version should not be empty" }
     println("   ✓ Version check passed\n")
 
@@ -61,7 +61,7 @@ fun main() {
         check(cotXml.contains("<event")) { "Should contain <event" }
         check(cotXml.contains("track-001")) { "Should contain track ID" }
         println("   ✓ CoT encoding passed\n")
-    } catch (e: HiveException) {
+    } catch (e: PeatException) {
         println("   ✗ CoT encoding failed: ${e.message}")
         throw e
     }
@@ -81,8 +81,8 @@ fun main() {
 
     try {
         encodeTrackToCot(badTrack)
-        println("   ✗ Should have thrown HiveException.InvalidInput")
-    } catch (e: HiveException.InvalidInput) {
+        println("   ✗ Should have thrown PeatException.InvalidInput")
+    } catch (e: PeatException.InvalidInput) {
         println("   Caught expected error: ${e.message}")
         println("   ✓ Error handling passed\n")
     } catch (e: Exception) {
@@ -90,9 +90,9 @@ fun main() {
         throw e
     }
 
-    // Test 6: HiveNode creation and document operations
-    println("6. Testing HiveNode creation...")
-    val tempDir = createTempDir("hive-kotlin-test-${UUID.randomUUID()}")
+    // Test 6: PeatNode creation and document operations
+    println("6. Testing PeatNode creation...")
+    val tempDir = createTempDir("peat-kotlin-test-${UUID.randomUUID()}")
     try {
         val nodeConfig = NodeConfig(
             bindAddress = "127.0.0.1:0",  // Auto-assign port
@@ -167,7 +167,7 @@ fun main() {
 
     // Test 10: Subscription callbacks
     println("10. Testing subscription callbacks...")
-    val tempDirSub = createTempDir("hive-sub-test-${UUID.randomUUID()}")
+    val tempDirSub = createTempDir("peat-sub-test-${UUID.randomUUID()}")
     try {
         val subNodeConfig = NodeConfig(
             bindAddress = "127.0.0.1:0",
@@ -232,8 +232,8 @@ fun main() {
 
     // Test 11: Two-node sync test
     println("11. Testing two-node sync...")
-    val tempDir1 = createTempDir("hive-node1-${UUID.randomUUID()}")
-    val tempDir2 = createTempDir("hive-node2-${UUID.randomUUID()}")
+    val tempDir1 = createTempDir("peat-node1-${UUID.randomUUID()}")
+    val tempDir2 = createTempDir("peat-node2-${UUID.randomUUID()}")
 
     try {
         // Create two nodes on different ports

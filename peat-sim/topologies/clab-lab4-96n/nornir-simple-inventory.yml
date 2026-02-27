@@ -1,0 +1,506 @@
+---
+company-1-commander:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.71
+company-1-platoon-1-leader:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.8
+company-1-platoon-1-squad-1-leader:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.10
+company-1-platoon-1-squad-1-soldier-1:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.56
+company-1-platoon-1-squad-1-soldier-2:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.33
+company-1-platoon-1-squad-1-soldier-3:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.6
+company-1-platoon-1-squad-1-soldier-4:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.75
+company-1-platoon-1-squad-1-soldier-5:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.38
+company-1-platoon-1-squad-1-soldier-6:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.4
+company-1-platoon-1-squad-1-soldier-7:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.79
+company-1-platoon-1-squad-2-leader:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.68
+company-1-platoon-1-squad-2-soldier-1:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.28
+company-1-platoon-1-squad-2-soldier-2:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.94
+company-1-platoon-1-squad-2-soldier-3:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.55
+company-1-platoon-1-squad-2-soldier-4:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.91
+company-1-platoon-1-squad-2-soldier-5:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.9
+company-1-platoon-1-squad-2-soldier-6:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.19
+company-1-platoon-1-squad-2-soldier-7:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.43
+company-1-platoon-1-squad-3-leader:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.59
+company-1-platoon-1-squad-3-soldier-1:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.58
+company-1-platoon-1-squad-3-soldier-2:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.100
+company-1-platoon-1-squad-3-soldier-3:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.84
+company-1-platoon-1-squad-3-soldier-4:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.54
+company-1-platoon-1-squad-3-soldier-5:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.69
+company-1-platoon-1-squad-3-soldier-6:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.53
+company-1-platoon-1-squad-3-soldier-7:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.29
+company-1-platoon-2-leader:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.17
+company-1-platoon-2-squad-1-leader:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.76
+company-1-platoon-2-squad-1-soldier-1:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.62
+company-1-platoon-2-squad-1-soldier-2:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.92
+company-1-platoon-2-squad-1-soldier-3:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.24
+company-1-platoon-2-squad-1-soldier-4:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.2
+company-1-platoon-2-squad-1-soldier-5:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.5
+company-1-platoon-2-squad-1-soldier-6:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.39
+company-1-platoon-2-squad-1-soldier-7:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.25
+company-1-platoon-2-squad-2-leader:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.81
+company-1-platoon-2-squad-2-soldier-1:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.14
+company-1-platoon-2-squad-2-soldier-2:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.16
+company-1-platoon-2-squad-2-soldier-3:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.37
+company-1-platoon-2-squad-2-soldier-4:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.15
+company-1-platoon-2-squad-2-soldier-5:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.60
+company-1-platoon-2-squad-2-soldier-6:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.49
+company-1-platoon-2-squad-2-soldier-7:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.48
+company-1-platoon-2-squad-3-leader:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.21
+company-1-platoon-2-squad-3-soldier-1:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.98
+company-1-platoon-2-squad-3-soldier-2:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.93
+company-1-platoon-2-squad-3-soldier-3:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.73
+company-1-platoon-2-squad-3-soldier-4:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.11
+company-1-platoon-2-squad-3-soldier-5:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.30
+company-1-platoon-2-squad-3-soldier-6:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.63
+company-1-platoon-2-squad-3-soldier-7:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.31
+company-1-platoon-3-leader:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.27
+company-1-platoon-3-squad-1-leader:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.42
+company-1-platoon-3-squad-1-soldier-1:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.70
+company-1-platoon-3-squad-1-soldier-2:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.72
+company-1-platoon-3-squad-1-soldier-3:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.87
+company-1-platoon-3-squad-1-soldier-4:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.65
+company-1-platoon-3-squad-1-soldier-5:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.78
+company-1-platoon-3-squad-1-soldier-6:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.44
+company-1-platoon-3-squad-1-soldier-7:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.26
+company-1-platoon-3-squad-2-leader:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.23
+company-1-platoon-3-squad-2-soldier-1:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.7
+company-1-platoon-3-squad-2-soldier-2:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.89
+company-1-platoon-3-squad-2-soldier-3:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.88
+company-1-platoon-3-squad-2-soldier-4:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.64
+company-1-platoon-3-squad-2-soldier-5:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.35
+company-1-platoon-3-squad-2-soldier-6:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.97
+company-1-platoon-3-squad-2-soldier-7:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.34
+company-1-platoon-3-squad-3-leader:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.80
+company-1-platoon-3-squad-3-soldier-1:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.90
+company-1-platoon-3-squad-3-soldier-2:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.74
+company-1-platoon-3-squad-3-soldier-3:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.83
+company-1-platoon-3-squad-3-soldier-4:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.85
+company-1-platoon-3-squad-3-soldier-5:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.3
+company-1-platoon-3-squad-3-soldier-6:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.99
+company-1-platoon-3-squad-3-soldier-7:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.36
+company-1-platoon-4-leader:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.12
+company-1-platoon-4-squad-1-leader:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.57
+company-1-platoon-4-squad-1-soldier-1:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.46
+company-1-platoon-4-squad-1-soldier-2:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.61
+company-1-platoon-4-squad-1-soldier-3:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.52
+company-1-platoon-4-squad-1-soldier-4:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.96
+company-1-platoon-4-squad-1-soldier-5:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.102
+company-1-platoon-4-squad-1-soldier-6:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.50
+company-1-platoon-4-squad-1-soldier-7:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.86
+company-1-platoon-4-squad-2-leader:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.82
+company-1-platoon-4-squad-2-soldier-1:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.95
+company-1-platoon-4-squad-2-soldier-2:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.51
+company-1-platoon-4-squad-2-soldier-3:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.32
+company-1-platoon-4-squad-2-soldier-4:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.47
+company-1-platoon-4-squad-2-soldier-5:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.18
+company-1-platoon-4-squad-2-soldier-6:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.13
+company-1-platoon-4-squad-2-soldier-7:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.41
+company-1-platoon-4-squad-3-leader:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.45
+company-1-platoon-4-squad-3-soldier-1:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.101
+company-1-platoon-4-squad-3-soldier-2:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.67
+company-1-platoon-4-squad-3-soldier-3:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.77
+company-1-platoon-4-squad-3-soldier-4:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.66
+company-1-platoon-4-squad-3-soldier-5:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.40
+company-1-platoon-4-squad-3-soldier-6:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.20
+company-1-platoon-4-squad-3-soldier-7:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.22

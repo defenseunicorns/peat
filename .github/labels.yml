@@ -1,4 +1,4 @@
-# HIVE Protocol Demo - GitHub Labels Configuration
+# PEAT Protocol Demo - GitHub Labels Configuration
 # 
 # To apply these labels to your repository, use the GitHub CLI:
 #   gh label create "team/core" --color "0052CC" --description "Core protocol team"
@@ -6,7 +6,7 @@
 # Or use a label sync tool like https://github.com/EndBug/label-sync
 #
 # Organization: (r)evolve - Revolve Team LLC
-# Repository: kitplummer/hive
+# Repository: kitplummer/peat
 
 # =============================================================================
 # TEAM LABELS - Ownership and responsibility
@@ -158,7 +158,7 @@
 
 - name: "component/tak-bridge"
   color: "BFD4F2"
-  description: "HIVE-TAK Bridge / CoT translation"
+  description: "PEAT-TAK Bridge / CoT translation"
 
 - name: "component/atak-plugin"
   color: "BFD4F2"

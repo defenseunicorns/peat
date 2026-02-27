@@ -55,7 +55,7 @@ We will **implement a hybrid human-machine composition model** that extends the 
 #### 1. Operator Model (New)
 
 ```rust
-// Location: hive-protocol/src/models/operator.rs
+// Location: peat-protocol/src/models/operator.rs
 
 /// Human operator of a platform
 pub struct Operator {
@@ -87,7 +87,7 @@ pub enum AuthorityLevel {
 #### 2. Human-Machine Binding (New)
 
 ```rust
-// Location: hive-protocol/src/models/operator.rs
+// Location: peat-protocol/src/models/operator.rs
 
 pub struct HumanMachinePair {
     pub operators: Vec<Operator>,
@@ -108,7 +108,7 @@ pub enum BindingType {
 #### 3. Extended Node Model (Modified)
 
 ```rust
-// Location: hive-protocol/src/models/node.rs
+// Location: peat-protocol/src/models/node.rs
 
 pub struct PlatformConfig {
     pub id: String,
@@ -124,7 +124,7 @@ pub struct PlatformConfig {
 #### 4. Extended Leadership Scoring (Modified E4.2)
 
 ```rust
-// Location: hive-protocol/src/cell/leader_election.rs
+// Location: peat-protocol/src/cell/leader_election.rs
 
 pub struct ElectionContext {
     pub policy: LeadershipPolicy,
@@ -188,7 +188,7 @@ impl LeadershipScore {
 #### 5. Tunable Configuration (New)
 
 ```rust
-// Location: hive-protocol/src/config/election_policy.rs
+// Location: peat-protocol/src/config/election_policy.rs
 
 /// Configuration for leader election policies
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -441,7 +441,7 @@ cell_variants:
 
 ## References
 
-- [E4.2: Leader Election Algorithm](https://github.com/kitplummer/hive/pull/24)
+- [E4.2: Leader Election Algorithm](https://github.com/defenseunicorns/peat/pull/24)
 - DARPA OFFSET program - Human-swarm interfaces
 - NATO STANAG 4586 - UAV interoperability
 - Army FM 3-0: Operations - Leadership principles
@@ -458,7 +458,7 @@ cell_variants:
 
 ## Notes
 
-This is a foundational architectural decision that affects all subsequent work. Taking 2-3 days now to implement properly will save weeks of refactoring later and enable realistic demonstrations of the HIVE protocol in human-machine teaming scenarios.
+This is a foundational architectural decision that affects all subsequent work. Taking 2-3 days now to implement properly will save weeks of refactoring later and enable realistic demonstrations of the PEAT protocol in human-machine teaming scenarios.
 
 The tunable configuration system is critical for research - allows experimentation with different authority policies to find optimal human-machine teaming strategies.
 

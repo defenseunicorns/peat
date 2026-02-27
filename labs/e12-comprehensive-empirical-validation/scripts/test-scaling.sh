@@ -97,11 +97,11 @@ echo "Results directory: $RESULTS_DIR"
 echo ""
 
 # Run tests
-run_scaling_test "2" "../../../hive-sim/topologies/traditional-2node.yaml"
-run_scaling_test "12" "../../../hive-sim/topologies/squad-12node-client-server.yaml"
-run_scaling_test "24" "../../../hive-sim/topologies/traditional-platoon-24node.yaml"
-run_scaling_test "48" "../../../hive-sim/topologies/traditional-battalion-48node.yaml"
-run_scaling_test "96" "../../../hive-sim/topologies/traditional-battalion-96node.yaml"
+run_scaling_test "2" "../../../peat-sim/topologies/traditional-2node.yaml"
+run_scaling_test "12" "../../../peat-sim/topologies/squad-12node-client-server.yaml"
+run_scaling_test "24" "../../../peat-sim/topologies/traditional-platoon-24node.yaml"
+run_scaling_test "48" "../../../peat-sim/topologies/traditional-battalion-48node.yaml"
+run_scaling_test "96" "../../../peat-sim/topologies/traditional-battalion-96node.yaml"
 
 echo ""
 echo "╔════════════════════════════════════════════════════════════╗"

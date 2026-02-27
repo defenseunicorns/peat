@@ -1,6 +1,6 @@
 # Storage and Persistence Layer Due Diligence
 
-**Purpose**: Evaluate embedded database options for HIVE Protocol's Automerge + Iroh storage layer
+**Purpose**: Evaluate embedded database options for PEAT Protocol's Automerge + Iroh storage layer
 **Context**: ADR-011 E11.2 - Production storage implementation
 **Date**: 2025-11-12
 **Status**: Research Phase
@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-HIVE Protocol needs a production-grade embedded storage layer to persist Automerge CRDT documents on tactical edge devices. This document evaluates options for replacing Ditto's proprietary storage with an open-source alternative.
+PEAT Protocol needs a production-grade embedded storage layer to persist Automerge CRDT documents on tactical edge devices. This document evaluates options for replacing Ditto's proprietary storage with an open-source alternative.
 
 **Key Requirements**:
 - Embedded (no separate server process)
@@ -104,7 +104,7 @@ let cfs = vec![
     ColumnFamilyDescriptor::new("capabilities", Options::default()),
 ];
 
-let db = DB::open_cf_descriptors(&opts, "/var/hive/data", cfs)?;
+let db = DB::open_cf_descriptors(&opts, "/var/peat/data", cfs)?;
 
 // Get collection handle
 let cells_cf = db.cf_handle("cells").unwrap();
@@ -173,7 +173,7 @@ use redb::{Database, TableDefinition, ReadableTable};
 const CELLS_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("cells");
 
 // Open database
-let db = Database::create("/var/hive/data.redb")?;
+let db = Database::create("/var/peat/data.redb")?;
 
 // Write transaction
 let write_txn = db.begin_write()?;
@@ -351,7 +351,7 @@ Need battle-tested production reliability?
 
 **Implementation Plan**:
 ```rust
-// hive-protocol/src/storage/rocksdb_backend.rs
+// peat-protocol/src/storage/rocksdb_backend.rs
 
 use rocksdb::{DB, Options, ColumnFamilyDescriptor};
 
@@ -469,7 +469,7 @@ If pure Rust becomes a priority (easier debugging, no FFI, faster compilation), 
 
 ```
 ┌─────────────────────────────────────────────┐
-│         hive-protocol (Business Logic)        │
+│         peat-protocol (Business Logic)        │
 ├─────────────────────────────────────────────┤
 │           Automerge (CRDT Engine)            │
 ├─────────────────────────────────────────────┤
@@ -484,7 +484,7 @@ If pure Rust becomes a priority (easier debugging, no FFI, faster compilation), 
 ### Trait-Based Abstraction
 
 ```rust
-// hive-protocol/src/storage/mod.rs
+// peat-protocol/src/storage/mod.rs
 
 pub trait StorageBackend: Send + Sync {
     fn collection(&self, name: &str) -> Box<dyn Collection>;
@@ -516,12 +516,12 @@ pub fn create_storage_backend(config: &Config) -> Result<Box<dyn StorageBackend>
 ```bash
 # Environment variables
 export CAP_STORAGE_BACKEND=rocksdb  # or redb, ditto
-export CAP_DATA_PATH=/var/hive/data
+export CAP_DATA_PATH=/var/peat/data
 
 # Or in config file
 [storage]
 backend = "rocksdb"
-data_path = "/var/hive/data"
+data_path = "/var/peat/data"
 ```
 
 ---

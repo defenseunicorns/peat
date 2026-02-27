@@ -12,10 +12,10 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         flatDir {
-            dirs("${rootDir}/../../hive-btle/android/build/outputs/aar")
+            dirs("${rootDir}/../../peat-btle/android/build/outputs/aar")
         }
     }
 }
 
-rootProject.name = "hive-ble-test"
+rootProject.name = "peat-ble-test"
 include(":app")

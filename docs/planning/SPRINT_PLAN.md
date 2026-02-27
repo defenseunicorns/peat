@@ -1,4 +1,4 @@
-# HIVE Protocol Demo - Sprint Plan
+# PEAT Protocol Demo - Sprint Plan
 
 **Document Version**: 1.0  
 **Organization**: (r)evolve - Revolve Team LLC  
@@ -9,14 +9,14 @@
 
 ## Overview
 
-This document provides a detailed sprint plan for coordinating five parallel development teams toward a successful HIVE Protocol demonstration. The plan maps team deliverables to vignette phases with clear dependencies and integration milestones.
+This document provides a detailed sprint plan for coordinating five parallel development teams toward a successful PEAT Protocol demonstration. The plan maps team deliverables to vignette phases with clear dependencies and integration milestones.
 
 ## Team Summary
 
 | Team | Focus | Lead | Workstation |
 |------|-------|------|-------------|
 | **Core** | Schema, protocol, Automerge/Iroh sync | TBD | Server 1 |
-| **ATAK** | Android plugin, HIVE-TAK Bridge, CoT | TBD | Server 2 |
+| **ATAK** | Android plugin, PEAT-TAK Bridge, CoT | TBD | Server 2 |
 | **Experiments** | Containerlab, validation, metrics | TBD | Server 3 |
 | **AI** | Jetson inference, YOLOv8, MLOps agent | TBD | Jetson Orin Nano |
 | **PM** | Coordination, stakeholders, demo script | TBD | Laptop |
@@ -48,7 +48,7 @@ This document provides a detailed sprint plan for coordinating five parallel dev
 | Define TrackUpdate schema | P1 | None | `schemas/track-update.json` |
 | Define MissionTask schema | P1 | None | `schemas/mission-task.json` |
 | Set up Automerge document sync | P1 | None | Basic sync working |
-| Provide schema validation library | P2 | Schemas | `hive-core/validate.rs` |
+| Provide schema validation library | P2 | Schemas | `peat-core/validate.rs` |
 | Create mock data files | P2 | Schemas | `test-data/` |
 
 **Exit Criteria**: All Phase 1-3 schemas defined and validated
@@ -58,8 +58,8 @@ This document provides a detailed sprint plan for coordinating five parallel dev
 |------|----------|------------|-------------|
 | Set up Android dev environment | P1 | None | Build system working |
 | Review CoT specification | P1 | None | Internal doc |
-| Define CoT ↔ HIVE mapping | P1 | Core schemas | Mapping table |
-| Scaffold HIVE-TAK Bridge | P1 | None | Bridge skeleton |
+| Define CoT ↔ PEAT mapping | P1 | Core schemas | Mapping table |
+| Scaffold PEAT-TAK Bridge | P1 | None | Bridge skeleton |
 | Connect to TAK Server (hello world) | P2 | TAK Server available | CoT send/receive |
 
 **Exit Criteria**: Bridge can send static CoT to TAK Server
@@ -67,7 +67,7 @@ This document provides a detailed sprint plan for coordinating five parallel dev
 ### Experiments Team
 | Task | Priority | Dependency | Deliverable |
 |------|----------|------------|-------------|
-| Create Containerlab topology | P1 | None | `hive-demo.clab.yml` |
+| Create Containerlab topology | P1 | None | `peat-demo.clab.yml` |
 | Deploy TAK Server container | P1 | None | TAK Server running |
 | Set up WebTAK | P1 | TAK Server | WebTAK accessible |
 | Create network scenario scripts | P2 | Topology | `scripts/set-network.sh` |
@@ -123,7 +123,7 @@ This document provides a detailed sprint plan for coordinating five parallel dev
 ### ATAK Team
 | Task | Priority | Dependency | Deliverable |
 |------|----------|------------|-------------|
-| Receive capability via HIVE sync | P1 | Core sync | Bridge receives |
+| Receive capability via PEAT sync | P1 | Core sync | Bridge receives |
 | Convert capability → CoT registration | P1 | Mapping | CoT generated |
 | Send formation to TAK Server | P1 | CoT | TAK receives |
 | Display capability on ATAK plugin | P2 | Bridge | UI shows status |
@@ -170,7 +170,7 @@ This document provides a detailed sprint plan for coordinating five parallel dev
 ### ATAK Team
 | Task | Priority | Dependency | Deliverable |
 |------|----------|------------|-------------|
-| Convert CoT mission → HIVE task | P1 | Mapping | Task generated |
+| Convert CoT mission → PEAT task | P1 | Mapping | Task generated |
 | Route task to teams via bridge | P1 | Core sync | Teams receive |
 | Convert track → CoT position event | P1 | Mapping | CoT generated |
 | Display track on WebTAK | P1 | CoT | Track visible |
@@ -390,8 +390,8 @@ Week 11-12: Rehearsals & Demo ←── Delivery
 
 **ATAK Team:**
 - [ ] [FEATURE] Set up Android development environment
-- [ ] [CONTRACT] Define CoT ↔ HIVE mapping
-- [ ] [FEATURE] Scaffold HIVE-TAK Bridge
+- [ ] [CONTRACT] Define CoT ↔ PEAT mapping
+- [ ] [FEATURE] Scaffold PEAT-TAK Bridge
 - [ ] [INTEGRATION] Connect Bridge to TAK Server
 
 **Experiments Team:**

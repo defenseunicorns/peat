@@ -1,6 +1,6 @@
-# HIVE Protocol Documentation Index
+# PEAT Protocol Documentation Index
 
-> **Navigation Guide**: All documentation for the HIVE Protocol project, organized by category and purpose.
+> **Navigation Guide**: All documentation for the PEAT Protocol project, organized by category and purpose.
 
 ---
 
@@ -53,7 +53,7 @@ ADRs document significant architectural decisions and their rationale.
 
 | ADR | Title | Date | Status |
 |-----|-------|------|--------|
-| [001](adr/001-hive-protocol-poc.md) | HIVE Protocol POC | 2024-10-28 | Implemented |
+| [001](adr/001-peat-protocol-poc.md) | PEAT Protocol POC | 2024-10-28 | Implemented |
 | [002](adr/002-beacon-storage-architecture.md) | Beacon Storage Architecture | 2024-10-29 | Implemented |
 | [004](adr/004-human-machine-cell-composition.md) | Human-Machine Cell Composition | 2024-10-30 | Implemented |
 | [011](adr/011-ditto-vs-automerge-iroh.md) | Ditto vs Automerge/Iroh Backend Abstraction | 2024-11-15 | Accepted |
@@ -71,7 +71,7 @@ IETF RFC-style specifications for protocol implementers. See [spec/README.md](sp
 
 | Spec | Topic |
 |------|-------|
-| [001-transport.md](spec/001-transport.md) | Wire formats, QUIC/Iroh, UDP bypass, HIVE-Lite |
+| [001-transport.md](spec/001-transport.md) | Wire formats, QUIC/Iroh, UDP bypass, PEAT-Lite |
 | [002-sync.md](spec/002-sync.md) | CRDT semantics, Automerge, Negentropy |
 | [003-schema.md](spec/003-schema.md) | Protobuf definitions, CoT mapping |
 | [004-coordination.md](spec/004-coordination.md) | Cell formation, leader election, hierarchy |
@@ -97,7 +97,7 @@ Comprehensive testing strategy and implementation guides.
 |----------|-------|---------|
 | [TESTING_STRATEGY.md](TESTING_STRATEGY.md) | Workspace-wide | Testing philosophy, pyramid, and E2E requirements |
 | [FUNCTIONAL-TESTING.md](FUNCTIONAL-TESTING.md) | Transport layer | Hardware functional tests (BLE + QUIC), feature-to-phase mapping, platform extension guide |
-| [hive-protocol/docs/testing/e2e-cell-formation.md](../hive-protocol/docs/testing/e2e-cell-formation.md) | Cell Formation E2E | Detailed E2E test scenarios and matrix |
+| [peat-protocol/docs/testing/e2e-cell-formation.md](../peat-protocol/docs/testing/e2e-cell-formation.md) | Cell Formation E2E | Detailed E2E test scenarios and matrix |
 
 ### Key Testing Concepts
 
@@ -109,11 +109,11 @@ Comprehensive testing strategy and implementation guides.
 
 ## Codebase Documentation
 
-### HIVE Protocol Core (`hive-protocol/`)
+### PEAT Protocol Core (`peat-protocol/`)
 
 | Module | Documentation |
 |--------|---------------|
-| Testing | [hive-protocol/docs/testing/](../hive-protocol/docs/testing/) |
+| Testing | [peat-protocol/docs/testing/](../peat-protocol/docs/testing/) |
 
 ## Documentation Categories
 
@@ -142,7 +142,7 @@ Comprehensive testing strategy and implementation guides.
 ### File Organization
 
 ```
-hive/
+peat/
 ├── README.md                    # Project overview
 ├── DEVELOPMENT.md              # Dev setup
 ├── Codex.md                   # AI context
@@ -224,5 +224,5 @@ When making significant changes:
 ---
 
 **Last Updated**: 2025-01-08
-**Maintained By**: HIVE Protocol Team
+**Maintained By**: PEAT Protocol Team
 **Questions?**: Check DEVELOPMENT.md for contribution guidelines
