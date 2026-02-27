@@ -1,0 +1,3759 @@
+{
+  "name": "lab4-96n",
+  "type": "clab",
+  "clab": {
+    "config": {
+      "prefix": "clab",
+      "mgmt": {
+        "network": "lab4-96n",
+        "bridge": "br-37efecb28d21",
+        "ipv4-subnet": "172.20.20.0/24",
+        "ipv4-gw": "172.20.20.1",
+        "ipv6-gw": "fe80::cc94:47ff:fe50:902f",
+        "external-access": true
+      }
+    }
+  },
+  "ssh-pub-keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCv2DjtvthW5tI9WcwiWo/HnDNz+B98z/fBzKprU11/l8hGTXjFWINRI/UUC/dhC2zCjaZSLcGKNGaKhKNhdmjylyz40YDVGY880Zbc4yK4DTV+0R5C6WVB9Gb6RbBI1SxBHdvpNWRSHyAqanPrUIzHpeiaHUFG5B/55oPmeB/W7PZnkHAH3HndDCTCdFaDVMAJfw8+bH28tBJevuvSV6XYf69j6d/1ZkNDAhmLMV3x/CE7JAQzN9sIkSI0NpnwD/DxR4KPIjfn51mBJv940yqdlAMpOk1suW4xiS+cb1+sS6o0zCi/Z4QFsdXaJtQl4xnfWCNBIbRWMP5+s7pRtSw4lR6fFpLp67RCRQVlsxl+e9T3GKC/BgOQ/aXoEsdgP2WudkBKPVf5Rx26ULtbJeOsYgL7j06k5oLlM7HDPtHY5eFNQTwF2lho+GdGLzVDa51piWhWu6gTbFJza+pmZVaLVDzBPh75w3TZYlY1glfkR2Ts1qI7vaypuK3qubpcbZ0=","ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDhswTat2Z2gek3g0aUi8G06tO+FtGskh2eBmgN/xyGSkW70X4tHi94siMcSc9cXj+xsNnljpGPS8Y00n+ijJe3W40uxrAvK7h1qRTciwZeqj1Zm9lKx/ptA6uoQAKY5hQR4ywyuYWg6y+XHtdV5HXPNOrX8j1eW4VQ0+HDR/z6Asl0TTO1MqLghgC4gg5WZQvFSdIgqnFFeiGY/cXtHUpl49LQgB7K6C1YCWlkHfw7zcuhak5e+HEAdjwqoKzg61f/WPCqy3Mv0qvZeVivwzkqlTh1YdgPHp58TPlIOwCDlsdCsWdgNYu5T4e1+9Gv3JAByig7mvOlL+UkXh6SSyNJ3JnaAIIvjkM45jCil20IuV5Aoaitsw3TsXIUgmWmvhlybdgWahNbn6X9nqv2hNPyntxVgOxPAUBwmhDDQcDqaH36+Q0tt80kGptDCNdrxndsJXgb+sFoLCfRN350jKx9QnFnG0uvfp/YKadKlASUn4noUnQ0+bYQrIF9qD1MT7U=","ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDJyu+/LyVZqKgsouVRbIClDlR0uHudNkp+c/PelEAzRW7UGu4aMUTLMTTU0S4x2F9LA4CN5n2M1ayfXy0m8Ylx0mw1WFCP3usvaCYZU6t10R1N/mjL4nAbARJ2NjiKP0UGwreNZEYfsN9PWudlLfnWdpSVlOkBqm8mvBvjuR/ADhrziy0Fua4Dmw16N05Mmwiptt8lY4MwOOnv2Um2OWSSf4Knzj6W+Jlz6c8I0nviIKoXOllI9+YIed9JhASvJhqyeyjQLRrAN2KcR7kljYbV211EnlT5fhf1efJLMtMyJheuzXDD4P/B2BdgBlwvByWpH6xUDSFh34U5Je5lORvj3dzLPB53fPdKpNThsCYXMcCMDNa51UYgLsRjcdG+Qr1fsbZRI4R0Qv/6bZTQuipBJd1wJmabvsTTxcEEDxbjOHqCETeRDJfOjCYtGMkY8+1WC5rU+rZ680uxwkDsw18ZageKID8dcQtUhfO0BXvSjvFnzqbjXvP/KHV0AdtqcOk=","ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDTk6lLkSlJW1mcvyCqcKCt0z8TXso5tCytUy+nqWqAAnc1Csu0ajxQyW/z1Nql4Bz6yuJhiikzefEs2cluW1mNSP+PSVwkuoCMxHUCPpAWqL2z+DF9W/3sUjM77V8W6PRqUWLYnShNMZbGQb11JCIOkvWVez5fkm09+5GE7ySwVytnQeEcResWzObt+9i7394ce1MzLGwRuHV8bv8cGCLqch8IaiayuKE/72Uki5qQcyAxMaMw9ULPDIPmXhhdMJj1DN0HVUjsvbWJIwM9mpP/oSF49sbw+xQdaLtD5aq85kc60v7qq2iHHOEFZYC8m83GyUj6KH3CoK7h1hTUxBxLtm71/k6PYljTrumVVJ8e4fu8KYSkb+1WhqKRtcDN44Ri9ScydetUh/MNvwmqnu9p/Ke124gPicHrJwotxphIicKFoYpAyvs0o3yEdTTFzLIRSkrbSsAfqXYkHa44C78c497sEpxtkF3R2Q+/aKWXu5dflIH68FBbO+3B4QHvvn8="],
+  "nodes": {
+    "company-1-commander": {
+      "index": "0",
+      "shortname": "company-1-commander",
+      "longname": "clab-lab4-96n-company-1-commander",
+      "fqdn": "company-1-commander.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-commander",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.71",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-commander",
+        "clab-node-longname": "clab-lab4-96n-company-1-commander",
+        "clab-node-name": "company-1-commander",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-leader": {
+      "index": "1",
+      "shortname": "company-1-platoon-1-leader",
+      "longname": "clab-lab4-96n-company-1-platoon-1-leader",
+      "fqdn": "company-1-platoon-1-leader.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-leader",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.8",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-leader",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-leader",
+        "clab-node-name": "company-1-platoon-1-leader",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-1-leader": {
+      "index": "2",
+      "shortname": "company-1-platoon-1-squad-1-leader",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-1-leader",
+      "fqdn": "company-1-platoon-1-squad-1-leader.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-1-leader",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.10",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-1-leader",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-1-leader",
+        "clab-node-name": "company-1-platoon-1-squad-1-leader",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-1-soldier-1": {
+      "index": "3",
+      "shortname": "company-1-platoon-1-squad-1-soldier-1",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-1-soldier-1",
+      "fqdn": "company-1-platoon-1-squad-1-soldier-1.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-1-soldier-1",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.56",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-1-soldier-1",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-1-soldier-1",
+        "clab-node-name": "company-1-platoon-1-squad-1-soldier-1",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-1-soldier-2": {
+      "index": "4",
+      "shortname": "company-1-platoon-1-squad-1-soldier-2",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-1-soldier-2",
+      "fqdn": "company-1-platoon-1-squad-1-soldier-2.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-1-soldier-2",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.33",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-1-soldier-2",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-1-soldier-2",
+        "clab-node-name": "company-1-platoon-1-squad-1-soldier-2",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-1-soldier-3": {
+      "index": "5",
+      "shortname": "company-1-platoon-1-squad-1-soldier-3",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-1-soldier-3",
+      "fqdn": "company-1-platoon-1-squad-1-soldier-3.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-1-soldier-3",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.6",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-1-soldier-3",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-1-soldier-3",
+        "clab-node-name": "company-1-platoon-1-squad-1-soldier-3",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-1-soldier-4": {
+      "index": "6",
+      "shortname": "company-1-platoon-1-squad-1-soldier-4",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-1-soldier-4",
+      "fqdn": "company-1-platoon-1-squad-1-soldier-4.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-1-soldier-4",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.75",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-1-soldier-4",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-1-soldier-4",
+        "clab-node-name": "company-1-platoon-1-squad-1-soldier-4",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-1-soldier-5": {
+      "index": "7",
+      "shortname": "company-1-platoon-1-squad-1-soldier-5",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-1-soldier-5",
+      "fqdn": "company-1-platoon-1-squad-1-soldier-5.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-1-soldier-5",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.38",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-1-soldier-5",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-1-soldier-5",
+        "clab-node-name": "company-1-platoon-1-squad-1-soldier-5",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-1-soldier-6": {
+      "index": "8",
+      "shortname": "company-1-platoon-1-squad-1-soldier-6",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-1-soldier-6",
+      "fqdn": "company-1-platoon-1-squad-1-soldier-6.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-1-soldier-6",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.4",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-1-soldier-6",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-1-soldier-6",
+        "clab-node-name": "company-1-platoon-1-squad-1-soldier-6",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-1-soldier-7": {
+      "index": "9",
+      "shortname": "company-1-platoon-1-squad-1-soldier-7",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-1-soldier-7",
+      "fqdn": "company-1-platoon-1-squad-1-soldier-7.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-1-soldier-7",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.79",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-1-soldier-7",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-1-soldier-7",
+        "clab-node-name": "company-1-platoon-1-squad-1-soldier-7",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-2-leader": {
+      "index": "10",
+      "shortname": "company-1-platoon-1-squad-2-leader",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-2-leader",
+      "fqdn": "company-1-platoon-1-squad-2-leader.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-2-leader",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.68",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-2-leader",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-2-leader",
+        "clab-node-name": "company-1-platoon-1-squad-2-leader",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-2-soldier-1": {
+      "index": "11",
+      "shortname": "company-1-platoon-1-squad-2-soldier-1",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-2-soldier-1",
+      "fqdn": "company-1-platoon-1-squad-2-soldier-1.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-2-soldier-1",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.28",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-2-soldier-1",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-2-soldier-1",
+        "clab-node-name": "company-1-platoon-1-squad-2-soldier-1",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-2-soldier-2": {
+      "index": "12",
+      "shortname": "company-1-platoon-1-squad-2-soldier-2",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-2-soldier-2",
+      "fqdn": "company-1-platoon-1-squad-2-soldier-2.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-2-soldier-2",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.94",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-2-soldier-2",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-2-soldier-2",
+        "clab-node-name": "company-1-platoon-1-squad-2-soldier-2",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-2-soldier-3": {
+      "index": "13",
+      "shortname": "company-1-platoon-1-squad-2-soldier-3",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-2-soldier-3",
+      "fqdn": "company-1-platoon-1-squad-2-soldier-3.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-2-soldier-3",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.55",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-2-soldier-3",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-2-soldier-3",
+        "clab-node-name": "company-1-platoon-1-squad-2-soldier-3",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-2-soldier-4": {
+      "index": "14",
+      "shortname": "company-1-platoon-1-squad-2-soldier-4",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-2-soldier-4",
+      "fqdn": "company-1-platoon-1-squad-2-soldier-4.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-2-soldier-4",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.91",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-2-soldier-4",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-2-soldier-4",
+        "clab-node-name": "company-1-platoon-1-squad-2-soldier-4",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-2-soldier-5": {
+      "index": "15",
+      "shortname": "company-1-platoon-1-squad-2-soldier-5",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-2-soldier-5",
+      "fqdn": "company-1-platoon-1-squad-2-soldier-5.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-2-soldier-5",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.9",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-2-soldier-5",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-2-soldier-5",
+        "clab-node-name": "company-1-platoon-1-squad-2-soldier-5",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-2-soldier-6": {
+      "index": "16",
+      "shortname": "company-1-platoon-1-squad-2-soldier-6",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-2-soldier-6",
+      "fqdn": "company-1-platoon-1-squad-2-soldier-6.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-2-soldier-6",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.19",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-2-soldier-6",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-2-soldier-6",
+        "clab-node-name": "company-1-platoon-1-squad-2-soldier-6",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-2-soldier-7": {
+      "index": "17",
+      "shortname": "company-1-platoon-1-squad-2-soldier-7",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-2-soldier-7",
+      "fqdn": "company-1-platoon-1-squad-2-soldier-7.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-2-soldier-7",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.43",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-2-soldier-7",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-2-soldier-7",
+        "clab-node-name": "company-1-platoon-1-squad-2-soldier-7",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-3-leader": {
+      "index": "18",
+      "shortname": "company-1-platoon-1-squad-3-leader",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-3-leader",
+      "fqdn": "company-1-platoon-1-squad-3-leader.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-3-leader",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.59",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-3-leader",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-3-leader",
+        "clab-node-name": "company-1-platoon-1-squad-3-leader",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-3-soldier-1": {
+      "index": "19",
+      "shortname": "company-1-platoon-1-squad-3-soldier-1",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-3-soldier-1",
+      "fqdn": "company-1-platoon-1-squad-3-soldier-1.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-3-soldier-1",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.58",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-3-soldier-1",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-3-soldier-1",
+        "clab-node-name": "company-1-platoon-1-squad-3-soldier-1",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-3-soldier-2": {
+      "index": "20",
+      "shortname": "company-1-platoon-1-squad-3-soldier-2",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-3-soldier-2",
+      "fqdn": "company-1-platoon-1-squad-3-soldier-2.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-3-soldier-2",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.100",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-3-soldier-2",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-3-soldier-2",
+        "clab-node-name": "company-1-platoon-1-squad-3-soldier-2",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-3-soldier-3": {
+      "index": "21",
+      "shortname": "company-1-platoon-1-squad-3-soldier-3",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-3-soldier-3",
+      "fqdn": "company-1-platoon-1-squad-3-soldier-3.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-3-soldier-3",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.84",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-3-soldier-3",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-3-soldier-3",
+        "clab-node-name": "company-1-platoon-1-squad-3-soldier-3",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-3-soldier-4": {
+      "index": "22",
+      "shortname": "company-1-platoon-1-squad-3-soldier-4",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-3-soldier-4",
+      "fqdn": "company-1-platoon-1-squad-3-soldier-4.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-3-soldier-4",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.54",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-3-soldier-4",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-3-soldier-4",
+        "clab-node-name": "company-1-platoon-1-squad-3-soldier-4",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-3-soldier-5": {
+      "index": "23",
+      "shortname": "company-1-platoon-1-squad-3-soldier-5",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-3-soldier-5",
+      "fqdn": "company-1-platoon-1-squad-3-soldier-5.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-3-soldier-5",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.69",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-3-soldier-5",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-3-soldier-5",
+        "clab-node-name": "company-1-platoon-1-squad-3-soldier-5",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-3-soldier-6": {
+      "index": "24",
+      "shortname": "company-1-platoon-1-squad-3-soldier-6",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-3-soldier-6",
+      "fqdn": "company-1-platoon-1-squad-3-soldier-6.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-3-soldier-6",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.53",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-3-soldier-6",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-3-soldier-6",
+        "clab-node-name": "company-1-platoon-1-squad-3-soldier-6",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-1-squad-3-soldier-7": {
+      "index": "25",
+      "shortname": "company-1-platoon-1-squad-3-soldier-7",
+      "longname": "clab-lab4-96n-company-1-platoon-1-squad-3-soldier-7",
+      "fqdn": "company-1-platoon-1-squad-3-soldier-7.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-3-soldier-7",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.29",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-1-squad-3-soldier-7",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-1-squad-3-soldier-7",
+        "clab-node-name": "company-1-platoon-1-squad-3-soldier-7",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-leader": {
+      "index": "26",
+      "shortname": "company-1-platoon-2-leader",
+      "longname": "clab-lab4-96n-company-1-platoon-2-leader",
+      "fqdn": "company-1-platoon-2-leader.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-leader",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.17",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-leader",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-leader",
+        "clab-node-name": "company-1-platoon-2-leader",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-1-leader": {
+      "index": "27",
+      "shortname": "company-1-platoon-2-squad-1-leader",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-1-leader",
+      "fqdn": "company-1-platoon-2-squad-1-leader.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-1-leader",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.76",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-1-leader",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-1-leader",
+        "clab-node-name": "company-1-platoon-2-squad-1-leader",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-1-soldier-1": {
+      "index": "28",
+      "shortname": "company-1-platoon-2-squad-1-soldier-1",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-1-soldier-1",
+      "fqdn": "company-1-platoon-2-squad-1-soldier-1.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-1-soldier-1",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.62",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-1-soldier-1",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-1-soldier-1",
+        "clab-node-name": "company-1-platoon-2-squad-1-soldier-1",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-1-soldier-2": {
+      "index": "29",
+      "shortname": "company-1-platoon-2-squad-1-soldier-2",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-1-soldier-2",
+      "fqdn": "company-1-platoon-2-squad-1-soldier-2.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-1-soldier-2",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.92",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-1-soldier-2",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-1-soldier-2",
+        "clab-node-name": "company-1-platoon-2-squad-1-soldier-2",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-1-soldier-3": {
+      "index": "30",
+      "shortname": "company-1-platoon-2-squad-1-soldier-3",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-1-soldier-3",
+      "fqdn": "company-1-platoon-2-squad-1-soldier-3.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-1-soldier-3",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.24",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-1-soldier-3",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-1-soldier-3",
+        "clab-node-name": "company-1-platoon-2-squad-1-soldier-3",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-1-soldier-4": {
+      "index": "31",
+      "shortname": "company-1-platoon-2-squad-1-soldier-4",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-1-soldier-4",
+      "fqdn": "company-1-platoon-2-squad-1-soldier-4.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-1-soldier-4",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.2",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-1-soldier-4",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-1-soldier-4",
+        "clab-node-name": "company-1-platoon-2-squad-1-soldier-4",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-1-soldier-5": {
+      "index": "32",
+      "shortname": "company-1-platoon-2-squad-1-soldier-5",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-1-soldier-5",
+      "fqdn": "company-1-platoon-2-squad-1-soldier-5.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-1-soldier-5",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.5",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-1-soldier-5",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-1-soldier-5",
+        "clab-node-name": "company-1-platoon-2-squad-1-soldier-5",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-1-soldier-6": {
+      "index": "33",
+      "shortname": "company-1-platoon-2-squad-1-soldier-6",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-1-soldier-6",
+      "fqdn": "company-1-platoon-2-squad-1-soldier-6.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-1-soldier-6",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.39",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-1-soldier-6",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-1-soldier-6",
+        "clab-node-name": "company-1-platoon-2-squad-1-soldier-6",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-1-soldier-7": {
+      "index": "34",
+      "shortname": "company-1-platoon-2-squad-1-soldier-7",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-1-soldier-7",
+      "fqdn": "company-1-platoon-2-squad-1-soldier-7.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-1-soldier-7",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.25",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-1-soldier-7",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-1-soldier-7",
+        "clab-node-name": "company-1-platoon-2-squad-1-soldier-7",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-2-leader": {
+      "index": "35",
+      "shortname": "company-1-platoon-2-squad-2-leader",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-2-leader",
+      "fqdn": "company-1-platoon-2-squad-2-leader.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-2-leader",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.81",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-2-leader",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-2-leader",
+        "clab-node-name": "company-1-platoon-2-squad-2-leader",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-2-soldier-1": {
+      "index": "36",
+      "shortname": "company-1-platoon-2-squad-2-soldier-1",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-2-soldier-1",
+      "fqdn": "company-1-platoon-2-squad-2-soldier-1.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-2-soldier-1",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.14",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-2-soldier-1",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-2-soldier-1",
+        "clab-node-name": "company-1-platoon-2-squad-2-soldier-1",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-2-soldier-2": {
+      "index": "37",
+      "shortname": "company-1-platoon-2-squad-2-soldier-2",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-2-soldier-2",
+      "fqdn": "company-1-platoon-2-squad-2-soldier-2.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-2-soldier-2",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.16",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-2-soldier-2",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-2-soldier-2",
+        "clab-node-name": "company-1-platoon-2-squad-2-soldier-2",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-2-soldier-3": {
+      "index": "38",
+      "shortname": "company-1-platoon-2-squad-2-soldier-3",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-2-soldier-3",
+      "fqdn": "company-1-platoon-2-squad-2-soldier-3.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-2-soldier-3",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.37",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-2-soldier-3",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-2-soldier-3",
+        "clab-node-name": "company-1-platoon-2-squad-2-soldier-3",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-2-soldier-4": {
+      "index": "39",
+      "shortname": "company-1-platoon-2-squad-2-soldier-4",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-2-soldier-4",
+      "fqdn": "company-1-platoon-2-squad-2-soldier-4.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-2-soldier-4",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.15",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-2-soldier-4",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-2-soldier-4",
+        "clab-node-name": "company-1-platoon-2-squad-2-soldier-4",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-2-soldier-5": {
+      "index": "40",
+      "shortname": "company-1-platoon-2-squad-2-soldier-5",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-2-soldier-5",
+      "fqdn": "company-1-platoon-2-squad-2-soldier-5.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-2-soldier-5",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.60",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-2-soldier-5",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-2-soldier-5",
+        "clab-node-name": "company-1-platoon-2-squad-2-soldier-5",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-2-soldier-6": {
+      "index": "41",
+      "shortname": "company-1-platoon-2-squad-2-soldier-6",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-2-soldier-6",
+      "fqdn": "company-1-platoon-2-squad-2-soldier-6.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-2-soldier-6",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.49",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-2-soldier-6",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-2-soldier-6",
+        "clab-node-name": "company-1-platoon-2-squad-2-soldier-6",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-2-soldier-7": {
+      "index": "42",
+      "shortname": "company-1-platoon-2-squad-2-soldier-7",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-2-soldier-7",
+      "fqdn": "company-1-platoon-2-squad-2-soldier-7.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-2-soldier-7",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.48",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-2-soldier-7",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-2-soldier-7",
+        "clab-node-name": "company-1-platoon-2-squad-2-soldier-7",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-3-leader": {
+      "index": "43",
+      "shortname": "company-1-platoon-2-squad-3-leader",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-3-leader",
+      "fqdn": "company-1-platoon-2-squad-3-leader.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-3-leader",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.21",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-3-leader",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-3-leader",
+        "clab-node-name": "company-1-platoon-2-squad-3-leader",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-3-soldier-1": {
+      "index": "44",
+      "shortname": "company-1-platoon-2-squad-3-soldier-1",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-3-soldier-1",
+      "fqdn": "company-1-platoon-2-squad-3-soldier-1.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-3-soldier-1",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.98",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-3-soldier-1",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-3-soldier-1",
+        "clab-node-name": "company-1-platoon-2-squad-3-soldier-1",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-3-soldier-2": {
+      "index": "45",
+      "shortname": "company-1-platoon-2-squad-3-soldier-2",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-3-soldier-2",
+      "fqdn": "company-1-platoon-2-squad-3-soldier-2.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-3-soldier-2",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.93",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-3-soldier-2",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-3-soldier-2",
+        "clab-node-name": "company-1-platoon-2-squad-3-soldier-2",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-3-soldier-3": {
+      "index": "46",
+      "shortname": "company-1-platoon-2-squad-3-soldier-3",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-3-soldier-3",
+      "fqdn": "company-1-platoon-2-squad-3-soldier-3.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-3-soldier-3",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.73",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-3-soldier-3",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-3-soldier-3",
+        "clab-node-name": "company-1-platoon-2-squad-3-soldier-3",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-3-soldier-4": {
+      "index": "47",
+      "shortname": "company-1-platoon-2-squad-3-soldier-4",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-3-soldier-4",
+      "fqdn": "company-1-platoon-2-squad-3-soldier-4.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-3-soldier-4",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.11",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-3-soldier-4",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-3-soldier-4",
+        "clab-node-name": "company-1-platoon-2-squad-3-soldier-4",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-3-soldier-5": {
+      "index": "48",
+      "shortname": "company-1-platoon-2-squad-3-soldier-5",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-3-soldier-5",
+      "fqdn": "company-1-platoon-2-squad-3-soldier-5.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-3-soldier-5",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.30",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-3-soldier-5",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-3-soldier-5",
+        "clab-node-name": "company-1-platoon-2-squad-3-soldier-5",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-3-soldier-6": {
+      "index": "49",
+      "shortname": "company-1-platoon-2-squad-3-soldier-6",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-3-soldier-6",
+      "fqdn": "company-1-platoon-2-squad-3-soldier-6.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-3-soldier-6",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.63",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-3-soldier-6",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-3-soldier-6",
+        "clab-node-name": "company-1-platoon-2-squad-3-soldier-6",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-2-squad-3-soldier-7": {
+      "index": "50",
+      "shortname": "company-1-platoon-2-squad-3-soldier-7",
+      "longname": "clab-lab4-96n-company-1-platoon-2-squad-3-soldier-7",
+      "fqdn": "company-1-platoon-2-squad-3-soldier-7.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-3-soldier-7",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.31",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-2-squad-3-soldier-7",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-2-squad-3-soldier-7",
+        "clab-node-name": "company-1-platoon-2-squad-3-soldier-7",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-leader": {
+      "index": "51",
+      "shortname": "company-1-platoon-3-leader",
+      "longname": "clab-lab4-96n-company-1-platoon-3-leader",
+      "fqdn": "company-1-platoon-3-leader.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-leader",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.27",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-leader",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-leader",
+        "clab-node-name": "company-1-platoon-3-leader",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-1-leader": {
+      "index": "52",
+      "shortname": "company-1-platoon-3-squad-1-leader",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-1-leader",
+      "fqdn": "company-1-platoon-3-squad-1-leader.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-1-leader",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.42",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-1-leader",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-1-leader",
+        "clab-node-name": "company-1-platoon-3-squad-1-leader",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-1-soldier-1": {
+      "index": "53",
+      "shortname": "company-1-platoon-3-squad-1-soldier-1",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-1-soldier-1",
+      "fqdn": "company-1-platoon-3-squad-1-soldier-1.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-1-soldier-1",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.70",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-1-soldier-1",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-1-soldier-1",
+        "clab-node-name": "company-1-platoon-3-squad-1-soldier-1",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-1-soldier-2": {
+      "index": "54",
+      "shortname": "company-1-platoon-3-squad-1-soldier-2",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-1-soldier-2",
+      "fqdn": "company-1-platoon-3-squad-1-soldier-2.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-1-soldier-2",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.72",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-1-soldier-2",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-1-soldier-2",
+        "clab-node-name": "company-1-platoon-3-squad-1-soldier-2",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-1-soldier-3": {
+      "index": "55",
+      "shortname": "company-1-platoon-3-squad-1-soldier-3",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-1-soldier-3",
+      "fqdn": "company-1-platoon-3-squad-1-soldier-3.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-1-soldier-3",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.87",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-1-soldier-3",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-1-soldier-3",
+        "clab-node-name": "company-1-platoon-3-squad-1-soldier-3",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-1-soldier-4": {
+      "index": "56",
+      "shortname": "company-1-platoon-3-squad-1-soldier-4",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-1-soldier-4",
+      "fqdn": "company-1-platoon-3-squad-1-soldier-4.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-1-soldier-4",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.65",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-1-soldier-4",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-1-soldier-4",
+        "clab-node-name": "company-1-platoon-3-squad-1-soldier-4",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-1-soldier-5": {
+      "index": "57",
+      "shortname": "company-1-platoon-3-squad-1-soldier-5",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-1-soldier-5",
+      "fqdn": "company-1-platoon-3-squad-1-soldier-5.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-1-soldier-5",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.78",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-1-soldier-5",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-1-soldier-5",
+        "clab-node-name": "company-1-platoon-3-squad-1-soldier-5",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-1-soldier-6": {
+      "index": "58",
+      "shortname": "company-1-platoon-3-squad-1-soldier-6",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-1-soldier-6",
+      "fqdn": "company-1-platoon-3-squad-1-soldier-6.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-1-soldier-6",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.44",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-1-soldier-6",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-1-soldier-6",
+        "clab-node-name": "company-1-platoon-3-squad-1-soldier-6",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-1-soldier-7": {
+      "index": "59",
+      "shortname": "company-1-platoon-3-squad-1-soldier-7",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-1-soldier-7",
+      "fqdn": "company-1-platoon-3-squad-1-soldier-7.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-1-soldier-7",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.26",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-1-soldier-7",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-1-soldier-7",
+        "clab-node-name": "company-1-platoon-3-squad-1-soldier-7",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-2-leader": {
+      "index": "60",
+      "shortname": "company-1-platoon-3-squad-2-leader",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-2-leader",
+      "fqdn": "company-1-platoon-3-squad-2-leader.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-2-leader",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.23",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-2-leader",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-2-leader",
+        "clab-node-name": "company-1-platoon-3-squad-2-leader",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-2-soldier-1": {
+      "index": "61",
+      "shortname": "company-1-platoon-3-squad-2-soldier-1",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-2-soldier-1",
+      "fqdn": "company-1-platoon-3-squad-2-soldier-1.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-2-soldier-1",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.7",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-2-soldier-1",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-2-soldier-1",
+        "clab-node-name": "company-1-platoon-3-squad-2-soldier-1",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-2-soldier-2": {
+      "index": "62",
+      "shortname": "company-1-platoon-3-squad-2-soldier-2",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-2-soldier-2",
+      "fqdn": "company-1-platoon-3-squad-2-soldier-2.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-2-soldier-2",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.89",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-2-soldier-2",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-2-soldier-2",
+        "clab-node-name": "company-1-platoon-3-squad-2-soldier-2",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-2-soldier-3": {
+      "index": "63",
+      "shortname": "company-1-platoon-3-squad-2-soldier-3",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-2-soldier-3",
+      "fqdn": "company-1-platoon-3-squad-2-soldier-3.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-2-soldier-3",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.88",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-2-soldier-3",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-2-soldier-3",
+        "clab-node-name": "company-1-platoon-3-squad-2-soldier-3",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-2-soldier-4": {
+      "index": "64",
+      "shortname": "company-1-platoon-3-squad-2-soldier-4",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-2-soldier-4",
+      "fqdn": "company-1-platoon-3-squad-2-soldier-4.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-2-soldier-4",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.64",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-2-soldier-4",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-2-soldier-4",
+        "clab-node-name": "company-1-platoon-3-squad-2-soldier-4",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-2-soldier-5": {
+      "index": "65",
+      "shortname": "company-1-platoon-3-squad-2-soldier-5",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-2-soldier-5",
+      "fqdn": "company-1-platoon-3-squad-2-soldier-5.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-2-soldier-5",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.35",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-2-soldier-5",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-2-soldier-5",
+        "clab-node-name": "company-1-platoon-3-squad-2-soldier-5",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-2-soldier-6": {
+      "index": "66",
+      "shortname": "company-1-platoon-3-squad-2-soldier-6",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-2-soldier-6",
+      "fqdn": "company-1-platoon-3-squad-2-soldier-6.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-2-soldier-6",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.97",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-2-soldier-6",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-2-soldier-6",
+        "clab-node-name": "company-1-platoon-3-squad-2-soldier-6",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-2-soldier-7": {
+      "index": "67",
+      "shortname": "company-1-platoon-3-squad-2-soldier-7",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-2-soldier-7",
+      "fqdn": "company-1-platoon-3-squad-2-soldier-7.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-2-soldier-7",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.34",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-2-soldier-7",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-2-soldier-7",
+        "clab-node-name": "company-1-platoon-3-squad-2-soldier-7",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-3-leader": {
+      "index": "68",
+      "shortname": "company-1-platoon-3-squad-3-leader",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-3-leader",
+      "fqdn": "company-1-platoon-3-squad-3-leader.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-3-leader",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.80",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-3-leader",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-3-leader",
+        "clab-node-name": "company-1-platoon-3-squad-3-leader",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-3-soldier-1": {
+      "index": "69",
+      "shortname": "company-1-platoon-3-squad-3-soldier-1",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-3-soldier-1",
+      "fqdn": "company-1-platoon-3-squad-3-soldier-1.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-3-soldier-1",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.90",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-3-soldier-1",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-3-soldier-1",
+        "clab-node-name": "company-1-platoon-3-squad-3-soldier-1",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-3-soldier-2": {
+      "index": "70",
+      "shortname": "company-1-platoon-3-squad-3-soldier-2",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-3-soldier-2",
+      "fqdn": "company-1-platoon-3-squad-3-soldier-2.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-3-soldier-2",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.74",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-3-soldier-2",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-3-soldier-2",
+        "clab-node-name": "company-1-platoon-3-squad-3-soldier-2",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-3-soldier-3": {
+      "index": "71",
+      "shortname": "company-1-platoon-3-squad-3-soldier-3",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-3-soldier-3",
+      "fqdn": "company-1-platoon-3-squad-3-soldier-3.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-3-soldier-3",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.83",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-3-soldier-3",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-3-soldier-3",
+        "clab-node-name": "company-1-platoon-3-squad-3-soldier-3",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-3-soldier-4": {
+      "index": "72",
+      "shortname": "company-1-platoon-3-squad-3-soldier-4",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-3-soldier-4",
+      "fqdn": "company-1-platoon-3-squad-3-soldier-4.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-3-soldier-4",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.85",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-3-soldier-4",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-3-soldier-4",
+        "clab-node-name": "company-1-platoon-3-squad-3-soldier-4",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-3-soldier-5": {
+      "index": "73",
+      "shortname": "company-1-platoon-3-squad-3-soldier-5",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-3-soldier-5",
+      "fqdn": "company-1-platoon-3-squad-3-soldier-5.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-3-soldier-5",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.3",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-3-soldier-5",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-3-soldier-5",
+        "clab-node-name": "company-1-platoon-3-squad-3-soldier-5",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-3-soldier-6": {
+      "index": "74",
+      "shortname": "company-1-platoon-3-squad-3-soldier-6",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-3-soldier-6",
+      "fqdn": "company-1-platoon-3-squad-3-soldier-6.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-3-soldier-6",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.99",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-3-soldier-6",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-3-soldier-6",
+        "clab-node-name": "company-1-platoon-3-squad-3-soldier-6",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-3-squad-3-soldier-7": {
+      "index": "75",
+      "shortname": "company-1-platoon-3-squad-3-soldier-7",
+      "longname": "clab-lab4-96n-company-1-platoon-3-squad-3-soldier-7",
+      "fqdn": "company-1-platoon-3-squad-3-soldier-7.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-3-soldier-7",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.36",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-3-squad-3-soldier-7",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-3-squad-3-soldier-7",
+        "clab-node-name": "company-1-platoon-3-squad-3-soldier-7",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-leader": {
+      "index": "76",
+      "shortname": "company-1-platoon-4-leader",
+      "longname": "clab-lab4-96n-company-1-platoon-4-leader",
+      "fqdn": "company-1-platoon-4-leader.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-leader",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.12",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-leader",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-leader",
+        "clab-node-name": "company-1-platoon-4-leader",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-1-leader": {
+      "index": "77",
+      "shortname": "company-1-platoon-4-squad-1-leader",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-1-leader",
+      "fqdn": "company-1-platoon-4-squad-1-leader.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-1-leader",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.57",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-1-leader",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-1-leader",
+        "clab-node-name": "company-1-platoon-4-squad-1-leader",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-1-soldier-1": {
+      "index": "78",
+      "shortname": "company-1-platoon-4-squad-1-soldier-1",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-1-soldier-1",
+      "fqdn": "company-1-platoon-4-squad-1-soldier-1.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-1-soldier-1",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.46",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-1-soldier-1",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-1-soldier-1",
+        "clab-node-name": "company-1-platoon-4-squad-1-soldier-1",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-1-soldier-2": {
+      "index": "79",
+      "shortname": "company-1-platoon-4-squad-1-soldier-2",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-1-soldier-2",
+      "fqdn": "company-1-platoon-4-squad-1-soldier-2.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-1-soldier-2",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.61",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-1-soldier-2",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-1-soldier-2",
+        "clab-node-name": "company-1-platoon-4-squad-1-soldier-2",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-1-soldier-3": {
+      "index": "80",
+      "shortname": "company-1-platoon-4-squad-1-soldier-3",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-1-soldier-3",
+      "fqdn": "company-1-platoon-4-squad-1-soldier-3.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-1-soldier-3",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.52",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-1-soldier-3",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-1-soldier-3",
+        "clab-node-name": "company-1-platoon-4-squad-1-soldier-3",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-1-soldier-4": {
+      "index": "81",
+      "shortname": "company-1-platoon-4-squad-1-soldier-4",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-1-soldier-4",
+      "fqdn": "company-1-platoon-4-squad-1-soldier-4.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-1-soldier-4",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.96",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-1-soldier-4",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-1-soldier-4",
+        "clab-node-name": "company-1-platoon-4-squad-1-soldier-4",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-1-soldier-5": {
+      "index": "82",
+      "shortname": "company-1-platoon-4-squad-1-soldier-5",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-1-soldier-5",
+      "fqdn": "company-1-platoon-4-squad-1-soldier-5.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-1-soldier-5",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.102",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-1-soldier-5",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-1-soldier-5",
+        "clab-node-name": "company-1-platoon-4-squad-1-soldier-5",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-1-soldier-6": {
+      "index": "83",
+      "shortname": "company-1-platoon-4-squad-1-soldier-6",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-1-soldier-6",
+      "fqdn": "company-1-platoon-4-squad-1-soldier-6.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-1-soldier-6",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.50",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-1-soldier-6",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-1-soldier-6",
+        "clab-node-name": "company-1-platoon-4-squad-1-soldier-6",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-1-soldier-7": {
+      "index": "84",
+      "shortname": "company-1-platoon-4-squad-1-soldier-7",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-1-soldier-7",
+      "fqdn": "company-1-platoon-4-squad-1-soldier-7.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-1-soldier-7",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.86",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-1-soldier-7",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-1-soldier-7",
+        "clab-node-name": "company-1-platoon-4-squad-1-soldier-7",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-2-leader": {
+      "index": "85",
+      "shortname": "company-1-platoon-4-squad-2-leader",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-2-leader",
+      "fqdn": "company-1-platoon-4-squad-2-leader.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-2-leader",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.82",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-2-leader",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-2-leader",
+        "clab-node-name": "company-1-platoon-4-squad-2-leader",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-2-soldier-1": {
+      "index": "86",
+      "shortname": "company-1-platoon-4-squad-2-soldier-1",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-2-soldier-1",
+      "fqdn": "company-1-platoon-4-squad-2-soldier-1.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-2-soldier-1",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.95",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-2-soldier-1",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-2-soldier-1",
+        "clab-node-name": "company-1-platoon-4-squad-2-soldier-1",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-2-soldier-2": {
+      "index": "87",
+      "shortname": "company-1-platoon-4-squad-2-soldier-2",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-2-soldier-2",
+      "fqdn": "company-1-platoon-4-squad-2-soldier-2.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-2-soldier-2",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.51",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-2-soldier-2",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-2-soldier-2",
+        "clab-node-name": "company-1-platoon-4-squad-2-soldier-2",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-2-soldier-3": {
+      "index": "88",
+      "shortname": "company-1-platoon-4-squad-2-soldier-3",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-2-soldier-3",
+      "fqdn": "company-1-platoon-4-squad-2-soldier-3.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-2-soldier-3",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.32",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-2-soldier-3",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-2-soldier-3",
+        "clab-node-name": "company-1-platoon-4-squad-2-soldier-3",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-2-soldier-4": {
+      "index": "89",
+      "shortname": "company-1-platoon-4-squad-2-soldier-4",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-2-soldier-4",
+      "fqdn": "company-1-platoon-4-squad-2-soldier-4.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-2-soldier-4",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.47",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-2-soldier-4",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-2-soldier-4",
+        "clab-node-name": "company-1-platoon-4-squad-2-soldier-4",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-2-soldier-5": {
+      "index": "90",
+      "shortname": "company-1-platoon-4-squad-2-soldier-5",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-2-soldier-5",
+      "fqdn": "company-1-platoon-4-squad-2-soldier-5.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-2-soldier-5",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.18",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-2-soldier-5",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-2-soldier-5",
+        "clab-node-name": "company-1-platoon-4-squad-2-soldier-5",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-2-soldier-6": {
+      "index": "91",
+      "shortname": "company-1-platoon-4-squad-2-soldier-6",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-2-soldier-6",
+      "fqdn": "company-1-platoon-4-squad-2-soldier-6.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-2-soldier-6",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.13",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-2-soldier-6",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-2-soldier-6",
+        "clab-node-name": "company-1-platoon-4-squad-2-soldier-6",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-2-soldier-7": {
+      "index": "92",
+      "shortname": "company-1-platoon-4-squad-2-soldier-7",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-2-soldier-7",
+      "fqdn": "company-1-platoon-4-squad-2-soldier-7.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-2-soldier-7",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.41",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-2-soldier-7",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-2-soldier-7",
+        "clab-node-name": "company-1-platoon-4-squad-2-soldier-7",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-3-leader": {
+      "index": "93",
+      "shortname": "company-1-platoon-4-squad-3-leader",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-3-leader",
+      "fqdn": "company-1-platoon-4-squad-3-leader.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-3-leader",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.45",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-3-leader",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-3-leader",
+        "clab-node-name": "company-1-platoon-4-squad-3-leader",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-3-soldier-1": {
+      "index": "94",
+      "shortname": "company-1-platoon-4-squad-3-soldier-1",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-3-soldier-1",
+      "fqdn": "company-1-platoon-4-squad-3-soldier-1.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-3-soldier-1",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.101",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-3-soldier-1",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-3-soldier-1",
+        "clab-node-name": "company-1-platoon-4-squad-3-soldier-1",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-3-soldier-2": {
+      "index": "95",
+      "shortname": "company-1-platoon-4-squad-3-soldier-2",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-3-soldier-2",
+      "fqdn": "company-1-platoon-4-squad-3-soldier-2.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-3-soldier-2",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.67",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-3-soldier-2",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-3-soldier-2",
+        "clab-node-name": "company-1-platoon-4-squad-3-soldier-2",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-3-soldier-3": {
+      "index": "96",
+      "shortname": "company-1-platoon-4-squad-3-soldier-3",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-3-soldier-3",
+      "fqdn": "company-1-platoon-4-squad-3-soldier-3.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-3-soldier-3",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.77",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-3-soldier-3",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-3-soldier-3",
+        "clab-node-name": "company-1-platoon-4-squad-3-soldier-3",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-3-soldier-4": {
+      "index": "97",
+      "shortname": "company-1-platoon-4-squad-3-soldier-4",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-3-soldier-4",
+      "fqdn": "company-1-platoon-4-squad-3-soldier-4.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-3-soldier-4",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.66",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-3-soldier-4",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-3-soldier-4",
+        "clab-node-name": "company-1-platoon-4-squad-3-soldier-4",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-3-soldier-5": {
+      "index": "98",
+      "shortname": "company-1-platoon-4-squad-3-soldier-5",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-3-soldier-5",
+      "fqdn": "company-1-platoon-4-squad-3-soldier-5.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-3-soldier-5",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.40",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-3-soldier-5",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-3-soldier-5",
+        "clab-node-name": "company-1-platoon-4-squad-3-soldier-5",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-3-soldier-6": {
+      "index": "99",
+      "shortname": "company-1-platoon-4-squad-3-soldier-6",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-3-soldier-6",
+      "fqdn": "company-1-platoon-4-squad-3-soldier-6.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-3-soldier-6",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.20",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-3-soldier-6",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-3-soldier-6",
+        "clab-node-name": "company-1-platoon-4-squad-3-soldier-6",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "company-1-platoon-4-squad-3-soldier-7": {
+      "index": "100",
+      "shortname": "company-1-platoon-4-squad-3-soldier-7",
+      "longname": "clab-lab4-96n-company-1-platoon-4-squad-3-soldier-7",
+      "fqdn": "company-1-platoon-4-squad-3-soldier-7.lab4-96n.io",
+      "group": "",
+      "labdir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-3-soldier-7",
+      "kind": "linux",
+      "image": "hive-sim-node:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.22",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-37efecb28d21",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/kit/Code/revolve/hive/hive-sim/topologies/clab-lab4-96n/company-1-platoon-4-squad-3-soldier-7",
+        "clab-node-longname": "clab-lab4-96n-company-1-platoon-4-squad-3-soldier-7",
+        "clab-node-name": "company-1-platoon-4-squad-3-soldier-7",
+        "clab-node-type": "",
+        "clab-owner": "kit",
+        "clab-topo-file": "/home/kit/Code/revolve/hive/hive-sim/topologies/lab4-96n-1gbps.yaml",
+        "containerlab": "lab4-96n"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 12345,
+          "protocol": "tcp"
+        }
+      ]
+    }
+  },
+  "links": [
+  ]
+}

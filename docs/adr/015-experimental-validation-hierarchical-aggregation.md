@@ -7,7 +7,7 @@
 
 ## Context and Problem Statement
 
-During E8 experimental validation, we have developed a comprehensive test laboratory infrastructure using ContainerLab to validate HIVE protocol performance at scale. Initial testing (2-node POC, 12-node squad) showed promising results, and we expanded to 24-node platoon hierarchies (Phase 3A) as documented in EXPERIMENT-PORTFOLIO.md.
+During E8 experimental validation, we have developed a comprehensive test laboratory infrastructure using ContainerLab to validate PEAT protocol performance at scale. Initial testing (2-node POC, 12-node squad) showed promising results, and we expanded to 24-node platoon hierarchies (Phase 3A) as documented in EXPERIMENT-PORTFOLIO.md.
 
 However, **Phase 3A validation (2025-11-08) revealed a critical architectural concern:**
 
@@ -186,13 +186,13 @@ Continue some experiments while investigating architecture in parallel.
 1. **Analyze 24-Node Validation Logs** (Day 1-2)
    ```bash
    # Review what platoon leader actually received
-   grep -r "document" hive-sim/validation-platoon-24node-*/platoon-leader.log
-   grep -r "Query::" hive-sim/validation-platoon-24node-*/platoon-leader.log
-   grep -r "capability" hive-sim/validation-platoon-24node-*/
+   grep -r "document" peat-sim/validation-platoon-24node-*/platoon-leader.log
+   grep -r "Query::" peat-sim/validation-platoon-24node-*/platoon-leader.log
+   grep -r "capability" peat-sim/validation-platoon-24node-*/
    ```
 
 2. **Review Ditto Integration Code** (Day 2-4)
-   - Examine `hive-sim-node` implementation
+   - Examine `peat-sim-node` implementation
    - Understand query patterns (Query::All vs capability-filtered)
    - Verify CAP_FILTER_ENABLED actually changes behavior
    - Document current data flow patterns
@@ -369,7 +369,7 @@ Before resuming Phase 3A/3B/3C testing, we must verify:
 
 ## Related Decisions
 
-- **ADR-001:** HIVE Protocol POC - Established capability-based filtering as core design
+- **ADR-001:** PEAT Protocol POC - Established capability-based filtering as core design
 - **ADR-008:** Network Simulation Layer - Defined experimental validation approach
 - **ADR-009:** Bidirectional Hierarchical Flows - Documented hierarchical data patterns
 - **EXPERIMENT-PORTFOLIO.md:** Phase 3A-3D scaling roadmap
@@ -387,7 +387,7 @@ Before resuming Phase 3A/3B/3C testing, we must verify:
 
 1. Create ADR-016: Hierarchical Data Aggregation Patterns
 2. Design aggregation API (sum, average, max, custom reducers)
-3. Implement in hive-protocol or hive-transport layer
+3. Implement in peat-protocol or peat-transport layer
 4. Integrate with Ditto sync (or alternative if needed)
 5. Re-baseline all experiments with aggregation enabled
 

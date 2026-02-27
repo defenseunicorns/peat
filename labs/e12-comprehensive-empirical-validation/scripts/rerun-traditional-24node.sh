@@ -25,10 +25,10 @@ fi
 
 # Test configurations
 declare -A TEST_CONFIGS
-TEST_CONFIGS["traditional-24node-1gbps"]="../../../hive-sim/topologies/traditional-platoon-24node.yaml"
-TEST_CONFIGS["traditional-24node-100mbps"]="../../../hive-sim/topologies/traditional-platoon-24node.yaml"
-TEST_CONFIGS["traditional-24node-1mbps"]="../../../hive-sim/topologies/traditional-platoon-24node.yaml"
-TEST_CONFIGS["traditional-24node-256kbps"]="../../../hive-sim/topologies/traditional-platoon-24node.yaml"
+TEST_CONFIGS["traditional-24node-1gbps"]="../../../peat-sim/topologies/traditional-platoon-24node.yaml"
+TEST_CONFIGS["traditional-24node-100mbps"]="../../../peat-sim/topologies/traditional-platoon-24node.yaml"
+TEST_CONFIGS["traditional-24node-1mbps"]="../../../peat-sim/topologies/traditional-platoon-24node.yaml"
+TEST_CONFIGS["traditional-24node-256kbps"]="../../../peat-sim/topologies/traditional-platoon-24node.yaml"
 
 # Bandwidth constraints
 declare -A BANDWIDTH_CONSTRAINTS

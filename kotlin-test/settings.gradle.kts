@@ -1,1 +1,1 @@
-rootProject.name = "hive-kotlin-test"
+rootProject.name = "peat-kotlin-test"

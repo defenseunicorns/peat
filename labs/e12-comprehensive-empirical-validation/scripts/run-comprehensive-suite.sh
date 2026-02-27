@@ -563,47 +563,47 @@ EOF
 declare -A TEST_CONFIGS
 
 # Traditional IoT configurations
-TEST_CONFIGS["traditional-2node-1gbps"]="../../../hive-sim/topologies/traditional-2node.yaml"
-TEST_CONFIGS["traditional-2node-100mbps"]="../../../hive-sim/topologies/traditional-2node.yaml"
-TEST_CONFIGS["traditional-2node-1mbps"]="../../../hive-sim/topologies/traditional-2node.yaml"
-TEST_CONFIGS["traditional-2node-256kbps"]="../../../hive-sim/topologies/traditional-2node.yaml"
+TEST_CONFIGS["traditional-2node-1gbps"]="../../../peat-sim/topologies/traditional-2node.yaml"
+TEST_CONFIGS["traditional-2node-100mbps"]="../../../peat-sim/topologies/traditional-2node.yaml"
+TEST_CONFIGS["traditional-2node-1mbps"]="../../../peat-sim/topologies/traditional-2node.yaml"
+TEST_CONFIGS["traditional-2node-256kbps"]="../../../peat-sim/topologies/traditional-2node.yaml"
 
-TEST_CONFIGS["traditional-12node-1gbps"]="../../../hive-sim/topologies/traditional-squad-client-server.yaml"
-TEST_CONFIGS["traditional-12node-100mbps"]="../../../hive-sim/topologies/traditional-squad-client-server.yaml"
-TEST_CONFIGS["traditional-12node-1mbps"]="../../../hive-sim/topologies/traditional-squad-client-server.yaml"
-TEST_CONFIGS["traditional-12node-256kbps"]="../../../hive-sim/topologies/traditional-squad-client-server.yaml"
+TEST_CONFIGS["traditional-12node-1gbps"]="../../../peat-sim/topologies/traditional-squad-client-server.yaml"
+TEST_CONFIGS["traditional-12node-100mbps"]="../../../peat-sim/topologies/traditional-squad-client-server.yaml"
+TEST_CONFIGS["traditional-12node-1mbps"]="../../../peat-sim/topologies/traditional-squad-client-server.yaml"
+TEST_CONFIGS["traditional-12node-256kbps"]="../../../peat-sim/topologies/traditional-squad-client-server.yaml"
 
-TEST_CONFIGS["traditional-24node-1gbps"]="../../../hive-sim/topologies/traditional-platoon-24node.yaml"
-TEST_CONFIGS["traditional-24node-100mbps"]="../../../hive-sim/topologies/traditional-platoon-24node.yaml"
-TEST_CONFIGS["traditional-24node-1mbps"]="../../../hive-sim/topologies/traditional-platoon-24node.yaml"
-TEST_CONFIGS["traditional-24node-256kbps"]="../../../hive-sim/topologies/traditional-platoon-24node.yaml"
+TEST_CONFIGS["traditional-24node-1gbps"]="../../../peat-sim/topologies/traditional-platoon-24node.yaml"
+TEST_CONFIGS["traditional-24node-100mbps"]="../../../peat-sim/topologies/traditional-platoon-24node.yaml"
+TEST_CONFIGS["traditional-24node-1mbps"]="../../../peat-sim/topologies/traditional-platoon-24node.yaml"
+TEST_CONFIGS["traditional-24node-256kbps"]="../../../peat-sim/topologies/traditional-platoon-24node.yaml"
 
-TEST_CONFIGS["traditional-48node-1gbps"]="../../../hive-sim/topologies/traditional-battalion-48node.yaml"
-TEST_CONFIGS["traditional-96node-1gbps"]="../../../hive-sim/topologies/traditional-battalion-96node.yaml"
+TEST_CONFIGS["traditional-48node-1gbps"]="../../../peat-sim/topologies/traditional-battalion-48node.yaml"
+TEST_CONFIGS["traditional-96node-1gbps"]="../../../peat-sim/topologies/traditional-battalion-96node.yaml"
 
 # CAP Full configurations (CRDT but no hierarchy - flat client-server)
-TEST_CONFIGS["cap-full-12node-1gbps"]="../../../hive-sim/topologies/squad-12node-client-server.yaml"
-TEST_CONFIGS["cap-full-12node-100mbps"]="../../../hive-sim/topologies/squad-12node-client-server.yaml"
-TEST_CONFIGS["cap-full-12node-1mbps"]="../../../hive-sim/topologies/squad-12node-client-server.yaml"
-TEST_CONFIGS["cap-full-12node-256kbps"]="../../../hive-sim/topologies/squad-12node-client-server.yaml"
+TEST_CONFIGS["cap-full-12node-1gbps"]="../../../peat-sim/topologies/squad-12node-client-server.yaml"
+TEST_CONFIGS["cap-full-12node-100mbps"]="../../../peat-sim/topologies/squad-12node-client-server.yaml"
+TEST_CONFIGS["cap-full-12node-1mbps"]="../../../peat-sim/topologies/squad-12node-client-server.yaml"
+TEST_CONFIGS["cap-full-12node-256kbps"]="../../../peat-sim/topologies/squad-12node-client-server.yaml"
 
-TEST_CONFIGS["cap-full-24node-1gbps"]="../../../hive-sim/topologies/platoon-24node-client-server.yaml"
-TEST_CONFIGS["cap-full-24node-100mbps"]="../../../hive-sim/topologies/platoon-24node-client-server.yaml"
-TEST_CONFIGS["cap-full-24node-1mbps"]="../../../hive-sim/topologies/platoon-24node-client-server.yaml"
-TEST_CONFIGS["cap-full-24node-256kbps"]="../../../hive-sim/topologies/platoon-24node-client-server.yaml"
+TEST_CONFIGS["cap-full-24node-1gbps"]="../../../peat-sim/topologies/platoon-24node-client-server.yaml"
+TEST_CONFIGS["cap-full-24node-100mbps"]="../../../peat-sim/topologies/platoon-24node-client-server.yaml"
+TEST_CONFIGS["cap-full-24node-1mbps"]="../../../peat-sim/topologies/platoon-24node-client-server.yaml"
+TEST_CONFIGS["cap-full-24node-256kbps"]="../../../peat-sim/topologies/platoon-24node-client-server.yaml"
 
-TEST_CONFIGS["cap-full-48node-1gbps"]="../../../hive-sim/topologies/battalion-48node-client-server.yaml"
-TEST_CONFIGS["cap-full-96node-1gbps"]="../../../hive-sim/topologies/battalion-96node-client-server.yaml"
+TEST_CONFIGS["cap-full-48node-1gbps"]="../../../peat-sim/topologies/battalion-48node-client-server.yaml"
+TEST_CONFIGS["cap-full-96node-1gbps"]="../../../peat-sim/topologies/battalion-96node-client-server.yaml"
 
 # CAP Hierarchical configurations (CRDT + Mode 4 aggregation with P2P mesh)
 # IMPORTANT: Using mesh-mode4 topologies for proper hierarchical aggregation with squad summaries
 # These topologies have 3-level hierarchy: Battalion HQ → Platoon Leaders → Squad Leaders → Squad Members
-TEST_CONFIGS["cap-hierarchical-24node-1gbps"]="../../../hive-sim/topologies/platoon-24node-mesh-mode4.yaml"
-TEST_CONFIGS["cap-hierarchical-24node-100mbps"]="../../../hive-sim/topologies/platoon-24node-mesh-mode4.yaml"
-TEST_CONFIGS["cap-hierarchical-24node-1mbps"]="../../../hive-sim/topologies/platoon-24node-mesh-mode4.yaml"
-TEST_CONFIGS["cap-hierarchical-24node-256kbps"]="../../../hive-sim/topologies/platoon-24node-mesh-mode4.yaml"
-TEST_CONFIGS["cap-hierarchical-48node-1gbps"]="../../../hive-sim/topologies/battalion-48node-mesh-mode4.yaml"
-TEST_CONFIGS["cap-hierarchical-96node-1gbps"]="../../../hive-sim/topologies/battalion-96node-mesh-mode4.yaml"
+TEST_CONFIGS["cap-hierarchical-24node-1gbps"]="../../../peat-sim/topologies/platoon-24node-mesh-mode4.yaml"
+TEST_CONFIGS["cap-hierarchical-24node-100mbps"]="../../../peat-sim/topologies/platoon-24node-mesh-mode4.yaml"
+TEST_CONFIGS["cap-hierarchical-24node-1mbps"]="../../../peat-sim/topologies/platoon-24node-mesh-mode4.yaml"
+TEST_CONFIGS["cap-hierarchical-24node-256kbps"]="../../../peat-sim/topologies/platoon-24node-mesh-mode4.yaml"
+TEST_CONFIGS["cap-hierarchical-48node-1gbps"]="../../../peat-sim/topologies/battalion-48node-mesh-mode4.yaml"
+TEST_CONFIGS["cap-hierarchical-96node-1gbps"]="../../../peat-sim/topologies/battalion-96node-mesh-mode4.yaml"
 
 ################################################################################
 # Main Execution

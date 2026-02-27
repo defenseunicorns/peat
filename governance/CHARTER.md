@@ -1,8 +1,8 @@
-# HIVE Protocol Project Charter
+# PEAT Protocol Project Charter
 
 ## 1. Mission
 
-The HIVE Protocol project exists to develop and maintain an open standard for hierarchical coordination of autonomous systems, enabling scalable, partition-tolerant coordination across defense, commercial, and research applications.
+The PEAT Protocol project exists to develop and maintain an open standard for hierarchical coordination of autonomous systems, enabling scalable, partition-tolerant coordination across defense, commercial, and research applications.
 
 ## 2. Vision
 
@@ -193,5 +193,5 @@ This charter may be amended by:
 
 ## Contact
 
-- GitHub: https://github.com/kitplummer/hive
+- GitHub: https://github.com/defenseunicorns/peat
 - Email: kit@revolveteam.com

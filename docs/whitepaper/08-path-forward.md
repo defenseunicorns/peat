@@ -1,19 +1,19 @@
 ## VII. PATH FORWARD
 
-**Thesis:** HIVE is validated, integration-ready, and positioned for standardization with clear pathways for pilot programs and adoption.
+**Thesis:** PEAT is validated, integration-ready, and positioned for standardization with clear pathways for pilot programs and adoption.
 
 ---
 
 ### 7.1 Current State
 
-HIVE is ready for integration pilots.
+PEAT is ready for integration pilots.
 
 **Technology Readiness**: TRL 4-5 (laboratory validated, integration demonstrated)
 
 **Reference Implementation**:
 - Core: Rust + Automerge + Iroh
 - Bindings: C FFI, Swift, Kotlin (in progress)
-- Embedded: hive-lite for resource-constrained devices
+- Embedded: peat-lite for resource-constrained devices
 
 **Architecture**:
 - Five-layer design enables flexible integration depth
@@ -36,8 +36,8 @@ Organizations choose integration depth based on requirements.
 #### Shallow Integration
 
 Minimal changes to existing systems:
-- Protocol adapters translate existing data formats to HIVE schema
-- HIVE coordinates outputs from existing control systems
+- Protocol adapters translate existing data formats to PEAT schema
+- PEAT coordinates outputs from existing control systems
 - Legacy systems participate via bridge components
 - Suitable for: Evaluation, hybrid deployments, legacy integration
 
@@ -45,16 +45,16 @@ Minimal changes to existing systems:
 
 Native capability with backward compatibility:
 - Capability advertisement from existing platforms
-- Direct participation in HIVE hierarchy
+- Direct participation in PEAT hierarchy
 - Gradual migration path from legacy coordination
 - Suitable for: New deployments with legacy components, incremental adoption
 
 #### Deep Integration
 
-Full native HIVE implementation:
-- Native hive-ffi or hive-lite integration
+Full native PEAT implementation:
+- Native peat-ffi or peat-lite integration
 - Complete capability and authority model
-- Designed from ground up for HIVE coordination
+- Designed from ground up for PEAT coordination
 - Suitable for: New platform development, maximum coordination capability
 
 ---
@@ -91,7 +91,7 @@ Multiple paths reinforce each other.
 #### For Technical Evaluators
 
 - Assess current coordination architectures against O(n²) scaling limits
-- Evaluate HIVE integration feasibility for multi-agent coordination requirements
+- Evaluate PEAT integration feasibility for multi-agent coordination requirements
 - Review IETF-style specifications for protocol completeness
 - Consider five-layer architecture for incremental adoption strategy
 
@@ -100,21 +100,21 @@ Multiple paths reinforce each other.
 - Identify pilot opportunities where scale limits current capability
 - Evaluate shallow integration as low-risk entry point
 - Plan migration path from proprietary coordination protocols
-- Consider HIVE for new platform coordination architecture
+- Consider PEAT for new platform coordination architecture
 
 #### For Decision Makers
 
 - Recognize coordination architecture as infrastructure investment
 - Prioritize open standards for long-term interoperability
 - Consider total cost including vendor lock-in risk
-- Engage with HIVE community development
+- Engage with PEAT community development
 
 #### For Developers
 
 - Explore reference implementation on GitHub
 - Join development community for contribution opportunities
 - Provide integration feedback to specification process
-- Consider HIVE for multi-agent coordination projects
+- Consider PEAT for multi-agent coordination projects
 
 ---
 
@@ -123,13 +123,13 @@ Multiple paths reinforce each other.
 **Evaluate**: Clone the repository, run examples, review specifications
 
 ```bash
-git clone https://github.com/[org]/hive
-cd hive
+git clone https://github.com/[org]/peat
+cd peat
 cargo build --all
 cargo test --all
 ```
 
-**Integrate**: Start with hive-ffi for native integration or hive-lite for embedded
+**Integrate**: Start with peat-ffi for native integration or peat-lite for embedded
 
 **Engage**: Join community discussions, file issues, propose improvements
 
@@ -139,6 +139,6 @@ cargo test --all
 
 ### Key Finding: Section VII
 
-> "HIVE is validated and integration-ready. The path from current state to industry standard is clear. What's required is engagement: pilot programs, community participation, and commitment to open coordination infrastructure."
+> "PEAT is validated and integration-ready. The path from current state to industry standard is clear. What's required is engagement: pilot programs, community participation, and commitment to open coordination infrastructure."
 
 ---

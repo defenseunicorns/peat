@@ -1,5 +1,5 @@
 # Patent Filing Summary
-## HIVE Protocol - Provisional Patent Applications
+## PEAT Protocol - Provisional Patent Applications
 
 **Date**: November 14, 2024
 **Status**: ✅ Ready to File
@@ -71,7 +71,7 @@ Method and system for composing capabilities hierarchically in distributed syste
 ## What Makes These Patents Strong
 
 ### Technical Depth
-- Based on **actual working code** in hive-protocol/src/
+- Based on **actual working code** in peat-protocol/src/
 - Grounded in real ADRs (Architecture Decision Records)
 - 4 months of development and iteration
 - Production-ready implementation exists

@@ -1,14 +1,14 @@
-# HIVE Protocol - Development Guide
+# PEAT Protocol - Development Guide
 
 ## Overview
 
-This repository contains the Hierarchical Intelligence for Versatile Entities (HIVE) proof-of-concept implementation in Rust. The HIVE protocol enables scalable coordination of autonomous nodes through hierarchical capability composition using CRDTs.
+This repository contains the Hierarchical Intelligence for Versatile Entities (PEAT) proof-of-concept implementation in Rust. The PEAT protocol enables scalable coordination of autonomous nodes through hierarchical capability composition using CRDTs.
 
 ## Repository Structure
 
 ```
 cap/
-├── hive-protocol/          # Core protocol library
+├── peat-protocol/          # Core protocol library
 │   ├── src/
 │   │   ├── discovery/     # Phase 1: Bootstrap
 │   │   ├── cell/         # Phase 2: Cell Formation
@@ -20,7 +20,7 @@ cap/
 │   │   ├── storage/       # Ditto CRDT integration
 │   │   └── traits.rs      # Core trait definitions
 │   └── Cargo.toml
-├── hive-sim/               # Reference application & simulator
+├── peat-sim/               # Reference application & simulator
 │   ├── src/
 │   │   └── main.rs        # Simulation harness
 │   └── Cargo.toml
@@ -92,10 +92,10 @@ cargo test test_node_state
 
 ```bash
 # Run the reference simulator
-cargo run --bin hive-sim
+cargo run --bin peat-sim
 
 # Run with debug logging
-RUST_LOG=debug cargo run --bin hive-sim
+RUST_LOG=debug cargo run --bin peat-sim
 ```
 
 ### 5. Code Quality
@@ -282,11 +282,11 @@ The protocol uses Ditto SDK for CRDT synchronization:
 ```bash
 # Profile with flamegraph
 cargo install flamegraph
-sudo flamegraph --bin hive-sim
+sudo flamegraph --bin peat-sim
 
 # Profile with perf
 cargo build --release
-perf record --call-graph=dwarf target/release/hive-sim
+perf record --call-graph=dwarf target/release/peat-sim
 perf report
 ```
 

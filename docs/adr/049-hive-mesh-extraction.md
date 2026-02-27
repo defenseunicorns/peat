@@ -1,26 +1,26 @@
-# ADR-049: hive-mesh Extraction (Open Source Sync Layer)
+# ADR-049: peat-mesh Extraction (Open Source Sync Layer)
 
 **Status**: IMPLEMENTED (All 8 Phases Complete — PRs #622-#629)
 **Date**: 2025-01-31 (proposed) / 2026-02-12 (completed)
 **Authors**: Kit Plummer, Claude  
 **Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)  
 **Priority**: URGENT - Blocking for Defense Unicorns transition  
-**Relates To**: ADR-011 (Automerge + Iroh), ADR-032 (Pluggable Transport), ADR-039 (hive-btle), ADR-041 (Multi-Transport Embedded)
+**Relates To**: ADR-011 (Automerge + Iroh), ADR-032 (Pluggable Transport), ADR-039 (peat-btle), ADR-041 (Multi-Transport Embedded)
 
 ---
 
 ## Executive Summary
 
-This ADR defines the extraction of **hive-mesh** - a standalone, open-source CRDT-based mesh synchronization library that serves as a direct alternative to Ditto. This crate provides the foundational sync infrastructure that HIVE Protocol consumes, but contains **zero HIVE-specific semantics**.
+This ADR defines the extraction of **peat-mesh** - a standalone, open-source CRDT-based mesh synchronization library that serves as a direct alternative to Ditto. This crate provides the foundational sync infrastructure that PEAT Protocol consumes, but contains **zero PEAT-specific semantics**.
 
-**hive-mesh** is to HIVE Protocol what SQLite is to an application - a general-purpose data layer that the application builds upon.
+**peat-mesh** is to PEAT Protocol what SQLite is to an application - a general-purpose data layer that the application builds upon.
 
 ### Strategic Importance
 
-1. **IP Clarity**: Clean separation between sync infrastructure (open source) and HIVE Protocol (proprietary IP)
-2. **DU Transition**: Enables Defense Unicorns to receive HIVE Protocol IP without Ditto dependency
+1. **IP Clarity**: Clean separation between sync infrastructure (open source) and PEAT Protocol (proprietary IP)
+2. **DU Transition**: Enables Defense Unicorns to receive PEAT Protocol IP without Ditto dependency
 3. **Market Position**: Open source Ditto alternative creates competitive dynamics and community adoption
-4. **IETF Pathway**: Sync protocol can be standardized independently of HIVE semantics
+4. **IETF Pathway**: Sync protocol can be standardized independently of PEAT semantics
 
 ---
 
@@ -28,13 +28,13 @@ This ADR defines the extraction of **hive-mesh** - a standalone, open-source CRD
 
 ### The Current State
 
-Today, HIVE Protocol's sync capabilities are intertwined with protocol semantics:
+Today, PEAT Protocol's sync capabilities are intertwined with protocol semantics:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                 Current: Tightly Coupled                         │
 │                                                                  │
-│  hive-protocol crate                                            │
+│  peat-protocol crate                                            │
 │  ├── Hierarchical aggregation logic                             │
 │  ├── Capability composition                                     │
 │  ├── Cell formation rules                                       │
@@ -47,11 +47,11 @@ Today, HIVE Protocol's sync capabilities are intertwined with protocol semantics
 
 ### The Target State
 
-Clean separation where hive-mesh is a standalone, reusable sync layer:
+Clean separation where peat-mesh is a standalone, reusable sync layer:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    HIVE Protocol (Your IP)                       │
+│                    PEAT Protocol (Your IP)                       │
 │                                                                  │
 │  • Hierarchical Aggregation    • Capability Composition         │
 │  • Emergent Capability Synthesis                                │
@@ -59,12 +59,12 @@ Clean separation where hive-mesh is a standalone, reusable sync layer:
 │  • PlatformBeacon, CellState, Command schemas                   │
 │  • Cell leadership, aggregation rules                           │
 │                                                                  │
-│              Consumes hive-mesh via MeshProvider                │
+│              Consumes peat-mesh via MeshProvider                │
 └─────────────────────────────────────────────────────────────────┘
                                 │
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│              hive-mesh (Extracted - Open Source)                 │
+│              peat-mesh (Extracted - Open Source)                 │
 │              "Ditto Alternative"                                 │
 │                                                                  │
 │  • CRDT Documents (Automerge)     • Peer Discovery              │
@@ -74,10 +74,10 @@ Clean separation where hive-mesh is a standalone, reusable sync layer:
 │                                                                  │
 │  ┌─────────────────────────────────────────────────────────┐   │
 │  │              Transport Layer                             │   │
-│  │   Iroh (QUIC)  │  hive-btle (BLE)  │  Future: LoRa     │   │
+│  │   Iroh (QUIC)  │  peat-btle (BLE)  │  Future: LoRa     │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                                                                  │
-│           NO HIVE SEMANTICS - sync arbitrary documents          │
+│           NO PEAT SEMANTICS - sync arbitrary documents          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -85,9 +85,9 @@ Clean separation where hive-mesh is a standalone, reusable sync layer:
 
 | Stakeholder | Benefit |
 |-------------|---------|
-| **Defense Unicorns** | Receives HIVE Protocol IP without Ditto licensing complexity |
+| **Defense Unicorns** | Receives PEAT Protocol IP without Ditto licensing complexity |
 | **Open Source Community** | Gets a Ditto alternative for their own mesh sync needs |
-| **HIVE Users** | Can choose sync backend (hive-mesh vs Ditto) based on requirements |
+| **PEAT Users** | Can choose sync backend (peat-mesh vs Ditto) based on requirements |
 | **IETF Standardization** | Sync protocol can be specified independently |
 | **Competitive Position** | Open standard beats proprietary lock-in (Anduril Lattice, etc.) |
 
@@ -95,9 +95,9 @@ Clean separation where hive-mesh is a standalone, reusable sync layer:
 
 ## Decision
 
-### Extract hive-mesh as Standalone Crate
+### Extract peat-mesh as Standalone Crate
 
-Create `hive-mesh` as a separate repository/crate that provides:
+Create `peat-mesh` as a separate repository/crate that provides:
 
 1. **CRDT-based document storage** (Automerge)
 2. **P2P mesh networking** (Iroh + optional transports)
@@ -109,14 +109,14 @@ Create `hive-mesh` as a separate repository/crate that provides:
 ### Core API Surface
 
 ```rust
-// hive-mesh/src/lib.rs
+// peat-mesh/src/lib.rs
 
 /// Main entry point for mesh operations
-pub struct HiveMesh {
+pub struct PeatMesh {
     // Internal: Automerge docs, Iroh endpoint, peer manager
 }
 
-impl HiveMesh {
+impl PeatMesh {
     /// Create a new mesh instance
     pub async fn new(config: MeshConfig) -> Result<Self, MeshError>;
     
@@ -273,7 +273,7 @@ pub enum ConflictResolution {
 
 #### Q1: API Surface Design
 
-**Should hive-mesh mirror Ditto's API patterns to ease migration, or clean-sheet design?**
+**Should peat-mesh mirror Ditto's API patterns to ease migration, or clean-sheet design?**
 
 | Option | Pros | Cons |
 |--------|------|------|
@@ -285,51 +285,51 @@ pub enum ConflictResolution {
 
 #### Q2: What Existing Code is Being Extracted?
 
-**Is this pulling from current hive-protocol internals, or formalizing the Automerge+Iroh work?**
+**Is this pulling from current peat-protocol internals, or formalizing the Automerge+Iroh work?**
 
 Current state assessment needed:
-- [ ] Audit `hive-protocol/src/sync/` - what's reusable?
-- [ ] Audit `hive-protocol/src/transport/` - what's reusable?
-- [ ] Identify HIVE-specific code that must NOT be extracted
+- [ ] Audit `peat-protocol/src/sync/` - what's reusable?
+- [ ] Audit `peat-protocol/src/transport/` - what's reusable?
+- [ ] Identify PEAT-specific code that must NOT be extracted
 - [ ] Identify generic sync code that SHOULD be extracted
 
 #### Q3: Transport Layer Ownership
 
-**Does hive-mesh own the transport layer (ADR-032), or consume transports?**
+**Does peat-mesh own the transport layer (ADR-032), or consume transports?**
 
 | Option | Description |
 |--------|-------------|
-| **hive-mesh owns transports** | Transport abstraction lives in hive-mesh, Iroh and BLE are built-in |
-| **hive-mesh consumes transports** | Separate `hive-transport` crate, hive-mesh depends on it |
-| **Transports are plugins** | hive-mesh defines trait, transports are separate crates |
+| **peat-mesh owns transports** | Transport abstraction lives in peat-mesh, Iroh and BLE are built-in |
+| **peat-mesh consumes transports** | Separate `peat-transport` crate, peat-mesh depends on it |
+| **Transports are plugins** | peat-mesh defines trait, transports are separate crates |
 
-*Recommendation*: hive-mesh owns the transport trait and includes Iroh by default. hive-btle is an optional feature/dependency. This keeps the "Ditto alternative" self-contained.
+*Recommendation*: peat-mesh owns the transport trait and includes Iroh by default. peat-btle is an optional feature/dependency. This keeps the "Ditto alternative" self-contained.
 
 #### Q4: Relationship to MeshProvider Trait (ADR-042)
 
-**How does hive-mesh relate to the MeshProvider trait defined yesterday?**
+**How does peat-mesh relate to the MeshProvider trait defined yesterday?**
 
 Options:
-1. **hive-mesh implements MeshProvider** - The trait is defined in hive-protocol, hive-mesh provides an implementation
-2. **MeshProvider moves to hive-mesh** - The trait is part of hive-mesh's public API
-3. **MeshProvider is a wrapper** - hive-protocol defines MeshProvider, which wraps hive-mesh internally
+1. **peat-mesh implements MeshProvider** - The trait is defined in peat-protocol, peat-mesh provides an implementation
+2. **MeshProvider moves to peat-mesh** - The trait is part of peat-mesh's public API
+3. **MeshProvider is a wrapper** - peat-protocol defines MeshProvider, which wraps peat-mesh internally
 
-*Recommendation*: Option 1 - MeshProvider trait stays in hive-protocol (it's the HIVE-specific interface), hive-mesh implements it. This allows other implementations (Ditto, mock) to also implement MeshProvider.
+*Recommendation*: Option 1 - MeshProvider trait stays in peat-protocol (it's the PEAT-specific interface), peat-mesh implements it. This allows other implementations (Ditto, mock) to also implement MeshProvider.
 
 ```rust
-// In hive-protocol
+// In peat-protocol
 pub trait MeshProvider { ... }
 
-// In hive-mesh
-impl MeshProvider for HiveMesh { ... }
+// In peat-mesh
+impl MeshProvider for PeatMesh { ... }
 
-// In hive-mesh-ditto (if needed)
+// In peat-mesh-ditto (if needed)
 impl MeshProvider for DittoMesh { ... }
 ```
 
 #### Q5: Repository Structure
 
-**Separate repo or monorepo with hive-protocol?**
+**Separate repo or monorepo with peat-protocol?**
 
 | Option | Pros | Cons |
 |--------|------|------|
@@ -337,7 +337,7 @@ impl MeshProvider for DittoMesh { ... }
 | **Monorepo** | Easier development, atomic changes | IP boundary less clear, harder for community |
 | **Cargo workspace** | Best of both - separate crates, shared tooling | Still need clear ownership boundaries |
 
-*Recommendation*: Separate repo (`github.com/revolveteam/hive-mesh`) for clean IP separation and community adoption. HIVE Protocol depends on it as external crate.
+*Recommendation*: Separate repo (`github.com/revolveteam/peat-mesh`) for clean IP separation and community adoption. PEAT Protocol depends on it as external crate.
 
 ### Tactical Questions
 
@@ -360,7 +360,7 @@ Deferred to post-MVP:
 
 #### Q7: Testing Strategy
 
-**How do we validate hive-mesh independently of HIVE Protocol?**
+**How do we validate peat-mesh independently of PEAT Protocol?**
 
 - [ ] Unit tests for Collection/Document API
 - [ ] Integration tests with multiple mesh instances
@@ -385,13 +385,13 @@ Deferred to post-MVP:
 ### Crate Structure
 
 ```
-hive-mesh/
+peat-mesh/
 ├── Cargo.toml
 ├── README.md
 ├── src/
-│   ├── lib.rs              # Public API: HiveMesh, Collection, Document
+│   ├── lib.rs              # Public API: PeatMesh, Collection, Document
 │   ├── config.rs           # MeshConfig, TransportConfig, etc.
-│   ├── mesh.rs             # HiveMesh implementation
+│   ├── mesh.rs             # PeatMesh implementation
 │   ├── collection.rs       # Collection implementation
 │   ├── document.rs         # Document, CRDT operations
 │   ├── sync/
@@ -449,7 +449,7 @@ uuid = { version = "1", features = ["v4"] }
 [features]
 default = ["iroh"]
 iroh = []
-ble = ["hive-btle"]
+ble = ["peat-btle"]
 full = ["iroh", "ble"]
 ```
 
@@ -459,10 +459,10 @@ full = ["iroh", "ble"]
 
 ### Phase 1: Core Extraction (THIS WEEK - DU Blocking)
 
-**Goal**: Minimal viable hive-mesh that HIVE Protocol can depend on
+**Goal**: Minimal viable peat-mesh that PEAT Protocol can depend on
 
-- [ ] Create `hive-mesh` repository
-- [ ] Define public API (HiveMesh, Collection, Document)
+- [ ] Create `peat-mesh` repository
+- [ ] Define public API (PeatMesh, Collection, Document)
 - [ ] Extract/implement Automerge document operations
 - [ ] Extract/implement Iroh transport
 - [ ] Basic peer discovery (bootstrap peers)
@@ -470,16 +470,16 @@ full = ["iroh", "ble"]
 - [ ] Unit tests for core operations
 - [ ] Integration test: two-node sync
 
-**Deliverable**: `hive-mesh` crate that compiles and syncs documents between two nodes
+**Deliverable**: `peat-mesh` crate that compiles and syncs documents between two nodes
 
-### Phase 2: HIVE Protocol Integration (Week 2)
+### Phase 2: PEAT Protocol Integration (Week 2)
 
-- [ ] Implement MeshProvider trait for HiveMesh
-- [ ] Refactor hive-protocol to use hive-mesh
-- [ ] Verify all existing HIVE tests pass
-- [ ] Document migration from embedded sync to hive-mesh
+- [ ] Implement MeshProvider trait for PeatMesh
+- [ ] Refactor peat-protocol to use peat-mesh
+- [ ] Verify all existing PEAT tests pass
+- [ ] Document migration from embedded sync to peat-mesh
 
-**Deliverable**: HIVE Protocol uses hive-mesh, all tests green
+**Deliverable**: PEAT Protocol uses peat-mesh, all tests green
 
 ### Phase 3: Production Hardening (Week 3-4)
 
@@ -490,16 +490,16 @@ full = ["iroh", "ble"]
 - [ ] Performance benchmarks
 - [ ] Documentation
 
-**Deliverable**: Production-ready hive-mesh
+**Deliverable**: Production-ready peat-mesh
 
 ### Phase 4: BLE Integration (Week 5-6)
 
-- [ ] Integrate hive-btle as optional transport
+- [ ] Integrate peat-btle as optional transport
 - [ ] Multi-transport coordination
 - [ ] Transport selection logic
 - [ ] Mobile platform testing
 
-**Deliverable**: hive-mesh works over BLE
+**Deliverable**: peat-mesh works over BLE
 
 ### Phase 5: Community Release (Week 7-8)
 
@@ -521,8 +521,8 @@ full = ["iroh", "ble"]
 - [ ] Two nodes can sync documents via Iroh
 - [ ] Offline changes merge correctly on reconnection
 - [ ] CRDT conflicts resolve deterministically
-- [ ] HIVE Protocol works with hive-mesh backend
-- [ ] No HIVE-specific code in hive-mesh
+- [ ] PEAT Protocol works with peat-mesh backend
+- [ ] No PEAT-specific code in peat-mesh
 
 ### Performance
 
@@ -544,8 +544,8 @@ full = ["iroh", "ble"]
 
 ### Positive
 
-- **Clean IP separation** - HIVE Protocol is clearly differentiated from sync infrastructure
-- **Open source adoption** - Community can use hive-mesh without HIVE
+- **Clean IP separation** - PEAT Protocol is clearly differentiated from sync infrastructure
+- **Open source adoption** - Community can use peat-mesh without PEAT
 - **DU transition unblocked** - No Ditto dependency in delivered IP
 - **Competitive positioning** - Open standard beats proprietary
 - **Easier testing** - Can test sync layer independently
@@ -553,16 +553,16 @@ full = ["iroh", "ble"]
 ### Negative
 
 - **Development effort** - Extraction takes time
-- **Two codebases** - Must maintain hive-mesh separately
-- **Version coordination** - HIVE Protocol must track hive-mesh versions
+- **Two codebases** - Must maintain peat-mesh separately
+- **Version coordination** - PEAT Protocol must track peat-mesh versions
 - **Community support** - Open source means issue triage, PRs, etc.
 
 ### Risks
 
 - **Scope creep** - "Just one more feature" delays delivery
-- **API instability** - Changing hive-mesh API breaks HIVE Protocol
+- **API instability** - Changing peat-mesh API breaks PEAT Protocol
 - **Performance regression** - Extraction might miss optimizations
-- **Incomplete extraction** - HIVE-specific code accidentally included
+- **Incomplete extraction** - PEAT-specific code accidentally included
 
 ---
 
@@ -573,7 +573,7 @@ full = ["iroh", "ble"]
 - [Ditto](https://ditto.live/) - Commercial mesh sync (competitive reference)
 - ADR-011: Automerge + Iroh Integration
 - ADR-032: Pluggable Transport Abstraction
-- ADR-039: hive-btle Mesh Transport
+- ADR-039: peat-btle Mesh Transport
 - ADR-041: Multi-Transport Embedded Integration
 - ADR-042: Protocol/Mesh Layer Abstraction (MeshProvider trait)
 
@@ -583,24 +583,24 @@ full = ["iroh", "ble"]
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2025-01-31 | Extract hive-mesh as standalone crate | IP clarity for DU transition, open source positioning |
+| 2025-01-31 | Extract peat-mesh as standalone crate | IP clarity for DU transition, open source positioning |
 | 2025-01-31 | Automerge + Iroh as foundation | Already validated in ADR-011, production-ready |
-| 2025-01-31 | Zero HIVE semantics in hive-mesh | Clean separation, general-purpose utility |
-| 2026-02-11 | Phase 0: Break reverse deps (PR #622) | Remove all hive-protocol/hive-schema imports from hive-mesh |
+| 2025-01-31 | Zero PEAT semantics in peat-mesh | Clean separation, general-purpose utility |
+| 2026-02-11 | Phase 0: Break reverse deps (PR #622) | Remove all peat-protocol/peat-schema imports from peat-mesh |
 | 2026-02-11 | Phase 1: Generic trait surface (PR #623) | DocumentStore, SyncEngine, DiscoveryStrategy traits |
 | 2026-02-11 | Phase 2: Transport layer (PR #624) | Multi-transport manager, bypass, health, reconnection |
 | 2026-02-11 | Phase 3: Storage/persistence (PR #625) | Automerge, Iroh blobs, negentropy, query, TTL |
 | 2026-02-11 | Phase 4: QoS framework (PR #626) | 5-level priority, bandwidth, eviction, GC, audit |
 | 2026-02-11 | Phase 5: Security primitives (PR #627) | Ed25519, X25519, ChaCha20, HMAC-SHA256, callsigns |
 | 2026-02-12 | Phase 6: Service broker (PR #628) | Axum HTTP + WebSocket, feature-gated |
-| 2026-02-12 | Phase 7: HiveMesh facade (PR #629) | Unified entry point, builder, lifecycle, events |
+| 2026-02-12 | Phase 7: PeatMesh facade (PR #629) | Unified entry point, builder, lifecycle, events |
 | TBD | API surface design | Clean-sheet Rust-native (not Ditto-compat) |
 | TBD | Repository structure | Currently monorepo workspace, separate repo planned |
-| TBD | Transport ownership | hive-mesh owns transport trait + Iroh default |
+| TBD | Transport ownership | peat-mesh owns transport trait + Iroh default |
 
 ---
 
 **Last Updated**: 2026-02-12
 **Status**: IMPLEMENTED — All 8 phases complete (PRs #622-#629)
-**Result**: 50,124 lines of standalone mesh code, 1,151 unit tests, zero hive-protocol/hive-schema dependencies
+**Result**: 50,124 lines of standalone mesh code, 1,151 unit tests, zero peat-protocol/peat-schema dependencies
 **Next Action**: README, examples, crates.io publish, Collection convenience API

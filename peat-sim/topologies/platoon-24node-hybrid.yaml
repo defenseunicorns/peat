@@ -1,0 +1,402 @@
+# ContainerLab Topology: 24-Node Platoon - Hybrid Mode (NEW)
+#
+# Purpose: Phase 3A - Intra-squad mesh + inter-squad hierarchical
+# Architecture: Best of both worlds
+#   - Within squads: Full peer-to-peer mesh (resilience)
+#   - Between squads: Hierarchical via squad leaders (efficiency)
+# Scale: 2× squad (12 → 24 nodes)
+#
+# Structure:
+#   Platoon Leader ↔ 3 Squad Leaders (hierarchical)
+#   Squad Alpha: 7 members in full mesh
+#   Squad Bravo: 8 members in full mesh
+#   Squad Charlie: 8 members in full mesh
+#
+# Network Topology:
+#   - Platoon Leader connects to 3 squad leaders
+#   - Each squad leader connects to platoon leader + all squad members
+#   - Squad members connect to all members in their squad (mesh)
+#   - NO direct cross-squad connections (except via squad leaders)
+
+name: cap-platoon-hybrid
+
+topology:
+  nodes:
+    # Platoon Leader (connects to all squad leaders)
+    platoon-leader:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: platoon-leader
+        ROLE: platoon_leader
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: writer
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12345"
+        TCP_CONNECT: "platoon-leader:12345,squad-alpha-leader:12346,squad-bravo-leader:12353,squad-charlie-leader:12361"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+      ports:
+        - "12345:12345"
+
+    # ========================================
+    # Squad Alpha (7 members in full mesh)
+    # ========================================
+    squad-alpha-leader:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: squad-alpha-leader
+        ROLE: squad_leader
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12346"
+        TCP_CONNECT: "platoon-leader:12345,squad-alpha-leader:12346,alpha-soldier-1:12347,alpha-soldier-2:12348,alpha-soldier-3:12349,alpha-soldier-4:12350,alpha-uav-1:12351,alpha-ugv-1:12352"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+      ports:
+        - "12346:12346"
+
+    alpha-soldier-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: alpha-soldier-1
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12347"
+        TCP_CONNECT: "squad-alpha-leader:12346,alpha-soldier-1:12347,alpha-soldier-2:12348,alpha-soldier-3:12349,alpha-soldier-4:12350,alpha-uav-1:12351,alpha-ugv-1:12352"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    alpha-soldier-2:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: alpha-soldier-2
+        ROLE: grenadier
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12348"
+        TCP_CONNECT: "squad-alpha-leader:12346,alpha-soldier-1:12347,alpha-soldier-2:12348,alpha-soldier-3:12349,alpha-soldier-4:12350,alpha-uav-1:12351,alpha-ugv-1:12352"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    alpha-soldier-3:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: alpha-soldier-3
+        ROLE: automatic_rifleman
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12349"
+        TCP_CONNECT: "squad-alpha-leader:12346,alpha-soldier-1:12347,alpha-soldier-2:12348,alpha-soldier-3:12349,alpha-soldier-4:12350,alpha-uav-1:12351,alpha-ugv-1:12352"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    alpha-soldier-4:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: alpha-soldier-4
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12350"
+        TCP_CONNECT: "squad-alpha-leader:12346,alpha-soldier-1:12347,alpha-soldier-2:12348,alpha-soldier-3:12349,alpha-soldier-4:12350,alpha-uav-1:12351,alpha-ugv-1:12352"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    alpha-uav-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: alpha-uav-1
+        ROLE: reconnaissance
+        PLATFORM_TYPE: uav
+        NODE_TYPE: uav
+        MODE: reader
+        TCP_LISTEN: "12351"
+        TCP_CONNECT: "squad-alpha-leader:12346,alpha-soldier-1:12347,alpha-soldier-2:12348,alpha-soldier-3:12349,alpha-soldier-4:12350,alpha-uav-1:12351,alpha-ugv-1:12352"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    alpha-ugv-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: alpha-ugv-1
+        ROLE: resupply_isr
+        PLATFORM_TYPE: ugv
+        NODE_TYPE: ugv
+        MODE: reader
+        TCP_LISTEN: "12352"
+        TCP_CONNECT: "squad-alpha-leader:12346,alpha-soldier-1:12347,alpha-soldier-2:12348,alpha-soldier-3:12349,alpha-soldier-4:12350,alpha-uav-1:12351,alpha-ugv-1:12352"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    # ========================================
+    # Squad Bravo (8 members in full mesh)
+    # ========================================
+    squad-bravo-leader:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: squad-bravo-leader
+        ROLE: squad_leader
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12353"
+        TCP_CONNECT: "platoon-leader:12345,squad-bravo-leader:12353,bravo-soldier-1:12354,bravo-soldier-2:12355,bravo-soldier-3:12356,bravo-soldier-4:12357,bravo-soldier-5:12358,bravo-uav-1:12359,bravo-ugv-1:12360"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+      ports:
+        - "12353:12353"
+
+    bravo-soldier-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: bravo-soldier-1
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12354"
+        TCP_CONNECT: "squad-bravo-leader:12353,bravo-soldier-1:12354,bravo-soldier-2:12355,bravo-soldier-3:12356,bravo-soldier-4:12357,bravo-soldier-5:12358,bravo-uav-1:12359,bravo-ugv-1:12360"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    bravo-soldier-2:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: bravo-soldier-2
+        ROLE: grenadier
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12355"
+        TCP_CONNECT: "squad-bravo-leader:12353,bravo-soldier-1:12354,bravo-soldier-2:12355,bravo-soldier-3:12356,bravo-soldier-4:12357,bravo-soldier-5:12358,bravo-uav-1:12359,bravo-ugv-1:12360"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    bravo-soldier-3:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: bravo-soldier-3
+        ROLE: automatic_rifleman
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12356"
+        TCP_CONNECT: "squad-bravo-leader:12353,bravo-soldier-1:12354,bravo-soldier-2:12355,bravo-soldier-3:12356,bravo-soldier-4:12357,bravo-soldier-5:12358,bravo-uav-1:12359,bravo-ugv-1:12360"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    bravo-soldier-4:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: bravo-soldier-4
+        ROLE: team_leader
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12357"
+        TCP_CONNECT: "squad-bravo-leader:12353,bravo-soldier-1:12354,bravo-soldier-2:12355,bravo-soldier-3:12356,bravo-soldier-4:12357,bravo-soldier-5:12358,bravo-uav-1:12359,bravo-ugv-1:12360"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    bravo-soldier-5:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: bravo-soldier-5
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12358"
+        TCP_CONNECT: "squad-bravo-leader:12353,bravo-soldier-1:12354,bravo-soldier-2:12355,bravo-soldier-3:12356,bravo-soldier-4:12357,bravo-soldier-5:12358,bravo-uav-1:12359,bravo-ugv-1:12360"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    bravo-uav-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: bravo-uav-1
+        ROLE: reconnaissance
+        PLATFORM_TYPE: uav
+        NODE_TYPE: uav
+        MODE: reader
+        TCP_LISTEN: "12359"
+        TCP_CONNECT: "squad-bravo-leader:12353,bravo-soldier-1:12354,bravo-soldier-2:12355,bravo-soldier-3:12356,bravo-soldier-4:12357,bravo-soldier-5:12358,bravo-uav-1:12359,bravo-ugv-1:12360"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    bravo-ugv-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: bravo-ugv-1
+        ROLE: resupply_isr
+        PLATFORM_TYPE: ugv
+        NODE_TYPE: ugv
+        MODE: reader
+        TCP_LISTEN: "12360"
+        TCP_CONNECT: "squad-bravo-leader:12353,bravo-soldier-1:12354,bravo-soldier-2:12355,bravo-soldier-3:12356,bravo-soldier-4:12357,bravo-soldier-5:12358,bravo-uav-1:12359,bravo-ugv-1:12360"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    # ========================================
+    # Squad Charlie (8 members in full mesh)
+    # ========================================
+    squad-charlie-leader:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: squad-charlie-leader
+        ROLE: squad_leader
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12361"
+        TCP_CONNECT: "platoon-leader:12345,squad-charlie-leader:12361,charlie-soldier-1:12362,charlie-soldier-2:12363,charlie-soldier-3:12364,charlie-soldier-4:12365,charlie-soldier-5:12366,charlie-uav-1:12367,charlie-ugv-1:12368"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+      ports:
+        - "12361:12361"
+
+    charlie-soldier-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: charlie-soldier-1
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12362"
+        TCP_CONNECT: "squad-charlie-leader:12361,charlie-soldier-1:12362,charlie-soldier-2:12363,charlie-soldier-3:12364,charlie-soldier-4:12365,charlie-soldier-5:12366,charlie-uav-1:12367,charlie-ugv-1:12368"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    charlie-soldier-2:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: charlie-soldier-2
+        ROLE: grenadier
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12363"
+        TCP_CONNECT: "squad-charlie-leader:12361,charlie-soldier-1:12362,charlie-soldier-2:12363,charlie-soldier-3:12364,charlie-soldier-4:12365,charlie-soldier-5:12366,charlie-uav-1:12367,charlie-ugv-1:12368"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    charlie-soldier-3:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: charlie-soldier-3
+        ROLE: automatic_rifleman
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12364"
+        TCP_CONNECT: "squad-charlie-leader:12361,charlie-soldier-1:12362,charlie-soldier-2:12363,charlie-soldier-3:12364,charlie-soldier-4:12365,charlie-soldier-5:12366,charlie-uav-1:12367,charlie-ugv-1:12368"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    charlie-soldier-4:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: charlie-soldier-4
+        ROLE: team_leader
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12365"
+        TCP_CONNECT: "squad-charlie-leader:12361,charlie-soldier-1:12362,charlie-soldier-2:12363,charlie-soldier-3:12364,charlie-soldier-4:12365,charlie-soldier-5:12366,charlie-uav-1:12367,charlie-ugv-1:12368"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    charlie-soldier-5:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: charlie-soldier-5
+        ROLE: rifleman
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: reader
+        TCP_LISTEN: "12366"
+        TCP_CONNECT: "squad-charlie-leader:12361,charlie-soldier-1:12362,charlie-soldier-2:12363,charlie-soldier-3:12364,charlie-soldier-4:12365,charlie-soldier-5:12366,charlie-uav-1:12367,charlie-ugv-1:12368"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    charlie-uav-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: charlie-uav-1
+        ROLE: reconnaissance
+        PLATFORM_TYPE: uav
+        NODE_TYPE: uav
+        MODE: reader
+        TCP_LISTEN: "12367"
+        TCP_CONNECT: "squad-charlie-leader:12361,charlie-soldier-1:12362,charlie-soldier-2:12363,charlie-soldier-3:12364,charlie-soldier-4:12365,charlie-soldier-5:12366,charlie-uav-1:12367,charlie-ugv-1:12368"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}
+
+    charlie-ugv-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: charlie-ugv-1
+        ROLE: resupply_isr
+        PLATFORM_TYPE: ugv
+        NODE_TYPE: ugv
+        MODE: reader
+        TCP_LISTEN: "12368"
+        TCP_CONNECT: "squad-charlie-leader:12361,charlie-soldier-1:12362,charlie-soldier-2:12363,charlie-soldier-3:12364,charlie-soldier-4:12365,charlie-soldier-5:12366,charlie-uav-1:12367,charlie-ugv-1:12368"
+        DITTO_APP_ID: ${DITTO_APP_ID}
+        DITTO_OFFLINE_TOKEN: ${DITTO_OFFLINE_TOKEN}
+        DITTO_SHARED_KEY: ${DITTO_SHARED_KEY}

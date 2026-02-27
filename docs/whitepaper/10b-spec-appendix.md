@@ -1,6 +1,6 @@
-# HIVE Protocol Specification: Transport Layer
+# PEAT Protocol Specification: Transport Layer
 
-**Spec ID**: HIVE-SPEC-001
+**Spec ID**: PEAT-SPEC-001
 **Status**: Draft
 **Version**: 0.1.0
 **Date**: 2025-01-07
@@ -8,13 +8,13 @@
 
 ## Abstract
 
-This document specifies the transport layer for the HIVE Protocol. It defines wire formats, connection lifecycle, transport abstractions, and the UDP bypass channel for latency-critical applications.
+This document specifies the transport layer for the PEAT Protocol. It defines wire formats, connection lifecycle, transport abstractions, and the UDP bypass channel for latency-critical applications.
 
 ## 1. Introduction
 
 ### 1.1 Purpose
 
-The HIVE transport layer provides reliable and unreliable message delivery across heterogeneous network environments. It abstracts multiple physical transports (QUIC, UDP, BLE) behind a common interface, enabling applications to function regardless of underlying connectivity.
+The PEAT transport layer provides reliable and unreliable message delivery across heterogeneous network environments. It abstracts multiple physical transports (QUIC, UDP, BLE) behind a common interface, enabling applications to function regardless of underlying connectivity.
 
 ### 1.2 Scope
 
@@ -22,7 +22,7 @@ This specification covers:
 - Transport trait abstraction
 - QUIC-based primary transport (via Iroh)
 - UDP bypass channel for low-latency data
-- HIVE-Lite protocol for constrained devices
+- PEAT-Lite protocol for constrained devices
 - BLE mesh transport for mobile/embedded devices
 - Connection establishment and teardown
 - Wire format encoding
@@ -37,7 +37,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 | Term | Definition |
 |------|------------|
-| **Node** | A HIVE-capable device with a unique identity |
+| **Node** | A PEAT-capable device with a unique identity |
 | **Peer** | A node with an established transport connection |
 | **Endpoint** | A network address (IP:port, BLE address, etc.) |
 | **Channel** | A logical stream within a transport connection |
@@ -50,7 +50,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ### 3.1 Transport Trait
 
-All HIVE transports MUST implement the following interface:
+All PEAT transports MUST implement the following interface:
 
 ```rust
 pub trait Transport: Send + Sync {
@@ -103,7 +103,7 @@ Implementations MUST use the first 32 bytes of the SHA-256 hash. The PeerId MUST
 
 ### 4.1 Overview
 
-The primary HIVE transport uses QUIC via the Iroh library. QUIC provides:
+The primary PEAT transport uses QUIC via the Iroh library. QUIC provides:
 - Multiplexed streams over a single connection
 - Built-in encryption (TLS 1.3)
 - Connection migration
@@ -118,10 +118,10 @@ The primary HIVE transport uses QUIC via the Iroh library. QUIC provides:
         |                                   |
         |<------- QUIC ServerHello ---------|
         |                                   |
-        |-------- HIVE Handshake ---------->|
+        |-------- PEAT Handshake ---------->|
         |  (DeviceId, FormationId, Nonce)   |
         |                                   |
-        |<------- HIVE HandshakeAck --------|
+        |<------- PEAT HandshakeAck --------|
         |  (DeviceId, Challenge)            |
         |                                   |
         |-------- ChallengeResponse ------->|
@@ -131,7 +131,7 @@ The primary HIVE transport uses QUIC via the Iroh library. QUIC provides:
         |                                   |
 ```
 
-### 4.3 HIVE Handshake Message
+### 4.3 PEAT Handshake Message
 
 ```
  0                   1                   2                   3
@@ -272,11 +272,11 @@ pub struct BypassCollectionConfig {
 
 ### 5.4 Multicast
 
-For broadcast scenarios, HIVE supports IP multicast:
+For broadcast scenarios, PEAT supports IP multicast:
 
 | Multicast Group | Purpose |
 |-----------------|---------|
-| `239.255.72.86` | Default HIVE multicast group |
+| `239.255.72.86` | Default PEAT multicast group |
 | `239.255.72.87` | Sensor data |
 | `239.255.72.88` | Control commands |
 
@@ -292,11 +292,11 @@ Nodes MUST join multicast groups using IGMP. The default TTL for multicast packe
 
 ---
 
-## 6. HIVE-Lite Protocol
+## 6. PEAT-Lite Protocol
 
 ### 6.1 Purpose
 
-HIVE-Lite is a lightweight UDP protocol for resource-constrained devices (ESP32, ARM Cortex-M) that cannot run the full QUIC stack.
+PEAT-Lite is a lightweight UDP protocol for resource-constrained devices (ESP32, ARM Cortex-M) that cannot run the full QUIC stack.
 
 ### 6.2 Message Format
 
@@ -330,7 +330,7 @@ HIVE-Lite is a lightweight UDP protocol for resource-constrained devices (ESP32,
 
 ### 6.3 Reliability
 
-HIVE-Lite uses a simple acknowledgment scheme:
+PEAT-Lite uses a simple acknowledgment scheme:
 - Sender transmits with sequence number (0-255, wraparound)
 - Receiver sends Ack/Nack within timeout (default: 100ms)
 - Sender retries up to 3 times before marking peer as failed
@@ -341,19 +341,19 @@ HIVE-Lite uses a simple acknowledgment scheme:
 
 ### 7.1 Overview
 
-The BLE mesh transport (`hive-btle`) enables HIVE communication over Bluetooth Low Energy for mobile and embedded devices.
+The BLE mesh transport (`peat-btle`) enables PEAT communication over Bluetooth Low Energy for mobile and embedded devices.
 
 ### 7.2 GATT Service
 
 | UUID | Name | Description |
 |------|------|-------------|
-| `0x1826` | HIVE Mesh Service | Primary service |
+| `0x1826` | PEAT Mesh Service | Primary service |
 | `0x2A6E` | Data Characteristic | Read/Write/Notify |
 | `0x2A6F` | Control Characteristic | Write only |
 
 ### 7.3 Advertising
 
-HIVE nodes advertise with:
+PEAT nodes advertise with:
 - Service UUID: `0x1826`
 - Manufacturer Data: 4-byte Formation ID + 2-byte Mesh ID
 
@@ -453,13 +453,13 @@ All multi-byte integers are encoded in **big-endian** (network byte order).
 |------|----------|---------|
 | 4433 | UDP | QUIC/Iroh primary transport |
 | 4434 | UDP | Bypass channel |
-| 4435 | UDP | HIVE-Lite |
+| 4435 | UDP | PEAT-Lite |
 
 ### 11.2 Multicast Groups
 
 | Group | Purpose |
 |-------|---------|
-| 239.255.72.86-88 | HIVE protocol multicast |
+| 239.255.72.86-88 | PEAT protocol multicast |
 
 ---
 
@@ -479,9 +479,9 @@ All multi-byte integers are encoded in **big-endian** (network byte order).
 
 ---
 
-# HIVE Protocol Specification: Synchronization Protocol
+# PEAT Protocol Specification: Synchronization Protocol
 
-**Spec ID**: HIVE-SPEC-002
+**Spec ID**: PEAT-SPEC-002
 **Status**: Draft
 **Version**: 0.1.0
 **Date**: 2025-01-07
@@ -489,13 +489,13 @@ All multi-byte integers are encoded in **big-endian** (network byte order).
 
 ## Abstract
 
-This document specifies the synchronization protocol for HIVE. It defines CRDT semantics, conflict resolution, document lifecycle, and the Negentropy-based set reconciliation mechanism.
+This document specifies the synchronization protocol for PEAT. It defines CRDT semantics, conflict resolution, document lifecycle, and the Negentropy-based set reconciliation mechanism.
 
 ## 1. Introduction
 
 ### 1.1 Purpose
 
-HIVE's synchronization protocol ensures that all nodes in a cell eventually converge to the same state, even when operating offline or with intermittent connectivity. It builds on Conflict-free Replicated Data Types (CRDTs) to achieve automatic conflict resolution.
+PEAT's synchronization protocol ensures that all nodes in a cell eventually converge to the same state, even when operating offline or with intermittent connectivity. It builds on Conflict-free Replicated Data Types (CRDTs) to achieve automatic conflict resolution.
 
 ### 1.2 Design Goals
 
@@ -528,7 +528,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ### 3.1 Automerge CRDT
 
-HIVE uses Automerge as its CRDT implementation. Automerge provides:
+PEAT uses Automerge as its CRDT implementation. Automerge provides:
 
 - **JSON-like documents**: Nested maps, lists, and primitives
 - **Causal ordering**: Operations include dependency information
@@ -821,7 +821,7 @@ Tombstones and old changes MAY be collected when:
 
 ### 8.1 Overview
 
-For efficient sync of large collections, HIVE uses Negentropy set reconciliation. This protocol efficiently computes set differences using range fingerprints.
+For efficient sync of large collections, PEAT uses Negentropy set reconciliation. This protocol efficiently computes set differences using range fingerprints.
 
 ### 8.2 Fingerprint Computation
 
@@ -967,7 +967,7 @@ Sync priority SHOULD be assigned based on:
 
 ### 11.1 Operation Signing
 
-When E2E encryption is enabled (see HIVE-SPEC-005), operations SHOULD be signed:
+When E2E encryption is enabled (see PEAT-SPEC-005), operations SHOULD be signed:
 
 ```rust
 pub struct SignedChange {
@@ -992,7 +992,7 @@ Implementations MUST validate:
 
 ### 11.3 Storage Encryption
 
-Documents at rest SHOULD be encrypted. See HIVE-SPEC-005 for key management.
+Documents at rest SHOULD be encrypted. See PEAT-SPEC-005 for key management.
 
 ---
 
@@ -1012,9 +1012,9 @@ Documents at rest SHOULD be encrypted. See HIVE-SPEC-005 for key management.
 
 ---
 
-# HIVE Protocol Specification: Data Schema Definitions
+# PEAT Protocol Specification: Data Schema Definitions
 
-**Spec ID**: HIVE-SPEC-003
+**Spec ID**: PEAT-SPEC-003
 **Status**: Draft
 **Version**: 0.1.0
 **Date**: 2025-01-07
@@ -1022,13 +1022,13 @@ Documents at rest SHOULD be encrypted. See HIVE-SPEC-005 for key management.
 
 ## Abstract
 
-This document specifies the data schemas for HIVE Protocol. It defines the Protocol Buffer message formats for tactical entities, their relationships, and mapping to external standards (CoT/TAK).
+This document specifies the data schemas for PEAT Protocol. It defines the Protocol Buffer message formats for tactical entities, their relationships, and mapping to external standards (CoT/TAK).
 
 ## 1. Introduction
 
 ### 1.1 Purpose
 
-HIVE schemas define the structure of all data exchanged between nodes. Using Protocol Buffers ensures:
+PEAT schemas define the structure of all data exchanged between nodes. Using Protocol Buffers ensures:
 - Compact binary encoding
 - Forward/backward compatibility
 - Cross-language support
@@ -1052,8 +1052,8 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 ### 2.1 Package Structure
 
 ```
-hive-schema/proto/
-├── hive/
+peat-schema/proto/
+├── peat/
 │   ├── common/
 │   │   └── v1/
 │   │       └── common.proto       # Common types (Position, Timestamp)
@@ -1102,7 +1102,7 @@ Schema packages follow semantic versioning:
 
 ```protobuf
 syntax = "proto3";
-package hive.common.v1;
+package peat.common.v1;
 
 // Geographic position in WGS84
 message Position {
@@ -1205,26 +1205,26 @@ The primary entity tracking message:
 
 ```protobuf
 syntax = "proto3";
-package hive.beacon.v1;
+package peat.beacon.v1;
 
-import "hive/common/v1/common.proto";
+import "peat/common/v1/common.proto";
 
 // Track update from a node
 message Beacon {
     // Unique identifier for this track
-    hive.common.v1.UUID track_id = 1;
+    peat.common.v1.UUID track_id = 1;
 
     // Device that produced this beacon
     bytes device_id = 2;
 
     // Callsign for display
-    hive.common.v1.Callsign callsign = 3;
+    peat.common.v1.Callsign callsign = 3;
 
     // Current position
-    hive.common.v1.Position position = 4;
+    peat.common.v1.Position position = 4;
 
     // Timestamp of position fix
-    hive.common.v1.Timestamp timestamp = 5;
+    peat.common.v1.Timestamp timestamp = 5;
 
     // Entity classification
     Affiliation affiliation = 6;
@@ -1278,13 +1278,13 @@ For hierarchical reporting:
 // Aggregated track summary (sent upward in hierarchy)
 message TrackSummary {
     // Cell producing this summary
-    hive.common.v1.UUID cell_id = 1;
+    peat.common.v1.UUID cell_id = 1;
 
     // Time range covered
-    hive.common.v1.TimeRange time_range = 2;
+    peat.common.v1.TimeRange time_range = 2;
 
     // Bounding box containing all tracks
-    hive.common.v1.BoundingBox coverage = 3;
+    peat.common.v1.BoundingBox coverage = 3;
 
     // Count by affiliation
     map<int32, uint32> affiliation_counts = 4;
@@ -1305,14 +1305,14 @@ message TrackSummary {
 
 ```protobuf
 syntax = "proto3";
-package hive.mission.v1;
+package peat.mission.v1;
 
-import "hive/common/v1/common.proto";
+import "peat/common/v1/common.proto";
 
 // Mission definition
 message Mission {
     // Unique mission identifier
-    hive.common.v1.UUID mission_id = 1;
+    peat.common.v1.UUID mission_id = 1;
 
     // Human-readable name
     string name = 2;
@@ -1327,13 +1327,13 @@ message Mission {
     Priority priority = 5;
 
     // Time window
-    hive.common.v1.TimeRange time_window = 6;
+    peat.common.v1.TimeRange time_window = 6;
 
     // Area of operations
     AreaOfOperations aoo = 7;
 
     // Assigned cells/units
-    repeated hive.common.v1.UUID assigned_cells = 8;
+    repeated peat.common.v1.UUID assigned_cells = 8;
 
     // Objectives within this mission
     repeated Objective objectives = 9;
@@ -1389,16 +1389,16 @@ message AreaOfOperations {
 }
 
 message CircularArea {
-    hive.common.v1.Position center = 1;
+    peat.common.v1.Position center = 1;
     double radius_meters = 2;
 }
 
 message PolygonArea {
-    repeated hive.common.v1.Position vertices = 1;
+    repeated peat.common.v1.Position vertices = 1;
 }
 
 message RouteArea {
-    repeated hive.common.v1.Position waypoints = 1;
+    repeated peat.common.v1.Position waypoints = 1;
     double corridor_width_meters = 2;
 }
 ```
@@ -1408,10 +1408,10 @@ message RouteArea {
 ```protobuf
 // Individual objective within a mission
 message Objective {
-    hive.common.v1.UUID objective_id = 1;
+    peat.common.v1.UUID objective_id = 1;
     string description = 2;
     ObjectiveType type = 3;
-    hive.common.v1.Position location = 4;
+    peat.common.v1.Position location = 4;
     ObjectiveStatus status = 5;
     Priority priority = 6;
 }
@@ -1443,9 +1443,9 @@ enum ObjectiveStatus {
 
 ```protobuf
 syntax = "proto3";
-package hive.capability.v1;
+package peat.capability.v1;
 
-import "hive/common/v1/common.proto";
+import "peat/common/v1/common.proto";
 
 // Node capability advertisement
 message CapabilityAdvertisement {
@@ -1453,7 +1453,7 @@ message CapabilityAdvertisement {
     bytes device_id = 1;
 
     // Callsign
-    hive.common.v1.Callsign callsign = 2;
+    peat.common.v1.Callsign callsign = 2;
 
     // Platform type
     PlatformType platform = 3;
@@ -1477,7 +1477,7 @@ message CapabilityAdvertisement {
     Availability availability = 9;
 
     // Last update time
-    hive.common.v1.Timestamp timestamp = 10;
+    peat.common.v1.Timestamp timestamp = 10;
 }
 
 // Sensor capability
@@ -1550,7 +1550,7 @@ message CommunicationCapability {
 
 enum LinkType {
     LINK_TYPE_UNSPECIFIED = 0;
-    LINK_TYPE_MESH = 1;         // HIVE mesh
+    LINK_TYPE_MESH = 1;         // PEAT mesh
     LINK_TYPE_SATCOM = 2;
     LINK_TYPE_HF = 3;
     LINK_TYPE_VHF = 4;
@@ -1594,7 +1594,7 @@ enum PowerSource {
 message Availability {
     bool available = 1;
     optional string reason = 2;
-    optional hive.common.v1.Timestamp available_at = 3;
+    optional peat.common.v1.Timestamp available_at = 3;
 }
 ```
 
@@ -1606,9 +1606,9 @@ message Availability {
 
 ```protobuf
 syntax = "proto3";
-package hive.security.v1;
+package peat.security.v1;
 
-import "hive/common/v1/common.proto";
+import "peat/common/v1/common.proto";
 
 // Device identity information
 message DeviceIdentity {
@@ -1636,7 +1636,7 @@ enum DeviceType {
 // Challenge for authentication
 message Challenge {
     bytes nonce = 1;
-    hive.common.v1.Timestamp timestamp = 2;
+    peat.common.v1.Timestamp timestamp = 2;
     bytes challenger_id = 3;
 }
 
@@ -1674,9 +1674,9 @@ enum SecurityErrorCode {
 
 ```protobuf
 syntax = "proto3";
-package hive.ai.v1;
+package peat.ai.v1;
 
-import "hive/common/v1/common.proto";
+import "peat/common/v1/common.proto";
 
 // AI model metadata
 message ModelMetadata {
@@ -1767,9 +1767,9 @@ message Detection {
 
 ### 9.1 CoT Event Mapping
 
-HIVE beacons map to CoT events:
+PEAT beacons map to CoT events:
 
-| HIVE Field | CoT Field | Notes |
+| PEAT Field | CoT Field | Notes |
 |------------|-----------|-------|
 | `track_id` | `uid` | UUID format |
 | `position.latitude` | `point/@lat` | |
@@ -1784,7 +1784,7 @@ HIVE beacons map to CoT events:
 ### 9.2 CoT Type Mapping
 
 ```
-HIVE Affiliation + Dimension → CoT Type
+PEAT Affiliation + Dimension → CoT Type
 
 MEMBER + GROUND     → a-f-G
 MEMBER + AIR        → a-f-A
@@ -1795,16 +1795,16 @@ UNKNOWN + AIR       → a-u-A
 
 ### 9.3 CoT Detail Extensions
 
-HIVE-specific data is carried in CoT `<detail>` elements:
+PEAT-specific data is carried in CoT `<detail>` elements:
 
 ```xml
 <detail>
-    <__hive>
+    <__peat>
         <device_id>0x1234...</device_id>
         <cell_id>uuid</cell_id>
         <power_level>85</power_level>
         <capabilities>sensor,relay</capabilities>
-    </__hive>
+    </__peat>
 </detail>
 ```
 
@@ -1878,9 +1878,9 @@ Production deployments SHOULD maintain a schema registry for:
 
 ---
 
-# HIVE Protocol Specification: Coordination Protocol
+# PEAT Protocol Specification: Coordination Protocol
 
-**Spec ID**: HIVE-SPEC-004
+**Spec ID**: PEAT-SPEC-004
 **Status**: Draft
 **Version**: 0.1.0
 **Date**: 2025-01-07
@@ -1888,13 +1888,13 @@ Production deployments SHOULD maintain a schema registry for:
 
 ## Abstract
 
-This document specifies the coordination protocol for HIVE. It defines cell formation, leader election, hierarchical organization, and inter-cell coordination mechanisms.
+This document specifies the coordination protocol for PEAT. It defines cell formation, leader election, hierarchical organization, and inter-cell coordination mechanisms.
 
 ## 1. Introduction
 
 ### 1.1 Purpose
 
-The HIVE coordination protocol enables autonomous and semi-autonomous systems to form dynamic teams ("cells") that operate effectively without centralized control. It provides mechanisms for:
+The PEAT coordination protocol enables autonomous and semi-autonomous systems to form dynamic teams ("cells") that operate effectively without centralized control. It provides mechanisms for:
 - Discovering and joining cells
 - Electing leaders based on capabilities and authority
 - Organizing hierarchically (team → group → formation)
@@ -2224,7 +2224,7 @@ enum BindingStatus {
 
 ### 6.3 Capability Aggregation and Emergent Behavior
 
-A core principle of HIVE is that **cells exhibit emergent capabilities** greater than the sum of their individual members. Capability aggregation flows upward through the hierarchy, enabling higher echelons to understand and task based on collective capabilities.
+A core principle of PEAT is that **cells exhibit emergent capabilities** greater than the sum of their individual members. Capability aggregation flows upward through the hierarchy, enabling higher echelons to understand and task based on collective capabilities.
 
 #### 6.3.1 Capability Flow Model
 
@@ -2267,7 +2267,7 @@ Individual platforms → Group capabilities → Formation emergent → Cluster e
 Emergent capabilities arise from the **composition** of individual platform capabilities:
 
 ```rust
-/// Emergent capability patterns recognized by HIVE
+/// Emergent capability patterns recognized by PEAT
 pub enum EmergentCapability {
     /// Multiple sensors with overlapping coverage → Wide-area observation
     WideAreaObservation {
@@ -2482,7 +2482,7 @@ pub enum CapabilitySummaryMode {
 
 ### 6.4 Bidirectional Flow Model
 
-HIVE operates as a **full-duplex hierarchical synchronization system**:
+PEAT operates as a **full-duplex hierarchical synchronization system**:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -2521,7 +2521,7 @@ HIVE operates as a **full-duplex hierarchical synchronization system**:
 
 #### 6.4.1 Policy-Based Routing
 
-Events carry routing policies that HIVE enforces:
+Events carry routing policies that PEAT enforces:
 
 ```rust
 pub struct EventRoutingPolicy {
@@ -2895,9 +2895,9 @@ All coordination messages include:
 
 ---
 
-# HIVE Protocol Specification: Security Framework
+# PEAT Protocol Specification: Security Framework
 
-**Spec ID**: HIVE-SPEC-005
+**Spec ID**: PEAT-SPEC-005
 **Status**: Draft
 **Version**: 0.1.0
 **Date**: 2025-01-07
@@ -2905,13 +2905,13 @@ All coordination messages include:
 
 ## Abstract
 
-This document specifies the security framework for HIVE Protocol. It defines device authentication, user authorization, encryption, key management, and audit logging requirements.
+This document specifies the security framework for PEAT Protocol. It defines device authentication, user authorization, encryption, key management, and audit logging requirements.
 
 ## 1. Introduction
 
 ### 1.1 Purpose
 
-The HIVE security framework ensures that tactical mesh networks operate securely in contested environments. It provides:
+The PEAT security framework ensures that tactical mesh networks operate securely in contested environments. It provides:
 - Device identity verification
 - Cell membership authentication
 - Role-based access control
@@ -3403,7 +3403,7 @@ message EncryptedKeyShare {
 
 ### 8.4 Forward Secrecy
 
-HIVE provides forward secrecy through:
+PEAT provides forward secrecy through:
 1. **Ephemeral keys**: New X25519 keypair per session
 2. **Key ratcheting**: Group keys advance after member removal
 3. **MLS integration** (recommended): Full forward secrecy via tree-based key agreement

@@ -1,16 +1,16 @@
-# ADR-040: Nostr Protocol Lessons for HIVE Architecture
+# ADR-040: Nostr Protocol Lessons for PEAT Architecture
 
 **Status**: Proposed  
 **Date**: 2025-12-15  
 **Authors**: Kit Plummer, Claude  
 **Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)  
-**Relates To**: ADR-007 (Automerge Sync Engine), ADR-012 (Schema Definition), ADR-017 (P2P Mesh Management), ADR-021 (Document-Oriented Architecture), ADR-027 (Event Routing), ADR-035 (HIVE-Lite), ADR-039 (BTLE Mesh)
+**Relates To**: ADR-007 (Automerge Sync Engine), ADR-012 (Schema Definition), ADR-017 (P2P Mesh Management), ADR-021 (Document-Oriented Architecture), ADR-027 (Event Routing), ADR-035 (PEAT-Lite), ADR-039 (BTLE Mesh)
 
 ---
 
 ## Executive Summary
 
-This ADR captures architectural lessons from the Nostr protocol and its NIPs (Nostr Implementation Possibilities) that inform HIVE Protocol design. Nostr represents a novel "Relay Architecture" that accepts network centralization as inevitable while preserving user key ownership. HIVE can adapt several Nostr patterns—particularly NIP-29 (Relay-Based Groups), NIP-77 (Negentropy Syncing), and the event-centric data model—while maintaining its distinct "Hierarchical Aggregation Architecture" optimized for contested tactical environments without cloud infrastructure.
+This ADR captures architectural lessons from the Nostr protocol and its NIPs (Nostr Implementation Possibilities) that inform PEAT Protocol design. Nostr represents a novel "Relay Architecture" that accepts network centralization as inevitable while preserving user key ownership. PEAT can adapt several Nostr patterns—particularly NIP-29 (Relay-Based Groups), NIP-77 (Negentropy Syncing), and the event-centric data model—while maintaining its distinct "Hierarchical Aggregation Architecture" optimized for contested tactical environments without cloud infrastructure.
 
 ---
 
@@ -34,13 +34,13 @@ Rather than fighting this physics, Nostr accepts it while preserving user sovere
 | **Centralized** | Bigger servers | Unlimited resources | Enterprise SaaS |
 | **Federated** | More servers talk | Servers cooperate | Social platforms (Mastodon) |
 | **Relay (Nostr)** | Dumb pipes + smart clients | Cloud available | Censorship resistance |
-| **Hierarchical (HIVE)** | Decompose by scope | No cloud, hierarchy exists | Tactical coordination |
+| **Hierarchical (PEAT)** | Decompose by scope | No cloud, hierarchy exists | Tactical coordination |
 
-HIVE represents a fourth architecture: **Hierarchical Aggregation**—designed for environments where relays don't exist, peers are bandwidth-constrained, and command hierarchy naturally dictates information flow.
+PEAT represents a fourth architecture: **Hierarchical Aggregation**—designed for environments where relays don't exist, peers are bandwidth-constrained, and command hierarchy naturally dictates information flow.
 
-### Why Nostr Matters for HIVE
+### Why Nostr Matters for PEAT
 
-Despite different target environments, Nostr and HIVE share fundamental challenges:
+Despite different target environments, Nostr and PEAT share fundamental challenges:
 
 1. **Eventual consistency** across disconnected nodes
 2. **Cryptographic identity** independent of any server
@@ -77,7 +77,7 @@ Nostr's entire protocol centers on a single object type—the **Event**:
 
 ### NIP-29: Relay-Based Groups
 
-NIP-29 defines closed groups managed by relay authority—directly analogous to HIVE's hierarchical echelons:
+NIP-29 defines closed groups managed by relay authority—directly analogous to PEAT's hierarchical echelons:
 
 **Key Patterns**:
 
@@ -111,7 +111,7 @@ NIP-29 defines closed groups managed by relay authority—directly analogous to 
 
 5. **Anti-Replay Protection**: "Relays should prevent late publication (messages published now with a timestamp from days or even hours ago)."
 
-**HIVE Parallel**: The squad leader's node is the "relay" for that squad. The `h` tag maps to hierarchical scope (`squad/alpha-1`). Roles map to military positions (squad leader, team leader).
+**PEAT Parallel**: The squad leader's node is the "relay" for that squad. The `h` tag maps to hierarchical scope (`squad/alpha-1`). Roles map to military positions (squad leader, team leader).
 
 ### NIP-77: Negentropy Syncing
 
@@ -148,11 +148,11 @@ NEG-ERR:  [subscription_id, reason]
 - Decoupled from storage structure (tree, array, etc.)
 - Supports frame size limits for constrained transports
 
-**HIVE Application**: Use Negentropy for **event discovery** (what capability reports exist?) before CRDT state sync (what's the current aggregated state?).
+**PEAT Application**: Use Negentropy for **event discovery** (what capability reports exist?) before CRDT state sync (what's the current aggregated state?).
 
 ### Other Relevant NIPs
 
-| NIP | Purpose | HIVE Relevance |
+| NIP | Purpose | PEAT Relevance |
 |-----|---------|----------------|
 | NIP-01 | Basic protocol flow | Event structure, filter syntax |
 | NIP-09 | Event deletion | Tombstone handling (ADR-034) |
@@ -168,16 +168,16 @@ NEG-ERR:  [subscription_id, reason]
 
 ## Decision
 
-### Adopt Nostr Patterns for HIVE
+### Adopt Nostr Patterns for PEAT
 
 #### 1. Event Structure Alignment
 
-Adopt a Nostr-compatible event structure as HIVE's base message format:
+Adopt a Nostr-compatible event structure as PEAT's base message format:
 
 ```rust
-/// HIVE Protocol Event (Nostr-compatible base)
+/// PEAT Protocol Event (Nostr-compatible base)
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct HiveEvent {
+pub struct PeatEvent {
     /// SHA-256 hash of serialized event data
     pub id: EventId,  // [u8; 32]
     
@@ -200,7 +200,7 @@ pub struct HiveEvent {
     pub sig: Signature,  // [u8; 64]
 }
 
-impl HiveEvent {
+impl PeatEvent {
     /// Compute event ID per Nostr spec
     pub fn compute_id(&self) -> EventId {
         let serialized = json!([
@@ -221,22 +221,22 @@ impl HiveEvent {
 }
 ```
 
-#### 2. HIVE Kind Registry
+#### 2. PEAT Kind Registry
 
-Define HIVE-specific event kinds in reserved ranges:
+Define PEAT-specific event kinds in reserved ranges:
 
 ```rust
-/// HIVE Protocol Kind Registry
+/// PEAT Protocol Kind Registry
 /// 
 /// Ranges:
 /// - 0-9999: Nostr standard kinds (reserved)
-/// - 10000-19999: HIVE core protocol
-/// - 20000-29999: HIVE integrations (TAK, Link 16, etc.)
+/// - 10000-19999: PEAT core protocol
+/// - 20000-29999: PEAT integrations (TAK, Link 16, etc.)
 /// - 30000-39999: Replaceable events (Nostr standard)
 /// - 40000-49999: Application-specific (user-defined)
 
 pub mod kinds {
-    // HIVE Core Protocol (10000-10999)
+    // PEAT Core Protocol (10000-10999)
     pub const CAPABILITY_REPORT: u16 = 10001;
     pub const CAPABILITY_AGGREGATE: u16 = 10002;
     pub const COMMAND_INTENT: u16 = 10003;
@@ -246,18 +246,18 @@ pub mod kinds {
     pub const SYNC_REQUEST: u16 = 10007;
     pub const SYNC_RESPONSE: u16 = 10008;
     
-    // HIVE Coordination (10100-10199)
+    // PEAT Coordination (10100-10199)
     pub const TASK_ASSIGNMENT: u16 = 10100;
     pub const TASK_STATUS: u16 = 10101;
     pub const RESOURCE_REQUEST: u16 = 10102;
     pub const RESOURCE_OFFER: u16 = 10103;
     
-    // HIVE AI/ML (10200-10299)
+    // PEAT AI/ML (10200-10299)
     pub const MODEL_CAPABILITY: u16 = 10200;
     pub const INFERENCE_REQUEST: u16 = 10201;
     pub const INFERENCE_RESULT: u16 = 10202;
     
-    // HIVE Security (10300-10399)
+    // PEAT Security (10300-10399)
     pub const KEY_ANNOUNCEMENT: u16 = 10300;
     pub const KEY_ROTATION: u16 = 10301;
     pub const ACCESS_GRANT: u16 = 10302;
@@ -278,7 +278,7 @@ pub mod kinds {
 Adopt the `h` tag pattern for hierarchical scoping:
 
 ```rust
-/// HIVE Hierarchical Scope Tags
+/// PEAT Hierarchical Scope Tags
 /// 
 /// Tag structure: ["h", "<echelon>/<unit-id>"]
 /// Examples:
@@ -312,7 +312,7 @@ impl HierarchyTag {
 }
 
 /// Filter events by hierarchical scope
-pub fn filter_by_scope(events: &[HiveEvent], scope: &HierarchyTag) -> Vec<&HiveEvent> {
+pub fn filter_by_scope(events: &[PeatEvent], scope: &HierarchyTag) -> Vec<&PeatEvent> {
     events.iter()
         .filter(|e| e.tags.iter().any(|t| {
             HierarchyTag::from_tag(t)
@@ -359,7 +359,7 @@ impl PreviousTag {
 }
 
 /// Builder for events with causal references
-impl HiveEvent {
+impl PeatEvent {
     pub fn with_previous(mut self, seen_events: &[EventId]) -> Self {
         let prev = PreviousTag::from_events(seen_events);
         self.tags.push(prev.to_tag());
@@ -442,7 +442,7 @@ impl NegentropySync {
 }
 
 /// Combined sync strategy
-pub struct HiveSyncEngine {
+pub struct PeatSyncEngine {
     /// Negentropy for event discovery
     negentropy: NegentropySync,
     
@@ -450,7 +450,7 @@ pub struct HiveSyncEngine {
     automerge: AutomergeSync,
 }
 
-impl HiveSyncEngine {
+impl PeatSyncEngine {
     /// Full sync sequence after partition
     pub async fn full_sync(&self, peer: NodeId) -> Result<SyncReport, SyncError> {
         // Phase 1: Event discovery via Negentropy
@@ -549,7 +549,7 @@ impl EventFilter {
     }
     
     /// Check if event matches filter
-    pub fn matches(&self, event: &HiveEvent) -> bool {
+    pub fn matches(&self, event: &PeatEvent) -> bool {
         // IDs filter
         if let Some(ids) = &self.ids {
             if !ids.contains(&event.id) {
@@ -609,9 +609,9 @@ impl EventFilter {
 
 ## Architectural Comparison
 
-### Nostr vs HIVE: Where They Diverge
+### Nostr vs PEAT: Where They Diverge
 
-| Aspect | Nostr | HIVE |
+| Aspect | Nostr | PEAT |
 |--------|-------|------|
 | **Problem Domain** | Censorship-resistant social | Real-time tactical coordination |
 | **Network Assumption** | Cloud relays always available | No cloud, contested comms |
@@ -636,11 +636,11 @@ The architectures address different constraints:
             │                           │
       ┌─────┴─────┐               ┌─────┴─────┐
       │           │               │           │
-   Nostr      Federation      HIVE-Full   HIVE-Lite
+   Nostr      Federation      PEAT-Full   PEAT-Lite
    Relays     (Mastodon)      (Platoon+)  (Wearables)
 ```
 
-HIVE's hierarchical aggregation is what Nostr would need if relays disappeared and nodes had to form their own coordination structure.
+PEAT's hierarchical aggregation is what Nostr would need if relays disappeared and nodes had to form their own coordination structure.
 
 ---
 
@@ -648,8 +648,8 @@ HIVE's hierarchical aggregation is what Nostr would need if relays disappeared a
 
 ### Phase 1: Event Format Adoption (Immediate)
 
-1. Update `hive-core` event structures to Nostr compatibility
-2. Implement kind registry with HIVE-specific ranges
+1. Update `peat-core` event structures to Nostr compatibility
+2. Implement kind registry with PEAT-specific ranges
 3. Add `h` tag parsing and scope filtering
 4. Validate events with Schnorr signatures
 
@@ -657,7 +657,7 @@ HIVE's hierarchical aggregation is what Nostr would need if relays disappeared a
 
 1. Integrate `rust-negentropy` crate
 2. Implement `NegentropySync` layer
-3. Add to `HiveSyncEngine` as discovery phase
+3. Add to `PeatSyncEngine` as discovery phase
 4. Benchmark vs pure Automerge sync
 
 ### Phase 3: Filter Optimization (Q2 2026)
@@ -670,9 +670,9 @@ HIVE's hierarchical aggregation is what Nostr would need if relays disappeared a
 ### Phase 4: Interoperability Testing (Q3 2026)
 
 1. Test Nostr client connectivity (read-only)
-2. Evaluate hybrid Nostr/HIVE scenarios
+2. Evaluate hybrid Nostr/PEAT scenarios
 3. Document interop limitations
-4. Consider Nostr relay mode for HIVE nodes
+4. Consider Nostr relay mode for PEAT nodes
 
 ---
 
@@ -729,7 +729,7 @@ HIVE's hierarchical aggregation is what Nostr would need if relays disappeared a
 - ADR-021: Document-Oriented Architecture
 - ADR-027: Event Routing and Aggregation Protocol
 - ADR-034: Record Deletion and Tombstone Management
-- ADR-035: HIVE-Lite Embedded Nodes
+- ADR-035: PEAT-Lite Embedded Nodes
 
 ---
 
@@ -739,7 +739,7 @@ Per Nostr specification, event ID is computed from UTF-8 JSON serialization:
 
 ```rust
 /// Canonical event serialization for ID computation
-fn serialize_for_id(event: &HiveEvent) -> String {
+fn serialize_for_id(event: &PeatEvent) -> String {
     // Array format: [0, pubkey, created_at, kind, tags, content]
     let arr = json!([
         0,
@@ -755,7 +755,7 @@ fn serialize_for_id(event: &HiveEvent) -> String {
 }
 
 /// Compute event ID
-fn compute_event_id(event: &HiveEvent) -> [u8; 32] {
+fn compute_event_id(event: &PeatEvent) -> [u8; 32] {
     let serialized = serialize_for_id(event);
     sha256(serialized.as_bytes())
 }
@@ -786,9 +786,9 @@ Fingerprint computation:
 
 ---
 
-## Appendix C: HIVE vs Nostr Tag Mapping
+## Appendix C: PEAT vs Nostr Tag Mapping
 
-| Nostr Tag | HIVE Usage | Example |
+| Nostr Tag | PEAT Usage | Example |
 |-----------|------------|---------|
 | `e` | Reference to event | `["e", "<event-id>"]` |
 | `p` | Reference to pubkey/node | `["p", "<node-pubkey>"]` |
@@ -797,18 +797,18 @@ Fingerprint computation:
 | `d` | Unique identifier (replaceable) | `["d", "capability-summary"]` |
 | `previous` | Causal reference | `["previous", "<id-prefix>", ...]` |
 | `expiration` | TTL timestamp | `["expiration", "1702656000"]` |
-| `echelon` | HIVE-specific: echelon level | `["echelon", "squad"]` |
-| `capability` | HIVE-specific: capability type | `["capability", "isr", "sigint"]` |
+| `echelon` | PEAT-specific: echelon level | `["echelon", "squad"]` |
+| `capability` | PEAT-specific: capability type | `["capability", "isr", "sigint"]` |
 
 ---
 
 ## Appendix D: Community Reception Analysis
 
-The [Hacker News discussion](https://news.ycombinator.com/item?id=46225803) (December 2025) of Brander's article surfaced several critiques that validate HIVE's architectural choices.
+The [Hacker News discussion](https://news.ycombinator.com/item?id=46225803) (December 2025) of Brander's article surfaced several critiques that validate PEAT's architectural choices.
 
 ### Key Critiques and Responses
 
-| Critique | Nostr Response | HIVE Response |
+| Critique | Nostr Response | PEAT Response |
 |----------|----------------|---------------|
 | Centralization inevitable | Accept it, users choose relays | Structure it via designed hierarchy |
 | "Relays don't actually relay" | Clients push to multiple relays | Echelon nodes actively aggregate and forward |
@@ -823,43 +823,43 @@ The [Hacker News discussion](https://news.ycombinator.com/item?id=46225803) (Dec
 **On relays not relaying** (treyd):
 > "If you and another party aren't using the same relay, there is 0 way for you to interact... The protocol explicitly forbids relays from forwarding to each other."
 
-*HIVE insight*: This validates active coordination. Nostr punts message flow to clients; HIVE explicitly defines information flow through echelon nodes.
+*PEAT insight*: This validates active coordination. Nostr punts message flow to clients; PEAT explicitly defines information flow through echelon nodes.
 
 **On inevitable centralization** (treyd):
 > "Email is currently more decentralized than Nostr is in practice."
 
-*HIVE insight*: Networks centralize due to physics. The question is whether centralization is emergent/unplanned (Nostr) or designed/accountable (HIVE hierarchy).
+*PEAT insight*: Networks centralize due to physics. The question is whether centralization is emergent/unplanned (Nostr) or designed/accountable (PEAT hierarchy).
 
 **On protocol simplicity vs robustness** (treyd):
 > "Nostr is a very simple protocol that could have been invented in essence in 1995. There's a reason it wasn't invented until recently, because it's difficult to build *robust* protocols with good guarantees about discoverability and reliability with a foundation that is as limited as it is."
 
-*HIVE insight*: This captures the fundamental tradeoff. Nostr optimizes for simplicity in connected environments. HIVE accepts complexity cost to provide robustness guarantees in contested environments.
+*PEAT insight*: This captures the fundamental tradeoff. Nostr optimizes for simplicity in connected environments. PEAT accepts complexity cost to provide robustness guarantees in contested environments.
 
 **On key management** (rglullis):
 > "Nostr will always be a fringe network. The normies do not want to manage their own keys... What happens if you lose the cryptographic key to your nostr account? Who do you call for help?"
 
-*HIVE insight*: Less relevant for military/industrial use cases where devices have HSMs, key provisioning is part of deployment, and recovery involves issuing new credentials through existing C2. Trained operators, not "normies."
+*PEAT insight*: Less relevant for military/industrial use cases where devices have HSMs, key provisioning is part of deployment, and recovery involves issuing new credentials through existing C2. Trained operators, not "normies."
 
 **On moderation as sewage filtering** (bflesch):
 > "Their statement underlines the fact that nostr is a stream of dirty sewage and they want users to submit their valuable user-created content into this sewage."
 
-*HIVE insight*: Military hierarchies *are* moderation systems. Classification levels, need-to-know, commander's authority—content moderation by another name. Hierarchical scoping provides natural boundaries.
+*PEAT insight*: Military hierarchies *are* moderation systems. Classification levels, need-to-know, commander's authority—content moderation by another name. Hierarchical scoping provides natural boundaries.
 
 **On incentives** (wmf):
 > "I'm also not aware of any incentives for the relay operators either."
 
-*HIVE insight*: Military systems don't need economic incentives—they have mission requirements. The squad leader runs the squad node because that's their job, not because they get paid per message.
+*PEAT insight*: Military systems don't need economic incentives—they have mission requirements. The squad leader runs the squad node because that's their job, not because they get paid per message.
 
 ### The Outbox Model Defense
 
 Nostr advocates (shark_laser) cite the "outbox model" as solving discovery:
 > "You post to your own preferred relays, as well as to the preferred relays of others who are involved in the conversation, as well as to a couple of global relays for easy discoverability."
 
-This parallels HIVE's capability advertisement (ADR-018)—nodes announce authoritative data sources. The difference: HIVE aggregates at each echelon, so consumers query the squad node rather than every squad member.
+This parallels PEAT's capability advertisement (ADR-018)—nodes announce authoritative data sources. The difference: PEAT aggregates at each echelon, so consumers query the squad node rather than every squad member.
 
 ### Strategic Positioning
 
-| Dimension | Nostr | HIVE |
+| Dimension | Nostr | PEAT |
 |-----------|-------|------|
 | Optimization target | Simplicity | Robustness |
 | Environment assumption | Cloud available | Contested, disconnected |
@@ -868,7 +868,7 @@ This parallels HIVE's capability advertisement (ADR-018)—nodes announce author
 | Moderation model | User filtering | Hierarchical scope (OPSEC) |
 | Incentive model | Economic (Zaps) | Mission requirement |
 
-**Summary**: Nostr and HIVE solve different problems. Nostr provides censorship resistance for social media in connected environments. HIVE provides coordination robustness for human-machine teams in contested environments. The HN critiques of Nostr largely don't apply to HIVE's domain, while validating HIVE's choice to accept architectural complexity for operational guarantees.
+**Summary**: Nostr and PEAT solve different problems. Nostr provides censorship resistance for social media in connected environments. PEAT provides coordination robustness for human-machine teams in contested environments. The HN critiques of Nostr largely don't apply to PEAT's domain, while validating PEAT's choice to accept architectural complexity for operational guarantees.
 
 ---
 

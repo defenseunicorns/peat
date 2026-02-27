@@ -1,6 +1,6 @@
-# Contributing to HIVE Protocol
+# Contributing to PEAT Protocol
 
-Thank you for your interest in contributing to the HIVE Protocol! This document provides guidelines for contributing to both the specification and the reference implementation.
+Thank you for your interest in contributing to the PEAT Protocol! This document provides guidelines for contributing to both the specification and the reference implementation.
 
 ## Table of Contents
 
@@ -40,7 +40,7 @@ Thank you for your interest in contributing to the HIVE Protocol! This document 
 
 - **Review specification**: Check for ambiguity, inconsistency
 - **Suggest clarifications**: Where is the spec unclear?
-- **Alignment**: How does HIVE relate to existing standards?
+- **Alignment**: How does PEAT relate to existing standards?
 
 ---
 
@@ -49,8 +49,8 @@ Thank you for your interest in contributing to the HIVE Protocol! This document 
 ### 1. Fork and Clone
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/hive.git
-cd hive
+git clone https://github.com/YOUR_USERNAME/peat.git
+cd peat
 ```
 
 ### 2. Set Up Development Environment
@@ -97,7 +97,7 @@ Specification content lives in `/spec/`:
 
 ```
 spec/
-├── draft-hive-protocol-00.md   # Main specification
+├── draft-peat-protocol-00.md   # Main specification
 ├── proto/                       # Protocol Buffer definitions
 │   └── cap/v1/*.proto
 └── README.md
@@ -147,12 +147,12 @@ Use requirement keywords correctly:
 ### Repository Structure
 
 ```
-hive/
+peat/
 ├── spec/                    # Normative specification (CC0/CC BY)
 ├── reference/               # Reference implementation (MIT/Apache-2.0)
 │   └── rust/
-│       ├── hive-protocol/   # Core library
-│       ├── hive-mesh/       # Mesh management
+│       ├── peat-protocol/   # Core library
+│       ├── peat-mesh/       # Mesh management
 │       └── ...
 ├── tools/                   # Utilities and testing tools
 ├── labs/                    # Experiments
@@ -298,4 +298,4 @@ If including third-party code:
 - **GitHub Discussions**: For open-ended discussion
 - **Email**: kit@revolveteam.com
 
-Welcome to the HIVE community!
+Welcome to the PEAT community!

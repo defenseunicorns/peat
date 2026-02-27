@@ -1,0 +1,879 @@
+//! Iroh mesh transport implementation
+//!
+//! This module provides a `MeshTransport` implementation backed by Iroh's QUIC transport.
+//! It integrates with static peer configuration for discovery and manages NodeId ↔ EndpointId mapping.
+//!
+//! ## Features
+//!
+//! - **Connection Liveness Detection (Issue #251)**: Uses QUIC `close_reason()` to detect disconnected peers
+//! - **Peer Events (Issue #252)**: Emits `PeerEvent` notifications on connect/disconnect
+//! - **Connection Health**: Tracks connection establishment time and disconnect reasons
+
+use super::capabilities::{Transport, TransportCapabilities};
+use super::health::{HealthMonitor, HeartbeatConfig};
+use super::reconnection::{ReconnectionManager, ReconnectionPolicy};
+use super::{
+    ConnectionHealth, DisconnectReason, MeshConnection, MeshTransport, NodeId, PeerEvent,
+    PeerEventReceiver, PeerEventSender, Result, TransportError, PEER_EVENT_CHANNEL_CAPACITY,
+};
+use crate::network::iroh_transport::IrohTransport;
+use crate::network::peer_config::PeerConfig;
+use async_trait::async_trait;
+use iroh::endpoint::Connection;
+use iroh::EndpointId;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
+use tokio::sync::mpsc;
+use tracing::{debug, info, warn};
+
+/// Iroh-based mesh transport implementation
+///
+/// Wraps `IrohTransport` to provide the `MeshTransport` interface with:
+/// - NodeId ↔ EndpointId mapping for discovery
+/// - Static peer configuration integration
+/// - Connection lifecycle management
+///
+/// # Example
+///
+/// ```ignore
+/// use peat_protocol::transport::iroh::IrohMeshTransport;
+/// use peat_protocol::network::peer_config::PeerConfig;
+/// use peat_protocol::network::iroh_transport::IrohTransport;
+///
+/// let iroh_transport = Arc::new(IrohTransport::new().await?);
+/// let peer_config = PeerConfig::from_file("peers.toml")?;
+/// let mesh_transport = IrohMeshTransport::new(iroh_transport, peer_config);
+///
+/// mesh_transport.start().await?;
+/// ```
+/// Default interval for stale peer cleanup (Issue #244)
+pub const DEFAULT_CLEANUP_INTERVAL: Duration = Duration::from_secs(5);
+
+pub struct IrohMeshTransport {
+    /// Underlying Iroh transport
+    transport: Arc<IrohTransport>,
+
+    /// Static peer configuration (for discovery)
+    peer_config: Arc<RwLock<PeerConfig>>,
+
+    /// NodeId → EndpointId mapping (for discovery)
+    node_to_endpoint: Arc<RwLock<HashMap<NodeId, EndpointId>>>,
+
+    /// EndpointId → NodeId mapping (for incoming connections)
+    endpoint_to_node: Arc<RwLock<HashMap<EndpointId, NodeId>>>,
+
+    /// Connections by NodeId
+    connections: Arc<RwLock<HashMap<NodeId, IrohMeshConnection>>>,
+
+    /// Event broadcaster for peer events (Issue #252)
+    /// Multiple receivers can subscribe via subscribe_peer_events()
+    event_senders: Arc<RwLock<Vec<PeerEventSender>>>,
+
+    /// Whether the cleanup task is running (Issue #244)
+    cleanup_running: Arc<AtomicBool>,
+
+    /// Cleanup interval
+    cleanup_interval: Duration,
+
+    /// Reconnection manager (Issue #253)
+    reconnection: Arc<RwLock<ReconnectionManager>>,
+
+    /// Track which peers are from static config (vs discovered)
+    static_peers: Arc<RwLock<std::collections::HashSet<NodeId>>>,
+
+    /// Health monitor for connection health tracking (Issue #254)
+    health_monitor: Arc<HealthMonitor>,
+
+    /// Transport capabilities (Issue #255)
+    capabilities: TransportCapabilities,
+}
+
+impl IrohMeshTransport {
+    /// Create a new Iroh mesh transport
+    ///
+    /// # Arguments
+    ///
+    /// * `transport` - Underlying IrohTransport
+    /// * `peer_config` - Static peer configuration for discovery
+    pub fn new(transport: Arc<IrohTransport>, peer_config: PeerConfig) -> Self {
+        Self::with_cleanup_interval(transport, peer_config, DEFAULT_CLEANUP_INTERVAL)
+    }
+
+    /// Create a new Iroh mesh transport with custom cleanup interval
+    ///
+    /// # Arguments
+    ///
+    /// * `transport` - Underlying IrohTransport
+    /// * `peer_config` - Static peer configuration for discovery
+    /// * `cleanup_interval` - Interval for stale peer cleanup
+    pub fn with_cleanup_interval(
+        transport: Arc<IrohTransport>,
+        peer_config: PeerConfig,
+        cleanup_interval: Duration,
+    ) -> Self {
+        Self::with_reconnection_policy(
+            transport,
+            peer_config,
+            cleanup_interval,
+            ReconnectionPolicy::default(),
+        )
+    }
+
+    /// Create a new Iroh mesh transport with full configuration
+    ///
+    /// # Arguments
+    ///
+    /// * `transport` - Underlying IrohTransport
+    /// * `peer_config` - Static peer configuration for discovery
+    /// * `cleanup_interval` - Interval for stale peer cleanup
+    /// * `reconnection_policy` - Policy for automatic reconnection (Issue #253)
+    pub fn with_reconnection_policy(
+        transport: Arc<IrohTransport>,
+        peer_config: PeerConfig,
+        cleanup_interval: Duration,
+        reconnection_policy: ReconnectionPolicy,
+    ) -> Self {
+        Self::with_full_config(
+            transport,
+            peer_config,
+            cleanup_interval,
+            reconnection_policy,
+            HeartbeatConfig::default(),
+        )
+    }
+
+    /// Create a new Iroh mesh transport with full configuration including health monitoring
+    ///
+    /// # Arguments
+    ///
+    /// * `transport` - Underlying IrohTransport
+    /// * `peer_config` - Static peer configuration for discovery
+    /// * `cleanup_interval` - Interval for stale peer cleanup
+    /// * `reconnection_policy` - Policy for automatic reconnection (Issue #253)
+    /// * `heartbeat_config` - Configuration for health monitoring (Issue #254)
+    pub fn with_full_config(
+        transport: Arc<IrohTransport>,
+        peer_config: PeerConfig,
+        cleanup_interval: Duration,
+        reconnection_policy: ReconnectionPolicy,
+        heartbeat_config: HeartbeatConfig,
+    ) -> Self {
+        Self {
+            transport,
+            peer_config: Arc::new(RwLock::new(peer_config)),
+            node_to_endpoint: Arc::new(RwLock::new(HashMap::new())),
+            endpoint_to_node: Arc::new(RwLock::new(HashMap::new())),
+            connections: Arc::new(RwLock::new(HashMap::new())),
+            event_senders: Arc::new(RwLock::new(Vec::new())),
+            cleanup_running: Arc::new(AtomicBool::new(false)),
+            cleanup_interval,
+            reconnection: Arc::new(RwLock::new(ReconnectionManager::new(reconnection_policy))),
+            static_peers: Arc::new(RwLock::new(std::collections::HashSet::new())),
+            health_monitor: Arc::new(HealthMonitor::new(heartbeat_config)),
+            capabilities: TransportCapabilities::quic(),
+        }
+    }
+
+    /// Get the health monitor for this transport
+    pub fn health_monitor(&self) -> &Arc<HealthMonitor> {
+        &self.health_monitor
+    }
+
+    /// Emit a peer event to all subscribers (Issue #252)
+    ///
+    /// Non-blocking: if a subscriber's channel is full, the event is dropped for that subscriber.
+    /// Dead channels are automatically removed.
+    fn emit_event(&self, event: PeerEvent) {
+        let mut senders = self.event_senders.write().unwrap();
+
+        // Remove closed channels and send to remaining
+        senders.retain(|sender| {
+            match sender.try_send(event.clone()) {
+                Ok(()) => true,
+                Err(mpsc::error::TrySendError::Full(_)) => {
+                    warn!(
+                        "Peer event channel full, dropping event for one subscriber: {:?}",
+                        event
+                    );
+                    true // Keep the channel, just couldn't send this time
+                }
+                Err(mpsc::error::TrySendError::Closed(_)) => {
+                    debug!("Peer event subscriber disconnected, removing channel");
+                    false // Remove dead channel
+                }
+            }
+        });
+    }
+
+    /// Clean up dead connections and emit disconnect events (Issue #251 + #252)
+    ///
+    /// This should be called periodically to detect disconnected peers.
+    pub fn cleanup_dead_connections(&self) {
+        let mut connections = self.connections.write().unwrap();
+        let dead_peers: Vec<_> = connections
+            .iter()
+            .filter(|(_, conn)| !conn.is_alive())
+            .map(|(id, conn)| (id.clone(), conn.disconnect_reason(), conn.connected_at()))
+            .collect();
+
+        for (peer_id, reason, connected_at) in dead_peers {
+            connections.remove(&peer_id);
+
+            let event = PeerEvent::Disconnected {
+                peer_id: peer_id.clone(),
+                reason: reason.unwrap_or(DisconnectReason::Unknown),
+                connection_duration: connected_at.elapsed(),
+            };
+
+            debug!("Peer {} disconnected: {:?}", peer_id, event);
+            self.emit_event(event);
+        }
+    }
+
+    /// Register a peer (NodeId → EndpointId mapping)
+    ///
+    /// This is called during discovery to map node IDs to Iroh endpoint IDs.
+    /// Used by both static config and future mDNS discovery.
+    pub fn register_peer(&self, node_id: NodeId, endpoint_id: EndpointId) {
+        self.node_to_endpoint
+            .write()
+            .unwrap()
+            .insert(node_id.clone(), endpoint_id);
+        self.endpoint_to_node
+            .write()
+            .unwrap()
+            .insert(endpoint_id, node_id);
+    }
+
+    /// Get NodeId from EndpointId (for incoming connections)
+    pub fn get_node_id(&self, endpoint_id: &EndpointId) -> Option<NodeId> {
+        self.endpoint_to_node
+            .read()
+            .unwrap()
+            .get(endpoint_id)
+            .cloned()
+    }
+
+    /// Get EndpointId from NodeId (for outgoing connections)
+    pub fn get_endpoint_id(&self, node_id: &NodeId) -> Option<EndpointId> {
+        self.node_to_endpoint.read().unwrap().get(node_id).copied()
+    }
+
+    /// Get the underlying IrohTransport
+    pub fn transport(&self) -> &Arc<IrohTransport> {
+        &self.transport
+    }
+
+    /// Start the background cleanup and reconnection task (Issue #244 + #253)
+    ///
+    /// This spawns a task that periodically:
+    /// 1. Checks for dead connections and emits disconnect events
+    /// 2. Schedules static peers for reconnection
+    /// 3. Attempts due reconnections with exponential backoff
+    fn start_cleanup_task(&self) {
+        if self
+            .cleanup_running
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            // Already running
+            return;
+        }
+
+        let connections = Arc::clone(&self.connections);
+        let event_senders = Arc::clone(&self.event_senders);
+        let cleanup_running = Arc::clone(&self.cleanup_running);
+        let interval = self.cleanup_interval;
+        let reconnection = Arc::clone(&self.reconnection);
+        let static_peers = Arc::clone(&self.static_peers);
+        let transport = Arc::clone(&self.transport);
+        let peer_config = Arc::clone(&self.peer_config);
+        let health_monitor = Arc::clone(&self.health_monitor);
+
+        tokio::spawn(async move {
+            info!(
+                "Started peer cleanup/reconnection task with interval {:?}",
+                interval
+            );
+
+            // Helper to emit events
+            let emit_event = |event: PeerEvent, senders: &Arc<RwLock<Vec<PeerEventSender>>>| {
+                let mut senders = senders.write().unwrap();
+                senders.retain(|sender| match sender.try_send(event.clone()) {
+                    Ok(()) => true,
+                    Err(mpsc::error::TrySendError::Full(_)) => true,
+                    Err(mpsc::error::TrySendError::Closed(_)) => false,
+                });
+            };
+
+            while cleanup_running.load(Ordering::SeqCst) {
+                tokio::time::sleep(interval).await;
+
+                if !cleanup_running.load(Ordering::SeqCst) {
+                    break;
+                }
+
+                // Phase 1: Check for dead connections
+                let dead_peers: Vec<_> = {
+                    let conns = connections.read().unwrap();
+                    conns
+                        .iter()
+                        .filter(|(_, conn)| !conn.is_alive())
+                        .map(|(id, conn)| {
+                            (id.clone(), conn.disconnect_reason(), conn.connected_at())
+                        })
+                        .collect()
+                };
+
+                // Remove dead connections, emit events, schedule reconnection
+                if !dead_peers.is_empty() {
+                    let mut conns = connections.write().unwrap();
+                    let static_set = static_peers.read().unwrap();
+                    let mut recon = reconnection.write().unwrap();
+
+                    for (peer_id, reason, connected_at) in dead_peers {
+                        conns.remove(&peer_id);
+
+                        // Stop health monitoring for dead peer (Issue #254)
+                        health_monitor.stop_monitoring(&peer_id);
+
+                        let event = PeerEvent::Disconnected {
+                            peer_id: peer_id.clone(),
+                            reason: reason.unwrap_or(DisconnectReason::Unknown),
+                            connection_duration: connected_at.elapsed(),
+                        };
+
+                        debug!("Cleanup: Peer {} disconnected: {:?}", peer_id, event);
+                        emit_event(event, &event_senders);
+
+                        // Schedule reconnection for static peers (Issue #253)
+                        let is_static = static_set.contains(&peer_id);
+                        if is_static {
+                            recon.schedule_reconnect(peer_id.clone(), true);
+                            debug!("Scheduled reconnection for static peer: {}", peer_id);
+                        }
+                    }
+                }
+
+                // Phase 2: Check health timeouts (Issue #254)
+                // This detects peers that have stopped responding to heartbeats
+                let newly_dead_from_health: Vec<NodeId> = health_monitor.check_timeouts();
+                for peer_id in newly_dead_from_health {
+                    // If health monitor declares peer dead, we should disconnect
+                    // The connection cleanup above will handle it on next iteration
+                    // But we can proactively schedule reconnection for static peers
+                    let is_static = static_peers.read().unwrap().contains(&peer_id);
+                    if is_static {
+                        let mut recon = reconnection.write().unwrap();
+                        recon.schedule_reconnect(peer_id.clone(), true);
+                        debug!(
+                            "Health monitor detected dead peer, scheduling reconnection: {}",
+                            peer_id
+                        );
+                    }
+                }
+
+                // Phase 3: Attempt due reconnections (Issue #253)
+                let due_peers: Vec<NodeId> = {
+                    let recon = reconnection.read().unwrap();
+                    if !recon.is_enabled() {
+                        continue;
+                    }
+                    recon.due_reconnections()
+                };
+
+                for peer_id in due_peers {
+                    // Get current attempt info
+                    let (attempt, max_attempts) = {
+                        let recon = reconnection.read().unwrap();
+                        let state = recon.get_state(&peer_id);
+                        let attempt = state.map(|s| s.attempts + 1).unwrap_or(1);
+                        let max = recon.policy().max_retries;
+                        (attempt, max)
+                    };
+
+                    // Emit reconnecting event
+                    emit_event(
+                        PeerEvent::Reconnecting {
+                            peer_id: peer_id.clone(),
+                            attempt,
+                            max_attempts,
+                        },
+                        &event_senders,
+                    );
+
+                    // Try to reconnect
+                    let peer_info_opt = {
+                        let config = peer_config.read().unwrap();
+                        config
+                            .peers
+                            .iter()
+                            .find(|p| p.name == peer_id.as_str())
+                            .cloned()
+                    };
+
+                    let result = if let Some(peer_info) = peer_info_opt {
+                        transport.connect_peer(&peer_info).await
+                    } else {
+                        Err(anyhow::anyhow!("Peer not found in config: {}", peer_id))
+                    };
+
+                    match result {
+                        Ok(Some(conn)) => {
+                            // Success - new connection established
+                            let connected_at = Instant::now();
+                            let mesh_conn =
+                                IrohMeshConnection::new(peer_id.clone(), conn, connected_at);
+                            connections
+                                .write()
+                                .unwrap()
+                                .insert(peer_id.clone(), mesh_conn);
+                            reconnection.write().unwrap().reconnected(&peer_id);
+
+                            // Start health monitoring for reconnected peer (Issue #254)
+                            health_monitor.start_monitoring(peer_id.clone());
+
+                            info!("Reconnected to peer: {} (attempt {})", peer_id, attempt);
+                            emit_event(
+                                PeerEvent::Connected {
+                                    peer_id: peer_id.clone(),
+                                    connected_at,
+                                },
+                                &event_senders,
+                            );
+                        }
+                        Ok(None) => {
+                            // Accept path is handling connection
+                            reconnection.write().unwrap().reconnected(&peer_id);
+                            debug!("Reconnection to {} handled by accept path", peer_id);
+                        }
+                        Err(e) => {
+                            let error_msg = e.to_string();
+                            let will_retry = {
+                                let mut recon = reconnection.write().unwrap();
+                                let will_retry = recon.failed(&peer_id, error_msg.clone());
+                                if !will_retry {
+                                    recon.remove(&peer_id);
+                                }
+                                will_retry
+                            };
+
+                            warn!(
+                                "Reconnection to {} failed (attempt {}): {} - will_retry={}",
+                                peer_id, attempt, error_msg, will_retry
+                            );
+
+                            emit_event(
+                                PeerEvent::ReconnectFailed {
+                                    peer_id: peer_id.clone(),
+                                    attempt,
+                                    error: error_msg,
+                                    will_retry,
+                                },
+                                &event_senders,
+                            );
+                        }
+                    }
+                }
+            }
+
+            info!("Stopped peer cleanup/reconnection task");
+        });
+    }
+
+    /// Stop the background cleanup task
+    fn stop_cleanup_task(&self) {
+        self.cleanup_running.store(false, Ordering::SeqCst);
+    }
+}
+
+#[async_trait]
+impl MeshTransport for IrohMeshTransport {
+    async fn start(&self) -> Result<()> {
+        // Start Iroh accept loop
+        self.transport
+            .start_accept_loop()
+            .map_err(|e| TransportError::ConnectionFailed(e.to_string()))?;
+
+        // Load static peer config and register peers
+        let config = self.peer_config.read().unwrap();
+        let mut static_peers = self.static_peers.write().unwrap();
+        for peer_info in &config.peers {
+            let node_id = NodeId::new(peer_info.name.clone());
+            if let Ok(endpoint_id) = peer_info.endpoint_id() {
+                self.register_peer(node_id.clone(), endpoint_id);
+                // Mark as static peer for reconnection (Issue #253)
+                static_peers.insert(node_id);
+            }
+        }
+        drop(static_peers);
+
+        // Start background cleanup task (Issue #244)
+        self.start_cleanup_task();
+
+        Ok(())
+    }
+
+    async fn stop(&self) -> Result<()> {
+        // Stop cleanup task first (Issue #244)
+        self.stop_cleanup_task();
+
+        // Stop accept loop
+        self.transport
+            .stop_accept_loop()
+            .map_err(|e| TransportError::ConnectionFailed(e.to_string()))?;
+
+        // Clear health monitoring (Issue #254)
+        self.health_monitor.clear();
+
+        // Close all connections
+        let connections = self
+            .connections
+            .write()
+            .unwrap()
+            .drain()
+            .collect::<Vec<_>>();
+        for (_node_id, _conn) in connections {
+            // Connections will be closed when dropped
+        }
+
+        Ok(())
+    }
+
+    async fn connect(&self, peer_id: &NodeId) -> Result<Box<dyn MeshConnection>> {
+        // Check if already connected and still alive
+        if let Some(conn) = self.get_connection(peer_id) {
+            if conn.is_alive() {
+                return Ok(conn);
+            }
+            // Connection exists but is dead - clean it up first
+            debug!("Existing connection to {} is dead, reconnecting", peer_id);
+            self.cleanup_dead_connections();
+        }
+
+        // Resolve NodeId → EndpointId
+        let _endpoint_id = self
+            .node_to_endpoint
+            .read()
+            .unwrap()
+            .get(peer_id)
+            .copied()
+            .ok_or_else(|| TransportError::PeerNotFound(peer_id.as_str().to_string()))?;
+
+        // Get peer info from static config
+        let peer_info = {
+            let config = self.peer_config.read().unwrap();
+            config
+                .peers
+                .iter()
+                .find(|p| p.name == peer_id.as_str())
+                .cloned()
+                .ok_or_else(|| TransportError::PeerNotFound(peer_id.as_str().to_string()))?
+        };
+
+        // Connect using IrohTransport (conflict resolution handled by transport layer)
+        let conn_opt = self
+            .transport
+            .connect_peer(&peer_info)
+            .await
+            .map_err(|e| TransportError::ConnectionFailed(e.to_string()))?;
+
+        match conn_opt {
+            Some(conn) => {
+                // New connection - wrap in MeshConnection and store
+                let connected_at = Instant::now();
+                let mesh_conn = IrohMeshConnection::new(peer_id.clone(), conn, connected_at);
+                self.connections
+                    .write()
+                    .unwrap()
+                    .insert(peer_id.clone(), mesh_conn.clone());
+
+                // Start health monitoring for this peer (Issue #254)
+                self.health_monitor.start_monitoring(peer_id.clone());
+
+                // Emit connected event (Issue #252)
+                self.emit_event(PeerEvent::Connected {
+                    peer_id: peer_id.clone(),
+                    connected_at,
+                });
+
+                debug!("Connected to peer: {}", peer_id);
+                Ok(Box::new(mesh_conn))
+            }
+            None => {
+                // Accept path is handling - check if connection exists
+                self.connections
+                    .read()
+                    .unwrap()
+                    .get(peer_id)
+                    .cloned()
+                    .map(|c| Box::new(c) as Box<dyn MeshConnection>)
+                    .ok_or_else(|| {
+                        TransportError::ConnectionFailed(
+                            "Connection being handled by accept path".to_string(),
+                        )
+                    })
+            }
+        }
+    }
+
+    async fn disconnect(&self, peer_id: &NodeId) -> Result<()> {
+        // Remove connection from map
+        if let Some(conn) = self.connections.write().unwrap().remove(peer_id) {
+            // Stop health monitoring (Issue #254)
+            self.health_monitor.stop_monitoring(peer_id);
+
+            // Emit disconnect event (Issue #252)
+            let event = PeerEvent::Disconnected {
+                peer_id: peer_id.clone(),
+                reason: DisconnectReason::LocalClosed,
+                connection_duration: conn.connected_at().elapsed(),
+            };
+            debug!("Disconnected from peer: {}", peer_id);
+            self.emit_event(event);
+            // Connection will be closed when dropped
+        }
+        Ok(())
+    }
+
+    fn get_connection(&self, peer_id: &NodeId) -> Option<Box<dyn MeshConnection>> {
+        self.connections
+            .read()
+            .unwrap()
+            .get(peer_id)
+            .cloned()
+            .map(|c| Box::new(c) as Box<dyn MeshConnection>)
+    }
+
+    fn peer_count(&self) -> usize {
+        self.connections.read().unwrap().len()
+    }
+
+    fn connected_peers(&self) -> Vec<NodeId> {
+        self.connections.read().unwrap().keys().cloned().collect()
+    }
+
+    fn subscribe_peer_events(&self) -> PeerEventReceiver {
+        let (tx, rx) = mpsc::channel(PEER_EVENT_CHANNEL_CAPACITY);
+        self.event_senders.write().unwrap().push(tx);
+        rx
+    }
+
+    fn get_peer_health(&self, peer_id: &NodeId) -> Option<ConnectionHealth> {
+        // Return health from the HealthMonitor if available
+        self.health_monitor.get_health(peer_id)
+    }
+}
+
+// =============================================================================
+// Transport Trait Implementation (Issue #255)
+// =============================================================================
+
+impl Transport for IrohMeshTransport {
+    fn capabilities(&self) -> &TransportCapabilities {
+        &self.capabilities
+    }
+
+    fn is_available(&self) -> bool {
+        // QUIC transport is always available when started
+        self.cleanup_running.load(Ordering::SeqCst)
+    }
+
+    fn signal_quality(&self) -> Option<u8> {
+        // QUIC over IP doesn't have a signal quality metric
+        // Could potentially use average RTT across connections as a proxy
+        None
+    }
+
+    fn can_reach(&self, peer_id: &NodeId) -> bool {
+        // Check if we have a mapping for this peer
+        // This means we know how to reach them (via static config or discovery)
+        self.node_to_endpoint.read().unwrap().contains_key(peer_id)
+    }
+}
+
+/// Iroh mesh connection implementation
+///
+/// Wraps an Iroh QUIC connection with the `MeshConnection` interface.
+///
+/// ## Liveness Detection (Issue #251)
+///
+/// Uses QUIC `close_reason()` to detect when a connection has been closed.
+/// A connection is alive if `close_reason()` returns `None`.
+#[derive(Clone)]
+pub struct IrohMeshConnection {
+    peer_id: NodeId,
+    connection: Connection,
+    /// When this connection was established
+    connected_at: Instant,
+}
+
+impl IrohMeshConnection {
+    /// Create a new Iroh mesh connection
+    pub fn new(peer_id: NodeId, connection: Connection, connected_at: Instant) -> Self {
+        Self {
+            peer_id,
+            connection,
+            connected_at,
+        }
+    }
+
+    /// Get the underlying Iroh connection
+    pub fn connection(&self) -> &Connection {
+        &self.connection
+    }
+
+    /// Parse QUIC close reason into our DisconnectReason
+    fn parse_close_reason(&self) -> Option<DisconnectReason> {
+        self.connection.close_reason().map(|reason| {
+            // Iroh's close_reason returns a quinn::ConnectionError
+            // We convert it to our DisconnectReason enum
+            let reason_str = reason.to_string();
+
+            if reason_str.contains("timeout") || reason_str.contains("idle") {
+                DisconnectReason::IdleTimeout
+            } else if reason_str.contains("reset") || reason_str.contains("closed") {
+                DisconnectReason::RemoteClosed
+            } else if reason_str.contains("application") {
+                DisconnectReason::ApplicationError(reason_str)
+            } else {
+                DisconnectReason::NetworkError(reason_str)
+            }
+        })
+    }
+}
+
+impl MeshConnection for IrohMeshConnection {
+    fn peer_id(&self) -> &NodeId {
+        &self.peer_id
+    }
+
+    /// Check if the connection is still alive (Issue #251)
+    ///
+    /// Uses QUIC's `close_reason()` to determine connection status.
+    /// Returns `true` if the connection is active, `false` if closed.
+    fn is_alive(&self) -> bool {
+        // Connection is alive if there's no close reason
+        // close_reason() returns Some(reason) when connection is closed
+        self.connection.close_reason().is_none()
+    }
+
+    fn connected_at(&self) -> Instant {
+        self.connected_at
+    }
+
+    fn disconnect_reason(&self) -> Option<DisconnectReason> {
+        self.parse_close_reason()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::network::peer_config::{LocalConfig, PeerInfo};
+    use std::net::SocketAddr;
+
+    #[tokio::test]
+    async fn test_iroh_mesh_transport_creation() {
+        let transport = Arc::new(IrohTransport::new().await.unwrap());
+        let peer_config = PeerConfig::empty();
+        let mesh_transport = IrohMeshTransport::new(transport, peer_config);
+
+        assert_eq!(mesh_transport.peer_count(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_peer_registration() {
+        let transport = Arc::new(IrohTransport::new().await.unwrap());
+        let peer_config = PeerConfig::empty();
+        let mesh_transport = IrohMeshTransport::new(transport.clone(), peer_config);
+
+        // Register a peer
+        let node_id = NodeId::new("test-node".to_string());
+        let endpoint_id = transport.endpoint_id();
+        mesh_transport.register_peer(node_id.clone(), endpoint_id);
+
+        // Verify mapping
+        assert_eq!(mesh_transport.get_endpoint_id(&node_id), Some(endpoint_id));
+        assert_eq!(mesh_transport.get_node_id(&endpoint_id), Some(node_id));
+    }
+
+    #[tokio::test]
+    async fn test_start_stop_lifecycle() {
+        let transport = Arc::new(IrohTransport::new().await.unwrap());
+        let peer_config = PeerConfig::empty();
+        let mesh_transport = IrohMeshTransport::new(transport.clone(), peer_config);
+
+        // Start
+        mesh_transport.start().await.unwrap();
+        assert!(transport.is_accept_loop_running());
+
+        // Stop
+        mesh_transport.stop().await.unwrap();
+        assert!(!transport.is_accept_loop_running());
+    }
+
+    #[tokio::test]
+    async fn test_connect_to_unknown_peer() {
+        let transport = Arc::new(IrohTransport::new().await.unwrap());
+        let peer_config = PeerConfig::empty();
+        let mesh_transport = IrohMeshTransport::new(transport, peer_config);
+
+        mesh_transport.start().await.unwrap();
+
+        // Try to connect to unknown peer
+        let unknown_peer = NodeId::new("unknown".to_string());
+        let result = mesh_transport.connect(&unknown_peer).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(TransportError::PeerNotFound(_)) => {}
+            _ => panic!("Expected PeerNotFound error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_disconnect() {
+        let transport = Arc::new(IrohTransport::new().await.unwrap());
+        let peer_config = PeerConfig::empty();
+        let mesh_transport = IrohMeshTransport::new(transport, peer_config);
+
+        mesh_transport.start().await.unwrap();
+
+        // Disconnect from non-existent peer should not error
+        let peer_id = NodeId::new("test".to_string());
+        let result = mesh_transport.disconnect(&peer_id).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_static_config_peer_registration() {
+        // Create transport
+        let bind_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let transport = Arc::new(IrohTransport::bind(bind_addr).await.unwrap());
+        let endpoint_id = transport.endpoint_id();
+
+        // Create config with one peer
+        let peer_config = PeerConfig {
+            local: LocalConfig::default(),
+            formation: None,
+            peers: vec![PeerInfo {
+                name: "test-peer".to_string(),
+                node_id: hex::encode(endpoint_id.as_bytes()),
+                addresses: vec!["127.0.0.1:9999".to_string()],
+                relay_url: None,
+            }],
+        };
+
+        let mesh_transport = IrohMeshTransport::new(transport, peer_config);
+
+        // Start should register peers from config
+        mesh_transport.start().await.unwrap();
+
+        // Verify peer was registered
+        let node_id = NodeId::new("test-peer".to_string());
+        assert_eq!(mesh_transport.get_endpoint_id(&node_id), Some(endpoint_id));
+    }
+}

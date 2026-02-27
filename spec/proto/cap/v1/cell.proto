@@ -1,8 +1,8 @@
-// HIVE Protocol - Cell Model
+// PEAT Protocol - Cell Model
 // Specification Version: 0.1.0
 // License: CC0 1.0 Universal (Public Domain)
 //
-// This file defines the cell (squad) model for HIVE Protocol.
+// This file defines the cell (squad) model for PEAT Protocol.
 // A Cell is a group of nodes that operate together, with a single leader.
 // Cells are the fundamental unit of hierarchical organization.
 

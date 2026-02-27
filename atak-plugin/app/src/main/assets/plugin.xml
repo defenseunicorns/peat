@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- HIVE Plugin registration for ATAK -->
+<!-- PEAT Plugin registration for ATAK -->
 <plugin>
 
     <extension
         type="gov.tak.api.plugin.IPlugin"
-        impl="com.revolveteam.atak.hive.HivePluginLifecycle"
+        impl="com.revolveteam.atak.peat.PeatPluginLifecycle"
         singleton="true" />
 
 </plugin>

@@ -1,0 +1,49 @@
+# PEAT-TAK Bridge Testing Environment
+# Spins up FreeTAKServer + UI for integration testing
+#
+# Usage:
+#   docker compose up -d        # Start FreeTAKServer + UI
+#   cargo run --package peat-tak-bridge -- --demo --verbose
+#   docker compose down         # Stop all
+#
+# Access:
+#   - WebTAK UI: http://localhost:5000
+#   - REST API: http://localhost:19023
+
+services:
+  freetakserver:
+    image: ghcr.io/freetakteam/freetakserver:latest
+    container_name: freetakserver
+    restart: unless-stopped
+    ports:
+      - "8080:8080"   # FTS Web
+      - "8087:8087"   # CoT TCP (plain)
+      - "8089:8089"   # CoT SSL
+      - "8443:8443"   # Web SSL
+      - "19023:19023" # REST API
+    environment:
+      FTS_DP_ADDRESS: "0.0.0.0"
+      FTS_COT_PORT: "8087"
+      FTS_SSLCOT_PORT: "8089"
+      FTS_SAVE_COT_TO_DB: "True"
+    volumes:
+      - fts_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  ui:
+    image: ghcr.io/freetakteam/ui:latest
+    container_name: freetakserver-ui
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      FTS_IP: "127.0.0.1"
+      FTS_API_PORT: "19023"
+      FTS_COT_PORT: "8087"
+
+volumes:
+  fts_data:

@@ -1,6 +1,6 @@
-# HIVE Protocol Examples
+# PEAT Protocol Examples
 
-This directory contains normative message examples for the HIVE Protocol.
+This directory contains normative message examples for the PEAT Protocol.
 
 ## Purpose
 

@@ -1,0 +1,78 @@
+# HQ Network A Topology
+#
+# Real hardware deployment for PEAT demo at HQ
+# This is NOT a containerlab topology - it documents physical devices
+#
+# Network: 192.168.1.0/24
+#
+
+name: hq-network-a
+
+nodes:
+  # TAK Server + WebTAK + PEAT-TAK Bridge (C2)
+  tak-server:
+    hostname: tak-server
+    ip: 192.168.1.166
+    roles:
+      - tak_server
+      - webtak
+      - hive_tak_bridge
+    team: alpha
+    ports:
+      tak_tls: 8089
+      https_cert: 8443
+      https_login: 8446
+      peat: 12345
+    notes: |
+      TAK Server with PEAT-TAK Bridge
+      Bridge connects TAK Server to PEAT mesh
+      WebTAK: https://192.168.1.166:8443/webtak/index.html
+
+  # Alpha Operator - PEAT node (ATAK device)
+  alpha-operator:
+    hostname: atak
+    ip: 192.168.1.103
+    roles:
+      - hive_node
+      - operator
+    team: alpha
+    notes: |
+      PEAT node running on ATAK device
+
+  # Alpha Jetson - PEAT node (sensor + UGV)
+  alpha-jetson:
+    hostname: orin.local
+    ip: 192.168.1.102
+    roles:
+      - hive_node
+      - edge_compute
+      - sensor
+      - ugv
+    team: alpha
+    platform: nvidia_jetson_orin
+    notes: |
+      PEAT node running:
+      - AI/ML inference (sensor)
+      - UGV platform
+
+# Network topology
+#
+#   PEAT Mesh:
+#
+#     TAK Server + Bridge (192.168.1.166)
+#              |
+#     ATAK/Operator (192.168.1.103)
+#              |
+#     Jetson/UGV (192.168.1.102)
+#
+
+connections:
+  - from: tak-server
+    to: alpha-operator
+    protocol: PEAT
+    notes: Bridge participates in PEAT mesh
+
+  - from: alpha-operator
+    to: alpha-jetson
+    protocol: PEAT
+    notes: PEAT mesh communication

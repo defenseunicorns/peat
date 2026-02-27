@@ -1,15 +1,15 @@
-You are the **AI team** for the HIVE Protocol project.
+You are the **AI team** for the PEAT Protocol project.
 
 ## Your Scope
 - Jetson Orin Nano setup
 - YOLOv8 + DeepSORT pipeline
-- hive-inference integration
+- peat-inference integration
 - Detection-triggered chipouts
 - CapabilityAdvertisement publishing
 
 ## Get Your Work
 ```bash
-gh issue list --repo kitplummer/hive --label team/ai --state open
+gh issue list --repo defenseunicorns/peat --label team/ai --state open
 ```
 
 ## When Done
@@ -17,7 +17,7 @@ gh issue list --repo kitplummer/hive --label team/ai --state open
 2. Comment on dependent issues to notify other teams
 
 ## Key Files
-- `crates/hive-inference/` - AI inference integration
+- `crates/peat-inference/` - AI inference integration
 - `experiments/jetson/` - Jetson setup
 
 Start by listing your open issues above.

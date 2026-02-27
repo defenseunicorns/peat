@@ -1,4 +1,4 @@
-# HIVE Documentation GitHub Issues
+# PEAT Documentation GitHub Issues
 
 > **Purpose**: Copy these issue templates to create GitHub Issues for tracking documentation work.
 > **Last Updated**: 2025-12-08
@@ -7,7 +7,7 @@
 
 ## Issue #1: Create Comprehensive Operator Guide
 
-**Title**: `docs: Create comprehensive Operator Guide for HIVE deployment and operations`
+**Title**: `docs: Create comprehensive Operator Guide for PEAT deployment and operations`
 
 **Labels**: `documentation`, `operator`, `priority:high`, `good first issue`
 
@@ -15,11 +15,11 @@
 
 ### Description
 
-Create a production-grade operator guide that enables system administrators and mission operators to successfully deploy, configure, monitor, and troubleshoot HIVE systems without requiring deep code knowledge.
+Create a production-grade operator guide that enables system administrators and mission operators to successfully deploy, configure, monitor, and troubleshoot PEAT systems without requiring deep code knowledge.
 
 ### Background
 
-HIVE currently has extensive technical documentation (ADRs, design docs) but lacks structured operational documentation for the operator persona. This guide will bridge that gap and enable production deployments.
+PEAT currently has extensive technical documentation (ADRs, design docs) but lacks structured operational documentation for the operator persona. This guide will bridge that gap and enable production deployments.
 
 ### Requirements
 
@@ -79,10 +79,10 @@ HIVE currently has extensive technical documentation (ADRs, design docs) but lac
 
 ### Acceptance Criteria
 
-1. New contributor can deploy HIVE simulation in < 10 minutes following the guide
+1. New contributor can deploy PEAT simulation in < 10 minutes following the guide
 2. All configuration options are documented with defaults and examples
 3. At least 10 common issues documented in troubleshooting section
-4. Guide tested by someone unfamiliar with HIVE codebase
+4. Guide tested by someone unfamiliar with PEAT codebase
 
 ### Technical Notes
 
@@ -102,7 +102,7 @@ HIVE currently has extensive technical documentation (ADRs, design docs) but lac
 
 ## Issue #2: Create Comprehensive Developer Guide
 
-**Title**: `docs: Create comprehensive Developer Guide for HIVE SDK and contribution`
+**Title**: `docs: Create comprehensive Developer Guide for PEAT SDK and contribution`
 
 **Labels**: `documentation`, `developer`, `priority:high`
 
@@ -110,7 +110,7 @@ HIVE currently has extensive technical documentation (ADRs, design docs) but lac
 
 ### Description
 
-Create a developer guide that enables software engineers to understand HIVE architecture, build applications using the HIVE SDK, contribute to the core protocol, and extend HIVE with custom functionality.
+Create a developer guide that enables software engineers to understand PEAT architecture, build applications using the PEAT SDK, contribute to the core protocol, and extend PEAT with custom functionality.
 
 ### Background
 
@@ -154,7 +154,7 @@ While ADRs provide decision rationale and code has inline documentation, there's
   - Running tests with Makefile
 
 #### Should Have (P1)
-- [ ] **Extending HIVE**
+- [ ] **Extending PEAT**
   - Adding custom capabilities
   - Creating discovery strategies
   - Implementing composition rules
@@ -175,13 +175,13 @@ While ADRs provide decision rationale and code has inline documentation, there's
 
 #### Nice to Have (P2)
 - [ ] **Mobile Development**
-  - hive-ffi usage
+  - peat-ffi usage
   - Kotlin bindings
   - Swift bindings
   - Android build process
 
 - [ ] **Edge AI Integration**
-  - hive-inference overview
+  - peat-inference overview
   - Model deployment
   - ONNX runtime integration
   - Video pipeline setup
@@ -212,7 +212,7 @@ While ADRs provide decision rationale and code has inline documentation, there's
 
 ## Issue #3: Create Quickstart Tutorial Series
 
-**Title**: `docs: Create hands-on tutorial series for common HIVE use cases`
+**Title**: `docs: Create hands-on tutorial series for common PEAT use cases`
 
 **Labels**: `documentation`, `tutorials`, `priority:medium`, `good first issue`
 
@@ -220,19 +220,19 @@ While ADRs provide decision rationale and code has inline documentation, there's
 
 ### Description
 
-Create a series of hands-on tutorials that guide users through common HIVE use cases, from running their first simulation to building custom applications.
+Create a series of hands-on tutorials that guide users through common PEAT use cases, from running their first simulation to building custom applications.
 
 ### Tutorials to Create
 
-#### Tutorial 1: Your First HIVE Simulation (10 minutes)
+#### Tutorial 1: Your First PEAT Simulation (10 minutes)
 - Clone and build
-- Run hive-sim
+- Run peat-sim
 - Observe cell formation
 - Understand the output
 
-#### Tutorial 2: Building a HIVE Application
+#### Tutorial 2: Building a PEAT Application
 - Set up a new Rust project
-- Add hive-protocol dependency
+- Add peat-protocol dependency
 - Create nodes with capabilities
 - Join a cell
 - Exchange messages
@@ -274,7 +274,7 @@ Create a series of hands-on tutorials that guide users through common HIVE use c
 
 ### Description
 
-Establish documentation infrastructure to ensure quality and maintainability of HIVE documentation.
+Establish documentation infrastructure to ensure quality and maintainability of PEAT documentation.
 
 ### Requirements
 

@@ -101,9 +101,9 @@ The inventors acknowledge prior work in distributed autonomous systems coordinat
 **Concepts Potentially Derived from COD**:
 - **Prioritization**: Concept of priority-based data synchronization in bandwidth-constrained environments (not currently claimed in this application)
 
-### Differentiation: HIVE Protocol Innovations Beyond COD
+### Differentiation: PEAT Protocol Innovations Beyond COD
 
-The present invention (HIVE Protocol) was developed independently at (r)evolve LLC (2024-2025) and differs substantially from COD:
+The present invention (PEAT Protocol) was developed independently at (r)evolve LLC (2024-2025) and differs substantially from COD:
 
 **COD Approach** (Prior Art):
 - Binary autonomy model (autonomous operation with human monitoring)
@@ -122,7 +122,7 @@ The present invention (HIVE Protocol) was developed independently at (r)evolve L
 
 ### Independent Development
 
-HIVE Protocol was developed independently at (r)evolve LLC using:
+PEAT Protocol was developed independently at (r)evolve LLC using:
 - DoD Directive 3000.09 on autonomous weapon systems
 - EU AI Act requirements for human oversight
 - Published human-robot teaming literature

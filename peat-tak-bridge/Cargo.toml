@@ -1,0 +1,42 @@
+[package]
+name = "peat-tak-bridge"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "PEAT-TAK Bridge service - connects PEAT mesh to TAK Server"
+
+[[bin]]
+name = "peat-tak-bridge"
+path = "src/main.rs"
+
+[dependencies]
+# Workspace crates
+peat-protocol = { path = "../peat-protocol", default-features = false, features = ["automerge-backend"] }
+peat-transport = { path = "../peat-transport" }
+
+# Async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+futures = "0.3"
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Utilities
+uuid = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+
+# Encoding
+hex = "0.4"

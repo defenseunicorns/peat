@@ -4,8 +4,8 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'hive-sim/**'
-      - 'hive-protocol/**'
+      - 'peat-sim/**'
+      - 'peat-protocol/**'
       - '.github/workflows/simulation.yml'
   schedule:
     - cron: '0 6 * * 0'  # Sunday 06:00 UTC
@@ -27,8 +27,8 @@ jobs:
           curl -sL https://get.containerlab.dev | sudo bash
 
       - name: Build Docker image
-        run: docker build -f hive-sim/Dockerfile -t hive-sim-node:latest .
+        run: docker build -f peat-sim/Dockerfile -t peat-sim-node:latest .
 
       - name: Run validation
-        working-directory: hive-sim
+        working-directory: peat-sim
         run: ./simple-validate.sh

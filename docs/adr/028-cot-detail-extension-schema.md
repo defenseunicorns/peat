@@ -1,4 +1,4 @@
-# ADR-028: HIVE CoT Custom Detail Extension Schema
+# ADR-028: PEAT CoT Custom Detail Extension Schema
 
 **Status**: Proposed
 **Date**: 2025-11-26
@@ -14,24 +14,24 @@
 
 ### Problem Statement
 
-When translating HIVE messages to Cursor-on-Target (CoT) XML format for TAK integration, significant semantic information is lost. CoT's core schema supports:
+When translating PEAT messages to Cursor-on-Target (CoT) XML format for TAK integration, significant semantic information is lost. CoT's core schema supports:
 - Position (lat/lon/hae)
 - Identity (uid, type)
 - Time bounds (time, start, stale)
 - Basic details (remarks, links, contacts)
 
-However, HIVE messages contain rich context that TAK operators need:
+However, PEAT messages contain rich context that TAK operators need:
 - **Source attribution**: Which platform and AI model produced this data?
 - **Confidence scores**: How reliable is this track detection?
 - **Hierarchy membership**: Which cell/formation does this belong to?
 - **Capability status**: What can this platform do? Is it degraded?
 - **Custom attributes**: Domain-specific metadata (clothing color, vehicle type, etc.)
 
-Without preserving this information, TAK operators cannot make informed decisions about HIVE-coordinated assets.
+Without preserving this information, TAK operators cannot make informed decisions about PEAT-coordinated assets.
 
 ### CoT Extensibility
 
-CoT supports custom detail elements via XML namespaces. Elements starting with `_` are treated as extensions and passed through by TAK servers/clients that don't recognize them. This allows HIVE to embed rich metadata while maintaining compatibility.
+CoT supports custom detail elements via XML namespaces. Elements starting with `_` are treated as extensions and passed through by TAK servers/clients that don't recognize them. This allows PEAT to embed rich metadata while maintaining compatibility.
 
 **TAK Extension Convention**:
 - Element names starting with `_` are extensions
@@ -41,16 +41,16 @@ CoT supports custom detail elements via XML namespaces. Elements starting with `
 
 ## Decision
 
-We will define a standardized `<_hive_>` CoT detail extension schema for embedding HIVE-specific semantics in CoT messages.
+We will define a standardized `<_peat_>` CoT detail extension schema for embedding PEAT-specific semantics in CoT messages.
 
 ### Schema Definition
 
-**Namespace**: `urn:hive:cot:1.0`
-**Element Name**: `_hive_`
+**Namespace**: `urn:peat:cot:1.0`
+**Element Name**: `_peat_`
 **Version**: `1.0`
 
 ```xml
-<_hive_ version="1.0" xmlns:hive="urn:hive:cot:1.0">
+<_peat_ version="1.0" xmlns:peat="urn:peat:cot:1.0">
   <!-- Source Attribution -->
   <source platform="{platform_id}"
           model="{model_id}"
@@ -68,7 +68,7 @@ We will define a standardized `<_hive_>` CoT detail extension schema for embeddi
     <zone id="{zone_id}"/>
   </hierarchy>
 
-  <!-- Custom Attributes (pass-through from HIVE messages) -->
+  <!-- Custom Attributes (pass-through from PEAT messages) -->
   <attributes>
     <attr key="{key}" type="{string|number|boolean}">{value}</attr>
     <!-- ... additional attributes ... -->
@@ -128,7 +128,7 @@ We will define a standardized `<_hive_>` CoT detail extension schema for embeddi
   <capabilities>
     <capability type="{type}" confidence="{0.0-1.0}"/>
   </capabilities>
-</_hive_>
+</_peat_>
 ```
 
 ### Element Specifications
@@ -161,7 +161,7 @@ We will define a standardized `<_hive_>` CoT detail extension schema for embeddi
 
 #### `<hierarchy>` - Hierarchy Membership
 
-Contains child elements describing the entity's position in HIVE hierarchy:
+Contains child elements describing the entity's position in PEAT hierarchy:
 
 | Element | Attributes | Description |
 |---------|------------|-------------|
@@ -180,7 +180,7 @@ Contains child elements describing the entity's position in HIVE hierarchy:
 
 #### `<attributes>` - Custom Attributes
 
-Pass-through container for domain-specific metadata from HIVE messages.
+Pass-through container for domain-specific metadata from PEAT messages.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -264,7 +264,7 @@ Pass-through container for domain-specific metadata from HIVE messages.
     <track course="45.0" speed="1.2"/>
     <remarks>person: blue jacket, has backpack (89% confidence)</remarks>
 
-    <_hive_ version="1.0">
+    <_peat_ version="1.0">
       <source platform="Alpha-2" model="Alpha-3" model_version="1.3.0"/>
       <confidence value="0.89" threshold="0.70"/>
       <hierarchy>
@@ -275,7 +275,7 @@ Pass-through container for domain-specific metadata from HIVE messages.
         <attr key="jacket_color">blue</attr>
         <attr key="has_backpack" type="boolean">true</attr>
       </attributes>
-    </_hive_>
+    </_peat_>
 
     <link uid="Alpha-2" type="a-f-G-U-C" relation="o-o"/>
   </detail>
@@ -300,7 +300,7 @@ Pass-through container for domain-specific metadata from HIVE messages.
     <contact callsign="Alpha-3"/>
     <remarks>AI Platform: object_tracker v1.3.0 (Active, 91% ready)</remarks>
 
-    <_hive_ version="1.0">
+    <_peat_ version="1.0">
       <status operational="ACTIVE" readiness="0.91"/>
       <capability type="OBJECT_TRACKING"
                   model_id="object_tracker"
@@ -313,7 +313,7 @@ Pass-through container for domain-specific metadata from HIVE messages.
       <hierarchy>
         <cell id="Alpha-Team" role="ai_platform"/>
       </hierarchy>
-    </_hive_>
+    </_peat_>
 
     <__group name="Alpha-Team" role="AI Platform"/>
   </detail>
@@ -337,7 +337,7 @@ Pass-through container for domain-specific metadata from HIVE messages.
   <detail>
     <remarks>HANDOFF PREPARE: TRACK-001 from Alpha-Team to Bravo-Team</remarks>
 
-    <_hive_ version="1.0">
+    <_peat_ version="1.0">
       <handoff type="PREPARE"
                track_id="TRACK-001"
                source="Alpha-Team"
@@ -345,7 +345,7 @@ Pass-through container for domain-specific metadata from HIVE messages.
       <poi_description>Person in blue jacket with backpack, heading NE</poi_description>
       <predicted lat="33.7850" lon="-84.3850"/>
       <confidence value="0.85"/>
-    </_hive_>
+    </_peat_>
 
     <link uid="Alpha-Team" type="a-f-G-U-C" relation="h-h" remarks="handoff-source"/>
     <link uid="Bravo-Team" type="a-f-G-U-C" relation="h-h" remarks="handoff-target"/>
@@ -361,16 +361,16 @@ Pass-through container for domain-specific metadata from HIVE messages.
 ```rust
 use quick_xml::{Writer, events::{Event, BytesStart, BytesText}};
 
-pub struct HiveDetailEncoder;
+pub struct PeatDetailEncoder;
 
-impl HiveDetailEncoder {
+impl PeatDetailEncoder {
     pub fn encode_track_update(track: &TrackUpdate) -> Result<String, EncodingError> {
         let mut writer = Writer::new(Cursor::new(Vec::new()));
 
-        // Start _hive_ element
-        let mut hive = BytesStart::borrowed(b"_hive_", "_hive_".len());
-        hive.push_attribute(("version", "1.0"));
-        writer.write_event(Event::Start(hive))?;
+        // Start _peat_ element
+        let mut peat = BytesStart::borrowed(b"_peat_", "_peat_".len());
+        peat.push_attribute(("version", "1.0"));
+        writer.write_event(Event::Start(peat))?;
 
         // Source attribution
         let mut source = BytesStart::borrowed(b"source", "source".len());
@@ -397,8 +397,8 @@ impl HiveDetailEncoder {
             writer.write_event(Event::End(BytesEnd::borrowed(b"attributes")))?;
         }
 
-        // End _hive_ element
-        writer.write_event(Event::End(BytesEnd::borrowed(b"_hive_")))?;
+        // End _peat_ element
+        writer.write_event(Event::End(BytesEnd::borrowed(b"_peat_")))?;
 
         Ok(String::from_utf8(writer.into_inner().into_inner())?)
     }
@@ -410,14 +410,14 @@ impl HiveDetailEncoder {
 ```rust
 use quick_xml::Reader;
 
-pub struct HiveDetailDecoder;
+pub struct PeatDetailDecoder;
 
-impl HiveDetailDecoder {
-    pub fn decode_hive_extension(xml: &str) -> Result<HiveExtension, DecodingError> {
+impl PeatDetailDecoder {
+    pub fn decode_peat_extension(xml: &str) -> Result<PeatExtension, DecodingError> {
         let mut reader = Reader::from_str(xml);
         reader.trim_text(true);
 
-        let mut extension = HiveExtension::default();
+        let mut extension = PeatExtension::default();
         let mut buf = Vec::new();
 
         loop {
@@ -454,25 +454,25 @@ impl HiveDetailDecoder {
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
-           xmlns:hive="urn:hive:cot:1.0"
-           targetNamespace="urn:hive:cot:1.0"
+           xmlns:peat="urn:peat:cot:1.0"
+           targetNamespace="urn:peat:cot:1.0"
            elementFormDefault="qualified">
 
-  <xs:element name="_hive_">
+  <xs:element name="_peat_">
     <xs:complexType>
       <xs:sequence>
-        <xs:element name="source" type="hive:SourceType" minOccurs="0"/>
-        <xs:element name="confidence" type="hive:ConfidenceType" minOccurs="0"/>
-        <xs:element name="hierarchy" type="hive:HierarchyType" minOccurs="0"/>
-        <xs:element name="attributes" type="hive:AttributesType" minOccurs="0"/>
-        <xs:element name="status" type="hive:StatusType" minOccurs="0"/>
-        <xs:element name="capability" type="hive:CapabilityType" minOccurs="0" maxOccurs="unbounded"/>
-        <xs:element name="resources" type="hive:ResourcesType" minOccurs="0"/>
-        <xs:element name="handoff" type="hive:HandoffType" minOccurs="0"/>
-        <xs:element name="predicted" type="hive:PositionType" minOccurs="0"/>
+        <xs:element name="source" type="peat:SourceType" minOccurs="0"/>
+        <xs:element name="confidence" type="peat:ConfidenceType" minOccurs="0"/>
+        <xs:element name="hierarchy" type="peat:HierarchyType" minOccurs="0"/>
+        <xs:element name="attributes" type="peat:AttributesType" minOccurs="0"/>
+        <xs:element name="status" type="peat:StatusType" minOccurs="0"/>
+        <xs:element name="capability" type="peat:CapabilityType" minOccurs="0" maxOccurs="unbounded"/>
+        <xs:element name="resources" type="peat:ResourcesType" minOccurs="0"/>
+        <xs:element name="handoff" type="peat:HandoffType" minOccurs="0"/>
+        <xs:element name="predicted" type="peat:PositionType" minOccurs="0"/>
         <xs:element name="poi_description" type="xs:string" minOccurs="0"/>
-        <xs:element name="classification" type="hive:ClassificationType" minOccurs="0"/>
-        <xs:element name="formation" type="hive:FormationType" minOccurs="0"/>
+        <xs:element name="classification" type="peat:ClassificationType" minOccurs="0"/>
+        <xs:element name="formation" type="peat:FormationType" minOccurs="0"/>
       </xs:sequence>
       <xs:attribute name="version" type="xs:string" use="required"/>
     </xs:complexType>
@@ -486,8 +486,8 @@ impl HiveDetailDecoder {
   </xs:complexType>
 
   <xs:complexType name="ConfidenceType">
-    <xs:attribute name="value" type="hive:UnitInterval" use="required"/>
-    <xs:attribute name="threshold" type="hive:UnitInterval"/>
+    <xs:attribute name="value" type="peat:UnitInterval" use="required"/>
+    <xs:attribute name="threshold" type="peat:UnitInterval"/>
   </xs:complexType>
 
   <xs:simpleType name="UnitInterval">
@@ -516,12 +516,12 @@ impl HiveDetailDecoder {
 
 ### Positive
 
-1. **Semantic Preservation**: Rich HIVE context survives translation to CoT
+1. **Semantic Preservation**: Rich PEAT context survives translation to CoT
 2. **TAK Compatibility**: Uses standard CoT extension mechanism
 3. **Operator Awareness**: TAK users can see confidence, source, hierarchy
-4. **Plugin Support**: ATAK plugins can render HIVE-specific UI
+4. **Plugin Support**: ATAK plugins can render PEAT-specific UI
 5. **Versioned Schema**: Enables forward-compatible evolution
-6. **Standardized Format**: Consistent across all HIVE message types
+6. **Standardized Format**: Consistent across all PEAT message types
 
 ### Negative
 
@@ -546,8 +546,8 @@ impl HiveDetailDecoder {
 
 ## Success Metrics
 
-1. **Completeness**: All HIVE message types have defined mappings
-2. **Round-trip**: HIVE → CoT → HIVE preserves semantic meaning
+1. **Completeness**: All PEAT message types have defined mappings
+2. **Round-trip**: PEAT → CoT → PEAT preserves semantic meaning
 3. **Compatibility**: Works with TAK Server, FreeTakServer, ATAK
 4. **Performance**: Extension parsing < 1ms
 5. **Documentation**: XSD schema published and validated
@@ -564,6 +564,6 @@ impl HiveDetailDecoder {
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2025-11-26 | Created ADR-028 | M1 POC feedback - need standardized HIVE extension |
-| 2025-11-26 | Selected `_hive_` element name | TAK `_` prefix convention for extensions |
-| 2025-11-26 | Included all HIVE message types | Comprehensive coverage from COT_SCHEMA_MAPPING.md |
+| 2025-11-26 | Created ADR-028 | M1 POC feedback - need standardized PEAT extension |
+| 2025-11-26 | Selected `_peat_` element name | TAK `_` prefix convention for extensions |
+| 2025-11-26 | Included all PEAT message types | Comprehensive coverage from COT_SCHEMA_MAPPING.md |

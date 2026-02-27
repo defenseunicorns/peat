@@ -243,7 +243,7 @@ Based on investigation results, Iroh natively handles multi-interface. The decis
 
 ### Phase 1: Verify Iroh Multipath (Investigation) - COMPLETE ✅
 
-**Test**: `hive-protocol/tests/iroh_multipath_investigation.rs`
+**Test**: `peat-protocol/tests/iroh_multipath_investigation.rs`
 
 **Result**: Iroh automatically advertises all interfaces:
 - IPv4 LAN addresses
@@ -253,7 +253,7 @@ Based on investigation results, Iroh natively handles multi-interface. The decis
 ```rust
 // This already works - Iroh discovers all interfaces
 let endpoint = Endpoint::builder()
-    .alpns(vec![b"hive/1".to_vec()])
+    .alpns(vec![b"peat/1".to_vec()])
     .bind()  // Binds to ALL interfaces automatically
     .await?;
 

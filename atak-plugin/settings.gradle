@@ -1,9 +1,9 @@
-rootProject.name = 'hive-atak-plugin'
+rootProject.name = 'peat-atak-plugin'
 include ':app'
 
-// Use local hive-btle repo for development
-includeBuild('../../hive-btle/android') {
+// Use local peat-btle repo for development
+includeBuild('../../peat-btle/android') {
     dependencySubstitution {
-        substitute(module('com.revolveteam:hive')).using(project(':'))
+        substitute(module('com.revolveteam:peat')).using(project(':'))
     }
 }

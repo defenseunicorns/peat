@@ -76,7 +76,7 @@ fi
 echo "Results: ${RESULTS_DIR}"
 echo ""
 
-cd /home/kit/Code/revolve/hive/hive-sim
+cd /home/kit/Code/revolve/peat/peat-sim
 
 # Source environment variables for Ditto credentials
 log_info "Loading Ditto credentials from .env"
@@ -221,7 +221,7 @@ echo "  3. Measure hierarchical aggregation overhead"
 echo "  4. Validate 5-second aggregation delay per hop"
 echo ""
 echo "Analysis command:"
-echo "  cd /home/kit/Code/revolve/hive/labs/e12-comprehensive-empirical-validation/scripts"
+echo "  cd /home/kit/Code/revolve/peat/labs/e12-comprehensive-empirical-validation/scripts"
 echo "  python3 analyze-e13v3.py ${RESULTS_DIR}"
 echo ""
 

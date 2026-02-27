@@ -41,7 +41,7 @@ Time 1: Nodes sync
 Result: "Husked document" where updated fields exist but all others are null
 \`\`\`
 
-**Mitigation**: HIVE Protocol uses soft-delete patterns for high-churn data (beacons, positions) to avoid husking issues.
+**Mitigation**: PEAT Protocol uses soft-delete patterns for high-churn data (beacons, positions) to avoid husking issues.
 
 #### 3. **Storage Constraints on Edge Devices**
 \`\`\`
@@ -256,7 +256,7 @@ Set via ALTER SYSTEM or environment variables (as documented above).
 
 ### 2. Application-Level Lifecycle Policies
 
-Collection-specific TTLs managed by HIVE Protocol:
+Collection-specific TTLs managed by PEAT Protocol:
 
 \`\`\`rust
 pub struct TtlConfig {
@@ -539,7 +539,7 @@ impl ConnectivityAwareRetention {
 3. **Tombstone TTL** is configured via \`ALTER SYSTEM\` or environment variables
 4. **Soft-delete pattern** avoids husking and reduces tombstone churn
 
-### HIVE Protocol Strategy
+### PEAT Protocol Strategy
 
 1. **High-churn data** (beacons, positions): Soft-delete pattern
 2. **Low-churn data** (capabilities, cells): Hard delete (EVICT)
@@ -554,7 +554,7 @@ impl ConnectivityAwareRetention {
 
 ## Related ADRs
 
-- ADR-001: HIVE Protocol POC (CRDT-based state management)
+- ADR-001: PEAT Protocol POC (CRDT-based state management)
 - ADR-002: Beacon Storage Architecture (Ditto integration patterns)
 
 ## References

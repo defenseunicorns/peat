@@ -1,16 +1,16 @@
-# ADR-053: Voice and Audio Messages in the HIVE CRDT Landscape
+# ADR-053: Voice and Audio Messages in the PEAT CRDT Landscape
 
 **Status**: Proposed
 **Date**: 2026-02-26
 **Authors**: Kit Plummer, Claude
 **Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)
-**Relates To**: ADR-021 (Document-Oriented Architecture), ADR-025 (Blob Transfer Protocol), ADR-032 (Pluggable Transport Abstraction), ADR-035 (HIVE-Lite Embedded Nodes), ADR-037 (Resource-Constrained Device Optimization), ADR-039 (HIVE-BTLE Mesh Transport), ADR-044 (Encryption), ADR-051 (HIVE-SBD Satellite Transport), ADR-052 (HIVE-LoRa Transport)
+**Relates To**: ADR-021 (Document-Oriented Architecture), ADR-025 (Blob Transfer Protocol), ADR-032 (Pluggable Transport Abstraction), ADR-035 (PEAT-Lite Embedded Nodes), ADR-037 (Resource-Constrained Device Optimization), ADR-039 (PEAT-BTLE Mesh Transport), ADR-044 (Encryption), ADR-051 (PEAT-SBD Satellite Transport), ADR-052 (PEAT-LoRa Transport)
 
 ---
 
 ## Executive Summary
 
-This ADR defines the concept and requirements for voice and audio messages as a first-class data type in HIVE. Inspired by the [TerminalPhone](https://gitlab.com/here_forawhile/terminalphone) project — a Bash script providing anonymous encrypted push-to-talk (PTT) voice over Tor hidden services — this document captures how discrete audio clips fit naturally into HIVE's CRDT-based synchronization model. A voice message is an immutable binary blob with metadata, exactly like a PLI report or sensor reading: record it, encode it, publish it as a CRDT document referencing a BlobStore entry, and let the mesh sync it. This is not real-time streaming voice — it is the record-then-send PTT model, where each audio clip is a discrete, self-contained artifact that syncs across transports at whatever bandwidth is available.
+This ADR defines the concept and requirements for voice and audio messages as a first-class data type in PEAT. Inspired by the [TerminalPhone](https://gitlab.com/here_forawhile/terminalphone) project — a Bash script providing anonymous encrypted push-to-talk (PTT) voice over Tor hidden services — this document captures how discrete audio clips fit naturally into PEAT's CRDT-based synchronization model. A voice message is an immutable binary blob with metadata, exactly like a PLI report or sensor reading: record it, encode it, publish it as a CRDT document referencing a BlobStore entry, and let the mesh sync it. This is not real-time streaming voice — it is the record-then-send PTT model, where each audio clip is a discrete, self-contained artifact that syncs across transports at whatever bandwidth is available.
 
 ---
 
@@ -18,19 +18,19 @@ This ADR defines the concept and requirements for voice and audio messages as a 
 
 ### The Voice Gap
 
-HIVE Protocol synchronizes structured data (PLI, status, sensor readings, AI products) across a multi-transport mesh. But field operators communicate primarily by voice — and today that voice traffic flows through entirely separate radio systems (VHF/UHF tactical radios, cell phones, satellite phones) that are disconnected from the HIVE data mesh. This creates several problems:
+PEAT Protocol synchronizes structured data (PLI, status, sensor readings, AI products) across a multi-transport mesh. But field operators communicate primarily by voice — and today that voice traffic flows through entirely separate radio systems (VHF/UHF tactical radios, cell phones, satellite phones) that are disconnected from the PEAT data mesh. This creates several problems:
 
 | Problem | Impact |
 |---------|--------|
 | Voice lives outside the data mesh | No searchability, no persistence, no CRDT sync |
 | Radio channels are ephemeral | Missed transmissions are lost forever |
 | No transcript integration | Voice intel requires manual transcription |
-| Separate encryption domains | HIVE data encrypted one way, voice another |
+| Separate encryption domains | PEAT data encrypted one way, voice another |
 | No transport flexibility | Voice locked to one radio, can't failover |
 
 ### Why PTT (Record-Then-Send), Not Streaming
 
-Real-time voice streaming (VoIP, WebRTC, RTP) requires dedicated low-latency transport with jitter buffers, packet loss concealment, and sustained bandwidth — fundamentally incompatible with HIVE's store-and-forward, multi-transport, CRDT-based architecture. The PTT model maps naturally to HIVE because:
+Real-time voice streaming (VoIP, WebRTC, RTP) requires dedicated low-latency transport with jitter buffers, packet loss concealment, and sustained bandwidth — fundamentally incompatible with PEAT's store-and-forward, multi-transport, CRDT-based architecture. The PTT model maps naturally to PEAT because:
 
 | Property | PTT (Record-Then-Send) | Streaming (Real-Time) |
 |----------|------------------------|----------------------|
@@ -47,18 +47,18 @@ A 10-second PTT message at Opus 16kbps mono is ~20 KB — smaller than many CRDT
 
 ### TerminalPhone as Prior Art
 
-[TerminalPhone](https://gitlab.com/here_forawhile/terminalphone) is a Bash script that provides anonymous encrypted PTT voice communication over Tor hidden services. Its design decisions are directly relevant to HIVE:
+[TerminalPhone](https://gitlab.com/here_forawhile/terminalphone) is a Bash script that provides anonymous encrypted PTT voice communication over Tor hidden services. Its design decisions are directly relevant to PEAT:
 
-| TerminalPhone Concept | HIVE Equivalent |
+| TerminalPhone Concept | PEAT Equivalent |
 |-----------------------|-----------------|
 | `.onion` address as identity | Cryptographic node ID |
 | PTT model (record → send) | Audio blob → CRDT document → mesh sync |
 | App-layer encryption (independent of transport) | ChaCha20-Poly1305 (ADR-044) |
-| Simple line protocol over Tor | eche-lite frame format over any transport (ADR-035) |
+| Simple line protocol over Tor | peat-lite frame format over any transport (ADR-035) |
 | Tor as anonymous transport | Noted as future transport possibility |
 | `opusenc`/`opusdec` for audio | Opus codec (or Codec2 for constrained links) |
 
-TerminalPhone validates the core concept: PTT voice as discrete encrypted messages over an overlay network. HIVE extends this to multi-transport mesh sync with CRDT persistence and transcription integration.
+TerminalPhone validates the core concept: PTT voice as discrete encrypted messages over an overlay network. PEAT extends this to multi-transport mesh sync with CRDT persistence and transcription integration.
 
 ---
 
@@ -299,11 +299,11 @@ This is optional and compute-dependent: resource-constrained nodes skip transcri
 
 ### Physical Device Concept ("Peat")
 
-A purpose-built field audio device running HIVE for transport:
+A purpose-built field audio device running PEAT for transport:
 
 ```
 ┌───────────────────────────────────────┐
-│  "Peat" - HIVE Audio Field Device     │
+│  "Peat" - PEAT Audio Field Device     │
 │                                       │
 │  ┌─────────┐  ┌────────────────────┐  │
 │  │   Mic   │  │  Speaker           │  │
@@ -316,7 +316,7 @@ A purpose-built field audio device running HIVE for transport:
 │  └────────────┬────────────────────┘  │
 │               │                       │
 │  ┌────────────▼────────────────────┐  │
-│  │  HIVE Node (eche-lite)          │  │
+│  │  PEAT Node (peat-lite)          │  │
 │  │  AudioMessage doc + BlobStore   │  │
 │  └────────────┬────────────────────┘  │
 │               │                       │
@@ -333,7 +333,7 @@ A purpose-built field audio device running HIVE for transport:
 └───────────────────────────────────────┘
 ```
 
-The "Peat" concept demonstrates that HIVE can subsume the role of a tactical radio: audio captured locally, Opus-encoded, published as a CRDT blob, transported over whatever link is available. Unlike a traditional radio, the message persists, syncs to nodes that weren't online during transmission, and can be transcribed for searchability.
+The "Peat" concept demonstrates that PEAT can subsume the role of a tactical radio: audio captured locally, Opus-encoded, published as a CRDT blob, transported over whatever link is available. Unlike a traditional radio, the message persists, syncs to nodes that weren't online during transmission, and can be transcribed for searchability.
 
 ---
 
@@ -345,7 +345,7 @@ The "Peat" concept demonstrates that HIVE can subsume the role of a tactical rad
 - **Transport flexibility**: Voice travels over QUIC, BLE, LoRa, or SBD — whatever is available
 - **Offline resilience**: PTT messages queue and sync when connectivity returns
 - **Searchability**: Transcription integration makes voice content text-searchable
-- **Consistent encryption**: Same app-layer encryption model as all other HIVE data (ADR-044)
+- **Consistent encryption**: Same app-layer encryption model as all other PEAT data (ADR-044)
 - **Natural CRDT fit**: Immutable audio blobs + metadata documents work perfectly with existing blob-document integration (ADR-025)
 - **Embedded viable**: Codec2 at 700 bps enables voice over SBD satellite — global voice messaging in < 2 KB
 
@@ -365,7 +365,7 @@ The "Peat" concept demonstrates that HIVE can subsume the role of a tactical rad
 | Opus too heavy for ESP32 | Low | Medium | ESP32-S3 has sufficient CPU for Opus encode at 16 kbps; fallback to Codec2 |
 | Codec2 quality insufficient | Medium | Low | 2400 mode is intelligible for speech; 700C is last resort for SBD only |
 | Transcription accuracy on noisy field audio | High | Low | Confidence scores in TranscriptionProduct; human review for critical intel |
-| Key distribution for channel PSKs | Medium | Medium | Reuse existing HIVE key distribution (ADR-044); pre-shared keys for initial deployment |
+| Key distribution for channel PSKs | Medium | Medium | Reuse existing PEAT key distribution (ADR-044); pre-shared keys for initial deployment |
 
 ---
 
@@ -374,14 +374,14 @@ The "Peat" concept demonstrates that HIVE can subsume the role of a tactical rad
 ### Option 1: Real-Time Streaming Voice (WebRTC/RTP)
 **Pros**: Natural conversation flow, low latency
 **Cons**: Requires sustained low-latency transport (only QUIC), incompatible with store-and-forward transports (BLE, LoRa, SBD), doesn't persist, doesn't sync across disconnected nodes, fundamentally different problem than CRDT data sync
-**Decision**: Deferred — streaming voice is a separate feature that could coexist alongside PTT, but requires dedicated real-time transport infrastructure that HIVE doesn't currently have.
+**Decision**: Deferred — streaming voice is a separate feature that could coexist alongside PTT, but requires dedicated real-time transport infrastructure that PEAT doesn't currently have.
 
 ### Option 2: Integrate TerminalPhone Directly
 **Pros**: Working implementation, proven concept
 **Cons**: Written in Bash (not embeddable in Rust/embedded), depends on Tor (not available on embedded), tightly coupled to Unix toolchain (`opusenc`, `sox`, `socat`), single transport only
-**Decision**: Rejected as direct integration. TerminalPhone validates the concept but HIVE needs a native Rust implementation that works across all transports and on embedded platforms.
+**Decision**: Rejected as direct integration. TerminalPhone validates the concept but PEAT needs a native Rust implementation that works across all transports and on embedded platforms.
 
-### Option 3: Tor as a HIVE Transport
+### Option 3: Tor as a PEAT Transport
 **Pros**: Anonymous communication, TerminalPhone compatibility, censorship resistance
 **Cons**: High latency (seconds), requires Tor daemon, not available on embedded, adds significant complexity
 **Decision**: Noted as future possibility. Tor could be a transport plugin (ADR-032) independent of this audio ADR. The audio architecture is transport-agnostic by design.
@@ -400,7 +400,7 @@ The "Peat" concept demonstrates that HIVE can subsume the role of a tactical rad
 | ADR-021 (Document-Oriented Architecture) | AudioMessage follows one-document-per-entity pattern |
 | ADR-025 (Blob Transfer Protocol) | Audio stored as content-addressed blobs via BlobStore trait |
 | ADR-032 (Transport Abstraction) | Transport bandwidth drives codec selection |
-| ADR-035 (eche-lite Embedded Nodes) | Embedded node constraints for audio on ESP32 |
+| ADR-035 (peat-lite Embedded Nodes) | Embedded node constraints for audio on ESP32 |
 | ADR-037 (Resource-Constrained Devices) | Codec2 selection for constrained nodes |
 | ADR-039 (BLE Transport) | BLE bandwidth constraints for audio quality |
 | ADR-044 (Encryption) | ChaCha20-Poly1305 app-layer encryption for audio blobs |
@@ -419,12 +419,12 @@ The "Peat" concept demonstrates that HIVE can subsume the role of a tactical rad
 6. ADR-021: Document-Oriented Architecture and Update Semantics
 7. ADR-025: Blob Transfer Protocol
 8. ADR-032: Pluggable Transport Abstraction
-9. ADR-035: HIVE-Lite Embedded Nodes (eche-lite protocol)
+9. ADR-035: PEAT-Lite Embedded Nodes (peat-lite protocol)
 10. ADR-044: Application-Layer Encryption
-11. ADR-051: HIVE-SBD Satellite Transport
-12. ADR-052: HIVE-LoRa Long-Range Radio Transport
-13. `hive-schema/proto/product.proto` — TranscriptionProduct definition (speech-to-text with word timestamps and speaker diarization)
-14. `hive-protocol/src/storage/blob_document_integration.rs` — BlobDocumentIntegration trait and BlobReference types
+11. ADR-051: PEAT-SBD Satellite Transport
+12. ADR-052: PEAT-LoRa Long-Range Radio Transport
+13. `peat-schema/proto/product.proto` — TranscriptionProduct definition (speech-to-text with word timestamps and speaker diarization)
+14. `peat-protocol/src/storage/blob_document_integration.rs` — BlobDocumentIntegration trait and BlobReference types
 
 ---
 
@@ -443,7 +443,7 @@ The "Peat" concept demonstrates that HIVE can subsume the role of a tactical rad
 
 **Next Steps:**
 1. Review and approve ADR
-2. Prototype AudioMessage document schema in hive-schema
+2. Prototype AudioMessage document schema in peat-schema
 3. Prototype Opus encoding pipeline (Rust, using `opus` crate)
 4. Prototype Codec2 encoding for SBD/LoRa constraint testing
 5. Build "Peat" hardware prototype (Pi Zero 2W + I2S mic/speaker + SX1262)

@@ -100,7 +100,7 @@ We conducted a comprehensive survey of existing AI/ML metadata standards and mil
 
 ### Key Findings
 
-**No existing standard addresses the HIVE use case:**
+**No existing standard addresses the PEAT use case:**
 
 1. **Industry standards** (Model Cards, ONNX, MLflow) provide good **static documentation** but lack:
    - Operational status tracking (is the model actually running?)
@@ -150,7 +150,7 @@ We conducted a comprehensive survey of existing AI/ML metadata standards and mil
 
 ### Core Principle: Capability-Centric AI Model Advertisement
 
-We will create a **HIVE AI Model Capability Advertisement Schema** that shifts focus from "what models are installed" to "what AI capabilities are operationally available" across the distributed system.
+We will create a **PEAT AI Model Capability Advertisement Schema** that shifts focus from "what models are installed" to "what AI capabilities are operationally available" across the distributed system.
 
 **Design Philosophy:**
 1. **Operational First**: Track runtime status, not just deployment state
@@ -165,12 +165,12 @@ We will create a **HIVE AI Model Capability Advertisement Schema** that shifts f
 
 #### Level 1: Platform AI Capability Advertisement
 
-Each platform advertises its AI capabilities using a standardized schema integrated into the HIVE capability advertisement protocol:
+Each platform advertises its AI capabilities using a standardized schema integrated into the PEAT capability advertisement protocol:
 
 ```protobuf
 syntax = "proto3";
 
-package hive.ai.v1;
+package peat.ai.v1;
 
 import "google/protobuf/timestamp.proto";
 
@@ -747,7 +747,7 @@ Following ADR-007 Automerge principles, AI capability advertisements are synchro
 The `ModelMetadata` message is designed for **bidirectional mapping** with Model Card schemas:
 
 ```python
-# Export HIVE AI capability to Model Card format
+# Export PEAT AI capability to Model Card format
 def export_model_card(ai_model_instance):
     return {
         "model_details": {
@@ -776,7 +776,7 @@ def export_model_card(ai_model_instance):
         }
     }
 
-# Import Model Card to HIVE format
+# Import Model Card to PEAT format
 def import_model_card(model_card_json):
     metadata = ModelMetadata()
     metadata.model_name = model_card_json["model_details"]["name"]
@@ -788,16 +788,16 @@ def import_model_card(model_card_json):
 #### ONNX Metadata Integration
 
 ```python
-# Augment ONNX model with HIVE metadata
+# Augment ONNX model with PEAT metadata
 import onnx
 import json
 
 model = onnx.load('target_recognition_v4.2.1.onnx')
 
-# Add HIVE metadata to ONNX metadata_props
-hive_meta = model.metadata_props.add()
-hive_meta.key = 'hive_model_metadata'
-hive_meta.value = json.dumps({
+# Add PEAT metadata to ONNX metadata_props
+peat_meta = model.metadata_props.add()
+peat_meta.key = 'peat_model_metadata'
+peat_meta.value = json.dumps({
     "model_type": "classifier",
     "intended_use": "Target recognition for ISR operations",
     "design_metrics": {"precision": 0.94, "recall": 0.89},
@@ -815,13 +815,13 @@ onnx.save(model, f'target_recognition_v4.2.1.onnx')
 #### MLflow Registry Synchronization
 
 ```python
-# Register HIVE-tracked model in MLflow
+# Register PEAT-tracked model in MLflow
 import mlflow
 
-def register_hive_model_to_mlflow(ai_model_instance, model_artifact_path):
-    # Create MLflow signature from HIVE ModelSignature
+def register_peat_model_to_mlflow(ai_model_instance, model_artifact_path):
+    # Create MLflow signature from PEAT ModelSignature
     from mlflow.models import infer_signature
-    signature = convert_hive_signature_to_mlflow(ai_model_instance.signature)
+    signature = convert_peat_signature_to_mlflow(ai_model_instance.signature)
     
     # Register with metadata
     mlflow.pyfunc.log_model(
@@ -830,9 +830,9 @@ def register_hive_model_to_mlflow(ai_model_instance, model_artifact_path):
         signature=signature,
         registered_model_name=ai_model_instance.metadata.model_name,
         metadata={
-            "hive_model_id": ai_model_instance.model_id,
-            "hive_version": ai_model_instance.model_version,
-            "hive_hash": ai_model_instance.model_hash,
+            "peat_model_id": ai_model_instance.model_id,
+            "peat_version": ai_model_instance.model_version,
+            "peat_hash": ai_model_instance.model_hash,
             "design_precision": ai_model_instance.metadata.design_metrics["precision"],
             "intended_use": ai_model_instance.metadata.intended_use
         }
@@ -853,7 +853,7 @@ def register_hive_model_to_mlflow(ai_model_instance, model_artifact_path):
 
 **STANAG 4778 Metadata Binding:**
 ```python
-# Cryptographically bind HIVE metadata to model artifact
+# Cryptographically bind PEAT metadata to model artifact
 def bind_metadata_stanag_4778(model_artifact_bytes, ai_model_instance):
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import ed25519
@@ -880,9 +880,9 @@ def bind_metadata_stanag_4778(model_artifact_bytes, ai_model_instance):
 
 **STANAG 5636 NCMS Searchability:**
 ```xml
-<!-- Map HIVE AI capabilities to NATO Core Metadata Specification -->
+<!-- Map PEAT AI capabilities to NATO Core Metadata Specification -->
 <NCMS:Resource xmlns:NCMS="urn:nato:stanag:5636">
-    <NCMS:Identifier>urn:hive:model:target_recognition:4.2.1</NCMS:Identifier>
+    <NCMS:Identifier>urn:peat:model:target_recognition:4.2.1</NCMS:Identifier>
     <NCMS:Title>Target Recognition Model v4.2.1</NCMS:Title>
     <NCMS:Type>AI_ML_Model</NCMS:Type>
     <NCMS:Format>application/onnx</NCMS:Format>
@@ -903,7 +903,7 @@ def bind_metadata_stanag_4778(model_artifact_bytes, ai_model_instance):
 
 ```rust
 // Rust implementation for edge platforms
-use hive_ai_capability::*;
+use peat_ai_capability::*;
 
 // Initialize AI capability advertiser
 let mut advertiser = AICapabilityAdvertiser::new("platform_007");
@@ -940,14 +940,14 @@ advertiser.update_performance("target_recognition", |perf| {
 
 // Advertise capabilities (differential CRDT sync)
 let advertisement = advertiser.generate_advertisement();
-hive_sync_engine.publish(advertisement);  // Uses ADR-007 Automerge sync
+peat_sync_engine.publish(advertisement);  // Uses ADR-007 Automerge sync
 ```
 
 #### Squad/Platoon Aggregation
 
 ```rust
 // Hierarchical aggregation at squad level
-use hive_ai_capability::aggregation::*;
+use peat_ai_capability::aggregation::*;
 
 let mut aggregator = AICapabilityAggregator::new("alpha_squad", FormationLevel::Squad);
 
@@ -968,14 +968,14 @@ for gap in gaps {
 }
 
 // Propagate aggregated capability upward
-hive_sync_engine.publish_aggregated(squad_capability);
+peat_sync_engine.publish_aggregated(squad_capability);
 ```
 
 #### C2 Capability Query Interface
 
 ```rust
 // Company C2 queries available AI capabilities
-use hive_ai_capability::query::*;
+use peat_ai_capability::query::*;
 
 let query = AICapabilityQuery::new()
     .model_type("classifier")
@@ -985,7 +985,7 @@ let query = AICapabilityQuery::new()
     .operational_status(Status::Operational)
     .formation_level(FormationLevel::Platoon);
 
-let results = hive_registry.query_capabilities(query);
+let results = peat_registry.query_capabilities(query);
 
 println!("Available ISR capabilities:");
 for result in results {
@@ -1143,7 +1143,7 @@ impl PerformanceDegradationDetector {
 **Standards Evolution Risk**
 - Model Card, ONNX, MLflow standards may evolve incompatibly
 - NATO STANAGs update on multi-year cycles
-- HIVE schema may need versioning strategy to handle changes
+- PEAT schema may need versioning strategy to handle changes
 - Risk of becoming tied to deprecated standards
 
 **Performance Measurement Challenges**
@@ -1206,7 +1206,7 @@ impl PerformanceDegradationDetector {
 - ONNX metadata integration
 - MLflow registry synchronization
 - STANAG 4778/5636 compliance validation
-- **Deliverable**: HIVE AI capabilities compatible with industry/military standards
+- **Deliverable**: PEAT AI capabilities compatible with industry/military standards
 
 ### Phase 5: Security and Governance (Months 8-10)
 - Implement cryptographic provenance verification

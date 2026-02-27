@@ -3,7 +3,7 @@
 **Status**: Proposed
 **Date**: 2025-01-29
 **Authors**: Claude, Kit Plummer
-**Related**: ADR-006 (Security Architecture), ADR-044 (E2E Encryption), ADR-039 (hive-btle Mesh Transport)
+**Related**: ADR-006 (Security Architecture), ADR-044 (E2E Encryption), ADR-039 (peat-btle Mesh Transport)
 
 ## Context
 
@@ -17,7 +17,7 @@ ADR-006 describes a full PKI model with X509 certificates and external CA hierar
 
 ### Current Problem
 
-Mesh encryption (ChaCha20-Poly1305 via hive-btle) proves a sender has the mesh key, but does NOT authenticate *which* mesh member sent a message. This enables spoofing:
+Mesh encryption (ChaCha20-Poly1305 via peat-btle) proves a sender has the mesh key, but does NOT authenticate *which* mesh member sent a message. This enables spoofing:
 
 1. Attacker joins mesh (has mesh key)
 2. Attacker sends CannedMessage with `sourceNodeId` = victim's nodeId
@@ -241,7 +241,7 @@ Unknown or invalid certificates → reject peer, do not sync.
 ### Neutral
 
 - Coexists with ADR-006 PKI model for enterprise deployments
-- hive-btle provides crypto primitives, HIVE implements policy
+- peat-btle provides crypto primitives, PEAT implements policy
 
 ## Implementation
 
@@ -249,20 +249,20 @@ Unknown or invalid certificates → reject peer, do not sync.
 
 | Layer | Responsibility |
 |-------|----------------|
-| **hive-btle** | Ed25519 sign/verify, IdentityAttestation, peer pubkey registry |
-| **hive-lite** | Signed wire formats (86-byte CannedMessage) |
-| **HIVE** | MembershipCertificate, enrollment protocol, auth policy, UX |
+| **peat-btle** | Ed25519 sign/verify, IdentityAttestation, peer pubkey registry |
+| **peat-lite** | Signed wire formats (86-byte CannedMessage) |
+| **PEAT** | MembershipCertificate, enrollment protocol, auth policy, UX |
 | **Apps** | Enrollment UI, QR display/scan, callsign assignment |
 
 ### Related Issues
 
-- **hive-btle** `cac154cc`: Crypto primitives (sign/verify utilities)
-- **hive-lite** `2140b82a`: Signed CannedMessage wire format
-- **HIVE** `23505348`: Membership certificates, enrollment, trust hierarchy
+- **peat-btle** `cac154cc`: Crypto primitives (sign/verify utilities)
+- **peat-lite** `2140b82a`: Signed CannedMessage wire format
+- **PEAT** `23505348`: Membership certificates, enrollment, trust hierarchy
 
 ## References
 
-- hive-btle `src/security/identity.rs`: DeviceIdentity, IdentityAttestation
-- hive-btle `src/security/genesis.rs`: MeshGenesis, MembershipPolicy
+- peat-btle `src/security/identity.rs`: DeviceIdentity, IdentityAttestation
+- peat-btle `src/security/genesis.rs`: MeshGenesis, MembershipPolicy
 - ADR-006: Security, Authentication, Authorization (PKI model)
 - ADR-044: E2E Encryption and Key Management (MLS, group keys)

@@ -55,7 +55,7 @@ echo ""
 echo "Results: ${RESULTS_DIR}"
 echo ""
 
-cd /home/kit/Code/revolve/hive/hive-sim
+cd /home/kit/Code/revolve/peat/peat-sim
 
 # Source environment variables
 log_info "Loading Ditto credentials from .env"

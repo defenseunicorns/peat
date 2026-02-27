@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'hive-protocol/**'
+      - 'peat-protocol/**'
       - '.github/workflows/benchmarks.yml'
   schedule:
     - cron: '0 6 * * 0'  # Sunday 06:00 UTC
@@ -36,7 +36,7 @@ jobs:
           shared-key: benchmarks
 
       - name: Run cap_benchmarks
-        run: cargo bench --bench cap_benchmarks -p hive-protocol
+        run: cargo bench --bench cap_benchmarks -p peat-protocol
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4

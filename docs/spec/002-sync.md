@@ -1,6 +1,6 @@
-# HIVE Protocol Specification: Synchronization Protocol
+# PEAT Protocol Specification: Synchronization Protocol
 
-**Spec ID**: HIVE-SPEC-002
+**Spec ID**: PEAT-SPEC-002
 **Status**: Draft
 **Version**: 0.1.0
 **Date**: 2025-01-07
@@ -8,7 +8,7 @@
 
 ## Abstract
 
-This document specifies the synchronization protocol for HIVE. It defines CRDT semantics, conflict resolution, document lifecycle, and the Negentropy-based set reconciliation mechanism.
+This document specifies the synchronization protocol for PEAT. It defines CRDT semantics, conflict resolution, document lifecycle, and the Negentropy-based set reconciliation mechanism.
 
 ## Table of Contents
 
@@ -30,7 +30,7 @@ This document specifies the synchronization protocol for HIVE. It defines CRDT s
 
 ### 1.1 Purpose
 
-HIVE's synchronization protocol ensures that all nodes in a cell eventually converge to the same state, even when operating offline or with intermittent connectivity. It builds on Conflict-free Replicated Data Types (CRDTs) to achieve automatic conflict resolution.
+PEAT's synchronization protocol ensures that all nodes in a cell eventually converge to the same state, even when operating offline or with intermittent connectivity. It builds on Conflict-free Replicated Data Types (CRDTs) to achieve automatic conflict resolution.
 
 ### 1.2 Design Goals
 
@@ -63,7 +63,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ### 3.1 Automerge CRDT
 
-HIVE uses Automerge as its CRDT implementation. Automerge provides:
+PEAT uses Automerge as its CRDT implementation. Automerge provides:
 
 - **JSON-like documents**: Nested maps, lists, and primitives
 - **Causal ordering**: Operations include dependency information
@@ -356,7 +356,7 @@ Tombstones and old changes MAY be collected when:
 
 ### 8.1 Overview
 
-For efficient sync of large collections, HIVE uses Negentropy set reconciliation. This protocol efficiently computes set differences using range fingerprints.
+For efficient sync of large collections, PEAT uses Negentropy set reconciliation. This protocol efficiently computes set differences using range fingerprints.
 
 ### 8.2 Fingerprint Computation
 
@@ -502,7 +502,7 @@ Sync priority SHOULD be assigned based on:
 
 ### 11.1 Operation Signing
 
-When E2E encryption is enabled (see HIVE-SPEC-005), operations SHOULD be signed:
+When E2E encryption is enabled (see PEAT-SPEC-005), operations SHOULD be signed:
 
 ```rust
 pub struct SignedChange {
@@ -527,7 +527,7 @@ Implementations MUST validate:
 
 ### 11.3 Storage Encryption
 
-Documents at rest SHOULD be encrypted. See HIVE-SPEC-005 for key management.
+Documents at rest SHOULD be encrypted. See PEAT-SPEC-005 for key management.
 
 ---
 

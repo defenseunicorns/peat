@@ -1,4 +1,4 @@
-# ADR-050: HIVE SDK Integration (Optimal Path)
+# ADR-050: PEAT SDK Integration (Optimal Path)
 
 **Status**: Proposed  
 **Date**: 2025-01-31  
@@ -11,11 +11,11 @@
 
 ## Executive Summary
 
-This ADR defines the **HIVE SDK** (`hive-sdk`) - the **optimal integration path** for systems that can incorporate HIVE directly. Unlike the consumer interface adapters (ADR-043), SDK integration provides:
+This ADR defines the **PEAT SDK** (`peat-sdk`) - the **optimal integration path** for systems that can incorporate PEAT directly. Unlike the consumer interface adapters (ADR-043), SDK integration provides:
 
 - **Full CRDT synchronization** with eventual consistency guarantees
 - **Offline operation** with automatic reconnection and sync
-- **Hierarchical participation** as a first-class HIVE node
+- **Hierarchical participation** as a first-class PEAT node
 - **Minimal latency** (sync latency only, no adapter overhead)
 - **Native capability aggregation** and cell membership
 
@@ -29,11 +29,11 @@ This ADR defines the **HIVE SDK** (`hive-sdk`) - the **optimal integration path*
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         HIVE Mesh                                        │
+│                         PEAT Mesh                                        │
 │                                                                          │
 │    ┌──────────┐      ┌──────────┐      ┌──────────┐      ┌──────────┐  │
 │    │  Squad   │◄────►│  UAS-1   │◄────►│  UGV-2   │◄────►│  Human   │  │
-│    │  Leader  │      │(hive-sdk)│      │(hive-sdk)│      │(hive-sdk)│  │
+│    │  Leader  │      │(peat-sdk)│      │(peat-sdk)│      │(peat-sdk)│  │
 │    └──────────┘      └──────────┘      └──────────┘      └──────────┘  │
 │         ▲                                                               │
 │         │ All nodes are equal CRDT participants                         │
@@ -54,7 +54,7 @@ vs.
 │                   Consumer Interface Architecture                        │
 │                                                                          │
 │    ┌──────────┐      ┌──────────┐                                       │
-│    │  HIVE    │◄────►│  HIVE    │                                       │
+│    │  PEAT    │◄────►│  PEAT    │                                       │
 │    │  Node    │      │  Node    │◄───HTTP/WS───► Legacy System          │
 │    └──────────┘      └──────────┘                (not a real participant)│
 │                           │                                              │
@@ -82,7 +82,7 @@ vs.
 
 ### Target Platforms
 
-The SDK targets systems where HIVE can be embedded:
+The SDK targets systems where PEAT can be embedded:
 
 | Platform | Language Binding | Use Case |
 |----------|------------------|----------|
@@ -103,7 +103,7 @@ The SDK targets systems where HIVE can be embedded:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                            hive-sdk                                      │
+│                            peat-sdk                                      │
 │                                                                          │
 │  ┌────────────────────────────────────────────────────────────────────┐ │
 │  │                     Language Bindings                               │ │
@@ -117,7 +117,7 @@ The SDK targets systems where HIVE can be embedded:
 │  ┌────────────────────────────────────────────────────────────────────┐ │
 │  │                     High-Level API                                  │ │
 │  │                                                                     │ │
-│  │  • HiveNode - main entry point                                     │ │
+│  │  • PeatNode - main entry point                                     │ │
 │  │  • Platform - represent this platform's state                      │ │
 │  │  • Cell - cell membership and queries                              │ │
 │  │  • Capabilities - advertise and discover                           │ │
@@ -130,7 +130,7 @@ The SDK targets systems where HIVE can be embedded:
 │  │                     Core Components                                 │ │
 │  │                                                                     │ │
 │  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐    │ │
-│  │  │  hive-protocol  │  │   hive-schema   │  │  MeshProvider   │    │ │
+│  │  │  peat-protocol  │  │   peat-schema   │  │  MeshProvider   │    │ │
 │  │  │                 │  │   (ADR-049)     │  │                 │    │ │
 │  │  └─────────────────┘  └─────────────────┘  └─────────────────┘    │ │
 │  └────────────────────────────────────────────────────────────────────┘ │
@@ -139,7 +139,7 @@ The SDK targets systems where HIVE can be embedded:
 │  ┌────────────────────────────────────────────────────────────────────┐ │
 │  │                     Transport Layer (ADR-032)                       │ │
 │  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐                  │ │
-│  │  │  Iroh   │ │hive-btle│ │  LoRa   │ │ Custom  │                  │ │
+│  │  │  Iroh   │ │peat-btle│ │  LoRa   │ │ Custom  │                  │ │
 │  │  │ (QUIC)  │ │  (BLE)  │ │         │ │         │                  │ │
 │  │  └─────────┘ └─────────┘ └─────────┘ └─────────┘                  │ │
 │  └────────────────────────────────────────────────────────────────────┘ │
@@ -151,26 +151,26 @@ The SDK targets systems where HIVE can be embedded:
 #### Rust (Native)
 
 ```rust
-// hive-sdk/src/lib.rs
+// peat-sdk/src/lib.rs
 
-use hive_schema::hive::v1::*;
+use peat_schema::peat::v1::*;
 use std::sync::Arc;
 
-/// Main entry point for HIVE integration
-pub struct HiveNode {
+/// Main entry point for PEAT integration
+pub struct PeatNode {
     platform: Platform,
-    config: HiveConfig,
+    config: PeatConfig,
 }
 
-impl HiveNode {
-    /// Create a new HIVE node with the given configuration
-    pub async fn new(config: HiveConfig) -> Result<Self, HiveError> {
+impl PeatNode {
+    /// Create a new PEAT node with the given configuration
+    pub async fn new(config: PeatConfig) -> Result<Self, PeatError> {
         let platform = Platform::new(&config.platform_id);
         Ok(Self { platform, config })
     }
     
     /// Start the node and begin mesh participation
-    pub async fn start(&self) -> Result<(), HiveError> {
+    pub async fn start(&self) -> Result<(), PeatError> {
         self.platform.start_beacon_broadcast().await?;
         Ok(())
     }
@@ -196,7 +196,7 @@ impl HiveNode {
     }
     
     /// Send a command to another platform or cell
-    pub async fn command(&self, cmd: Command) -> Result<CommandReceipt, HiveError> {
+    pub async fn command(&self, cmd: Command) -> Result<CommandReceipt, PeatError> {
         todo!()
     }
 }
@@ -208,22 +208,22 @@ pub struct Platform {
 
 impl Platform {
     /// Update this platform's position
-    pub async fn set_position(&self, position: Position) -> Result<(), HiveError> {
+    pub async fn set_position(&self, position: Position) -> Result<(), PeatError> {
         Ok(())
     }
     
     /// Update this platform's operational status
-    pub async fn set_operational(&self, operational: bool) -> Result<(), HiveError> {
+    pub async fn set_operational(&self, operational: bool) -> Result<(), PeatError> {
         Ok(())
     }
     
     /// Advertise a capability
-    pub async fn advertise_capability(&self, cap: CapabilityAdvertisement) -> Result<(), HiveError> {
+    pub async fn advertise_capability(&self, cap: CapabilityAdvertisement) -> Result<(), PeatError> {
         Ok(())
     }
     
     /// Remove a capability advertisement
-    pub async fn remove_capability(&self, capability_id: &str) -> Result<(), HiveError> {
+    pub async fn remove_capability(&self, capability_id: &str) -> Result<(), PeatError> {
         Ok(())
     }
     
@@ -268,7 +268,7 @@ impl PlatformQuery {
     }
     
     /// Execute the query and return results
-    pub async fn execute(&self) -> Result<Vec<PlatformBeacon>, HiveError> {
+    pub async fn execute(&self) -> Result<Vec<PlatformBeacon>, PeatError> {
         Ok(vec![])
     }
 }
@@ -282,19 +282,19 @@ pub enum SpatialFilter {
 #### Python (PyO3)
 
 ```python
-# hive_sdk/__init__.py
+# peat_sdk/__init__.py
 
 import asyncio
 
 async def main():
-    # Create and start a HIVE node
-    config = HiveConfig(
+    # Create and start a PEAT node
+    config = PeatConfig(
         platform_id="uav-001",
         mesh_backend="automerge",  # or "ditto"
         transports=["iroh", "ble"],
     )
     
-    node = await HiveNode.create(config)
+    node = await PeatNode.create(config)
     await node.start()
     
     # Update our position
@@ -333,21 +333,21 @@ if __name__ == "__main__":
 #### Kotlin (Android/JNI)
 
 ```kotlin
-// HiveSDK.kt
+// PeatSDK.kt
 
-package com.revolveteam.hive
+package com.revolveteam.peat
 
 import kotlinx.coroutines.flow.Flow
 
-class HiveNode private constructor(
+class PeatNode private constructor(
     private val native: Long  // JNI pointer
 ) {
     companion object {
-        suspend fun create(config: HiveConfig): HiveNode {
-            return HiveNode(nativeCreate(config))
+        suspend fun create(config: PeatConfig): PeatNode {
+            return PeatNode(nativeCreate(config))
         }
         
-        private external fun nativeCreate(config: HiveConfig): Long
+        private external fun nativeCreate(config: PeatConfig): Long
     }
     
     val platform: Platform = Platform(this)
@@ -367,19 +367,19 @@ class HiveNode private constructor(
 
 // Usage in Android Activity/ViewModel
 class DroneViewModel : ViewModel() {
-    private lateinit var hive: HiveNode
+    private lateinit var peat: PeatNode
     
     fun initialize() {
         viewModelScope.launch {
-            hive = HiveNode.create(HiveConfig(
+            peat = PeatNode.create(PeatConfig(
                 platformId = "android-${Build.SERIAL}",
                 meshBackend = MeshBackend.AUTOMERGE,
                 transports = listOf(Transport.IROH, Transport.BLE),
             ))
-            hive.start()
+            peat.start()
             
             // Observe nearby platforms
-            hive.platforms()
+            peat.platforms()
                 .withinRadius(currentPosition, 5000.0)
                 .subscribe()
                 .collect { platform ->
@@ -393,13 +393,13 @@ class DroneViewModel : ViewModel() {
 #### Go (cgo)
 
 ```go
-// hive-sdk-go/hive.go
+// peat-sdk-go/peat.go
 
-package hive
+package peat
 
 /*
-#cgo LDFLAGS: -lhive_sdk
-#include "hive_sdk.h"
+#cgo LDFLAGS: -lpeat_sdk
+#include "peat_sdk.h"
 */
 import "C"
 import (
@@ -408,12 +408,12 @@ import (
     "unsafe"
 )
 
-// HiveNode represents a HIVE mesh participant
-type HiveNode struct {
+// PeatNode represents a PEAT mesh participant
+type PeatNode struct {
     ptr unsafe.Pointer
 }
 
-// Config for creating a HiveNode
+// Config for creating a PeatNode
 type Config struct {
     PlatformID   string      `json:"platform_id"`
     MeshBackend  string      `json:"mesh_backend"` // "automerge" or "ditto"
@@ -421,23 +421,23 @@ type Config struct {
     BeaconInterval int       `json:"beacon_interval_secs"`
 }
 
-// NewHiveNode creates a new HIVE node
-func NewHiveNode(cfg Config) (*HiveNode, error) {
+// NewPeatNode creates a new PEAT node
+func NewPeatNode(cfg Config) (*PeatNode, error) {
     cfgJSON, _ := json.Marshal(cfg)
     cConfig := C.CString(string(cfgJSON))
     defer C.free(unsafe.Pointer(cConfig))
     
-    ptr := C.hive_node_create(cConfig)
+    ptr := C.peat_node_create(cConfig)
     if ptr == nil {
-        return nil, fmt.Errorf("failed to create HiveNode")
+        return nil, fmt.Errorf("failed to create PeatNode")
     }
     
-    return &HiveNode{ptr: ptr}, nil
+    return &PeatNode{ptr: ptr}, nil
 }
 
 // Start begins mesh participation
-func (h *HiveNode) Start(ctx context.Context) error {
-    result := C.hive_node_start(h.ptr)
+func (h *PeatNode) Start(ctx context.Context) error {
+    result := C.peat_node_start(h.ptr)
     if result != 0 {
         return fmt.Errorf("failed to start: %d", result)
     }
@@ -445,8 +445,8 @@ func (h *HiveNode) Start(ctx context.Context) error {
 }
 
 // SetPosition updates this platform's position
-func (h *HiveNode) SetPosition(lat, lon, alt float64) error {
-    result := C.hive_platform_set_position(h.ptr, C.double(lat), C.double(lon), C.double(alt))
+func (h *PeatNode) SetPosition(lat, lon, alt float64) error {
+    result := C.peat_platform_set_position(h.ptr, C.double(lat), C.double(lon), C.double(alt))
     if result != 0 {
         return fmt.Errorf("failed to set position: %d", result)
     }
@@ -463,13 +463,13 @@ type Platform struct {
 }
 
 // QueryPlatforms returns platforms matching the query
-func (h *HiveNode) QueryPlatforms(opts QueryOpts) ([]Platform, error) {
+func (h *PeatNode) QueryPlatforms(opts QueryOpts) ([]Platform, error) {
     optsJSON, _ := json.Marshal(opts)
     cOpts := C.CString(string(optsJSON))
     defer C.free(unsafe.Pointer(cOpts))
     
     var resultLen C.int
-    resultPtr := C.hive_query_platforms(h.ptr, cOpts, &resultLen)
+    resultPtr := C.peat_query_platforms(h.ptr, cOpts, &resultLen)
     if resultPtr == nil {
         return nil, fmt.Errorf("query failed")
     }
@@ -483,7 +483,7 @@ func (h *HiveNode) QueryPlatforms(opts QueryOpts) ([]Platform, error) {
 }
 
 // SubscribePlatforms returns a channel of platform updates
-func (h *HiveNode) SubscribePlatforms(ctx context.Context) (<-chan Platform, error) {
+func (h *PeatNode) SubscribePlatforms(ctx context.Context) (<-chan Platform, error) {
     ch := make(chan Platform, 100)
     
     go func() {
@@ -496,8 +496,8 @@ func (h *HiveNode) SubscribePlatforms(ctx context.Context) (<-chan Platform, err
 }
 
 // Close shuts down the node
-func (h *HiveNode) Close() error {
-    C.hive_node_destroy(h.ptr)
+func (h *PeatNode) Close() error {
+    C.peat_node_destroy(h.ptr)
     h.ptr = nil
     return nil
 }
@@ -513,15 +513,15 @@ import (
     "os"
     "os/signal"
     
-    "github.com/revolveteam/hive-sdk-go"
+    "github.com/revolveteam/peat-sdk-go"
 )
 
 func main() {
     ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
     defer cancel()
     
-    // Create HIVE node for this operator instance
-    node, err := hive.NewHiveNode(hive.Config{
+    // Create PEAT node for this operator instance
+    node, err := peat.NewPeatNode(peat.Config{
         PlatformID:  os.Getenv("HOSTNAME"),
         MeshBackend: "automerge",
         Transports:  []string{"iroh"},
@@ -553,30 +553,30 @@ func main() {
 #### ROS2 Integration
 
 ```rust
-// hive-ros2-bridge/src/lib.rs
+// peat-ros2-bridge/src/lib.rs
 
-use hive_sdk::HiveNode;
+use peat_sdk::PeatNode;
 
-/// ROS2 bridge that publishes HIVE state as ROS2 topics
-/// and subscribes to ROS2 topics to update HIVE state
-pub struct HiveRos2Bridge {
-    hive: HiveNode,
+/// ROS2 bridge that publishes PEAT state as ROS2 topics
+/// and subscribes to ROS2 topics to update PEAT state
+pub struct PeatRos2Bridge {
+    peat: PeatNode,
     // ROS2 node, publishers, subscribers...
 }
 
-impl HiveRos2Bridge {
-    pub async fn new(hive_config: HiveConfig) -> Result<Self> {
-        let hive = HiveNode::new(hive_config).await?;
-        Ok(Self { hive })
+impl PeatRos2Bridge {
+    pub async fn new(peat_config: PeatConfig) -> Result<Self> {
+        let peat = PeatNode::new(peat_config).await?;
+        Ok(Self { peat })
     }
     
     pub async fn run(&mut self) -> Result<()> {
-        self.hive.start().await?;
+        self.peat.start().await?;
         
         loop {
             tokio::select! {
-                // ROS2 odometry → HIVE position
-                // HIVE platform updates → ROS2 topics
+                // ROS2 odometry → PEAT position
+                // PEAT platform updates → ROS2 topics
             }
         }
     }
@@ -590,7 +590,7 @@ impl HiveRos2Bridge {
 ```rust
 /// SDK configuration
 #[derive(Debug, Clone)]
-pub struct HiveConfig {
+pub struct PeatConfig {
     /// Unique identifier for this platform
     pub platform_id: String,
     
@@ -651,8 +651,8 @@ pub enum TransportConfig {
 
 ### Phase 1: Core Rust SDK (Week 1-3)
 
-- [ ] Create `hive-sdk` crate
-- [ ] Implement HiveNode, Platform, PlatformQuery
+- [ ] Create `peat-sdk` crate
+- [ ] Implement PeatNode, Platform, PlatformQuery
 - [ ] Implement subscription system
 - [ ] Unit tests with MockMeshProvider
 - [ ] Integration tests with real mesh
@@ -663,11 +663,11 @@ pub enum TransportConfig {
 
 - [ ] PyO3 bindings for core types
 - [ ] Async support via pyo3-asyncio
-- [ ] Python package structure (hive_sdk)
+- [ ] Python package structure (peat_sdk)
 - [ ] PyPI publication pipeline
 - [ ] Python examples and documentation
 
-**Deliverable**: `pip install hive-sdk` works
+**Deliverable**: `pip install peat-sdk` works
 
 ### Phase 3: Go Bindings (Week 6-7)
 
@@ -678,7 +678,7 @@ pub enum TransportConfig {
 - [ ] Zarf/UDS integration example
 - [ ] Kubernetes operator example
 
-**Deliverable**: `go get github.com/revolveteam/hive-sdk-go` works
+**Deliverable**: `go get github.com/revolveteam/peat-sdk-go` works
 
 ### Phase 4: Mobile Bindings (Week 8-10)
 
@@ -692,13 +692,13 @@ pub enum TransportConfig {
 
 ### Phase 5: ROS2 Bridge (Week 11-12)
 
-- [ ] hive-ros2-bridge crate
+- [ ] peat-ros2-bridge crate
 - [ ] Standard message conversions
 - [ ] Launch file templates
 - [ ] ROS2 Humble/Iron compatibility
 - [ ] Integration with common robot platforms
 
-**Deliverable**: ROS2 robots can join HIVE mesh
+**Deliverable**: ROS2 robots can join PEAT mesh
 
 ### Phase 6: Documentation & Examples (Week 13-14)
 
@@ -715,11 +715,11 @@ pub enum TransportConfig {
 ## Success Criteria
 
 1. **Rust Integration**: < 50 lines of code to join mesh and broadcast position
-2. **Python Integration**: `pip install hive-sdk` + 10 lines to basic functionality
+2. **Python Integration**: `pip install peat-sdk` + 10 lines to basic functionality
 3. **Go Integration**: `go get` + idiomatic Go API with channels and context
 4. **Android Integration**: AAR dependency + Kotlin coroutines API
 5. **iOS Integration**: Swift Package Manager + async/await API
-6. **ROS2 Integration**: Single launch file to bridge robot to HIVE
+6. **ROS2 Integration**: Single launch file to bridge robot to PEAT
 7. **Latency**: < 50ms position sync between SDK nodes (network permitting)
 8. **Offline**: Survives 10-minute network partition, syncs on reconnect
 9. **Documentation**: New developer productive in < 1 hour per language
@@ -741,7 +741,7 @@ pub enum TransportConfig {
 
 - **Integration effort** - requires modifying target system
 - **Binary size** - SDK adds ~5-15MB depending on features
-- **Platform support** - may not work on very constrained devices (use hive-btle Lite)
+- **Platform support** - may not work on very constrained devices (use peat-btle Lite)
 - **Learning curve** - developers must understand CRDT concepts
 - **cgo overhead** - Go bindings have FFI overhead vs native Go
 
@@ -759,7 +759,7 @@ pub enum TransportConfig {
 
 **Pros**: Single integration point, simpler
 **Cons**: Loses all CRDT benefits, adds latency, no offline
-**Decision**: Rejected - defeats the purpose of HIVE's architecture
+**Decision**: Rejected - defeats the purpose of PEAT's architecture
 
 ### 2. WASM-Only Cross-Platform
 
@@ -791,7 +791,7 @@ pub enum TransportConfig {
 - [r2r - Rust ROS2 client](https://github.com/sequenceplanner/r2r)
 - ADR-043: Consumer Interface Adapters (Compatibility Path)
 - ADR-045: Zarf/UDS Integration
-- ADR-049: hive-mesh Extraction
+- ADR-049: peat-mesh Extraction
 
 ---
 

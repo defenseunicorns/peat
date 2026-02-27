@@ -1,10 +1,10 @@
 
-# ADR-001: HIVE Protocol Proof-of-Concept Architecture
+# ADR-001: PEAT Protocol Proof-of-Concept Architecture
 
 **Status:** Proposed  
 **Date:** 2025-10-28  
 **Decision Makers:** Research Team  
-**Technical Story:** Implement HIVE protocol to demonstrate hierarchical capability composition at scale
+**Technical Story:** Implement PEAT protocol to demonstrate hierarchical capability composition at scale
 
 ## Context and Problem Statement
 
@@ -84,7 +84,7 @@ Build a Rust library + reference application that demonstrates:
 └─────────────────────────────────────────────────────────┘
                             │
 ┌─────────────────────────────────────────────────────────┐
-│                    HIVE Protocol Library                  │
+│                    PEAT Protocol Library                  │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
 │  │   Phase 1:   │  │   Phase 2:   │  │   Phase 3:   │ │
 │  │  Discovery   │→ │    Cell     │→ │ Hierarchical │ │
@@ -516,12 +516,12 @@ proptest = "1"              # Property testing
 
 **Status**: Accepted
 **Date**: 2025-10-29
-**Decision Makers**: HIVE Protocol Team
+**Decision Makers**: PEAT Protocol Team
 **Related**: E3.1 Geographic Self-Organization
 
 ## Context
 
-The HIVE protocol's geographic discovery system requires nodes to continuously broadcast their position and status as "beacons" across a Ditto mesh network. Each node must be able to discover nearby nodes to autonomously form cells during the discovery phase.
+The PEAT protocol's geographic discovery system requires nodes to continuously broadcast their position and status as "beacons" across a Ditto mesh network. Each node must be able to discover nearby nodes to autonomously form cells during the discovery phase.
 
 Two architectural approaches were considered for beacon storage:
 
@@ -717,7 +717,7 @@ tokio::spawn(async move {
 
 - [Ditto TTL Documentation](https://docs.ditto.live/concepts/document-ttl)
 - [Ditto Query Language](https://docs.ditto.live/concepts/dql)
-- HIVE Protocol Specification: Discovery Phase (E3.1)
+- PEAT Protocol Specification: Discovery Phase (E3.1)
 - Swarm Robotics Patterns: Decentralized State Management
 
 ## Notes
@@ -794,7 +794,7 @@ We will **implement a hybrid human-machine composition model** that extends the 
 #### 1. Operator Model (New)
 
 ```rust
-// Location: hive-protocol/src/models/operator.rs
+// Location: peat-protocol/src/models/operator.rs
 
 /// Human operator of a platform
 pub struct Operator {
@@ -826,7 +826,7 @@ pub enum AuthorityLevel {
 #### 2. Human-Machine Binding (New)
 
 ```rust
-// Location: hive-protocol/src/models/operator.rs
+// Location: peat-protocol/src/models/operator.rs
 
 pub struct HumanMachinePair {
     pub operators: Vec<Operator>,
@@ -847,7 +847,7 @@ pub enum BindingType {
 #### 3. Extended Node Model (Modified)
 
 ```rust
-// Location: hive-protocol/src/models/node.rs
+// Location: peat-protocol/src/models/node.rs
 
 pub struct PlatformConfig {
     pub id: String,
@@ -863,7 +863,7 @@ pub struct PlatformConfig {
 #### 4. Extended Leadership Scoring (Modified E4.2)
 
 ```rust
-// Location: hive-protocol/src/cell/leader_election.rs
+// Location: peat-protocol/src/cell/leader_election.rs
 
 pub struct ElectionContext {
     pub policy: LeadershipPolicy,
@@ -927,7 +927,7 @@ impl LeadershipScore {
 #### 5. Tunable Configuration (New)
 
 ```rust
-// Location: hive-protocol/src/config/election_policy.rs
+// Location: peat-protocol/src/config/election_policy.rs
 
 /// Configuration for leader election policies
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1180,7 +1180,7 @@ cell_variants:
 
 ## References
 
-- [E4.2: Leader Election Algorithm](https://github.com/kitplummer/hive/pull/24)
+- [E4.2: Leader Election Algorithm](https://github.com/defenseunicorns/peat/pull/24)
 - DARPA OFFSET program - Human-swarm interfaces
 - NATO STANAG 4586 - UAV interoperability
 - Army FM 3-0: Operations - Leadership principles
@@ -1197,7 +1197,7 @@ cell_variants:
 
 ## Notes
 
-This is a foundational architectural decision that affects all subsequent work. Taking 2-3 days now to implement properly will save weeks of refactoring later and enable realistic demonstrations of the HIVE protocol in human-machine teaming scenarios.
+This is a foundational architectural decision that affects all subsequent work. Taking 2-3 days now to implement properly will save weeks of refactoring later and enable realistic demonstrations of the PEAT protocol in human-machine teaming scenarios.
 
 The tunable configuration system is critical for research - allows experimentation with different authority policies to find optimal human-machine teaming strategies.
 
@@ -1437,7 +1437,7 @@ Cell Leader Intent → Cell Message Bus → Node Receives → Human Display
 
 ## Context
 
-HIVE Protocol currently has a hard dependency on Ditto SDK for CRDT synchronization, peer discovery, and data persistence. While Ditto provides excellent P2P mesh capabilities, we've encountered several limitations:
+PEAT Protocol currently has a hard dependency on Ditto SDK for CRDT synchronization, peer discovery, and data persistence. While Ditto provides excellent P2P mesh capabilities, we've encountered several limitations:
 
 ### Issues with Current Ditto Integration
 
@@ -1463,7 +1463,7 @@ The new `crdt-edge` implementation plan (see `CAP_Rust_Implementation_Plan.md`) 
 
 ## Decision
 
-We will define a **Data Synchronization Abstraction Layer** consisting of four core traits that completely isolate HIVE Protocol business logic from the underlying sync engine:
+We will define a **Data Synchronization Abstraction Layer** consisting of four core traits that completely isolate PEAT Protocol business logic from the underlying sync engine:
 
 ### Core Abstraction Traits
 
@@ -1602,7 +1602,7 @@ pub struct TransportConfig {
 
 ### Phase 1: Refactor Existing Code to Use Abstraction (Week 1-2)
 
-1. **Create `hive-protocol/src/sync/` module** with trait definitions
+1. **Create `peat-protocol/src/sync/` module** with trait definitions
 2. **Implement `DittoBackend`** that wraps existing DittoStore
 3. **Update `CellStore` and `NodeStore`** to use trait instead of concrete DittoStore
 4. **No behavior changes** - pure refactoring for abstraction
@@ -1874,7 +1874,7 @@ async fn test_cell_sync_both_backends() {
 
 ### Milestone 1: Abstraction Layer (Weeks 1-2)
 
-- [ ] Define all abstraction traits in `hive-protocol/src/sync/traits.rs`
+- [ ] Define all abstraction traits in `peat-protocol/src/sync/traits.rs`
 - [ ] Implement `DittoBackend` wrapper
 - [ ] Refactor `CellStore` to be generic over `DataSyncBackend`
 - [ ] Refactor `NodeStore` to be generic over `DataSyncBackend`
@@ -1914,7 +1914,7 @@ Follow `CAP_Rust_Implementation_Plan.md` phases 1-3:
 ## References
 
 - [CAP_Rust_Implementation_Plan.md](../CAP_Rust_Implementation_Plan.md) - Detailed custom implementation design
-- [ADR-001](001-hive-protocol-poc.md) - Original Ditto integration decision
+- [ADR-001](001-peat-protocol-poc.md) - Original Ditto integration decision
 - [ADR-002](002-beacon-storage-architecture.md) - Current Ditto storage patterns
 - [Automerge Columnar Protocol](https://automerge.org/blog/2023/11/06/automerge-2/) - Wire format inspiration
 - [Ditto SDK Documentation](https://docs.ditto.live/) - Current backend reference
@@ -1944,7 +1944,7 @@ Follow `CAP_Rust_Implementation_Plan.md` phases 1-3:
 
 ---
 
-# ADR-006: Security, Authentication, and Authorization for HIVE Protocol
+# ADR-006: Security, Authentication, and Authorization for PEAT Protocol
 
 **Status**: Proposed
 **Date**: 2025-11-04
@@ -1953,7 +1953,7 @@ Follow `CAP_Rust_Implementation_Plan.md` phases 1-3:
 
 ## Context
 
-HIVE Protocol coordinates autonomous platforms in tactical military environments where security failures can result in:
+PEAT Protocol coordinates autonomous platforms in tactical military environments where security failures can result in:
 - **Loss of life** (compromised UAVs, corrupted mission data)
 - **Mission failure** (adversary disruption of coordination)
 - **Tactical disadvantage** (enemy intelligence gathering)
@@ -1979,7 +1979,7 @@ Current implementation has **no authentication or authorization**. All nodes tru
 
 ### Security Requirements
 
-HIVE Protocol must provide:
+PEAT Protocol must provide:
 
 1. **Device Authentication** - Cryptographically verify device identity
 2. **User Authentication** - Verify human operator credentials (for C2 apps)
@@ -2282,7 +2282,7 @@ impl ApplicationAuthenticator {
 Control what each authenticated entity can do.
 
 ```rust
-/// Roles in HIVE Protocol
+/// Roles in PEAT Protocol
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Role {
     /// Squad/cell leader - can command cell, set objectives
@@ -2425,7 +2425,7 @@ pub struct AuthorizationContext {
     pub cell_store: Arc<dyn CellStoreReader>,
 }
 
-/// Default authorization policy for HIVE Protocol
+/// Default authorization policy for PEAT Protocol
 impl AuthorizationPolicy {
     pub fn default_policy() -> Self {
         let mut policy = AuthorizationPolicy::new();
@@ -2469,7 +2469,7 @@ impl AuthorizationPolicy {
 Encrypt all data in transit and at rest.
 
 ```rust
-/// Encryption manager for HIVE Protocol
+/// Encryption manager for PEAT Protocol
 pub struct EncryptionManager {
     /// Device's encryption keypair
     keypair: EncryptionKeypair,
@@ -2492,7 +2492,7 @@ impl EncryptionManager {
         let shared_secret = self.keypair.dh_exchange(peer_pubkey)?;
 
         // 2. Derive symmetric key using HKDF
-        let symmetric_key = hkdf_derive(&shared_secret, b"hive-protocol-v1")?;
+        let symmetric_key = hkdf_derive(&shared_secret, b"peat-protocol-v1")?;
 
         // 3. Store key for this peer
         self.peer_keys.write().await.insert(*peer_id, symmetric_key.clone());
@@ -2562,7 +2562,7 @@ impl EncryptionManager {
 
 Security must integrate with the abstraction layer from ADR-005.
 
-**Critical Requirement**: Following the Ports & Adapters pattern from ADR-005/ADR-011, the security layer **must be backend-agnostic**. The HIVE Protocol API should work identically regardless of whether Ditto or AutomergeIroh is the underlying backend.
+**Critical Requirement**: Following the Ports & Adapters pattern from ADR-005/ADR-011, the security layer **must be backend-agnostic**. The PEAT Protocol API should work identically regardless of whether Ditto or AutomergeIroh is the underlying backend.
 
 #### Backend Implementation Notes
 
@@ -2792,7 +2792,7 @@ impl AuditLogger for FileAuditLogger {
 }
 ```
 
-## Integration with HIVE Protocol Phases
+## Integration with PEAT Protocol Phases
 
 ### Phase 1: Discovery → Requires Device Authentication
 
@@ -2931,7 +2931,7 @@ if !user.has_clearance_for_level(HierarchyLevel::Platoon) {
 
 ## Compliance Considerations
 
-HIVE Protocol security must align with:
+PEAT Protocol security must align with:
 
 - **NIST SP 800-53** - Security and Privacy Controls for Information Systems
 - **DoD 8500 Series** - Cybersecurity for DoD Information Systems
@@ -3069,7 +3069,7 @@ This ADR proposes evaluating **both Automerge and Loro** as CRDT backend options
 
 **Government Off-The-Shelf (GOTS) Opportunity**
 
-An open-source, Automerge-based sync engine positions HIVE Protocol as **Government Off-The-Shelf (GOTS)** software, providing critical advantages:
+An open-source, Automerge-based sync engine positions PEAT Protocol as **Government Off-The-Shelf (GOTS)** software, providing critical advantages:
 
 1. **Open Architecture Compliance**
    - Aligns with DoD's **Modular Open Systems Approach (MOSA)**
@@ -3078,7 +3078,7 @@ An open-source, Automerge-based sync engine positions HIVE Protocol as **Governm
    - Facilitates competition and innovation in tactical autonomous systems
 
 2. **NATO Standardization Path**
-   - **STANAG Candidate**: HIVE Protocol + automerge-edge could become a NATO standard for autonomous platform coordination
+   - **STANAG Candidate**: PEAT Protocol + automerge-edge could become a NATO standard for autonomous platform coordination
    - **Interoperability**: Allied forces can adopt without licensing barriers
    - **Multi-National Development**: NATO members can contribute improvements
    - **Coalition Operations**: Shared technology base for combined operations
@@ -3119,7 +3119,7 @@ Historical examples of successful defense technology standardization:
 3. **ATDL-1/VMF (STANAG 5500)** - Variable message format for tactical messaging
 4. **ASTERIX (STANAG 4761)** - Air traffic surveillance data format
 
-**HIVE Protocol + automerge-edge** could become the **STANAG for autonomous platform coordination**, analogous to how Link 16 standardized data sharing between manned platforms.
+**PEAT Protocol + automerge-edge** could become the **STANAG for autonomous platform coordination**, analogous to how Link 16 standardized data sharing between manned platforms.
 
 ### Open Architecture Alignment
 
@@ -3338,7 +3338,7 @@ Open-source approach enables broader innovation ecosystem:
 
 **Proposed Timeline**:
 
-1. **Year 1: Demonstrate in HIVE Protocol**
+1. **Year 1: Demonstrate in PEAT Protocol**
    - Prove capability in US tactical autonomous systems
    - Publish performance benchmarks and test results
    - Present at DoD and NATO conferences
@@ -3772,7 +3772,7 @@ criterion_main!(benches);
 
 **Path Forward**:
 1. Remove non-selected backend code
-2. Build `hive-protocol-core` on winning backend
+2. Build `peat-protocol-core` on winning backend
 3. Integrate with CellStore/NodeStore
 4. Update E2E tests
 5. Remove all Ditto dependencies
@@ -4476,16 +4476,16 @@ impl Collection {
 }
 ```
 
-## HIVE Protocol Integration
+## PEAT Protocol Integration
 
-HIVE Protocol uses `automerge-edge` as a library:
+PEAT Protocol uses `automerge-edge` as a library:
 
 ```rust
-// In hive-protocol/Cargo.toml
+// In peat-protocol/Cargo.toml
 [dependencies]
 automerge-edge = { version = "0.1", features = ["security", "priority-sync"] }
 
-// In hive-protocol/src/storage/mod.rs
+// In peat-protocol/src/storage/mod.rs
 use automerge_edge::{Repository, Collection};
 
 pub struct CellStore {
@@ -4540,7 +4540,7 @@ Tasks:
 
 ### Phase 2: Feature Parity with Ditto (Weeks 9-16)
 
-**Goal**: Match capabilities currently used by HIVE Protocol
+**Goal**: Match capabilities currently used by PEAT Protocol
 
 Tasks:
 - [ ] Collection queries (find, find_one, update)
@@ -4560,7 +4560,7 @@ Tasks:
 - [ ] Encrypted storage
 - [ ] **Milestone**: Secure sync with authenticated peers
 
-### Phase 4: Replace Ditto in HIVE Protocol (Weeks 21-24)
+### Phase 4: Replace Ditto in PEAT Protocol (Weeks 21-24)
 
 **Goal**: Complete migration
 
@@ -4570,7 +4570,7 @@ Tasks:
 - [ ] Update E2E tests
 - [ ] Remove Ditto dependency
 - [ ] Performance benchmarks (vs Ditto baseline)
-- [ ] **Milestone**: HIVE Protocol fully operational without Ditto
+- [ ] **Milestone**: PEAT Protocol fully operational without Ditto
 
 ### Phase 5: Publish and Promote (Weeks 25+)
 
@@ -4604,7 +4604,7 @@ Tasks:
 ### Ecosystem Benefits
 
 1. **Fills Gap**: Automerge lacks networking/discovery
-2. **General Purpose**: Useful beyond HIVE Protocol
+2. **General Purpose**: Useful beyond PEAT Protocol
 3. **Production Ready**: Unlike many CRDT research projects
 4. **Modern Rust**: Idiomatic, async, type-safe
 5. **Open Source**: Apache-2.0 or MIT license
@@ -4649,7 +4649,7 @@ Tasks:
 2. **Performance Equivalent**: Within 20% of Ditto on key metrics
 3. **Test Coverage**: 80%+ coverage, all E2E tests passing
 4. **Documentation**: Complete API docs and tutorials
-5. **Zero Ditto Dependency**: HIVE Protocol compiles without Ditto
+5. **Zero Ditto Dependency**: PEAT Protocol compiles without Ditto
 6. **Reusability**: At least one example of non-CAP usage
 
 ## References
@@ -4662,7 +4662,7 @@ Tasks:
 - [Loro Documentation](https://loro.dev/docs) - API reference and guides
 - [CRDT Benchmarks](https://github.com/dmonad/crdt-benchmarks) - Performance comparisons
 
-**HIVE Protocol:**
+**PEAT Protocol:**
 - [CAP_Rust_Implementation_Plan.md](../CAP_Rust_Implementation_Plan.md) - Detailed design
 - [ADR-006](006-security-authentication-authorization.md) - Security integration
 - [ADR-009](009-bidirectional-hierarchical-flows.md) - Hierarchical communication
@@ -4796,7 +4796,7 @@ Tasks:
    - Update ADR-007 with final choice
    - Remove non-selected backend code
    - Update architecture diagrams
-   - Plan integration with HIVE Protocol
+   - Plan integration with PEAT Protocol
 
 ### Short-term - Post-E8 (Weeks 3-12)
 
@@ -4861,7 +4861,7 @@ Tasks:
 ### Long-term - Standardization (1-3 Years)
 
 1. **NATO STANAG Path** (Years 1-2)
-   - Demonstrate in HIVE Protocol deployments
+   - Demonstrate in PEAT Protocol deployments
    - Conduct multi-national trials
    - Gather feedback from allied systems
    - Publish technical specification
@@ -4927,7 +4927,7 @@ Tasks:
    - Recommendation: **Apache-2.0** (DoD-friendly, NATO-compatible, patent protection)
 
 7. **Should we target crates.io publication from day one?**
-   - Or keep private until proven in HIVE Protocol?
+   - Or keep private until proven in PEAT Protocol?
    - Recommendation: **Public from day one**:
      - Builds community early
      - Attracts contributors
@@ -4955,7 +4955,7 @@ Tasks:
     - Too early risks premature specification
     - Too late misses opportunity for input
     - Recommendation: **Year 2** after:
-      - Proving capability in HIVE Protocol
+      - Proving capability in PEAT Protocol
       - Gathering performance data
       - Before architecture solidifies
       - When ready for multi-national trials
@@ -4965,7 +4965,7 @@ Tasks:
     - CAP-specific features in separate layer
     - Recommendation:
       - Keep sync engine pure and general-purpose
-      - Build `hive-protocol-core` on top with CAP-specific logic
+      - Build `peat-protocol-core` on top with CAP-specific logic
       - Hierarchical operations as CAP module, not sync engine feature
       - Enables broader adoption beyond CAP
 
@@ -4990,7 +4990,7 @@ Tasks:
 
 ### The Decision Framework
 
-**What We're Deciding**: Choose between Automerge and Loro as the CRDT foundation for HIVE Protocol's sync engine.
+**What We're Deciding**: Choose between Automerge and Loro as the CRDT foundation for PEAT Protocol's sync engine.
 
 **Why This Matters**: 
 - Eliminates Ditto licensing constraints (both options)
@@ -5037,7 +5037,7 @@ Tasks:
 - ✅ Team alignment on selection
 
 **Long-term Success**:
-- ✅ HIVE Protocol operational without Ditto
+- ✅ PEAT Protocol operational without Ditto
 - ✅ Performance meets tactical requirements
 - ✅ DoD/NATO certification achievable
 - ✅ Community adoption and contributions
@@ -5216,13 +5216,13 @@ See `docs/E9-NETWORK-TRANSPORT-LAYER-PLAN.md` for full details:
    - **Verdict**: Resource cost outweighs licensing concern at this stage
 
 4. **Licensing Constraint is Future Problem**
-   - HIVE Protocol is pre-production (no deployments yet)
+   - PEAT Protocol is pre-production (no deployments yet)
    - Ditto licensing negotiable for government/defense use
    - NATO STANAG timeline is 12-24 months out
    - Abstraction layer makes future swap feasible
    - **Verdict**: Defer licensing decision until closer to production deployment
 
-5. **Focus on HIVE Protocol Innovation**
+5. **Focus on PEAT Protocol Innovation**
    - CAP's value is in hierarchical capability composition, not CRDT implementation
    - Building network stack diverts from core research
    - Ditto enables faster iteration on cell formation logic
@@ -5239,7 +5239,7 @@ See `docs/E9-NETWORK-TRANSPORT-LAYER-PLAN.md` for full details:
 ### Updated Strategy
 
 **Immediate (Next 3 months)**:
-- ✅ Continue with Ditto for all HIVE Protocol development
+- ✅ Continue with Ditto for all PEAT Protocol development
 - ✅ Focus on hierarchical composition rules (E6, E7)
 - ✅ Validate cell formation logic with E2E tests
 - ✅ Document Ditto-specific assumptions for future portability
@@ -5277,9 +5277,9 @@ The AutomergeBackend implementation (commit 94b7f10) is preserved in the reposit
 - Starting point if E9 is needed later
 
 **Key files**:
-- `hive-protocol/src/sync/automerge.rs` - Full backend implementation
-- `hive-protocol/tests/automerge_backend_integration.rs` - Integration tests
-- `hive-protocol/benches/backend_comparison.rs` - Performance benchmarks
+- `peat-protocol/src/sync/automerge.rs` - Full backend implementation
+- `peat-protocol/tests/automerge_backend_integration.rs` - Integration tests
+- `peat-protocol/benches/backend_comparison.rs` - Performance benchmarks
 - `docs/E9-NETWORK-TRANSPORT-LAYER-PLAN.md` - Network layer implementation plan
 
 ---
@@ -5299,7 +5299,7 @@ The AutomergeBackend implementation (commit 94b7f10) is preserved in the reposit
 
 ## Context and Problem Statement
 
-We have implemented the HIVE protocol's core synchronization mechanisms using Ditto (E1-E6) and a differential updates framework (E7). Before optimizing the integration between our protocol-level delta operations and Ditto's document model, we need to:
+We have implemented the PEAT protocol's core synchronization mechanisms using Ditto (E1-E6) and a differential updates framework (E7). Before optimizing the integration between our protocol-level delta operations and Ditto's document model, we need to:
 
 1. **Establish baseline metrics** for current Ditto performance under realistic network conditions
 2. **Validate protocol behavior** across varying network quality (9.6Kbps - 1Mbps, 100ms - 5s latency)
@@ -5456,7 +5456,7 @@ Shadow provides the best balance of realism, scalability, and ease of use for E8
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
-│                    hive-sim Binary                             │
+│                    peat-sim Binary                             │
 │  - CLI for running simulations                                │
 │  - Generates Shadow YAML configs (Army company structure)     │
 │  - Invokes Shadow simulator                                   │
@@ -5491,7 +5491,7 @@ Shadow provides the best balance of realism, scalability, and ease of use for E8
 │ Virtual Host  │  │  Virtual Host   │  │ Virtual  │  │ Virtual  │
 │ soldier_1     │  │  soldier_2      │  │ ugv_1    │  │ uav_1    │
 │ ┌───────────┐ │  │ ┌─────────────┐ │  │          │  │          │
-│ │hive-sim-node│ │  │ │hive-sim-node │ │  │   ...    │  │   ...    │
+│ │peat-sim-node│ │  │ │peat-sim-node │ │  │   ...    │  │   ...    │
 │ │+ Ditto    │ │  │ │+ Ditto      │ │  │          │  │  (112    │
 │ │+ CAP      │ │  │ │+ CAP        │ │  │          │  │   total) │
 │ └───────────┘ │  │ └─────────────┘ │  │          │  │          │
@@ -5516,8 +5516,8 @@ Shadow provides the best balance of realism, scalability, and ease of use for E8
 ```
 
 **Key Components:**
-- **hive-sim:** Generates Shadow YAML, invokes `shadow`, collects metrics
-- **Shadow:** Runs unmodified hive-sim-node binaries with syscall interception
+- **peat-sim:** Generates Shadow YAML, invokes `shadow`, collects metrics
+- **Shadow:** Runs unmodified peat-sim-node binaries with syscall interception
 - **Virtual Hosts:** Each node thinks it's on a real network
 - **Simulated Network:** Graph-based topology with precise network characteristics
 - **No root required:** Shadow runs as regular user
@@ -5551,11 +5551,11 @@ impl SimulationHarness {
 ```
 
 #### 2. SimulatedNode
-**Purpose:** Represents a single HIVE protocol node with Ditto sync
+**Purpose:** Represents a single PEAT protocol node with Ditto sync
 
 **Responsibilities:**
 - Wraps real Ditto store instance
-- Implements HIVE protocol logic (discovery, cell formation)
+- Implements PEAT protocol logic (discovery, cell formation)
 - Tracks node-local metrics (bandwidth, message count)
 - Respects network constraints from NetworkSimulator
 
@@ -5730,7 +5730,7 @@ impl MetricsCollector {
 
 **Tasks:**
 - Implement Shadow YAML generator for scenarios
-- Build `hive-sim-node` binary (HIVE protocol + Ditto)
+- Build `peat-sim-node` binary (PEAT protocol + Ditto)
 - Create simple scenario: Squad formation (12 nodes)
 - Run under Shadow, collect metrics
 
@@ -5950,7 +5950,7 @@ impl MetricsCollector {
 - Extend with network constraint capabilities
 - Maintain observer-based sync validation approach
 
-### hive-sim Binary
+### peat-sim Binary
 - CLI interface for running scenarios
 - Configuration files for network profiles
 - Output formats: JSON (CI), text (human), CSV (analysis)
@@ -6000,7 +6000,7 @@ done
 ```bash
 # Launch a single node inside namespace
 sudo ip netns exec capsim-node1 \
-  /path/to/hive-sim-node \
+  /path/to/peat-sim-node \
   --node-id soldier-1-1 \
   --role soldier \
   --capabilities sensor,comms
@@ -6022,7 +6022,7 @@ sudo ip link del br-capsim 2>/dev/null || true
 
 ### Network Profiles by Echelon
 ```rust
-// hive-sim/src/network_profiles.rs
+// peat-sim/src/network_profiles.rs
 pub struct NetworkProfile {
     pub bandwidth_kbps: u32,
     pub latency_ms: u32,
@@ -6108,14 +6108,14 @@ impl NetworkProfile {
    - **Action:** Experiment with sync intervals, batch sizes
 
 4. **Metrics Storage:** Where do we store historical simulation results?
-   - **Recommendation:** JSON files in `hive-sim/results/`, gitignore large files
+   - **Recommendation:** JSON files in `peat-sim/results/`, gitignore large files
 
 ## References
 
-- ADR-001: HIVE Protocol POC Architecture (network requirements)
+- ADR-001: PEAT Protocol POC Architecture (network requirements)
 - ADR-002: Beacon Storage Architecture (Ditto integration patterns)
-- E7 Baseline Tests: `hive-protocol/tests/baseline_ditto_bandwidth_e2e.rs`
-- E2E Harness: `hive-protocol/src/testing/e2e_harness.rs`
+- E7 Baseline Tests: `peat-protocol/tests/baseline_ditto_bandwidth_e2e.rs`
+- E2E Harness: `peat-protocol/src/testing/e2e_harness.rs`
 - Testing Strategy: `docs/TESTING_STRATEGY.md`
 
 ## Success Criteria
@@ -6154,7 +6154,7 @@ E8 is complete when:
 **Date**: 2025-11-05
 **Updated**: 2025-11-18
 **Authors**: Claude, Kit Plummer
-**Relates to**: ADR-001 (HIVE Protocol), ADR-004 (Human-Machine Composition), ADR-007 (Automerge Sync), ADR-008 (Network Simulation), ADR-021 (Document-Oriented Architecture)
+**Relates to**: ADR-001 (PEAT Protocol), ADR-004 (Human-Machine Composition), ADR-007 (Automerge Sync), ADR-008 (Network Simulation), ADR-021 (Document-Oriented Architecture)
 
 ## Context
 
@@ -6708,7 +6708,7 @@ impl SharedContext {
 
 ## Related Decisions
 
-- **ADR-001 (HIVE Protocol POC)**: Establishes hierarchical architecture for upward flows
+- **ADR-001 (PEAT Protocol POC)**: Establishes hierarchical architecture for upward flows
 - **ADR-004 (Human-Machine Composition)**: Defines authority model for decision delegation
 - **ADR-006 (Security)**: Cryptographic signatures for command authentication
 - **ADR-007 (Automerge Sync)**: CRDT foundation enables bidirectional sync
@@ -6734,11 +6734,11 @@ impl SharedContext {
 ### Phase 1: Command Dissemination (In Progress)
 
 **Completed:**
-- Command schema fully defined in `hive-schema/proto/command.proto`:
+- Command schema fully defined in `peat-schema/proto/command.proto`:
   - `HierarchicalCommand` with policies (buffer, conflict, acknowledgment, leader change)
   - `CommandAcknowledgment` with ack status flow (received, accepted, completed, rejected, failed)
   - `CommandTarget` with scope (individual, squad, platoon, broadcast)
-- Core logic implemented in `hive-protocol/src/command/`:
+- Core logic implemented in `peat-protocol/src/command/`:
   - `CommandCoordinator` - Command lifecycle management with in-memory tracking
   - `CommandRouter` - Target resolution and routing logic (individual/squad/platoon/broadcast)
   - `ConflictResolver` - Policy-based conflict resolution (last-write-wins, highest-priority, highest-authority, merge-compatible, reject)
@@ -6799,7 +6799,7 @@ This bidirectional architecture transforms CAP from a monitoring system into a c
 
 ---
 
-# ADR-010: Transport Layer - UDP vs TCP for HIVE Protocol
+# ADR-010: Transport Layer - UDP vs TCP for PEAT Protocol
 
 **Status**: Superseded by ADR-011 (Automerge + Iroh Integration)
 **Date**: 2025-11-05
@@ -6833,7 +6833,7 @@ ADR-011 adopts **Iroh** for networking, which provides:
 
 ## Context and Problem Statement (Original)
 
-The HIVE protocol currently assumes TCP as the primary transport layer (via Tokio TcpStream). However, different types of data in the CAP ecosystem have fundamentally different delivery requirements:
+The PEAT protocol currently assumes TCP as the primary transport layer (via Tokio TcpStream). However, different types of data in the CAP ecosystem have fundamentally different delivery requirements:
 
 ### The Transport Mismatch Problem
 
@@ -6953,7 +6953,7 @@ System automatically chooses transport based on message characteristics.
 
 **Adopt Option 3: Hybrid Transport with Per-Message Selection**
 
-Extend HIVE protocol to support both UDP and TCP transports, with explicit application control over which transport is used for each message type.
+Extend PEAT protocol to support both UDP and TCP transports, with explicit application control over which transport is used for each message type.
 
 ## Design Details
 
@@ -7647,7 +7647,7 @@ For position updates where loss is acceptable, UDP provides 2.5-8x latency reduc
 
 ## References
 
-1. ADR-001: HIVE Protocol POC Architecture
+1. ADR-001: PEAT Protocol POC Architecture
 2. ADR-007: Automerge-Based Sync Engine
 3. ADR-009: Bidirectional Hierarchical Flows
 4. RFC 768: User Datagram Protocol
@@ -7685,7 +7685,7 @@ For position updates where loss is acceptable, UDP provides 2.5-8x latency reduc
 **Date**: 2025-11-06  
 **Authors**: Claude, Kit Plummer  
 **Supersedes**: ADR-007 (Automerge-Based Sync Engine)  
-**Relates To**: ADR-001 (HIVE Protocol POC), ADR-005 (Data Sync Abstraction), ADR-006 (Security), ADR-010 (Transport Layer)
+**Relates To**: ADR-001 (PEAT Protocol POC), ADR-005 (Data Sync Abstraction), ADR-006 (Security), ADR-010 (Transport Layer)
 
 ## Context
 
@@ -7718,7 +7718,7 @@ Initial analysis (ADR-007) assumed simplified Ethernet-only networking. **Real t
 
 ### Backend Architecture Design
 
-**Important Conceptual Clarification**: A "backend" in HIVE Protocol is a **complete, integrated solution** for storage, synchronization, and persistence - not individual components.
+**Important Conceptual Clarification**: A "backend" in PEAT Protocol is a **complete, integrated solution** for storage, synchronization, and persistence - not individual components.
 
 #### What is a Backend?
 
@@ -7768,7 +7768,7 @@ A backend is the complete stack that provides:
 
 #### Capability-Based Architecture
 
-Rather than forcing all backends into one interface, HIVE Protocol uses **optional capability traits**:
+Rather than forcing all backends into one interface, PEAT Protocol uses **optional capability traits**:
 
 ```rust
 // Required for all backends
@@ -7943,7 +7943,7 @@ Use Loro instead of Automerge as CRDT foundation, Iroh for networking.
 
 **Adopt Option 3: Automerge + Iroh**
 
-Build HIVE Protocol's sync and networking layers using:
+Build PEAT Protocol's sync and networking layers using:
 - **Automerge** for CRDT foundation and delta sync
 - **Iroh** for multi-path QUIC networking and peer connectivity
 - **Custom glue code** for Repository/Collection API, discovery, storage, queries
@@ -8018,7 +8018,7 @@ impl CapMdnsDiscovery {
         let daemon = ServiceDaemon::new()?;
         Ok(Self {
             daemon,
-            service_type: "_hive-protocol._quic.local.".to_string(),
+            service_type: "_peat-protocol._quic.local.".to_string(),
         })
     }
     
@@ -8027,7 +8027,7 @@ impl CapMdnsDiscovery {
             &self.service_type,
             &format!("cap-{}", node_id),
             &format!("0.0.0.0:{}", port),
-            "HIVE Protocol Node",
+            "PEAT Protocol Node",
         )?;
         self.daemon.register(service)?;
         Ok(())
@@ -8830,7 +8830,7 @@ impl Collection {
 **Usage Example:**
 ```rust
 // Create repository
-let store = AutomergeStore::open("/var/lib/hive/storage")?;
+let store = AutomergeStore::open("/var/lib/peat/storage")?;
 let repo = Repository::new(Arc::new(store));
 
 // Use collections just like Ditto
@@ -9210,7 +9210,7 @@ impl MdnsDiscovery {
         
         Ok(Self {
             daemon,
-            service_type: "_hive-protocol._quic.local.".to_string(),
+            service_type: "_peat-protocol._quic.local.".to_string(),
             discovered: Arc::new(RwLock::new(HashMap::new())),
             events,
         })
@@ -9221,7 +9221,7 @@ impl MdnsDiscovery {
             &self.service_type,
             &format!("cap-{}", endpoint_id),
             &format!("0.0.0.0:{}", port),
-            "HIVE Protocol Node",
+            "PEAT Protocol Node",
         )?;
         
         // Add EndpointId as TXT record
@@ -10172,7 +10172,7 @@ Result: 64x smaller updates for single-field changes
 
 ### Feature Parity (Week 18)
 
-- [x] All HIVE Protocol use cases supported
+- [x] All PEAT Protocol use cases supported
 - [x] Performance within 20% of Ditto on key metrics
 - [x] Security layer integrated (PKI, encryption, authorization)
 - [x] Geohash-based proximity queries
@@ -10223,7 +10223,7 @@ The identified gaps are **manageable** with well-known libraries and straightfor
 6. [QUIC Multipath Extension](https://datatracker.ietf.org/doc/draft-ietf-quic-multipath/)
 7. [Loro CRDT](https://loro.dev/)
 8. [RocksDB](https://rocksdb.org/)
-9. ADR-001: HIVE Protocol POC Architecture
+9. ADR-001: PEAT Protocol POC Architecture
 10. ADR-005: Data Synchronization Abstraction Layer
 11. ADR-006: Security, Authentication, and Authorization
 12. ADR-007: Automerge-Based Sync Engine
@@ -10266,8 +10266,8 @@ async fn main() -> Result<()> {
         .bind_addr("10.0.0.100:3478".parse()?)
         .stun_port(3478)  // For NAT detection
         .relay_port(3479) // For fallback relay
-        .tls_cert_path("/etc/hive/relay-cert.pem")
-        .tls_key_path("/etc/hive/relay-key.pem")
+        .tls_cert_path("/etc/peat/relay-cert.pem")
+        .tls_key_path("/etc/peat/relay-key.pem")
         .spawn()
         .await?;
     
@@ -10301,27 +10301,27 @@ let endpoint = Endpoint::builder()
 
 ### Milestone Updates
 
-**2025-11-19: hive-sim Backend Abstraction Complete** ✅
+**2025-11-19: peat-sim Backend Abstraction Complete** ✅
 
-Added pluggable backend support to hive-sim network simulator:
+Added pluggable backend support to peat-sim network simulator:
 
 **Changes Made**:
 - Added `--backend` CLI flag for backend selection (`ditto` or `automerge`)
-- Updated `hive-sim/src/main.rs` with backend-agnostic initialization (main.rs:1281-1349)
-- Exposed `automerge-backend` feature flag in `hive-sim/Cargo.toml`
-- Documentation updated in `hive-sim/README.md` with backend comparison table and usage guide
+- Updated `peat-sim/src/main.rs` with backend-agnostic initialization (main.rs:1281-1349)
+- Exposed `automerge-backend` feature flag in `peat-sim/Cargo.toml`
+- Documentation updated in `peat-sim/README.md` with backend comparison table and usage guide
 
 **Usage**:
 ```bash
 # Ditto backend (default - requires credentials)
-docker build -f hive-sim/Dockerfile -t hive-sim-node:latest .
-hive-sim --backend ditto --node-id node1
+docker build -f peat-sim/Dockerfile -t peat-sim-node:latest .
+peat-sim --backend ditto --node-id node1
 
 # Automerge+Iroh backend (open source - no credentials)
-docker build -f hive-sim/Dockerfile \
+docker build -f peat-sim/Dockerfile \
   --build-arg FEATURES="automerge-backend" \
-  -t hive-sim-node:automerge .
-hive-sim --backend automerge --node-id node1
+  -t peat-sim-node:automerge .
+peat-sim --backend automerge --node-id node1
 ```
 
 **Impact**:
@@ -10364,7 +10364,7 @@ The feedback revealed a fundamental separation of concerns:
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │      hive-schema (Foundational Library)                │  │
+│  │      peat-schema (Foundational Library)                │  │
 │  │  • Message schemas (Protobuf/Avro/JSON Schema)        │  │
 │  │  • Ontology definitions (capabilities, cells, etc)    │  │
 │  │  • Validation rules                                   │  │
@@ -10380,7 +10380,7 @@ The feedback revealed a fundamental separation of concerns:
 │  └──────────────────────────────────────────────────────┘  │
 │                           ↓ uses                             │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │      hive-transport (Protocol Adapters)                │  │
+│  │      peat-transport (Protocol Adapters)                │  │
 │  │  • HTTP/WebSocket adapter                             │  │
 │  │  • gRPC adapter                                       │  │
 │  │  • ROS2 DDS adapter                                   │  │
@@ -10452,7 +10452,7 @@ The current ADR-005 (Data Sync Abstraction Layer) proposes abstracting sync back
 
 We will **separate schema definition, ontology, and protocol extensibility into distinct architectural layers**, creating three new foundational crates:
 
-### 1. `hive-schema` - Schema Definition Library
+### 1. `peat-schema` - Schema Definition Library
 
 **Purpose**: Define CAP message schemas and ontology in a standard, code-generatable format
 
@@ -10472,7 +10472,7 @@ We will **separate schema definition, ontology, and protocol extensibility into 
 
 **Structure**:
 ```
-hive-schema/
+peat-schema/
 ├── proto/
 │   ├── core.proto           # Core message types (Position, Timestamp, UUID)
 │   ├── platform.proto       # Platform state, capabilities, beacons
@@ -10730,7 +10730,7 @@ protoc --cpp_out=./cpp proto/*.proto
 protoc --java_out=./java proto/*.proto
 ```
 
-### 2. `hive-transport` - Protocol Adapter Abstraction
+### 2. `peat-transport` - Protocol Adapter Abstraction
 
 **Purpose**: Define standard interfaces for protocol adapters and implement concrete transports
 
@@ -10738,7 +10738,7 @@ protoc --java_out=./java proto/*.proto
 
 **Core Abstraction**:
 ```rust
-// hive-transport/src/lib.rs
+// peat-transport/src/lib.rs
 
 use cap_schema::platform::v1::PlatformBeacon;
 use async_trait::async_trait;
@@ -10828,7 +10828,7 @@ pub enum MulticastScope {
 **Transport Implementations**:
 
 ```rust
-// hive-transport/src/adapters/http_websocket.rs
+// peat-transport/src/adapters/http_websocket.rs
 
 use axum::{Router, routing::post};
 use tokio_tungstenite::WebSocketStream;
@@ -10913,7 +10913,7 @@ impl HttpWebSocketTransport {
 ```
 
 ```rust
-// hive-transport/src/adapters/grpc.rs
+// peat-transport/src/adapters/grpc.rs
 
 use tonic::{transport::Server, Request, Response, Status};
 
@@ -10924,7 +10924,7 @@ pub struct GrpcTransport {
     client_pool: Arc<RwLock<HashMap<String, PlatformServiceClient>>>,
 }
 
-// gRPC service definitions in hive-schema/proto/service.proto
+// gRPC service definitions in peat-schema/proto/service.proto
 // service PlatformService {
 //   rpc SendBeacon(PlatformBeacon) returns (SendReceipt);
 //   rpc StreamBeacons(StreamRequest) returns (stream PlatformBeacon);
@@ -10990,7 +10990,7 @@ impl MessageTransport for GrpcTransport {
 ```
 
 ```rust
-// hive-transport/src/adapters/ros2.rs
+// peat-transport/src/adapters/ros2.rs
 
 use rclrs::{Node, Publisher, Subscription};
 use rosidl_runtime_rs::Message as RosMessage;
@@ -11098,14 +11098,14 @@ impl Ros2Transport {
 }
 ```
 
-### 3. `hive-persistence` - Storage Abstraction
+### 3. `peat-persistence` - Storage Abstraction
 
 **Purpose**: Define standard interfaces for accessing the data persistence layer, allowing external systems to interact with CAP's data store
 
 **Architecture**: Trait-based abstraction with multiple backend implementations
 
 ```rust
-// hive-persistence/src/lib.rs
+// peat-persistence/src/lib.rs
 
 use cap_schema::platform::v1::PlatformBeacon;
 use cap_schema::cell::v1::CellState;
@@ -11180,7 +11180,7 @@ impl Query {
 
 **Storage Backends**:
 ```rust
-// hive-persistence/src/backends/
+// peat-persistence/src/backends/
 
 pub mod automerge;   // CRDT-based sync store
 pub mod ditto;       // Ditto SDK wrapper
@@ -11192,7 +11192,7 @@ pub mod redis;       // In-memory cache/pub-sub
 
 **External Access Interface**:
 ```rust
-// hive-persistence/src/external_api.rs
+// peat-persistence/src/external_api.rs
 
 /// External API for non-CAP systems to access CAP data
 pub struct ExternalApi {
@@ -11482,9 +11482,9 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 │  ADR-012: Schema Definition & Protocol Extensibility            │
 │  ↓ (defines WHAT messages look like)                            │
 │  │                                                               │
-│  ├─→ hive-schema (protobuf definitions)                          │
-│  ├─→ hive-transport (HTTP/gRPC/ROS2 adapters)                    │
-│  └─→ hive-persistence (storage interfaces)                       │
+│  ├─→ peat-schema (protobuf definitions)                          │
+│  ├─→ peat-transport (HTTP/gRPC/ROS2 adapters)                    │
+│  └─→ peat-persistence (storage interfaces)                       │
 │                                                                  │
 │                         ↓ used by                                │
 │                                                                  │
@@ -11493,7 +11493,7 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 │  │                                                               │
 │  ├─→ Automerge CRDT layer                                       │
 │  ├─→ Iroh networking layer (QUIC transport)                     │
-│  └─→ Implements hive-persistence traits                          │
+│  └─→ Implements peat-persistence traits                          │
 │                                                                  │
 │                         ↓ used by                                │
 │                                                                  │
@@ -11545,7 +11545,7 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 
 ### Phase 0: Schema Definition (Weeks 1-2) - **HIGHEST PRIORITY**
 
-**Goal**: Create `hive-schema` crate with core message definitions
+**Goal**: Create `peat-schema` crate with core message definitions
 
 **Tasks**:
 1. Define protobuf schemas for core messages:
@@ -11570,20 +11570,20 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
    - Migration guide from current JSON schemas
 
 **Success Criteria**:
-- [ ] `hive-schema` crate compiles and passes all tests
+- [ ] `peat-schema` crate compiles and passes all tests
 - [ ] Can generate bindings for Rust, Python, JavaScript
 - [ ] Validation catches common errors
 - [ ] Documentation complete
 
 ### Phase 1: Transport Abstraction (Weeks 3-4)
 
-**Goal**: Create `hive-transport` crate with HTTP/WebSocket adapter
+**Goal**: Create `peat-transport` crate with HTTP/WebSocket adapter
 
 **Tasks**:
 1. Define `MessageTransport` trait
 2. Implement `HttpWebSocketTransport` adapter
 3. Add message routing and pub-sub logic
-4. Integration tests with `hive-schema` messages
+4. Integration tests with `peat-schema` messages
 
 **Success Criteria**:
 - [ ] Can send/receive CAP messages over HTTP/WebSocket
@@ -11592,7 +11592,7 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 
 ### Phase 2: Persistence Abstraction (Weeks 5-6)
 
-**Goal**: Create `hive-persistence` crate with external API
+**Goal**: Create `peat-persistence` crate with external API
 
 **Tasks**:
 1. Define `DataStore` trait
@@ -11627,11 +11627,11 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 
 ### Phase 4: CAP Core Refactoring (Weeks 11-14)
 
-**Goal**: Refactor `hive-protocol` crate to use new abstractions
+**Goal**: Refactor `peat-protocol` crate to use new abstractions
 
 **Tasks**:
-1. Replace inline schemas with `hive-schema`
-2. Replace direct Ditto/Automerge calls with `hive-persistence` traits
+1. Replace inline schemas with `peat-schema`
+2. Replace direct Ditto/Automerge calls with `peat-persistence` traits
 3. Add transport selection logic
 4. Update all tests
 
@@ -11662,7 +11662,7 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 1. **Schema Clarity**: Message schemas are first-class artifacts, not buried in code
 2. **Type Safety**: Code generation prevents schema drift across languages
 3. **Extensibility**: New transports can be added without modifying core protocol
-4. **Integration**: External systems can adopt CAP messages without HIVE protocol
+4. **Integration**: External systems can adopt CAP messages without PEAT protocol
 5. **Tooling**: Standard schema enables validation, visualization, debugging tools
 6. **Multi-Language**: Python, JavaScript, Java, C++ can all use CAP messages natively
 7. **Versioning**: Protobuf supports schema evolution with backward compatibility
@@ -11758,9 +11758,9 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 ## Success Metrics
 
 1. **Schema Adoption**:
-   - [ ] All CAP messages defined in `hive-schema`
+   - [ ] All CAP messages defined in `peat-schema`
    - [ ] Code generation works for 3+ languages
-   - [ ] Zero manual serialization code in `hive-protocol`
+   - [ ] Zero manual serialization code in `peat-protocol`
 
 2. **Transport Extensibility**:
    - [ ] 3+ transport implementations (HTTP/WS, gRPC, ROS2)
@@ -11782,17 +11782,17 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
    - [ ] Validation catches 90%+ of schema errors at compile-time
    - [ ] Documentation rated "good" or better by external developers
 
-## Appendix: HIVE Protocol Schemas (v1)
+## Appendix: PEAT Protocol Schemas (v1)
 
-> **Added 2025-11-25**: These schemas define the core HIVE Protocol primitives for software distribution, capability advertisement, and event routing. They supersede the earlier example schemas above and represent the canonical protocol definitions.
+> **Added 2025-11-25**: These schemas define the core PEAT Protocol primitives for software distribution, capability advertisement, and event routing. They supersede the earlier example schemas above and represent the canonical protocol definitions.
 >
-> **Design Principle**: HIVE Protocol defines the envelope, applications define the contents. All payloads use `google.protobuf.Any` or `google.protobuf.Struct` to remain application-agnostic.
+> **Design Principle**: PEAT Protocol defines the envelope, applications define the contents. All payloads use `google.protobuf.Any` or `google.protobuf.Struct` to remain application-agnostic.
 
 ### A.1 Blob Reference (ADR-025)
 
 ```protobuf
 syntax = "proto3";
-package hive.blob.v1;
+package peat.blob.v1;
 
 // Content-addressed blob reference
 message BlobReference {
@@ -11800,7 +11800,7 @@ message BlobReference {
   string hash_algorithm = 2;    // "sha256", "blake3"
   uint64 size_bytes = 3;
 
-  // Application-defined metadata (opaque to HIVE)
+  // Application-defined metadata (opaque to PEAT)
   map<string, string> metadata = 10;
 }
 ```
@@ -11809,7 +11809,7 @@ message BlobReference {
 
 ```protobuf
 syntax = "proto3";
-package hive.capability.v1;
+package peat.capability.v1;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
@@ -11867,16 +11867,16 @@ message AggregatedCapability {
 }
 ```
 
-### A.3 HIVE Event (Products, Anomalies, Telemetry)
+### A.3 PEAT Event (Products, Anomalies, Telemetry)
 
 ```protobuf
 syntax = "proto3";
-package hive.event.v1;
+package peat.event.v1;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/any.proto";
 
-message HiveEvent {
+message PeatEvent {
   string event_id = 1;
   google.protobuf.Timestamp timestamp = 2;
   string source_node_id = 3;
@@ -11933,11 +11933,11 @@ message EventSummary {
 
 ```protobuf
 syntax = "proto3";
-package hive.deployment.v1;
+package peat.deployment.v1;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
-import "hive/blob/v1/blob.proto";
+import "peat/blob/v1/blob.proto";
 
 message DeploymentDirective {
   string directive_id = 1;
@@ -11945,7 +11945,7 @@ message DeploymentDirective {
   string issuer_node_id = 3;
   string issuer_formation_id = 4;
   DeploymentScope scope = 5;
-  hive.blob.v1.BlobReference artifact = 6;
+  peat.blob.v1.BlobReference artifact = 6;
   string artifact_type = 7;     // "onnx_model", "container", "config_package"
   google.protobuf.Struct config = 10;  // Application-defined
   DeploymentOptions options = 11;
@@ -11974,7 +11974,7 @@ message CapabilityFilter {
 }
 
 message DeploymentOptions {
-  hive.event.v1.EventPriority priority = 1;
+  peat.event.v1.EventPriority priority = 1;
   uint32 timeout_seconds = 2;
   bool replace_existing = 3;
   optional uint32 rollback_threshold_percent = 4;
@@ -12003,24 +12003,24 @@ enum DeploymentState {
 
 ### A.5 Protocol Behavior Summary
 
-| Schema | Direction | Aggregation | HIVE Responsibility |
+| Schema | Direction | Aggregation | PEAT Responsibility |
 |--------|-----------|-------------|---------------------|
 | BlobReference | N/A | N/A | Transfer bytes, verify hash |
 | CapabilityAdvertisement | ↑ Upward | Summarize at echelons | Route through hierarchy |
-| HiveEvent | ↑ Upward | Per AggregationPolicy | Apply routing policy |
+| PeatEvent | ↑ Upward | Per AggregationPolicy | Apply routing policy |
 | DeploymentDirective | ↓ Downward | Scope filtering | Route to matching nodes |
 | DeploymentStatus | ↑ Upward | Aggregate per directive | Collect status reports |
 
 ### A.6 Extension Points
 
-Applications extend HIVE by:
+Applications extend PEAT by:
 1. **Defining capability attributes** (`Capability.attributes`)
-2. **Defining event payloads** (`HiveEvent.payload`)
+2. **Defining event payloads** (`PeatEvent.payload`)
 3. **Defining artifact types** (`DeploymentDirective.artifact_type`)
 4. **Defining deployment config** (`DeploymentDirective.config`)
 5. **Defining custom filters** (`CapabilityFilter.custom_filters`)
 
-HIVE routes, aggregates, and enforces policies without understanding application semantics.
+PEAT routes, aggregates, and enforces policies without understanding application semantics.
 
 ---
 
@@ -12065,7 +12065,7 @@ HIVE routes, aggregates, and enforces policies without understanding application
    - Validate Protobuf selection
    - Confirm ROS2 integration requirements
 
-2. **Prototype `hive-schema` with core messages** (1 week)
+2. **Prototype `peat-schema` with core messages** (1 week)
    - Implement Phase 0 (Schema Definition)
    - Generate Rust, Python, JavaScript bindings
    - Validate with simple examples
@@ -12088,12 +12088,12 @@ HIVE routes, aggregates, and enforces policies without understanding application
 ### After ADR-012 Phase 0 Complete
 
 6. **Begin ADR-011 (Automerge + Iroh) implementation**
-   - Use hive-schema messages as Automerge document structure
-   - Implement hive-persistence traits
+   - Use peat-schema messages as Automerge document structure
+   - Implement peat-persistence traits
    - Integrate with Iroh networking
 
 7. **Update ADR-005 implementation plan** 
-   - Reframe as backend abstraction within hive-persistence
+   - Reframe as backend abstraction within peat-persistence
    - Not top-level protocol interface
 
 ---
@@ -12964,7 +12964,7 @@ Every artifact must be cryptographically verifiable throughout distribution:
 
 ## References
 
-- ADR-001: HIVE Protocol PoC
+- ADR-001: PEAT Protocol PoC
 - ADR-006: Security, Authentication, and Authorization
 - ADR-007: Automerge-Based Sync Engine
 - ADR-009: Bidirectional Hierarchical Flows
@@ -13812,7 +13812,7 @@ Implement **optimistic coordination with deterministic conflict resolution**:
 
 ## Context and Problem Statement
 
-During E8 experimental validation, we have developed a comprehensive test laboratory infrastructure using ContainerLab to validate HIVE protocol performance at scale. Initial testing (2-node POC, 12-node squad) showed promising results, and we expanded to 24-node platoon hierarchies (Phase 3A) as documented in EXPERIMENT-PORTFOLIO.md.
+During E8 experimental validation, we have developed a comprehensive test laboratory infrastructure using ContainerLab to validate PEAT protocol performance at scale. Initial testing (2-node POC, 12-node squad) showed promising results, and we expanded to 24-node platoon hierarchies (Phase 3A) as documented in EXPERIMENT-PORTFOLIO.md.
 
 However, **Phase 3A validation (2025-11-08) revealed a critical architectural concern:**
 
@@ -13991,13 +13991,13 @@ Continue some experiments while investigating architecture in parallel.
 1. **Analyze 24-Node Validation Logs** (Day 1-2)
    ```bash
    # Review what platoon leader actually received
-   grep -r "document" hive-sim/validation-platoon-24node-*/platoon-leader.log
-   grep -r "Query::" hive-sim/validation-platoon-24node-*/platoon-leader.log
-   grep -r "capability" hive-sim/validation-platoon-24node-*/
+   grep -r "document" peat-sim/validation-platoon-24node-*/platoon-leader.log
+   grep -r "Query::" peat-sim/validation-platoon-24node-*/platoon-leader.log
+   grep -r "capability" peat-sim/validation-platoon-24node-*/
    ```
 
 2. **Review Ditto Integration Code** (Day 2-4)
-   - Examine `hive-sim-node` implementation
+   - Examine `peat-sim-node` implementation
    - Understand query patterns (Query::All vs capability-filtered)
    - Verify CAP_FILTER_ENABLED actually changes behavior
    - Document current data flow patterns
@@ -14174,7 +14174,7 @@ Before resuming Phase 3A/3B/3C testing, we must verify:
 
 ## Related Decisions
 
-- **ADR-001:** HIVE Protocol POC - Established capability-based filtering as core design
+- **ADR-001:** PEAT Protocol POC - Established capability-based filtering as core design
 - **ADR-008:** Network Simulation Layer - Defined experimental validation approach
 - **ADR-009:** Bidirectional Hierarchical Flows - Documented hierarchical data patterns
 - **EXPERIMENT-PORTFOLIO.md:** Phase 3A-3D scaling roadmap
@@ -14192,7 +14192,7 @@ Before resuming Phase 3A/3B/3C testing, we must verify:
 
 1. Create ADR-016: Hierarchical Data Aggregation Patterns
 2. Design aggregation API (sum, average, max, custom reducers)
-3. Implement in hive-protocol or hive-transport layer
+3. Implement in peat-protocol or peat-transport layer
 4. Integrate with Ditto sync (or alternative if needed)
 5. Re-baseline all experiments with aggregation enabled
 
@@ -14258,11 +14258,11 @@ Before resuming Phase 3A/3B/3C testing, we must verify:
 **Date**: 2025-01-10
 **Authors**: Kit (with Claude Code)
 **Supersedes**: None
-**Related ADRs**: [ADR-001](001-hive-protocol-poc.md) (CRDT-based state), [ADR-002](002-beacon-storage-architecture.md) (Ditto storage), [ADR-011](011-ditto-vs-automerge-iroh.md) (Backend abstraction)
+**Related ADRs**: [ADR-001](001-peat-protocol-poc.md) (CRDT-based state), [ADR-002](002-beacon-storage-architecture.md) (Ditto storage), [ADR-011](011-ditto-vs-automerge-iroh.md) (Backend abstraction)
 
 ## Context
 
-HIVE Protocol operates in disconnected tactical edge environments where nodes may be offline for hours or days. Managing document lifecycle in these environments presents fundamental challenges rooted in the CAP theorem:
+PEAT Protocol operates in disconnected tactical edge environments where nodes may be offline for hours or days. Managing document lifecycle in these environments presents fundamental challenges rooted in the CAP theorem:
 
 ### The Distributed Deletion Problem
 
@@ -14510,7 +14510,7 @@ Applications using this abstraction MUST monitor:
 ## References
 
 - [TTL and Data Lifecycle Design](../TTL_AND_DATA_LIFECYCLE_DESIGN.md) - Ditto-specific implementation details
-- [ADR-001: HIVE Protocol POC](001-hive-protocol-poc.md) - CRDT-based state management decision
+- [ADR-001: PEAT Protocol POC](001-peat-protocol-poc.md) - CRDT-based state management decision
 - [ADR-002: Beacon Storage Architecture](002-beacon-storage-architecture.md) - Ditto storage patterns
 - [ADR-011: Ditto vs Automerge/Iroh](011-ditto-vs-automerge-iroh.md) - Backend abstraction requirements
 - [Ditto DELETE vs EVICT](https://docs.ditto.live/sdk/latest/crud/delete) - Ditto deletion semantics
@@ -14527,7 +14527,7 @@ Applications using this abstraction MUST monitor:
 **Date**: 2025-11-14  
 **Authors**: Kit Plummer, Claude  
 **Supersedes**: None  
-**Relates To**: ADR-001 (HIVE Protocol POC), ADR-002 (Beacon Storage), ADR-011 (Automerge + Iroh), ADR-013 (Distributed Software & AI Ops)
+**Relates To**: ADR-001 (PEAT Protocol POC), ADR-002 (Beacon Storage), ADR-011 (Automerge + Iroh), ADR-013 (Distributed Software & AI Ops)
 
 ---
 
@@ -16093,7 +16093,7 @@ async fn test_network_partition() {
 3. [Containerlab Documentation](https://containerlab.dev)
 4. [mdns-sd Crate](https://crates.io/crates/mdns-sd)
 5. [Geohash Algorithm](https://en.wikipedia.org/wiki/Geohash)
-6. ADR-001: HIVE Protocol POC Architecture
+6. ADR-001: PEAT Protocol POC Architecture
 7. ADR-002: Beacon Storage Architecture
 8. ADR-011: CRDT + Networking Stack Selection
 9. ADR-013: Distributed Software & AI Operations
@@ -16278,7 +16278,7 @@ We conducted a comprehensive survey of existing AI/ML metadata standards and mil
 
 ### Key Findings
 
-**No existing standard addresses the HIVE use case:**
+**No existing standard addresses the PEAT use case:**
 
 1. **Industry standards** (Model Cards, ONNX, MLflow) provide good **static documentation** but lack:
    - Operational status tracking (is the model actually running?)
@@ -16328,7 +16328,7 @@ We conducted a comprehensive survey of existing AI/ML metadata standards and mil
 
 ### Core Principle: Capability-Centric AI Model Advertisement
 
-We will create a **HIVE AI Model Capability Advertisement Schema** that shifts focus from "what models are installed" to "what AI capabilities are operationally available" across the distributed system.
+We will create a **PEAT AI Model Capability Advertisement Schema** that shifts focus from "what models are installed" to "what AI capabilities are operationally available" across the distributed system.
 
 **Design Philosophy:**
 1. **Operational First**: Track runtime status, not just deployment state
@@ -16343,12 +16343,12 @@ We will create a **HIVE AI Model Capability Advertisement Schema** that shifts f
 
 #### Level 1: Platform AI Capability Advertisement
 
-Each platform advertises its AI capabilities using a standardized schema integrated into the HIVE capability advertisement protocol:
+Each platform advertises its AI capabilities using a standardized schema integrated into the PEAT capability advertisement protocol:
 
 ```protobuf
 syntax = "proto3";
 
-package hive.ai.v1;
+package peat.ai.v1;
 
 import "google/protobuf/timestamp.proto";
 
@@ -16925,7 +16925,7 @@ Following ADR-007 Automerge principles, AI capability advertisements are synchro
 The `ModelMetadata` message is designed for **bidirectional mapping** with Model Card schemas:
 
 ```python
-# Export HIVE AI capability to Model Card format
+# Export PEAT AI capability to Model Card format
 def export_model_card(ai_model_instance):
     return {
         "model_details": {
@@ -16954,7 +16954,7 @@ def export_model_card(ai_model_instance):
         }
     }
 
-# Import Model Card to HIVE format
+# Import Model Card to PEAT format
 def import_model_card(model_card_json):
     metadata = ModelMetadata()
     metadata.model_name = model_card_json["model_details"]["name"]
@@ -16966,16 +16966,16 @@ def import_model_card(model_card_json):
 #### ONNX Metadata Integration
 
 ```python
-# Augment ONNX model with HIVE metadata
+# Augment ONNX model with PEAT metadata
 import onnx
 import json
 
 model = onnx.load('target_recognition_v4.2.1.onnx')
 
-# Add HIVE metadata to ONNX metadata_props
-hive_meta = model.metadata_props.add()
-hive_meta.key = 'hive_model_metadata'
-hive_meta.value = json.dumps({
+# Add PEAT metadata to ONNX metadata_props
+peat_meta = model.metadata_props.add()
+peat_meta.key = 'peat_model_metadata'
+peat_meta.value = json.dumps({
     "model_type": "classifier",
     "intended_use": "Target recognition for ISR operations",
     "design_metrics": {"precision": 0.94, "recall": 0.89},
@@ -16993,13 +16993,13 @@ onnx.save(model, f'target_recognition_v4.2.1.onnx')
 #### MLflow Registry Synchronization
 
 ```python
-# Register HIVE-tracked model in MLflow
+# Register PEAT-tracked model in MLflow
 import mlflow
 
-def register_hive_model_to_mlflow(ai_model_instance, model_artifact_path):
-    # Create MLflow signature from HIVE ModelSignature
+def register_peat_model_to_mlflow(ai_model_instance, model_artifact_path):
+    # Create MLflow signature from PEAT ModelSignature
     from mlflow.models import infer_signature
-    signature = convert_hive_signature_to_mlflow(ai_model_instance.signature)
+    signature = convert_peat_signature_to_mlflow(ai_model_instance.signature)
     
     # Register with metadata
     mlflow.pyfunc.log_model(
@@ -17008,9 +17008,9 @@ def register_hive_model_to_mlflow(ai_model_instance, model_artifact_path):
         signature=signature,
         registered_model_name=ai_model_instance.metadata.model_name,
         metadata={
-            "hive_model_id": ai_model_instance.model_id,
-            "hive_version": ai_model_instance.model_version,
-            "hive_hash": ai_model_instance.model_hash,
+            "peat_model_id": ai_model_instance.model_id,
+            "peat_version": ai_model_instance.model_version,
+            "peat_hash": ai_model_instance.model_hash,
             "design_precision": ai_model_instance.metadata.design_metrics["precision"],
             "intended_use": ai_model_instance.metadata.intended_use
         }
@@ -17031,7 +17031,7 @@ def register_hive_model_to_mlflow(ai_model_instance, model_artifact_path):
 
 **STANAG 4778 Metadata Binding:**
 ```python
-# Cryptographically bind HIVE metadata to model artifact
+# Cryptographically bind PEAT metadata to model artifact
 def bind_metadata_stanag_4778(model_artifact_bytes, ai_model_instance):
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import ed25519
@@ -17058,9 +17058,9 @@ def bind_metadata_stanag_4778(model_artifact_bytes, ai_model_instance):
 
 **STANAG 5636 NCMS Searchability:**
 ```xml
-<!-- Map HIVE AI capabilities to NATO Core Metadata Specification -->
+<!-- Map PEAT AI capabilities to NATO Core Metadata Specification -->
 <NCMS:Resource xmlns:NCMS="urn:nato:stanag:5636">
-    <NCMS:Identifier>urn:hive:model:target_recognition:4.2.1</NCMS:Identifier>
+    <NCMS:Identifier>urn:peat:model:target_recognition:4.2.1</NCMS:Identifier>
     <NCMS:Title>Target Recognition Model v4.2.1</NCMS:Title>
     <NCMS:Type>AI_ML_Model</NCMS:Type>
     <NCMS:Format>application/onnx</NCMS:Format>
@@ -17081,7 +17081,7 @@ def bind_metadata_stanag_4778(model_artifact_bytes, ai_model_instance):
 
 ```rust
 // Rust implementation for edge platforms
-use hive_ai_capability::*;
+use peat_ai_capability::*;
 
 // Initialize AI capability advertiser
 let mut advertiser = AICapabilityAdvertiser::new("platform_007");
@@ -17118,14 +17118,14 @@ advertiser.update_performance("target_recognition", |perf| {
 
 // Advertise capabilities (differential CRDT sync)
 let advertisement = advertiser.generate_advertisement();
-hive_sync_engine.publish(advertisement);  // Uses ADR-007 Automerge sync
+peat_sync_engine.publish(advertisement);  // Uses ADR-007 Automerge sync
 ```
 
 #### Squad/Platoon Aggregation
 
 ```rust
 // Hierarchical aggregation at squad level
-use hive_ai_capability::aggregation::*;
+use peat_ai_capability::aggregation::*;
 
 let mut aggregator = AICapabilityAggregator::new("alpha_squad", FormationLevel::Squad);
 
@@ -17146,14 +17146,14 @@ for gap in gaps {
 }
 
 // Propagate aggregated capability upward
-hive_sync_engine.publish_aggregated(squad_capability);
+peat_sync_engine.publish_aggregated(squad_capability);
 ```
 
 #### C2 Capability Query Interface
 
 ```rust
 // Company C2 queries available AI capabilities
-use hive_ai_capability::query::*;
+use peat_ai_capability::query::*;
 
 let query = AICapabilityQuery::new()
     .model_type("classifier")
@@ -17163,7 +17163,7 @@ let query = AICapabilityQuery::new()
     .operational_status(Status::Operational)
     .formation_level(FormationLevel::Platoon);
 
-let results = hive_registry.query_capabilities(query);
+let results = peat_registry.query_capabilities(query);
 
 println!("Available ISR capabilities:");
 for result in results {
@@ -17321,7 +17321,7 @@ impl PerformanceDegradationDetector {
 **Standards Evolution Risk**
 - Model Card, ONNX, MLflow standards may evolve incompatibly
 - NATO STANAGs update on multi-year cycles
-- HIVE schema may need versioning strategy to handle changes
+- PEAT schema may need versioning strategy to handle changes
 - Risk of becoming tied to deprecated standards
 
 **Performance Measurement Challenges**
@@ -17384,7 +17384,7 @@ impl PerformanceDegradationDetector {
 - ONNX metadata integration
 - MLflow registry synchronization
 - STANAG 4778/5636 compliance validation
-- **Deliverable**: HIVE AI capabilities compatible with industry/military standards
+- **Deliverable**: PEAT AI capabilities compatible with industry/military standards
 
 ### Phase 5: Security and Governance (Months 8-10)
 - Implement cryptographic provenance verification
@@ -17456,7 +17456,7 @@ This ADR requires approval from:
 
 ---
 
-# ADR-019: Quality of Service and Data Prioritization for HIVE Sync
+# ADR-019: Quality of Service and Data Prioritization for PEAT Sync
 
 **Status**: Proposed  
 **Date**: 2025-11-16  
@@ -17467,7 +17467,7 @@ This ADR requires approval from:
 
 ### The Problem: Not All Data Is Created Equal
 
-Customer feedback has revealed a critical requirement: **HIVE must support delivering model products (contact reports, images, audio/video clips, etc.) through its hierarchical network with appropriate prioritization.**
+Customer feedback has revealed a critical requirement: **PEAT must support delivering model products (contact reports, images, audio/video clips, etc.) through its hierarchical network with appropriate prioritization.**
 
 The operational reality:
 
@@ -17498,7 +17498,7 @@ WITH QoS:
 
 ### The Fundamental Issue
 
-Current HIVE architecture (as inherited from Ditto/Automerge) treats all CRDT updates with approximately equal priority. This creates several operational problems:
+Current PEAT architecture (as inherited from Ditto/Automerge) treats all CRDT updates with approximately equal priority. This creates several operational problems:
 
 1. **Priority Inversion**: Critical contact reports wait behind routine telemetry
 2. **Bandwidth Starvation**: Large media files (images/video) block small critical updates
@@ -17524,7 +17524,7 @@ A comprehensive **Quality of Service (QoS) framework** that provides:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    HIVE QoS Framework                       │
+│                    PEAT QoS Framework                       │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  ┌─────────────────────────────────────────────────────┐   │
@@ -18251,7 +18251,7 @@ pub struct QoSMetrics {
 **Dashboard Example:**
 
 ```
-=== HIVE QoS Dashboard ===
+=== PEAT QoS Dashboard ===
 Bandwidth: 487 Kbps / 1000 Kbps (48.7% utilized)
 
 Priority Queues:
@@ -18376,16 +18376,16 @@ pub enum EnforcementMode {
 
 **STANAG 4586 (UAV C2)**: Defines message priorities for UAV control
 - Our P1-P5 aligns with 4586's "Immediate", "Priority", "Routine", "Deferred"
-- HIVE extends to multi-platform coordination beyond single UAV
+- PEAT extends to multi-platform coordination beyond single UAV
 
 **Link 16 Message Standard**: Tactical data link with priority levels
 - J-Series messages have defined precedence
-- HIVE provides similar prioritization for autonomous platforms
+- PEAT provides similar prioritization for autonomous platforms
 
 ### Commercial Standards
 
 **DiffServ (RFC 2474)**: IP packet QoS markings
-- We can map HIVE QoS classes to DSCP values for network-layer QoS
+- We can map PEAT QoS classes to DSCP values for network-layer QoS
 
 **MQTT QoS Levels**: Quality of Service for pub-sub messaging
 - MQTT has 3 levels (0, 1, 2) - we extend to 5 for finer control
@@ -18505,7 +18505,7 @@ impl AutomergeSyncCoordinator {
 
 ### Subscription Granularity
 
-**Current HIVE subscription model:**
+**Current PEAT subscription model:**
 ```rust
 // Subscribe to entire collection
 backend.subscribe("beacons", Query::All).await?;
@@ -18519,7 +18519,7 @@ ditto.store.collection("beacons")
     .subscribe();
 ```
 
-**Proposed HIVE extension:**
+**Proposed PEAT extension:**
 ```rust
 /// Enhanced query with spatial and attribute predicates
 pub enum Query {
@@ -18764,25 +18764,25 @@ collections:
 - Standardized types enable automatic symbol rendering
 
 **CoT Message Characteristics:**
-- **Size**: XML format up to 40KB per message (larger than HIVE's differential sync)
+- **Size**: XML format up to 40KB per message (larger than PEAT's differential sync)
 - **Transport**: UDP/TCP, optionally Protobuf-encoded for bandwidth efficiency
 - **Update Rate**: Typically 1-5 second position updates
 - **Network**: Designed for IP-based networks (not optimized for contested/DIL environments)
 
-### Strategic Importance for HIVE
+### Strategic Importance for PEAT
 
 **AUKUS Integration Requirement:**
 - TAK is extensively used within AUKUS partners (US, UK, Australia)
 - AUKUS Pillar II emphasizes technology interoperability
-- **Requirement**: HIVE must integrate with existing TAK infrastructure to enable adoption
+- **Requirement**: PEAT must integrate with existing TAK infrastructure to enable adoption
 
 **Ecosystem Benefits:**
-1. **Common Operating Picture**: HIVE-coordinated assets visible in TAK
-2. **Human-Machine Interface**: TAK serves as operator interface for HIVE teams
-3. **Interoperability**: HIVE coordinates autonomy; TAK provides situational awareness to C2
-4. **Gradual Adoption**: Organizations can integrate HIVE without replacing TAK infrastructure
+1. **Common Operating Picture**: PEAT-coordinated assets visible in TAK
+2. **Human-Machine Interface**: TAK serves as operator interface for PEAT teams
+3. **Interoperability**: PEAT coordinates autonomy; TAK provides situational awareness to C2
+4. **Gradual Adoption**: Organizations can integrate PEAT without replacing TAK infrastructure
 
-**Challenge**: TAK's all-to-all event streaming model conflicts with HIVE's hierarchical aggregation approach.
+**Challenge**: TAK's all-to-all event streaming model conflicts with PEAT's hierarchical aggregation approach.
 
 ### The Integration Problem
 
@@ -18798,7 +18798,7 @@ collections:
  [ATAK]   [WinTAK]  [ATAK]   [ATAK]   [ATAK]
 ```
 
-**HIVE's Architecture (Hierarchical Aggregation)**:
+**PEAT's Architecture (Hierarchical Aggregation)**:
 ```
 ┌─────────────────────────────────────────────────────────┐
 │              Company HQ (Aggregated View)               │
@@ -18815,13 +18815,13 @@ collections:
 
 **Architectural Tension:**
 - TAK expects all position updates from all platforms
-- HIVE provides aggregated capabilities and filtered/summarized position data
-- **Risk**: Naively bridging HIVE → TAK could saturate network with O(n²) messages
-- **Opportunity**: TAK can display HIVE's hierarchical abstractions as cells/formations
+- PEAT provides aggregated capabilities and filtered/summarized position data
+- **Risk**: Naively bridging PEAT → TAK could saturate network with O(n²) messages
+- **Opportunity**: TAK can display PEAT's hierarchical abstractions as cells/formations
 
 ## Decision
 
-We will implement **bidirectional integration between HIVE Protocol and TAK ecosystem** through a **three-tier integration architecture**:
+We will implement **bidirectional integration between PEAT Protocol and TAK ecosystem** through a **three-tier integration architecture**:
 
 ### Tier 1: CoT Message Schema Integration (cap-schema layer)
 
@@ -18834,43 +18834,43 @@ cap-schema/
 │   └── ...
 ├── src/
 │   ├── cot/
-│   │   ├── encoder.rs         # HIVE → CoT XML/Protobuf
-│   │   ├── decoder.rs         # CoT → HIVE messages
+│   │   ├── encoder.rs         # PEAT → CoT XML/Protobuf
+│   │   ├── decoder.rs         # CoT → PEAT messages
 │   │   ├── types.rs           # CoT type hierarchy mapping
 │   │   └── validation.rs      # CoT schema validation
 ```
 
 **Bidirectional Message Mapping:**
 
-| HIVE Concept | CoT Representation | Direction | Notes |
+| PEAT Concept | CoT Representation | Direction | Notes |
 |--------------|-------------------|-----------|-------|
-| Platform Position | CoT Event (type: a-f-G-U-C) | HIVE → TAK | Individual platform tracks |
-| Squad Formation | CoT Event + detail/link | HIVE → TAK | Cell as tactical graphic |
-| Capability Aggregate | CoT Event (custom detail) | HIVE → TAK | Squad-level capability summary |
-| Command Intent | CoT Event (type: t-x-m) | TAK → HIVE | Mission tasking from C2 |
-| Geofence/ROZ | CoT Event (type: u-d-r) | TAK → HIVE | Operational boundaries |
+| Platform Position | CoT Event (type: a-f-G-U-C) | PEAT → TAK | Individual platform tracks |
+| Squad Formation | CoT Event + detail/link | PEAT → TAK | Cell as tactical graphic |
+| Capability Aggregate | CoT Event (custom detail) | PEAT → TAK | Squad-level capability summary |
+| Command Intent | CoT Event (type: t-x-m) | TAK → PEAT | Mission tasking from C2 |
+| Geofence/ROZ | CoT Event (type: u-d-r) | TAK → PEAT | Operational boundaries |
 | Chat/Text | CoT Event (type: b-t-f) | Bidirectional | Text messaging |
 
 **MIL-STD-2525 Entity Type Mappings** (from M1 POC):
 
-| HIVE Entity | CoT Type | MIL-STD-2525 Description |
+| PEAT Entity | CoT Type | MIL-STD-2525 Description |
 |-------------|----------|--------------------------|
 | Tracked Person (POI) | `a-f-G-E-S` | Friendly Ground Equipment - Sensor |
 | Tracked Vehicle | `a-f-G-E-V` | Friendly Ground Equipment - Vehicle |
 | Unknown Track | `a-u-G` | Unknown Ground |
 | Hostile Track | `a-h-G` | Hostile Ground |
-| HIVE Platform (UGV) | `a-f-G-U-C` | Friendly Ground Unit - Combat |
-| HIVE Platform (UAV) | `a-f-A-M-F-Q` | Friendly Air - Military Fixed Wing - UAV |
-| HIVE Operator | `a-f-G-U-C-I` | Friendly Ground Unit - Infantry |
-| HIVE Cell/Team | `a-f-G-U-C` + links | Friendly Ground Unit with subordinates |
+| PEAT Platform (UGV) | `a-f-G-U-C` | Friendly Ground Unit - Combat |
+| PEAT Platform (UAV) | `a-f-A-M-F-Q` | Friendly Air - Military Fixed Wing - UAV |
+| PEAT Operator | `a-f-G-U-C-I` | Friendly Ground Unit - Infantry |
+| PEAT Cell/Team | `a-f-G-U-C` + links | Friendly Ground Unit with subordinates |
 | Formation | `a-f-G-U-C` + links | Higher echelon unit |
 | Geofence/ROZ | `u-d-r` | Drawing - Route/Area |
 | Mission Tasking | `t-x-m-c` | Tasking - Mission - Track |
-| Handoff Event | `a-x-h-h` | Custom - HIVE Handoff |
+| Handoff Event | `a-x-h-h` | Custom - PEAT Handoff |
 
 **Hierarchy Encoding via CoT Links:**
 
-HIVE's hierarchical relationships map to CoT `<link>` elements with relation types:
+PEAT's hierarchical relationships map to CoT `<link>` elements with relation types:
 
 ```xml
 <!-- Platform belongs to cell -->
@@ -18891,7 +18891,7 @@ HIVE's hierarchical relationships map to CoT `<link>` elements with relation typ
 | `o-o` | Observing | Sensor→track relationship |
 
 **Key Design Principles:**
-1. **Semantic Preservation**: HIVE capabilities map to appropriate CoT detail sub-schemas
+1. **Semantic Preservation**: PEAT capabilities map to appropriate CoT detail sub-schemas
 2. **Minimal Overhead**: Only send necessary data; leverage CoT's extensible detail fields
 3. **Standard Compliance**: Use existing CoT sub-schemas where possible (flow-tags, sensor, etc.)
 4. **Hierarchy Encoding**: Use CoT link elements to represent squad→platform relationships
@@ -18930,7 +18930,7 @@ pub struct TakConfig {
 #[async_trait]
 impl MessageTransport for TakTransport {
     async fn send(&self, message: &dyn CapMessage, ...) -> Result<...> {
-        // 1. Convert HIVE message to CoT event
+        // 1. Convert PEAT message to CoT event
         let cot_event = self.cot_encoder.encode(message)?;
         
         // 2. Serialize to XML or Protobuf
@@ -18951,12 +18951,12 @@ impl MessageTransport for TakTransport {
         // 1. Subscribe to CoT messages from TAK
         let cot_stream = self.client.subscribe().await?;
         
-        // 2. Filter and decode into HIVE messages
-        let hive_stream = cot_stream
+        // 2. Filter and decode into PEAT messages
+        let peat_stream = cot_stream
             .filter_map(|cot_event| self.cot_decoder.decode::<M>(cot_event))
             .filter(|msg| filter.matches(msg));
         
-        Ok(hive_stream)
+        Ok(peat_stream)
     }
 }
 ```
@@ -18980,13 +18980,13 @@ impl MessageTransport for TakTransport {
 
 ### Tier 3: Hierarchical Filtering & Aggregation Bridge
 
-**Implement HIVE-specific logic to bridge hierarchical model with TAK's flat model:**
+**Implement PEAT-specific logic to bridge hierarchical model with TAK's flat model:**
 
 ```rust
 // cap-protocol/src/tak_bridge.rs
 
-pub struct HiveTakBridge {
-    hive_node: HiveNode,
+pub struct PeatTakBridge {
+    peat_node: PeatNode,
     tak_transport: TakTransport,
     aggregation_policy: AggregationPolicy,
 }
@@ -19002,13 +19002,13 @@ pub enum AggregationPolicy {
     /// Recipients see detail appropriate to their echelon
     HierarchicalFiltering,
 
-    /// Custom filtering based on CoT type, recipient, and HIVE cell membership
+    /// Custom filtering based on CoT type, recipient, and PEAT cell membership
     CustomFilters(Vec<FilterRule>),
 
     // === Additional policies from M1 POC feedback ===
 
     /// Track-focused: Only active tracks visible, not platform positions
-    /// Useful when operators care about targets, not HIVE assets
+    /// Useful when operators care about targets, not PEAT assets
     TracksOnly,
 
     /// Capability-focused: Formation capabilities only, not positions
@@ -19026,10 +19026,10 @@ pub enum AggregationPolicy {
 
 /// QoS Priority to CoT Flow-Tags Mapping (ADR-019 integration)
 ///
-/// Maps HIVE QoS priorities to CoT `_flow-tags_` for TAK-side prioritization.
+/// Maps PEAT QoS priorities to CoT `_flow-tags_` for TAK-side prioritization.
 /// TAK servers that honor flow-tags will process messages accordingly.
 ///
-/// | HIVE Priority | CoT Flow-Tag | TAK Behavior |
+/// | PEAT Priority | CoT Flow-Tag | TAK Behavior |
 /// |---------------|--------------|--------------|
 /// | P1 (Critical) | `priority=flash` | Immediate delivery |
 /// | P2 (High) | `priority=immediate` | High priority queue |
@@ -19046,8 +19046,8 @@ pub fn priority_to_flow_tag(priority: Priority) -> &'static str {
     }
 }
 
-impl HiveTakBridge {
-    /// Publish HIVE state to TAK
+impl PeatTakBridge {
+    /// Publish PEAT state to TAK
     pub async fn publish_to_tak(&self) -> Result<()> {
         match self.aggregation_policy {
             AggregationPolicy::HierarchicalFiltering => {
@@ -19065,7 +19065,7 @@ impl HiveTakBridge {
         Ok(())
     }
     
-    /// Ingest TAK events into HIVE
+    /// Ingest TAK events into PEAT
     pub async fn ingest_from_tak(&self) -> Result<()> {
         let mut tak_stream = self.tak_transport.subscribe::<CotEvent>(
             MessageFilter::default()
@@ -19074,18 +19074,18 @@ impl HiveTakBridge {
         while let Some(cot_event) = tak_stream.next().await {
             match cot_event.event_type {
                 CotType::MissionTasking => {
-                    // Convert TAK mission tasking to HIVE command
-                    let command = self.convert_to_hive_command(cot_event)?;
-                    self.hive_node.execute_command(command).await?;
+                    // Convert TAK mission tasking to PEAT command
+                    let command = self.convert_to_peat_command(cot_event)?;
+                    self.peat_node.execute_command(command).await?;
                 },
                 CotType::Geofence => {
-                    // Import geofence as HIVE operational constraint
+                    // Import geofence as PEAT operational constraint
                     let constraint = self.convert_to_constraint(cot_event)?;
-                    self.hive_node.add_constraint(constraint).await?;
+                    self.peat_node.add_constraint(constraint).await?;
                 },
                 CotType::FriendlyPosition => {
-                    // Track external friendly units in HIVE
-                    self.hive_node.update_external_track(cot_event).await?;
+                    // Track external friendly units in PEAT
+                    self.peat_node.update_external_track(cot_event).await?;
                 },
                 _ => {
                     // Log other event types for situational awareness
@@ -19106,21 +19106,21 @@ impl HiveTakBridge {
               │ (Filtered CoT messages)
               │
     ┌─────────▼─────────┐
-    │  HIVE TAK Bridge  │
+    │  PEAT TAK Bridge  │
     │  (Aggregation +   │
     │   Filtering)      │
     └─────────┬─────────┘
               │
-              │ (HIVE internal protocol - differential sync)
+              │ (PEAT internal protocol - differential sync)
               │
     ┌─────────▼─────────┐
-    │    HIVE Network   │
+    │    PEAT Network   │
     │  (Hierarchical)   │
     └───────────────────┘
 ```
 
 **Filtering Rules:**
-- **Geographic**: Only forward CoT events within HIVE cell's area of operations
+- **Geographic**: Only forward CoT events within PEAT cell's area of operations
 - **Temporal**: Stale events (beyond stale time) filtered out
 - **Type-Based**: Only relevant CoT types forwarded (filter out irrelevant chat, admin messages)
 - **Authority-Based**: Mission commands only accepted from authorized TAK users
@@ -19128,22 +19128,22 @@ impl HiveTakBridge {
 
 ### Integration Deployment Models
 
-**Model 1: HIVE as TAK Plugin (Tight Integration)**
-- Develop ATAK plugin that exposes HIVE capabilities
-- Plugin displays HIVE cell formations, hierarchical summaries
-- Operators send commands to HIVE via TAK UI
+**Model 1: PEAT as TAK Plugin (Tight Integration)**
+- Develop ATAK plugin that exposes PEAT capabilities
+- Plugin displays PEAT cell formations, hierarchical summaries
+- Operators send commands to PEAT via TAK UI
 - **Pros**: Seamless UX, no separate infrastructure
 - **Cons**: Limited to Android devices, plugin development complexity
 
-**Model 2: HIVE TAK Bridge Node (Federated)**
-- Standalone HIVE node acts as TAK federation member
+**Model 2: PEAT TAK Bridge Node (Federated)**
+- Standalone PEAT node acts as TAK federation member
 - Appears as TAK server to TAK clients
-- Translates between HIVE and TAK protocols
+- Translates between PEAT and TAK protocols
 - **Pros**: Works with all TAK clients (ATAK, WinTAK, iTAK)
 - **Cons**: Additional infrastructure, configuration complexity
 
-**Model 3: Hybrid - HIVE Core + TAK Interface Layer**
-- HIVE operates independently with native protocol
+**Model 3: Hybrid - PEAT Core + TAK Interface Layer**
+- PEAT operates independently with native protocol
 - TAK transport adapter provides bidirectional bridge
 - Multiple TAK bridges for scalability
 - **Pros**: Best performance, flexibility, supports multiple deployment scenarios
@@ -19159,7 +19159,7 @@ impl HiveTakBridge {
 
 **Tasks**:
 1. Survey TAK deployment patterns within AUKUS partners
-2. Identify critical CoT message types for HIVE integration
+2. Identify critical CoT message types for PEAT integration
 3. Define success criteria for integration (latency, bandwidth, usability)
 4. Document security requirements (PKI, certificate management)
 
@@ -19171,18 +19171,18 @@ impl HiveTakBridge {
 
 ### Phase 1: CoT Schema Adapter (Weeks 3-4)
 
-**Goal**: Implement bidirectional CoT ↔ HIVE message conversion in `cap-schema`
+**Goal**: Implement bidirectional CoT ↔ PEAT message conversion in `cap-schema`
 
 **Tasks**:
 1. Implement CoT XML parser/generator
 2. Implement CoT Protobuf encoder/decoder
-3. Create HIVE → CoT message mappings (platform position, squad formation, etc.)
-4. Create CoT → HIVE message mappings (mission tasking, geofences, etc.)
+3. Create PEAT → CoT message mappings (platform position, squad formation, etc.)
+4. Create CoT → PEAT message mappings (mission tasking, geofences, etc.)
 5. Unit tests for all conversions
 
 **Success Criteria**:
-- [ ] HIVE platform position converts to valid CoT event (MIL-STD-2525 type)
-- [ ] CoT mission tasking converts to HIVE command
+- [ ] PEAT platform position converts to valid CoT event (MIL-STD-2525 type)
+- [ ] CoT mission tasking converts to PEAT command
 - [ ] Round-trip conversion preserves semantic meaning
 - [ ] Validation catches malformed CoT messages
 
@@ -19203,38 +19203,38 @@ impl HiveTakBridge {
 - [ ] Mesh SA mode works in local network
 - [ ] Handles connection failures gracefully
 
-### Phase 3: HIVE-TAK Bridge Logic (Weeks 8-10)
+### Phase 3: PEAT-TAK Bridge Logic (Weeks 8-10)
 
 **Goal**: Implement hierarchical filtering and aggregation bridge
 
 **Tasks**:
-1. Implement `HiveTakBridge` with aggregation policies
+1. Implement `PeatTakBridge` with aggregation policies
 2. Add hierarchical filtering logic (echelon-based visibility)
 3. Implement bandwidth-aware throttling
 4. Create configuration system for filtering rules
-5. End-to-end testing with HIVE + TAK ecosystem
+5. End-to-end testing with PEAT + TAK ecosystem
 
 **Success Criteria**:
 - [ ] Company HQ in TAK sees platoon summaries, not individual platforms
 - [ ] Squad leaders in TAK see full platform details
-- [ ] Mission commands from TAK correctly execute in HIVE
+- [ ] Mission commands from TAK correctly execute in PEAT
 - [ ] Bandwidth usage < 10% of full event streaming
 
 ### Phase 4: ATAK Plugin Development (Weeks 11-14) [Optional]
 
-**Goal**: Create native ATAK plugin for HIVE integration
+**Goal**: Create native ATAK plugin for PEAT integration
 
 **Tasks**:
 1. ATAK plugin skeleton (Java/Kotlin)
-2. Display HIVE cell formations on map
+2. Display PEAT cell formations on map
 3. Display aggregated capabilities in UI
-4. Send commands to HIVE via plugin
+4. Send commands to PEAT via plugin
 5. User acceptance testing with operators
 
 **Success Criteria**:
 - [ ] Plugin installs on ATAK devices
-- [ ] HIVE squad formations visible on map
-- [ ] Operators can task HIVE cells via natural interface
+- [ ] PEAT squad formations visible on map
+- [ ] Operators can task PEAT cells via natural interface
 - [ ] Performance acceptable on tactical devices
 
 ### Phase 5: Field Validation (Weeks 15-16)
@@ -19249,8 +19249,8 @@ impl HiveTakBridge {
 5. Documentation and training materials
 
 **Success Criteria**:
-- [ ] HIVE-coordinated assets visible in TAK common operating picture
-- [ ] Operators successfully task HIVE via TAK
+- [ ] PEAT-coordinated assets visible in TAK common operating picture
+- [ ] Operators successfully task PEAT via TAK
 - [ ] Performance meets operational requirements
 - [ ] Security audit passes with no critical findings
 
@@ -19258,20 +19258,20 @@ impl HiveTakBridge {
 
 ### Positive
 
-1. **AUKUS Interoperability**: Enables HIVE adoption within existing TAK infrastructure
+1. **AUKUS Interoperability**: Enables PEAT adoption within existing TAK infrastructure
 2. **Operator Familiarity**: Leverages existing TAK training and muscle memory
-3. **Ecosystem Access**: Connects HIVE to broader TAK plugin ecosystem
-4. **Gradual Adoption**: Organizations can integrate HIVE incrementally
-5. **Common Operating Picture**: HIVE assets visible alongside traditional C2
+3. **Ecosystem Access**: Connects PEAT to broader TAK plugin ecosystem
+4. **Gradual Adoption**: Organizations can integrate PEAT incrementally
+5. **Common Operating Picture**: PEAT assets visible alongside traditional C2
 6. **Standards Alignment**: Uses widely-adopted CoT message format
 7. **Multi-National Collaboration**: TAK used across NATO and AUKUS partners
-8. **Bidirectional Data Flow**: Both HIVE → TAK (awareness) and TAK → HIVE (tasking)
+8. **Bidirectional Data Flow**: Both PEAT → TAK (awareness) and TAK → PEAT (tasking)
 
 ### Negative
 
 1. **Complexity**: Additional abstraction layer increases system complexity
-2. **Bandwidth Overhead**: CoT messages larger than HIVE's differential sync
-3. **Impedance Mismatch**: TAK's flat model vs HIVE's hierarchical model requires careful bridging
+2. **Bandwidth Overhead**: CoT messages larger than PEAT's differential sync
+3. **Impedance Mismatch**: TAK's flat model vs PEAT's hierarchical model requires careful bridging
 4. **Security Surface**: Additional attack vectors through TAK integration points
 5. **Dependency**: Adds TAK ecosystem as external dependency
 6. **Testing Burden**: Must test against multiple TAK server implementations
@@ -19280,7 +19280,7 @@ impl HiveTakBridge {
 
 ### Risks and Mitigations
 
-**Risk 1**: TAK event flooding overwhelms HIVE network
+**Risk 1**: TAK event flooding overwhelms PEAT network
 - **Mitigation**: Hierarchical filtering prevents O(n²) message forwarding
 - **Mitigation**: Bandwidth monitoring with dynamic throttling
 - **Mitigation**: Configurable aggregation policies
@@ -19294,7 +19294,7 @@ impl HiveTakBridge {
 - **Mitigation**: PKI-based authentication for TAK connections
 - **Mitigation**: Message signing for commands (ADR-006 integration)
 - **Mitigation**: Security audit before operational deployment
-- **Mitigation**: Network segmentation between TAK and HIVE domains
+- **Mitigation**: Network segmentation between TAK and PEAT domains
 
 **Risk 4**: TAK server federation complexity
 - **Mitigation**: Start with single TAK server deployments
@@ -19310,7 +19310,7 @@ impl HiveTakBridge {
 
 ### Alternative 1: Ignore TAK Ecosystem
 
-**Approach**: HIVE operates entirely independently, no TAK integration
+**Approach**: PEAT operates entirely independently, no TAK integration
 
 **Rejected Because**:
 - Blocks AUKUS adoption (TAK is deeply entrenched)
@@ -19318,9 +19318,9 @@ impl HiveTakBridge {
 - Loses access to TAK's extensive plugin ecosystem
 - Misses opportunity for common operating picture
 
-### Alternative 2: Replace TAK with HIVE-Native UI
+### Alternative 2: Replace TAK with PEAT-Native UI
 
-**Approach**: Build HIVE's own mobile/desktop UI instead of TAK integration
+**Approach**: Build PEAT's own mobile/desktop UI instead of TAK integration
 
 **Rejected Because**:
 - Massive development effort (ATAK took years to mature)
@@ -19330,13 +19330,13 @@ impl HiveTakBridge {
 
 ### Alternative 3: TAK-Only Mode (No Hierarchical Optimization)
 
-**Approach**: Naive bridge that forwards all HIVE events to TAK without filtering
+**Approach**: Naive bridge that forwards all PEAT events to TAK without filtering
 
 **Rejected Because**:
-- Defeats HIVE's core value proposition (hierarchical scaling)
-- Would recreate O(n²) problem HIVE solves
+- Defeats PEAT's core value proposition (hierarchical scaling)
+- Would recreate O(n²) problem PEAT solves
 - Unacceptable bandwidth usage at scale
-- Doesn't leverage HIVE's aggregation capabilities
+- Doesn't leverage PEAT's aggregation capabilities
 
 ### Alternative 4: Custom Protocol Instead of CoT
 
@@ -19351,20 +19351,20 @@ impl HiveTakBridge {
 ## Success Metrics
 
 1. **Integration Completeness**:
-   - [ ] Bidirectional message flow works (HIVE ↔ TAK)
+   - [ ] Bidirectional message flow works (PEAT ↔ TAK)
    - [ ] 5+ CoT message types supported in each direction
    - [ ] Works with TAK Server, FreeTakServer, and Mesh SA
 
 2. **Performance**:
    - [ ] Message translation latency < 10ms
    - [ ] Bandwidth usage < 10% of naive event streaming
-   - [ ] Supports 100+ HIVE platforms visible in TAK
-   - [ ] TAK UI remains responsive with HIVE integration
+   - [ ] Supports 100+ PEAT platforms visible in TAK
+   - [ ] TAK UI remains responsive with PEAT integration
 
 3. **Operational Validation**:
    - [ ] Successfully demonstrated in AUKUS context
-   - [ ] Operators can task HIVE teams via TAK
-   - [ ] HIVE status updates visible in TAK within 2 seconds
+   - [ ] Operators can task PEAT teams via TAK
+   - [ ] PEAT status updates visible in TAK within 2 seconds
    - [ ] Works in contested network conditions (30% packet loss)
 
 4. **Developer Experience**:
@@ -19401,7 +19401,7 @@ impl HiveTakBridge {
 
 5. **Related ADRs**:
    - **ADR-012**: Defines cap-schema and cap-transport abstractions that enable TAK integration
-   - **ADR-009**: Bidirectional flows architecture aligns with TAK ↔ HIVE communication
+   - **ADR-009**: Bidirectional flows architecture aligns with TAK ↔ PEAT communication
    - **ADR-006**: Security architecture extends to TAK authentication
 
 ## References
@@ -19420,10 +19420,10 @@ impl HiveTakBridge {
 | 2025-11-17 | Proposed TAK/CoT integration | AUKUS interoperability requirement |
 | 2025-11-17 | Selected Hybrid deployment model (Model 3) | Maximum flexibility, aligns with cap-transport |
 | 2025-11-17 | Hierarchical filtering mandatory | Prevents O(n²) message explosion |
-| 2025-11-26 | Added `_hive_` CoT extension schema (ADR-028) | M1 POC integrator feedback - preserve HIVE semantics |
+| 2025-11-26 | Added `_peat_` CoT extension schema (ADR-028) | M1 POC integrator feedback - preserve PEAT semantics |
 | 2025-11-26 | Added MIL-STD-2525 entity type mappings | M1 POC integrator feedback - concrete type codes |
 | 2025-11-26 | Added QoS→flow-tags mapping | ADR-019 integration for TAK-side prioritization |
-| 2025-11-26 | Resolved Q5: No model distribution via TAK | Keep on HIVE blob transport (size limits, hash verification) |
+| 2025-11-26 | Resolved Q5: No model distribution via TAK | Keep on PEAT blob transport (size limits, hash verification) |
 | 2025-11-26 | Resolved Q7: Yes, cells as TAK groups | Natural fit for operator workflow |
 | 2025-11-26 | Formation-level track correlation | Hierarchical aggregation before TAK bridge |
 | 2025-11-26 | Created ADR-029 for TAK Transport Adapter | DIL message queuing, separate architectural component |
@@ -19433,16 +19433,16 @@ impl HiveTakBridge {
 
 ### Resolved (M1 POC Feedback - 2025-11-26)
 
-**Q5: Should HIVE AI models distribute via TAK data packages?**
-- **Answer**: **No** - Keep model distribution on HIVE's content-addressed blob transport.
+**Q5: Should PEAT AI models distribute via TAK data packages?**
+- **Answer**: **No** - Keep model distribution on PEAT's content-addressed blob transport.
 - **Rationale**:
   - TAK data packages have size limits (~50MB typical)
-  - HIVE's Iroh-based blob transport provides hash verification, resumable transfers
+  - PEAT's Iroh-based blob transport provides hash verification, resumable transfers
   - Model updates are P5 (bulk) priority - shouldn't compete with tactical data on TAK
-  - Separation of concerns: TAK for SA, HIVE for autonomy coordination
+  - Separation of concerns: TAK for SA, PEAT for autonomy coordination
 
-**Q7: Should HIVE cells appear as TAK "groups"?**
-- **Answer**: **Yes** - Map HIVE cells to TAK contact groups.
+**Q7: Should PEAT cells appear as TAK "groups"?**
+- **Answer**: **Yes** - Map PEAT cells to TAK contact groups.
 - **Rationale**:
   - Natural fit for operators managing multiple teams
   - Enables group messaging to cells
@@ -19458,15 +19458,15 @@ impl HiveTakBridge {
 **Q (New): How to handle track correlation across teams?**
 - **Answer**: **Formation correlates** (Option 3)
 - **Context**: In M1 vignette, Alpha and Bravo teams may independently detect the same POI.
-- **Rationale**: Aligns with HIVE's hierarchical aggregation philosophy - coordinator correlates before bridge, single track to TAK.
+- **Rationale**: Aligns with PEAT's hierarchical aggregation philosophy - coordinator correlates before bridge, single track to TAK.
 
 ### Still Open
 
-1. **Should HIVE support TAK federation directly?** Or only single TAK server connections?
+1. **Should PEAT support TAK federation directly?** Or only single TAK server connections?
 2. ~~How do we handle TAK server outages?~~ → Resolved: DIL Message Queuing (see ADR-029)
 3. **What is the priority for ATAK plugin vs standalone bridge?** Resource allocation?
-4. **Should we support TAK's video streaming features?** Integration with HIVE sensor data?
-6. **Do we need CoT→HIVE conversion for all CoT types?** Or subset initially?
+4. **Should we support TAK's video streaming features?** Integration with PEAT sensor data?
+6. **Do we need CoT→PEAT conversion for all CoT types?** Or subset initially?
 
 ## Next Steps
 
@@ -19500,7 +19500,7 @@ impl HiveTakBridge {
 
 **Navy NIWC PAC Proposal**:
 - TAK integration addresses Maritime Big Play requirements
-- Enables HIVE adoption within existing USN TAK infrastructure
+- Enables PEAT adoption within existing USN TAK infrastructure
 - Demonstrates interoperability with allied systems
 
 **BlackFlag.vc Seed Round**:
@@ -19510,9 +19510,9 @@ impl HiveTakBridge {
 
 ---
 
-**Critical Success Factor**: TAK integration must be **demonstrably operational** before major NATO STANAG proposals. Working TAK bridge provides credibility and shows HIVE complements (rather than replaces) existing C2 infrastructure.
+**Critical Success Factor**: TAK integration must be **demonstrably operational** before major NATO STANAG proposals. Working TAK bridge provides credibility and shows PEAT complements (rather than replaces) existing C2 infrastructure.
 
-**Author's Note**: This ADR represents a strategic integration that enables HIVE adoption within the existing TAK ecosystem prevalent in AUKUS and broader DoD/NATO operations. The hierarchical filtering bridge is essential—naive event forwarding would recreate the O(n²) problem HIVE solves. By treating TAK as a first-class integration target, we position HIVE as complementary infrastructure that enhances existing situational awareness tools rather than competing with them.
+**Author's Note**: This ADR represents a strategic integration that enables PEAT adoption within the existing TAK ecosystem prevalent in AUKUS and broader DoD/NATO operations. The hierarchical filtering bridge is essential—naive event forwarding would recreate the O(n²) problem PEAT solves. By treating TAK as a first-class integration target, we position PEAT as complementary infrastructure that enhances existing situational awareness tools rather than competing with them.
 
 ---
 
@@ -19542,7 +19542,7 @@ This represents a **20× bandwidth amplification** where we're recreating docume
 
 ### The Core Architectural Principle
 
-HIVE Protocol is designed around a **document-oriented architecture** where:
+PEAT Protocol is designed around a **document-oriented architecture** where:
 
 1. **Each entity is represented by exactly ONE living document**
    - Soldier/Platform/UAV → `sim_doc_{node_id}` (1 document)
@@ -19912,7 +19912,7 @@ Total bandwidth: O(n + n/k + n/k*s + n/k*s*p) ≈ O(n log n)
 
 **Tasks:**
 1. **Refactor `upsert_squad_summary()` → `create/update` pattern**
-   - Location: `hive-protocol/src/storage/ditto_store.rs:484`
+   - Location: `peat-protocol/src/storage/ditto_store.rs:484`
    - Split into `create_squad_summary()` (called once)
    - And `update_squad_summary()` (called many times)
 
@@ -20068,7 +20068,7 @@ async fn test_document_lifecycle_invariant() {
 
 ## Related Decisions
 
-- **ADR-001 (HIVE Protocol POC):** Defined CRDT-based architecture, implied but didn't mandate update semantics
+- **ADR-001 (PEAT Protocol POC):** Defined CRDT-based architecture, implied but didn't mandate update semantics
 - **ADR-009 (Bidirectional Hierarchical Flows):** Covered flow direction, not document lifecycle
 - **ADR-011 (Ditto vs Automerge/Iroh):** Chose Ditto for CRDT support - must use properly
 - **ADR-015 (Hierarchical Aggregation):** Identified full replication vs aggregation concern, didn't specify document semantics
@@ -20232,7 +20232,7 @@ Traditional Machine Learning Operations (MLOps) architectures assume:
 - Continuous monitoring telemetry → Central dashboards
 - Model registry as source of truth
 
-**HIVE Enables:**
+**PEAT Enables:**
 - Edge-first inference with local model execution
 - Hierarchical model distribution via differential sync
 - Aggregated performance monitoring through hierarchy
@@ -20241,14 +20241,14 @@ Traditional Machine Learning Operations (MLOps) architectures assume:
 
 **Design Philosophy:**
 - **Models run at the edge** where decisions are made
-- **Model updates propagate hierarchically** using HIVE's differential sync
+- **Model updates propagate hierarchically** using PEAT's differential sync
 - **Performance metrics aggregate upward** through command hierarchy
 - **Training happens offline** or via federated learning
 - **Capability, not inventory** is the operational metric
 
 ### Model Format Standards: ONNX as Foundation
 
-**HIVE uses ONNX (Open Neural Network Exchange) as the standard model interchange format** for edge AI operations. This decision provides critical benefits for military edge deployments:
+**PEAT uses ONNX (Open Neural Network Exchange) as the standard model interchange format** for edge AI operations. This decision provides critical benefits for military edge deployments:
 
 #### Why ONNX for Tactical Edge
 
@@ -20295,10 +20295,10 @@ Traditional Machine Learning Operations (MLOps) architectures assume:
 - Integration with MLOps tools (MLflow, Azure ML)
 - Active development and governance (LF AI & Data)
 
-#### ONNX Integration in HIVE
+#### ONNX Integration in PEAT
 
 ```python
-# Example: ONNX model in HIVE registry
+# Example: ONNX model in PEAT registry
 {
   "model_id": "target_recognition_yolov8",
   "version": "4.2.1",
@@ -20377,15 +20377,15 @@ Traditional Machine Learning Operations (MLOps) architectures assume:
 }
 ```
 
-**HIVE's ONNX Runtime Integration:**
+**PEAT's ONNX Runtime Integration:**
 
 ```python
-class HiveMLRuntime:
+class PeatMLRuntime:
     """ONNX-first ML runtime for edge platforms"""
     
-    def __init__(self, platform_id: str, hive_sync: HiveSyncEngine):
+    def __init__(self, platform_id: str, peat_sync: PeatSyncEngine):
         self.platform_id = platform_id
-        self.hive_sync = hive_sync
+        self.peat_sync = peat_sync
         self.sessions = {}
         
         # Detect available hardware and execution providers
@@ -20408,8 +20408,8 @@ class HiveMLRuntime:
         
     def load_model(self, model_spec: ModelSpec):
         """Load ONNX model with automatic variant selection"""
-        # Fetch model metadata from HIVE
-        model_metadata = self.hive_sync.get_artifact_metadata(
+        # Fetch model metadata from PEAT
+        model_metadata = self.peat_sync.get_artifact_metadata(
             collection="models.registry",
             artifact_id=f"{model_spec.model_id}:{model_spec.version}"
         )
@@ -20421,8 +20421,8 @@ class HiveMLRuntime:
             self.get_hardware_capabilities()
         )
         
-        # Fetch ONNX model file via HIVE differential sync
-        onnx_model_path = self.hive_sync.fetch_artifact(
+        # Fetch ONNX model file via PEAT differential sync
+        onnx_model_path = self.peat_sync.fetch_artifact(
             artifact_id=variant.file,
             priority="normal"
         )
@@ -20451,8 +20451,8 @@ class HiveMLRuntime:
             "loaded_at": datetime.now()
         }
         
-        # Update capability state in HIVE
-        self.hive_sync.update_capability_state(
+        # Update capability state in PEAT
+        self.peat_sync.update_capability_state(
             platform_id=self.platform_id,
             capability=model_spec.model_id,
             status="operational",
@@ -20535,7 +20535,7 @@ ONNX's structured format enables intelligent differential sync:
 }
 ```
 
-**Benefits for HIVE:**
+**Benefits for PEAT:**
 - ONNX graph structure enables semantic chunking (by layer/operator)
 - Changed weights identified at granular level
 - Architecture changes (nodes/edges) detected separately
@@ -20585,27 +20585,27 @@ Each platform runs models locally with instrumentation:
 
 ```python
 # Edge platform ML runtime
-class HiveMLRuntime:
-    def __init__(self, platform_id: str, hive_sync: HiveSyncEngine):
+class PeatMLRuntime:
+    def __init__(self, platform_id: str, peat_sync: PeatSyncEngine):
         self.platform_id = platform_id
-        self.hive_sync = hive_sync
+        self.peat_sync = peat_sync
         self.models = {}
         self.performance_metrics = {}
         
     def load_model(self, model_spec: ModelSpec):
-        """Load model from HIVE-synced model registry"""
+        """Load model from PEAT-synced model registry"""
         model_id = model_spec.model_id
         version = model_spec.version
         
-        # Check if model available in local HIVE state
-        model_artifact = self.hive_sync.get_artifact(
+        # Check if model available in local PEAT state
+        model_artifact = self.peat_sync.get_artifact(
             collection="models.registry",
             artifact_id=f"{model_id}:{version}"
         )
         
         if model_artifact is None:
-            # Request from parent via HIVE sync
-            self.hive_sync.request_artifact(
+            # Request from parent via PEAT sync
+            self.peat_sync.request_artifact(
                 artifact_id=f"{model_id}:{version}",
                 priority="normal"
             )
@@ -20625,8 +20625,8 @@ class HiveMLRuntime:
             "inference_count": 0
         }
         
-        # Update capability state in HIVE
-        self.hive_sync.update_capability_state(
+        # Update capability state in PEAT
+        self.peat_sync.update_capability_state(
             platform_id=self.platform_id,
             capability=model_id,
             status="operational",
@@ -20684,15 +20684,15 @@ class HiveMLRuntime:
         metrics["inference_count"] += 1
         metrics["last_updated"] = datetime.now()
         
-        # Periodically sync performance metrics up through HIVE
+        # Periodically sync performance metrics up through PEAT
         if metrics["inference_count"] % 100 == 0:
             self.sync_performance_metrics(model_id)
             
     def sync_performance_metrics(self, model_id: str):
-        """Aggregate performance metrics into HIVE state"""
+        """Aggregate performance metrics into PEAT state"""
         metrics = self.performance_metrics[model_id]
         
-        self.hive_sync.update_capability_state(
+        self.peat_sync.update_capability_state(
             platform_id=self.platform_id,
             capability=model_id,
             performance={
@@ -20824,7 +20824,7 @@ impl ModelDistribution {
         
         // Companies automatically propagate to Platoons
         // Platoons to Squads, Squads to Platforms
-        // All via HIVE sync protocol
+        // All via PEAT sync protocol
         
         // Step 5: Monitor convergence
         let convergence = self.monitor_convergence(
@@ -20866,7 +20866,7 @@ impl ModelDistribution {
 
 #### 3. Hierarchical Performance Monitoring
 
-Performance metrics aggregate up through HIVE hierarchy:
+Performance metrics aggregate up through PEAT hierarchy:
 
 ```javascript
 // Platform-level performance (raw)
@@ -21041,9 +21041,9 @@ class TrainingDataCollector:
         # Store locally
         self.local_storage.store(metadata)
         
-        # Metadata propagates up via HIVE (small)
+        # Metadata propagates up via PEAT (small)
         # Raw data stays local until platform returns to base
-        self.hive_sync.log_training_metadata(metadata)
+        self.peat_sync.log_training_metadata(metadata)
 ```
 
 **Bulk data collection when connectivity permits:**
@@ -21100,8 +21100,8 @@ class FederatedLearningClient:
         compressed_delta = compress(weight_delta)
         signed_delta = self.sign_update(compressed_delta)
         
-        # Send delta up via HIVE (much smaller than raw data)
-        self.hive_sync.send_federated_update(
+        # Send delta up via PEAT (much smaller than raw data)
+        self.peat_sync.send_federated_update(
             model_id=model_id,
             delta=signed_delta,
             training_samples=len(training_data),
@@ -21138,7 +21138,7 @@ class FederatedLearningAggregator:
         validation_results = self.validate_model(updated_model)
         
         if validation_results.meets_criteria():
-            # Publish new version via HIVE
+            # Publish new version via PEAT
             new_version = self.model_registry.publish(
                 model=updated_model,
                 validation=validation_results,
@@ -21198,36 +21198,36 @@ class SyntheticDataGenerator:
 
 #### 5. Agent Context Integration (MCP Bridge)
 
-HIVE-synced state becomes context for AI agents:
+PEAT-synced state becomes context for AI agents:
 
 ```python
-class HiveMCPBridge:
-    """Bridge between HIVE distributed state and MCP agent context"""
+class PeatMCPBridge:
+    """Bridge between PEAT distributed state and MCP agent context"""
     
-    def __init__(self, hive_sync: HiveSyncEngine):
-        self.hive_sync = hive_sync
+    def __init__(self, peat_sync: PeatSyncEngine):
+        self.peat_sync = peat_sync
         self.mcp_server = MCPServer()
         
-        # Register HIVE collections as MCP resources
-        self.register_hive_resources()
+        # Register PEAT collections as MCP resources
+        self.register_peat_resources()
         
-    def register_hive_resources(self):
-        """Expose HIVE state as MCP resources for agents"""
+    def register_peat_resources(self):
+        """Expose PEAT state as MCP resources for agents"""
         
         # Resource: Current model registry
         @self.mcp_server.resource("models://registry")
         def get_model_registry():
-            return self.hive_sync.query_collection("models.registry")
+            return self.peat_sync.query_collection("models.registry")
             
         # Resource: Platform capabilities
         @self.mcp_server.resource("capabilities://platforms")
         def get_platform_capabilities():
-            return self.hive_sync.query_collection("platforms.capabilities")
+            return self.peat_sync.query_collection("platforms.capabilities")
             
         # Resource: Aggregated performance metrics
         @self.mcp_server.resource("performance://aggregated")
         def get_performance_metrics():
-            return self.hive_sync.query_aggregated_state(
+            return self.peat_sync.query_aggregated_state(
                 "platforms.performance",
                 aggregation_level=self.get_echelon()
             )
@@ -21236,17 +21236,17 @@ class HiveMCPBridge:
         @self.mcp_server.resource("mission://context")
         def get_mission_context():
             return {
-                "roe": self.hive_sync.get("company.orders", "current_roe"),
-                "objectives": self.hive_sync.get("platoon.taskings", "objectives"),
-                "no_strike_zones": self.hive_sync.get("shared.no_strike_zones"),
-                "threat_assessment": self.hive_sync.get("shared.enemy_disposition")
+                "roe": self.peat_sync.get("company.orders", "current_roe"),
+                "objectives": self.peat_sync.get("platoon.taskings", "objectives"),
+                "no_strike_zones": self.peat_sync.get("shared.no_strike_zones"),
+                "threat_assessment": self.peat_sync.get("shared.enemy_disposition")
             }
             
         # Tool: Request model update
         @self.mcp_server.tool("request_model_update")
         def request_model_update(model_id: str, target_version: str, justification: str):
-            """Agent can request model updates through HIVE"""
-            return self.hive_sync.request_model_update(
+            """Agent can request model updates through PEAT"""
+            return self.peat_sync.request_model_update(
                 model_id=model_id,
                 target_version=target_version,
                 requested_by=self.agent_id,
@@ -21256,8 +21256,8 @@ class HiveMCPBridge:
         # Tool: Report model performance issue
         @self.mcp_server.tool("report_performance_issue")
         def report_performance_issue(model_id: str, issue_type: str, details: dict):
-            """Agent can report degradation through HIVE"""
-            return self.hive_sync.log_performance_issue(
+            """Agent can report degradation through PEAT"""
+            return self.peat_sync.log_performance_issue(
                 model_id=model_id,
                 issue_type=issue_type,
                 details=details,
@@ -21265,16 +21265,16 @@ class HiveMCPBridge:
             )
 
 class EdgeAgent:
-    """AI agent using HIVE-synced context via MCP"""
+    """AI agent using PEAT-synced context via MCP"""
     
     def __init__(self, agent_id: str, mcp_client: MCPClient):
         self.agent_id = agent_id
         self.mcp = mcp_client
         
     async def make_decision(self, situation: Situation):
-        """Agent decision-making with HIVE context"""
+        """Agent decision-making with PEAT context"""
         
-        # Get current context from HIVE via MCP
+        # Get current context from PEAT via MCP
         model_registry = await self.mcp.get_resource("models://registry")
         capabilities = await self.mcp.get_resource("capabilities://platforms")
         mission_context = await self.mcp.get_resource("mission://context")
@@ -21305,8 +21305,8 @@ class EdgeAgent:
 │  AI Agent (ReAct, function calling) │
 │         ↕ [MCP Protocol]            │
 │  MCP Server (Context Provider)      │
-│         ↕ [HIVE Bridge]             │
-│  HIVE Sync Engine                   │
+│         ↕ [PEAT Bridge]             │
+│  PEAT Sync Engine                   │
 │    • Model Registry                 │
 │    • Capability State               │
 │    • Performance Metrics            │
@@ -21318,8 +21318,8 @@ class EdgeAgent:
 
 **Value Proposition:**
 - **MCP standardizes** agent-to-context interface
-- **HIVE ensures** context is available, current, consistent in DIL environments
-- **Separation of concerns**: MCP = local API, HIVE = distributed state
+- **PEAT ensures** context is available, current, consistent in DIL environments
+- **Separation of concerns**: MCP = local API, PEAT = distributed state
 - **Agents reason over hierarchically-appropriate context** (platform sees squad, squad sees platoon, etc.)
 
 ### Implementation Phases
@@ -21327,7 +21327,7 @@ class EdgeAgent:
 #### Phase 1: Foundation (Months 1-3)
 - **Model distribution infrastructure** using ADR-013 differential propagation
 - **Edge runtime instrumentation** for performance tracking
-- **Basic performance aggregation** through HIVE hierarchy
+- **Basic performance aggregation** through PEAT hierarchy
 - **Content-addressed model storage** with signature verification
 
 **Success Criteria:**
@@ -21358,15 +21358,15 @@ class EdgeAgent:
 - Model performance improves from operational feedback
 
 #### Phase 4: Agent Integration (Months 9-12)
-- **MCP bridge** exposing HIVE state to agents
+- **MCP bridge** exposing PEAT state to agents
 - **Hierarchical agent architecture** (agents at each echelon)
-- **Agent-driven model requests** through HIVE
+- **Agent-driven model requests** through PEAT
 - **Multi-echelon agentic coordination**
 
 **Success Criteria:**
-- Agents can query HIVE-synced context via MCP
+- Agents can query PEAT-synced context via MCP
 - Agents at different echelons see appropriate abstraction levels
-- Agent decisions propagate through HIVE hierarchy
+- Agent decisions propagate through PEAT hierarchy
 
 ## Consequences
 
@@ -21398,9 +21398,9 @@ class EdgeAgent:
 
 **Agent Enablement:**
 - MCP provides standard interface for agent context
-- HIVE ensures context availability in disconnected environments
+- PEAT ensures context availability in disconnected environments
 - Hierarchical abstraction matches agent decision scope
-- Agents can request updates through HIVE infrastructure
+- Agents can request updates through PEAT infrastructure
 
 ### Negative
 
@@ -21465,7 +21465,7 @@ class EdgeAgent:
 ### With ADR-006 (Security, Authentication, Authorization)
 - **Model provenance:** Signature chains for model verification
 - **Federated learning:** Cryptographic verification of gradient updates
-- **Agent authorization:** MCP tools respect HIVE authorization model
+- **Agent authorization:** MCP tools respect PEAT authorization model
 - **Training data:** Encryption of sensitive training metadata
 
 ### With ADR-007 (Automerge-Based Sync Engine)
@@ -21534,12 +21534,12 @@ class EdgeAgent:
 - Not designed for contested environments
 - Heavy resource requirements for edge
 
-**Why HIVE Edge MLOps:**
+**Why PEAT Edge MLOps:**
 - **Hierarchical by design:** Matches military organization
 - **Offline-first:** Works in DIL environments
 - **Differential propagation:** Optimal for bandwidth constraints
 - **Capability focus:** Operational assessment, not just inventory
-- **Integrated:** Leverages existing HIVE infrastructure for distribution, monitoring, and coordination
+- **Integrated:** Leverages existing PEAT infrastructure for distribution, monitoring, and coordination
 
 ## References
 
@@ -21591,7 +21591,7 @@ class EdgeAgent:
 
 ## Appendix A: Model Format Comparison for Tactical Edge
 
-This appendix compares the three primary model formats considered for HIVE edge deployments: **ONNX**, **TensorFlow Lite (TFLite)**, and **Native Framework Formats** (PyTorch .pt/.pth, TensorFlow SavedModel).
+This appendix compares the three primary model formats considered for PEAT edge deployments: **ONNX**, **TensorFlow Lite (TFLite)**, and **Native Framework Formats** (PyTorch .pt/.pth, TensorFlow SavedModel).
 
 ### Evaluation Criteria for Military Edge
 
@@ -21627,7 +21627,7 @@ This appendix compares the three primary model formats considered for HIVE edge 
 
 **Tactical Edge Suitability:** ⭐⭐⭐⭐⭐ (5/5)
 
-**HIVE Integration:**
+**PEAT Integration:**
 ```python
 # ONNX as standard format
 model_variants = {
@@ -21637,7 +21637,7 @@ model_variants = {
 }
 
 # Differential sync: 16MB delta between versions vs 487MB full model
-# HIVE distributes only changed weights using ONNX graph structure
+# PEAT distributes only changed weights using ONNX graph structure
 ```
 
 **Size Analysis:**
@@ -21677,9 +21677,9 @@ model_variants = {
 
 **Tactical Edge Suitability:** ⭐⭐⭐ (3/5)
 
-**HIVE Integration Challenges:**
+**PEAT Integration Challenges:**
 ```python
-# TFLite more difficult to integrate into HIVE
+# TFLite more difficult to integrate into PEAT
 # - Conversion from PyTorch requires TF intermediate step
 # - Less semantic structure for differential sync
 # - Fewer hardware backend options
@@ -21714,9 +21714,9 @@ model_variants = {
 
 **Tactical Edge Suitability:** ⭐⭐ (2/5)
 
-**HIVE Integration Challenges:**
+**PEAT Integration Challenges:**
 ```python
-# Native formats problematic for HIVE
+# Native formats problematic for PEAT
 # - Large runtime dependencies (PyTorch 700MB + model 500MB = 1.2GB)
 # - Vendor lock-in unacceptable for government procurement
 # - Security: PyTorch uses pickle (arbitrary code execution risk)
@@ -21749,9 +21749,9 @@ model_variants = {
 | **Extremely constrained** | TFLite | When <10MB total footprint required |
 | **Research/experimentation** | Native | Rapid iteration, full operator support |
 
-### HIVE Architecture Decision
+### PEAT Architecture Decision
 
-**HIVE adopts ONNX as the standard model format** for the following reasons:
+**PEAT adopts ONNX as the standard model format** for the following reasons:
 
 1. **Vendor Neutrality:** Critical for government procurement and multi-vendor ecosystem
 2. **Security:** Auditable graph structure enables malware detection and operator whitelisting
@@ -21770,7 +21770,7 @@ Traditional PyTorch Deployment:
 - 200 platforms = 140GB runtime + 100GB models = 240GB total
 - Update: 100GB for new model version
 
-HIVE with ONNX:
+PEAT with ONNX:
 - Runtime: 15MB per platform (ONNX Runtime)
 - Model: 125MB INT8 per model
 - 200 platforms = 3GB runtime + 25GB models = 28GB total (88% reduction)
@@ -21804,12 +21804,12 @@ def verify_onnx_security(model_path: str) -> bool:
 ```
 
 **NATO Standardization Argument:**
-> "HIVE uses ONNX as the standard model interchange format, enabling allied forces to share AI capabilities without vendor lock-in. A US-trained ONNX model can deploy to UK, Australian, or Canadian platforms via HIVE's hierarchical distribution, supporting coalition operations and AUKUS Pillar II technology sharing objectives."
+> "PEAT uses ONNX as the standard model interchange format, enabling allied forces to share AI capabilities without vendor lock-in. A US-trained ONNX model can deploy to UK, Australian, or Canadian platforms via PEAT's hierarchical distribution, supporting coalition operations and AUKUS Pillar II technology sharing objectives."
 
 ### Future Considerations
 
 **Multi-Format Support:**
-While ONNX is the standard, HIVE architecture allows for alternative formats when operationally necessary:
+While ONNX is the standard, PEAT architecture allows for alternative formats when operationally necessary:
 - TFLite for extremely constrained platforms (<100MB storage)
 - Native formats for experimental/research deployments
 - Emerging formats (e.g., MLIR, StableHLO) as they mature
@@ -21826,14 +21826,14 @@ Quantization (FP16/INT8)
     ↓
 AFRL AI Passport Validation
     ↓
-HIVE Model Registry
+PEAT Model Registry
     ↓
 Hierarchical Distribution to Tactical Edge
 ```
 
 ---
 
-**This ADR establishes HIVE as the enabling infrastructure for edge-first ML operations in contested tactical environments, supporting the full model lifecycle from distribution through training while maintaining operational capability focus throughout the hierarchy.**
+**This ADR establishes PEAT as the enabling infrastructure for edge-first ML operations in contested tactical environments, supporting the full model lifecycle from distribution through training while maintaining operational capability focus throughout the hierarchy.**
 
 ---
 
@@ -21884,7 +21884,7 @@ Traditional baseline with UPDATE_FREQUENCY=0.5s (500ms broadcast interval):
 - Server → Client: ~1ms (measured)
 - **Total P50: ~252ms** (250× higher than measured!)
 
-### Why This Matters for HIVE Comparison
+### Why This Matters for PEAT Comparison
 
 We're building hierarchical CRDT to improve on traditional client-server. But our comparison is unfair:
 
@@ -22086,12 +22086,12 @@ Could add additional metrics:
 - **ServerQueuingDelay**: Time between receive and broadcast
 - **MultiHopPropagation**: Track propagation through multiple tiers
 
-This creates a comprehensive latency measurement framework for all HIVE architectures.
+This creates a comprehensive latency measurement framework for all PEAT architectures.
 
 ## References
 
-- Traditional baseline test results: `hive-sim/traditional-baseline-20251121-211945/`
-- Current analysis (broadcast only): `hive-sim/traditional-baseline-20251121-211945/ANALYSIS.md`
+- Traditional baseline test results: `peat-sim/traditional-baseline-20251121-211945/`
+- Current analysis (broadcast only): `peat-sim/traditional-baseline-20251121-211945/ANALYSIS.md`
 - ADR-015: Hierarchical aggregation validation requirements
 - ADR-011: Ditto vs Automerge backend comparison
 
@@ -22106,7 +22106,7 @@ This creates a comprehensive latency measurement framework for all HIVE architec
 
 ## Context
 
-HIVE requires peer discovery mechanisms to enable nodes to find and connect to each other in the P2P mesh network. Discovery needs vary by operational scale:
+PEAT requires peer discovery mechanisms to enable nodes to find and connect to each other in the P2P mesh network. Discovery needs vary by operational scale:
 
 ### Tactical/Local Scale (meters to kilometers)
 - Squad members discovering squad leader
@@ -22261,12 +22261,12 @@ DHT uses **XOR distance** (logical), not **geographic distance**:
 
 ### Current (Phase 1)
 ```
-hive-mesh/src/beacon/
+peat-mesh/src/beacon/
 ├── broadcaster.rs      # Periodic beacon broadcasts
 ├── observer.rs         # Local beacon filtering
 └── storage.rs          # In-memory/persistent storage
 
-hive-mesh/src/topology/
+peat-mesh/src/topology/
 ├── selection.rs        # PeerSelector (geographic + hierarchy)
 ├── builder.rs          # TopologyBuilder (peer selection events)
 └── manager.rs          # TopologyManager (connection lifecycle)
@@ -22274,7 +22274,7 @@ hive-mesh/src/topology/
 
 ### Future (Phase 2 - Optional)
 ```
-hive-mesh/src/discovery/
+peat-mesh/src/discovery/
 ├── mod.rs              # PeerDiscovery trait (abstraction)
 ├── beacon.rs           # BeaconDiscovery (Tier 1)
 └── dht.rs              # DhtDiscovery (Tier 2, optional)
@@ -22302,7 +22302,7 @@ hive-mesh/src/discovery/
 - **Ethereum**: Kademlia DHT for global node discovery
 - **Polkadot**: libp2p-kad + mDNS
 
-HIVE follows similar pattern: **Local discovery (beacons) + optional global discovery (DHT)**.
+PEAT follows similar pattern: **Local discovery (beacons) + optional global discovery (DHT)**.
 
 ## References
 
@@ -22435,7 +22435,7 @@ ADR-017 focused exclusively on **vertical hierarchy** (parent-child relationship
 ### Core Abstraction
 
 ```rust
-// File: hive-mesh/src/hierarchy/mod.rs
+// File: peat-mesh/src/hierarchy/mod.rs
 
 /// Node role within its hierarchy level
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -22505,7 +22505,7 @@ pub trait HierarchyStrategy: Send + Sync + std::fmt::Debug {
 **Use Case**: Pre-planned military operations with defined command structure
 
 ```rust
-// File: hive-mesh/src/hierarchy/static_strategy.rs
+// File: peat-mesh/src/hierarchy/static_strategy.rs
 
 /// Static hierarchy strategy with fixed assignments
 ///
@@ -22572,7 +22572,7 @@ impl HierarchyStrategy for StaticHierarchyStrategy {
 **Use Case**: Ad-hoc networks, disaster response, autonomous adaptation
 
 ```rust
-// File: hive-mesh/src/hierarchy/dynamic_strategy.rs
+// File: peat-mesh/src/hierarchy/dynamic_strategy.rs
 
 /// Election configuration weights for multi-factor scoring
 #[derive(Debug, Clone)]
@@ -22782,7 +22782,7 @@ impl HierarchyStrategy for DynamicHierarchyStrategy {
 **Use Case**: Organizational structure with adaptation needs
 
 ```rust
-// File: hive-mesh/src/hierarchy/hybrid_strategy.rs
+// File: peat-mesh/src/hierarchy/hybrid_strategy.rs
 
 /// Transition rules for hybrid strategy
 #[derive(Debug, Clone)]
@@ -22965,7 +22965,7 @@ impl HierarchyStrategy for HybridHierarchyStrategy {
 ### TopologyBuilder Integration
 
 ```rust
-// File: hive-mesh/src/topology/builder.rs
+// File: peat-mesh/src/topology/builder.rs
 
 pub struct TopologyConfig {
     // ... existing fields ...
@@ -23027,7 +23027,7 @@ impl TopologyBuilder {
 **Solution**: Track same-level peers and emit discovery events
 
 ```rust
-// File: hive-mesh/src/topology/builder.rs
+// File: peat-mesh/src/topology/builder.rs
 
 impl TopologyBuilder {
     /// Update lateral peers (same hierarchy level)
@@ -23111,7 +23111,7 @@ pub enum TopologyEvent {
 
 ### Completed (PR #140 - Merged 2025-11-22)
 
-**Core Abstractions** (`hive-mesh/src/hierarchy/mod.rs`, 90 lines):
+**Core Abstractions** (`peat-mesh/src/hierarchy/mod.rs`, 90 lines):
 - ✅ `HierarchyStrategy` trait with Send + Sync + Debug bounds
 - ✅ `NodeRole` enum (Leader, Member, Standalone)
 - ✅ Public exports for all hierarchy types
@@ -23159,7 +23159,7 @@ pub enum TopologyEvent {
 - ✅ test_role_stability_with_hysteresis
 
 **Test Results**:
-- All 49 hive-mesh unit tests passing ✅
+- All 49 peat-mesh unit tests passing ✅
 - All 8 E2E tests passing ✅
 - No regressions in existing test suite
 
@@ -23170,9 +23170,9 @@ pub enum TopologyEvent {
 ### Example 1: Static Military Organization
 
 ```rust
-use hive_mesh::hierarchy::{StaticHierarchyStrategy, NodeRole};
-use hive_mesh::beacon::HierarchyLevel;
-use hive_mesh::topology::{TopologyBuilder, TopologyConfig};
+use peat_mesh::hierarchy::{StaticHierarchyStrategy, NodeRole};
+use peat_mesh::beacon::HierarchyLevel;
+use peat_mesh::topology::{TopologyBuilder, TopologyConfig};
 
 // Mission planning: Platoon leader node
 let strategy = Arc::new(StaticHierarchyStrategy {
@@ -23192,7 +23192,7 @@ let builder = TopologyBuilder::new(config, observer, node_id);
 ### Example 2: Dynamic Disaster Response
 
 ```rust
-use hive_mesh::hierarchy::{DynamicHierarchyStrategy, ElectionConfig};
+use peat_mesh::hierarchy::{DynamicHierarchyStrategy, ElectionConfig};
 
 // First responders with varying capabilities
 let strategy = Arc::new(DynamicHierarchyStrategy::new(
@@ -23214,7 +23214,7 @@ let builder = TopologyBuilder::new(config, observer, node_id);
 ### Example 3: Hybrid with Adaptive Promotion
 
 ```rust
-use hive_mesh::hierarchy::{HybridHierarchyStrategy, ElectionConfig, NodeRole};
+use peat_mesh::hierarchy::{HybridHierarchyStrategy, ElectionConfig, NodeRole};
 
 // Squad node that can promote to Platoon if no Platoon leader available
 let strategy = Arc::new(HybridHierarchyStrategy::with_adaptive_promotion(
@@ -23236,7 +23236,7 @@ let builder = TopologyBuilder::new(config, observer, node_id);
 ### Example 4: Custom Strategy for Specialized Use Case
 
 ```rust
-use hive_mesh::hierarchy::{HierarchyStrategy, NodeRole};
+use peat_mesh::hierarchy::{HierarchyStrategy, NodeRole};
 
 // Custom strategy for IoT sensor network
 #[derive(Debug, Clone)]
@@ -23871,7 +23871,7 @@ let config = TopologyConfig {
 
 ### The File Transfer Gap
 
-HIVE Protocol has comprehensive architecture for distributed AI model operations (ADR-013, ADR-022) and capability advertisement (ADR-018), but lacks the foundational primitive: **backend-agnostic binary file transfer through the mesh**.
+PEAT Protocol has comprehensive architecture for distributed AI model operations (ADR-013, ADR-022) and capability advertisement (ADR-018), but lacks the foundational primitive: **backend-agnostic binary file transfer through the mesh**.
 
 **Current State:**
 - `StorageBackend` and `Collection` traits handle document CRUD (`storage/traits.rs`)
@@ -23975,7 +23975,7 @@ while let Some(chunk) = reader.next().await {
 
 ### Gap Analysis
 
-| Feature | Ditto | iroh-blobs | HIVE (Current) |
+| Feature | Ditto | iroh-blobs | PEAT (Current) |
 |---------|-------|------------|----------------|
 | Content-addressed storage | Yes | Yes | No |
 | Progress tracking | Yes | Yes | No |
@@ -23993,7 +23993,7 @@ Introduce a `BlobStore` trait parallel to `StorageBackend`, acknowledging that b
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    HIVE Protocol Layer                       │
+│                    PEAT Protocol Layer                       │
 │                                                              │
 │  ┌─────────────────┐           ┌─────────────────────────┐  │
 │  │ ModelDistribution│           │  SoftwareDistribution   │  │
@@ -24788,7 +24788,7 @@ impl BlobStore for IrohBlobStore {
 
 ### ADR-022 (Edge MLOps)
 - Model registry stores blob tokens
-- `HiveMLRuntime` uses `fetch_blob()` to load models
+- `PeatMLRuntime` uses `fetch_blob()` to load models
 - Variant selection uses blob metadata
 
 ### ADR-018 (AI Model Capability Advertisement)
@@ -24859,7 +24859,7 @@ These questions must be answered before implementing Phase 4:
 10. **API Abstraction Depth**:
     - Thin wrapper over FileDistribution (minimal model-specific logic)?
     - Rich model-specific API (variant selection, convergence tracking)?
-    - How much should be in hive-protocol vs inference runtime integration?
+    - How much should be in peat-protocol vs inference runtime integration?
 
 11. **NodeCapabilities Schema**: What capabilities should nodes advertise?
     ```rust
@@ -24876,7 +24876,7 @@ These questions must be answered before implementing Phase 4:
 
 ---
 
-**This ADR establishes the foundational file transfer abstraction enabling AI model distribution and software operations across the HIVE mesh network.**
+**This ADR establishes the foundational file transfer abstraction enabling AI model distribution and software operations across the PEAT mesh network.**
 
 ---
 
@@ -24891,7 +24891,7 @@ These questions must be answered before implementing Phase 4:
 
 ### The File Transfer Gap
 
-HIVE Protocol provides CRDT-based document synchronization for coordination state (capabilities, commands, events). However, many coordination scenarios require transferring large binary artifacts:
+PEAT Protocol provides CRDT-based document synchronization for coordination state (capabilities, commands, events). However, many coordination scenarios require transferring large binary artifacts:
 
 | Use Case | Examples | Size Range |
 |----------|----------|------------|
@@ -24925,14 +24925,14 @@ Both Ditto and Iroh recognize this distinction with separate APIs:
 
 ### Scope Clarification
 
-**This ADR defines HIVE Protocol primitives for blob transfer.**
+**This ADR defines PEAT Protocol primitives for blob transfer.**
 
 It does NOT define:
 - How applications use blobs (model loading, container execution)
 - Distribution orchestration (which nodes get which blobs)
 - Application-specific metadata schemas
 
-Those concerns belong to applications built on HIVE (see ADR-026 Reference Implementation).
+Those concerns belong to applications built on PEAT (see ADR-026 Reference Implementation).
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -24942,7 +24942,7 @@ Those concerns belong to applications built on HIVE (see ADR-026 Reference Imple
 └──────────────────────────┬──────────────────────────────────────┘
                            │ uses
 ═══════════════════════════╪═══════════════════════════════════════
-         HIVE PROTOCOL (this ADR)
+         PEAT PROTOCOL (this ADR)
 ═══════════════════════════╪═══════════════════════════════════════
                            │
 ┌──────────────────────────┴──────────────────────────────────────┐
@@ -24965,17 +24965,17 @@ Blobs are identified by content hash, enabling:
 
 ### Schema: BlobReference
 
-The fundamental unit of blob identification in HIVE:
+The fundamental unit of blob identification in PEAT:
 
 ```protobuf
 syntax = "proto3";
 
-package hive.blob.v1;
+package peat.blob.v1;
 
 import "google/protobuf/timestamp.proto";
 
 // Content-addressed blob reference
-// This is the HIVE protocol's way of identifying binary artifacts
+// This is the PEAT protocol's way of identifying binary artifacts
 message BlobReference {
   // Content hash (hex-encoded)
   string hash = 1;
@@ -24987,7 +24987,7 @@ message BlobReference {
   uint64 size_bytes = 3;
   
   // Optional: application-defined metadata
-  // HIVE treats this as opaque - applications define semantics
+  // PEAT treats this as opaque - applications define semantics
   map<string, string> metadata = 10;
 }
 
@@ -25061,7 +25061,7 @@ Backend-agnostic interface for blob operations:
 //!
 //! This trait abstracts over backend-specific blob storage implementations
 //! (Ditto Attachments, iroh-blobs, etc.) providing a unified interface
-//! for the HIVE protocol layer.
+//! for the PEAT protocol layer.
 //!
 //! # Design Principles
 //!
@@ -25621,7 +25621,7 @@ impl BlobStore for IrohBlobStore {
 ### Phase 1: Core Trait & Schema (Week 1)
 - `BlobRef`, `BlobHash` types
 - `BlobStore` trait definition
-- Protobuf schema (`hive.blob.v1`)
+- Protobuf schema (`peat.blob.v1`)
 - Unit tests with mock implementation
 
 ### Phase 2: Ditto Backend (Week 2)
@@ -25714,7 +25714,7 @@ The following are explicitly out of scope for this ADR:
 
 ---
 
-**This ADR establishes the HIVE Protocol primitive for content-addressed blob transfer, enabling applications to distribute large binary artifacts through the mesh network.**
+**This ADR establishes the PEAT Protocol primitive for content-addressed blob transfer, enabling applications to distribute large binary artifacts through the mesh network.**
 
 ---
 
@@ -25728,14 +25728,14 @@ The following are explicitly out of scope for this ADR:
 
 ## Document Classification
 
-> **⚠️ This is a REFERENCE IMPLEMENTATION guide, not a HIVE Protocol specification.**
+> **⚠️ This is a REFERENCE IMPLEMENTATION guide, not a PEAT Protocol specification.**
 >
-> This ADR demonstrates how to build a software orchestration system on top of HIVE Protocol primitives. The patterns, traits, and implementations shown here are examples that users MAY adopt, adapt, or replace entirely.
+> This ADR demonstrates how to build a software orchestration system on top of PEAT Protocol primitives. The patterns, traits, and implementations shown here are examples that users MAY adopt, adapt, or replace entirely.
 >
-> **HIVE Protocol primitives used:**
+> **PEAT Protocol primitives used:**
 > - `BlobStore` / `BlobRef` (ADR-025)
 > - `CapabilityAdvertisement` (ADR-012)
-> - `HiveEvent` with `AggregationPolicy` (ADR-012)
+> - `PeatEvent` with `AggregationPolicy` (ADR-012)
 > - `DeploymentDirective` (ADR-012)
 >
 > **Application-layer concerns defined here:**
@@ -25746,25 +25746,25 @@ The following are explicitly out of scope for this ADR:
 
 ## Context
 
-### Building on HIVE Primitives
+### Building on PEAT Primitives
 
-HIVE Protocol provides foundational primitives for distributed coordination:
+PEAT Protocol provides foundational primitives for distributed coordination:
 
-| HIVE Primitive | What It Does | ADR |
+| PEAT Primitive | What It Does | ADR |
 |----------------|--------------|-----|
 | BlobRef / BlobStore | Content-addressed binary transfer | ADR-025 |
 | CapabilityAdvertisement | Nodes advertise what they can do | ADR-012 |
-| HiveEvent | Typed events with routing policies | ADR-012 |
+| PeatEvent | Typed events with routing policies | ADR-012 |
 | DeploymentDirective | Commands flow through hierarchy | ADR-012 |
 | AggregationPolicy | Control event propagation | ADR-012 |
 
-**These primitives are runtime-agnostic** - HIVE doesn't know or care if you're deploying ONNX models, Docker containers, or configuration files.
+**These primitives are runtime-agnostic** - PEAT doesn't know or care if you're deploying ONNX models, Docker containers, or configuration files.
 
 This reference implementation shows **one way** to build a software orchestration system that:
 - Deploys multiple artifact types (models, containers, binaries)
-- Reports health and status through HIVE events
-- Produces outputs that flow through HIVE's event routing
-- Uses HIVE's blob transfer for artifact distribution
+- Reports health and status through PEAT events
+- Produces outputs that flow through PEAT's event routing
+- Uses PEAT's blob transfer for artifact distribution
 
 ### Why a Reference Implementation?
 
@@ -25774,7 +25774,7 @@ Different organizations will have different needs:
 - Military users may have specific runtime requirements (MOSA, certifications)
 
 By providing a reference implementation rather than mandating an approach, we:
-1. **Demonstrate** how to use HIVE primitives effectively
+1. **Demonstrate** how to use PEAT primitives effectively
 2. **Provide** working code that can be adopted or adapted
 3. **Avoid** constraining users to our specific choices
 4. **Enable** innovation in the application layer
@@ -25807,12 +25807,12 @@ By providing a reference implementation rather than mandating an approach, we:
 └──────────────────────────┬──────────────────────────────────────┘
                            │ uses
 ═══════════════════════════╪═══════════════════════════════════════
-         HIVE PROTOCOL BOUNDARY
+         PEAT PROTOCOL BOUNDARY
 ═══════════════════════════╪═══════════════════════════════════════
                            │
 ┌──────────────────────────┴──────────────────────────────────────┐
-│  HIVE PROTOCOL LAYER                                             │
-│  BlobStore, CapabilityAdvertisement, HiveEvent, DeploymentDir.  │
+│  PEAT PROTOCOL LAYER                                             │
+│  BlobStore, CapabilityAdvertisement, PeatEvent, DeploymentDir.  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -25821,7 +25821,7 @@ By providing a reference implementation rather than mandating an approach, we:
 **Artifact**: A deployable unit (blob) with type information
 ```rust
 struct Artifact {
-    blob_ref: BlobRef,           // HIVE primitive (ADR-025)
+    blob_ref: BlobRef,           // PEAT primitive (ADR-025)
     artifact_type: ArtifactType, // Application-defined
     config: serde_json::Value,   // Runtime-specific config
 }
@@ -25840,8 +25840,8 @@ trait RuntimeAdapter {
 **OrchestrationService**: Coordinates deployment lifecycle
 ```rust
 struct OrchestrationService {
-    blob_store: Arc<dyn BlobStore>,        // HIVE primitive
-    hive_events: Arc<dyn HiveEventPublisher>, // HIVE primitive  
+    blob_store: Arc<dyn BlobStore>,        // PEAT primitive
+    peat_events: Arc<dyn PeatEventPublisher>, // PEAT primitive  
     adapters: Vec<Arc<dyn RuntimeAdapter>>, // Application-defined
 }
 ```
@@ -25952,7 +25952,7 @@ pub struct RuntimeMetrics {
 
 /// Output product from software (detection, classification, etc.)
 /// 
-/// This wraps a HiveEvent payload with instance context.
+/// This wraps a PeatEvent payload with instance context.
 /// The actual payload is application-defined.
 #[derive(Clone, Debug)]
 pub struct ProductOutput {
@@ -25963,10 +25963,10 @@ pub struct ProductOutput {
     pub routing: RoutingHint,
 }
 
-/// Hint for how this product should be routed through HIVE
+/// Hint for how this product should be routed through PEAT
 #[derive(Clone, Debug, Default)]
 pub struct RoutingHint {
-    /// Map to HiveEvent.AggregationPolicy
+    /// Map to PeatEvent.AggregationPolicy
     pub propagate_full: bool,
     pub propagate_summary: bool,
     pub priority: EventPriority,
@@ -26046,7 +26046,7 @@ pub trait RuntimeAdapter: Send + Sync {
     /// Subscribe to product outputs from this instance
     ///
     /// Products are runtime-specific outputs (detections, classifications, etc.)
-    /// The orchestration service will route these through HIVE events.
+    /// The orchestration service will route these through PEAT events.
     async fn subscribe_products(
         &self,
         instance_id: &InstanceId,
@@ -26106,7 +26106,7 @@ struct InferenceMetrics {
 impl OnnxRuntimeAdapter {
     pub fn new() -> Result<Self> {
         let env = Environment::builder()
-            .with_name("hive_onnx")
+            .with_name("peat_onnx")
             .build()?;
         
         Ok(Self {
@@ -26455,25 +26455,25 @@ impl RuntimeAdapter for ContainerAdapter {
 
 ### OrchestrationService
 
-Coordinates deployment using HIVE primitives:
+Coordinates deployment using PEAT primitives:
 
 ```rust
 use crate::storage::{BlobStore, BlobRef};
-use crate::protocol::{HiveEventPublisher, CapabilityPublisher};
+use crate::protocol::{PeatEventPublisher, CapabilityPublisher};
 
 /// Orchestration service coordinating software lifecycle
 ///
 /// This is the main entry point for deploying and managing software.
-/// It uses HIVE primitives (BlobStore, Events) and delegates runtime
+/// It uses PEAT primitives (BlobStore, Events) and delegates runtime
 /// specifics to RuntimeAdapter implementations.
 pub struct OrchestrationService {
-    /// HIVE blob store for artifact retrieval
+    /// PEAT blob store for artifact retrieval
     blob_store: Arc<dyn BlobStore>,
     
-    /// HIVE event publisher for products/anomalies
-    event_publisher: Arc<dyn HiveEventPublisher>,
+    /// PEAT event publisher for products/anomalies
+    event_publisher: Arc<dyn PeatEventPublisher>,
     
-    /// HIVE capability publisher for status
+    /// PEAT capability publisher for status
     capability_publisher: Arc<dyn CapabilityPublisher>,
     
     /// Available runtime adapters
@@ -26495,7 +26495,7 @@ struct InstanceRecord {
 impl OrchestrationService {
     pub fn new(
         blob_store: Arc<dyn BlobStore>,
-        event_publisher: Arc<dyn HiveEventPublisher>,
+        event_publisher: Arc<dyn PeatEventPublisher>,
         capability_publisher: Arc<dyn CapabilityPublisher>,
     ) -> Self {
         Self {
@@ -26514,11 +26514,11 @@ impl OrchestrationService {
     
     /// Deploy an artifact locally
     ///
-    /// 1. Fetches blob via BlobStore (HIVE primitive)
+    /// 1. Fetches blob via BlobStore (PEAT primitive)
     /// 2. Selects appropriate RuntimeAdapter
     /// 3. Activates via adapter
     /// 4. Subscribes to products/anomalies
-    /// 5. Publishes capability advertisement (HIVE primitive)
+    /// 5. Publishes capability advertisement (PEAT primitive)
     pub async fn deploy(
         &self,
         blob_ref: BlobRef,
@@ -26526,7 +26526,7 @@ impl OrchestrationService {
         config: serde_json::Value,
         capabilities: Vec<String>,
     ) -> Result<InstanceId> {
-        // Step 1: Fetch blob (HIVE primitive)
+        // Step 1: Fetch blob (PEAT primitive)
         let local_blob = self.blob_store.fetch(&blob_ref, |progress| {
             // Could emit progress events here
             tracing::debug!(?progress, "Blob fetch progress");
@@ -26550,7 +26550,7 @@ impl OrchestrationService {
         // Step 4: Subscribe to outputs
         self.start_monitoring(&instance_id, &adapter).await?;
         
-        // Step 5: Publish capability (HIVE primitive)
+        // Step 5: Publish capability (PEAT primitive)
         self.publish_capability(&instance_id, &capabilities, InstanceState::Running).await?;
         
         // Record instance
@@ -26603,15 +26603,15 @@ impl OrchestrationService {
         instance_id: &InstanceId,
         adapter: &Arc<dyn RuntimeAdapter>,
     ) -> Result<()> {
-        // Subscribe to products and route through HIVE events
+        // Subscribe to products and route through PEAT events
         let mut products = adapter.subscribe_products(instance_id).await?;
         let event_pub = self.event_publisher.clone();
         let iid = instance_id.clone();
         
         tokio::spawn(async move {
             while let Ok(product) = products.recv().await {
-                // Convert ProductOutput to HiveEvent and publish
-                let hive_event = HiveEvent {
+                // Convert ProductOutput to PeatEvent and publish
+                let peat_event = PeatEvent {
                     event_class: EventClass::Product,
                     event_type: product.product_type.clone(),
                     source_instance_id: Some(iid.0.clone()),
@@ -26620,18 +26620,18 @@ impl OrchestrationService {
                         propagate_full: product.routing.propagate_full,
                         propagate_summary: product.routing.propagate_summary,
                         priority: match product.routing.priority {
-                            EventPriority::Critical => hive::EventPriority::Critical,
-                            EventPriority::High => hive::EventPriority::High,
-                            EventPriority::Normal => hive::EventPriority::Normal,
-                            EventPriority::Low => hive::EventPriority::Low,
-                            EventPriority::LocalOnly => hive::EventPriority::LocalOnly,
+                            EventPriority::Critical => peat::EventPriority::Critical,
+                            EventPriority::High => peat::EventPriority::High,
+                            EventPriority::Normal => peat::EventPriority::Normal,
+                            EventPriority::Low => peat::EventPriority::Low,
+                            EventPriority::LocalOnly => peat::EventPriority::LocalOnly,
                         },
                         ttl_seconds: product.routing.ttl_seconds,
                     },
                     ..Default::default()
                 };
                 
-                let _ = event_pub.publish(hive_event).await;
+                let _ = event_pub.publish(peat_event).await;
             }
         });
         
@@ -26643,12 +26643,12 @@ impl OrchestrationService {
         tokio::spawn(async move {
             while let Ok(anomaly) = anomalies.recv().await {
                 let priority = match anomaly.severity {
-                    AnomalySeverity::Critical => hive::EventPriority::Critical,
-                    AnomalySeverity::Error => hive::EventPriority::High,
-                    _ => hive::EventPriority::Normal,
+                    AnomalySeverity::Critical => peat::EventPriority::Critical,
+                    AnomalySeverity::Error => peat::EventPriority::High,
+                    _ => peat::EventPriority::Normal,
                 };
                 
-                let hive_event = HiveEvent {
+                let peat_event = PeatEvent {
                     event_class: EventClass::Anomaly,
                     event_type: anomaly.anomaly_type.clone(),
                     source_instance_id: Some(iid.0.clone()),
@@ -26665,7 +26665,7 @@ impl OrchestrationService {
                     ..Default::default()
                 };
                 
-                let _ = event_pub.publish(hive_event).await;
+                let _ = event_pub.publish(peat_event).await;
             }
         });
         
@@ -26678,7 +26678,7 @@ impl OrchestrationService {
         capabilities: &[String],
         state: InstanceState,
     ) -> Result<()> {
-        // Build HIVE CapabilityAdvertisement
+        // Build PEAT CapabilityAdvertisement
         let advertisement = CapabilityAdvertisement {
             capabilities: capabilities.iter().map(|c| Capability {
                 capability_type: "software".into(),
@@ -26700,7 +26700,7 @@ impl OrchestrationService {
 
 ## Application Schemas
 
-Define your own product schemas that flow through `HiveEvent.payload`:
+Define your own product schemas that flow through `PeatEvent.payload`:
 
 ```rust
 /// Detection product (example application schema)
@@ -26758,17 +26758,17 @@ pub struct Waypoint {
 }
 ```
 
-## Integration with HIVE Protocol
+## Integration with PEAT Protocol
 
-### Using HIVE Primitives
+### Using PEAT Primitives
 
 ```rust
-// Example: Full deployment flow using HIVE primitives
+// Example: Full deployment flow using PEAT primitives
 
 async fn deploy_model(
     orchestration: &OrchestrationService,
-    hive_storage: &dyn StorageBackend,  // HIVE document storage
-    blob_store: &dyn BlobStore,          // HIVE blob storage (ADR-025)
+    peat_storage: &dyn StorageBackend,  // PEAT document storage
+    blob_store: &dyn BlobStore,          // PEAT blob storage (ADR-025)
 ) -> Result<()> {
     // 1. Model blob already stored (maybe by C2 node)
     let model_ref = BlobRef {
@@ -26788,8 +26788,8 @@ async fn deploy_model(
         vec!["target_recognition".into()],
     ).await?;
     
-    // 3. Capability is automatically advertised via HIVE
-    // 4. Products/anomalies automatically flow via HiveEvent
+    // 3. Capability is automatically advertised via PEAT
+    // 4. Products/anomalies automatically flow via PeatEvent
     
     Ok(())
 }
@@ -26798,10 +26798,10 @@ async fn deploy_model(
 ### Receiving Deployment Commands
 
 ```rust
-// Example: Handling DeploymentDirective from HIVE
+// Example: Handling DeploymentDirective from PEAT
 
 async fn handle_deployment_directive(
-    directive: DeploymentDirective,  // HIVE protocol message
+    directive: DeploymentDirective,  // PEAT protocol message
     orchestration: &OrchestrationService,
 ) -> Result<()> {
     // Extract application-specific config from directive
@@ -26815,7 +26815,7 @@ async fn handle_deployment_directive(
     
     // Deploy using orchestration service
     orchestration.deploy(
-        directive.artifact,  // BlobRef from HIVE
+        directive.artifact,  // BlobRef from PEAT
         artifact_type,
         directive.config,
         capabilities,
@@ -26859,8 +26859,8 @@ These are valid extensions you may need - this reference focuses on the core lif
 
 ## References
 
-### HIVE Protocol ADRs
-- ADR-012: Schema Definition (CapabilityAdvertisement, HiveEvent)
+### PEAT Protocol ADRs
+- ADR-012: Schema Definition (CapabilityAdvertisement, PeatEvent)
 - ADR-025: Blob Transfer Protocol (BlobStore, BlobRef)
 
 ### Runtime Technologies
@@ -26874,7 +26874,7 @@ These are valid extensions you may need - this reference focuses on the core lif
 
 ---
 
-**This reference implementation demonstrates how to build software orchestration on HIVE Protocol primitives. Adopt, adapt, or replace as needed for your use case.**
+**This reference implementation demonstrates how to build software orchestration on PEAT Protocol primitives. Adopt, adapt, or replace as needed for your use case.**
 
 ---
 
@@ -26889,7 +26889,7 @@ These are valid extensions you may need - this reference focuses on the core lif
 
 ### The Event Flow Problem
 
-HIVE Protocol enables distributed autonomous systems to coordinate through hierarchical state synchronization. ADR-012 defines the **schemas** for events, capabilities, and commands. This ADR defines the **protocol behavior** - how events flow through the hierarchy and how aggregation policies are enforced.
+PEAT Protocol enables distributed autonomous systems to coordinate through hierarchical state synchronization. ADR-012 defines the **schemas** for events, capabilities, and commands. This ADR defines the **protocol behavior** - how events flow through the hierarchy and how aggregation policies are enforced.
 
 **Core Challenge:**
 
@@ -26904,9 +26904,9 @@ In a 1000-node company formation with 4 echelons (platform → squad → platoon
 - Operators overwhelmed with undifferentiated data
 - Higher echelons have no situational awareness
 
-**HIVE's Solution:**
+**PEAT's Solution:**
 
-Events carry `AggregationPolicy` metadata that tells HIVE *how* to route them:
+Events carry `AggregationPolicy` metadata that tells PEAT *how* to route them:
 - **Critical anomalies**: Immediate propagation, preempt other traffic
 - **Routine detections**: Aggregate into summaries at squad level
 - **Telemetry**: Store locally, respond to queries
@@ -26918,14 +26918,14 @@ This ADR specifies the protocol behavior that enforces these policies.
 
 | ADR | Defines | This ADR's Relationship |
 |-----|---------|------------------------|
-| ADR-012 | Event schemas (HiveEvent, AggregationPolicy) | **Uses** these schemas |
+| ADR-012 | Event schemas (PeatEvent, AggregationPolicy) | **Uses** these schemas |
 | ADR-009 | Bidirectional flow concepts | **Implements** upward event flow |
 | ADR-019 | QoS framework | **Integrates** priority enforcement |
 | ADR-001 | Hierarchical architecture | **Operates within** this structure |
 
 ### Design Principles
 
-1. **Policy-Driven**: Event producers declare routing intent; HIVE enforces
+1. **Policy-Driven**: Event producers declare routing intent; PEAT enforces
 2. **Hierarchical**: Events flow through formation structure, not arbitrary mesh
 3. **Bandwidth-Aware**: Aggregation reduces traffic at each echelon
 4. **Priority-Respecting**: Critical events preempt routine traffic
@@ -26977,12 +26977,12 @@ When software on a platform produces an event:
 pub struct EventEmitter {
     node_id: String,
     formation_id: String,
-    outbound_queue: PriorityQueue<HiveEvent>,
+    outbound_queue: PriorityQueue<PeatEvent>,
 }
 
 impl EventEmitter {
     /// Emit an event with routing policy
-    pub fn emit(&mut self, event: HiveEvent) {
+    pub fn emit(&mut self, event: PeatEvent) {
         // Validate event has required fields
         assert!(!event.event_id.is_empty());
         assert!(event.routing.is_some());
@@ -27002,7 +27002,7 @@ impl EventEmitter {
     }
     
     /// Store event locally (for QUERY mode or LOCAL mode)
-    fn store_local(&self, event: &HiveEvent) {
+    fn store_local(&self, event: &PeatEvent) {
         // Store in local event log with TTL
         // Queryable by higher echelons
     }
@@ -27017,7 +27017,7 @@ Events are transmitted based on priority:
 /// Priority-based event transmission
 pub struct EventTransmitter {
     /// Events queued by priority
-    queues: [VecDeque<HiveEvent>; 4],  // CRITICAL, HIGH, NORMAL, LOW
+    queues: [VecDeque<PeatEvent>; 4],  // CRITICAL, HIGH, NORMAL, LOW
     
     /// Bandwidth allocation per priority (configurable)
     bandwidth_allocation: BandwidthAllocation,
@@ -27077,7 +27077,7 @@ pub struct EchelonAggregator {
     windows: HashMap<(EventClass, String), AggregationWindow>,
     
     /// Events to forward without aggregation
-    passthrough_queue: PriorityQueue<HiveEvent>,
+    passthrough_queue: PriorityQueue<PeatEvent>,
     
     /// Outbound to parent echelon
     parent_emitter: EventEmitter,
@@ -27090,7 +27090,7 @@ pub struct AggregationWindow {
     window_start: Instant,
     
     /// Events collected in this window
-    events: Vec<HiveEvent>,
+    events: Vec<PeatEvent>,
     
     /// Source nodes that contributed
     source_nodes: HashSet<String>,
@@ -27098,7 +27098,7 @@ pub struct AggregationWindow {
 
 impl EchelonAggregator {
     /// Process incoming event from subordinate
-    pub fn receive(&mut self, event: HiveEvent) {
+    pub fn receive(&mut self, event: PeatEvent) {
         let routing = event.routing.as_ref().unwrap();
         
         match routing.propagation {
@@ -27142,8 +27142,8 @@ impl EchelonAggregator {
     }
     
     /// Generate summary from aggregation window
-    fn generate_summary(window: &AggregationWindow) -> HiveEvent {
-        HiveEvent {
+    fn generate_summary(window: &AggregationWindow) -> PeatEvent {
+        PeatEvent {
             event_id: uuid::Uuid::new_v4().to_string(),
             timestamp: Some(chrono::Utc::now().into()),
             source_node_id: self.echelon_id.clone(),
@@ -27182,7 +27182,7 @@ pub trait SummaryStrategy: Send + Sync {
     fn event_type(&self) -> &str;
     
     /// Generate summary payload from collected events
-    fn summarize(&self, events: &[HiveEvent]) -> prost_types::Any;
+    fn summarize(&self, events: &[PeatEvent]) -> prost_types::Any;
 }
 
 /// Detection event summary: count by type, confidence histogram
@@ -27193,7 +27193,7 @@ impl SummaryStrategy for DetectionSummaryStrategy {
         "detection"
     }
     
-    fn summarize(&self, events: &[HiveEvent]) -> prost_types::Any {
+    fn summarize(&self, events: &[PeatEvent]) -> prost_types::Any {
         let mut counts_by_type: HashMap<String, u32> = HashMap::new();
         let mut confidence_histogram = [0u32; 10];
         
@@ -27224,7 +27224,7 @@ impl SummaryStrategy for TelemetrySummaryStrategy {
         "telemetry"
     }
     
-    fn summarize(&self, events: &[HiveEvent]) -> prost_types::Any {
+    fn summarize(&self, events: &[PeatEvent]) -> prost_types::Any {
         let mut metrics: HashMap<String, MetricStats> = HashMap::new();
         
         for event in events {
@@ -27323,7 +27323,7 @@ pub struct EventFilters {
 pub struct EventQueryResponse {
     pub query_id: String,
     pub responder_id: String,
-    pub events: Vec<HiveEvent>,
+    pub events: Vec<PeatEvent>,
     pub total_matching: u32,  // May be > events.len() if limited
     pub truncated: bool,
 }
@@ -27440,19 +27440,19 @@ impl EventTTLEnforcer {
 
 ### Wire Protocol
 
-Events are transmitted using the standard HIVE transport (ADR-010):
+Events are transmitted using the standard PEAT transport (ADR-010):
 
 ```protobuf
 syntax = "proto3";
-package hive.event.wire.v1;
+package peat.event.wire.v1;
 
-import "hive/event/v1/event.proto";
+import "peat/event/v1/event.proto";
 
 // Event transmission message
 message EventTransmission {
   oneof payload {
     // Single event
-    hive.event.v1.HiveEvent event = 1;
+    peat.event.v1.PeatEvent event = 1;
     
     // Batch of events (efficiency optimization)
     EventBatch batch = 2;
@@ -27466,7 +27466,7 @@ message EventTransmission {
 }
 
 message EventBatch {
-  repeated hive.event.v1.HiveEvent events = 1;
+  repeated peat.event.v1.PeatEvent events = 1;
 }
 
 message EventQuery {
@@ -27486,7 +27486,7 @@ message QueryScope {
 }
 
 message EventFilters {
-  optional hive.event.v1.EventClass event_class = 1;
+  optional peat.event.v1.EventClass event_class = 1;
   optional string event_type = 2;
   optional google.protobuf.Timestamp after = 3;
   optional google.protobuf.Timestamp before = 4;
@@ -27496,7 +27496,7 @@ message EventFilters {
 message EventQueryResponse {
   string query_id = 1;
   string responder_id = 2;
-  repeated hive.event.v1.HiveEvent events = 3;
+  repeated peat.event.v1.PeatEvent events = 3;
   uint32 total_matching = 4;
   bool truncated = 5;
 }
@@ -27522,9 +27522,9 @@ message EventQueryResponse {
 Capability advertisements (ADR-012) follow the same routing:
 
 ```rust
-impl From<CapabilityAdvertisement> for HiveEvent {
+impl From<CapabilityAdvertisement> for PeatEvent {
     fn from(cap: CapabilityAdvertisement) -> Self {
-        HiveEvent {
+        PeatEvent {
             event_id: uuid::Uuid::new_v4().to_string(),
             timestamp: cap.advertised_at,
             source_node_id: cap.node_id.clone(),
@@ -27630,10 +27630,10 @@ Capability summaries are generated at each echelon using `FormationCapabilitySum
 ## References
 
 ### Related ADRs
-- ADR-012: Schema Definition (HiveEvent, AggregationPolicy schemas)
+- ADR-012: Schema Definition (PeatEvent, AggregationPolicy schemas)
 - ADR-009: Bidirectional Hierarchical Flows
 - ADR-019: QoS and Data Prioritization
-- ADR-001: HIVE Protocol PoC
+- ADR-001: PEAT Protocol PoC
 
 ### Algorithms
 - Weighted Fair Queuing (WFQ)
@@ -27647,11 +27647,11 @@ Capability summaries are generated at each echelon using `FormationCapabilitySum
 
 ---
 
-**This ADR specifies how HIVE Protocol routes events through the hierarchy, enforces aggregation policies, and enables bandwidth-efficient distributed coordination.**
+**This ADR specifies how PEAT Protocol routes events through the hierarchy, enforces aggregation policies, and enables bandwidth-efficient distributed coordination.**
 
 ---
 
-# ADR-028: HIVE CoT Custom Detail Extension Schema
+# ADR-028: PEAT CoT Custom Detail Extension Schema
 
 **Status**: Proposed
 **Date**: 2025-11-26
@@ -27667,24 +27667,24 @@ Capability summaries are generated at each echelon using `FormationCapabilitySum
 
 ### Problem Statement
 
-When translating HIVE messages to Cursor-on-Target (CoT) XML format for TAK integration, significant semantic information is lost. CoT's core schema supports:
+When translating PEAT messages to Cursor-on-Target (CoT) XML format for TAK integration, significant semantic information is lost. CoT's core schema supports:
 - Position (lat/lon/hae)
 - Identity (uid, type)
 - Time bounds (time, start, stale)
 - Basic details (remarks, links, contacts)
 
-However, HIVE messages contain rich context that TAK operators need:
+However, PEAT messages contain rich context that TAK operators need:
 - **Source attribution**: Which platform and AI model produced this data?
 - **Confidence scores**: How reliable is this track detection?
 - **Hierarchy membership**: Which cell/formation does this belong to?
 - **Capability status**: What can this platform do? Is it degraded?
 - **Custom attributes**: Domain-specific metadata (clothing color, vehicle type, etc.)
 
-Without preserving this information, TAK operators cannot make informed decisions about HIVE-coordinated assets.
+Without preserving this information, TAK operators cannot make informed decisions about PEAT-coordinated assets.
 
 ### CoT Extensibility
 
-CoT supports custom detail elements via XML namespaces. Elements starting with `_` are treated as extensions and passed through by TAK servers/clients that don't recognize them. This allows HIVE to embed rich metadata while maintaining compatibility.
+CoT supports custom detail elements via XML namespaces. Elements starting with `_` are treated as extensions and passed through by TAK servers/clients that don't recognize them. This allows PEAT to embed rich metadata while maintaining compatibility.
 
 **TAK Extension Convention**:
 - Element names starting with `_` are extensions
@@ -27694,16 +27694,16 @@ CoT supports custom detail elements via XML namespaces. Elements starting with `
 
 ## Decision
 
-We will define a standardized `<_hive_>` CoT detail extension schema for embedding HIVE-specific semantics in CoT messages.
+We will define a standardized `<_peat_>` CoT detail extension schema for embedding PEAT-specific semantics in CoT messages.
 
 ### Schema Definition
 
-**Namespace**: `urn:hive:cot:1.0`
-**Element Name**: `_hive_`
+**Namespace**: `urn:peat:cot:1.0`
+**Element Name**: `_peat_`
 **Version**: `1.0`
 
 ```xml
-<_hive_ version="1.0" xmlns:hive="urn:hive:cot:1.0">
+<_peat_ version="1.0" xmlns:peat="urn:peat:cot:1.0">
   <!-- Source Attribution -->
   <source platform="{platform_id}"
           model="{model_id}"
@@ -27721,7 +27721,7 @@ We will define a standardized `<_hive_>` CoT detail extension schema for embeddi
     <zone id="{zone_id}"/>
   </hierarchy>
 
-  <!-- Custom Attributes (pass-through from HIVE messages) -->
+  <!-- Custom Attributes (pass-through from PEAT messages) -->
   <attributes>
     <attr key="{key}" type="{string|number|boolean}">{value}</attr>
     <!-- ... additional attributes ... -->
@@ -27781,7 +27781,7 @@ We will define a standardized `<_hive_>` CoT detail extension schema for embeddi
   <capabilities>
     <capability type="{type}" confidence="{0.0-1.0}"/>
   </capabilities>
-</_hive_>
+</_peat_>
 ```
 
 ### Element Specifications
@@ -27814,7 +27814,7 @@ We will define a standardized `<_hive_>` CoT detail extension schema for embeddi
 
 #### `<hierarchy>` - Hierarchy Membership
 
-Contains child elements describing the entity's position in HIVE hierarchy:
+Contains child elements describing the entity's position in PEAT hierarchy:
 
 | Element | Attributes | Description |
 |---------|------------|-------------|
@@ -27833,7 +27833,7 @@ Contains child elements describing the entity's position in HIVE hierarchy:
 
 #### `<attributes>` - Custom Attributes
 
-Pass-through container for domain-specific metadata from HIVE messages.
+Pass-through container for domain-specific metadata from PEAT messages.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -27917,7 +27917,7 @@ Pass-through container for domain-specific metadata from HIVE messages.
     <track course="45.0" speed="1.2"/>
     <remarks>person: blue jacket, has backpack (89% confidence)</remarks>
 
-    <_hive_ version="1.0">
+    <_peat_ version="1.0">
       <source platform="Alpha-2" model="Alpha-3" model_version="1.3.0"/>
       <confidence value="0.89" threshold="0.70"/>
       <hierarchy>
@@ -27928,7 +27928,7 @@ Pass-through container for domain-specific metadata from HIVE messages.
         <attr key="jacket_color">blue</attr>
         <attr key="has_backpack" type="boolean">true</attr>
       </attributes>
-    </_hive_>
+    </_peat_>
 
     <link uid="Alpha-2" type="a-f-G-U-C" relation="o-o"/>
   </detail>
@@ -27953,7 +27953,7 @@ Pass-through container for domain-specific metadata from HIVE messages.
     <contact callsign="Alpha-3"/>
     <remarks>AI Platform: object_tracker v1.3.0 (Active, 91% ready)</remarks>
 
-    <_hive_ version="1.0">
+    <_peat_ version="1.0">
       <status operational="ACTIVE" readiness="0.91"/>
       <capability type="OBJECT_TRACKING"
                   model_id="object_tracker"
@@ -27966,7 +27966,7 @@ Pass-through container for domain-specific metadata from HIVE messages.
       <hierarchy>
         <cell id="Alpha-Team" role="ai_platform"/>
       </hierarchy>
-    </_hive_>
+    </_peat_>
 
     <__group name="Alpha-Team" role="AI Platform"/>
   </detail>
@@ -27990,7 +27990,7 @@ Pass-through container for domain-specific metadata from HIVE messages.
   <detail>
     <remarks>HANDOFF PREPARE: TRACK-001 from Alpha-Team to Bravo-Team</remarks>
 
-    <_hive_ version="1.0">
+    <_peat_ version="1.0">
       <handoff type="PREPARE"
                track_id="TRACK-001"
                source="Alpha-Team"
@@ -27998,7 +27998,7 @@ Pass-through container for domain-specific metadata from HIVE messages.
       <poi_description>Person in blue jacket with backpack, heading NE</poi_description>
       <predicted lat="33.7850" lon="-84.3850"/>
       <confidence value="0.85"/>
-    </_hive_>
+    </_peat_>
 
     <link uid="Alpha-Team" type="a-f-G-U-C" relation="h-h" remarks="handoff-source"/>
     <link uid="Bravo-Team" type="a-f-G-U-C" relation="h-h" remarks="handoff-target"/>
@@ -28014,16 +28014,16 @@ Pass-through container for domain-specific metadata from HIVE messages.
 ```rust
 use quick_xml::{Writer, events::{Event, BytesStart, BytesText}};
 
-pub struct HiveDetailEncoder;
+pub struct PeatDetailEncoder;
 
-impl HiveDetailEncoder {
+impl PeatDetailEncoder {
     pub fn encode_track_update(track: &TrackUpdate) -> Result<String, EncodingError> {
         let mut writer = Writer::new(Cursor::new(Vec::new()));
 
-        // Start _hive_ element
-        let mut hive = BytesStart::borrowed(b"_hive_", "_hive_".len());
-        hive.push_attribute(("version", "1.0"));
-        writer.write_event(Event::Start(hive))?;
+        // Start _peat_ element
+        let mut peat = BytesStart::borrowed(b"_peat_", "_peat_".len());
+        peat.push_attribute(("version", "1.0"));
+        writer.write_event(Event::Start(peat))?;
 
         // Source attribution
         let mut source = BytesStart::borrowed(b"source", "source".len());
@@ -28050,8 +28050,8 @@ impl HiveDetailEncoder {
             writer.write_event(Event::End(BytesEnd::borrowed(b"attributes")))?;
         }
 
-        // End _hive_ element
-        writer.write_event(Event::End(BytesEnd::borrowed(b"_hive_")))?;
+        // End _peat_ element
+        writer.write_event(Event::End(BytesEnd::borrowed(b"_peat_")))?;
 
         Ok(String::from_utf8(writer.into_inner().into_inner())?)
     }
@@ -28063,14 +28063,14 @@ impl HiveDetailEncoder {
 ```rust
 use quick_xml::Reader;
 
-pub struct HiveDetailDecoder;
+pub struct PeatDetailDecoder;
 
-impl HiveDetailDecoder {
-    pub fn decode_hive_extension(xml: &str) -> Result<HiveExtension, DecodingError> {
+impl PeatDetailDecoder {
+    pub fn decode_peat_extension(xml: &str) -> Result<PeatExtension, DecodingError> {
         let mut reader = Reader::from_str(xml);
         reader.trim_text(true);
 
-        let mut extension = HiveExtension::default();
+        let mut extension = PeatExtension::default();
         let mut buf = Vec::new();
 
         loop {
@@ -28107,25 +28107,25 @@ impl HiveDetailDecoder {
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
-           xmlns:hive="urn:hive:cot:1.0"
-           targetNamespace="urn:hive:cot:1.0"
+           xmlns:peat="urn:peat:cot:1.0"
+           targetNamespace="urn:peat:cot:1.0"
            elementFormDefault="qualified">
 
-  <xs:element name="_hive_">
+  <xs:element name="_peat_">
     <xs:complexType>
       <xs:sequence>
-        <xs:element name="source" type="hive:SourceType" minOccurs="0"/>
-        <xs:element name="confidence" type="hive:ConfidenceType" minOccurs="0"/>
-        <xs:element name="hierarchy" type="hive:HierarchyType" minOccurs="0"/>
-        <xs:element name="attributes" type="hive:AttributesType" minOccurs="0"/>
-        <xs:element name="status" type="hive:StatusType" minOccurs="0"/>
-        <xs:element name="capability" type="hive:CapabilityType" minOccurs="0" maxOccurs="unbounded"/>
-        <xs:element name="resources" type="hive:ResourcesType" minOccurs="0"/>
-        <xs:element name="handoff" type="hive:HandoffType" minOccurs="0"/>
-        <xs:element name="predicted" type="hive:PositionType" minOccurs="0"/>
+        <xs:element name="source" type="peat:SourceType" minOccurs="0"/>
+        <xs:element name="confidence" type="peat:ConfidenceType" minOccurs="0"/>
+        <xs:element name="hierarchy" type="peat:HierarchyType" minOccurs="0"/>
+        <xs:element name="attributes" type="peat:AttributesType" minOccurs="0"/>
+        <xs:element name="status" type="peat:StatusType" minOccurs="0"/>
+        <xs:element name="capability" type="peat:CapabilityType" minOccurs="0" maxOccurs="unbounded"/>
+        <xs:element name="resources" type="peat:ResourcesType" minOccurs="0"/>
+        <xs:element name="handoff" type="peat:HandoffType" minOccurs="0"/>
+        <xs:element name="predicted" type="peat:PositionType" minOccurs="0"/>
         <xs:element name="poi_description" type="xs:string" minOccurs="0"/>
-        <xs:element name="classification" type="hive:ClassificationType" minOccurs="0"/>
-        <xs:element name="formation" type="hive:FormationType" minOccurs="0"/>
+        <xs:element name="classification" type="peat:ClassificationType" minOccurs="0"/>
+        <xs:element name="formation" type="peat:FormationType" minOccurs="0"/>
       </xs:sequence>
       <xs:attribute name="version" type="xs:string" use="required"/>
     </xs:complexType>
@@ -28139,8 +28139,8 @@ impl HiveDetailDecoder {
   </xs:complexType>
 
   <xs:complexType name="ConfidenceType">
-    <xs:attribute name="value" type="hive:UnitInterval" use="required"/>
-    <xs:attribute name="threshold" type="hive:UnitInterval"/>
+    <xs:attribute name="value" type="peat:UnitInterval" use="required"/>
+    <xs:attribute name="threshold" type="peat:UnitInterval"/>
   </xs:complexType>
 
   <xs:simpleType name="UnitInterval">
@@ -28169,12 +28169,12 @@ impl HiveDetailDecoder {
 
 ### Positive
 
-1. **Semantic Preservation**: Rich HIVE context survives translation to CoT
+1. **Semantic Preservation**: Rich PEAT context survives translation to CoT
 2. **TAK Compatibility**: Uses standard CoT extension mechanism
 3. **Operator Awareness**: TAK users can see confidence, source, hierarchy
-4. **Plugin Support**: ATAK plugins can render HIVE-specific UI
+4. **Plugin Support**: ATAK plugins can render PEAT-specific UI
 5. **Versioned Schema**: Enables forward-compatible evolution
-6. **Standardized Format**: Consistent across all HIVE message types
+6. **Standardized Format**: Consistent across all PEAT message types
 
 ### Negative
 
@@ -28199,8 +28199,8 @@ impl HiveDetailDecoder {
 
 ## Success Metrics
 
-1. **Completeness**: All HIVE message types have defined mappings
-2. **Round-trip**: HIVE → CoT → HIVE preserves semantic meaning
+1. **Completeness**: All PEAT message types have defined mappings
+2. **Round-trip**: PEAT → CoT → PEAT preserves semantic meaning
 3. **Compatibility**: Works with TAK Server, FreeTakServer, ATAK
 4. **Performance**: Extension parsing < 1ms
 5. **Documentation**: XSD schema published and validated
@@ -28217,9 +28217,9 @@ impl HiveDetailDecoder {
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2025-11-26 | Created ADR-028 | M1 POC feedback - need standardized HIVE extension |
-| 2025-11-26 | Selected `_hive_` element name | TAK `_` prefix convention for extensions |
-| 2025-11-26 | Included all HIVE message types | Comprehensive coverage from COT_SCHEMA_MAPPING.md |
+| 2025-11-26 | Created ADR-028 | M1 POC feedback - need standardized PEAT extension |
+| 2025-11-26 | Selected `_peat_` element name | TAK `_` prefix convention for extensions |
+| 2025-11-26 | Included all PEAT message types | Comprehensive coverage from COT_SCHEMA_MAPPING.md |
 
 ---
 
@@ -28256,7 +28256,7 @@ ADR-020 defines the high-level TAK/CoT integration strategy, but the transport l
 
 ### Transport Adapter Pattern
 
-HIVE already uses transport adapters for backend abstraction (Ditto, Iroh). TAK integration follows this pattern as an external bridge transport, not a CRDT sync backend.
+PEAT already uses transport adapters for backend abstraction (Ditto, Iroh). TAK integration follows this pattern as an external bridge transport, not a CRDT sync backend.
 
 ## Decision
 
@@ -28267,7 +28267,7 @@ We will implement `TakTransport` as a first-class transport adapter with DIL-res
 ```rust
 /// TAK Transport Adapter
 ///
-/// Provides bidirectional CoT message transport between HIVE and TAK ecosystem.
+/// Provides bidirectional CoT message transport between PEAT and TAK ecosystem.
 /// Supports TAK Server (TCP/SSL) and Mesh SA (UDP multicast) modes.
 #[async_trait]
 pub trait TakTransport: Send + Sync {
@@ -28460,8 +28460,8 @@ pub struct XmlEncodingOptions {
     /// Pretty print (development only)
     pub pretty_print: bool,
 
-    /// Include HIVE extension by default
-    pub include_hive_extension: bool,
+    /// Include PEAT extension by default
+    pub include_peat_extension: bool,
 }
 ```
 
@@ -28810,7 +28810,7 @@ impl TakServerTransport {
     async fn send_presence(&mut self) -> Result<(), TakError> {
         let callsign = self.config.identity.as_ref()
             .map(|i| i.callsign.as_str())
-            .unwrap_or("HIVE-BRIDGE");
+            .unwrap_or("PEAT-BRIDGE");
 
         let presence = CotEvent::presence(callsign);
         self.send_raw(&presence).await
@@ -29128,7 +29128,7 @@ pub struct QueueDepthMetrics {
 ### Integration Tests
 
 1. FreeTakServer connection lifecycle
-2. Message round-trip (HIVE → TAK → ATAK)
+2. Message round-trip (PEAT → TAK → ATAK)
 3. Disconnection/reconnection handling
 4. Certificate authentication
 
@@ -29143,7 +29143,7 @@ pub struct QueueDepthMetrics {
 
 ### Why Protobuf is Preferred
 
-TAK Server and modern TAK clients (ATAK, WinTAK, iTAK) support **TAK Protocol Version 1** which uses Google Protocol Buffers instead of XML. This is critical for HIVE's tactical/DIL environments:
+TAK Server and modern TAK clients (ATAK, WinTAK, iTAK) support **TAK Protocol Version 1** which uses Google Protocol Buffers instead of XML. This is critical for PEAT's tactical/DIL environments:
 
 | Metric | XML | Protobuf | Benefit |
 |--------|-----|----------|---------|
@@ -29172,9 +29172,9 @@ The official TAK Protocol Buffers definitions are available at:
 
 Key message type: `atakmap.commoncommo.v1.TakMessage`
 
-### HIVE Extension in Protobuf
+### PEAT Extension in Protobuf
 
-The `_hive_` XML extension (ADR-028) can be embedded in Protobuf via:
+The `_peat_` XML extension (ADR-028) can be embedded in Protobuf via:
 1. **`xmlDetail` field** - Embed XML string in Protobuf detail (initial approach, maximum compatibility)
 2. **Native Protobuf extension** - Define custom proto messages (future optimization)
 
@@ -29463,7 +29463,7 @@ Based on investigation results, Iroh natively handles multi-interface. The decis
 
 ### Phase 1: Verify Iroh Multipath (Investigation) - COMPLETE ✅
 
-**Test**: `hive-protocol/tests/iroh_multipath_investigation.rs`
+**Test**: `peat-protocol/tests/iroh_multipath_investigation.rs`
 
 **Result**: Iroh automatically advertises all interfaces:
 - IPv4 LAN addresses
@@ -29473,7 +29473,7 @@ Based on investigation results, Iroh natively handles multi-interface. The decis
 ```rust
 // This already works - Iroh discovers all interfaces
 let endpoint = Endpoint::builder()
-    .alpns(vec![b"hive/1".to_vec()])
+    .alpns(vec![b"peat/1".to_vec()])
     .bind()  // Binds to ALL interfaces automatically
     .await?;
 
@@ -29601,24 +29601,24 @@ Update documentation to clarify multi-interface support:
 
 ---
 
-# ADR-031: HIVE Commander - Tactical Capability RPG
+# ADR-031: PEAT Commander - Tactical Capability RPG
 
 ## Status
 Proposed (TUI prototype complete)
 
 ## Context
 
-Industry feedback identified two critical gaps in HIVE's current demonstration capability:
+Industry feedback identified two critical gaps in PEAT's current demonstration capability:
 
 1. **Visualization Gap**: "You need to be able to visualize the hierarchy in some simple C2 map, video game kind of way - showing individual capabilities being aggregated into emergent capabilities, and tasking being redistributed back out by the player"
 
 2. **Cross-Boundary Coordination Gap**: "Can you take one asset from one squad and another asset from a different squad and task them as a new group? This would be super valuable, especially if they are crossing ownership boundaries (operated by two different countries)"
 
-Additionally, the concept of **coagency performance** - measuring how well human-machine-AI teams perform together - was identified as a research differentiator that HIVE could demonstrate through interactive gameplay.
+Additionally, the concept of **coagency performance** - measuring how well human-machine-AI teams perform together - was identified as a research differentiator that PEAT could demonstrate through interactive gameplay.
 
 ### Why Not RTS?
 
-Real-time strategy games are chaotic, hard to follow in demos, and don't naturally emphasize **composition** - the core value of HIVE. Players focus on micro-management and APM rather than thoughtful capability aggregation.
+Real-time strategy games are chaotic, hard to follow in demos, and don't naturally emphasize **composition** - the core value of PEAT. Players focus on micro-management and APM rather than thoughtful capability aggregation.
 
 ### Why D&D-Style Tactical RPG?
 
@@ -29627,18 +29627,18 @@ Dungeons & Dragons is fundamentally about **party composition**:
 - "Who has the skill we need? Can we combine abilities?"
 - "The rogue can't pick the lock alone, but with the wizard's guidance spell..."
 
-This is *exactly* what HIVE does - matching task requirements to composed capabilities. The D&D framing makes this intuitive and memorable.
+This is *exactly* what PEAT does - matching task requirements to composed capabilities. The D&D framing makes this intuitive and memorable.
 
 ## Decision
 
-Build **HIVE Commander**, a turn-based tactical RPG that uses the actual Rust HIVE reference implementation to coordinate heterogeneous assets on a 3D terrain map. The game emphasizes **capability composition** through D&D-style skill checks and party mechanics.
+Build **PEAT Commander**, a turn-based tactical RPG that uses the actual Rust PEAT reference implementation to coordinate heterogeneous assets on a 3D terrain map. The game emphasizes **capability composition** through D&D-style skill checks and party mechanics.
 
 ### Core Design Principles
 
 1. **Composition is the game** - Victory comes from clever capability combinations, not twitch reflexes
 2. **Turn-based for clarity** - Audience can follow the action in demos
 3. **DM = Presenter** - The presenter controls scenarios, introduces challenges
-4. **Skill checks = Capability matching** - D&D's core mechanic maps perfectly to HIVE
+4. **Skill checks = Capability matching** - D&D's core mechanic maps perfectly to PEAT
 5. **3D terrain map** - Spatial context with elevation, cover, and line-of-sight
 6. **Hierarchy through zoom** - Zoomed out shows composed capabilities, drill down for details
 
@@ -29646,9 +29646,9 @@ Build **HIVE Commander**, a turn-based tactical RPG that uses the actual Rust HI
 
 ## Game Design
 
-### The HIVE Party System
+### The PEAT Party System
 
-Instead of D&D's Fighter/Wizard/Rogue classes, HIVE Commander has **Capability Classes**:
+Instead of D&D's Fighter/Wizard/Rogue classes, PEAT Commander has **Capability Classes**:
 
 | Class | Role | Base Capabilities | D&D Analog |
 |-------|------|-------------------|------------|
@@ -29687,7 +29687,7 @@ Every piece has a capability profile:
 
 ### The Skill Check System
 
-When a task requires capabilities, HIVE Commander uses D&D-style skill checks:
+When a task requires capabilities, PEAT Commander uses D&D-style skill checks:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -29722,7 +29722,7 @@ When a task requires capabilities, HIVE Commander uses D&D-style skill checks:
 
 ### Turn Structure
 
-Each round has phases that mirror HIVE's coordination flow:
+Each round has phases that mirror PEAT's coordination flow:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -29736,7 +29736,7 @@ Each round has phases that mirror HIVE's coordination flow:
 │                                                                 │
 │  PHASE 2: PLANNING (Commander)                                  │
 │  ├── View capability requirements for each objective           │
-│  ├── See HIVE's recommended compositions                       │
+│  ├── See PEAT's recommended compositions                       │
 │  └── Decide which objectives to pursue                         │
 │                                                                 │
 │  PHASE 3: MOVEMENT (All Players)                                │
@@ -29925,7 +29925,7 @@ In demo mode, the presenter acts as Dungeon Master:
 │                                                                 │
 │  TEACHING MOMENTS                                               │
 │  ├── [Highlight Composition] - show why this combo worked      │
-│  ├── [Show HIVE Recommendation] - "HIVE suggests..."           │
+│  ├── [Show PEAT Recommendation] - "PEAT suggests..."           │
 │  └── [Pause for Q&A] - freeze game state                       │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -29969,7 +29969,7 @@ In demo mode, the presenter acts as Dungeon Master:
 │     └── Selects scenario, theme, difficulty                    │
 │                                                                 │
 │  2. Displays QR code / short link                               │
-│     └── "Join at hive.game/ABC123"                             │
+│     └── "Join at peat.game/ABC123"                             │
 │                                                                 │
 │  3. Attendees join on phones                                    │
 │     ├── Select available piece to control                       │
@@ -30000,7 +30000,7 @@ In demo mode, the presenter acts as Dungeon Master:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        HIVE Commander                           │
+│                        PEAT Commander                           │
 ├─────────────────────────────────────────────────────────────────┤
 │  Frontend (TypeScript/React)                                    │
 │  ├── 3D Map Renderer (Three.js or React Three Fiber)           │
@@ -30013,7 +30013,7 @@ In demo mode, the presenter acts as Dungeon Master:
 │  WebSocket Connection                                           │
 ├─────────────────────────────────────────────────────────────────┤
 │  Backend (Rust/Axum)                                            │
-│  ├── HIVE Reference Implementation                              │
+│  ├── PEAT Reference Implementation                              │
 │  │   ├── Capability Documents (Automerge CRDTs)                │
 │  │   ├── Composition Engine (calculate synergies)              │
 │  │   ├── Task-Capability Matching (DC calculation)             │
@@ -30029,10 +30029,10 @@ In demo mode, the presenter acts as Dungeon Master:
 
 ```
 cap/
-├── hive-protocol/
-├── hive-mesh/
-├── hive-sim/
-├── hive-commander/           # Rust backend (Axum server)
+├── peat-protocol/
+├── peat-mesh/
+├── peat-sim/
+├── peat-commander/           # Rust backend (Axum server)
 │   ├── Cargo.toml
 │   └── src/
 │       ├── main.rs
@@ -30045,7 +30045,7 @@ cap/
 │       ├── ws/                   # WebSocket handlers
 │       └── types/                # Shared types (ts-rs)
 │
-└── hive-commander-ui/        # Frontend (React/TypeScript)
+└── peat-commander-ui/        # Frontend (React/TypeScript)
     ├── package.json
     └── src/
         ├── components/
@@ -30066,10 +30066,10 @@ cap/
 
 ### 1. Capability Composition (Core Mechanic)
 
-The skill check system directly validates HIVE's composition engine:
+The skill check system directly validates PEAT's composition engine:
 
 ```rust
-// Does HIVE's composition bonus calculation match player intuition?
+// Does PEAT's composition bonus calculation match player intuition?
 fn calculate_party_modifier(party: &[Piece], check_type: Capability) -> i32 {
     let base = party.iter()
         .map(|p| p.get_modifier(check_type))
@@ -30099,7 +30099,7 @@ Encounters validate that DC calculation makes sense:
 
 - Are "impossible" encounters actually impossible without the right composition?
 - Do "easy" encounters feel appropriately simple?
-- Does HIVE's recommendation system suggest good parties?
+- Does PEAT's recommendation system suggest good parties?
 
 ### 4. Cross-Boundary Coordination
 
@@ -30200,7 +30200,7 @@ The D&D-style mechanics support multiple themes:
 |-----------|---------|--------|
 | Time to "get it" | New user understands composition | < 2 minutes |
 | Engagement | "I was the drone" recall | > 90% |
-| Teaching value | Audience asks about HIVE | > 50% |
+| Teaching value | Audience asks about PEAT | > 50% |
 
 ### Technical Validation
 
@@ -30216,7 +30216,7 @@ The D&D-style mechanics support multiple themes:
 |-----------|---------|--------|
 | Composition data | Which synergies players discover | Logged |
 | Strategy patterns | Winning compositions | Analyzed |
-| Human-AI teaming | HIVE recommendation acceptance | Tracked |
+| Human-AI teaming | PEAT recommendation acceptance | Tracked |
 
 ---
 
@@ -30225,7 +30225,7 @@ The D&D-style mechanics support multiple themes:
 ### RTS (Real-Time Strategy) - Rejected
 - Pro: Exciting, immediate
 - Con: Chaotic, hard to follow in demos
-- Con: Doesn't emphasize composition (the core HIVE value)
+- Con: Doesn't emphasize composition (the core PEAT value)
 - Con: Favors micro-management over thoughtful coordination
 
 ### Pure Chess - Rejected
@@ -30240,7 +30240,7 @@ The D&D-style mechanics support multiple themes:
 - Con: Abstract, not tangible for C2 demos
 
 ### D&D-Style Tactical RPG - Chosen
-- Pro: Party composition is the core mechanic (exactly HIVE)
+- Pro: Party composition is the core mechanic (exactly PEAT)
 - Pro: Skill checks map directly to capability matching
 - Pro: Turn-based means audience can follow
 - Pro: DM role fits presenter perfectly
@@ -30251,11 +30251,11 @@ The D&D-style mechanics support multiple themes:
 
 ## Prototyping Notes
 
-### TUI Prototype (hive-commander crate)
+### TUI Prototype (peat-commander crate)
 
 A terminal-based prototype was created to validate the intent-based command model concepts before investing in full graphical UI development.
 
-**Location**: `hive-commander/` crate in the workspace
+**Location**: `peat-commander/` crate in the workspace
 
 **What was built**:
 - Procedural terrain generation using Perlin noise (water, plains, forest, hills, mountains, urban, base)
@@ -30274,7 +30274,7 @@ A terminal-based prototype was created to validate the intent-based command mode
 
 **Run the prototype**:
 ```bash
-cargo run -p hive-commander
+cargo run -p peat-commander
 ```
 
 **Controls**:
@@ -30293,7 +30293,7 @@ cargo run -p hive-commander
 - ADR-001: CAP Protocol POC
 - ADR-004: Human-Machine Squad Composition
 - ADR-014: Distributed Coordination Primitives
-- Industry Feedback: HIVE Hierarchy Visualization (2024-12-06)
+- Industry Feedback: PEAT Hierarchy Visualization (2024-12-06)
 
 ---
 
@@ -30355,7 +30355,7 @@ How multiple transports are used together:
 ### Current Implementation Gap
 
 **What exists today:**
-- `MeshTransport` trait in `hive-protocol/src/transport/mod.rs`
+- `MeshTransport` trait in `peat-protocol/src/transport/mod.rs`
 - `IrohMeshTransport` implementing QUIC-based transport
 - `DittoMeshTransport` delegating to Ditto's transport
 - `HealthMonitor` for connection quality tracking
@@ -30373,7 +30373,7 @@ How multiple transports are used together:
 **ADR-030** answered: "Does Iroh support multiple NICs?"
 - Yes, Iroh automatically binds to all interfaces
 
-**ADR-032** answers: "How does HIVE manage multiple transports holistically?"
+**ADR-032** answers: "How does PEAT manage multiple transports holistically?"
 - Transport registration with unique IDs
 - PACE-style failover policies
 - Simultaneous use modes
@@ -30998,7 +30998,7 @@ impl BluetoothLETransport {
             },
             adapter,
             connections: RwLock::new(HashMap::new()),
-            service_uuid: Uuid::parse_str("HIVE-SERVICE-UUID").unwrap(),
+            service_uuid: Uuid::parse_str("PEAT-SERVICE-UUID").unwrap(),
         }
     }
 }
@@ -31353,7 +31353,7 @@ This integrates with the geographic beacon system (ADR-024) to provide distance 
 
 **Goal**: Android/iOS peer discovery and messaging
 
-- [ ] Create `hive-bluetooth` crate (behind feature flag)
+- [ ] Create `peat-bluetooth` crate (behind feature flag)
 - [ ] Implement `BluetoothLETransport`
 - [ ] Implement BLE advertising for peer discovery
 - [ ] Implement GATT service for data exchange
@@ -31366,7 +31366,7 @@ This integrates with the geographic beacon system (ADR-024) to provide distance 
 
 **Goal**: Long-range, low-power telemetry
 
-- [ ] Create `hive-lora` crate (behind feature flag)
+- [ ] Create `peat-lora` crate (behind feature flag)
 - [ ] Implement `LoRaTransport`
 - [ ] Handle spreading factor selection
 - [ ] Implement duty cycle management
@@ -31379,7 +31379,7 @@ This integrates with the geographic beacon system (ADR-024) to provide distance 
 
 **Goal**: High-bandwidth peer-to-peer clusters
 
-- [ ] Create `hive-wifi-direct` crate
+- [ ] Create `peat-wifi-direct` crate
 - [ ] Implement `WifiDirectTransport`
 - [ ] Handle group formation (GO negotiation)
 - [ ] Integrate with IP-based QUIC after connection
@@ -31677,7 +31677,7 @@ Where does PACE transport policy live, and how do the layers interact?
 
 ### The GPS Dependency Problem
 
-HIVE Protocol currently assumes GPS availability for:
+PEAT Protocol currently assumes GPS availability for:
 - **Geographic beacons** (ADR-024) - nodes advertise lat/long/altitude
 - **Distance-based hierarchy** - parent selection based on proximity
 - **Range mode selection** (ADR-032) - transport config based on peer distance
@@ -31696,7 +31696,7 @@ HIVE Protocol currently assumes GPS availability for:
 
 ### The Timing Problem
 
-Beyond positioning, GPS provides precise timing (PPS - Pulse Per Second). HIVE needs time sync for:
+Beyond positioning, GPS provides precise timing (PPS - Pulse Per Second). PEAT needs time sync for:
 - **CRDT ordering** - Automerge uses timestamps for conflict resolution
 - **Event sequencing** - Telemetry and command ordering
 - **TTL enforcement** - Document expiration
@@ -32236,7 +32236,7 @@ impl MeshTimeSync {
 }
 ```
 
-### 5. Integration with HIVE Components
+### 5. Integration with PEAT Components
 
 ```rust
 /// Central positioning and timing service
@@ -32524,12 +32524,12 @@ struct Tombstone {
 2. Without the tombstone, sync would resurrect the document
 3. No safe point to garbage collect without coordination
 
-**In HIVE's tactical context:**
+**In PEAT's tactical context:**
 - A 10-node squad generating 1 beacon/second for 8 hours = 288,000 records
 - If 10% are "deleted" (superseded), that's 28,800 tombstones
 - Tombstones sync forever, consuming bandwidth on reconnection
 
-### HIVE-Specific Considerations
+### PEAT-Specific Considerations
 
 | Data Type | Deletion Semantics | Retention Need |
 |-----------|-------------------|----------------|
@@ -32542,7 +32542,7 @@ struct Tombstone {
 
 ### Current State
 
-HIVE currently has **no explicit deletion mechanism**:
+PEAT currently has **no explicit deletion mechanism**:
 - `DocumentStore::delete()` is not implemented
 - Old documents accumulate indefinitely
 - `SyncMode::LatestOnly` discards history but not documents
@@ -33055,7 +33055,7 @@ Legend: ✅ = Full support, ⚠️ = Partial/conditional, ❌ = Not supported
 
 ---
 
-# ADR-035: HIVE-Lite Embedded Sensor Nodes
+# ADR-035: PEAT-Lite Embedded Sensor Nodes
 
 ## Status
 
@@ -33073,13 +33073,13 @@ The current approach for integrating such sensors is MQTT or similar broker-base
 4. **No hierarchical filtering** - Can't aggregate/filter at intermediate tiers
 5. **Single point of compromise** - Broker is an attractive attack target
 
-HIVE's mesh architecture offers a fundamentally different model where sensors can be first-class participants in a distributed data fabric, but our current implementation requires:
+PEAT's mesh architecture offers a fundamentally different model where sensors can be first-class participants in a distributed data fabric, but our current implementation requires:
 - Full Rust `std` library support
 - Automerge CRDT engine (memory-intensive)
 - Persistent storage backends
 - Significant RAM (tens of MB minimum)
 
-This ADR proposes HIVE-Lite: a minimal, resource-constrained implementation enabling embedded devices to participate as full mesh members while respecting their hardware limitations.
+This ADR proposes PEAT-Lite: a minimal, resource-constrained implementation enabling embedded devices to participate as full mesh members while respecting their hardware limitations.
 
 ## Target Hardware Profile
 
@@ -33091,7 +33091,7 @@ This ADR proposes HIVE-Lite: a minimal, resource-constrained implementation enab
 - Power: Battery + USB-C
 
 **Minimum Target Specs:**
-- 256KB RAM available for HIVE-Lite
+- 256KB RAM available for PEAT-Lite
 - WiFi or BLE connectivity
 - No persistent storage required (ephemeral operation)
 
@@ -33102,17 +33102,17 @@ This ADR proposes HIVE-Lite: a minimal, resource-constrained implementation enab
 
 ## Decision
 
-We will create HIVE-Lite as a distinct but protocol-compatible implementation targeting embedded devices. Key design decisions:
+We will create PEAT-Lite as a distinct but protocol-compatible implementation targeting embedded devices. Key design decisions:
 
 ### 1. Tiered Node Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        HIVE Node Tiers                          │
+│                        PEAT Node Tiers                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐         │
-│  │  HIVE-Full  │    │ HIVE-Edge   │    │ HIVE-Lite   │         │
+│  │  PEAT-Full  │    │ PEAT-Edge   │    │ PEAT-Lite   │         │
 │  │             │    │             │    │             │         │
 │  │ • Full CRDT │    │ • Selective │    │ • Minimal   │         │
 │  │ • Persistent│    │   CRDTs     │    │   CRDTs     │         │
@@ -33130,13 +33130,13 @@ We will create HIVE-Lite as a distinct but protocol-compatible implementation ta
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**HIVE-Full**: Current implementation - servers, powerful edge devices
-**HIVE-Edge**: Intermediate tier - Raspberry Pi, phones, tablets (future)
-**HIVE-Lite**: This ADR - microcontrollers, embedded sensors
+**PEAT-Full**: Current implementation - servers, powerful edge devices
+**PEAT-Edge**: Intermediate tier - Raspberry Pi, phones, tablets (future)
+**PEAT-Lite**: This ADR - microcontrollers, embedded sensors
 
 ### 2. Ephemeral-First Design
 
-HIVE-Lite nodes operate without persistent storage:
+PEAT-Lite nodes operate without persistent storage:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -33164,7 +33164,7 @@ HIVE-Lite nodes operate without persistent storage:
 
 ### 3. Minimal CRDT Subset
 
-Instead of full Automerge, HIVE-Lite implements only essential CRDTs:
+Instead of full Automerge, PEAT-Lite implements only essential CRDTs:
 
 | CRDT Type | Use Case | Memory | Complexity |
 |-----------|----------|--------|------------|
@@ -33177,7 +33177,7 @@ Instead of full Automerge, HIVE-Lite implements only essential CRDTs:
 **Not included**: Full document CRDTs, text CRDTs, complex nested structures
 
 ```rust
-// HIVE-Lite CRDT trait (no_std compatible)
+// PEAT-Lite CRDT trait (no_std compatible)
 #![no_std]
 
 pub trait LiteCrdt: Sized {
@@ -33201,11 +33201,11 @@ pub struct LwwRegister<T, const MAX_SIZE: usize> {
 
 ### 4. Lightweight Gossip Protocol
 
-HIVE-Lite uses a simplified gossip protocol optimized for constrained networks:
+PEAT-Lite uses a simplified gossip protocol optimized for constrained networks:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                  HIVE-Lite Gossip Protocol                      │
+│                  PEAT-Lite Gossip Protocol                      │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  Message Types (4-bit type field):                              │
@@ -33235,14 +33235,14 @@ HIVE-Lite uses a simplified gossip protocol optimized for constrained networks:
 
 ### 5. Hierarchical Data Flow
 
-This is where HIVE-Lite differs fundamentally from MQTT:
+This is where PEAT-Lite differs fundamentally from MQTT:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │              Hierarchical vs Broker Architecture                │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  MQTT (Centralized):              HIVE (Mesh + Hierarchy):      │
+│  MQTT (Centralized):              PEAT (Mesh + Hierarchy):      │
 │                                                                 │
 │       ┌─────────┐                      ┌─────────┐              │
 │       │ Broker  │                      │ Squad   │              │
@@ -33270,7 +33270,7 @@ This is where HIVE-Lite differs fundamentally from MQTT:
 
 ### 6. First-Class Mesh Participation
 
-HIVE-Lite nodes are **not** second-class citizens requiring a bridge. They participate directly in the mesh using the same protocol as Full nodes, with capability negotiation to handle feature differences.
+PEAT-Lite nodes are **not** second-class citizens requiring a bridge. They participate directly in the mesh using the same protocol as Full nodes, with capability negotiation to handle feature differences.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -33280,7 +33280,7 @@ HIVE-Lite nodes are **not** second-class citizens requiring a bridge. They parti
 │  Bridge Model (REJECTED):         First-Class Model (CHOSEN):   │
 │                                                                 │
 │  ┌──────────┐                     ┌──────────┐                  │
-│  │HIVE-Full │                     │HIVE-Full │                  │
+│  │PEAT-Full │                     │PEAT-Full │                  │
 │  │          │                     │          │                  │
 │  │ ┌──────┐ │                     └────┬─────┘                  │
 │  │ │Bridge│ │                          │                        │
@@ -33304,7 +33304,7 @@ HIVE-Lite nodes are **not** second-class citizens requiring a bridge. They parti
 2. **Capability advertisement** - Nodes announce what they support (storage, relay, CRDTs)
 3. **Graceful degradation** - Full nodes understand Lite limitations, don't request unsupported features
 4. **Direct peering** - Lite nodes connect directly to any reachable node (Full, Edge, or Lite)
-5. **No translation layer** - Data from Lite nodes is native HIVE data, not converted
+5. **No translation layer** - Data from Lite nodes is native PEAT data, not converted
 
 **Capability Flags (announced during handshake):**
 
@@ -33321,10 +33321,10 @@ bitflags! {
     }
 }
 
-// HIVE-Lite typical capabilities:
+// PEAT-Lite typical capabilities:
 const LITE_CAPS: NodeCapabilities = NodeCapabilities::PRIMITIVE_CRDT;
 
-// HIVE-Full typical capabilities:
+// PEAT-Full typical capabilities:
 const FULL_CAPS: NodeCapabilities = NodeCapabilities::all();
 ```
 
@@ -33344,7 +33344,7 @@ const FULL_CAPS: NodeCapabilities = NodeCapabilities::all();
 ### 7. Implementation Strategy
 
 **Phase 1: Unified Protocol Specification**
-- Extend current HIVE wire protocol with capability negotiation
+- Extend current PEAT wire protocol with capability negotiation
 - Define compact binary encoding for primitive CRDTs
 - Ensure protocol works identically for all node types
 - Add feature flags for graceful capability discovery
@@ -33355,8 +33355,8 @@ const FULL_CAPS: NodeCapabilities = NodeCapabilities::all();
 - ESP32 HAL integration (using `esp-hal` or `esp-idf-hal`)
 - UDP transport with multicast discovery
 
-**Phase 3: HIVE-Full Compatibility**
-- Update HIVE-Full to handle capability negotiation
+**Phase 3: PEAT-Full Compatibility**
+- Update PEAT-Full to handle capability negotiation
 - Ensure Full nodes work seamlessly with Lite peers
 - Add primitive CRDT support to Full nodes (for interop)
 
@@ -33367,7 +33367,7 @@ const FULL_CAPS: NodeCapabilities = NodeCapabilities::all();
 
 ### 8. Memory Budget
 
-Target: 256KB RAM allocation for HIVE-Lite runtime
+Target: 256KB RAM allocation for PEAT-Lite runtime
 
 | Component | Budget | Notes |
 |-----------|--------|-------|
@@ -33396,7 +33396,7 @@ Target: 256KB RAM allocation for HIVE-Lite runtime
 │                 └──────────────┼───────────┘                    │
 │                                │                                │
 │  Floor 1:  [Temp-101]◄──►[Gateway]◄──►[Temp-102]               │
-│                         (HIVE-Full)                             │
+│                         (PEAT-Full)                             │
 │                              │                                  │
 │                              ▼                                  │
 │                    [Cloud/HQ Systems]                           │
@@ -33423,7 +33423,7 @@ A key capability is how primitive CRDTs from Lite nodes feed into Automerge docu
 │           Primitive CRDT → Automerge Document Flow              │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  HIVE-Lite Node                    HIVE-Full/Edge Node          │
+│  PEAT-Lite Node                    PEAT-Full/Edge Node          │
 │  ┌─────────────────┐               ┌─────────────────────────┐  │
 │  │ LWW-Register:   │   gossip      │ Automerge Document:     │  │
 │  │ temp = 23.5°C   │ ──────────►   │ {                       │  │
@@ -33478,7 +33478,7 @@ The M5Stack Core2 provides an excellent reference platform with meaningful onboa
 An M5Stack Core2 worn by a team member could provide:
 
 ```rust
-// Data published by a single HIVE-Lite node (M5Stack Core2)
+// Data published by a single PEAT-Lite node (M5Stack Core2)
 struct PersonnelSensorData {
     // Motion/Posture (from IMU)
     orientation: LwwRegister<Orientation>,  // Standing, prone, moving
@@ -33560,8 +33560,8 @@ A Full node correlates: "Possible casualty event - Operator-2 down, Operator-3 r
 2. **Local Intelligence** - Sensors benefit from peer data, enabling edge decisions
 3. **Bandwidth Efficiency** - Hierarchical aggregation reduces upstream traffic
 4. **Resilience** - Local mesh operates independently of upstream connectivity
-5. **Low Cost** - $15-30 sensor nodes can participate in HIVE mesh
-6. **Incremental Adoption** - Can add Lite nodes to existing HIVE deployments
+5. **Low Cost** - $15-30 sensor nodes can participate in PEAT mesh
+6. **Incremental Adoption** - Can add Lite nodes to existing PEAT deployments
 
 ### Negative
 
@@ -33572,7 +33572,7 @@ A Full node correlates: "Possible casualty event - Operator-2 down, Operator-3 r
 
 ### Neutral
 
-1. **Separate Codebase** - HIVE-Lite likely needs its own repo/crate (shared protocol definitions)
+1. **Separate Codebase** - PEAT-Lite likely needs its own repo/crate (shared protocol definitions)
 2. **Different Skillset** - Embedded development differs from server development
 3. **Hardware Dependency** - Testing requires physical devices or emulators
 4. **Capability Negotiation** - All nodes must implement capability discovery
@@ -33590,7 +33590,7 @@ Attempt to run full Automerge on ESP32 with PSRAM.
 
 ### Alternative 2: MQTT Bridge Only
 
-Keep sensors on MQTT, bridge at HIVE-Full nodes.
+Keep sensors on MQTT, bridge at PEAT-Full nodes.
 
 **Rejected because:**
 - Loses peer-to-peer benefits
@@ -33604,7 +33604,7 @@ Simple pub/sub without CRDT guarantees.
 **Rejected because:**
 - Loses consistency guarantees
 - Can't meaningfully merge conflicting data
-- Defeats purpose of HIVE integration
+- Defeats purpose of PEAT integration
 
 ## Appendix C: AXP192 Power Management (CRITICAL)
 
@@ -33696,7 +33696,7 @@ The AXP192 is not a peripheral to experiment with. Its registers directly contro
 ## Appendix A: Sensor Data Schema
 
 ```rust
-/// Standard sensor reading format for HIVE-Lite
+/// Standard sensor reading format for PEAT-Lite
 #[derive(Clone)]
 pub struct SensorReading {
     /// Sensor type identifier
@@ -33723,7 +33723,7 @@ pub struct SensorAlert {
 
 All node types use the **same wire protocol**. Differences are in capabilities, not protocol dialect.
 
-| Feature | HIVE-Full | HIVE-Edge | HIVE-Lite |
+| Feature | PEAT-Full | PEAT-Edge | PEAT-Lite |
 |---------|-----------|-----------|-----------|
 | **Mesh Participation** | ✓ | ✓ | ✓ |
 | **Direct Peering** | ✓ | ✓ | ✓ |
@@ -33780,9 +33780,9 @@ All node types use the **same wire protocol**. Differences are in capabilities, 
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Critical J-Series Message Types for HIVE Integration:**
+**Critical J-Series Message Types for PEAT Integration:**
 
-| J-Series | Name | Purpose | HIVE Relevance |
+| J-Series | Name | Purpose | PEAT Relevance |
 |----------|------|---------|----------------|
 | J2.2 | Air Track | Air platform position/ID | Air asset SA |
 | J3.2 | Surface/Ground Track | Surface/ground position | Squad position aggregation |
@@ -33794,7 +33794,7 @@ All node types use the **same wire protocol**. Differences are in capabilities, 
 | J13.2 | Target Designation | Target assignment | Engagement coordination |
 | J14.0 | Info Management | Network coordination | Synchronization |
 
-### Strategic Importance for HIVE
+### Strategic Importance for PEAT
 
 **Multi-Domain Integration Requirement:**
 
@@ -33813,33 +33813,33 @@ Link 16 is **severely bandwidth-constrained** compared to IP networks:
 |---------|--------------------|--------------------|
 | Link 16 | ~115 kbps (shared) | 3-12 second cycles |
 | TAK/CoT | 1-100 Mbps | 1-5 seconds |
-| HIVE internal | 10-1000 Mbps | Sub-second differential |
+| PEAT internal | 10-1000 Mbps | Sub-second differential |
 
 **Naive bridging would fail catastrophically:**
 - 100 platforms × 70-bit position words × 1 Hz = exceeds entire Link 16 capacity
 - Each time slot is precious (~7.8125 ms, ~225 bits usable)
 - Flat event streaming is physically impossible
 
-**HIVE's hierarchical aggregation is the solution:**
+**PEAT's hierarchical aggregation is the solution:**
 - Squad of 12 platforms → 1 aggregate track
 - 95%+ bandwidth reduction through hierarchy
 - Natural mapping to military C2 echelons
 
-### Why HIVE Enables This
+### Why PEAT Enables This
 
-The question "how would HIVE bridge on-platform messaging to TADIL-J?" has a compelling answer:
+The question "how would PEAT bridge on-platform messaging to TADIL-J?" has a compelling answer:
 
-> **HIVE's hierarchical tiers create natural aggregation points that map directly to Link 16 network participation models. The tier leader—which already maintains aggregated subordinate state via CRDT synchronization—serves as the bridge point, presenting consolidated SA to the tactical data link rather than raw platform telemetry.**
+> **PEAT's hierarchical tiers create natural aggregation points that map directly to Link 16 network participation models. The tier leader—which already maintains aggregated subordinate state via CRDT synchronization—serves as the bridge point, presenting consolidated SA to the tactical data link rather than raw platform telemetry.**
 
 This is not a workaround; it's the architecture working as intended.
 
 ## Decision
 
-We will implement **TADIL-J/Link 16 integration as a transport adapter** within the HIVE architecture, following these principles:
+We will implement **TADIL-J/Link 16 integration as a transport adapter** within the PEAT architecture, following these principles:
 
 ### Principle 1: Hierarchy as Bridge Architecture
 
-HIVE tier boundaries serve as natural Link 16 integration points:
+PEAT tier boundaries serve as natural Link 16 integration points:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -33852,7 +33852,7 @@ HIVE tier boundaries serve as natural Link 16 integration points:
                           │ J12.x (Commands ↓)
                           │
               ┌───────────▼───────────┐
-              │   HIVE Tier Leader    │
+              │   PEAT Tier Leader    │
               │   (Link 16 Bridge)    │
               │                       │
               │  • MIDS Terminal      │
@@ -33872,7 +33872,7 @@ HIVE tier boundaries serve as natural Link 16 integration points:
          │               │               │
          └───────────────┴───────────────┘
                          │
-              HIVE CRDT Sync (Rich State)
+              PEAT CRDT Sync (Rich State)
               - Full telemetry
               - Detailed capabilities  
               - Sub-second updates
@@ -33882,19 +33882,19 @@ HIVE tier boundaries serve as natural Link 16 integration points:
 
 ### Principle 2: Schema Layer Handles J-Series Encoding
 
-Following ADR-012's separation of concerns, J-series message encoding/decoding belongs in `hive-schema`:
+Following ADR-012's separation of concerns, J-series message encoding/decoding belongs in `peat-schema`:
 
 ```
-hive-schema/
+peat-schema/
 ├── proto/
-│   ├── hive_core.proto           # Core HIVE messages
+│   ├── peat_core.proto           # Core PEAT messages
 │   ├── cot_bridge.proto          # CoT mappings (ADR-020)
 │   └── tadil_j_bridge.proto      # J-series mappings (this ADR)
 ├── src/
 │   ├── tadil_j/
 │   │   ├── mod.rs
-│   │   ├── encoder.rs            # HIVE → J-series
-│   │   ├── decoder.rs            # J-series → HIVE
+│   │   ├── encoder.rs            # PEAT → J-series
+│   │   ├── decoder.rs            # J-series → PEAT
 │   │   ├── j_series_types.rs     # J2, J3, J7, J12, J13, J14
 │   │   ├── track_number.rs       # JU Track Number management
 │   │   └── validation.rs         # MIL-STD-6016 compliance
@@ -33902,26 +33902,26 @@ hive-schema/
 
 **Bidirectional Message Mapping:**
 
-| HIVE Concept | J-Series Message | Direction | Notes |
+| PEAT Concept | J-Series Message | Direction | Notes |
 |--------------|------------------|-----------|-------|
-| Platform position (individual) | J3.2 (surface track) | HIVE → Link 16 | Only if full fidelity needed |
-| **Squad aggregate position** | **J3.2 (surface track)** | **HIVE → Link 16** | **Primary use case** |
-| Squad capability summary | J7.2 (platform status) | HIVE → Link 16 | Aggregated readiness |
-| Air contact detection | J2.2 (air track) | HIVE → Link 16 | Sensor fusion result |
-| Target designation | J13.2 (target) | HIVE → Link 16 | Engagement handoff |
+| Platform position (individual) | J3.2 (surface track) | PEAT → Link 16 | Only if full fidelity needed |
+| **Squad aggregate position** | **J3.2 (surface track)** | **PEAT → Link 16** | **Primary use case** |
+| Squad capability summary | J7.2 (platform status) | PEAT → Link 16 | Aggregated readiness |
+| Air contact detection | J2.2 (air track) | PEAT → Link 16 | Sensor fusion result |
+| Target designation | J13.2 (target) | PEAT → Link 16 | Engagement handoff |
 | Control measure / ROZ | J3.5 (land point) | Bidirectional | Operational boundaries |
-| Mission tasking | J12.0 (mission assignment) | Link 16 → HIVE | Higher HQ commands |
-| Movement vector | J12.6 (control) | Link 16 → HIVE | Directional commands |
-| Network time sync | J14.0 (info management) | Link 16 → HIVE | Time reference |
+| Mission tasking | J12.0 (mission assignment) | Link 16 → PEAT | Higher HQ commands |
+| Movement vector | J12.6 (control) | Link 16 → PEAT | Directional commands |
+| Network time sync | J14.0 (info management) | Link 16 → PEAT | Time reference |
 
-### Principle 3: Transport Adapter in hive-transport
+### Principle 3: Transport Adapter in peat-transport
 
 The Link 16 interface is a transport adapter, not core protocol logic:
 
 ```rust
-// hive-transport/src/link16_transport.rs
+// peat-transport/src/link16_transport.rs
 
-use hive_schema::tadil_j::{JSeriesEncoder, JSeriesDecoder, JMessage};
+use peat_schema::tadil_j::{JSeriesEncoder, JSeriesDecoder, JMessage};
 
 pub struct Link16Transport {
     config: Link16Config,
@@ -33952,7 +33952,7 @@ pub struct Link16Config {
 }
 
 pub enum Link16AggregationPolicy {
-    /// Send one track per HIVE tier (recommended)
+    /// Send one track per PEAT tier (recommended)
     TierAggregation,
     
     /// Send tracks for designated platforms only
@@ -33964,7 +33964,7 @@ pub enum Link16AggregationPolicy {
 
 #[async_trait]
 impl TacticalDataLink for Link16Transport {
-    /// Publish aggregated HIVE state to Link 16 network
+    /// Publish aggregated PEAT state to Link 16 network
     async fn publish(&self, state: &AggregatedState) -> Result<(), Link16Error> {
         // 1. Convert aggregated state to J-series messages
         let j_messages = self.encoder.encode_aggregated(state, &self.config)?;
@@ -33986,7 +33986,7 @@ impl TacticalDataLink for Link16Transport {
         
         match j_message.label() {
             JLabel::J12_0 | JLabel::J12_6 => {
-                // Command message - decode and return for HIVE processing
+                // Command message - decode and return for PEAT processing
                 let command = self.decoder.decode_command(&j_message)?;
                 Ok(Link16Message::Command(command))
             }
@@ -34008,17 +34008,17 @@ impl TacticalDataLink for Link16Transport {
 
 ### Principle 4: Track Number Management
 
-Link 16 requires globally unique track numbers (JU numbers) within a network. HIVE bridge nodes must manage track number allocation:
+Link 16 requires globally unique track numbers (JU numbers) within a network. PEAT bridge nodes must manage track number allocation:
 
 ```rust
-// hive-transport/src/link16/track_manager.rs
+// peat-transport/src/link16/track_manager.rs
 
 pub struct TrackNumberManager {
     /// Allocated block of track numbers for this unit
     allocated_block: TrackNumberBlock,
     
     /// Currently assigned track numbers
-    assignments: HashMap<HiveEntityId, JuTrackNumber>,
+    assignments: HashMap<PeatEntityId, JuTrackNumber>,
     
     /// Track number recycling (stale tracks)
     stale_threshold: Duration,
@@ -34036,8 +34036,8 @@ pub struct TrackNumberBlock {
 }
 
 impl TrackNumberManager {
-    /// Assign track number to HIVE entity (squad, platform, etc.)
-    pub fn assign(&mut self, entity_id: HiveEntityId) -> Result<JuTrackNumber, TrackError> {
+    /// Assign track number to PEAT entity (squad, platform, etc.)
+    pub fn assign(&mut self, entity_id: PeatEntityId) -> Result<JuTrackNumber, TrackError> {
         // Check if already assigned
         if let Some(existing) = self.assignments.get(&entity_id) {
             return Ok(*existing);
@@ -34051,7 +34051,7 @@ impl TrackNumberManager {
     }
     
     /// Release track number when entity no longer needs representation
-    pub fn release(&mut self, entity_id: &HiveEntityId) {
+    pub fn release(&mut self, entity_id: &PeatEntityId) {
         self.assignments.remove(entity_id);
     }
 }
@@ -34062,7 +34062,7 @@ impl TrackNumberManager {
 The critical architectural decision is **what gets aggregated and how**:
 
 ```rust
-// hive-core/src/aggregation/link16.rs
+// peat-core/src/aggregation/link16.rs
 
 /// Aggregation rules for Link 16 representation
 pub struct Link16Aggregator {
@@ -34144,15 +34144,15 @@ impl Link16Aggregator {
 
 ## Schema Impact (Open Standard)
 
-### hive-schema Additions
+### peat-schema Additions
 
-The HIVE open standard (`hive-schema`) gains J-series message definitions:
+The PEAT open standard (`peat-schema`) gains J-series message definitions:
 
 ```protobuf
-// hive-schema/proto/tadil_j_bridge.proto
+// peat-schema/proto/tadil_j_bridge.proto
 
 syntax = "proto3";
-package hive.schema.tadil_j;
+package peat.schema.tadil_j;
 
 // J3.2 Surface Track representation
 message J3_2_SurfaceTrack {
@@ -34210,9 +34210,9 @@ message J12_0_MissionAssignment {
     Timestamp not_after = 22;
 }
 
-// Mapping from HIVE entities to J-series representations
-message HiveToLink16Mapping {
-    string hive_entity_id = 1;
+// Mapping from PEAT entities to J-series representations
+message PeatToLink16Mapping {
+    string peat_entity_id = 1;
     JuTrackNumber link16_track = 2;
     AggregationLevel level = 3;
     
@@ -34230,7 +34230,7 @@ message HiveToLink16Mapping {
 The schema also defines **standard aggregation semantics** that implementations must follow:
 
 ```protobuf
-// hive-schema/proto/aggregation.proto
+// peat-schema/proto/aggregation.proto
 
 // Standard aggregation rules for tactical data link representation
 message Link16AggregationProfile {
@@ -34265,12 +34265,12 @@ enum CapabilityAggregationMethod {
 
 ## Reference Implementation
 
-### hive-transport Link 16 Adapter
+### peat-transport Link 16 Adapter
 
 The reference implementation provides a complete Link 16 transport adapter:
 
 ```
-hive-transport/
+peat-transport/
 ├── src/
 │   ├── lib.rs
 │   ├── link16/
@@ -34290,7 +34290,7 @@ hive-transport/
 To support both real hardware and simulation:
 
 ```rust
-// hive-transport/src/link16/mids_interface.rs
+// peat-transport/src/link16/mids_interface.rs
 
 /// Abstraction over MIDS terminal hardware
 #[async_trait]
@@ -34359,7 +34359,7 @@ impl MidsInterface for SimulatedMids {
 For PoC validation without hardware:
 
 ```rust
-// hive-transport/src/link16/simulator.rs
+// peat-transport/src/link16/simulator.rs
 
 /// Simulated Link 16 network for testing
 pub struct SimulatedLink16Network {
@@ -34410,23 +34410,23 @@ impl SimulatedLink16Network {
 }
 ```
 
-## Integration with HIVE Core
+## Integration with PEAT Core
 
 ### Bridge Node Configuration
 
-A HIVE node configured as a Link 16 bridge:
+A PEAT node configured as a Link 16 bridge:
 
 ```rust
 // Example: Squad leader with Link 16 bridge capability
 
-let config = HiveNodeConfig {
+let config = PeatNodeConfig {
     role: NodeRole::TierLeader {
         echelon: Echelon::Squad,
         subordinate_count: 12,
     },
     
     transports: vec![
-        // Internal HIVE sync
+        // Internal PEAT sync
         TransportConfig::Quic(QuicConfig::default()),
         
         // Link 16 bridge (if hardware available)
@@ -34456,10 +34456,10 @@ let config = HiveNodeConfig {
     },
 };
 
-let node = HiveNode::new(config).await?;
+let node = PeatNode::new(config).await?;
 
 // Bridge automatically publishes aggregated state to Link 16
-// and injects received commands into HIVE hierarchy
+// and injects received commands into PEAT hierarchy
 node.run().await?;
 ```
 
@@ -34476,11 +34476,11 @@ For larger formations, bridges at multiple echelons:
         │                                 │
 ┌───────▼───────┐                 ┌───────▼───────┐
 │  Company HQ   │                 │  Platoon HQ   │
-│  HIVE Bridge  │                 │  HIVE Bridge  │
+│  PEAT Bridge  │                 │  PEAT Bridge  │
 │  (Optional)   │                 │  (Primary)    │
 └───────┬───────┘                 └───────┬───────┘
         │                                 │
-        │ HIVE Protocol                   │ HIVE Protocol
+        │ PEAT Protocol                   │ PEAT Protocol
         │ (Platoon aggregates)            │ (Squad details)
         │                                 │
 ┌───────▼───────┐                 ┌───────▼───────┐
@@ -34512,7 +34512,7 @@ For larger formations, bridges at multiple echelons:
 **Complementary Integration:**
 - TAK for rich, low-latency team awareness
 - Link 16 for joint force integration and higher echelon SA
-- Both can operate simultaneously from same HIVE network
+- Both can operate simultaneously from same PEAT network
 
 ## Implementation Phases
 
@@ -34522,7 +34522,7 @@ For larger formations, bridges at multiple echelons:
 
 **Tasks**:
 1. Survey Link 16 usage patterns in target operational contexts
-2. Identify critical J-series message types for HIVE integration
+2. Identify critical J-series message types for PEAT integration
 3. Define track number allocation strategy
 4. Document MIDS integration requirements (vendor coordination)
 
@@ -34534,12 +34534,12 @@ For larger formations, bridges at multiple echelons:
 
 ### Phase 1: Schema Layer (Weeks 3-4)
 
-**Goal**: Implement J-series message encoding/decoding in `hive-schema`
+**Goal**: Implement J-series message encoding/decoding in `peat-schema`
 
 **Tasks**:
 1. Define J-series protobuf messages
-2. Implement J-series encoder (HIVE → Link 16)
-3. Implement J-series decoder (Link 16 → HIVE)
+2. Implement J-series encoder (PEAT → Link 16)
+3. Implement J-series decoder (Link 16 → PEAT)
 4. Define aggregation profile schemas
 5. Unit tests for all conversions
 
@@ -34551,7 +34551,7 @@ For larger formations, bridges at multiple echelons:
 
 ### Phase 2: Transport Adapter (Weeks 5-7)
 
-**Goal**: Implement `Link16Transport` in `hive-transport`
+**Goal**: Implement `Link16Transport` in `peat-transport`
 
 **Tasks**:
 1. Implement MIDS interface abstraction
@@ -34564,7 +34564,7 @@ For larger formations, bridges at multiple echelons:
 - [ ] SimulatedMids enables full testing without hardware
 - [ ] Track numbers assigned and managed correctly
 - [ ] Aggregation policies produce expected track representations
-- [ ] Bidirectional message flow works (HIVE ↔ Link 16)
+- [ ] Bidirectional message flow works (PEAT ↔ Link 16)
 
 ### Phase 3: Aggregation Logic (Weeks 8-10)
 
@@ -34574,7 +34574,7 @@ For larger formations, bridges at multiple echelons:
 1. Implement position aggregation methods (centroid, leader, weighted)
 2. Implement capability aggregation (sum, min, custom)
 3. Create configurable aggregation profiles
-4. Integrate with HIVE tier leader logic
+4. Integrate with PEAT tier leader logic
 5. End-to-end testing with multi-tier hierarchy
 
 **Success Criteria**:
@@ -34592,17 +34592,17 @@ For larger formations, bridges at multiple echelons:
 2. Add network condition simulation (latency, loss, jamming)
 3. Create external traffic injection (simulate other network participants)
 4. Build analysis tools for message flow visualization
-5. Integration with existing HIVE simulation framework (ADR-008)
+5. Integration with existing PEAT simulation framework (ADR-008)
 
 **Success Criteria**:
-- [ ] Simulate 10+ HIVE nodes with Link 16 bridges
+- [ ] Simulate 10+ PEAT nodes with Link 16 bridges
 - [ ] Inject realistic external Link 16 traffic
 - [ ] Measure and validate bandwidth utilization
 - [ ] Demonstrate graceful degradation under jamming
 
 ### Phase 5: PoC Integration (Weeks 14-16)
 
-**Goal**: Integrate Link 16 bridging into HIVE PoC demonstration
+**Goal**: Integrate Link 16 bridging into PEAT PoC demonstration
 
 **Tasks**:
 1. Add Link 16 bridge to POI tracking vignette
@@ -34613,7 +34613,7 @@ For larger formations, bridges at multiple echelons:
 
 **Success Criteria**:
 - [ ] POI tracking vignette shows squad tracks on simulated Link 16
-- [ ] Commands injected via Link 16 execute correctly in HIVE
+- [ ] Commands injected via Link 16 execute correctly in PEAT
 - [ ] Visualization clearly shows aggregation in action
 - [ ] Documentation enables third-party integration
 
@@ -34629,7 +34629,7 @@ For larger formations, bridges at multiple echelons:
 5. Security accreditation activities
 
 **Success Criteria**:
-- [ ] Real MIDS terminal successfully transmits HIVE-generated tracks
+- [ ] Real MIDS terminal successfully transmits PEAT-generated tracks
 - [ ] Received commands correctly processed
 - [ ] Interoperability with other Link 16 participants validated
 - [ ] Security architecture passes review
@@ -34638,12 +34638,12 @@ For larger formations, bridges at multiple echelons:
 
 ### Positive
 
-1. **Joint Force Integration**: HIVE-coordinated platforms visible to entire coalition via Link 16
-2. **Higher Echelon SA**: Brigade/Division C2 systems see aggregated HIVE formations
-3. **Command Reception**: Higher HQ can task HIVE teams through existing C2 infrastructure
-4. **Coalition Interoperability**: Allied platforms share SA with HIVE formations
-5. **Airspace Integration**: HIVE air assets properly represented for deconfliction
-6. **Validates Core Architecture**: Link 16's constraints prove HIVE's aggregation value
+1. **Joint Force Integration**: PEAT-coordinated platforms visible to entire coalition via Link 16
+2. **Higher Echelon SA**: Brigade/Division C2 systems see aggregated PEAT formations
+3. **Command Reception**: Higher HQ can task PEAT teams through existing C2 infrastructure
+4. **Coalition Interoperability**: Allied platforms share SA with PEAT formations
+5. **Airspace Integration**: PEAT air assets properly represented for deconfliction
+6. **Validates Core Architecture**: Link 16's constraints prove PEAT's aggregation value
 7. **Standards Alignment**: Uses established NATO tactical data link standards
 8. **Bandwidth Efficiency**: Hierarchical aggregation enables feasible Link 16 participation
 
@@ -34666,7 +34666,7 @@ For larger formations, bridges at multiple echelons:
 
 **Risk 2**: Track number conflicts with other network participants
 - **Mitigation**: Track number block allocation coordinated with network authority
-- **Mitigation**: Source Track ID uniquely identifies HIVE formations
+- **Mitigation**: Source Track ID uniquely identifies PEAT formations
 - **Mitigation**: Track recycling with appropriate stale timers
 
 **Risk 3**: Aggregation loses operationally critical information
@@ -34697,9 +34697,9 @@ For larger formations, bridges at multiple echelons:
    - [ ] Interoperability with JITC reference implementation
 
 3. **Operational Integration**:
-   - [ ] Commands from Link 16 correctly execute in HIVE (< 5s latency)
-   - [ ] HIVE state changes reflected in Link 16 tracks (< 15s latency)
-   - [ ] Simulated external participants see correct HIVE representation
+   - [ ] Commands from Link 16 correctly execute in PEAT (< 5s latency)
+   - [ ] PEAT state changes reflected in Link 16 tracks (< 15s latency)
+   - [ ] Simulated external participants see correct PEAT representation
 
 4. **PoC Demonstration**:
    - [ ] POI tracking vignette includes Link 16 bridge
@@ -34725,11 +34725,11 @@ For larger formations, bridges at multiple echelons:
 
 ---
 
-**Author's Note**: This ADR represents a strategic integration that validates HIVE's core architectural thesis: hierarchical aggregation isn't just an optimization—it's the **only** way to participate in bandwidth-constrained tactical networks at scale. While TAK/CoT integration (ADR-020) proves HIVE works with modern IP-based systems, Link 16 integration proves HIVE can bridge to the legacy tactical data link infrastructure that remains the backbone of NATO joint operations. The same hierarchical design that enables 1000+ platform coordination also enables participation in networks designed for dozens of tracks. This is "stop moving data, start moving decisions" made tangible.
+**Author's Note**: This ADR represents a strategic integration that validates PEAT's core architectural thesis: hierarchical aggregation isn't just an optimization—it's the **only** way to participate in bandwidth-constrained tactical networks at scale. While TAK/CoT integration (ADR-020) proves PEAT works with modern IP-based systems, Link 16 integration proves PEAT can bridge to the legacy tactical data link infrastructure that remains the backbone of NATO joint operations. The same hierarchical design that enables 1000+ platform coordination also enables participation in networks designed for dozens of tracks. This is "stop moving data, start moving decisions" made tangible.
 
 ---
 
-# ADR-025: Resource-Constrained Device Optimization (HIVE Lite)
+# ADR-025: Resource-Constrained Device Optimization (PEAT Lite)
 
 **Status**: Proposed  
 **Date**: 2025-12-11  
@@ -34740,7 +34740,7 @@ For larger formations, bridges at multiple echelons:
 
 ### The Problem: Battery-Constrained Tactical Wearables
 
-Customer feedback from Ascent (Alex Gorsuch) identified a critical pain point: **current sync solutions (specifically Ditto) drain battery rapidly on Samsung watches running WearTAK**. This represents a broader class of resource-constrained devices that need HIVE connectivity without the overhead of full mesh participation.
+Customer feedback from Ascent (Alex Gorsuch) identified a critical pain point: **current sync solutions (specifically Ditto) drain battery rapidly on Samsung watches running WearTAK**. This represents a broader class of resource-constrained devices that need PEAT connectivity without the overhead of full mesh participation.
 
 The operational reality for wearables:
 
@@ -34753,13 +34753,13 @@ Samsung Galaxy Watch Running WearTAK:
 ├─ Target mission duration: 12-24 hours
 └─ Battery budget for sync: ~10% of total
 
-Full HIVE Node Power Profile:
+Full PEAT Node Power Profile:
 ├─ Continuous sync heartbeats: Radio active 20% of time
 ├─ CRDT merge operations: CPU spikes every sync
 ├─ Full mesh state: Memory pressure → swap → battery
 ├─ Result: 3-4 hour battery life (unacceptable)
 
-HIVE Lite Target Profile:
+PEAT Lite Target Profile:
 ├─ Burst sync on connection: Radio active 2% of time
 ├─ Minimal state: Only upstream parent + own data
 ├─ Aggregated heartbeats: 60-second batched updates
@@ -34776,7 +34776,7 @@ HIVE Lite Target Profile:
 | **Tactical EUD** | 4-8 cores, 2GHz | 4-8GB | 64-128GB | 4000-6000 mAh | Multi-band | ATAK phone |
 | **Edge Compute** | 8+ cores, 2GHz+ | 8-32GB | 256GB+ | AC/Vehicle | Full stack | Jetson, vehicle server |
 
-HIVE must support the full spectrum, with optimization profiles appropriate to each class.
+PEAT must support the full spectrum, with optimization profiles appropriate to each class.
 
 ### Why Ditto Drains Batteries
 
@@ -34788,9 +34788,9 @@ Based on analysis and customer feedback, Ditto's battery consumption stems from:
 4. **Monolithic Design**: Can't disable features for constrained devices
 5. **Background Activity**: Sync continues even when app is idle
 
-### HIVE's Architectural Advantages
+### PEAT's Architectural Advantages
 
-HIVE's hierarchical model enables natural optimization:
+PEAT's hierarchical model enables natural optimization:
 
 1. **Leaf Node Simplification**: Wearables are leaves, not mesh participants
 2. **Differential Sync**: Only changed data transmits (95-99% reduction)
@@ -34800,9 +34800,9 @@ HIVE's hierarchical model enables natural optimization:
 
 ## Decision
 
-### HIVE Lite: Resource-Constrained Device Profile
+### PEAT Lite: Resource-Constrained Device Profile
 
-We introduce **HIVE Lite** as a configuration profile (not a separate codebase) that optimizes HIVE for resource-constrained devices through:
+We introduce **PEAT Lite** as a configuration profile (not a separate codebase) that optimizes PEAT for resource-constrained devices through:
 
 1. **Leaf-Only Operation**: No mesh routing, single parent connection
 2. **Minimal CRDT State**: Only track own documents + immediate parent sync state
@@ -34814,11 +34814,11 @@ We introduce **HIVE Lite** as a configuration profile (not a separate codebase) 
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    HIVE Device Profiles                         │
+│                    PEAT Device Profiles                         │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
-│  │  HIVE Full  │  │ HIVE Edge   │  │ HIVE Lite   │             │
+│  │  PEAT Full  │  │ PEAT Edge   │  │ PEAT Lite   │             │
 │  │             │  │             │  │             │             │
 │  │ • Full mesh │  │ • Limited   │  │ • Leaf only │             │
 │  │ • All roles │  │   routing   │  │ • Single    │             │
@@ -34835,11 +34835,11 @@ We introduce **HIVE Lite** as a configuration profile (not a separate codebase) 
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### HIVE Lite Architecture
+### PEAT Lite Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                    HIVE Lite Node                            │
+│                    PEAT Lite Node                            │
 ├──────────────────────────────────────────────────────────────┤
 │                                                              │
 │  ┌────────────────────────────────────────────────────────┐  │
@@ -34880,7 +34880,7 @@ We introduce **HIVE Lite** as a configuration profile (not a separate codebase) 
 ### Sync Window Optimization
 
 ```rust
-/// HIVE Lite sync configuration
+/// PEAT Lite sync configuration
 pub struct LiteSyncConfig {
     /// Minimum interval between sync attempts (power saving)
     pub min_sync_interval: Duration,
@@ -35093,11 +35093,11 @@ impl PowerAwareSyncScheduler {
 
 ### WearTAK Integration Architecture
 
-**Note**: WearTAK integration depends on ADR-026 (Protocol-Level Format Transformation Primitives) for CoT ↔ HIVE transformation. See ADR-026 for the FormatAdapter framework, CoT-native mode, and parent-side bridging patterns.
+**Note**: WearTAK integration depends on ADR-026 (Protocol-Level Format Transformation Primitives) for CoT ↔ PEAT transformation. See ADR-026 for the FormatAdapter framework, CoT-native mode, and parent-side bridging patterns.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                 WearTAK + HIVE Lite Stack                       │
+│                 WearTAK + PEAT Lite Stack                       │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  Samsung Galaxy Watch                    ATAK Phone (Parent)    │
@@ -35108,7 +35108,7 @@ impl PowerAwareSyncScheduler {
 │  │  └──────────────┘   │                │  └──────────────┘   │ │
 │  │         │           │                │         │           │ │
 │  │  ┌──────────────┐   │    BLE Link    │  ┌──────────────┐   │ │
-│  │  │ HIVE Lite    │───┼────────────────┼──│ HIVE Edge    │   │ │
+│  │  │ PEAT Lite    │───┼────────────────┼──│ PEAT Edge    │   │ │
 │  │  │ (Leaf Node)  │   │   Batched      │  │ (Aggregator) │   │ │
 │  │  │              │   │   Updates      │  │              │   │ │
 │  │  └──────────────┘   │                │  └──────────────┘   │ │
@@ -35128,16 +35128,16 @@ impl PowerAwareSyncScheduler {
 
 Data Flow:
 1. Watch generates position/health updates
-2. HIVE Lite batches updates (60-second window)
+2. PEAT Lite batches updates (60-second window)
 3. BLE sync to phone on schedule
-4. Phone aggregates into HIVE mesh
+4. Phone aggregates into PEAT mesh
 5. CoT events flow to TAK Server as normal
 ```
 
 ### Minimal State Schema for Wearables
 
 ```protobuf
-// Minimal schema for HIVE Lite wearable nodes
+// Minimal schema for PEAT Lite wearable nodes
 message LiteNodeState {
   // Identity
   string node_id = 1;
@@ -35300,7 +35300,7 @@ pub struct PowerImprovement {
 
 ## Alternatives Considered
 
-### Alternative 1: Separate HIVE Lite Codebase
+### Alternative 1: Separate PEAT Lite Codebase
 
 Create a distinct minimal implementation for constrained devices.
 
@@ -35316,7 +35316,7 @@ Wearables only relay data through BLE, no local CRDT state.
 **Pros**: Minimal device complexity, near-zero state overhead
 **Cons**: No offline operation, loses CRDT benefits, single point of failure
 
-**Decision**: Partially adopted. Available as `StatelessRelay` mode for extremely constrained devices, but HIVE Lite retains minimal CRDT state for offline resilience.
+**Decision**: Partially adopted. Available as `StatelessRelay` mode for extremely constrained devices, but PEAT Lite retains minimal CRDT state for offline resilience.
 
 ### Alternative 3: Custom Lightweight CRDT
 
@@ -35329,7 +35329,7 @@ Design a custom minimal CRDT specifically for constrained devices.
 
 ## Implementation Plan
 
-### Phase 1: Core HIVE Lite Profile (Q1 2026)
+### Phase 1: Core PEAT Lite Profile (Q1 2026)
 1. Define device profile configuration system
 2. Implement batch accumulator
 3. Add sync interval controls
@@ -35388,18 +35388,18 @@ Design a custom minimal CRDT specifically for constrained devices.
 | Display | 100 mW | 0.5 mW | 20% | 20% |
 | Sensors | 15 mW | 1 mW | 50% | 50% |
 
-**Full HIVE**: ~85 mW average → ~4 hours on 350 mAh
-**HIVE Lite**: ~35 mW average → ~10 hours on 350 mAh (with display active)
-**HIVE Lite (display off)**: ~15 mW average → ~23 hours on 350 mAh
+**Full PEAT**: ~85 mW average → ~4 hours on 350 mAh
+**PEAT Lite**: ~35 mW average → ~10 hours on 350 mAh (with display active)
+**PEAT Lite (display off)**: ~15 mW average → ~23 hours on 350 mAh
 
 ### Sync Energy Comparison
 
 | Sync Type | Energy per Sync | Syncs per Hour | Energy per Hour |
 |-----------|----------------|----------------|-----------------|
 | Ditto Continuous | 0.5 mWh | 60+ | 30+ mWh |
-| HIVE Full | 0.3 mWh | 30 | 9 mWh |
-| HIVE Lite (scheduled) | 0.2 mWh | 6 | 1.2 mWh |
-| HIVE Lite (low battery) | 0.2 mWh | 2 | 0.4 mWh |
+| PEAT Full | 0.3 mWh | 30 | 9 mWh |
+| PEAT Lite (scheduled) | 0.2 mWh | 6 | 1.2 mWh |
+| PEAT Lite (low battery) | 0.2 mWh | 2 | 0.4 mWh |
 
 ---
 
@@ -35431,20 +35431,20 @@ Current Architecture Problem:
                           │ ??? Integration Point
                           ▼
                     ┌─────────────┐
-                    │ HIVE Node   │
+                    │ PEAT Node   │
                     │ (CRDT docs) │
                     └─────────────┘
 
 Questions:
-1. Where does HIVE ↔ CoT transformation happen?
+1. Where does PEAT ↔ CoT transformation happen?
 2. Who owns the transformation logic?
-3. How does a WearTAK device join a HIVE hierarchy?
-4. Can a node speak CoT natively without full HIVE stack?
+3. How does a WearTAK device join a PEAT hierarchy?
+4. Can a node speak CoT natively without full PEAT stack?
 ```
 
 ### The Deeper Issue: Format Interoperability at Scale
 
-HIVE will integrate with multiple format ecosystems:
+PEAT will integrate with multiple format ecosystems:
 
 | Format | Use Case | Characteristics |
 |--------|----------|-----------------|
@@ -35458,21 +35458,21 @@ HIVE will integrate with multiple format ecosystems:
 
 Each requires bidirectional transformation. If transformation remains an ad-hoc concern, we get:
 - **N×M integration matrix** - every format pair needs custom code
-- **No composability** - can't chain HIVE → CoT → Link 16
+- **No composability** - can't chain PEAT → CoT → Link 16
 - **No negotiation** - nodes can't discover compatible formats
 - **No optimization** - constrained devices can't skip unused transforms
 
 ### WearTAK Integration Requirements
 
-For Samsung watches running WearTAK to participate in HIVE hierarchies:
+For Samsung watches running WearTAK to participate in PEAT hierarchies:
 
-1. **Minimal footprint** - Watch can't run full HIVE stack
+1. **Minimal footprint** - Watch can't run full PEAT stack
 2. **CoT native** - WearTAK already speaks CoT to ATAK
-3. **Hierarchy participation** - Watch is a leaf node in HIVE hierarchy
+3. **Hierarchy participation** - Watch is a leaf node in PEAT hierarchy
 4. **Bidirectional** - Receive commands, send position/health/alerts
 5. **Battery efficient** - Transform overhead must be minimal
 
-**Key Insight**: The watch shouldn't need to understand HIVE's CRDT internals. It should speak CoT, and HIVE should accept CoT as a valid input format at the protocol level.
+**Key Insight**: The watch shouldn't need to understand PEAT's CRDT internals. It should speak CoT, and PEAT should accept CoT as a valid input format at the protocol level.
 
 ## Decision
 
@@ -35482,7 +35482,7 @@ We introduce **Format Adapters** as first-class protocol elements:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    HIVE Protocol Stack                          │
+│                    PEAT Protocol Stack                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌───────────────────────────────────────────────────────────┐  │
@@ -35498,7 +35498,7 @@ We introduce **Format Adapters** as first-class protocol elements:
 │  ┌───────────────────────────────────────────────────────────┐  │
 │  │         ★ FORMAT ADAPTER LAYER ★ (NEW)                    │  │
 │  │  • Schema-declared transformations                        │  │
-│  │  • Bidirectional HIVE ↔ External format mapping          │  │
+│  │  • Bidirectional PEAT ↔ External format mapping          │  │
 │  │  • Format capability advertisement                        │  │
 │  │  • Automatic format negotiation                           │  │
 │  └───────────────────────────────────────────────────────────┘  │
@@ -35531,7 +35531,7 @@ We introduce **Format Adapters** as first-class protocol elements:
 │                          │                                      │
 │                          ▼                                      │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │              Canonical HIVE Document Model                │  │
+│  │              Canonical PEAT Document Model                │  │
 │  │  • Position, Health, Capability, Command, Alert           │  │
 │  │  • Hierarchical relationships (parent, children)          │  │
 │  │  • CRDT-native (Automerge compatible)                     │  │
@@ -35545,7 +35545,7 @@ We introduce **Format Adapters** as first-class protocol elements:
 Transformations are **declared in schema**, not just implemented in code:
 
 ```protobuf
-// hive_format_adapters.proto
+// peat_format_adapters.proto
 
 // Format adapter capability declaration
 message FormatAdapterCapability {
@@ -35558,13 +35558,13 @@ message FormatAdapterCapability {
 
 enum TransformDirection {
   BIDIRECTIONAL = 0;
-  ENCODE_ONLY = 1;   // HIVE → External
-  DECODE_ONLY = 2;   // External → HIVE
+  ENCODE_ONLY = 1;   // PEAT → External
+  DECODE_ONLY = 2;   // External → PEAT
 }
 
 // Schema-level type mapping declaration
 message TypeMapping {
-  string hive_type = 1;           // "hive.Position"
+  string peat_type = 1;           // "peat.Position"
   string external_type = 2;        // "cot.event[a-f-G]"
   string transform_id = 3;         // Reference to transform implementation
   FieldMappingSet field_mappings = 4;
@@ -35576,7 +35576,7 @@ message FieldMappingSet {
 }
 
 message FieldMapping {
-  string hive_field = 1;           // "latitude"
+  string peat_field = 1;           // "latitude"
   string external_field = 2;       // "point/@lat"
   FieldTransform transform = 3;    // Optional field-level transform
 }
@@ -35593,7 +35593,7 @@ message FieldTransform {
 
 // Declare what information is lost in transformation
 message LossInfo {
-  repeated string hive_fields_not_mapped = 1;   // HIVE fields with no external equivalent
+  repeated string peat_fields_not_mapped = 1;   // PEAT fields with no external equivalent
   repeated string external_fields_ignored = 2;  // External fields we don't import
   string semantic_notes = 3;                    // Human-readable loss description
 }
@@ -35607,8 +35607,8 @@ pub struct CotFormatAdapter {
     /// Supported CoT protocol versions
     supported_versions: Vec<CotVersion>,
     
-    /// Type mappings (HIVE type → CoT type code)
-    type_mappings: HashMap<HiveType, CotTypeMapping>,
+    /// Type mappings (PEAT type → CoT type code)
+    type_mappings: HashMap<PeatType, CotTypeMapping>,
     
     /// Field-level transformations
     field_transforms: FieldTransformRegistry,
@@ -35656,14 +35656,14 @@ impl FormatAdapter for CotFormatAdapter {
         }
     }
     
-    /// Encode HIVE document to CoT event
-    fn encode(&self, doc: &HiveDocument) -> Result<EncodedMessage, TransformError> {
+    /// Encode PEAT document to CoT event
+    fn encode(&self, doc: &PeatDocument) -> Result<EncodedMessage, TransformError> {
         let cot_event = match doc.doc_type() {
-            HiveDocType::Position => self.encode_position(doc)?,
-            HiveDocType::Track => self.encode_track(doc)?,
-            HiveDocType::Alert => self.encode_alert(doc)?,
-            HiveDocType::Capability => self.encode_capability(doc)?,
-            HiveDocType::Command => self.encode_command(doc)?,
+            PeatDocType::Position => self.encode_position(doc)?,
+            PeatDocType::Track => self.encode_track(doc)?,
+            PeatDocType::Alert => self.encode_alert(doc)?,
+            PeatDocType::Capability => self.encode_capability(doc)?,
+            PeatDocType::Command => self.encode_command(doc)?,
             _ => return Err(TransformError::UnsupportedType(doc.doc_type())),
         };
         
@@ -35685,16 +35685,16 @@ impl FormatAdapter for CotFormatAdapter {
         })
     }
     
-    /// Decode CoT event to HIVE document
-    fn decode(&self, msg: &EncodedMessage) -> Result<HiveDocument, TransformError> {
+    /// Decode CoT event to PEAT document
+    fn decode(&self, msg: &EncodedMessage) -> Result<PeatDocument, TransformError> {
         // Parse CoT event
         let cot_event = self.parse_cot(&msg.payload, &msg.encoding)?;
         
         // Validate against CoT schema
         self.validator.validate(&cot_event)?;
         
-        // Map to HIVE document based on CoT type
-        let hive_doc = match self.classify_cot_type(&cot_event.event_type) {
+        // Map to PEAT document based on CoT type
+        let peat_doc = match self.classify_cot_type(&cot_event.event_type) {
             CotClassification::Position => self.decode_position(&cot_event)?,
             CotClassification::Track => self.decode_track(&cot_event)?,
             CotClassification::Alert => self.decode_alert(&cot_event)?,
@@ -35707,7 +35707,7 @@ impl FormatAdapter for CotFormatAdapter {
             }
         };
         
-        Ok(hive_doc)
+        Ok(peat_doc)
     }
     
     /// Validate external message without full decode
@@ -35718,16 +35718,16 @@ impl FormatAdapter for CotFormatAdapter {
 }
 ```
 
-### Type Mapping: HIVE ↔ CoT
+### Type Mapping: PEAT ↔ CoT
 
 ```rust
-/// HIVE to CoT type mapping definitions
+/// PEAT to CoT type mapping definitions
 impl CotFormatAdapter {
-    fn init_type_mappings() -> HashMap<HiveType, CotTypeMapping> {
+    fn init_type_mappings() -> HashMap<PeatType, CotTypeMapping> {
         let mut mappings = HashMap::new();
         
         // Position → CoT Event (friendly ground unit)
-        mappings.insert(HiveType::Position, CotTypeMapping {
+        mappings.insert(PeatType::Position, CotTypeMapping {
             cot_type_template: "a-{affiliation}-G-{dimension}-{function}",
             default_type: "a-f-G-U-C",  // friendly-ground-unit-combat
             field_mappings: vec![
@@ -35748,7 +35748,7 @@ impl CotFormatAdapter {
         });
         
         // Alert → CoT Event (emergency/alert type)
-        mappings.insert(HiveType::Alert, CotTypeMapping {
+        mappings.insert(PeatType::Alert, CotTypeMapping {
             cot_type_template: "b-{alert_class}-{severity}",
             default_type: "b-a",  // alert atom
             field_mappings: vec![
@@ -35765,7 +35765,7 @@ impl CotFormatAdapter {
         });
         
         // Capability → CoT Event with custom detail schema
-        mappings.insert(HiveType::Capability, CotTypeMapping {
+        mappings.insert(PeatType::Capability, CotTypeMapping {
             cot_type_template: "a-f-G-U-C",  // Unit with capability detail
             default_type: "a-f-G-U-C",
             field_mappings: vec![
@@ -35773,15 +35773,15 @@ impl CotFormatAdapter {
                 FieldMapping::direct("timestamp", "@time"),
             ],
             detail_mappings: vec![
-                DetailMapping::nested("capabilities", "detail/hive_capabilities", 
+                DetailMapping::nested("capabilities", "detail/peat_capabilities", 
                     encode_capability_detail),
-                DetailMapping::nested("hierarchy", "detail/hive_hierarchy",
+                DetailMapping::nested("hierarchy", "detail/peat_hierarchy",
                     encode_hierarchy_detail),
             ],
         });
         
         // Track (aggregated positions) → CoT track message
-        mappings.insert(HiveType::Track, CotTypeMapping {
+        mappings.insert(PeatType::Track, CotTypeMapping {
             cot_type_template: "a-{affiliation}-{dimension}-{function}",
             default_type: "a-u-G",  // unknown ground track
             field_mappings: vec![
@@ -35805,11 +35805,11 @@ impl CotFormatAdapter {
 
 ### Format Capability Advertisement
 
-Nodes advertise their format capabilities as part of HIVE discovery:
+Nodes advertise their format capabilities as part of PEAT discovery:
 
 ```protobuf
 // Extend beacon to include format capabilities
-message HiveBeacon {
+message PeatBeacon {
   string node_id = 1;
   Position position = 2;
   NodeHealth health = 3;
@@ -35891,9 +35891,9 @@ impl FormatNegotiator {
             .ok_or(NegotiationError::NoCommonFormat)
     }
     
-    /// Handle HIVE-native peer (no format adapter needed)
-    pub fn is_hive_native(peer_capabilities: &[FormatAdapterCapability]) -> bool {
-        peer_capabilities.iter().any(|c| c.format_id == "hive-native")
+    /// Handle PEAT-native peer (no format adapter needed)
+    pub fn is_peat_native(peer_capabilities: &[FormatAdapterCapability]) -> bool {
+        peer_capabilities.iter().any(|c| c.format_id == "peat-native")
     }
 }
 
@@ -35907,7 +35907,7 @@ pub struct NegotiatedFormat {
 
 ### Transform Pipeline (Chained Transformations)
 
-For multi-hop scenarios (e.g., HIVE → CoT → Link 16 gateway):
+For multi-hop scenarios (e.g., PEAT → CoT → Link 16 gateway):
 
 ```rust
 /// Transform pipeline for chained format conversion
@@ -35923,19 +35923,19 @@ impl TransformPipeline {
         registry: &FormatAdapterRegistry
     ) -> Result<Self, PipelineError> {
         // Find path through registered adapters
-        // All adapters convert to/from canonical HIVE format
+        // All adapters convert to/from canonical PEAT format
         
         let mut stages: Vec<Box<dyn FormatAdapter>> = vec![];
         
-        // If source isn't HIVE-native, add decode stage
-        if source_format != "hive-native" {
+        // If source isn't PEAT-native, add decode stage
+        if source_format != "peat-native" {
             let decoder = registry.get(source_format)
                 .ok_or(PipelineError::AdapterNotFound(source_format.into()))?;
             stages.push(decoder);
         }
         
-        // If dest isn't HIVE-native, add encode stage
-        if dest_format != "hive-native" {
+        // If dest isn't PEAT-native, add encode stage
+        if dest_format != "peat-native" {
             let encoder = registry.get(dest_format)
                 .ok_or(PipelineError::AdapterNotFound(dest_format.into()))?;
             stages.push(encoder);
@@ -35949,14 +35949,14 @@ impl TransformPipeline {
         let mut current = input.clone();
         
         for stage in &self.stages {
-            // Decode to HIVE doc
+            // Decode to PEAT doc
             let doc = stage.decode(&current)?;
             
             // If more stages, encode to next format
             if let Some(next_stage) = self.stages.get(1) {
                 current = next_stage.encode(&doc)?;
             } else {
-                // Final stage - return as HIVE doc or re-encode
+                // Final stage - return as PEAT doc or re-encode
                 return stage.encode(&doc);
             }
         }
@@ -35965,27 +35965,27 @@ impl TransformPipeline {
     }
 }
 
-// Example: CoT → HIVE → Link 16 (via gateway)
+// Example: CoT → PEAT → Link 16 (via gateway)
 // let pipeline = TransformPipeline::build("cot", "link16", &registry)?;
 // let link16_msg = pipeline.transform(&cot_message)?;
 ```
 
 ### WearTAK Integration Mode
 
-For WearTAK devices, HIVE Lite can operate in **CoT-Native Mode**:
+For WearTAK devices, PEAT Lite can operate in **CoT-Native Mode**:
 
 ```rust
-/// HIVE Lite operating modes for format handling
+/// PEAT Lite operating modes for format handling
 pub enum LiteFormatMode {
-    /// Full HIVE protocol with optional format adapters
-    HiveNative {
+    /// Full PEAT protocol with optional format adapters
+    PeatNative {
         adapters: Vec<FormatAdapterCapability>,
     },
     
     /// Speak external format natively, parent handles conversion
     ExternalNative {
         format: String,          // "cot", "mqtt", etc.
-        parent_converts: bool,   // Parent handles HIVE ↔ format conversion
+        parent_converts: bool,   // Parent handles PEAT ↔ format conversion
     },
     
     /// Minimal: Only send raw data, parent handles everything
@@ -36012,15 +36012,15 @@ pub fn weartk_config() -> LiteNodeConfig {
 }
 ```
 
-### Parent-Side CoT Bridge for HIVE Lite
+### Parent-Side CoT Bridge for PEAT Lite
 
-The ATAK phone (HIVE Edge node) handles CoT ↔ HIVE transformation for its leaf children:
+The ATAK phone (PEAT Edge node) handles CoT ↔ PEAT transformation for its leaf children:
 
 ```rust
-/// ATAK/HIVE Edge node handling WearTAK children
-pub struct AtakHiveBridge {
-    /// Local HIVE node
-    hive_node: HiveEdgeNode,
+/// ATAK/PEAT Edge node handling WearTAK children
+pub struct AtakPeatBridge {
+    /// Local PEAT node
+    peat_node: PeatEdgeNode,
     
     /// CoT format adapter
     cot_adapter: CotFormatAdapter,
@@ -36032,13 +36032,13 @@ pub struct AtakHiveBridge {
     tak_connection: TakServerConnection,
 }
 
-impl AtakHiveBridge {
+impl AtakPeatBridge {
     /// Handle incoming CoT from WearTAK device
     pub async fn handle_weartk_cot(&mut self, 
         child_id: &NodeId, 
         cot_bytes: &[u8]
     ) -> Result<(), BridgeError> {
-        // Decode CoT to HIVE document
+        // Decode CoT to PEAT document
         let encoded = EncodedMessage {
             format: "cot".into(),
             encoding: "protobuf".into(),
@@ -36046,14 +36046,14 @@ impl AtakHiveBridge {
             metadata: Default::default(),
         };
         
-        let hive_doc = self.cot_adapter.decode(&encoded)?;
+        let peat_doc = self.cot_adapter.decode(&encoded)?;
         
-        // Inject into HIVE as child's document
-        let doc_with_hierarchy = hive_doc.with_parent(self.hive_node.node_id());
-        self.hive_node.merge_child_document(child_id, doc_with_hierarchy).await?;
+        // Inject into PEAT as child's document
+        let doc_with_hierarchy = peat_doc.with_parent(self.peat_node.node_id());
+        self.peat_node.merge_child_document(child_id, doc_with_hierarchy).await?;
         
         // Optionally forward to TAK server (as CoT)
-        if self.should_forward_to_tak(&hive_doc) {
+        if self.should_forward_to_tak(&peat_doc) {
             self.tak_connection.send(cot_bytes).await?;
         }
         
@@ -36063,11 +36063,11 @@ impl AtakHiveBridge {
     /// Send command to WearTAK device
     pub async fn send_to_weartk(&mut self,
         child_id: &NodeId,
-        command: HiveCommand
+        command: PeatCommand
     ) -> Result<(), BridgeError> {
-        // Encode HIVE command to CoT
-        let hive_doc = command.to_document();
-        let cot_msg = self.cot_adapter.encode(&hive_doc)?;
+        // Encode PEAT command to CoT
+        let peat_doc = command.to_document();
+        let cot_msg = self.cot_adapter.encode(&peat_doc)?;
         
         // Send via BLE to watch
         let child = self.weartk_children.get_mut(child_id)
@@ -36085,7 +36085,7 @@ impl AtakHiveBridge {
 Constrained devices only need a subset of CoT:
 
 ```protobuf
-// Minimal CoT for HIVE Lite wearables
+// Minimal CoT for PEAT Lite wearables
 // Subset of full CoT schema
 
 message MinimalCotEvent {
@@ -36142,12 +36142,12 @@ message AckDetail {
 
 ### Positive
 
-1. **Native format support**: Devices can speak CoT (or other formats) without full HIVE stack
+1. **Native format support**: Devices can speak CoT (or other formats) without full PEAT stack
 2. **Negotiated interoperability**: Peers automatically discover compatible formats
 3. **Composable transforms**: Multi-hop bridging becomes straightforward
 4. **Explicit semantics**: Schema-declared mappings document what's preserved/lost
 5. **Optimized for constraints**: Lite nodes can skip transformation overhead
-6. **Ecosystem integration**: TAK, ROS2, MQTT devices join HIVE naturally
+6. **Ecosystem integration**: TAK, ROS2, MQTT devices join PEAT naturally
 
 ### Negative
 
@@ -36158,7 +36158,7 @@ message AckDetail {
 
 ### Risks
 
-1. **Semantic drift**: HIVE concepts may not map cleanly to all formats
+1. **Semantic drift**: PEAT concepts may not map cleanly to all formats
 2. **Performance**: Transform overhead in hot paths (mitigated by caching)
 3. **Security**: Malformed external messages could exploit transform bugs
 
@@ -36171,13 +36171,13 @@ message AckDetail {
 4. Basic pipeline infrastructure
 
 ### Phase 2: CoT Reference Adapter (Q1 2026)
-1. Full HIVE ↔ CoT type mappings
+1. Full PEAT ↔ CoT type mappings
 2. XML and Protobuf encoding
 3. Schema validation
 4. Integration tests with TAK
 
 ### Phase 3: WearTAK Integration (Q1 2026)
-1. CoT-native mode for HIVE Lite
+1. CoT-native mode for PEAT Lite
 2. ATAK bridge implementation
 3. Minimal CoT schema for wearables
 4. Field testing with Ascent
@@ -36231,34 +36231,34 @@ Examples:
 
 ## Appendix B: Transform Loss Documentation
 
-| HIVE → CoT | Lost Information | Mitigation |
+| PEAT → CoT | Lost Information | Mitigation |
 |------------|------------------|------------|
-| Capability | Rich capability taxonomy | Encode in detail/hive_capabilities extension |
+| Capability | Rich capability taxonomy | Encode in detail/peat_capabilities extension |
 | Hierarchy | Multi-parent relationships | Use CoT link elements for primary parent |
 | CRDT metadata | Vector clocks, merge history | Not needed for TAK display |
-| TTL semantics | HIVE's flexible TTL tiers | Map to CoT stale time |
+| TTL semantics | PEAT's flexible TTL tiers | Map to CoT stale time |
 
-| CoT → HIVE | Lost Information | Mitigation |
+| CoT → PEAT | Lost Information | Mitigation |
 |------------|------------------|------------|
 | Symbology detail | MIL-STD-2525 specifics | Preserve in opaque detail field |
-| Contact chains | CoT contact references | Parse and map to HIVE relationships |
+| Contact chains | CoT contact references | Parse and map to PEAT relationships |
 | Custom detail schemas | Domain-specific extensions | Preserve as opaque JSON |
 
 ---
 
-# ADR-039: HIVE-BTLE Mesh Transport Crate
+# ADR-039: PEAT-BTLE Mesh Transport Crate
 
 **Status**: Proposed  
 **Date**: 2025-12-13  
 **Authors**: Kit Plummer, Claude  
 **Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)  
-**Relates To**: ADR-032 (Pluggable Transport Abstraction), ADR-035 (HIVE-Lite Embedded Nodes), ADR-037 (Resource-Constrained Device Optimization), ADR-017 (P2P Mesh Management), ADR-006 (Security)
+**Relates To**: ADR-032 (Pluggable Transport Abstraction), ADR-035 (PEAT-Lite Embedded Nodes), ADR-037 (Resource-Constrained Device Optimization), ADR-017 (P2P Mesh Management), ADR-006 (Security)
 
 ---
 
 ## Executive Summary
 
-This ADR defines the architecture for `hive-btle`, a Rust crate providing Bluetooth Low Energy mesh networking for HIVE Protocol. The crate enables peer-to-peer discovery, advertisement, and connectivity across resource-constrained devices while supporting HIVE-Lite synchronization. It implements configurable Coded PHYs for throughput/range tradeoffs and targets cross-platform deployment on Linux, Android, macOS, iOS, and Windows across x86 and ARM architectures.
+This ADR defines the architecture for `peat-btle`, a Rust crate providing Bluetooth Low Energy mesh networking for PEAT Protocol. The crate enables peer-to-peer discovery, advertisement, and connectivity across resource-constrained devices while supporting PEAT-Lite synchronization. It implements configurable Coded PHYs for throughput/range tradeoffs and targets cross-platform deployment on Linux, Android, macOS, iOS, and Windows across x86 and ARM architectures.
 
 ---
 
@@ -36266,9 +36266,9 @@ This ADR defines the architecture for `hive-btle`, a Rust crate providing Blueto
 
 ### The BLE Mesh Opportunity
 
-Bluetooth Low Energy represents a critical transport for HIVE's tactical edge scenarios:
+Bluetooth Low Energy represents a critical transport for PEAT's tactical edge scenarios:
 
-| Scenario | BLE Advantage | HIVE Use Case |
+| Scenario | BLE Advantage | PEAT Use Case |
 |----------|---------------|---------------|
 | Wearable sync | Ultra-low power (10mW) | WearTAK on Samsung watches |
 | Sensor mesh | No infrastructure required | Environmental sensors, asset trackers |
@@ -36287,10 +36287,10 @@ Ditto BLE Behavior:
 ├─ Full mesh participation: All devices relay everything
 └─ Result: 3-4 hour battery life (mission failure)
 
-HIVE-BTLE Target:
+PEAT-BTLE Target:
 ├─ Batched sync windows: Radio active <5% of time
 ├─ Hierarchical discovery: Leaf nodes don't scan
-├─ HIVE Lite profile: Minimal state, single parent
+├─ PEAT Lite profile: Minimal state, single parent
 └─ Result: 18-24 hour battery life (mission capable)
 ```
 
@@ -36313,7 +36313,7 @@ Per ADR-032 (Pluggable Transport Abstraction), each transport type requires fund
 
 1. **Cross-Platform**: Single codebase targeting Linux, Android, macOS, iOS, Windows
 2. **Cross-Architecture**: x86_64 and ARM (aarch64, armv7, armv7-a)
-3. **HIVE-Lite Support**: Synchronize minimal CRDT state per ADR-035/037
+3. **PEAT-Lite Support**: Synchronize minimal CRDT state per ADR-035/037
 4. **Coded PHY Support**: Configure LE Coded (S=2, S=8) for range/throughput tradeoffs
 5. **Mesh Topology**: P2P discovery, advertisement, and multi-peer connectivity
 6. **Power Efficiency**: >50% battery improvement over Ditto baseline
@@ -36335,7 +36335,7 @@ Per ADR-032 (Pluggable Transport Abstraction), each transport type requires fund
 ### Crate Structure
 
 ```
-hive-btle/
+peat-btle/
 ├── Cargo.toml
 ├── src/
 │   ├── lib.rs              # Public API, feature gates
@@ -36351,7 +36351,7 @@ hive-btle/
 │   │   ├── mod.rs
 │   │   ├── advertiser.rs   # Advertisement broadcasting
 │   │   ├── scanner.rs      # Passive/active scanning
-│   │   └── beacon.rs       # HIVE beacon encoding/decoding
+│   │   └── beacon.rs       # PEAT beacon encoding/decoding
 │   │
 │   ├── mesh/               # Mesh topology management
 │   │   ├── mod.rs
@@ -36361,11 +36361,11 @@ hive-btle/
 │   │
 │   ├── gatt/               # GATT service definition
 │   │   ├── mod.rs
-│   │   ├── service.rs      # HIVE BLE service
+│   │   ├── service.rs      # PEAT BLE service
 │   │   ├── characteristics.rs
 │   │   └── protocol.rs     # Characteristic read/write protocol
 │   │
-│   ├── sync/               # HIVE-Lite synchronization
+│   ├── sync/               # PEAT-Lite synchronization
 │   │   ├── mod.rs
 │   │   ├── batch.rs        # Batched sync accumulator
 │   │   ├── delta.rs        # Differential sync encoding
@@ -36415,12 +36415,12 @@ hive-btle/
 ```rust
 // File: src/transport.rs
 
-use hive_protocol::transport::{
+use peat_protocol::transport::{
     Transport, TransportCapabilities, TransportType, 
     MessageRequirements, MeshConnection
 };
 
-/// Bluetooth LE transport implementing HIVE Transport trait
+/// Bluetooth LE transport implementing PEAT Transport trait
 pub struct BluetoothLETransport {
     config: BleConfig,
     adapter: BleAdapter,
@@ -36581,10 +36581,10 @@ pub enum PhyStrategy {
 
 use crate::phy::BlePhy;
 
-/// HIVE BLE beacon format (fits in BLE advertisement payload)
+/// PEAT BLE beacon format (fits in BLE advertisement payload)
 #[derive(Debug, Clone)]
-pub struct HiveBeacon {
-    /// HIVE protocol version (4 bits)
+pub struct PeatBeacon {
+    /// PEAT protocol version (4 bits)
     pub version: u8,
     /// Node capabilities flags (12 bits)
     pub capabilities: NodeCapabilities,
@@ -36600,12 +36600,12 @@ pub struct HiveBeacon {
     pub seq_num: u16,
 }
 
-impl HiveBeacon {
+impl PeatBeacon {
     /// Encode to BLE advertisement data (max 31 bytes legacy, 254 bytes extended)
     pub fn encode(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(16);
-        // HIVE service UUID (16 bits)
-        buf.extend_from_slice(&HIVE_SERVICE_UUID_SHORT);
+        // PEAT service UUID (16 bits)
+        buf.extend_from_slice(&PEAT_SERVICE_UUID_SHORT);
         // Packed beacon data (13 bytes)
         buf.push((self.version << 4) | ((self.capabilities.bits() >> 8) as u8 & 0x0F));
         buf.push(self.capabilities.bits() as u8);
@@ -36638,7 +36638,7 @@ impl DiscoveryManager {
             interval_ms: self.config.scan_interval_ms,
             window_ms: self.config.scan_window_ms,
             filter_duplicates: true,
-            filter_uuids: vec![HIVE_SERVICE_UUID],
+            filter_uuids: vec![PEAT_SERVICE_UUID],
         }).await
     }
     
@@ -36650,15 +36650,15 @@ impl DiscoveryManager {
             interval_ms: self.config.scan_interval_ms,
             window_ms: self.config.scan_window_ms,
             filter_duplicates: false,  // Track RSSI changes
-            filter_uuids: vec![HIVE_SERVICE_UUID],
+            filter_uuids: vec![PEAT_SERVICE_UUID],
         }).await
     }
     
     /// Start advertising our beacon
-    pub async fn start_advertising(&self, beacon: &HiveBeacon) -> Result<(), BleError> {
+    pub async fn start_advertising(&self, beacon: &PeatBeacon) -> Result<(), BleError> {
         let adv_data = AdvertisementData {
-            service_uuids: vec![HIVE_SERVICE_UUID],
-            manufacturer_data: Some((HIVE_COMPANY_ID, beacon.encode())),
+            service_uuids: vec![PEAT_SERVICE_UUID],
+            manufacturer_data: Some((PEAT_COMPANY_ID, beacon.encode())),
             connectable: true,
             tx_power_level: Some(self.config.tx_power),
         };
@@ -36676,9 +36676,9 @@ impl DiscoveryManager {
 ```rust
 // File: src/gatt/service.rs
 
-/// HIVE BLE GATT Service definition
+/// PEAT BLE GATT Service definition
 /// 
-/// Service UUID: 0xHIVE (custom 128-bit UUID)
+/// Service UUID: 0xPEAT (custom 128-bit UUID)
 /// 
 /// Characteristics:
 /// - Node Info (read): Node identity and capabilities
@@ -36686,15 +36686,15 @@ impl DiscoveryManager {
 /// - Sync Data (write/indicate): Incoming sync data
 /// - Command (write): Control commands
 /// - Status (read/notify): Connection status
-pub struct HiveGattService {
+pub struct PeatGattService {
     service_uuid: Uuid,
     characteristics: Vec<Characteristic>,
 }
 
-impl HiveGattService {
+impl PeatGattService {
     pub fn new() -> Self {
         Self {
-            service_uuid: HIVE_SERVICE_UUID,
+            service_uuid: PEAT_SERVICE_UUID,
             characteristics: vec![
                 Characteristic {
                     uuid: CHAR_NODE_INFO_UUID,
@@ -36731,7 +36731,7 @@ impl HiveGattService {
     }
 }
 
-/// HIVE Sync Protocol over GATT
+/// PEAT Sync Protocol over GATT
 /// 
 /// Uses chunked transfer for payloads > MTU
 pub struct GattSyncProtocol {
@@ -36790,12 +36790,12 @@ impl GattSyncProtocol {
 }
 ```
 
-#### 5. HIVE-Lite Sync Support
+#### 5. PEAT-Lite Sync Support
 
 ```rust
 // File: src/sync/mod.rs
 
-use hive_lite::{LiteCrdt, LwwRegister, GCounter};
+use peat_lite::{LiteCrdt, LwwRegister, GCounter};
 
 /// Batched sync accumulator for power efficiency
 /// 
@@ -36876,8 +36876,8 @@ impl DeltaEncoder {
     }
 }
 
-/// HIVE-Lite sync state for BLE transport
-pub struct BleHiveLiteSync {
+/// PEAT-Lite sync state for BLE transport
+pub struct BlePeatLiteSync {
     node_id: NodeId,
     parent_id: Option<NodeId>,
     batch_accumulator: BatchAccumulator,
@@ -36888,7 +36888,7 @@ pub struct BleHiveLiteSync {
     parent_vector_clock: VectorClock,
 }
 
-impl BleHiveLiteSync {
+impl BlePeatLiteSync {
     /// Process incoming sync message from parent
     pub async fn receive_sync(&mut self, msg: SyncMessage) -> Result<(), SyncError> {
         // Merge CRDT state
@@ -36944,7 +36944,7 @@ pub enum PowerProfile {
         adv_interval_ms: u32,    // 500ms
         conn_interval_ms: u32,   // 30ms
     },
-    /// Maximum battery life (HIVE Lite default)
+    /// Maximum battery life (PEAT Lite default)
     /// Radio active ~2% of time
     LowPower {
         scan_interval_ms: u32,   // 5000ms
@@ -37032,7 +37032,7 @@ impl RadioScheduler {
 ```rust
 // File: src/security/mod.rs
 
-use hive_security::{SecurityManager, DeviceIdentity};
+use peat_security::{SecurityManager, DeviceIdentity};
 
 /// BLE security configuration
 #[derive(Debug, Clone)]
@@ -37068,7 +37068,7 @@ pub enum PairingMode {
 pub struct BleSecurityManager {
     config: BleSecurityConfig,
     bond_store: Box<dyn BondStore>,
-    hive_security: Arc<dyn SecurityManager>,
+    peat_security: Arc<dyn SecurityManager>,
 }
 
 impl BleSecurityManager {
@@ -37090,8 +37090,8 @@ impl BleSecurityManager {
             }
         }
         
-        // Step 3: HIVE-level authentication
-        let identity = self.hive_security.authenticate_peer(peer_id).await?;
+        // Step 3: PEAT-level authentication
+        let identity = self.peat_security.authenticate_peer(peer_id).await?;
         
         Ok(identity)
     }
@@ -37099,7 +37099,7 @@ impl BleSecurityManager {
     /// Encrypt sync payload (application layer)
     pub fn encrypt_sync_payload(&self, payload: &[u8], recipient: &NodeId) -> Result<Vec<u8>, SecurityError> {
         if self.config.app_layer_encryption {
-            self.hive_security.encrypt(payload, recipient)
+            self.peat_security.encrypt(payload, recipient)
         } else {
             Ok(payload.to_vec())
         }
@@ -37188,13 +37188,13 @@ mod embedded {
 
 ```toml
 [package]
-name = "hive-btle"
+name = "peat-btle"
 version = "0.1.0"
 edition = "2021"
 authors = ["(r)evolve - Revolve Team LLC"]
 license = "Apache-2.0"
-description = "Bluetooth Low Energy mesh transport for HIVE Protocol"
-repository = "https://github.com/revolveteam/hive-protocol"
+description = "Bluetooth Low Energy mesh transport for PEAT Protocol"
+repository = "https://github.com/revolveteam/peat-protocol"
 keywords = ["ble", "bluetooth", "mesh", "sync", "crdt"]
 categories = ["network-programming", "embedded", "hardware-support"]
 
@@ -37242,9 +37242,9 @@ esp-idf-hal = { version = "0.43", optional = true }  # ESP32
 # Embedded
 embedded-hal = { version = "1.0", optional = true }
 
-# HIVE Protocol integration
-hive-protocol = { path = "../hive-protocol" }
-hive-lite = { path = "../hive-lite", optional = true }
+# PEAT Protocol integration
+peat-protocol = { path = "../peat-protocol" }
+peat-lite = { path = "../peat-lite", optional = true }
 
 # Metrics/tracing
 prometheus = { version = "0.13", optional = true }
@@ -37273,14 +37273,14 @@ harness = false
 | Level 3 | Yes | Yes | MITM-protected pairing |
 | Level 4 | Yes | Yes (FIPS) | LE Secure Connections |
 
-**Recommendation**: HIVE-BTLE should require Level 3+ for sync operations.
+**Recommendation**: PEAT-BTLE should require Level 3+ for sync operations.
 
 ### Application-Layer Security
 
 Per ADR-006, BLE transport security is layered:
 
 1. **BLE Pairing**: Establishes link encryption (AES-CCM)
-2. **HIVE PKI**: Verifies device identity via certificates
+2. **PEAT PKI**: Verifies device identity via certificates
 3. **Application Encryption**: ChaCha20-Poly1305 for sync payloads (optional)
 
 ### Threat Model
@@ -37289,7 +37289,7 @@ Per ADR-006, BLE transport security is layered:
 |--------|------------|
 | Eavesdropping | BLE link encryption + optional app-layer encryption |
 | MITM | Numeric comparison or passkey pairing |
-| Replay | Sequence numbers in HIVE beacon/sync messages |
+| Replay | Sequence numbers in PEAT beacon/sync messages |
 | Rogue device | PKI-based device authentication |
 | Battery drain attack | Rate limiting, connection limits |
 
@@ -37348,7 +37348,7 @@ Per ADR-006, BLE transport security is layered:
 - [ ] Parent failover works
 - [ ] Connection limits enforced
 
-### Phase 3: HIVE-Lite Sync (Weeks 6-7)
+### Phase 3: PEAT-Lite Sync (Weeks 6-7)
 
 **Deliverables:**
 1. Batch accumulator
@@ -37422,7 +37422,7 @@ Bluetooth SIG defines a mesh networking standard.
 **Pros**: Standardized, multi-vendor support
 **Cons**: Complex provisioning, no CRDT support, designed for lighting/IoT not tactical
 
-**Decision**: Implement HIVE-native mesh over GATT, not SIG Mesh.
+**Decision**: Implement PEAT-native mesh over GATT, not SIG Mesh.
 
 ### 3. ESP-NOW on ESP32
 
@@ -37442,7 +37442,7 @@ ESP-NOW is Espressif's proprietary peer-to-peer protocol.
 3. [bluer crate](https://docs.rs/bluer/) - Linux BlueZ bindings
 4. [btleplug crate](https://docs.rs/btleplug/) - Cross-platform BLE
 5. ADR-032: Pluggable Transport Abstraction
-6. ADR-035: HIVE-Lite Embedded Nodes
+6. ADR-035: PEAT-Lite Embedded Nodes
 7. ADR-037: Resource-Constrained Device Optimization
 8. ADR-006: Security, Authentication, and Authorization
 
@@ -37452,8 +37452,8 @@ ESP-NOW is Espressif's proprietary peer-to-peer protocol.
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2025-12-13 | Create dedicated hive-btle crate | BLE requires fundamentally different abstractions than IP-based transports |
-| 2025-12-13 | GATT-based sync over SIG Mesh | HIVE needs CRDT sync semantics, not broadcast mesh |
+| 2025-12-13 | Create dedicated peat-btle crate | BLE requires fundamentally different abstractions than IP-based transports |
+| 2025-12-13 | GATT-based sync over SIG Mesh | PEAT needs CRDT sync semantics, not broadcast mesh |
 | 2025-12-13 | Platform abstraction with native implementations | Each platform has different BLE APIs and capabilities |
 | 2025-12-13 | Coded PHY support as feature | Enables range/throughput tradeoffs, requires BLE 5.0 |
 
@@ -37467,19 +37467,19 @@ ESP-NOW is Espressif's proprietary peer-to-peer protocol.
 
 ---
 
-# ADR-040: Nostr Protocol Lessons for HIVE Architecture
+# ADR-040: Nostr Protocol Lessons for PEAT Architecture
 
 **Status**: Proposed  
 **Date**: 2025-12-15  
 **Authors**: Kit Plummer, Claude  
 **Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)  
-**Relates To**: ADR-007 (Automerge Sync Engine), ADR-012 (Schema Definition), ADR-017 (P2P Mesh Management), ADR-021 (Document-Oriented Architecture), ADR-027 (Event Routing), ADR-035 (HIVE-Lite), ADR-039 (BTLE Mesh)
+**Relates To**: ADR-007 (Automerge Sync Engine), ADR-012 (Schema Definition), ADR-017 (P2P Mesh Management), ADR-021 (Document-Oriented Architecture), ADR-027 (Event Routing), ADR-035 (PEAT-Lite), ADR-039 (BTLE Mesh)
 
 ---
 
 ## Executive Summary
 
-This ADR captures architectural lessons from the Nostr protocol and its NIPs (Nostr Implementation Possibilities) that inform HIVE Protocol design. Nostr represents a novel "Relay Architecture" that accepts network centralization as inevitable while preserving user key ownership. HIVE can adapt several Nostr patterns—particularly NIP-29 (Relay-Based Groups), NIP-77 (Negentropy Syncing), and the event-centric data model—while maintaining its distinct "Hierarchical Aggregation Architecture" optimized for contested tactical environments without cloud infrastructure.
+This ADR captures architectural lessons from the Nostr protocol and its NIPs (Nostr Implementation Possibilities) that inform PEAT Protocol design. Nostr represents a novel "Relay Architecture" that accepts network centralization as inevitable while preserving user key ownership. PEAT can adapt several Nostr patterns—particularly NIP-29 (Relay-Based Groups), NIP-77 (Negentropy Syncing), and the event-centric data model—while maintaining its distinct "Hierarchical Aggregation Architecture" optimized for contested tactical environments without cloud infrastructure.
 
 ---
 
@@ -37503,13 +37503,13 @@ Rather than fighting this physics, Nostr accepts it while preserving user sovere
 | **Centralized** | Bigger servers | Unlimited resources | Enterprise SaaS |
 | **Federated** | More servers talk | Servers cooperate | Social platforms (Mastodon) |
 | **Relay (Nostr)** | Dumb pipes + smart clients | Cloud available | Censorship resistance |
-| **Hierarchical (HIVE)** | Decompose by scope | No cloud, hierarchy exists | Tactical coordination |
+| **Hierarchical (PEAT)** | Decompose by scope | No cloud, hierarchy exists | Tactical coordination |
 
-HIVE represents a fourth architecture: **Hierarchical Aggregation**—designed for environments where relays don't exist, peers are bandwidth-constrained, and command hierarchy naturally dictates information flow.
+PEAT represents a fourth architecture: **Hierarchical Aggregation**—designed for environments where relays don't exist, peers are bandwidth-constrained, and command hierarchy naturally dictates information flow.
 
-### Why Nostr Matters for HIVE
+### Why Nostr Matters for PEAT
 
-Despite different target environments, Nostr and HIVE share fundamental challenges:
+Despite different target environments, Nostr and PEAT share fundamental challenges:
 
 1. **Eventual consistency** across disconnected nodes
 2. **Cryptographic identity** independent of any server
@@ -37546,7 +37546,7 @@ Nostr's entire protocol centers on a single object type—the **Event**:
 
 ### NIP-29: Relay-Based Groups
 
-NIP-29 defines closed groups managed by relay authority—directly analogous to HIVE's hierarchical echelons:
+NIP-29 defines closed groups managed by relay authority—directly analogous to PEAT's hierarchical echelons:
 
 **Key Patterns**:
 
@@ -37580,7 +37580,7 @@ NIP-29 defines closed groups managed by relay authority—directly analogous to 
 
 5. **Anti-Replay Protection**: "Relays should prevent late publication (messages published now with a timestamp from days or even hours ago)."
 
-**HIVE Parallel**: The squad leader's node is the "relay" for that squad. The `h` tag maps to hierarchical scope (`squad/alpha-1`). Roles map to military positions (squad leader, team leader).
+**PEAT Parallel**: The squad leader's node is the "relay" for that squad. The `h` tag maps to hierarchical scope (`squad/alpha-1`). Roles map to military positions (squad leader, team leader).
 
 ### NIP-77: Negentropy Syncing
 
@@ -37617,11 +37617,11 @@ NEG-ERR:  [subscription_id, reason]
 - Decoupled from storage structure (tree, array, etc.)
 - Supports frame size limits for constrained transports
 
-**HIVE Application**: Use Negentropy for **event discovery** (what capability reports exist?) before CRDT state sync (what's the current aggregated state?).
+**PEAT Application**: Use Negentropy for **event discovery** (what capability reports exist?) before CRDT state sync (what's the current aggregated state?).
 
 ### Other Relevant NIPs
 
-| NIP | Purpose | HIVE Relevance |
+| NIP | Purpose | PEAT Relevance |
 |-----|---------|----------------|
 | NIP-01 | Basic protocol flow | Event structure, filter syntax |
 | NIP-09 | Event deletion | Tombstone handling (ADR-034) |
@@ -37637,16 +37637,16 @@ NEG-ERR:  [subscription_id, reason]
 
 ## Decision
 
-### Adopt Nostr Patterns for HIVE
+### Adopt Nostr Patterns for PEAT
 
 #### 1. Event Structure Alignment
 
-Adopt a Nostr-compatible event structure as HIVE's base message format:
+Adopt a Nostr-compatible event structure as PEAT's base message format:
 
 ```rust
-/// HIVE Protocol Event (Nostr-compatible base)
+/// PEAT Protocol Event (Nostr-compatible base)
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct HiveEvent {
+pub struct PeatEvent {
     /// SHA-256 hash of serialized event data
     pub id: EventId,  // [u8; 32]
     
@@ -37669,7 +37669,7 @@ pub struct HiveEvent {
     pub sig: Signature,  // [u8; 64]
 }
 
-impl HiveEvent {
+impl PeatEvent {
     /// Compute event ID per Nostr spec
     pub fn compute_id(&self) -> EventId {
         let serialized = json!([
@@ -37690,22 +37690,22 @@ impl HiveEvent {
 }
 ```
 
-#### 2. HIVE Kind Registry
+#### 2. PEAT Kind Registry
 
-Define HIVE-specific event kinds in reserved ranges:
+Define PEAT-specific event kinds in reserved ranges:
 
 ```rust
-/// HIVE Protocol Kind Registry
+/// PEAT Protocol Kind Registry
 /// 
 /// Ranges:
 /// - 0-9999: Nostr standard kinds (reserved)
-/// - 10000-19999: HIVE core protocol
-/// - 20000-29999: HIVE integrations (TAK, Link 16, etc.)
+/// - 10000-19999: PEAT core protocol
+/// - 20000-29999: PEAT integrations (TAK, Link 16, etc.)
 /// - 30000-39999: Replaceable events (Nostr standard)
 /// - 40000-49999: Application-specific (user-defined)
 
 pub mod kinds {
-    // HIVE Core Protocol (10000-10999)
+    // PEAT Core Protocol (10000-10999)
     pub const CAPABILITY_REPORT: u16 = 10001;
     pub const CAPABILITY_AGGREGATE: u16 = 10002;
     pub const COMMAND_INTENT: u16 = 10003;
@@ -37715,18 +37715,18 @@ pub mod kinds {
     pub const SYNC_REQUEST: u16 = 10007;
     pub const SYNC_RESPONSE: u16 = 10008;
     
-    // HIVE Coordination (10100-10199)
+    // PEAT Coordination (10100-10199)
     pub const TASK_ASSIGNMENT: u16 = 10100;
     pub const TASK_STATUS: u16 = 10101;
     pub const RESOURCE_REQUEST: u16 = 10102;
     pub const RESOURCE_OFFER: u16 = 10103;
     
-    // HIVE AI/ML (10200-10299)
+    // PEAT AI/ML (10200-10299)
     pub const MODEL_CAPABILITY: u16 = 10200;
     pub const INFERENCE_REQUEST: u16 = 10201;
     pub const INFERENCE_RESULT: u16 = 10202;
     
-    // HIVE Security (10300-10399)
+    // PEAT Security (10300-10399)
     pub const KEY_ANNOUNCEMENT: u16 = 10300;
     pub const KEY_ROTATION: u16 = 10301;
     pub const ACCESS_GRANT: u16 = 10302;
@@ -37747,7 +37747,7 @@ pub mod kinds {
 Adopt the `h` tag pattern for hierarchical scoping:
 
 ```rust
-/// HIVE Hierarchical Scope Tags
+/// PEAT Hierarchical Scope Tags
 /// 
 /// Tag structure: ["h", "<echelon>/<unit-id>"]
 /// Examples:
@@ -37781,7 +37781,7 @@ impl HierarchyTag {
 }
 
 /// Filter events by hierarchical scope
-pub fn filter_by_scope(events: &[HiveEvent], scope: &HierarchyTag) -> Vec<&HiveEvent> {
+pub fn filter_by_scope(events: &[PeatEvent], scope: &HierarchyTag) -> Vec<&PeatEvent> {
     events.iter()
         .filter(|e| e.tags.iter().any(|t| {
             HierarchyTag::from_tag(t)
@@ -37828,7 +37828,7 @@ impl PreviousTag {
 }
 
 /// Builder for events with causal references
-impl HiveEvent {
+impl PeatEvent {
     pub fn with_previous(mut self, seen_events: &[EventId]) -> Self {
         let prev = PreviousTag::from_events(seen_events);
         self.tags.push(prev.to_tag());
@@ -37911,7 +37911,7 @@ impl NegentropySync {
 }
 
 /// Combined sync strategy
-pub struct HiveSyncEngine {
+pub struct PeatSyncEngine {
     /// Negentropy for event discovery
     negentropy: NegentropySync,
     
@@ -37919,7 +37919,7 @@ pub struct HiveSyncEngine {
     automerge: AutomergeSync,
 }
 
-impl HiveSyncEngine {
+impl PeatSyncEngine {
     /// Full sync sequence after partition
     pub async fn full_sync(&self, peer: NodeId) -> Result<SyncReport, SyncError> {
         // Phase 1: Event discovery via Negentropy
@@ -38018,7 +38018,7 @@ impl EventFilter {
     }
     
     /// Check if event matches filter
-    pub fn matches(&self, event: &HiveEvent) -> bool {
+    pub fn matches(&self, event: &PeatEvent) -> bool {
         // IDs filter
         if let Some(ids) = &self.ids {
             if !ids.contains(&event.id) {
@@ -38078,9 +38078,9 @@ impl EventFilter {
 
 ## Architectural Comparison
 
-### Nostr vs HIVE: Where They Diverge
+### Nostr vs PEAT: Where They Diverge
 
-| Aspect | Nostr | HIVE |
+| Aspect | Nostr | PEAT |
 |--------|-------|------|
 | **Problem Domain** | Censorship-resistant social | Real-time tactical coordination |
 | **Network Assumption** | Cloud relays always available | No cloud, contested comms |
@@ -38105,11 +38105,11 @@ The architectures address different constraints:
             │                           │
       ┌─────┴─────┐               ┌─────┴─────┐
       │           │               │           │
-   Nostr      Federation      HIVE-Full   HIVE-Lite
+   Nostr      Federation      PEAT-Full   PEAT-Lite
    Relays     (Mastodon)      (Platoon+)  (Wearables)
 ```
 
-HIVE's hierarchical aggregation is what Nostr would need if relays disappeared and nodes had to form their own coordination structure.
+PEAT's hierarchical aggregation is what Nostr would need if relays disappeared and nodes had to form their own coordination structure.
 
 ---
 
@@ -38117,8 +38117,8 @@ HIVE's hierarchical aggregation is what Nostr would need if relays disappeared a
 
 ### Phase 1: Event Format Adoption (Immediate)
 
-1. Update `hive-core` event structures to Nostr compatibility
-2. Implement kind registry with HIVE-specific ranges
+1. Update `peat-core` event structures to Nostr compatibility
+2. Implement kind registry with PEAT-specific ranges
 3. Add `h` tag parsing and scope filtering
 4. Validate events with Schnorr signatures
 
@@ -38126,7 +38126,7 @@ HIVE's hierarchical aggregation is what Nostr would need if relays disappeared a
 
 1. Integrate `rust-negentropy` crate
 2. Implement `NegentropySync` layer
-3. Add to `HiveSyncEngine` as discovery phase
+3. Add to `PeatSyncEngine` as discovery phase
 4. Benchmark vs pure Automerge sync
 
 ### Phase 3: Filter Optimization (Q2 2026)
@@ -38139,9 +38139,9 @@ HIVE's hierarchical aggregation is what Nostr would need if relays disappeared a
 ### Phase 4: Interoperability Testing (Q3 2026)
 
 1. Test Nostr client connectivity (read-only)
-2. Evaluate hybrid Nostr/HIVE scenarios
+2. Evaluate hybrid Nostr/PEAT scenarios
 3. Document interop limitations
-4. Consider Nostr relay mode for HIVE nodes
+4. Consider Nostr relay mode for PEAT nodes
 
 ---
 
@@ -38198,7 +38198,7 @@ HIVE's hierarchical aggregation is what Nostr would need if relays disappeared a
 - ADR-021: Document-Oriented Architecture
 - ADR-027: Event Routing and Aggregation Protocol
 - ADR-034: Record Deletion and Tombstone Management
-- ADR-035: HIVE-Lite Embedded Nodes
+- ADR-035: PEAT-Lite Embedded Nodes
 
 ---
 
@@ -38208,7 +38208,7 @@ Per Nostr specification, event ID is computed from UTF-8 JSON serialization:
 
 ```rust
 /// Canonical event serialization for ID computation
-fn serialize_for_id(event: &HiveEvent) -> String {
+fn serialize_for_id(event: &PeatEvent) -> String {
     // Array format: [0, pubkey, created_at, kind, tags, content]
     let arr = json!([
         0,
@@ -38224,7 +38224,7 @@ fn serialize_for_id(event: &HiveEvent) -> String {
 }
 
 /// Compute event ID
-fn compute_event_id(event: &HiveEvent) -> [u8; 32] {
+fn compute_event_id(event: &PeatEvent) -> [u8; 32] {
     let serialized = serialize_for_id(event);
     sha256(serialized.as_bytes())
 }
@@ -38255,9 +38255,9 @@ Fingerprint computation:
 
 ---
 
-## Appendix C: HIVE vs Nostr Tag Mapping
+## Appendix C: PEAT vs Nostr Tag Mapping
 
-| Nostr Tag | HIVE Usage | Example |
+| Nostr Tag | PEAT Usage | Example |
 |-----------|------------|---------|
 | `e` | Reference to event | `["e", "<event-id>"]` |
 | `p` | Reference to pubkey/node | `["p", "<node-pubkey>"]` |
@@ -38266,18 +38266,18 @@ Fingerprint computation:
 | `d` | Unique identifier (replaceable) | `["d", "capability-summary"]` |
 | `previous` | Causal reference | `["previous", "<id-prefix>", ...]` |
 | `expiration` | TTL timestamp | `["expiration", "1702656000"]` |
-| `echelon` | HIVE-specific: echelon level | `["echelon", "squad"]` |
-| `capability` | HIVE-specific: capability type | `["capability", "isr", "sigint"]` |
+| `echelon` | PEAT-specific: echelon level | `["echelon", "squad"]` |
+| `capability` | PEAT-specific: capability type | `["capability", "isr", "sigint"]` |
 
 ---
 
 ## Appendix D: Community Reception Analysis
 
-The [Hacker News discussion](https://news.ycombinator.com/item?id=46225803) (December 2025) of Brander's article surfaced several critiques that validate HIVE's architectural choices.
+The [Hacker News discussion](https://news.ycombinator.com/item?id=46225803) (December 2025) of Brander's article surfaced several critiques that validate PEAT's architectural choices.
 
 ### Key Critiques and Responses
 
-| Critique | Nostr Response | HIVE Response |
+| Critique | Nostr Response | PEAT Response |
 |----------|----------------|---------------|
 | Centralization inevitable | Accept it, users choose relays | Structure it via designed hierarchy |
 | "Relays don't actually relay" | Clients push to multiple relays | Echelon nodes actively aggregate and forward |
@@ -38292,43 +38292,43 @@ The [Hacker News discussion](https://news.ycombinator.com/item?id=46225803) (Dec
 **On relays not relaying** (treyd):
 > "If you and another party aren't using the same relay, there is 0 way for you to interact... The protocol explicitly forbids relays from forwarding to each other."
 
-*HIVE insight*: This validates active coordination. Nostr punts message flow to clients; HIVE explicitly defines information flow through echelon nodes.
+*PEAT insight*: This validates active coordination. Nostr punts message flow to clients; PEAT explicitly defines information flow through echelon nodes.
 
 **On inevitable centralization** (treyd):
 > "Email is currently more decentralized than Nostr is in practice."
 
-*HIVE insight*: Networks centralize due to physics. The question is whether centralization is emergent/unplanned (Nostr) or designed/accountable (HIVE hierarchy).
+*PEAT insight*: Networks centralize due to physics. The question is whether centralization is emergent/unplanned (Nostr) or designed/accountable (PEAT hierarchy).
 
 **On protocol simplicity vs robustness** (treyd):
 > "Nostr is a very simple protocol that could have been invented in essence in 1995. There's a reason it wasn't invented until recently, because it's difficult to build *robust* protocols with good guarantees about discoverability and reliability with a foundation that is as limited as it is."
 
-*HIVE insight*: This captures the fundamental tradeoff. Nostr optimizes for simplicity in connected environments. HIVE accepts complexity cost to provide robustness guarantees in contested environments.
+*PEAT insight*: This captures the fundamental tradeoff. Nostr optimizes for simplicity in connected environments. PEAT accepts complexity cost to provide robustness guarantees in contested environments.
 
 **On key management** (rglullis):
 > "Nostr will always be a fringe network. The normies do not want to manage their own keys... What happens if you lose the cryptographic key to your nostr account? Who do you call for help?"
 
-*HIVE insight*: Less relevant for military/industrial use cases where devices have HSMs, key provisioning is part of deployment, and recovery involves issuing new credentials through existing C2. Trained operators, not "normies."
+*PEAT insight*: Less relevant for military/industrial use cases where devices have HSMs, key provisioning is part of deployment, and recovery involves issuing new credentials through existing C2. Trained operators, not "normies."
 
 **On moderation as sewage filtering** (bflesch):
 > "Their statement underlines the fact that nostr is a stream of dirty sewage and they want users to submit their valuable user-created content into this sewage."
 
-*HIVE insight*: Military hierarchies *are* moderation systems. Classification levels, need-to-know, commander's authority—content moderation by another name. Hierarchical scoping provides natural boundaries.
+*PEAT insight*: Military hierarchies *are* moderation systems. Classification levels, need-to-know, commander's authority—content moderation by another name. Hierarchical scoping provides natural boundaries.
 
 **On incentives** (wmf):
 > "I'm also not aware of any incentives for the relay operators either."
 
-*HIVE insight*: Military systems don't need economic incentives—they have mission requirements. The squad leader runs the squad node because that's their job, not because they get paid per message.
+*PEAT insight*: Military systems don't need economic incentives—they have mission requirements. The squad leader runs the squad node because that's their job, not because they get paid per message.
 
 ### The Outbox Model Defense
 
 Nostr advocates (shark_laser) cite the "outbox model" as solving discovery:
 > "You post to your own preferred relays, as well as to the preferred relays of others who are involved in the conversation, as well as to a couple of global relays for easy discoverability."
 
-This parallels HIVE's capability advertisement (ADR-018)—nodes announce authoritative data sources. The difference: HIVE aggregates at each echelon, so consumers query the squad node rather than every squad member.
+This parallels PEAT's capability advertisement (ADR-018)—nodes announce authoritative data sources. The difference: PEAT aggregates at each echelon, so consumers query the squad node rather than every squad member.
 
 ### Strategic Positioning
 
-| Dimension | Nostr | HIVE |
+| Dimension | Nostr | PEAT |
 |-----------|-------|------|
 | Optimization target | Simplicity | Robustness |
 | Environment assumption | Cloud available | Contested, disconnected |
@@ -38337,7 +38337,7 @@ This parallels HIVE's capability advertisement (ADR-018)—nodes announce author
 | Moderation model | User filtering | Hierarchical scope (OPSEC) |
 | Incentive model | Economic (Zaps) | Mission requirement |
 
-**Summary**: Nostr and HIVE solve different problems. Nostr provides censorship resistance for social media in connected environments. HIVE provides coordination robustness for human-machine teams in contested environments. The HN critiques of Nostr largely don't apply to HIVE's domain, while validating HIVE's choice to accept architectural complexity for operational guarantees.
+**Summary**: Nostr and PEAT solve different problems. Nostr provides censorship resistance for social media in connected environments. PEAT provides coordination robustness for human-machine teams in contested environments. The HN critiques of Nostr largely don't apply to PEAT's domain, while validating PEAT's choice to accept architectural complexity for operational guarantees.
 
 ---
 
@@ -38356,13 +38356,13 @@ This parallels HIVE's capability advertisement (ADR-018)—nodes announce author
 **Date**: 2024-12-22
 **Authors**: Kit Plummer, Claude
 **Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)
-**Relates To**: ADR-035 (HIVE-Lite Embedded Nodes), ADR-039 (HIVE-BTLE Mesh Transport), ADR-032 (Pluggable Transport Abstraction), ADR-007 (Automerge Sync Engine), ADR-011 (Ditto vs AutomergeIroh)
+**Relates To**: ADR-035 (PEAT-Lite Embedded Nodes), ADR-039 (PEAT-BTLE Mesh Transport), ADR-032 (Pluggable Transport Abstraction), ADR-007 (Automerge Sync Engine), ADR-011 (Ditto vs AutomergeIroh)
 
 ---
 
 ## Executive Summary
 
-This ADR defines how HIVE supports multiple simultaneous transports (AutomergeIroh, hive-btle, future transports) and how embedded devices integrate with full HIVE nodes. The key insight is that Automerge is too resource-intensive for embedded targets (ESP32, Pico), requiring a **gateway translation architecture** where full HIVE nodes translate between Automerge documents and hive-btle's lightweight CRDT format.
+This ADR defines how PEAT supports multiple simultaneous transports (AutomergeIroh, peat-btle, future transports) and how embedded devices integrate with full PEAT nodes. The key insight is that Automerge is too resource-intensive for embedded targets (ESP32, Pico), requiring a **gateway translation architecture** where full PEAT nodes translate between Automerge documents and peat-btle's lightweight CRDT format.
 
 ---
 
@@ -38370,22 +38370,22 @@ This ADR defines how HIVE supports multiple simultaneous transports (AutomergeIr
 
 ### The Multi-Transport Reality
 
-HIVE must operate across diverse network conditions:
+PEAT must operate across diverse network conditions:
 
 | Scenario | Transport | Bandwidth | Typical Nodes |
 |----------|-----------|-----------|---------------|
 | Full connectivity | Iroh (QUIC/UDP) | High (Mbps) | Phones, servers, laptops |
-| BLE mesh | hive-btle | Low (Kbps) | Wearables, sensors, embedded |
+| BLE mesh | peat-btle | Low (Kbps) | Wearables, sensors, embedded |
 | Degraded network | Either/both | Variable | All nodes adapt |
 | Air-gapped | BLE only | Very low | Field operations |
 
-A phone running HIVE may have both transports active simultaneously:
+A phone running PEAT may have both transports active simultaneously:
 - WiFi/cellular: Syncing with cloud/HQ via Iroh
-- BLE: Syncing with nearby embedded sensors via hive-btle
+- BLE: Syncing with nearby embedded sensors via peat-btle
 
 ### The Automerge Problem
 
-Per ADR-007 and ADR-011, HIVE's primary sync engine is AutomergeIroh - Automerge CRDTs synced via Iroh networking. However:
+Per ADR-007 and ADR-011, PEAT's primary sync engine is AutomergeIroh - Automerge CRDTs synced via Iroh networking. However:
 
 **Automerge Resource Requirements:**
 - Binary size: ~2-3MB compiled
@@ -38403,11 +38403,11 @@ Per ADR-007 and ADR-011, HIVE's primary sync engine is AutomergeIroh - Automerge
 
 ### Current Backend Situation
 
-HIVE currently supports two sync backends:
+PEAT currently supports two sync backends:
 1. **AutomergeIroh** - Open source, Automerge CRDTs + Iroh transport
 2. **Ditto** - Commercial, proprietary CRDTs + proprietary transport
 
-hive-btle introduces a third CRDT implementation (GCounter, LWW-Register, etc.) optimized for embedded. This creates a potential fragmentation problem.
+peat-btle introduces a third CRDT implementation (GCounter, LWW-Register, etc.) optimized for embedded. This creates a potential fragmentation problem.
 
 ---
 
@@ -38415,11 +38415,11 @@ hive-btle introduces a third CRDT implementation (GCounter, LWW-Register, etc.) 
 
 ### Architecture: Gateway Translation Model
 
-Full HIVE nodes act as **gateways** that translate between Automerge documents and hive-btle's lightweight format:
+Full PEAT nodes act as **gateways** that translate between Automerge documents and peat-btle's lightweight format:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
-│                        Full HIVE Node (Phone/Server)                        │
+│                        Full PEAT Node (Phone/Server)                        │
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
 │  │                         AutomergeIroh                                 │  │
 │  │              (Full Automerge documents, sync via Iroh)                │  │
@@ -38427,12 +38427,12 @@ Full HIVE nodes act as **gateways** that translate between Automerge documents a
 │                                    ↕                                        │
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
 │  │                      Translation Layer                                │  │
-│  │         (Maps hive-btle primitives ↔ Automerge document fields)       │  │
-│  │                      OWNED BY HIVE REPO                               │  │
+│  │         (Maps peat-btle primitives ↔ Automerge document fields)       │  │
+│  │                      OWNED BY PEAT REPO                               │  │
 │  └──────────────────────────────────────────────────────────────────────┘  │
 │                                    ↕                                        │
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │                          hive-btle                                    │  │
+│  │                          peat-btle                                    │  │
 │  │              (BLE transport + lightweight CRDTs for embedded)         │  │
 │  └──────────────────────────────────────────────────────────────────────┘  │
 └────────────────────────────────────────────────────────────────────────────┘
@@ -38440,7 +38440,7 @@ Full HIVE nodes act as **gateways** that translate between Automerge documents a
 ┌────────────────────────────────────────────────────────────────────────────┐
 │                      Embedded Node (ESP32/Pico)                             │
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │                          hive-btle                                    │  │
+│  │                          peat-btle                                    │  │
 │  │          (BLE transport + lightweight CRDTs, standalone)              │  │
 │  └──────────────────────────────────────────────────────────────────────┘  │
 └────────────────────────────────────────────────────────────────────────────┘
@@ -38448,38 +38448,38 @@ Full HIVE nodes act as **gateways** that translate between Automerge documents a
 
 ### Key Principles
 
-#### 1. Schema Ownership Lives in HIVE
+#### 1. Schema Ownership Lives in PEAT
 
-The canonical schema definition lives in the HIVE repository, not in hive-btle:
+The canonical schema definition lives in the PEAT repository, not in peat-btle:
 
 | Component | Owner | Description |
 |-----------|-------|-------------|
-| **Schema definition** | HIVE repo | Canonical field names, types, semantics |
-| **Automerge representation** | HIVE repo | Full documents for std nodes |
-| **Lightweight representation** | hive-btle | Embedded-friendly projection |
-| **Translation logic** | HIVE repo | Maps between representations |
-| **BLE transport** | hive-btle | Document-agnostic byte transport |
+| **Schema definition** | PEAT repo | Canonical field names, types, semantics |
+| **Automerge representation** | PEAT repo | Full documents for std nodes |
+| **Lightweight representation** | peat-btle | Embedded-friendly projection |
+| **Translation logic** | PEAT repo | Maps between representations |
+| **BLE transport** | peat-btle | Document-agnostic byte transport |
 
-#### 2. hive-btle is Transport + Lightweight CRDTs
+#### 2. peat-btle is Transport + Lightweight CRDTs
 
-hive-btle provides two things:
+peat-btle provides two things:
 1. **BLE Transport**: Discovery, connections, GATT, chunking - document agnostic
-2. **Lightweight CRDTs**: GCounter, LWW-Register, Peripheral - the "embedded projection" of HIVE schema
+2. **Lightweight CRDTs**: GCounter, LWW-Register, Peripheral - the "embedded projection" of PEAT schema
 
 The lightweight CRDTs exist because embedded devices can't run Automerge. They represent the **same semantic data** as the full schema, just in a format that fits in 256KB RAM.
 
-#### 3. hive-btle Can Stand Alone
+#### 3. peat-btle Can Stand Alone
 
-hive-btle must be usable independently for:
-- Pure embedded deployments (ESP32 mesh without any full HIVE nodes)
+peat-btle must be usable independently for:
+- Pure embedded deployments (ESP32 mesh without any full PEAT nodes)
 - Open source release (standalone BLE mesh library)
 - Testing and development
 
-When used standalone, the lightweight CRDTs ARE the schema. When integrated with full HIVE, they become a projection that gets translated.
+When used standalone, the lightweight CRDTs ARE the schema. When integrated with full PEAT, they become a projection that gets translated.
 
 #### 4. BLE-First Schema Design
 
-HIVE's schema should be designed with BLE constraints in mind:
+PEAT's schema should be designed with BLE constraints in mind:
 
 ```
 DESIGN PRINCIPLE: If it works well on BLE, it works everywhere.
@@ -38494,15 +38494,15 @@ Benefits:
 
 ### Integration Points
 
-#### Full HIVE Node Receiving from Embedded
+#### Full PEAT Node Receiving from Embedded
 
 ```rust
-// In HIVE repo (not hive-btle)
+// In PEAT repo (not peat-btle)
 impl TranslationLayer {
     /// Receive lightweight document from BLE, update Automerge
     fn on_ble_document_received(&mut self, data: &[u8]) -> Result<()> {
-        // Decode hive-btle format
-        let lite_doc = hive_btle::HiveDocument::decode(data)?;
+        // Decode peat-btle format
+        let lite_doc = peat_btle::PeatDocument::decode(data)?;
 
         // Extract fields and map to Automerge document
         let node_id = lite_doc.node_id;
@@ -38539,20 +38539,20 @@ impl TranslationLayer {
 }
 ```
 
-#### Full HIVE Node Sending to Embedded
+#### Full PEAT Node Sending to Embedded
 
 ```rust
-// In HIVE repo (not hive-btle)
+// In PEAT repo (not peat-btle)
 impl TranslationLayer {
     /// Build lightweight document from Automerge for BLE broadcast
     fn build_ble_document(&self) -> Vec<u8> {
-        let mut doc = hive_btle::HiveDocument::new(self.node_id);
+        let mut doc = peat_btle::PeatDocument::new(self.node_id);
 
         // Extract relevant fields from Automerge
         // Only include what embedded nodes need
         if let Some(emergency_ts) = self.automerge_doc.get("/alerts/active/emergency") {
             doc.peripheral.as_mut().unwrap().set_event(
-                hive_btle::EventType::Emergency,
+                peat_btle::EventType::Emergency,
                 emergency_ts
             );
         }
@@ -38564,11 +38564,11 @@ impl TranslationLayer {
 
 ### Transport Abstraction
 
-For true multi-transport support, HIVE should have a transport abstraction:
+For true multi-transport support, PEAT should have a transport abstraction:
 
 ```rust
-// In HIVE repo
-trait HiveTransport {
+// In PEAT repo
+trait PeatTransport {
     /// Send data to a peer
     async fn send(&self, peer_id: &NodeId, data: &[u8]) -> Result<()>;
 
@@ -38584,11 +38584,11 @@ trait HiveTransport {
 
 // Implementations
 struct IrohTransport { /* AutomergeIroh */ }
-struct BleTransport { /* hive-btle */ }
+struct BleTransport { /* peat-btle */ }
 
 // Transport manager selects best transport per peer
 struct TransportManager {
-    transports: Vec<Box<dyn HiveTransport>>,
+    transports: Vec<Box<dyn PeatTransport>>,
 }
 
 impl TransportManager {
@@ -38613,7 +38613,7 @@ When network conditions change:
 |----------|----------|
 | Full connectivity | Use Iroh for full Automerge sync |
 | WiFi fails, BLE available | Fall back to BLE, sync lightweight format |
-| Only BLE available | Full HIVE nodes act as BLE mesh participants |
+| Only BLE available | Full PEAT nodes act as BLE mesh participants |
 | BLE to embedded | Translate and sync lightweight format |
 
 The translation layer ensures data flows correctly regardless of which transport is active.
@@ -38625,16 +38625,16 @@ The translation layer ensures data flows correctly regardless of which transport
 ### Positive
 
 1. **Embedded devices can participate** - No Automerge requirement
-2. **Clean separation** - hive-btle is standalone and useful independently
-3. **Single source of truth** - Schema owned by HIVE, not duplicated
+2. **Clean separation** - peat-btle is standalone and useful independently
+3. **Single source of truth** - Schema owned by PEAT, not duplicated
 4. **Graceful degradation** - BLE works when WiFi fails
-5. **OSS-friendly** - hive-btle can be released standalone
+5. **OSS-friendly** - peat-btle can be released standalone
 
 ### Negative
 
 1. **Translation complexity** - Must maintain mapping between formats
 2. **Potential data loss** - Lightweight format is a subset of full schema
-3. **Two CRDT implementations** - Automerge + hive-btle lightweight
+3. **Two CRDT implementations** - Automerge + peat-btle lightweight
 4. **Testing surface** - Must test translation correctness
 
 ### Neutral
@@ -38646,7 +38646,7 @@ The translation layer ensures data flows correctly regardless of which transport
 
 ## Schema Mapping Guidelines
 
-When designing HIVE schema, consider BLE representation:
+When designing PEAT schema, consider BLE representation:
 
 | Full Schema Field | BLE Representation | Notes |
 |-------------------|-------------------|-------|
@@ -38666,25 +38666,25 @@ When designing HIVE schema, consider BLE representation:
 
 ### Phase 1: Document Architecture (This ADR)
 - [x] Define gateway translation model
-- [x] Clarify ownership (schema in HIVE, transport in hive-btle)
+- [x] Clarify ownership (schema in PEAT, transport in peat-btle)
 - [x] Document integration points
 
-### Phase 2: hive-btle Standalone (Current Work)
+### Phase 2: peat-btle Standalone (Current Work)
 - [x] Lightweight CRDTs (GCounter, Peripheral)
-- [x] HiveDocument wire format
+- [x] PeatDocument wire format
 - [x] PeerManager, DocumentSync
-- [ ] HiveMesh facade
+- [ ] PeatMesh facade
 - [ ] Platform bindings (UniFFI, JNI)
 
-### Phase 3: HIVE Translation Layer (Future)
+### Phase 3: PEAT Translation Layer (Future)
 - [ ] Define schema-to-lightweight mapping
-- [ ] Implement TranslationLayer in HIVE repo
+- [ ] Implement TranslationLayer in PEAT repo
 - [ ] Integrate with AutomergeIroh documents
 
 ### Phase 4: Transport Abstraction (Future)
-- [ ] Define HiveTransport trait
+- [ ] Define PeatTransport trait
 - [ ] Implement for Iroh
-- [ ] Implement for hive-btle
+- [ ] Implement for peat-btle
 - [ ] TransportManager with fallback logic
 
 ---
@@ -38694,8 +38694,8 @@ When designing HIVE schema, consider BLE representation:
 - ADR-007: Automerge-Based Sync Engine
 - ADR-011: Ditto vs AutomergeIroh Analysis
 - ADR-032: Pluggable Transport Abstraction
-- ADR-035: HIVE-Lite Embedded Nodes
-- ADR-039: HIVE-BTLE Mesh Transport Crate
+- ADR-035: PEAT-Lite Embedded Nodes
+- ADR-039: PEAT-BTLE Mesh Transport Crate
 - [Automerge](https://automerge.org/) - CRDT library
 - [Iroh](https://iroh.computer/) - P2P networking
 
@@ -38706,8 +38706,8 @@ When designing HIVE schema, consider BLE representation:
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2024-12-22 | Gateway translation model | Automerge too heavy for ESP32, need lightweight alternative |
-| 2024-12-22 | Schema ownership in HIVE | Single source of truth, hive-btle is projection |
-| 2024-12-22 | hive-btle standalone capability | OSS release, pure embedded deployments |
+| 2024-12-22 | Schema ownership in PEAT | Single source of truth, peat-btle is projection |
+| 2024-12-22 | peat-btle standalone capability | OSS release, pure embedded deployments |
 | 2024-12-22 | BLE-first schema design | If it works on BLE, it works everywhere |
 
 ---
@@ -38729,7 +38729,7 @@ When designing HIVE schema, consider BLE representation:
 
 ### Problem Statement
 
-HIVE Protocol uses CRDT-based synchronization (Automerge over Iroh/QUIC) for data consistency across mesh networks. This approach provides:
+PEAT Protocol uses CRDT-based synchronization (Automerge over Iroh/QUIC) for data consistency across mesh networks. This approach provides:
 - Conflict-free eventual consistency
 - Automatic merge of concurrent updates
 - Reliable, ordered delivery via QUIC
@@ -39092,7 +39092,7 @@ Bypass messages use a compact header for identification and TTL:
 /// Bypass message header (12 bytes)
 #[repr(C, packed)]
 struct BypassHeader {
-    /// Magic number (0xHIVE)
+    /// Magic number (0xPEAT)
     magic: [u8; 4],
 
     /// Message type/collection hash (4 bytes)
@@ -39109,7 +39109,7 @@ struct BypassHeader {
 }
 
 impl BypassHeader {
-    const MAGIC: [u8; 4] = [0x48, 0x49, 0x56, 0x45]; // "HIVE"
+    const MAGIC: [u8; 4] = [0x48, 0x49, 0x56, 0x45]; // "PEAT"
 
     fn is_valid(&self) -> bool {
         self.magic == Self::MAGIC
@@ -39273,7 +39273,7 @@ Sender                                           Receiver
 ### YAML Configuration
 
 ```yaml
-# hive-config.yaml
+# peat-config.yaml
 
 bypass_channel:
   enabled: true
@@ -39466,7 +39466,7 @@ Two data paths increase debugging complexity.
 
 ### Problem Statement
 
-HIVE Protocol's primary interface is via **direct Rust API integration** using the `hive-protocol` and `hive-ffi` crates. However, many potential consumers cannot integrate at this level:
+PEAT Protocol's primary interface is via **direct Rust API integration** using the `peat-protocol` and `peat-ffi` crates. However, many potential consumers cannot integrate at this level:
 
 1. **Legacy C2 Systems**: Existing command and control systems built on older stacks
 2. **Web Dashboards**: Browser-based monitoring and control interfaces
@@ -39499,11 +39499,11 @@ pub trait TakTransport: Send + Sync {
 }
 ```
 
-This pattern works for **outbound integration** (HIVE → TAK). We need the inverse for **consumer interfaces** (External Systems → HIVE).
+This pattern works for **outbound integration** (PEAT → TAK). We need the inverse for **consumer interfaces** (External Systems → PEAT).
 
 ### Existing Infrastructure
 
-The `hive-transport` crate already provides basic HTTP/REST endpoints:
+The `peat-transport` crate already provides basic HTTP/REST endpoints:
 
 ```
 GET /api/v1/status - Node status
@@ -39523,7 +39523,7 @@ This needs extension for:
 
 ### Consumer Interface Adapter Architecture
 
-We will implement **Consumer Interface Adapters** as a facade layer over the HIVE Protocol API, supporting multiple transport protocols with unified semantics.
+We will implement **Consumer Interface Adapters** as a facade layer over the PEAT Protocol API, supporting multiple transport protocols with unified semantics.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -39545,7 +39545,7 @@ We will implement **Consumer Interface Adapters** as a facade layer over the HIV
 ├───────────────────────────┼──────────────────────────────────────┤
 │                           ▼                                      │
 │                  ┌────────────────┐                              │
-│                  │ hive-protocol  │                              │
+│                  │ peat-protocol  │                              │
 │                  │     API        │                              │
 │                  └────────────────┘                              │
 │                                                                  │
@@ -39713,7 +39713,7 @@ WebSocket provides bidirectional streaming for real-time applications:
 pub struct WebSocketAdapter {
     config: WebSocketConfig,
     sessions: Arc<RwLock<HashMap<String, Arc<WebSocketSession>>>>,
-    hive: Arc<HiveClient>,
+    peat: Arc<PeatClient>,
     metrics: Arc<AdapterMetrics>,
     running: AtomicBool,
     shutdown: broadcast::Sender<()>,
@@ -39744,10 +39744,10 @@ pub struct WebSocketConfig {
 }
 
 impl WebSocketAdapter {
-    pub fn new(config: WebSocketConfig, hive: Arc<HiveClient>) -> Self {
+    pub fn new(config: WebSocketConfig, peat: Arc<PeatClient>) -> Self {
         Self {
             sessions: Arc::new(RwLock::new(HashMap::new())),
-            hive,
+            peat,
             metrics: Arc::new(AdapterMetrics::default()),
             running: AtomicBool::new(false),
             shutdown: broadcast::channel(1).0,
@@ -39767,7 +39767,7 @@ impl ConsumerAdapter for WebSocketAdapter {
         self.running.store(true, Ordering::SeqCst);
 
         let sessions = self.sessions.clone();
-        let hive = self.hive.clone();
+        let peat = self.peat.clone();
         let metrics = self.metrics.clone();
         let config = self.config.clone();
         let mut shutdown = self.shutdown.subscribe();
@@ -39779,7 +39779,7 @@ impl ConsumerAdapter for WebSocketAdapter {
                         match result {
                             Ok((stream, addr)) => {
                                 let session = WebSocketSession::new(
-                                    stream, addr, hive.clone(), config.clone()
+                                    stream, addr, peat.clone(), config.clone()
                                 ).await;
 
                                 if let Ok(session) = session {
@@ -39791,7 +39791,7 @@ impl ConsumerAdapter for WebSocketAdapter {
                                     metrics.connections.fetch_add(1, Ordering::Relaxed);
 
                                     // Spawn session handler
-                                    tokio::spawn(Self::handle_session(session, hive.clone()));
+                                    tokio::spawn(Self::handle_session(session, peat.clone()));
                                 }
                             }
                             Err(e) => {
@@ -39872,7 +39872,7 @@ TCP provides simple framed messaging for legacy systems:
 pub struct TcpAdapter {
     config: TcpConfig,
     sessions: Arc<RwLock<HashMap<String, Arc<TcpSession>>>>,
-    hive: Arc<HiveClient>,
+    peat: Arc<PeatClient>,
     metrics: Arc<AdapterMetrics>,
     running: AtomicBool,
     shutdown: broadcast::Sender<()>,
@@ -40029,7 +40029,7 @@ HTTP/REST provides request/response semantics for scripting and automation:
 /// HTTP/REST consumer adapter
 pub struct HttpRestAdapter {
     config: HttpRestConfig,
-    hive: Arc<HiveClient>,
+    peat: Arc<PeatClient>,
     metrics: Arc<AdapterMetrics>,
     running: AtomicBool,
     server_handle: Option<ServerHandle>,
@@ -40059,7 +40059,7 @@ pub struct HttpRestConfig {
 impl HttpRestAdapter {
     /// Build HTTP routes
     fn routes(&self) -> Router {
-        let hive = self.hive.clone();
+        let peat = self.peat.clone();
 
         Router::new()
             // Node status
@@ -40088,7 +40088,7 @@ impl HttpRestAdapter {
             .route("/stream", get(Self::event_stream))
             .route("/stream/:collection", get(Self::collection_stream))
 
-            .with_state(hive)
+            .with_state(peat)
     }
 }
 ```
@@ -40162,10 +40162,10 @@ For HTTP clients that need streaming without WebSocket:
 ```rust
 /// Server-Sent Events endpoint
 async fn event_stream(
-    State(hive): State<Arc<HiveClient>>,
+    State(peat): State<Arc<PeatClient>>,
     Query(params): Query<StreamParams>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
-    let stream = hive.subscribe_all(params.filter).await.unwrap();
+    let stream = peat.subscribe_all(params.filter).await.unwrap();
 
     let sse_stream = stream.map(|update| {
         let data = serde_json::to_string(&update).unwrap();
@@ -40203,7 +40203,7 @@ The Interface Coordinator manages all adapters and provides unified configuratio
 /// Coordinates all consumer interface adapters
 pub struct InterfaceCoordinator {
     adapters: Vec<Box<dyn ConsumerAdapter>>,
-    hive: Arc<HiveClient>,
+    peat: Arc<PeatClient>,
     config: InterfaceConfig,
     metrics: CoordinatorMetrics,
 }
@@ -40224,33 +40224,33 @@ pub struct InterfaceConfig {
 }
 
 impl InterfaceCoordinator {
-    pub fn new(config: InterfaceConfig, hive: Arc<HiveClient>) -> Self {
+    pub fn new(config: InterfaceConfig, peat: Arc<PeatClient>) -> Self {
         let mut adapters: Vec<Box<dyn ConsumerAdapter>> = Vec::new();
 
         if let Some(ws_config) = &config.websocket {
             adapters.push(Box::new(WebSocketAdapter::new(
                 ws_config.clone(),
-                hive.clone(),
+                peat.clone(),
             )));
         }
 
         if let Some(tcp_config) = &config.tcp {
             adapters.push(Box::new(TcpAdapter::new(
                 tcp_config.clone(),
-                hive.clone(),
+                peat.clone(),
             )));
         }
 
         if let Some(http_config) = &config.http {
             adapters.push(Box::new(HttpRestAdapter::new(
                 http_config.clone(),
-                hive.clone(),
+                peat.clone(),
             )));
         }
 
         Self {
             adapters,
-            hive,
+            peat,
             config,
             metrics: CoordinatorMetrics::default(),
         }
@@ -40291,7 +40291,7 @@ impl InterfaceCoordinator {
 ### YAML Configuration
 
 ```yaml
-# hive-config.yaml
+# peat-config.yaml
 
 consumer_interfaces:
   # WebSocket for real-time dashboards
@@ -40300,8 +40300,8 @@ consumer_interfaces:
     listen_addr: "0.0.0.0:8080"
     path: "/ws"
     tls:
-      cert: "/etc/hive/tls/cert.pem"
-      key: "/etc/hive/tls/key.pem"
+      cert: "/etc/peat/tls/cert.pem"
+      key: "/etc/peat/tls/key.pem"
     max_connections: 100
     ping_interval_secs: 30
     cors_origins:
@@ -40322,8 +40322,8 @@ consumer_interfaces:
     listen_addr: "0.0.0.0:8081"
     base_path: "/api/v1"
     tls:
-      cert: "/etc/hive/tls/cert.pem"
-      key: "/etc/hive/tls/key.pem"
+      cert: "/etc/peat/tls/cert.pem"
+      key: "/etc/peat/tls/key.pem"
     cors:
       allowed_origins: ["*"]
       allowed_methods: ["GET", "POST", "PUT", "DELETE"]
@@ -40485,7 +40485,7 @@ pub struct CoordinatorMetrics {
 
 ### Phase 1: HTTP/REST Adapter
 
-- [ ] Extend `hive-transport` with full REST API
+- [ ] Extend `peat-transport` with full REST API
 - [ ] Add SSE streaming endpoint
 - [ ] Implement authentication middleware
 - [ ] Add rate limiting
@@ -40598,7 +40598,7 @@ pub struct CoordinatorMetrics {
 
 ## Context
 
-HIVE Protocol has a solid security foundation (ADR-006) with:
+PEAT Protocol has a solid security foundation (ADR-006) with:
 - Device identity (Ed25519 keypairs)
 - Peer-to-peer encryption (X25519 + ChaCha20-Poly1305)
 - Formation keys (pre-shared secret authentication)
@@ -40618,7 +40618,7 @@ The current `GroupKey` implementation can generate and rotate keys, but has no p
 Kerkour's research notes highlight a critical insight:
 > "Removing server-side validation creates vulnerability where malicious clients could introduce invalid mutations, compromising data structure integrity."
 
-In HIVE's mesh topology:
+In PEAT's mesh topology:
 - Any node can propose CRDT mutations
 - Compromised nodes could inject malformed documents
 - Replay attacks could revert document state
@@ -40661,7 +40661,7 @@ We will integrate the Messaging Layer Security protocol for cell-level key manag
 | X.509 Support | Limited | Full |
 | Audit Status | Partial | None |
 
-OpenMLS aligns with HIVE's existing crypto (ChaCha20-Poly1305, Ed25519) and has more real-world deployment experience.
+OpenMLS aligns with PEAT's existing crypto (ChaCha20-Poly1305, Ed25519) and has more real-world deployment experience.
 
 ### Architecture
 
@@ -41017,7 +41017,7 @@ pub enum BypassAuthMode {
 | **Simplicity** | Just a keypair | Certificate chains, CAs, validity periods |
 | **Key size** | 32 bytes public | ~1-2KB per cert |
 | **Revocation** | Manual tracking | CRL/OCSP infrastructure |
-| **Interop** | HIVE-specific | DoD PKI, NATO systems |
+| **Interop** | PEAT-specific | DoD PKI, NATO systems |
 | **Metadata** | None built-in | Org unit, clearance, role in cert |
 | **Offline validation** | Always works | Needs cached CRLs |
 
@@ -41025,7 +41025,7 @@ pub enum BypassAuthMode {
 
 ```rust
 /// Abstraction over credential types
-pub enum HiveCredential {
+pub enum PeatCredential {
     /// Simple Ed25519 public key (current implementation)
     Ed25519(DeviceKeypair),
     /// X.509 certificate chain (future, if needed)
@@ -41035,7 +41035,7 @@ pub enum HiveCredential {
 
 ## Hardware Root of Trust
 
-For tactical deployment, software-only keys are insufficient. Captured devices could have keys extracted. HIVE should support hardware-backed identity where available.
+For tactical deployment, software-only keys are insufficient. Captured devices could have keys extracted. PEAT should support hardware-backed identity where available.
 
 ### Physical Unclonable Functions (PUFs)
 
@@ -41109,13 +41109,13 @@ pub struct PufDeviceIdentity {
 impl PufDeviceIdentity {
     pub fn from_puf(puf: &dyn PufProvider) -> Result<Self> {
         let response = puf.reconstruct(
-            HIVE_PUF_CHALLENGE,
+            PEAT_PUF_CHALLENGE,
             &puf.get_helper_data()?
         )?;
 
         // Derive separate keys for signing and encryption
-        let signing_seed = hkdf_expand(&response, b"hive-signing-v1");
-        let encryption_seed = hkdf_expand(&response, b"hive-encryption-v1");
+        let signing_seed = hkdf_expand(&response, b"peat-signing-v1");
+        let encryption_seed = hkdf_expand(&response, b"peat-encryption-v1");
 
         Ok(Self {
             signing_key: DeviceKeypair::from_seed(&signing_seed),
@@ -41162,7 +41162,7 @@ pub enum AttestationProof {
 
 ### Hardware Support Matrix
 
-| Platform | PUF | TPM | Secure Enclave | HIVE Target |
+| Platform | PUF | TPM | Secure Enclave | PEAT Target |
 |----------|-----|-----|----------------|-------------|
 | NXP i.MX RT | ✅ SRAM PUF | ❌ | ✅ TrustZone | UAVs, edge |
 | Microchip ATECC608 | ✅ Built-in | ❌ | ✅ Secure element | Small UAS, sensors |
@@ -41250,7 +41250,7 @@ Existing solutions address parts of this problem:
 | **Zarf** | Air-gap packaging, OCI distribution | Single cluster focus, no mesh coordination |
 | **Kubernetes** | Container orchestration | Assumes connected control plane |
 | **GitOps (Flux/Argo)** | Declarative deployment | Requires Git connectivity |
-| **HIVE** | Mesh sync, hierarchical coordination | No container/K8s deployment |
+| **PEAT** | Mesh sync, hierarchical coordination | No container/K8s deployment |
 
 ### Defense Unicorns Ecosystem
 
@@ -41270,35 +41270,35 @@ Existing solutions address parts of this problem:
 
 ### Integration Opportunity
 
-HIVE + Zarf/UDS creates a complete tactical software delivery stack:
+PEAT + Zarf/UDS creates a complete tactical software delivery stack:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                     Cloud / Enterprise                                   │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                  │
-│  │ Zarf Build  │───▶│ OCI Registry│───▶│ HIVE Gateway│                  │
+│  │ Zarf Build  │───▶│ OCI Registry│───▶│ PEAT Gateway│                  │
 │  │  Pipeline   │    │  (packages) │    │  (metadata) │                  │
 │  └─────────────┘    └─────────────┘    └──────┬──────┘                  │
 └─────────────────────────────────────────────────┼────────────────────────┘
-                                                  │ HIVE Sync
+                                                  │ PEAT Sync
                     ┌─────────────────────────────┼─────────────────────────┐
                     │           FOB / Base        ▼                         │
                     │  ┌─────────────┐    ┌─────────────┐                   │
-                    │  │ Zarf Mirror │◀───│ HIVE Node   │                   │
+                    │  │ Zarf Mirror │◀───│ PEAT Node   │                   │
                     │  │  Registry   │    │ (metadata)  │                   │
                     │  └──────┬──────┘    └──────┬──────┘                   │
                     └─────────┼──────────────────┼─────────────────────────┘
-                              │                  │ HIVE Sync
+                              │                  │ PEAT Sync
               ┌───────────────┼──────────────────┼───────────────┐
               │     Vehicle   ▼                  ▼               │
               │  ┌─────────────┐    ┌─────────────┐              │
-              │  │ Zarf Deploy │◀───│ HIVE Node   │              │
+              │  │ Zarf Deploy │◀───│ PEAT Node   │              │
               │  │   (K3s)     │    │ (commands)  │              │
               │  └─────────────┘    └─────────────┘              │
               └──────────────────────────────────────────────────┘
 ```
 
-**HIVE provides:**
+**PEAT provides:**
 - Package metadata propagation across the mesh
 - Deployment intent/command distribution
 - Status aggregation up the hierarchy
@@ -41313,9 +41313,9 @@ HIVE + Zarf/UDS creates a complete tactical software delivery stack:
 
 ## Decision
 
-### 1. HIVE as Metadata Backplane
+### 1. PEAT as Metadata Backplane
 
-HIVE synchronizes **metadata about packages and deployments**, not the packages themselves:
+PEAT synchronizes **metadata about packages and deployments**, not the packages themselves:
 
 ```protobuf
 // Package availability advertisement
@@ -41394,9 +41394,9 @@ package_mirrors/         # Which registries have which packages
 1. BUILD (Cloud)
    ├─ CI/CD builds Zarf package
    ├─ Pushes to OCI registry
-   └─ Publishes ZarfPackageAvailable to HIVE
+   └─ Publishes ZarfPackageAvailable to PEAT
 
-2. PROPAGATE (HIVE Sync)
+2. PROPAGATE (PEAT Sync)
    ├─ Package metadata syncs through hierarchy
    ├─ Each node learns what packages exist
    └─ Mirrors can pre-pull packages
@@ -41412,7 +41412,7 @@ package_mirrors/         # Which registries have which packages
    ├─ Executes: zarf package deploy
    └─ Reports DeploymentStatus
 
-5. AGGREGATE (HIVE Hierarchy)
+5. AGGREGATE (PEAT Hierarchy)
    ├─ Status documents sync upward
    ├─ Leaders aggregate subordinate status
    └─ Operator sees convergence progress
@@ -41447,10 +41447,10 @@ store.write_targeted(
 
 ### 5. Integration Points
 
-#### HIVE Side
+#### PEAT Side
 
 ```rust
-// New crate: hive-zarf (or module in hive-protocol)
+// New crate: peat-zarf (or module in peat-protocol)
 
 pub struct ZarfIntegration {
     store: Arc<dyn DocumentStore>,
@@ -41477,24 +41477,24 @@ impl ZarfIntegration {
 Alternatively, integrate via Kubernetes:
 
 ```typescript
-// Pepr capability that watches HIVE and triggers Zarf
-When(HiveDeploymentIntent)
+// Pepr capability that watches PEAT and triggers Zarf
+When(PeatDeploymentIntent)
   .IsCreated()
   .Then(async (intent) => {
-    // Pull package from nearest HIVE-advertised mirror
+    // Pull package from nearest PEAT-advertised mirror
     const mirror = await findNearestMirror(intent.packageName);
 
     // Execute Zarf deployment
     await exec(`zarf package deploy ${mirror}/${intent.packageName}`);
 
-    // Report status back to HIVE
+    // Report status back to PEAT
     await reportDeploymentStatus(intent.id, "DEPLOYED");
   });
 ```
 
 ### 6. Security Considerations
 
-- **Deployment intents MUST be signed** by authorized issuer (uses HIVE security layer)
+- **Deployment intents MUST be signed** by authorized issuer (uses PEAT security layer)
 - **Package verification** via Zarf's built-in signature/SBOM verification
 - **RBAC**: Only authorized nodes can issue deployment intents
 - **Audit trail**: All intents and status changes recorded in CRDT history
@@ -41503,10 +41503,10 @@ When(HiveDeploymentIntent)
 
 ### Positive
 
-- **Complete stack**: HIVE + Zarf covers cloud-to-edge software delivery
+- **Complete stack**: PEAT + Zarf covers cloud-to-edge software delivery
 - **Disconnected operation**: Both tools designed for air-gap/intermittent connectivity
 - **Open source**: Full stack is FOSS, no vendor lock-in
-- **Separation of concerns**: HIVE does coordination, Zarf does deployment
+- **Separation of concerns**: PEAT does coordination, Zarf does deployment
 - **Existing ecosystem**: Leverage UDS Core, Pepr, existing Zarf packages
 
 ### Negative
@@ -41518,14 +41518,14 @@ When(HiveDeploymentIntent)
 
 ### Neutral
 
-- **Not replacing Zarf features**: HIVE doesn't do OCI, Helm, or K8s deployment
-- **Not replacing HIVE features**: Zarf doesn't do mesh sync or CRDT
+- **Not replacing Zarf features**: PEAT doesn't do OCI, Helm, or K8s deployment
+- **Not replacing PEAT features**: Zarf doesn't do mesh sync or CRDT
 
 ## Alternatives Considered
 
-### 1. HIVE-Native Package Distribution
+### 1. PEAT-Native Package Distribution
 
-Build package distribution into HIVE using blob transfer (ADR-025).
+Build package distribution into PEAT using blob transfer (ADR-025).
 
 **Rejected**: Reinventing Zarf's capabilities. Zarf already handles air-gap packaging well.
 
@@ -41537,7 +41537,7 @@ Use GitOps for deployment coordination.
 
 ### 3. Direct Zarf Push
 
-Use Zarf's OCI push capabilities directly without HIVE.
+Use Zarf's OCI push capabilities directly without PEAT.
 
 **Rejected**: No mesh coordination, no status aggregation, no store-and-forward.
 
@@ -41545,7 +41545,7 @@ Use Zarf's OCI push capabilities directly without HIVE.
 
 ### Phase 1: Schema & Collections
 - Define Protobuf messages for package/intent/status
-- Create collections in hive-schema
+- Create collections in peat-schema
 - Basic CRUD operations
 
 ### Phase 2: Targeted Delivery (ADR-046)
@@ -41553,7 +41553,7 @@ Use Zarf's OCI push capabilities directly without HIVE.
 - Selector-based targeting
 - Delivery confirmation
 
-### Phase 3: HIVE-Zarf Bridge
+### Phase 3: PEAT-Zarf Bridge
 - Watch for intents, execute Zarf
 - Package advertisement
 - Status reporting
@@ -41585,7 +41585,7 @@ Use Zarf's OCI push capabilities directly without HIVE.
 
 ### Current Model: Broadcast Replication
 
-HIVE's CRDT synchronization replicates documents to **all nodes** in a cell. When a document is written to a collection, every node eventually receives and persists a copy.
+PEAT's CRDT synchronization replicates documents to **all nodes** in a cell. When a document is written to a collection, every node eventually receives and persists a copy.
 
 ```
 Writer → Node A → Node B → Node C → Node D
@@ -41695,7 +41695,7 @@ Examples:
 - APP_ID: lowercase alphanumeric + hyphens, max 32 chars
 - Alias: lowercase alphanumeric + hyphens, max 64 chars
 - Full name: `{app_id}.{alias}`, max 97 chars
-- Reserved APP_IDs: `hive`, `system`
+- Reserved APP_IDs: `peat`, `system`
 
 #### Alias Registry Collection
 
@@ -42166,15 +42166,15 @@ store.write("commands/vehicle-1", &command).await?;
 // Only vehicle-1 persists, others relay
 
 // Example 7: Alias binding (leader binding flanker role)
-let name_binder = hive.name_binder();
+let name_binder = peat.name_binder();
 name_binder.bind("swarm", "flanker-1", &vehicle_peer_id, AliasType::ROLE).await?;
 
 // Example 8: Self-claiming an alias
-let name_binder = hive.name_binder();
+let name_binder = peat.name_binder();
 name_binder.claim("c2", "viper-3").await?;  // Claims for local node
 
 // Example 9: Resolving alias before send (manual)
-let name_resolver = hive.name_resolver();
+let name_resolver = peat.name_resolver();
 if let Some(peer_id) = name_resolver.resolve("swarm.flanker-1").await? {
     // Use peer_id directly
 }
@@ -42340,7 +42340,7 @@ theme: default
 paginate: true
 backgroundColor: #fff
 backgroundImage: url('https://marp.app/assets/hero-background.svg')
-header: 'HIVE Protocol - Technology Deep Dive | **COMPETITION SENSITIVE**'
+header: 'PEAT Protocol - Technology Deep Dive | **COMPETITION SENSITIVE**'
 footer: '© 2025 (r)evolve. All Rights Reserved. | **COMPETITION SENSITIVE**'
 style: |
   section {
@@ -42394,7 +42394,7 @@ style: |
 ---
 
 <!-- _class: lead -->
-# HIVE Protocol
+# PEAT Protocol
 ## Technology Deep Dive
 
 **Capability Aggregation Protocol**
@@ -42411,7 +42411,7 @@ Scalable Distributed Coordination for Autonomous Systems
 - No human oversight in distributed networks
 - Safety-critical systems need coordination guarantees
 
-**The Solution**: HIVE Protocol
+**The Solution**: PEAT Protocol
 - **95%+ bandwidth reduction** through hierarchical CRDT aggregation
 - **Validated with 12-node ContainerLab** across 3 topology modes
 - **Graduated human authority** for distributed autonomous control
@@ -42677,7 +42677,7 @@ CRDT eventual consistency alone doesn't provide enough control for safety-critic
 # ContainerLab Validation: Multi-Node Testing
 
 ## Test Environment
-- 12-24 containerized HIVE Protocol nodes
+- 12-24 containerized PEAT Protocol nodes
 - Ditto SDK 4.12+ for real CRDT synchronization
 - Real Docker networking (not mocked/simulated)
 - Network constraints via Linux traffic control (tc)
@@ -42826,7 +42826,7 @@ CRDT eventual consistency alone doesn't provide enough control for safety-critic
 
 ## Greenfield Systems (New Autonomous Platforms)
 
-**Integration Approach**: Native HIVE protocol implementation
+**Integration Approach**: Native PEAT protocol implementation
 
 | System Type | Integration Method | CAP Benefits |
 |-------------|-------------------|--------------|
@@ -42834,7 +42834,7 @@ CRDT eventual consistency alone doesn't provide enough control for safety-critic
 | **AI-enabled sensors** | CAP SDK integration | Real-time data sharing, distributed coordination |
 | **Next-gen robotics** | Built with CAP from day 1 | Zero translation overhead, native CRDT sync |
 
-**Example**: New quadcopter swarm designed with HIVE protocol
+**Example**: New quadcopter swarm designed with PEAT protocol
 ```rust
 let cap_node = CapNode::new(NodeCapabilities {
     role: Role::Scout,
@@ -42984,7 +42984,7 @@ CAP enables transformation at **every interface layer**:
 **Integration Points**:
 1. ATAK → CAP Gateway: TAK protocol translated to CAP documents
 2. DJI → CAP Bridge: DJI SDK calls wrapped in CAP client
-3. Radios: Native HIVE protocol (greenfield)
+3. Radios: Native PEAT protocol (greenfield)
 
 **Result**: Commercial drones coordinate with military units using existing C2
 
@@ -43092,7 +43092,7 @@ CAP enables transformation at **every interface layer**:
 
 ```
 cap/
-├── hive-protocol/          # Core protocol library (17K+ lines Rust)
+├── peat-protocol/          # Core protocol library (17K+ lines Rust)
 │   ├── src/
 │   │   ├── discovery/     # Phase 1: Bootstrap
 │   │   ├── cell/          # Phase 2: Cell Formation
@@ -43102,10 +43102,10 @@ cap/
 │   │   ├── storage/       # Ditto CRDT integration
 │   │   └── testing/       # E2E test harness
 │   └── tests/             # Integration & E2E tests (330+)
-├── hive-schema/            # Protocol Buffers definitions
-├── hive-persistence/       # TTL & data lifecycle management
-├── hive-transport/         # Network transport abstraction
-└── hive-sim/               # Reference simulator application
+├── peat-schema/            # Protocol Buffers definitions
+├── peat-persistence/       # TTL & data lifecycle management
+├── peat-transport/         # Network transport abstraction
+└── peat-sim/               # Reference simulator application
 ```
 
 **Code Quality**: Rust safety guarantees, 330+ tests, comprehensive documentation
@@ -43183,7 +43183,7 @@ cap/
 - References to validation results
 
 **Examples**:
-- ADR-001: HIVE Protocol POC (core architecture)
+- ADR-001: PEAT Protocol POC (core architecture)
 - ADR-014: Distributed Coordination Primitives (novel contribution)
 - ADR-015: Experimental Validation (scientific methodology)
 
@@ -43398,7 +43398,7 @@ cap/
 
 ---
 
-# Why HIVE Protocol Wins
+# Why PEAT Protocol Wins
 
 ## 1. Proven Technology
 - ✅ **100% sync success** under realistic network constraints
@@ -43716,28 +43716,28 @@ while let Some(event) = rx.recv().await {
 <!-- _class: lead -->
 # Thank You
 
-**HIVE Protocol: Scalable Autonomous Coordination**
+**PEAT Protocol: Scalable Autonomous Coordination**
 
 *Validated. Production-Ready. Defensible IP.*
 
 ---
 
-# HIVE ↔ CoT Schema Mapping Specification
+# PEAT ↔ CoT Schema Mapping Specification
 
 **Document Type**: Technical Specification
 **Date**: 2025-11-26
 **Version**: 1.0
-**Source**: hive-m1-poc message definitions
+**Source**: peat-m1-poc message definitions
 
 ## Overview
 
-This document provides field-by-field mapping between HIVE M1 message types and Cursor-on-Target (CoT) XML schema. These mappings enable bidirectional translation for TAK integration.
+This document provides field-by-field mapping between PEAT M1 message types and Cursor-on-Target (CoT) XML schema. These mappings enable bidirectional translation for TAK integration.
 
 ---
 
-## 1. TrackUpdate → CoT Event (HIVE → TAK)
+## 1. TrackUpdate → CoT Event (PEAT → TAK)
 
-### HIVE Source Structure
+### PEAT Source Structure
 
 ```rust
 pub struct TrackUpdate {
@@ -43790,7 +43790,7 @@ pub struct Velocity {
 
     <remarks>{classification}: {formatted_attributes} ({confidence}% confidence)</remarks>
 
-    <_hive_ version="1.0">
+    <_peat_ version="1.0">
       <source platform="{source_platform}"
               model="{source_model}"
               model_version="{model_version}"/>
@@ -43800,7 +43800,7 @@ pub struct Velocity {
         <attr key="{key}">{value}</attr>
         {end}
       </attributes>
-    </_hive_>
+    </_peat_>
 
     <link uid="{source_platform}" type="a-f-G-U-C" relation="o-o"/>
   </detail>
@@ -43809,7 +43809,7 @@ pub struct Velocity {
 
 ### Field Mapping Table
 
-| HIVE Field | CoT Field | Transformation | Notes |
+| PEAT Field | CoT Field | Transformation | Notes |
 |------------|-----------|----------------|-------|
 | `track_id` | `event@uid` | Direct | Unique track identifier |
 | `classification` | `event@type` | Lookup table | See classification mapping |
@@ -43825,11 +43825,11 @@ pub struct Velocity {
 | `velocity.bearing` | `track@course` | Direct | Degrees from north |
 | `velocity.speed_mps` | `track@speed` | Direct | Meters per second |
 | `classification` + `attributes` + `confidence` | `remarks` | Formatted string | Human-readable summary |
-| `source_platform` | `_hive_/source@platform` | Direct | HIVE extension |
-| `source_model` | `_hive_/source@model` | Direct | HIVE extension |
-| `model_version` | `_hive_/source@model_version` | Direct | HIVE extension |
-| `confidence` | `_hive_/confidence@value` | Direct | HIVE extension |
-| `attributes` | `_hive_/attributes/attr` | Key-value pairs | HIVE extension |
+| `source_platform` | `_peat_/source@platform` | Direct | PEAT extension |
+| `source_model` | `_peat_/source@model` | Direct | PEAT extension |
+| `model_version` | `_peat_/source@model_version` | Direct | PEAT extension |
+| `confidence` | `_peat_/confidence@value` | Direct | PEAT extension |
+| `attributes` | `_peat_/attributes/attr` | Key-value pairs | PEAT extension |
 | `source_platform` | `link@uid` | Direct | Links to sensor platform |
 
 ### Classification → CoT Type Mapping
@@ -43846,7 +43846,7 @@ pub struct Velocity {
 
 ### Example Conversion
 
-**HIVE TrackUpdate**:
+**PEAT TrackUpdate**:
 ```json
 {
   "track_id": "TRACK-001",
@@ -43895,7 +43895,7 @@ pub struct Velocity {
 
     <remarks>person: blue jacket, has backpack (89% confidence)</remarks>
 
-    <_hive_ version="1.0">
+    <_peat_ version="1.0">
       <source platform="Alpha-2"
               model="Alpha-3"
               model_version="1.3.0"/>
@@ -43904,7 +43904,7 @@ pub struct Velocity {
         <attr key="jacket_color">blue</attr>
         <attr key="has_backpack">true</attr>
       </attributes>
-    </_hive_>
+    </_peat_>
 
     <link uid="Alpha-2" type="a-f-G-U-C" relation="o-o"/>
   </detail>
@@ -43913,9 +43913,9 @@ pub struct Velocity {
 
 ---
 
-## 2. CapabilityAdvertisement → CoT Event (HIVE → TAK)
+## 2. CapabilityAdvertisement → CoT Event (PEAT → TAK)
 
-### HIVE Source Structure
+### PEAT Source Structure
 
 ```rust
 pub struct CapabilityAdvertisement {
@@ -43969,7 +43969,7 @@ pub enum OperationalStatus {
 
     <remarks>AI Platform: {model_summary}</remarks>
 
-    <_hive_ version="1.0">
+    <_peat_ version="1.0">
       <status operational="{operational_status}" readiness="{readiness_score}"/>
       {for model in models}
       <capability type="{model.model_type}"
@@ -43985,7 +43985,7 @@ pub enum OperationalStatus {
                  memory_used_mb="{resources.memory_used_mb}"
                  memory_total_mb="{resources.memory_total_mb}"/>
       {end}
-    </_hive_>
+    </_peat_>
 
     <__group name="{cell_id}" role="AI Platform"/>
   </detail>
@@ -43994,15 +43994,15 @@ pub enum OperationalStatus {
 
 ### Field Mapping Table
 
-| HIVE Field | CoT Field | Transformation | Notes |
+| PEAT Field | CoT Field | Transformation | Notes |
 |------------|-----------|----------------|-------|
 | `platform_id` | `event@uid` | Direct | Platform identifier |
 | `platform_id` | `contact@callsign` | Direct | TAK callsign |
 | - | `event@type` | Constant `a-f-G-U-C` | Friendly ground unit |
 | `advertised_at` | `event@time` | RFC 3339 | Advertisement timestamp |
 | `advertised_at` | `event@stale` | time + 60s | Longer stale for capabilities |
-| `models[*].operational_status` | `_hive_/status@operational` | Enum to string | Overall platform status |
-| `models[*]` | `_hive_/capability` | One element per model | Model capabilities |
+| `models[*].operational_status` | `_peat_/status@operational` | Enum to string | Overall platform status |
+| `models[*]` | `_peat_/capability` | One element per model | Model capabilities |
 | `models[*].model_id` | `capability@model_id` | Direct | |
 | `models[*].model_version` | `capability@model_version` | Direct | |
 | `models[*].performance.precision` | `capability@precision` | Direct | |
@@ -44013,7 +44013,7 @@ pub enum OperationalStatus {
 
 ### Operational Status Mapping
 
-| HIVE Status | CoT Value | TAK Display Suggestion |
+| PEAT Status | CoT Value | TAK Display Suggestion |
 |-------------|-----------|----------------------|
 | `Ready` | `READY` | Green indicator |
 | `Active` | `ACTIVE` | Blue/pulsing indicator |
@@ -44023,9 +44023,9 @@ pub enum OperationalStatus {
 
 ---
 
-## 3. HandoffMessage → CoT Event (HIVE → TAK)
+## 3. HandoffMessage → CoT Event (PEAT → TAK)
 
-### HIVE Source Structure
+### PEAT Source Structure
 
 ```rust
 pub struct HandoffMessage {
@@ -44070,7 +44070,7 @@ pub enum HandoffType {
   <detail>
     <remarks>HANDOFF {handoff_type}: {track_id} from {source_team} to {target_team}</remarks>
 
-    <_hive_ version="1.0">
+    <_peat_ version="1.0">
       <handoff type="{handoff_type}"
                track_id="{track_id}"
                source="{source_team}"
@@ -44082,7 +44082,7 @@ pub enum HandoffType {
       <predicted lat="{predicted_position.lat}"
                  lon="{predicted_position.lon}"/>
       {end}
-    </_hive_>
+    </_peat_>
 
     <!-- Link to source team -->
     <link uid="{source_team}" type="a-f-G-U-C" relation="h-h" remarks="handoff-source"/>
@@ -44098,7 +44098,7 @@ pub enum HandoffType {
 
 ### Handoff Type Mapping
 
-| HIVE HandoffType | CoT Remarks Prefix | Semantics |
+| PEAT HandoffType | CoT Remarks Prefix | Semantics |
 |------------------|-------------------|-----------|
 | `PrepareHandoff` | `HANDOFF PREPARE` | Source initiating handoff |
 | `ConfirmAcquisition` | `HANDOFF CONFIRM` | Target confirms acquisition |
@@ -44107,7 +44107,7 @@ pub enum HandoffType {
 
 ---
 
-## 4. CoT Event → TrackCommand (TAK → HIVE)
+## 4. CoT Event → TrackCommand (TAK → PEAT)
 
 ### CoT Source Structure (Mission Tasking)
 
@@ -44151,7 +44151,7 @@ pub enum HandoffType {
 </event>
 ```
 
-### HIVE Target Structure
+### PEAT Target Structure
 
 ```rust
 pub struct TrackCommand {
@@ -44165,9 +44165,9 @@ pub struct TrackCommand {
 }
 ```
 
-### Field Mapping Table (CoT → HIVE)
+### Field Mapping Table (CoT → PEAT)
 
-| CoT Field | HIVE Field | Transformation | Notes |
+| CoT Field | PEAT Field | Transformation | Notes |
 |-----------|------------|----------------|-------|
 | `event@uid` | `command_id` | Parse as UUID | May need to generate if not UUID |
 | `event@type` | `command_type` | Type mapping | See below |
@@ -44180,16 +44180,16 @@ pub struct TrackCommand {
 
 ### CoT Type → CommandType Mapping
 
-| CoT Type | HIVE CommandType | Description |
+| CoT Type | PEAT CommandType | Description |
 |----------|-----------------|-------------|
 | `t-x-m-c` | `TrackTarget` | Mission tasking - track |
 | `t-x-m-c-c` | `CancelTrack` | Mission tasking - cancel |
 | `t-x-m-c-u` | `UpdateParameters` | Mission tasking - update |
 | `t-x-m-c-a` | `AcknowledgeHandoff` | Mission tasking - acknowledge |
 
-### Priority Mapping (CoT → HIVE)
+### Priority Mapping (CoT → PEAT)
 
-| CoT Priority | HIVE Priority |
+| CoT Priority | PEAT Priority |
 |--------------|---------------|
 | `flash` | `Critical` |
 | `immediate` | `High` |
@@ -44200,7 +44200,7 @@ pub struct TrackCommand {
 
 ---
 
-## 5. CoT Event → OperationalBoundary (TAK → HIVE)
+## 5. CoT Event → OperationalBoundary (TAK → PEAT)
 
 ### CoT Source Structure (Drawing/Geofence)
 
@@ -44237,7 +44237,7 @@ pub struct TrackCommand {
 </event>
 ```
 
-### HIVE Target Structure
+### PEAT Target Structure
 
 ```rust
 pub struct OperationalBoundary {
@@ -44254,7 +44254,7 @@ pub enum BoundaryType {
 
 ### Field Mapping Table
 
-| CoT Field | HIVE Field | Transformation |
+| CoT Field | PEAT Field | Transformation |
 |-----------|------------|----------------|
 | `shape/polyline@closed="true"` | `boundary_type` | `Polygon` |
 | `shape/ellipse` | `boundary_type` | `Circle` |
@@ -44263,9 +44263,9 @@ pub enum BoundaryType {
 
 ---
 
-## 6. FormationCapabilitySummary → CoT Event (HIVE → TAK)
+## 6. FormationCapabilitySummary → CoT Event (PEAT → TAK)
 
-### HIVE Source Structure
+### PEAT Source Structure
 
 ```rust
 // From coordinator.rs (conceptual - aggregated at formation level)
@@ -44304,7 +44304,7 @@ pub struct FormationCapabilitySummary {
 
     <remarks>Formation: {team_count} teams, {platform_count} platforms, {readiness_pct}% ready</remarks>
 
-    <_hive_ version="1.0">
+    <_peat_ version="1.0">
       <formation teams="{team_count}"
                  platforms="{platform_count}"
                  cameras="{camera_count}"
@@ -44324,7 +44324,7 @@ pub struct FormationCapabilitySummary {
         <capability type="{cap}" confidence="{confidence}"/>
         {end}
       </capabilities>
-    </_hive_>
+    </_peat_>
 
     <!-- Links to subordinate teams -->
     {for team in teams}
@@ -44341,12 +44341,12 @@ pub struct FormationCapabilitySummary {
 ### Timestamp Handling
 
 ```rust
-// HIVE → CoT
+// PEAT → CoT
 fn encode_timestamp(dt: DateTime<Utc>) -> String {
     dt.format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
 
-// CoT → HIVE
+// CoT → PEAT
 fn decode_timestamp(s: &str) -> Result<DateTime<Utc>, ParseError> {
     DateTime::parse_from_rfc3339(s)
         .map(|dt| dt.with_timezone(&Utc))
@@ -44416,7 +44416,7 @@ fn encode_track_to_cot(track: &TrackUpdate) -> Result<String, EncodingError> {
 | Error | Handling |
 |-------|----------|
 | Malformed XML | Return `DecodingError::MalformedXml(details)` |
-| Unknown CoT type | Log and skip, or map to generic HIVE message |
+| Unknown CoT type | Log and skip, or map to generic PEAT message |
 | Missing required element | Return `DecodingError::MissingElement(name)` |
 | Invalid timestamp | Return `DecodingError::InvalidTimestamp` |
 
@@ -44427,17 +44427,17 @@ fn encode_track_to_cot(track: &TrackUpdate) -> Result<String, EncodingError> {
 - [CoT XML Schema](http://cot.mitre.org)
 - [MIL-STD-2525D](https://www.jcs.mil/Portals/36/Documents/Doctrine/Other_Pubs/ms_2525d.pdf)
 - [TAK Protocol Documentation](https://tak.gov)
-- [hive-m1-poc/src/messages.rs](../src/messages.rs)
+- [peat-m1-poc/src/messages.rs](../src/messages.rs)
 - [TAK Integration Requirements](./TAK_INTEGRATION_REQUIREMENTS.md)
 
 ---
 
-# TAK Integration Requirements for HIVE Protocol
+# TAK Integration Requirements for PEAT Protocol
 
 **Document Type**: Requirements & Recommendations for ADR-020
 **Date**: 2025-11-26
-**Source**: hive-m1-poc implementation experience
-**Target**: HIVE Core Team (cap repository)
+**Source**: peat-m1-poc implementation experience
+**Target**: PEAT Core Team (cap repository)
 
 ## Executive Summary
 
@@ -44447,16 +44447,16 @@ This document captures requirements and recommendations derived from implementin
 
 ## 1. Schema Layer Requirements (cap-schema)
 
-### 1.1 HIVE Custom Detail Extension Schema
+### 1.1 PEAT Custom Detail Extension Schema
 
-**Requirement**: Define a standardized `<_hive_>` CoT detail extension for preserving HIVE-specific semantics in CoT messages.
+**Requirement**: Define a standardized `<_peat_>` CoT detail extension for preserving PEAT-specific semantics in CoT messages.
 
-**Rationale**: HIVE messages contain rich context (model versions, confidence scores, cell membership) that TAK operators need but CoT doesn't natively support.
+**Rationale**: PEAT messages contain rich context (model versions, confidence scores, cell membership) that TAK operators need but CoT doesn't natively support.
 
 **Proposed Schema**:
 
 ```xml
-<_hive_ version="1.0" xmlns:hive="urn:hive:cot:1.0">
+<_peat_ version="1.0" xmlns:peat="urn:peat:cot:1.0">
   <!-- Source attribution -->
   <source platform="Alpha-2" model="Alpha-3" model_version="1.3.0"/>
 
@@ -44479,30 +44479,30 @@ This document captures requirements and recommendations derived from implementin
 
   <!-- Operational status (for capability advertisements) -->
   <status operational="ACTIVE" readiness="0.91"/>
-</_hive_>
+</_peat_>
 ```
 
 **Action Items**:
-- [ ] Add `_hive_` XSD schema to cap-schema
+- [ ] Add `_peat_` XSD schema to cap-schema
 - [ ] Document extension in CoT compatibility guide
 - [ ] Register namespace with TAK ecosystem maintainers (if applicable)
 
 ### 1.2 MIL-STD-2525 Symbol Type Mappings
 
-**Requirement**: Define canonical CoT type codes for HIVE entity classes.
+**Requirement**: Define canonical CoT type codes for PEAT entity classes.
 
 **Proposed Mappings**:
 
-| HIVE Entity | CoT Type | MIL-STD-2525 Description |
+| PEAT Entity | CoT Type | MIL-STD-2525 Description |
 |-------------|----------|--------------------------|
 | Tracked Person (POI) | `a-f-G-E-S` | Friendly Ground Equipment - Sensor |
 | Tracked Vehicle | `a-f-G-E-V` | Friendly Ground Equipment - Vehicle |
 | Unknown Track | `a-u-G` | Unknown Ground |
 | Hostile Track | `a-h-G` | Hostile Ground |
-| HIVE Platform (UGV) | `a-f-G-U-C` | Friendly Ground Unit - Combat |
-| HIVE Platform (UAV) | `a-f-A-M-F-Q` | Friendly Air - Military Fixed Wing - UAV |
-| HIVE Operator | `a-f-G-U-C-I` | Friendly Ground Unit - Infantry |
-| HIVE Cell/Team | `a-f-G-U-C` + links | Friendly Ground Unit with subordinates |
+| PEAT Platform (UGV) | `a-f-G-U-C` | Friendly Ground Unit - Combat |
+| PEAT Platform (UAV) | `a-f-A-M-F-Q` | Friendly Air - Military Fixed Wing - UAV |
+| PEAT Operator | `a-f-G-U-C-I` | Friendly Ground Unit - Infantry |
+| PEAT Cell/Team | `a-f-G-U-C` + links | Friendly Ground Unit with subordinates |
 | Formation | `a-f-G-U-C` + links | Higher echelon unit |
 | Geofence/ROZ | `u-d-r` | Drawing - Route/Area |
 | Mission Tasking | `t-x-m` | Tasking - Mission |
@@ -44514,7 +44514,7 @@ This document captures requirements and recommendations derived from implementin
 
 ### 1.3 Hierarchy Encoding in CoT Links
 
-**Requirement**: Standardize how HIVE's hierarchical relationships map to CoT `<link>` elements.
+**Requirement**: Standardize how PEAT's hierarchical relationships map to CoT `<link>` elements.
 
 **Proposed Convention**:
 
@@ -44626,7 +44626,7 @@ pub enum TakProtocol {
 **Proposed Behavior**:
 1. Queue messages when disconnected (up to configurable limit)
 2. Replay queued messages on reconnection (with staleness filtering)
-3. Prioritize by HIVE priority level (P1 messages first)
+3. Prioritize by PEAT priority level (P1 messages first)
 4. Drop stale messages (past CoT `stale` time)
 
 **Action Items**:
@@ -44674,11 +44674,11 @@ pub enum AggregationPolicy {
 
 ### 3.2 Priority to CoT Flow-Tags Mapping
 
-**Requirement**: Map HIVE QoS priorities (ADR-019) to CoT `_flow-tags_` for TAK-side prioritization.
+**Requirement**: Map PEAT QoS priorities (ADR-019) to CoT `_flow-tags_` for TAK-side prioritization.
 
 **Proposed Mapping**:
 
-| HIVE Priority | CoT Flow-Tag | TAK Behavior |
+| PEAT Priority | CoT Flow-Tag | TAK Behavior |
 |---------------|--------------|--------------|
 | P1 (Critical) | `priority=flash` | Immediate delivery |
 | P2 (High) | `priority=immediate` | High priority |
@@ -44702,20 +44702,20 @@ pub enum AggregationPolicy {
 <event uid="Alpha-3" type="a-f-G-U-C" ...>
   <point lat="33.7749" lon="-84.3958" .../>
   <detail>
-    <_hive_>
+    <_peat_>
       <status operational="ACTIVE" readiness="0.91"/>
       <capability type="OBJECT_TRACKING"
                   model_version="1.3.0"
                   precision="0.94"
                   status="ACTIVE"/>
-    </_hive_>
+    </_peat_>
     <remarks>AI Platform: object_tracker v1.3.0 (Active, 91% ready)</remarks>
   </detail>
 </event>
 ```
 
 **Status Values**:
-| HIVE Status | CoT Representation | TAK Display |
+| PEAT Status | CoT Representation | TAK Display |
 |-------------|-------------------|-------------|
 | `Ready` | `operational="READY"` | Green indicator |
 | `Active` | `operational="ACTIVE"` | Blue/active indicator |
@@ -44735,10 +44735,10 @@ pub enum AggregationPolicy {
 
 **Requirement**: Cryptographically verify commands received from TAK before execution.
 
-**Rationale**: CoT mission tasking (`t-x-m`) received via TAK could be spoofed. HIVE must verify command authority.
+**Rationale**: CoT mission tasking (`t-x-m`) received via TAK could be spoofed. PEAT must verify command authority.
 
 **Proposed Approach**:
-1. TAK client certificate identity maps to HIVE authority level
+1. TAK client certificate identity maps to PEAT authority level
 2. Commands require valid certificate from authorized source
 3. Maintain allowlist of authorized TAK users/certificates
 4. Log all command sources for audit
@@ -44755,14 +44755,14 @@ pub enum AggregationPolicy {
 **Proposed Extension**:
 
 ```xml
-<_hive_>
+<_peat_>
   <classification level="UNCLASSIFIED" caveat="FOUO"/>
-</_hive_>
+</_peat_>
 ```
 
 **Action Items**:
 - [ ] Add classification field to TrackUpdate (if not present)
-- [ ] Encode in CoT `_hive_` extension
+- [ ] Encode in CoT `_peat_` extension
 - [ ] Validate TAK transport supports classification handling
 
 ---
@@ -44771,21 +44771,21 @@ pub enum AggregationPolicy {
 
 These questions from ADR-020 warrant resolution based on M1 POC experience:
 
-### Q5: Should HIVE AI models distribute via TAK data packages?
+### Q5: Should PEAT AI models distribute via TAK data packages?
 
-**Recommendation**: No, keep model distribution on HIVE's content-addressed blob transport.
+**Recommendation**: No, keep model distribution on PEAT's content-addressed blob transport.
 
 **Rationale**:
 - TAK data packages have size limits (~50MB typical)
-- HIVE's Iroh-based blob transport provides hash verification, resumable transfers
+- PEAT's Iroh-based blob transport provides hash verification, resumable transfers
 - Model updates are P5 (bulk) priority - shouldn't compete with tactical data on TAK
-- Keep separation of concerns: TAK for SA, HIVE for autonomy coordination
+- Keep separation of concerns: TAK for SA, PEAT for autonomy coordination
 
-**Action**: Add explicit statement to ADR-020 that model distribution remains HIVE-internal.
+**Action**: Add explicit statement to ADR-020 that model distribution remains PEAT-internal.
 
-### Q7: Should HIVE cells appear as TAK "groups"?
+### Q7: Should PEAT cells appear as TAK "groups"?
 
-**Recommendation**: Yes, map HIVE cells to TAK contact groups.
+**Recommendation**: Yes, map PEAT cells to TAK contact groups.
 
 **Rationale**:
 - Natural fit for operators managing multiple teams
@@ -44807,11 +44807,11 @@ These questions from ADR-020 warrant resolution based on M1 POC experience:
 **Context**: In M1 vignette, Alpha and Bravo teams may independently detect the same POI. Should bridge correlate before sending to TAK?
 
 **Options**:
-1. **Bridge correlates**: Single track UID in TAK, sources noted in `_hive_`
+1. **Bridge correlates**: Single track UID in TAK, sources noted in `_peat_`
 2. **TAK correlates**: Multiple tracks with same description, operator correlates
 3. **Formation correlates**: Coordinator correlates before bridge, single track to TAK
 
-**Recommendation**: Option 3 (Formation correlates). This aligns with HIVE's hierarchical aggregation philosophy.
+**Recommendation**: Option 3 (Formation correlates). This aligns with PEAT's hierarchical aggregation philosophy.
 
 ---
 
@@ -44821,7 +44821,7 @@ Based on M1 POC findings, recommend creating:
 
 ### ADR-0XX: CoT Custom Detail Extension Schema
 
-**Scope**: Define the `_hive_` XML namespace and schema for embedding HIVE metadata in CoT messages.
+**Scope**: Define the `_peat_` XML namespace and schema for embedding PEAT metadata in CoT messages.
 
 **Why Separate ADR**: This is a contract with external systems (TAK ecosystem) and warrants dedicated documentation and versioning.
 
@@ -44833,9 +44833,9 @@ Based on M1 POC findings, recommend creating:
 
 ### ADR-0XX: Track Correlation and Deduplication
 
-**Scope**: Define how HIVE correlates tracks from multiple sources before external publication.
+**Scope**: Define how PEAT correlates tracks from multiple sources before external publication.
 
-**Why Separate ADR**: Affects both internal HIVE behavior and external representations in TAK.
+**Why Separate ADR**: Affects both internal PEAT behavior and external representations in TAK.
 
 ---
 
@@ -44847,7 +44847,7 @@ Based on M1 vignette requirements:
 1. CoT encoder for `TrackUpdate` → CoT Event
 2. CoT encoder for `CapabilityAdvertisement` → CoT Event
 3. Basic TAK Server TCP connection
-4. `_hive_` detail extension (minimal)
+4. `_peat_` detail extension (minimal)
 
 ### Phase 2 (Full M1)
 1. CoT decoder for `t-x-m` → `TrackCommand`
@@ -44876,7 +44876,7 @@ Based on M1 vignette requirements:
 | Test | Description | Success Criteria |
 |------|-------------|------------------|
 | TC-01 | TrackUpdate → CoT → ATAK | Track visible on ATAK map within 2s |
-| TC-02 | ATAK mission task → TrackCommand | Command received by HIVE team |
+| TC-02 | ATAK mission task → TrackCommand | Command received by PEAT team |
 | TC-03 | Capability advertisement | Platform capabilities visible in ATAK |
 | TC-04 | Track handoff | Handoff link visible, track transfers |
 | TC-05 | DIL resilience | Messages queue, replay on reconnect |
@@ -44887,7 +44887,7 @@ Based on M1 vignette requirements:
 ## References
 
 - [ADR-020: TAK-CoT Integration](../../../cap/docs/adr/020-TAK-CoT-Integration.md)
-- [M1 Vignette Use Case](./HIVE-Vignette-M1/VIGNETTE_USE_CASE.md)
+- [M1 Vignette Use Case](./PEAT-Vignette-M1/VIGNETTE_USE_CASE.md)
 - [CoT Schema Mapping](./COT_SCHEMA_MAPPING.md) (companion document)
 - [cottak crate](https://docs.rs/cottak/latest/cottak/)
 - [CoT Developer's Guide](https://tutorials.techrad.co.za/wp-content/uploads/2021/06/The-Developers-Guide-to-Cursor-on-Target-1.pdf)
@@ -44898,7 +44898,7 @@ Based on M1 vignette requirements:
 
 ## Executive Summary
 
-For HIVE Protocol's Automerge + Iroh implementation, **redb is the recommended choice**, primarily because Iroh already uses redb for its storage layer. This provides:
+For PEAT Protocol's Automerge + Iroh implementation, **redb is the recommended choice**, primarily because Iroh already uses redb for its storage layer. This provides:
 - Proven integration patterns with CRDT-sync use cases
 - Battle-tested async/sync bridging patterns documented by Iroh team
 - Ecosystem alignment with your primary networking dependency
@@ -45077,7 +45077,7 @@ However, fjall offers compelling advantages for write-heavy scenarios and should
 
 ---
 
-## HIVE-Specific Considerations
+## PEAT-Specific Considerations
 
 ### Iroh Integration (Critical Factor)
 
@@ -45092,11 +45092,11 @@ The Iroh team has documented their async/sync bridging patterns:
 // for bridging async Tokio tasks with sync redb operations
 ```
 
-This means proven patterns exist for the exact use case HIVE needs.
+This means proven patterns exist for the exact use case PEAT needs.
 
 ### CRDT Workload Analysis
 
-For HIVE's Automerge document sync:
+For PEAT's Automerge document sync:
 
 | Workload Pattern | Better Choice | Reasoning |
 |-----------------|---------------|-----------|
@@ -45135,7 +45135,7 @@ For HIVE's Automerge document sync:
 
 ---
 
-## Recommendation for HIVE
+## Recommendation for PEAT
 
 ### Primary: redb
 
@@ -45147,7 +45147,7 @@ For HIVE's Automerge document sync:
 
 ### When to Consider fjall
 
-- If HIVE workload becomes heavily write-dominated
+- If PEAT workload becomes heavily write-dominated
 - If storage efficiency becomes critical constraint
 - If batch sync operations dominate over individual updates
 - If deletion-heavy patterns emerge (TTL expiration)
@@ -45161,7 +45161,7 @@ For HIVE's Automerge document sync:
 use redb::{Database, TableDefinition};
 use tokio::sync::mpsc;
 
-// HIVE storage actor pattern (similar to Iroh)
+// PEAT storage actor pattern (similar to Iroh)
 struct StorageActor {
     db: Database,
     rx: mpsc::Receiver<StorageCommand>,

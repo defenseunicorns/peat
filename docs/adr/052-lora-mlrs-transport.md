@@ -1,16 +1,16 @@
-# ADR-052: HIVE-LoRa Long-Range Radio Transport
+# ADR-052: PEAT-LoRa Long-Range Radio Transport
 
 **Status**: Proposed
 **Date**: 2026-02-25
 **Authors**: Kit Plummer, Claude
 **Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)
-**Relates To**: ADR-032 (Pluggable Transport Abstraction), ADR-035 (HIVE-Lite Embedded Nodes), ADR-039 (HIVE-BTLE Mesh Transport), ADR-041 (Multi-Transport Embedded Integration), ADR-051 (HIVE-SBD Satellite Transport)
+**Relates To**: ADR-032 (Pluggable Transport Abstraction), ADR-035 (PEAT-Lite Embedded Nodes), ADR-039 (PEAT-BTLE Mesh Transport), ADR-041 (Multi-Transport Embedded Integration), ADR-051 (PEAT-SBD Satellite Transport)
 
 ---
 
 ## Executive Summary
 
-This ADR defines the architecture for `hive-lora`, a Rust crate providing long-range LoRa radio transport for HIVE Protocol. The crate fills the 7-87 km range gap between BLE mesh (100-400m) and SBD satellite (global), targeting remote sensor relay, forward observer links, and cross-ridge communication where IP infrastructure is unavailable. A single crate provides two feature-gated link backends: `mlrs-serial` for Linux/desktop nodes communicating via mLRS hardware over UART/USB, and `lora-phy` for embedded nodes (ESP32 + SX1262) driving LoRa chipsets directly. Both backends share the same over-the-air frame format and implement the ADR-032 `Transport` trait as an external transport extension, following the pattern established by `hive-btle` and `hive-sbd`.
+This ADR defines the architecture for `peat-lora`, a Rust crate providing long-range LoRa radio transport for PEAT Protocol. The crate fills the 7-87 km range gap between BLE mesh (100-400m) and SBD satellite (global), targeting remote sensor relay, forward observer links, and cross-ridge communication where IP infrastructure is unavailable. A single crate provides two feature-gated link backends: `mlrs-serial` for Linux/desktop nodes communicating via mLRS hardware over UART/USB, and `lora-phy` for embedded nodes (ESP32 + SX1262) driving LoRa chipsets directly. Both backends share the same over-the-air frame format and implement the ADR-032 `Transport` trait as an external transport extension, following the pattern established by `peat-btle` and `peat-sbd`.
 
 ---
 
@@ -18,18 +18,18 @@ This ADR defines the architecture for `hive-lora`, a Rust crate providing long-r
 
 ### The Long-Range Gap
 
-HIVE's current transport options cover short-range and global communication, but leave a critical gap in between:
+PEAT's current transport options cover short-range and global communication, but leave a critical gap in between:
 
 | Transport | Range | Bandwidth | Latency | Power | Use Case |
 |-----------|-------|-----------|---------|-------|----------|
 | QUIC/Iroh | Unlimited (IP) | 1-100 Mbps | 1-50ms | Low | Primary mesh |
-| hive-btle | 100-400m (Coded PHY) | 2 Mbps | 10-100ms | Very Low | Device mesh |
+| peat-btle | 100-400m (Coded PHY) | 2 Mbps | 10-100ms | Very Low | Device mesh |
 | **??? (Gap)** | **7-87 km** | **1.5-9.1 kB/s** | **50-500ms** | **Low** | **Long-range relay** |
-| hive-sbd | Global | ~33 B/s | 5-20s | ~1.5W TX | Emergency PACE |
+| peat-sbd | Global | ~33 B/s | 5-20s | ~1.5W TX | Emergency PACE |
 
 Tactical edge operations regularly need communication across distances that BLE cannot reach but where satellite is overkill or too slow:
 
-| Scenario | Gap | HIVE Use Case |
+| Scenario | Gap | PEAT Use Case |
 |----------|-----|---------------|
 | Cross-ridge relay | 5-15 km, no line-of-sight to IP | Forward observer ↔ command post PLI |
 | Remote sensor network | 10-50 km, no infrastructure | Environmental / seismic sensor data relay |
@@ -51,14 +51,14 @@ mLRS (Mavlink LoRa System) is an open-source LoRa firmware that provides transpa
 | **Infrastructure** | None (peer-to-peer) | None (peer-to-peer) | Requires gateway + network server |
 | **Range** | 7-87 km (mLRS optimized) | 5-50 km (depends on params) | 2-15 km typical |
 
-mLRS is the fastest path to long-range capability—connect mLRS modules to UART/USB, push HIVE frames through the serial link. Direct LoRa via `lora-phy` enables embedded nodes (ESP32 + SX1262) to participate without separate mLRS hardware.
+mLRS is the fastest path to long-range capability—connect mLRS modules to UART/USB, push PEAT frames through the serial link. Direct LoRa via `lora-phy` enables embedded nodes (ESP32 + SX1262) to participate without separate mLRS hardware.
 
 ### Why a Single Crate with Feature Flags?
 
 Both link backends share the same over-the-air frame format, the same `Transport` trait implementation, and the same gateway bridge logic. Splitting into two crates would duplicate the frame codec, fragmentation logic, and transport layer:
 
 ```
-hive-lora/
+peat-lora/
 ├── src/
 │   ├── frame.rs         # Shared frame format (both backends)
 │   ├── transport.rs     # Shared Transport trait impl
@@ -72,21 +72,21 @@ Feature flags keep the dependency footprint minimal: `mlrs-serial` pulls in `tok
 
 ### External Crate Pattern
 
-Like `hive-btle` and `hive-sbd`, `hive-lora` will be developed as an external crate, following the established pattern:
+Like `peat-btle` and `peat-sbd`, `peat-lora` will be developed as an external crate, following the established pattern:
 
 ```
-hive (main repo)
-├── hive-protocol/    ← Transport trait definitions (ADR-032)
-├── hive-ffi/         ← FFI bindings with LoRa config
+peat (main repo)
+├── peat-protocol/    ← Transport trait definitions (ADR-032)
+├── peat-ffi/         ← FFI bindings with LoRa config
 └── ...
 
-hive-btle (external) ← BLE mesh transport
+peat-btle (external) ← BLE mesh transport
     └── rad:z458mp9Um3AYNQQFMdHaNEUtmiohq
 
-hive-sbd (external)  ← SBD satellite transport
+peat-sbd (external)  ← SBD satellite transport
     └── rad:zXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
-hive-lora (external) ← LoRa long-range transport [NEW]
+peat-lora (external) ← LoRa long-range transport [NEW]
     └── rad:zXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ```
 
@@ -99,7 +99,7 @@ hive-lora (external) ← LoRa long-range transport [NEW]
 1. **Long-Range**: 7-87 km depending on frequency band and terrain
 2. **Low Power**: Suitable for battery-powered field devices (< 1W transmit)
 3. **No Infrastructure**: Peer-to-peer links, no gateways or network servers required
-4. **HIVE Transport Trait**: Implement ADR-032 `Transport` trait for TransportManager integration
+4. **PEAT Transport Trait**: Implement ADR-032 `Transport` trait for TransportManager integration
 5. **Dual Link Backends**: mLRS serial bridge (Linux) and direct LoRa radio (embedded)
 6. **Shared Frame Format**: Identical over-the-air encoding regardless of link backend
 7. **Gateway Bridge**: Linux nodes bridge LoRa ↔ IP mesh per ADR-041
@@ -121,12 +121,12 @@ hive-lora (external) ← LoRa long-range transport [NEW]
 
 ### Architecture
 
-`hive-lora` implements the ADR-032 `Transport` trait with a link abstraction layer that supports both mLRS serial bridge and direct LoRa radio backends.
+`peat-lora` implements the ADR-032 `Transport` trait with a link abstraction layer that supports both mLRS serial bridge and direct LoRa radio backends.
 
 ### Crate Structure
 
 ```
-hive-lora/
+peat-lora/
 ├── src/
 │   ├── lib.rs              # Public API, re-exports, feature gates
 │   ├── transport.rs         # Transport trait implementation (ADR-032)
@@ -196,13 +196,13 @@ pub trait LoRaLink: Send + Sync {
 
 ### Over-the-Air Frame Format
 
-Both backends use the same frame format on the wire. The frame wraps an eche-lite protocol payload (ADR-035) with a minimal header:
+Both backends use the same frame format on the wire. The frame wraps a peat-lite protocol payload (ADR-035) with a minimal header:
 
 ```rust
 /// LoRa over-the-air frame format
 ///
 /// Header (3 bytes):
-///   [0]     Marker byte (0xEC — "eche")
+///   [0]     Marker byte (0xEC — "peat")
 ///   [1]     Flags (1 byte)
 ///             bit 0:   fragmented (1 = fragment, 0 = complete)
 ///             bit 1:   encrypted (1 = app-layer encryption)
@@ -212,7 +212,7 @@ Both backends use the same frame format on the wire. The frame wraps an eche-lit
 ///   [2]     Payload length (1 byte, max 252)
 ///
 /// Payload (up to 249 bytes unfragmented, or per-fragment):
-///   eche-lite protocol header (16 bytes, ADR-035) + CRDT data
+///   peat-lite protocol header (16 bytes, ADR-035) + CRDT data
 ///
 /// Total: max 252 bytes (matching mLRS serial frame limit)
 ///
@@ -289,7 +289,7 @@ pub const FRAGMENT_HEADER_SIZE: usize = 3;
 pub const FRAGMENT_MAX_PAYLOAD: usize = LORA_MAX_PAYLOAD_SIZE - FRAGMENT_HEADER_SIZE; // 246
 ```
 
-At LoRa data rates (1.5-9.1 kB/s), fragmentation should be kept to a minimum. Most HIVE messages (PLI, status, CRDT deltas) fit in a single frame. Fragmentation is available for larger payloads but not the common case.
+At LoRa data rates (1.5-9.1 kB/s), fragmentation should be kept to a minimum. Most PEAT messages (PLI, status, CRDT deltas) fit in a single frame. Fragmentation is available for larger payloads but not the common case.
 
 ### Core Types
 
@@ -377,7 +377,7 @@ pub enum Region {
 /// Pre-configured peer entry
 #[derive(Debug, Clone)]
 pub struct PeerEntry {
-    /// HIVE node ID (hex string)
+    /// PEAT node ID (hex string)
     pub node_id: String,
     /// Human-readable label
     pub label: Option<String>,
@@ -387,7 +387,7 @@ pub struct PeerEntry {
 ### Transport Trait Implementation
 
 ```rust
-pub struct HiveLoRaTransport {
+pub struct PeatLoRaTransport {
     config: LoRaConfig,
     link: Arc<dyn LoRaLink>,
     capabilities: TransportCapabilities,
@@ -397,7 +397,7 @@ pub struct HiveLoRaTransport {
 }
 
 #[async_trait]
-impl Transport for HiveLoRaTransport {
+impl Transport for PeatLoRaTransport {
     fn capabilities(&self) -> &TransportCapabilities {
         &self.capabilities
     }
@@ -421,7 +421,7 @@ impl Transport for HiveLoRaTransport {
     }
 }
 
-impl HiveLoRaTransport {
+impl PeatLoRaTransport {
     pub fn new(config: LoRaConfig) -> Result<Self, LoRaError> {
         let (data_rate, range, latency) = match config.band.region {
             Region::Ism2400 => (9_100, 7_000, 50),      // 9.1 kB/s, 7 km, 50ms
@@ -474,7 +474,7 @@ impl HiveLoRaTransport {
         })
     }
 
-    /// Send a HIVE message over LoRa
+    /// Send a PEAT message over LoRa
     pub async fn send_message(&self, payload: &[u8]) -> Result<(), LoRaError> {
         // Check duty cycle budget
         if let Some(ref tracker) = self.duty_cycle {
@@ -534,7 +534,7 @@ LoRa performance varies significantly by frequency band. These figures assume mL
 
 ### Topology: Point-to-Point with Gateway Bridge
 
-LoRa links in HIVE are point-to-point, not mesh. A Linux gateway node bridges LoRa traffic into the IP mesh, following the ADR-041 multi-transport gateway pattern:
+LoRa links in PEAT are point-to-point, not mesh. A Linux gateway node bridges LoRa traffic into the IP mesh, following the ADR-041 multi-transport gateway pattern:
 
 ```
                 LoRa Radio Link (7-87 km)
@@ -544,18 +544,18 @@ LoRa links in HIVE are point-to-point, not mesh. A Linux gateway node bridges Lo
 │  Remote Sensor   │                    │  Gateway Node    │
 │  (ESP32+SX1262)  │   LoRa frames     │  (Linux+mLRS)    │
 │  ┌─────────────┐ │◄─────────────────►│ ┌─────────────┐  │
-│  │ eche-lite   │ │                    │ │ hive-lora    │  │
-│  │ hive-lora   │ │                    │ │ (mlrs-serial)│  │
+│  │ peat-lite   │ │                    │ │ peat-lora    │  │
+│  │ peat-lora   │ │                    │ │ (mlrs-serial)│  │
 │  │ (lora-phy)  │ │                    │ └──────┬───────┘  │
 │  └─────────────┘ │                    │        │          │
 └──────────────────┘                    │ ┌──────▼───────┐  │
-                                        │ │ HIVE Node    │  │
+                                        │ │ PEAT Node    │  │
                                         │ │ (QUIC/Iroh)  │  │
                                         │ └──────┬───────┘  │
                                         └────────┼──────────┘
                                                  │
                                         ┌────────▼──────────┐
-                                        │   HIVE IP Mesh    │
+                                        │   PEAT IP Mesh    │
                                         │   (Full CRDT sync)│
                                         └───────────────────┘
 ```
@@ -564,15 +564,15 @@ Multiple remote nodes can each have a dedicated LoRa link to the gateway (separa
 
 ### Discovery
 
-**mLRS serial mode**: Peers are pre-configured. The mLRS link is established at the radio firmware level (binding); HIVE sees a connected serial port. The `peers` list in `LoRaConfig` maps HIVE node IDs to known LoRa endpoints.
+**mLRS serial mode**: Peers are pre-configured. The mLRS link is established at the radio firmware level (binding); PEAT sees a connected serial port. The `peers` list in `LoRaConfig` maps PEAT node IDs to known LoRa endpoints.
 
-**Direct LoRa mode**: Optional beacon-based discovery. Nodes periodically transmit a beacon frame containing their HIVE node ID and capabilities. Receiving nodes add discovered peers to their local peer table.
+**Direct LoRa mode**: Optional beacon-based discovery. Nodes periodically transmit a beacon frame containing their PEAT node ID and capabilities. Receiving nodes add discovered peers to their local peer table.
 
 ```rust
 /// Beacon frame payload (fits in a single LoRa frame)
 ///
 ///   [0-15]   Node ID (16 bytes)
-///   [16]     Capabilities bitfield (NodeCapabilities from eche-lite)
+///   [16]     Capabilities bitfield (NodeCapabilities from peat-lite)
 ///   [17-18]  Beacon sequence number (2 bytes, big-endian)
 ///   [19]     TX power (dBm, signed)
 ///
@@ -592,7 +592,7 @@ Two layers of encryption protect LoRa traffic:
 
 1. **Link-layer (mLRS only)**: mLRS firmware provides AES encryption of the radio link. This protects against casual eavesdropping but uses a shared key configured in mLRS firmware.
 
-2. **Application-layer (both backends)**: HIVE app-layer ChaCha20-Poly1305 encryption using a pre-shared key (PSK). This protects the HIVE payload end-to-end, even if the link layer is compromised or absent (direct LoRa mode).
+2. **Application-layer (both backends)**: PEAT app-layer ChaCha20-Poly1305 encryption using a pre-shared key (PSK). This protects the PEAT payload end-to-end, even if the link layer is compromised or absent (direct LoRa mode).
 
 ```rust
 /// Encrypt payload with ChaCha20-Poly1305
@@ -616,7 +616,7 @@ pub fn encrypt_payload(plaintext: &[u8], psk: &[u8; 32]) -> Result<Vec<u8>, LoRa
 }
 ```
 
-Note: The 12-byte nonce + 16-byte AEAD tag adds 28 bytes of overhead per frame. With a 249-byte payload limit, this leaves 221 bytes for the eche-lite protocol header + CRDT data when encryption is enabled.
+Note: The 12-byte nonce + 16-byte AEAD tag adds 28 bytes of overhead per frame. With a 249-byte payload limit, this leaves 221 bytes for the peat-lite protocol header + CRDT data when encryption is enabled.
 
 ### Duty Cycle Compliance
 
@@ -648,9 +648,9 @@ impl DutyCycleTracker {
 
 ### MAVLink and UAS Integration
 
-mLRS — "MAVLink LoRa System" — was originally designed for MAVLink telemetry, the standard protocol for drone autopilot communication (ArduPilot, PX4). This heritage creates a natural synergy with HIVE's UAS integration architecture (see CAP Protocol Technology Deep Dive, ROS-CAP Bridge):
+mLRS — "MAVLink LoRa System" — was originally designed for MAVLink telemetry, the standard protocol for drone autopilot communication (ArduPilot, PX4). This heritage creates a natural synergy with PEAT's UAS integration architecture (see CAP Protocol Technology Deep Dive, ROS-CAP Bridge):
 
-**Shared radio link**: mLRS supports multiple serial channels on a single LoRa link. A companion computer on a UAS can multiplex HIVE sync frames and MAVLink telemetry over the same mLRS radio, eliminating the need for separate data links:
+**Shared radio link**: mLRS supports multiple serial channels on a single LoRa link. A companion computer on a UAS can multiplex PEAT sync frames and MAVLink telemetry over the same mLRS radio, eliminating the need for separate data links:
 
 ```
 ┌──────────────────────────────────┐
@@ -658,7 +658,7 @@ mLRS — "MAVLink LoRa System" — was originally designed for MAVLink telemetry
 │  ┌────────────┐ ┌──────────────┐ │
 │  │ Autopilot  │ │ Companion    │ │
 │  │ (PX4/Ardu) │ │ (Jetson/Pi)  │ │
-│  │ MAVLink    │ │ HIVE + ROS   │ │
+│  │ MAVLink    │ │ PEAT + ROS   │ │
 │  └─────┬──────┘ └──────┬───────┘ │
 │        │  UART1         │  UART2  │
 │  ┌─────▼────────────────▼──────┐ │
@@ -674,17 +674,17 @@ mLRS — "MAVLink LoRa System" — was originally designed for MAVLink telemetry
 │  └─────┬────────────────┬──────┘ │
 │        │  UART1         │  UART2  │
 │  ┌─────▼──────┐ ┌──────▼───────┐ │
-│  │ GCS        │ │ HIVE Gateway │ │
-│  │ (QGroundC) │ │ (hive-lora)  │ │
+│  │ GCS        │ │ PEAT Gateway │ │
+│  │ (QGroundC) │ │ (peat-lora)  │ │
 │  └────────────┘ └──────────────┘ │
 │  Ground Station                   │
 └───────────────────────────────────┘
 ```
 
 **Design implications**:
-- `hive-lora` treats the mLRS serial port as a transparent byte pipe — it is unaware of MAVLink traffic on other serial channels
-- Frame marker byte `0xEC` ensures HIVE frames are distinguishable from MAVLink frames (`0xFD` for MAVLink v2) if sharing a single serial channel
-- Future work: optional MAVLink passthrough mode where `hive-lora` can forward MAVLink position data into HIVE CRDTs, bridging UAS telemetry directly into the HIVE mesh without a separate ROS-CAP bridge
+- `peat-lora` treats the mLRS serial port as a transparent byte pipe — it is unaware of MAVLink traffic on other serial channels
+- Frame marker byte `0xEC` ensures PEAT frames are distinguishable from MAVLink frames (`0xFD` for MAVLink v2) if sharing a single serial channel
+- Future work: optional MAVLink passthrough mode where `peat-lora` can forward MAVLink position data into PEAT CRDTs, bridging UAS telemetry directly into the PEAT mesh without a separate ROS-CAP bridge
 
 ### PACE Integration
 
@@ -718,7 +718,7 @@ LoRa is a natural **alternate or contingency** transport:
 
 For remote sensor deployments, LoRa may serve as the **primary** transport when sensors are deployed beyond BLE range with no IP connectivity.
 
-### hive-ffi Integration
+### peat-ffi Integration
 
 Extend `TransportConfigFFI` (per ADR-050) to support LoRa:
 
@@ -767,10 +767,10 @@ pub struct TransportConfigFFI {
 
 ### Phase 3: Transport Trait + Gateway Bridge
 
-- [ ] Implement `HiveLoRaTransport` (ADR-032 `Transport` trait)
+- [ ] Implement `PeatLoRaTransport` (ADR-032 `Transport` trait)
 - [ ] Pre-configured peer routing
 - [ ] Signal quality mapping (RSSI → 0-100)
-- [ ] Gateway bridge: LoRa frames ↔ HIVE mesh messages (ADR-041 pattern)
+- [ ] Gateway bridge: LoRa frames ↔ PEAT mesh messages (ADR-041 pattern)
 - [ ] Integration tests with mock link
 
 ### Phase 4: Direct LoRa Radio (Embedded)
@@ -804,10 +804,10 @@ pub struct TransportConfigFFI {
 
 ### Functional Requirements
 
-- [ ] Send/receive HIVE messages via mLRS serial bridge (Linux)
-- [ ] Send/receive HIVE messages via direct SX1262 radio (ESP32)
+- [ ] Send/receive PEAT messages via mLRS serial bridge (Linux)
+- [ ] Send/receive PEAT messages via direct SX1262 radio (ESP32)
 - [ ] Fragment and reassemble messages exceeding 249 bytes
-- [ ] Gateway bridge relays LoRa traffic into HIVE IP mesh
+- [ ] Gateway bridge relays LoRa traffic into PEAT IP mesh
 - [ ] Pre-configured peer discovery works for mLRS mode
 - [ ] Beacon-based discovery works for direct LoRa mode
 - [ ] App-layer encryption protects payload end-to-end
@@ -828,7 +828,7 @@ pub struct TransportConfigFFI {
 - [ ] Integration tests with mock serial port
 - [ ] Hardware-in-the-loop tests with mLRS modules (915 MHz)
 - [ ] Hardware-in-the-loop tests with ESP32 + SX1262
-- [ ] End-to-end test: remote sensor → LoRa → gateway → HIVE mesh → response → LoRa → sensor
+- [ ] End-to-end test: remote sensor → LoRa → gateway → PEAT mesh → response → LoRa → sensor
 - [ ] Range test at 915 MHz: verify > 10 km line-of-sight
 
 ---
@@ -869,24 +869,24 @@ pub struct TransportConfigFFI {
 
 ## Alternatives Considered
 
-### Option 1: Separate Crates (hive-lora-mlrs + hive-lora-direct)
+### Option 1: Separate Crates (peat-lora-mlrs + peat-lora-direct)
 **Pros**: Cleaner dependency separation, each crate is simpler
 **Cons**: Duplicates frame format, fragmentation, transport trait implementation; two crates to version and publish
 **Decision**: Single crate with feature flags avoids duplication and ensures frame format consistency.
 
 ### Option 2: LoRaWAN (The Things Network / Helium)
 **Pros**: Established ecosystem, public network coverage in urban areas
-**Cons**: Uplink-dominant design (poor for bidirectional HIVE sync), 51-byte payload limit (SF12), requires LoRaWAN gateways (infrastructure dependency), class A latency of 1-5 seconds, not suitable for peer-to-peer tactical use
-**Decision**: LoRaWAN's gateway-centric architecture and tiny payloads are fundamentally misaligned with HIVE's peer-to-peer model. Raw LoRa (via mLRS or direct) provides the full 252-byte frame and true peer-to-peer operation.
+**Cons**: Uplink-dominant design (poor for bidirectional PEAT sync), 51-byte payload limit (SF12), requires LoRaWAN gateways (infrastructure dependency), class A latency of 1-5 seconds, not suitable for peer-to-peer tactical use
+**Decision**: LoRaWAN's gateway-centric architecture and tiny payloads are fundamentally misaligned with PEAT's peer-to-peer model. Raw LoRa (via mLRS or direct) provides the full 252-byte frame and true peer-to-peer operation.
 
 ### Option 3: Meshtastic
 **Pros**: Popular open-source LoRa mesh, large community, built-in mesh routing
-**Cons**: Opinionated protocol (protobuf-based, own message types), not a transparent bridge, mesh routing adds latency and complexity, would require adapting HIVE protocol to Meshtastic's message format rather than using native eche-lite framing
-**Decision**: mLRS's transparent serial passthrough lets HIVE use its own frame format directly. Meshtastic's mesh layer would conflict with HIVE's own routing and sync logic.
+**Cons**: Opinionated protocol (protobuf-based, own message types), not a transparent bridge, mesh routing adds latency and complexity, would require adapting PEAT protocol to Meshtastic's message format rather than using native peat-lite framing
+**Decision**: mLRS's transparent serial passthrough lets PEAT use its own frame format directly. Meshtastic's mesh layer would conflict with PEAT's own routing and sync logic.
 
-### Option 4: Integrate into hive-btle
+### Option 4: Integrate into peat-btle
 **Pros**: Reuse existing external transport infrastructure
-**Cons**: BLE and LoRa are fundamentally different radios with different APIs, ranges, data rates, and regulatory requirements; would bloat hive-btle with unrelated radio code; different dependency trees (BlueZ/CoreBluetooth vs tokio-serial/lora-phy)
+**Cons**: BLE and LoRa are fundamentally different radios with different APIs, ranges, data rates, and regulatory requirements; would bloat peat-btle with unrelated radio code; different dependency trees (BlueZ/CoreBluetooth vs tokio-serial/lora-phy)
 **Decision**: Separate crate follows the established pattern of one transport per crate.
 
 ---
@@ -898,12 +898,12 @@ pub struct TransportConfigFFI {
 3. [Semtech SX1262 Datasheet](https://www.semtech.com/products/wireless-rf/lora-connect/sx1262) - Target LoRa transceiver
 4. [LoRa Alliance — LoRa Technology Overview](https://lora-alliance.org/about-lorawan/) - LoRa modulation background
 5. ADR-032: Pluggable Transport Abstraction
-6. ADR-035: HIVE-Lite Embedded Nodes (eche-lite protocol)
-7. ADR-039: HIVE-BTLE Mesh Transport Crate
+6. ADR-035: PEAT-Lite Embedded Nodes (peat-lite protocol)
+7. ADR-039: PEAT-BTLE Mesh Transport Crate
 8. ADR-041: Multi-Transport Embedded Integration
-9. ADR-051: HIVE-SBD Satellite Transport
+9. ADR-051: PEAT-SBD Satellite Transport
 10. [MAVLink Protocol](https://mavlink.io/en/) - Standard UAS telemetry protocol (mLRS's native payload)
-11. [hive-btle on Radicle](https://app.radicle.xyz/nodes/rosa.radicle.xyz/rad%3Az458mp9Um3AYNQQFMdHaNEUtmiohq) - External transport crate pattern
+11. [peat-btle on Radicle](https://app.radicle.xyz/nodes/rosa.radicle.xyz/rad%3Az458mp9Um3AYNQQFMdHaNEUtmiohq) - External transport crate pattern
 12. CAP Protocol Technology Deep Dive (ROS-CAP Bridge, MAVLink/mavros integration)
 
 ---
@@ -917,17 +917,17 @@ pub struct TransportConfigFFI {
 | 2026-02-25 | mLRS as primary serial bridge | Open-source, transparent serial passthrough, proven 87 km range, no protocol adaptation needed |
 | 2026-02-25 | Direct LoRa via lora-phy for embedded | Enables ESP32+SX1262 nodes without separate mLRS hardware |
 | 2026-02-25 | Point-to-point topology (not mesh) | LoRa is half-duplex; mesh adds latency and complexity; gateway bridge to IP mesh is cleaner (ADR-041) |
-| 2026-02-25 | ChaCha20-Poly1305 app-layer encryption | Consistent with HIVE security model; supplements mLRS link-layer AES |
+| 2026-02-25 | ChaCha20-Poly1305 app-layer encryption | Consistent with PEAT security model; supplements mLRS link-layer AES |
 
 ---
 
 **Next Steps:**
 1. Review and approve ADR
-2. Create `hive-lora` Radicle repository
+2. Create `peat-lora` Radicle repository
 3. Phase 1: Frame format + core types (pure Rust, no hardware)
 4. Acquire mLRS-compatible modules (SX1262-based) for hardware-in-the-loop testing
 5. Phase 2: mLRS serial link integration on Linux
 6. Phase 4: ESP32 + SX1262 direct radio integration
 
 **Radicle:**
-- Create `rad:z...` for hive-lora (pending approval)
+- Create `rad:z...` for peat-lora (pending approval)

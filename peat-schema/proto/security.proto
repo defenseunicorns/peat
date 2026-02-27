@@ -1,0 +1,119 @@
+// Security message types for PEAT Protocol Device Authentication (PKI)
+// Version: 1.0.0
+// Related: ADR-006, Issue #160
+
+syntax = "proto3";
+
+package cap.security.v1;
+
+import "common.proto";
+
+// Device type classification per ADR-006
+enum DeviceType {
+  DEVICE_TYPE_UNSPECIFIED = 0;
+  DEVICE_TYPE_UAV = 1;           // Unmanned Aerial Vehicle
+  DEVICE_TYPE_UGV = 2;           // Unmanned Ground Vehicle
+  DEVICE_TYPE_USV = 3;           // Unmanned Surface Vehicle
+  DEVICE_TYPE_SOLDIER_SYSTEM = 4; // Soldier/Dismounted System
+  DEVICE_TYPE_C2_STATION = 5;     // Command & Control Station
+  DEVICE_TYPE_RELAY_NODE = 6;     // Relay/Communication Node
+  DEVICE_TYPE_SENSOR_PLATFORM = 7; // Sensor Platform (static)
+}
+
+// Hierarchy level for organizational units
+enum HierarchyLevel {
+  HIERARCHY_LEVEL_UNSPECIFIED = 0;
+  HIERARCHY_LEVEL_SQUAD = 1;
+  HIERARCHY_LEVEL_PLATOON = 2;
+  HIERARCHY_LEVEL_COMPANY = 3;
+  HIERARCHY_LEVEL_BATTALION = 4;
+  HIERARCHY_LEVEL_BRIGADE = 5;
+  HIERARCHY_LEVEL_DIVISION = 6;
+}
+
+// Device identity information
+message DeviceIdentity {
+  // Unique device identifier (hex-encoded, 32 chars from SHA-256 of public key)
+  string device_id = 1;
+
+  // Ed25519 public key (32 bytes)
+  bytes public_key = 2;
+
+  // Device type classification
+  DeviceType device_type = 3;
+
+  // Organization unit level
+  HierarchyLevel organization_level = 4;
+
+  // Organization unit identifier (e.g., "1-502" for 1st Battalion, 502nd Regiment)
+  string organization_unit_id = 5;
+
+  // Common name / call sign
+  string common_name = 6;
+
+  // X.509 certificate chain (DER-encoded, leaf first) - optional for MVP
+  repeated bytes certificates = 7;
+}
+
+// Authentication challenge for peer verification
+message Challenge {
+  // Random nonce (32 bytes) for replay protection
+  bytes nonce = 1;
+
+  // Challenge creation timestamp
+  cap.common.v1.Timestamp timestamp = 2;
+
+  // Challenger's device ID (hex string)
+  string challenger_id = 3;
+
+  // Challenge expiration timestamp
+  cap.common.v1.Timestamp expires_at = 4;
+}
+
+// Signed response to authentication challenge
+message SignedChallengeResponse {
+  // Original challenge nonce (for correlation)
+  bytes challenge_nonce = 1;
+
+  // Responder's Ed25519 public key (32 bytes)
+  bytes public_key = 2;
+
+  // Ed25519 signature (64 bytes) over: nonce || challenger_id || timestamp
+  bytes signature = 3;
+
+  // Response creation timestamp
+  cap.common.v1.Timestamp timestamp = 4;
+
+  // Responder's device type
+  DeviceType device_type = 5;
+
+  // X.509 certificate chain (DER-encoded) - optional for MVP
+  repeated bytes certificates = 6;
+}
+
+// Signed beacon wrapper for discovery phase security
+message SignedBeacon {
+  // The beacon data (serialized beacon protobuf)
+  bytes beacon_data = 1;
+
+  // Device ID of signer (hex string)
+  string signer_device_id = 2;
+
+  // Ed25519 signature over beacon_data
+  bytes signature = 3;
+
+  // Signer's certificate (included periodically, not every beacon)
+  optional bytes signer_certificate = 4;
+}
+
+// Security error details for protocol messages
+message SecurityError {
+  // Error code (e.g., "CERT_EXPIRED", "INVALID_SIGNATURE")
+  string code = 1;
+
+  // Human-readable error message
+  string message = 2;
+
+  // Device ID involved (if applicable)
+  optional string device_id = 3;
+}
