@@ -154,7 +154,6 @@ Bindings for Swift (iOS), Kotlin (Android), Python, and more.
 
 Domain-specific integration:
 - **peat-tak-bridge**: TAK/ATAK interoperability via CoT translation
-- **peat-commander**: Reference command interface
 - Custom integrations per deployment
 
 ---

@@ -8,7 +8,6 @@ members = [
     "peat-sim",
     "peat-discovery",
     "peat-ffi",
-    "peat-commander",
     "peat-inference",
     "peat-tak-bridge",
     "peat-ble-test",

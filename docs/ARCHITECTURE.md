@@ -31,10 +31,10 @@ PEAT is organized into five distinct layers, each with clear responsibilities:
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         APPLICATION LAYER                                    │
-│  ┌─────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌────────────┐  │
-│  │ TAK Bridge  │  │ PEAT Commander  │  │ PEAT Inference  │  │  Your App  │  │
-│  │ (CoT ↔ PEAT)│  │   (Game/TUI)    │  │  (Edge ML)      │  │            │  │
-│  └─────────────┘  └─────────────────┘  └─────────────────┘  └────────────┘  │
+│  ┌─────────────┐  ┌─────────────────┐  ┌────────────┐                      │
+│  │ TAK Bridge  │  │ PEAT Inference  │  │  Your App  │                      │
+│  │ (CoT ↔ PEAT)│  │  (Edge ML)      │  │            │                      │
+│  └─────────────┘  └─────────────────┘  └────────────┘                      │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                          BINDING LAYER                                       │
 │  ┌─────────────────────────────────────────────────────────────────────────┐│
@@ -184,7 +184,6 @@ pub trait Transport: Send + Sync {
 | Crate | Purpose |
 |-------|---------|
 | `peat-tak-bridge` | Bidirectional TAK Server <-> PEAT bridge |
-| `peat-commander` | TUI/Game interface for tactical visualization |
 | `peat-inference` | Edge ML inference (YOLOv8, object tracking) |
 | `peat-sim` | Network simulation and validation |
 
@@ -201,11 +200,11 @@ pub trait Transport: Send + Sync {
               ┌───────────────┼──────────────┼───────────────┐
               │               │              │               │
               ▼               ▼              ▼               ▼
-      ┌─────────────┐ ┌─────────────┐ ┌───────────┐ ┌─────────────┐
-      │tak-bridge   │ │commander    │ │inference  │ │  peat-sim   │
-      └─────────────┘ └─────────────┘ └───────────┘ └─────────────┘
-              │               │              │               │
-              └───────────────┼──────────────┼───────────────┘
+      ┌─────────────┐ ┌───────────┐ ┌─────────────┐
+      │tak-bridge   │ │inference  │ │  peat-sim   │
+      └─────────────┘ └───────────┘ └─────────────┘
+              │              │               │
+              └──────────────┼───────────────┘
                               │              │
                               ▼              ▼
                     ┌─────────────────────────────┐

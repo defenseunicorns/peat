@@ -1,174 +1,115 @@
-# Hierarchical Intelligence for Versatile Entities (PEAT)
+# PEAT — Protocol for Emergent Autonomous Teaming
 
-> "Let me give you a threshold that's easy to understand: when we can fly drones by command, not by pilot. When your drones can understand commander's intent—that, ladies and gentlemen, is the threshold for AI autonomy to help us."
-> — Brig. Gen. Travis McIntosh, on the Army's goal for autonomous drones
-
-A hierarchical capability composition protocol using CRDTs for autonomous systems that scales to 100+ nodes with O(n log n) message complexity.
+> A hierarchical capability composition protocol using CRDTs for autonomous systems that scales to 1,000+ nodes with O(n log n) message complexity.
 
 ## Overview
 
-The PEAT protocol enables scalable coordination of autonomous nodes through:
+PEAT enables scalable coordination of autonomous nodes through:
 
 - **Three-phase protocol**: Discovery → Cell Formation → Hierarchical Operations
-- **CRDT-based state**: Eventual consistency via Ditto SDK
+- **CRDT-based state**: Eventual consistency via Automerge/Ditto — operates through network partitions
 - **Capability composition**: Additive, emergent, redundant, and constraint-based patterns
-- **Differential updates**: Bandwidth-efficient delta propagation (95%+ reduction)
-- **Network efficiency**: Designed for constrained networks (9.6Kbps - 1Mbps)
+- **Hierarchical aggregation**: 93–99% bandwidth reduction vs. flat mesh
+- **Multi-transport**: QUIC (Iroh), BLE mesh, UDP bypass, HTTP — simultaneous multi-path
 
 ## Quick Start
 
-### Prerequisites
-
-- Rust 1.70+ (2021 edition)
-- Cargo
-
-### Build
-
 ```bash
-# Clone the repository
+# Clone and build
 git clone https://github.com/defenseunicorns/peat.git
-cd cap
-
-# Build all crates
+cd peat
 cargo build
 
-# Run tests (single-threaded to avoid Ditto persistence conflicts)
-cargo test -- --test-threads=1
+# Run tests
+cargo test --lib
 
 # Run the simulator
 cargo run --bin peat-sim
+
+# Development workflow
+make check       # format + lint + test
+make pre-commit  # full pre-commit checks
 ```
 
-### Development
-
-The project includes a Makefile for common development tasks:
-
-```bash
-# Show all available commands
-make help
-
-# Run all checks (format, lint, test)
-make check
-
-# Clean Ditto directories and run tests
-make test
-
-# Run pre-commit checks
-make pre-commit
-```
-
-See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed setup instructions, architecture overview, and contributing guidelines.
+See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed setup and contributing guidelines.
 
 ## Repository Structure
 
 ```
-cap/
-├── peat-protocol/          # Core protocol library
-│   ├── src/
-│   │   ├── discovery/     # Phase 1: Bootstrap
-│   │   ├── cell/         # Phase 2: Cell Formation
-│   │   ├── hierarchy/     # Phase 3: Hierarchical Operations
-│   │   ├── composition/   # Capability composition engine
-│   │   ├── delta/         # Differential update system
-│   │   ├── network/       # Network simulation layer
-│   │   ├── models/        # Data structures
-│   │   ├── storage/       # Ditto CRDT integration
-│   │   └── testing/       # E2E test harness
-│   ├── tests/             # Integration & E2E tests
-│   └── docs/testing/      # Test documentation
-├── peat-sim/               # Reference application & simulator
-│   └── src/main.rs
-├── docs/                  # Architecture & project docs
-│   ├── INDEX.md           # Documentation index (start here)
-│   ├── TESTING_STRATEGY.md # Testing philosophy
-│   └── adr/               # Architecture Decision Records
-└── DEVELOPMENT.md         # Development guide
+peat/
+├── Cargo.toml              # Workspace configuration
+├── Makefile                # Development commands
+├── DEVELOPMENT.md          # Development quickstart
+│
+├── peat-schema/            # Protobuf message definitions (wire format)
+├── peat-protocol/          # Core protocol: cells, hierarchy, sync, security
+├── peat-transport/         # HTTP/REST API layer (Axum)
+├── peat-persistence/       # Storage backends (Redb, SQLite)
+├── peat-discovery/         # Peer discovery (mDNS, static, hybrid)
+├── peat-ffi/               # Mobile bindings (Kotlin/Swift via UniFFI)
+├── peat-inference/         # Edge AI/ML pipeline (ONNX, YOLOv8)
+├── peat-tak-bridge/        # TAK/ATAK CoT interoperability
+├── peat-sim/               # Network simulator
+├── peat-ble-test/          # BLE integration test harness
+│
+├── docs/                   # Documentation
+│   ├── ARCHITECTURE.md     # Five-layer architecture overview
+│   ├── adr/                # Architecture Decision Records
+│   ├── guides/             # Developer & operator guides
+│   ├── spec/               # Protocol specification (IETF-style)
+│   └── whitepaper/         # Technical whitepaper
+│
+└── examples/               # Embedded examples (ESP32)
 ```
 
-## Project Status
+### External Crate Ecosystem
 
-**Current Phase**: Foundation & Setup (Week 1)
+| Crate | Description | Repo |
+|-------|-------------|------|
+| [peat-mesh](https://crates.io/crates/peat-mesh) | P2P topology, Iroh/QUIC transport, Automerge sync | [defenseunicorns/eche-mesh](https://github.com/defenseunicorns/eche-mesh) |
+| [peat-btle](https://crates.io/crates/peat-btle) | BLE GATT mesh for Android/iOS/Linux/ESP32 | [defenseunicorns/hive-btle](https://github.com/defenseunicorns/hive-btle) |
+| [peat-lite](https://crates.io/crates/peat-lite) | Embedded UDP protocol + wire format (no_std) | [defenseunicorns/peat-lite](https://github.com/defenseunicorns/peat-lite) |
 
-This is a proof-of-concept implementation following a 12-week development plan. See the [project plan](docs/CAP-POC-Project-Plan.md) for detailed roadmap.
+## Three-Phase Protocol
 
-### Recent Progress
+### Phase 1: Discovery
+Nodes discover peers via mDNS, static configuration, or geohash-based geographic clustering. O(√n) message complexity.
 
-✅ Repository initialized with Rust workspace
-✅ Core trait definitions established
-✅ CI/CD pipeline configured
-✅ Development environment documented
-✅ GitHub issues created for all 10 epics
+### Phase 2: Cell Formation
+Discovered nodes form cells with deterministic leader election based on capability scoring. Intra-cell capability exchange and role assignment.
 
-### Next Steps
+### Phase 3: Hierarchical Operations
+Cells organize into zones for multi-level coordination. Differential state updates propagate through the hierarchy with priority-based routing.
 
-- Epic 1: Complete Ditto SDK integration spike
-- Epic 2: Implement CRDT-based data models
-- Epic 3: Begin discovery phase implementation
+## Technology Stack
 
-See [GitHub Issues](https://github.com/defenseunicorns/peat/issues) for current work items.
+| Layer | Technology |
+|-------|------------|
+| Language | Rust (2021 edition) |
+| CRDT Engine | Automerge + Iroh (pure OSS) / Ditto SDK (production) |
+| Transport | QUIC (Iroh), BLE (BlueZ/CoreBluetooth), UDP, HTTP (Axum) |
+| Serialization | Protobuf (prost) + Serde |
+| Async Runtime | Tokio |
+| Mobile | UniFFI (Kotlin/Swift) + JNI |
+| Edge AI | ONNX Runtime, GStreamer |
+
+## Success Metrics
+
+- **Scalability**: O(n log n) message complexity (vs. O(n²) flat mesh)
+- **Efficiency**: 93–99% bandwidth reduction via hierarchical aggregation
+- **Latency**: Priority 1 updates propagate in <5 seconds
+- **Scale**: 1,000+ nodes validated in simulation; 24-node lab validated
 
 ## Documentation
-
-**📚 [Complete Documentation Index](docs/INDEX.md)** - Navigate all project documentation
-
-### Quick Links
 
 | Document | Purpose |
 |----------|---------|
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Development setup and workflow |
-| [TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md) | Testing philosophy and E2E requirements |
-| [Architecture Decisions](docs/adr/) | ADRs documenting key technical decisions |
-| [Project Plan](docs/CAP-POC-Project-Plan.md) | 12-week implementation roadmap |
-
-### Documentation Structure
-
-```
-docs/
-├── INDEX.md                    # Complete documentation index
-├── TESTING_STRATEGY.md         # Testing philosophy (Unit, Integration, E2E)
-├── adr/                        # Architecture Decision Records
-│   ├── 001-peat-protocol-poc.md
-│   ├── 002-beacon-storage-architecture.md
-│   └── 004-human-machine-cell-composition.md
-└── [Technical Design Docs]     # Architecture explorations & integration notes
-```
-
-**For AI Assistants**: See [Codex.md](Codex.md) for codebase context and guidelines.
-
-## Key Features (Planned)
-
-### Phase 1: Bootstrap
-- Geographic self-organization (geohash-based)
-- C2-directed assignment
-- Capability-based queries
-- O(√n) message complexity
-
-### Phase 2: Cell Formation
-- Deterministic leader election
-- Intra-cell capability exchange
-- Emergent capability detection
-- Role assignment
-
-### Phase 3: Hierarchical Operations
-- Hierarchical message routing
-- Multi-level capability aggregation
-- Priority-based message queuing
-- Differential state updates
-
-## Success Metrics
-
-- **Scalability**: O(n log n) message complexity (vs. O(n²) baseline)
-- **Efficiency**: 95%+ bandwidth reduction via differential updates
-- **Latency**: Priority 1 updates propagate in <5 seconds
-- **Scale**: Support 100+ nodes in simulation
-
-## Technology Stack
-
-- **Language**: Rust 1.70+ (2021 edition)
-- **CRDT Engine**: Ditto Rust SDK
-- **Async Runtime**: Tokio 1.x
-- **Serialization**: Serde + serde_json
-- **Logging**: Tracing
+| [Architecture](docs/ARCHITECTURE.md) | Five-layer architecture overview |
+| [Developer Guide](docs/guides/developer/DEVELOPER_GUIDE.md) | API reference, extending PEAT |
+| [Operator Guide](docs/guides/operator/OPERATOR_GUIDE.md) | Deployment, configuration, monitoring |
+| [ADRs](docs/adr/) | Architecture Decision Records |
+| [Whitepaper](docs/whitepaper/) | Technical whitepaper |
 
 ## License
 
@@ -176,9 +117,4 @@ Apache-2.0
 
 ## Contributing
 
-Contributions are welcome! Please see [DEVELOPMENT.md](DEVELOPMENT.md) for guidelines.
-
-## Contact
-
-For questions or discussions, please open an issue on GitHub.
-
+Contributions are welcome! See [DEVELOPMENT.md](DEVELOPMENT.md) for guidelines.
