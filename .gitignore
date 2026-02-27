@@ -24,7 +24,6 @@ peat-protocol/.ditto*
 .env.kit
 
 # Claude Code
-CLAUDE.md
 .mcp.json
 
 # Testing
