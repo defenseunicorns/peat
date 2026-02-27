@@ -1,0 +1,119 @@
+name: automerge-flat-mesh-5n-1mbps
+topology:
+  nodes:
+    peer-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: peer-1
+        ROLE: squad_member
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: flat_mesh
+        SQUAD_ID: flat-mesh
+        TCP_LISTEN: '12346'
+        TCP_CONNECT: peer-2:12347,peer-3:12348,peer-4:12349,peer-5:12350
+        UPDATE_RATE_MS: '5000'
+        BANDWIDTH: 1mbps
+        BACKEND: automerge
+        CAP_DATA_PATH: /data/automerge/peer-1
+        CAP_FILTER_ENABLED: 'false'
+    peer-2:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: peer-2
+        ROLE: squad_member
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: flat_mesh
+        SQUAD_ID: flat-mesh
+        TCP_LISTEN: '12347'
+        TCP_CONNECT: peer-1:12346,peer-3:12348,peer-4:12349,peer-5:12350
+        UPDATE_RATE_MS: '5000'
+        BANDWIDTH: 1mbps
+        BACKEND: automerge
+        CAP_DATA_PATH: /data/automerge/peer-2
+        CAP_FILTER_ENABLED: 'false'
+    peer-3:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: peer-3
+        ROLE: squad_member
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: flat_mesh
+        SQUAD_ID: flat-mesh
+        TCP_LISTEN: '12348'
+        TCP_CONNECT: peer-1:12346,peer-2:12347,peer-4:12349,peer-5:12350
+        UPDATE_RATE_MS: '5000'
+        BANDWIDTH: 1mbps
+        BACKEND: automerge
+        CAP_DATA_PATH: /data/automerge/peer-3
+        CAP_FILTER_ENABLED: 'false'
+    peer-4:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: peer-4
+        ROLE: squad_member
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: flat_mesh
+        SQUAD_ID: flat-mesh
+        TCP_LISTEN: '12349'
+        TCP_CONNECT: peer-1:12346,peer-2:12347,peer-3:12348,peer-5:12350
+        UPDATE_RATE_MS: '5000'
+        BANDWIDTH: 1mbps
+        BACKEND: automerge
+        CAP_DATA_PATH: /data/automerge/peer-4
+        CAP_FILTER_ENABLED: 'false'
+    peer-5:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: peer-5
+        ROLE: squad_member
+        PLATFORM_TYPE: soldier
+        NODE_TYPE: soldier
+        MODE: flat_mesh
+        SQUAD_ID: flat-mesh
+        TCP_LISTEN: '12350'
+        TCP_CONNECT: peer-1:12346,peer-2:12347,peer-3:12348,peer-4:12349
+        UPDATE_RATE_MS: '5000'
+        BANDWIDTH: 1mbps
+        BACKEND: automerge
+        CAP_DATA_PATH: /data/automerge/peer-5
+        CAP_FILTER_ENABLED: 'false'
+  links:
+  - endpoints:
+    - peer-1:eth1
+    - peer-2:eth1
+  - endpoints:
+    - peer-1:eth2
+    - peer-3:eth2
+  - endpoints:
+    - peer-1:eth3
+    - peer-4:eth3
+  - endpoints:
+    - peer-1:eth4
+    - peer-5:eth4
+  - endpoints:
+    - peer-2:eth5
+    - peer-3:eth5
+  - endpoints:
+    - peer-2:eth6
+    - peer-4:eth6
+  - endpoints:
+    - peer-2:eth7
+    - peer-5:eth7
+  - endpoints:
+    - peer-3:eth8
+    - peer-4:eth8
+  - endpoints:
+    - peer-3:eth9
+    - peer-5:eth9
+  - endpoints:
+    - peer-4:eth10
+    - peer-5:eth10

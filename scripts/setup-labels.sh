@@ -1,7 +1,7 @@
 #!/bin/bash
-# HIVE Protocol Demo - GitHub Label Setup Script
+# PEAT Protocol Demo - GitHub Label Setup Script
 # 
-# This script creates all labels for the kitplummer/hive repository
+# This script creates all labels for the kitplummer/peat repository
 # using the GitHub CLI (gh).
 #
 # Prerequisites:
@@ -17,7 +17,7 @@
 
 set -e
 
-REPO="kitplummer/hive"
+REPO="kitplummer/peat"
 
 echo "🏷️  Setting up GitHub labels for $REPO"
 echo "================================================"
@@ -88,7 +88,7 @@ echo "------------------------------------------------"
 create_label "component/schema" "BFD4F2" "JSON schema definitions"
 create_label "component/automerge" "BFD4F2" "Automerge CRDT sync engine"
 create_label "component/iroh" "BFD4F2" "Iroh networking layer"
-create_label "component/tak-bridge" "BFD4F2" "HIVE-TAK Bridge / CoT translation"
+create_label "component/tak-bridge" "BFD4F2" "PEAT-TAK Bridge / CoT translation"
 create_label "component/atak-plugin" "BFD4F2" "ATAK Android plugin"
 create_label "component/jetson" "BFD4F2" "Jetson edge compute / inference"
 create_label "component/mlops" "BFD4F2" "Model distribution and lifecycle"

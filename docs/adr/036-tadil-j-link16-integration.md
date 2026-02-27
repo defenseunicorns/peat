@@ -36,9 +36,9 @@
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Critical J-Series Message Types for HIVE Integration:**
+**Critical J-Series Message Types for PEAT Integration:**
 
-| J-Series | Name | Purpose | HIVE Relevance |
+| J-Series | Name | Purpose | PEAT Relevance |
 |----------|------|---------|----------------|
 | J2.2 | Air Track | Air platform position/ID | Air asset SA |
 | J3.2 | Surface/Ground Track | Surface/ground position | Squad position aggregation |
@@ -50,7 +50,7 @@
 | J13.2 | Target Designation | Target assignment | Engagement coordination |
 | J14.0 | Info Management | Network coordination | Synchronization |
 
-### Strategic Importance for HIVE
+### Strategic Importance for PEAT
 
 **Multi-Domain Integration Requirement:**
 
@@ -69,33 +69,33 @@ Link 16 is **severely bandwidth-constrained** compared to IP networks:
 |---------|--------------------|--------------------|
 | Link 16 | ~115 kbps (shared) | 3-12 second cycles |
 | TAK/CoT | 1-100 Mbps | 1-5 seconds |
-| HIVE internal | 10-1000 Mbps | Sub-second differential |
+| PEAT internal | 10-1000 Mbps | Sub-second differential |
 
 **Naive bridging would fail catastrophically:**
 - 100 platforms × 70-bit position words × 1 Hz = exceeds entire Link 16 capacity
 - Each time slot is precious (~7.8125 ms, ~225 bits usable)
 - Flat event streaming is physically impossible
 
-**HIVE's hierarchical aggregation is the solution:**
+**PEAT's hierarchical aggregation is the solution:**
 - Squad of 12 platforms → 1 aggregate track
 - 95%+ bandwidth reduction through hierarchy
 - Natural mapping to military C2 echelons
 
-### Why HIVE Enables This
+### Why PEAT Enables This
 
-The question "how would HIVE bridge on-platform messaging to TADIL-J?" has a compelling answer:
+The question "how would PEAT bridge on-platform messaging to TADIL-J?" has a compelling answer:
 
-> **HIVE's hierarchical tiers create natural aggregation points that map directly to Link 16 network participation models. The tier leader—which already maintains aggregated subordinate state via CRDT synchronization—serves as the bridge point, presenting consolidated SA to the tactical data link rather than raw platform telemetry.**
+> **PEAT's hierarchical tiers create natural aggregation points that map directly to Link 16 network participation models. The tier leader—which already maintains aggregated subordinate state via CRDT synchronization—serves as the bridge point, presenting consolidated SA to the tactical data link rather than raw platform telemetry.**
 
 This is not a workaround; it's the architecture working as intended.
 
 ## Decision
 
-We will implement **TADIL-J/Link 16 integration as a transport adapter** within the HIVE architecture, following these principles:
+We will implement **TADIL-J/Link 16 integration as a transport adapter** within the PEAT architecture, following these principles:
 
 ### Principle 1: Hierarchy as Bridge Architecture
 
-HIVE tier boundaries serve as natural Link 16 integration points:
+PEAT tier boundaries serve as natural Link 16 integration points:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -108,7 +108,7 @@ HIVE tier boundaries serve as natural Link 16 integration points:
                           │ J12.x (Commands ↓)
                           │
               ┌───────────▼───────────┐
-              │   HIVE Tier Leader    │
+              │   PEAT Tier Leader    │
               │   (Link 16 Bridge)    │
               │                       │
               │  • MIDS Terminal      │
@@ -128,7 +128,7 @@ HIVE tier boundaries serve as natural Link 16 integration points:
          │               │               │
          └───────────────┴───────────────┘
                          │
-              HIVE CRDT Sync (Rich State)
+              PEAT CRDT Sync (Rich State)
               - Full telemetry
               - Detailed capabilities  
               - Sub-second updates
@@ -138,19 +138,19 @@ HIVE tier boundaries serve as natural Link 16 integration points:
 
 ### Principle 2: Schema Layer Handles J-Series Encoding
 
-Following ADR-012's separation of concerns, J-series message encoding/decoding belongs in `hive-schema`:
+Following ADR-012's separation of concerns, J-series message encoding/decoding belongs in `peat-schema`:
 
 ```
-hive-schema/
+peat-schema/
 ├── proto/
-│   ├── hive_core.proto           # Core HIVE messages
+│   ├── peat_core.proto           # Core PEAT messages
 │   ├── cot_bridge.proto          # CoT mappings (ADR-020)
 │   └── tadil_j_bridge.proto      # J-series mappings (this ADR)
 ├── src/
 │   ├── tadil_j/
 │   │   ├── mod.rs
-│   │   ├── encoder.rs            # HIVE → J-series
-│   │   ├── decoder.rs            # J-series → HIVE
+│   │   ├── encoder.rs            # PEAT → J-series
+│   │   ├── decoder.rs            # J-series → PEAT
 │   │   ├── j_series_types.rs     # J2, J3, J7, J12, J13, J14
 │   │   ├── track_number.rs       # JU Track Number management
 │   │   └── validation.rs         # MIL-STD-6016 compliance
@@ -158,26 +158,26 @@ hive-schema/
 
 **Bidirectional Message Mapping:**
 
-| HIVE Concept | J-Series Message | Direction | Notes |
+| PEAT Concept | J-Series Message | Direction | Notes |
 |--------------|------------------|-----------|-------|
-| Platform position (individual) | J3.2 (surface track) | HIVE → Link 16 | Only if full fidelity needed |
-| **Squad aggregate position** | **J3.2 (surface track)** | **HIVE → Link 16** | **Primary use case** |
-| Squad capability summary | J7.2 (platform status) | HIVE → Link 16 | Aggregated readiness |
-| Air contact detection | J2.2 (air track) | HIVE → Link 16 | Sensor fusion result |
-| Target designation | J13.2 (target) | HIVE → Link 16 | Engagement handoff |
+| Platform position (individual) | J3.2 (surface track) | PEAT → Link 16 | Only if full fidelity needed |
+| **Squad aggregate position** | **J3.2 (surface track)** | **PEAT → Link 16** | **Primary use case** |
+| Squad capability summary | J7.2 (platform status) | PEAT → Link 16 | Aggregated readiness |
+| Air contact detection | J2.2 (air track) | PEAT → Link 16 | Sensor fusion result |
+| Target designation | J13.2 (target) | PEAT → Link 16 | Engagement handoff |
 | Control measure / ROZ | J3.5 (land point) | Bidirectional | Operational boundaries |
-| Mission tasking | J12.0 (mission assignment) | Link 16 → HIVE | Higher HQ commands |
-| Movement vector | J12.6 (control) | Link 16 → HIVE | Directional commands |
-| Network time sync | J14.0 (info management) | Link 16 → HIVE | Time reference |
+| Mission tasking | J12.0 (mission assignment) | Link 16 → PEAT | Higher HQ commands |
+| Movement vector | J12.6 (control) | Link 16 → PEAT | Directional commands |
+| Network time sync | J14.0 (info management) | Link 16 → PEAT | Time reference |
 
-### Principle 3: Transport Adapter in hive-transport
+### Principle 3: Transport Adapter in peat-transport
 
 The Link 16 interface is a transport adapter, not core protocol logic:
 
 ```rust
-// hive-transport/src/link16_transport.rs
+// peat-transport/src/link16_transport.rs
 
-use hive_schema::tadil_j::{JSeriesEncoder, JSeriesDecoder, JMessage};
+use peat_schema::tadil_j::{JSeriesEncoder, JSeriesDecoder, JMessage};
 
 pub struct Link16Transport {
     config: Link16Config,
@@ -208,7 +208,7 @@ pub struct Link16Config {
 }
 
 pub enum Link16AggregationPolicy {
-    /// Send one track per HIVE tier (recommended)
+    /// Send one track per PEAT tier (recommended)
     TierAggregation,
     
     /// Send tracks for designated platforms only
@@ -220,7 +220,7 @@ pub enum Link16AggregationPolicy {
 
 #[async_trait]
 impl TacticalDataLink for Link16Transport {
-    /// Publish aggregated HIVE state to Link 16 network
+    /// Publish aggregated PEAT state to Link 16 network
     async fn publish(&self, state: &AggregatedState) -> Result<(), Link16Error> {
         // 1. Convert aggregated state to J-series messages
         let j_messages = self.encoder.encode_aggregated(state, &self.config)?;
@@ -242,7 +242,7 @@ impl TacticalDataLink for Link16Transport {
         
         match j_message.label() {
             JLabel::J12_0 | JLabel::J12_6 => {
-                // Command message - decode and return for HIVE processing
+                // Command message - decode and return for PEAT processing
                 let command = self.decoder.decode_command(&j_message)?;
                 Ok(Link16Message::Command(command))
             }
@@ -264,17 +264,17 @@ impl TacticalDataLink for Link16Transport {
 
 ### Principle 4: Track Number Management
 
-Link 16 requires globally unique track numbers (JU numbers) within a network. HIVE bridge nodes must manage track number allocation:
+Link 16 requires globally unique track numbers (JU numbers) within a network. PEAT bridge nodes must manage track number allocation:
 
 ```rust
-// hive-transport/src/link16/track_manager.rs
+// peat-transport/src/link16/track_manager.rs
 
 pub struct TrackNumberManager {
     /// Allocated block of track numbers for this unit
     allocated_block: TrackNumberBlock,
     
     /// Currently assigned track numbers
-    assignments: HashMap<HiveEntityId, JuTrackNumber>,
+    assignments: HashMap<PeatEntityId, JuTrackNumber>,
     
     /// Track number recycling (stale tracks)
     stale_threshold: Duration,
@@ -292,8 +292,8 @@ pub struct TrackNumberBlock {
 }
 
 impl TrackNumberManager {
-    /// Assign track number to HIVE entity (squad, platform, etc.)
-    pub fn assign(&mut self, entity_id: HiveEntityId) -> Result<JuTrackNumber, TrackError> {
+    /// Assign track number to PEAT entity (squad, platform, etc.)
+    pub fn assign(&mut self, entity_id: PeatEntityId) -> Result<JuTrackNumber, TrackError> {
         // Check if already assigned
         if let Some(existing) = self.assignments.get(&entity_id) {
             return Ok(*existing);
@@ -307,7 +307,7 @@ impl TrackNumberManager {
     }
     
     /// Release track number when entity no longer needs representation
-    pub fn release(&mut self, entity_id: &HiveEntityId) {
+    pub fn release(&mut self, entity_id: &PeatEntityId) {
         self.assignments.remove(entity_id);
     }
 }
@@ -318,7 +318,7 @@ impl TrackNumberManager {
 The critical architectural decision is **what gets aggregated and how**:
 
 ```rust
-// hive-core/src/aggregation/link16.rs
+// peat-core/src/aggregation/link16.rs
 
 /// Aggregation rules for Link 16 representation
 pub struct Link16Aggregator {
@@ -400,15 +400,15 @@ impl Link16Aggregator {
 
 ## Schema Impact (Open Standard)
 
-### hive-schema Additions
+### peat-schema Additions
 
-The HIVE open standard (`hive-schema`) gains J-series message definitions:
+The PEAT open standard (`peat-schema`) gains J-series message definitions:
 
 ```protobuf
-// hive-schema/proto/tadil_j_bridge.proto
+// peat-schema/proto/tadil_j_bridge.proto
 
 syntax = "proto3";
-package hive.schema.tadil_j;
+package peat.schema.tadil_j;
 
 // J3.2 Surface Track representation
 message J3_2_SurfaceTrack {
@@ -466,9 +466,9 @@ message J12_0_MissionAssignment {
     Timestamp not_after = 22;
 }
 
-// Mapping from HIVE entities to J-series representations
-message HiveToLink16Mapping {
-    string hive_entity_id = 1;
+// Mapping from PEAT entities to J-series representations
+message PeatToLink16Mapping {
+    string peat_entity_id = 1;
     JuTrackNumber link16_track = 2;
     AggregationLevel level = 3;
     
@@ -486,7 +486,7 @@ message HiveToLink16Mapping {
 The schema also defines **standard aggregation semantics** that implementations must follow:
 
 ```protobuf
-// hive-schema/proto/aggregation.proto
+// peat-schema/proto/aggregation.proto
 
 // Standard aggregation rules for tactical data link representation
 message Link16AggregationProfile {
@@ -521,12 +521,12 @@ enum CapabilityAggregationMethod {
 
 ## Reference Implementation
 
-### hive-transport Link 16 Adapter
+### peat-transport Link 16 Adapter
 
 The reference implementation provides a complete Link 16 transport adapter:
 
 ```
-hive-transport/
+peat-transport/
 ├── src/
 │   ├── lib.rs
 │   ├── link16/
@@ -546,7 +546,7 @@ hive-transport/
 To support both real hardware and simulation:
 
 ```rust
-// hive-transport/src/link16/mids_interface.rs
+// peat-transport/src/link16/mids_interface.rs
 
 /// Abstraction over MIDS terminal hardware
 #[async_trait]
@@ -615,7 +615,7 @@ impl MidsInterface for SimulatedMids {
 For PoC validation without hardware:
 
 ```rust
-// hive-transport/src/link16/simulator.rs
+// peat-transport/src/link16/simulator.rs
 
 /// Simulated Link 16 network for testing
 pub struct SimulatedLink16Network {
@@ -666,23 +666,23 @@ impl SimulatedLink16Network {
 }
 ```
 
-## Integration with HIVE Core
+## Integration with PEAT Core
 
 ### Bridge Node Configuration
 
-A HIVE node configured as a Link 16 bridge:
+A PEAT node configured as a Link 16 bridge:
 
 ```rust
 // Example: Squad leader with Link 16 bridge capability
 
-let config = HiveNodeConfig {
+let config = PeatNodeConfig {
     role: NodeRole::TierLeader {
         echelon: Echelon::Squad,
         subordinate_count: 12,
     },
     
     transports: vec![
-        // Internal HIVE sync
+        // Internal PEAT sync
         TransportConfig::Quic(QuicConfig::default()),
         
         // Link 16 bridge (if hardware available)
@@ -712,10 +712,10 @@ let config = HiveNodeConfig {
     },
 };
 
-let node = HiveNode::new(config).await?;
+let node = PeatNode::new(config).await?;
 
 // Bridge automatically publishes aggregated state to Link 16
-// and injects received commands into HIVE hierarchy
+// and injects received commands into PEAT hierarchy
 node.run().await?;
 ```
 
@@ -732,11 +732,11 @@ For larger formations, bridges at multiple echelons:
         │                                 │
 ┌───────▼───────┐                 ┌───────▼───────┐
 │  Company HQ   │                 │  Platoon HQ   │
-│  HIVE Bridge  │                 │  HIVE Bridge  │
+│  PEAT Bridge  │                 │  PEAT Bridge  │
 │  (Optional)   │                 │  (Primary)    │
 └───────┬───────┘                 └───────┬───────┘
         │                                 │
-        │ HIVE Protocol                   │ HIVE Protocol
+        │ PEAT Protocol                   │ PEAT Protocol
         │ (Platoon aggregates)            │ (Squad details)
         │                                 │
 ┌───────▼───────┐                 ┌───────▼───────┐
@@ -768,7 +768,7 @@ For larger formations, bridges at multiple echelons:
 **Complementary Integration:**
 - TAK for rich, low-latency team awareness
 - Link 16 for joint force integration and higher echelon SA
-- Both can operate simultaneously from same HIVE network
+- Both can operate simultaneously from same PEAT network
 
 ## Implementation Phases
 
@@ -778,7 +778,7 @@ For larger formations, bridges at multiple echelons:
 
 **Tasks**:
 1. Survey Link 16 usage patterns in target operational contexts
-2. Identify critical J-series message types for HIVE integration
+2. Identify critical J-series message types for PEAT integration
 3. Define track number allocation strategy
 4. Document MIDS integration requirements (vendor coordination)
 
@@ -790,12 +790,12 @@ For larger formations, bridges at multiple echelons:
 
 ### Phase 1: Schema Layer (Weeks 3-4)
 
-**Goal**: Implement J-series message encoding/decoding in `hive-schema`
+**Goal**: Implement J-series message encoding/decoding in `peat-schema`
 
 **Tasks**:
 1. Define J-series protobuf messages
-2. Implement J-series encoder (HIVE → Link 16)
-3. Implement J-series decoder (Link 16 → HIVE)
+2. Implement J-series encoder (PEAT → Link 16)
+3. Implement J-series decoder (Link 16 → PEAT)
 4. Define aggregation profile schemas
 5. Unit tests for all conversions
 
@@ -807,7 +807,7 @@ For larger formations, bridges at multiple echelons:
 
 ### Phase 2: Transport Adapter (Weeks 5-7)
 
-**Goal**: Implement `Link16Transport` in `hive-transport`
+**Goal**: Implement `Link16Transport` in `peat-transport`
 
 **Tasks**:
 1. Implement MIDS interface abstraction
@@ -820,7 +820,7 @@ For larger formations, bridges at multiple echelons:
 - [ ] SimulatedMids enables full testing without hardware
 - [ ] Track numbers assigned and managed correctly
 - [ ] Aggregation policies produce expected track representations
-- [ ] Bidirectional message flow works (HIVE ↔ Link 16)
+- [ ] Bidirectional message flow works (PEAT ↔ Link 16)
 
 ### Phase 3: Aggregation Logic (Weeks 8-10)
 
@@ -830,7 +830,7 @@ For larger formations, bridges at multiple echelons:
 1. Implement position aggregation methods (centroid, leader, weighted)
 2. Implement capability aggregation (sum, min, custom)
 3. Create configurable aggregation profiles
-4. Integrate with HIVE tier leader logic
+4. Integrate with PEAT tier leader logic
 5. End-to-end testing with multi-tier hierarchy
 
 **Success Criteria**:
@@ -848,17 +848,17 @@ For larger formations, bridges at multiple echelons:
 2. Add network condition simulation (latency, loss, jamming)
 3. Create external traffic injection (simulate other network participants)
 4. Build analysis tools for message flow visualization
-5. Integration with existing HIVE simulation framework (ADR-008)
+5. Integration with existing PEAT simulation framework (ADR-008)
 
 **Success Criteria**:
-- [ ] Simulate 10+ HIVE nodes with Link 16 bridges
+- [ ] Simulate 10+ PEAT nodes with Link 16 bridges
 - [ ] Inject realistic external Link 16 traffic
 - [ ] Measure and validate bandwidth utilization
 - [ ] Demonstrate graceful degradation under jamming
 
 ### Phase 5: PoC Integration (Weeks 14-16)
 
-**Goal**: Integrate Link 16 bridging into HIVE PoC demonstration
+**Goal**: Integrate Link 16 bridging into PEAT PoC demonstration
 
 **Tasks**:
 1. Add Link 16 bridge to POI tracking vignette
@@ -869,7 +869,7 @@ For larger formations, bridges at multiple echelons:
 
 **Success Criteria**:
 - [ ] POI tracking vignette shows squad tracks on simulated Link 16
-- [ ] Commands injected via Link 16 execute correctly in HIVE
+- [ ] Commands injected via Link 16 execute correctly in PEAT
 - [ ] Visualization clearly shows aggregation in action
 - [ ] Documentation enables third-party integration
 
@@ -885,7 +885,7 @@ For larger formations, bridges at multiple echelons:
 5. Security accreditation activities
 
 **Success Criteria**:
-- [ ] Real MIDS terminal successfully transmits HIVE-generated tracks
+- [ ] Real MIDS terminal successfully transmits PEAT-generated tracks
 - [ ] Received commands correctly processed
 - [ ] Interoperability with other Link 16 participants validated
 - [ ] Security architecture passes review
@@ -894,12 +894,12 @@ For larger formations, bridges at multiple echelons:
 
 ### Positive
 
-1. **Joint Force Integration**: HIVE-coordinated platforms visible to entire coalition via Link 16
-2. **Higher Echelon SA**: Brigade/Division C2 systems see aggregated HIVE formations
-3. **Command Reception**: Higher HQ can task HIVE teams through existing C2 infrastructure
-4. **Coalition Interoperability**: Allied platforms share SA with HIVE formations
-5. **Airspace Integration**: HIVE air assets properly represented for deconfliction
-6. **Validates Core Architecture**: Link 16's constraints prove HIVE's aggregation value
+1. **Joint Force Integration**: PEAT-coordinated platforms visible to entire coalition via Link 16
+2. **Higher Echelon SA**: Brigade/Division C2 systems see aggregated PEAT formations
+3. **Command Reception**: Higher HQ can task PEAT teams through existing C2 infrastructure
+4. **Coalition Interoperability**: Allied platforms share SA with PEAT formations
+5. **Airspace Integration**: PEAT air assets properly represented for deconfliction
+6. **Validates Core Architecture**: Link 16's constraints prove PEAT's aggregation value
 7. **Standards Alignment**: Uses established NATO tactical data link standards
 8. **Bandwidth Efficiency**: Hierarchical aggregation enables feasible Link 16 participation
 
@@ -922,7 +922,7 @@ For larger formations, bridges at multiple echelons:
 
 **Risk 2**: Track number conflicts with other network participants
 - **Mitigation**: Track number block allocation coordinated with network authority
-- **Mitigation**: Source Track ID uniquely identifies HIVE formations
+- **Mitigation**: Source Track ID uniquely identifies PEAT formations
 - **Mitigation**: Track recycling with appropriate stale timers
 
 **Risk 3**: Aggregation loses operationally critical information
@@ -953,9 +953,9 @@ For larger formations, bridges at multiple echelons:
    - [ ] Interoperability with JITC reference implementation
 
 3. **Operational Integration**:
-   - [ ] Commands from Link 16 correctly execute in HIVE (< 5s latency)
-   - [ ] HIVE state changes reflected in Link 16 tracks (< 15s latency)
-   - [ ] Simulated external participants see correct HIVE representation
+   - [ ] Commands from Link 16 correctly execute in PEAT (< 5s latency)
+   - [ ] PEAT state changes reflected in Link 16 tracks (< 15s latency)
+   - [ ] Simulated external participants see correct PEAT representation
 
 4. **PoC Demonstration**:
    - [ ] POI tracking vignette includes Link 16 bridge
@@ -981,4 +981,4 @@ For larger formations, bridges at multiple echelons:
 
 ---
 
-**Author's Note**: This ADR represents a strategic integration that validates HIVE's core architectural thesis: hierarchical aggregation isn't just an optimization—it's the **only** way to participate in bandwidth-constrained tactical networks at scale. While TAK/CoT integration (ADR-020) proves HIVE works with modern IP-based systems, Link 16 integration proves HIVE can bridge to the legacy tactical data link infrastructure that remains the backbone of NATO joint operations. The same hierarchical design that enables 1000+ platform coordination also enables participation in networks designed for dozens of tracks. This is "stop moving data, start moving decisions" made tangible.
+**Author's Note**: This ADR represents a strategic integration that validates PEAT's core architectural thesis: hierarchical aggregation isn't just an optimization—it's the **only** way to participate in bandwidth-constrained tactical networks at scale. While TAK/CoT integration (ADR-020) proves PEAT works with modern IP-based systems, Link 16 integration proves PEAT can bridge to the legacy tactical data link infrastructure that remains the backbone of NATO joint operations. The same hierarchical design that enables 1000+ platform coordination also enables participation in networks designed for dozens of tracks. This is "stop moving data, start moving decisions" made tangible.

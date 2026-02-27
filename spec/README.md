@@ -1,12 +1,12 @@
-# HIVE Protocol Specification
+# PEAT Protocol Specification
 
-This directory contains the **normative specification** for the Hierarchical Intelligence for Versatile Entities (HIVE) Protocol.
+This directory contains the **normative specification** for the Hierarchical Intelligence for Versatile Entities (PEAT) Protocol.
 
 ## Purpose
 
 The contents of this directory define the **standard**—the protocol that any compliant implementation MUST follow. This specification is designed to be:
 
-1. **Implementation-agnostic**: Any language or platform can implement HIVE using these specifications
+1. **Implementation-agnostic**: Any language or platform can implement PEAT using these specifications
 2. **Testable**: Clear requirements enable conformance testing
 3. **Extensible**: Versioned schemas with backward compatibility guarantees
 
@@ -15,7 +15,7 @@ The contents of this directory define the **standard**—the protocol that any c
 ```
 spec/
 ├── README.md                           # This file
-├── draft-hive-protocol-00.md           # Main protocol specification (RFC-style)
+├── draft-peat-protocol-00.md           # Main protocol specification (RFC-style)
 ├── proto/                              # Normative Protocol Buffer definitions
 │   └── cap/
 │       └── v1/
@@ -70,7 +70,7 @@ This specification uses keywords as defined in [RFC 2119](https://tools.ietf.org
 - **Protocol Buffer definitions** (`.proto` files): [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) - public domain, no restrictions
 - **Reference implementation** (in `/reference/`): MIT OR Apache-2.0
 
-This licensing ensures anyone can implement the HIVE Protocol without legal barriers while maintaining attribution for the specification work.
+This licensing ensures anyone can implement the PEAT Protocol without legal barriers while maintaining attribution for the specification work.
 
 ## Standards Track
 
@@ -84,7 +84,7 @@ This specification is being developed with the goal of submission to:
 
 | Document | Purpose |
 |----------|---------|
-| [draft-hive-protocol-00.md](draft-hive-protocol-00.md) | Main protocol specification |
+| [draft-peat-protocol-00.md](draft-peat-protocol-00.md) | Main protocol specification |
 | [proto/README.md](proto/README.md) | Schema documentation |
 | [../governance/CHARTER.md](../governance/CHARTER.md) | Project governance |
 | [../governance/CONTRIBUTING.md](../governance/CONTRIBUTING.md) | Contribution guidelines |
@@ -93,5 +93,5 @@ This specification is being developed with the goal of submission to:
 ## Contact
 
 For questions about this specification:
-- GitHub Issues: [github.com/kitplummer/hive/issues](https://github.com/kitplummer/hive/issues)
+- GitHub Issues: [github.com/defenseunicorns/peat/issues](https://github.com/defenseunicorns/peat/issues)
 - Email: kit@revolveteam.com

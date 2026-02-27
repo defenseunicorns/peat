@@ -9,7 +9,7 @@
 
 ### Current Model: Broadcast Replication
 
-HIVE's CRDT synchronization replicates documents to **all nodes** in a cell. When a document is written to a collection, every node eventually receives and persists a copy.
+PEAT's CRDT synchronization replicates documents to **all nodes** in a cell. When a document is written to a collection, every node eventually receives and persists a copy.
 
 ```
 Writer → Node A → Node B → Node C → Node D
@@ -119,7 +119,7 @@ Examples:
 - APP_ID: lowercase alphanumeric + hyphens, max 32 chars
 - Alias: lowercase alphanumeric + hyphens, max 64 chars
 - Full name: `{app_id}.{alias}`, max 97 chars
-- Reserved APP_IDs: `hive`, `system`
+- Reserved APP_IDs: `peat`, `system`
 
 #### Alias Registry Collection
 
@@ -590,15 +590,15 @@ store.write("commands/vehicle-1", &command).await?;
 // Only vehicle-1 persists, others relay
 
 // Example 7: Alias binding (leader binding flanker role)
-let name_binder = hive.name_binder();
+let name_binder = peat.name_binder();
 name_binder.bind("swarm", "flanker-1", &vehicle_peer_id, AliasType::ROLE).await?;
 
 // Example 8: Self-claiming an alias
-let name_binder = hive.name_binder();
+let name_binder = peat.name_binder();
 name_binder.claim("c2", "viper-3").await?;  // Claims for local node
 
 // Example 9: Resolving alias before send (manual)
-let name_resolver = hive.name_resolver();
+let name_resolver = peat.name_resolver();
 if let Some(peer_id) = name_resolver.resolve("swarm.flanker-1").await? {
     // Use peer_id directly
 }

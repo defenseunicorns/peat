@@ -1,0 +1,88 @@
+[package]
+name = "peat-ffi"
+version = "0.1.0"
+edition = "2021"
+description = "FFI bindings for PEAT protocol (Kotlin/Swift via UniFFI)"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "peat_ffi"
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/uniffi_bindgen.rs"
+
+[[example]]
+name = "peat_tak_client"
+path = "examples/peat_tak_client.rs"
+required-features = ["sync"]
+
+[[example]]
+name = "iroh_test_peer"
+path = "examples/iroh_test_peer.rs"
+required-features = ["sync"]
+
+[[example]]
+name = "dual_test_peer"
+path = "examples/dual_test_peer.rs"
+required-features = ["sync", "bluetooth"]
+
+[features]
+default = ["sync"]
+sync = ["peat-protocol/automerge-backend"]
+# Bluetooth LE transport - BLE mesh networking (ADR-039)
+# Enables peat-btle integration via TransportManager
+bluetooth = ["peat-protocol/bluetooth", "dep:peat-btle"]
+
+[dependencies]
+# UniFFI for cross-language bindings (proc-macro only mode)
+uniffi = { version = "0.28", features = ["cli", "tokio"] }
+
+# JNI for direct Android native method binding (bypasses JNA symbol lookup issues)
+jni = "0.21"
+
+# PEAT crates - no ditto-backend for Android cross-compilation
+peat-protocol = { path = "../peat-protocol", default-features = false }
+
+# Time handling
+chrono = "0.4"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Async runtime for UniFFI async support
+tokio = { version = "1", features = ["rt-multi-thread", "sync"] }
+
+# JSON serialization for document data
+serde_json = "1.0"
+
+# Hex encoding for node IDs
+hex = "0.4"
+
+# Temporary directory for testing
+tempfile = "3"
+
+# BLE transport (optional, enabled by bluetooth feature)
+# Platform-specific adapter selected via target cfg in dependencies below
+peat-btle = { workspace = true, optional = true }
+
+# Platform-specific BLE adapter features
+[target.'cfg(target_os = "linux")'.dependencies]
+peat-btle = { workspace = true, features = ["linux"], optional = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+peat-btle = { workspace = true, features = ["macos"], optional = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+peat-btle = { workspace = true, features = ["windows"], optional = true }
+
+[target.'cfg(target_os = "android")'.dependencies]
+peat-btle = { workspace = true, features = ["android"], optional = true }
+
+[dev-dependencies]
+env_logger = "0.11"
+
+[build-dependencies]
+uniffi = { version = "0.28", features = ["build"] }

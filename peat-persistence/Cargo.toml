@@ -1,0 +1,48 @@
+[package]
+name = "peat-persistence"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Storage abstraction layer for Peat Protocol data persistence"
+repository.workspace = true
+
+[dependencies]
+# CAP dependencies
+peat-schema = { path = "../peat-schema" }
+peat-protocol = { path = "../peat-protocol" }
+peat-mesh = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true, features = ["full"] }
+tokio-stream = "0.1"
+async-trait = "0.1"
+futures = "0.3"
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+prost = "0.13"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Logging
+tracing = "0.1"
+
+# HTTP server (for external API)
+axum = { version = "0.7", features = ["macros"], optional = true }
+tower = { version = "0.4", optional = true }
+tower-http = { version = "0.5", features = ["cors", "trace", "timeout"], optional = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+reqwest = { version = "0.12", features = ["json"] }
+tracing-subscriber = { workspace = true }
+dotenvy = { workspace = true }
+serial_test = "3.2"
+
+[features]
+default = ["external-api"]
+external-api = ["axum", "tower", "tower-http"]

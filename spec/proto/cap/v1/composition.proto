@@ -1,8 +1,8 @@
-// HIVE Protocol - Capability Composition
+// PEAT Protocol - Capability Composition
 // Specification Version: 0.1.0
 // License: CC0 1.0 Universal (Public Domain)
 //
-// This file defines the capability composition model for HIVE Protocol.
+// This file defines the capability composition model for PEAT Protocol.
 // Composition rules transform individual platform capabilities into
 // aggregated team capabilities, including emergent capabilities.
 

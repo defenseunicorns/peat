@@ -1,4 +1,4 @@
-# HIVE Developer Guide
+# PEAT Developer Guide
 
 > **Version**: 1.0
 > **Last Updated**: 2025-12-08
@@ -14,7 +14,7 @@
 4. [Core Concepts](#4-core-concepts)
 5. [Crate Reference](#5-crate-reference)
 6. [API Reference](#6-api-reference)
-7. [Extending HIVE](#7-extending-hive)
+7. [Extending PEAT](#7-extending-peat)
 8. [Testing](#8-testing)
 9. [Backend Abstraction](#9-backend-abstraction)
 10. [Mobile Development](#10-mobile-development)
@@ -29,10 +29,10 @@
 ### 1.1 About This Guide
 
 This guide is for software engineers who want to:
-- **Build applications** using HIVE as a coordination protocol
-- **Contribute** to the HIVE core protocol
-- **Integrate** HIVE with existing systems
-- **Extend** HIVE with custom capabilities and behaviors
+- **Build applications** using PEAT as a coordination protocol
+- **Contribute** to the PEAT core protocol
+- **Integrate** PEAT with existing systems
+- **Extend** PEAT with custom capabilities and behaviors
 
 ### 1.2 Prerequisites
 
@@ -41,9 +41,9 @@ This guide is for software engineers who want to:
 - **Distributed systems**: Basic knowledge of CRDTs, eventual consistency
 - **Development tools**: Git, cargo, IDE of choice
 
-### 1.3 What is HIVE?
+### 1.3 What is PEAT?
 
-HIVE (Hierarchical Intelligence for Versatile Entities) is a protocol enabling scalable coordination of autonomous nodes through:
+PEAT (Hierarchical Intelligence for Versatile Entities) is a protocol enabling scalable coordination of autonomous nodes through:
 
 - **CRDT-based state synchronization** - Conflict-free data structures for eventual consistency
 - **Three-phase protocol** - Discovery → Cell Formation → Hierarchical Operations
@@ -67,8 +67,8 @@ source $HOME/.cargo/env
 rustc --version
 
 # Clone the repository
-git clone https://github.com/kitplummer/hive.git
-cd hive
+git clone https://github.com/defenseunicorns/peat.git
+cd peat
 ```
 
 #### Recommended Tools
@@ -142,25 +142,25 @@ make test
 
 ```bash
 # Run with default configuration
-cargo run --bin hive-sim
+cargo run --bin peat-sim
 
 # Run with debug logging
-RUST_LOG=debug cargo run --bin hive-sim
+RUST_LOG=debug cargo run --bin peat-sim
 
 # Run with specific module tracing
-RUST_LOG=hive_protocol::discovery=trace cargo run --bin hive-sim
+RUST_LOG=peat_protocol::discovery=trace cargo run --bin peat-sim
 ```
 
 ### 2.5 Project Layout
 
 ```
-hive/
+peat/
 ├── Cargo.toml                 # Workspace configuration
 ├── Makefile                   # Development commands
 ├── DEVELOPMENT.md             # Development quickstart
 ├── Codex.md                  # AI assistant context
 │
-├── hive-protocol/             # Core protocol library
+├── peat-protocol/             # Core protocol library
 │   ├── src/
 │   │   ├── lib.rs            # Crate root, public exports
 │   │   ├── cell/             # Phase 2: Cell formation
@@ -184,18 +184,18 @@ hive/
 │   ├── tests/                # Integration & E2E tests
 │   └── examples/             # Usage examples
 │
-├── hive-schema/               # Protobuf definitions
+├── peat-schema/               # Protobuf definitions
 │   ├── proto/                # .proto files
 │   └── src/                  # Generated Rust code
 │
-├── hive-mesh/                 # Mesh topology management
-├── hive-transport/            # HTTP/REST API layer
-├── hive-discovery/            # Peer discovery strategies
-├── hive-persistence/          # Storage backends
-├── hive-ffi/                  # Mobile bindings (Kotlin/Swift)
-├── hive-inference/            # Edge AI/ML pipeline
-├── hive-sim/                  # Network simulator
-├── hive-commander/            # TUI application
+├── peat-mesh/                 # Mesh topology management
+├── peat-transport/            # HTTP/REST API layer
+├── peat-discovery/            # Peer discovery strategies
+├── peat-persistence/          # Storage backends
+├── peat-ffi/                  # Mobile bindings (Kotlin/Swift)
+├── peat-inference/            # Edge AI/ML pipeline
+├── peat-sim/                  # Network simulator
+├── peat-commander/            # TUI application
 │
 ├── docs/                      # Documentation
 │   ├── adr/                  # Architecture Decision Records
@@ -214,16 +214,16 @@ hive/
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              HIVE Architecture                               │
+│                              PEAT Architecture                               │
 │                                                                              │
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
 │  │                        Application Layer                             │    │
-│  │   hive-sim    hive-commander    hive-transport    hive-inference    │    │
+│  │   peat-sim    peat-commander    peat-transport    peat-inference    │    │
 │  └────────────────────────────┬────────────────────────────────────────┘    │
 │                               │                                              │
 │  ┌────────────────────────────▼────────────────────────────────────────┐    │
 │  │                        Protocol Layer                                │    │
-│  │                         hive-protocol                                │    │
+│  │                         peat-protocol                                │    │
 │  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────┐    │    │
 │  │  │Discovery │  │   Cell   │  │Hierarchy │  │   Composition    │    │    │
 │  │  │ Phase 1  │──│ Phase 2  │──│ Phase 3  │  │     Engine       │    │    │
@@ -277,40 +277,40 @@ hive/
 ### 3.3 Crate Dependency Graph
 
 ```
-hive-sim ────────────────────────────────────┐
+peat-sim ────────────────────────────────────┐
     │                                        │
     ▼                                        │
-hive-mesh ◄──────────────────────────────────┤
+peat-mesh ◄──────────────────────────────────┤
     │                                        │
     ▼                                        │
-hive-protocol (core) ◄───────────────────────┤
+peat-protocol (core) ◄───────────────────────┤
     │                                        │
-    ├── hive-schema (protobuf)               │
+    ├── peat-schema (protobuf)               │
     │                                        │
     ├──► Ditto Backend (default)             │
     │    OR                                  │
     └──► Automerge + Iroh (feature flag)     │
                                              │
-hive-transport ──────────────────────────────┤
+peat-transport ──────────────────────────────┤
     │                                        │
-    └──► hive-protocol                       │
+    └──► peat-protocol                       │
                                              │
-hive-persistence ────────────────────────────┤
+peat-persistence ────────────────────────────┤
     │                                        │
-    └──► hive-protocol                       │
+    └──► peat-protocol                       │
                                              │
-hive-ffi (mobile) ───────────────────────────┤
+peat-ffi (mobile) ───────────────────────────┤
     │                                        │
-    └──► hive-protocol (automerge only)      │
+    └──► peat-protocol (automerge only)      │
                                              │
-hive-inference ──────────────────────────────┘
+peat-inference ──────────────────────────────┘
     │
-    └──► hive-protocol (automerge)
+    └──► peat-protocol (automerge)
 ```
 
 ### 3.4 CRDT Usage
 
-HIVE uses specific CRDT types for different data:
+PEAT uses specific CRDT types for different data:
 
 | Data Type | CRDT | Rationale |
 |-----------|------|-----------|
@@ -328,11 +328,11 @@ HIVE uses specific CRDT types for different data:
 
 ### 4.1 Nodes
 
-A **Node** represents a single entity in the HIVE network:
+A **Node** represents a single entity in the PEAT network:
 
 ```rust
-use hive_protocol::models::{Node, NodeId, PlatformType};
-use hive_protocol::models::capability::Capability;
+use peat_protocol::models::{Node, NodeId, PlatformType};
+use peat_protocol::models::capability::Capability;
 
 // Create a node
 let node = Node::new(
@@ -355,7 +355,7 @@ println!("Capabilities: {:?}", node.capabilities);
 **Capabilities** describe what a node can do:
 
 ```rust
-use hive_protocol::models::capability::{Capability, CapabilityType};
+use peat_protocol::models::capability::{Capability, CapabilityType};
 
 // Sensor capability
 let eo_ir = Capability::new(CapabilityType::Sensor)
@@ -391,7 +391,7 @@ let comms = Capability::new(CapabilityType::Communication)
 A **Cell** is a group of nodes that coordinate together:
 
 ```rust
-use hive_protocol::cell::{Cell, CellId, CellConfig};
+use peat_protocol::cell::{Cell, CellId, CellConfig};
 
 // Cell configuration
 let config = CellConfig::new()
@@ -428,7 +428,7 @@ let leader = cell.leader();
 A **Zone** aggregates multiple cells for hierarchical coordination:
 
 ```rust
-use hive_protocol::hierarchy::{Zone, ZoneId, ZoneConfig};
+use peat_protocol::hierarchy::{Zone, ZoneId, ZoneConfig};
 
 // Zone configuration
 let config = ZoneConfig::new()
@@ -452,7 +452,7 @@ let zone_capabilities = zone.aggregated_capabilities();
 Nodes discover each other and form initial groups:
 
 ```rust
-use hive_protocol::discovery::{DiscoveryConfig, DiscoveryStrategy};
+use peat_protocol::discovery::{DiscoveryConfig, DiscoveryStrategy};
 
 let config = DiscoveryConfig::new()
     .with_strategy(DiscoveryStrategy::Hybrid)
@@ -474,7 +474,7 @@ let peers = discovery.discover_peers(&config).await?;
 Discovered nodes form cells with elected leaders:
 
 ```rust
-use hive_protocol::cell::formation::{FormationConfig, FormationStrategy};
+use peat_protocol::cell::formation::{FormationConfig, FormationStrategy};
 
 let config = FormationConfig::new()
     .with_target_cell_size(5)
@@ -493,7 +493,7 @@ let leader = cell.elect_leader()?;
 Cells organize into zones for multi-level coordination:
 
 ```rust
-use hive_protocol::hierarchy::{HierarchyConfig, AggregationPolicy};
+use peat_protocol::hierarchy::{HierarchyConfig, AggregationPolicy};
 
 let config = HierarchyConfig::new()
     .with_zone_size(25)
@@ -508,10 +508,10 @@ hierarchy.propagate_update(&update).await?;
 
 ### 4.6 Capability Composition
 
-HIVE composes capabilities from multiple nodes:
+PEAT composes capabilities from multiple nodes:
 
 ```rust
-use hive_protocol::composition::{Composer, CompositionRules};
+use peat_protocol::composition::{Composer, CompositionRules};
 
 let composer = Composer::with_rules(CompositionRules::default());
 
@@ -538,14 +538,14 @@ let cell_capabilities = composer.compose(&cell.members())?;
 
 ## 5. Crate Reference
 
-### 5.1 hive-protocol
+### 5.1 peat-protocol
 
 The core protocol implementation.
 
 ```toml
 # Cargo.toml
 [dependencies]
-hive-protocol = { path = "../hive-protocol" }
+peat-protocol = { path = "../peat-protocol" }
 ```
 
 **Key Modules**:
@@ -564,13 +564,13 @@ hive-protocol = { path = "../hive-protocol" }
 | `storage` | CRDT backend abstraction |
 | `sync` | Synchronization primitives |
 
-### 5.2 hive-schema
+### 5.2 peat-schema
 
 Protocol buffer definitions and generated code.
 
 ```toml
 [dependencies]
-hive-schema = { path = "../hive-schema" }
+peat-schema = { path = "../peat-schema" }
 ```
 
 **Protobuf Messages**:
@@ -581,18 +581,18 @@ hive-schema = { path = "../hive-schema" }
 | `capability.proto` | Capability, CapabilityType |
 | `cell.proto` | Cell, CellState, CellRole |
 | `zone.proto` | Zone, ZoneState |
-| `message.proto` | HiveMessage, Priority |
+| `message.proto` | PeatMessage, Priority |
 | `command.proto` | Command, CommandResponse |
 | `sync.proto` | SyncRequest, SyncResponse |
 | `discovery.proto` | DiscoveryRequest, Peer |
 
-### 5.3 hive-mesh
+### 5.3 peat-mesh
 
 Mesh topology and beacon management.
 
 ```toml
 [dependencies]
-hive-mesh = { path = "../hive-mesh" }
+peat-mesh = { path = "../peat-mesh" }
 ```
 
 **Key Types**:
@@ -600,13 +600,13 @@ hive-mesh = { path = "../hive-mesh" }
 - `Beacon`: Node advertisement
 - `MeshRouter`: Message routing
 
-### 5.4 hive-transport
+### 5.4 peat-transport
 
 HTTP/REST API layer.
 
 ```toml
 [dependencies]
-hive-transport = { path = "../hive-transport" }
+peat-transport = { path = "../peat-transport" }
 ```
 
 **Endpoints**:
@@ -615,13 +615,13 @@ hive-transport = { path = "../hive-transport" }
 - `GET /api/v1/cell` - Cell information
 - `POST /api/v1/command` - Send command
 
-### 5.5 hive-discovery
+### 5.5 peat-discovery
 
 Peer discovery implementations.
 
 ```toml
 [dependencies]
-hive-discovery = { path = "../hive-discovery" }
+peat-discovery = { path = "../peat-discovery" }
 ```
 
 **Strategies**:
@@ -629,39 +629,39 @@ hive-discovery = { path = "../hive-discovery" }
 - `StaticDiscovery`: Pre-configured peers
 - `HybridDiscovery`: Combined strategy
 
-### 5.6 hive-persistence
+### 5.6 peat-persistence
 
 Storage backend abstraction.
 
 ```toml
 [dependencies]
-hive-persistence = { path = "../hive-persistence" }
+peat-persistence = { path = "../peat-persistence" }
 ```
 
 **Backends**:
 - `RedbBackend`: Embedded key-value store
 - `SqliteBackend`: SQLite database
 
-### 5.7 hive-ffi
+### 5.7 peat-ffi
 
 Foreign function interface for mobile.
 
 ```toml
 [dependencies]
-hive-ffi = { path = "../hive-ffi", features = ["automerge-backend"] }
+peat-ffi = { path = "../peat-ffi", features = ["automerge-backend"] }
 ```
 
 **Bindings**:
 - UniFFI for Kotlin/Swift
 - JNI for direct Android
 
-### 5.8 hive-inference
+### 5.8 peat-inference
 
 Edge AI/ML inference pipeline.
 
 ```toml
 [dependencies]
-hive-inference = { path = "../hive-inference", features = ["onnx-inference"] }
+peat-inference = { path = "../peat-inference", features = ["onnx-inference"] }
 ```
 
 **Features**:
@@ -677,7 +677,7 @@ hive-inference = { path = "../hive-inference", features = ["onnx-inference"] }
 ### 6.1 Node API
 
 ```rust
-use hive_protocol::models::{Node, NodeId, NodeState};
+use peat_protocol::models::{Node, NodeId, NodeState};
 
 impl Node {
     /// Create a new node with capabilities
@@ -703,7 +703,7 @@ impl Node {
 ### 6.2 Cell API
 
 ```rust
-use hive_protocol::cell::{Cell, CellId, CellConfig};
+use peat_protocol::cell::{Cell, CellId, CellConfig};
 
 impl Cell {
     /// Create a new cell
@@ -732,7 +732,7 @@ impl Cell {
 ### 6.3 Discovery API
 
 ```rust
-use hive_protocol::discovery::{Discovery, DiscoveryConfig, Peer};
+use peat_protocol::discovery::{Discovery, DiscoveryConfig, Peer};
 
 impl Discovery {
     /// Create discovery service
@@ -752,7 +752,7 @@ impl Discovery {
 ### 6.4 Sync API
 
 ```rust
-use hive_protocol::sync::{SyncEngine, SyncConfig};
+use peat_protocol::sync::{SyncEngine, SyncConfig};
 
 impl SyncEngine {
     /// Create sync engine with backend
@@ -775,7 +775,7 @@ impl SyncEngine {
 ### 6.5 Storage API
 
 ```rust
-use hive_protocol::storage::{Storage, StorageBackend};
+use peat_protocol::storage::{Storage, StorageBackend};
 
 /// Backend-agnostic storage trait
 pub trait StorageBackend: Send + Sync {
@@ -798,10 +798,10 @@ pub trait StorageBackend: Send + Sync {
 
 ### 6.6 Error Handling
 
-HIVE uses typed errors for each domain:
+PEAT uses typed errors for each domain:
 
 ```rust
-use hive_protocol::error::{HiveError, CellError, DiscoveryError, SyncError};
+use peat_protocol::error::{PeatError, CellError, DiscoveryError, SyncError};
 
 // Errors are enums with variants
 pub enum CellError {
@@ -821,7 +821,7 @@ fn add_to_cell(cell: &mut Cell, node: NodeId) -> Result<(), CellError> {
 }
 
 // Propagate with ?
-async fn join_network(config: &Config) -> Result<(), HiveError> {
+async fn join_network(config: &Config) -> Result<(), PeatError> {
     let peers = discovery.discover_peers().await?;
     let cell = formation.join_cell(&peers).await?;
     Ok(())
@@ -830,7 +830,7 @@ async fn join_network(config: &Config) -> Result<(), HiveError> {
 
 ---
 
-## 7. Extending HIVE
+## 7. Extending PEAT
 
 ### 7.1 Adding Custom Capabilities
 
@@ -873,7 +873,7 @@ impl CompositionRule for CustomLidar {
 Implement a custom discovery strategy:
 
 ```rust
-use hive_protocol::discovery::{DiscoveryStrategy, Peer, DiscoveryError};
+use peat_protocol::discovery::{DiscoveryStrategy, Peer, DiscoveryError};
 use async_trait::async_trait;
 
 pub struct CustomDiscovery {
@@ -909,7 +909,7 @@ let discovery = Discovery::new(config)
 Add custom composition rules:
 
 ```rust
-use hive_protocol::composition::{CompositionRule, CompositionResult};
+use peat_protocol::composition::{CompositionRule, CompositionResult};
 
 /// Custom rule for detecting emergent capabilities
 pub struct DetectionEmergence;
@@ -947,7 +947,7 @@ composer.add_rule(Box::new(DetectionEmergence));
 Implement policy rules for conflict resolution:
 
 ```rust
-use hive_protocol::policy::{PolicyRule, PolicyContext, PolicyDecision};
+use peat_protocol::policy::{PolicyRule, PolicyContext, PolicyDecision};
 
 pub struct CustomAuthorizationPolicy;
 
@@ -988,7 +988,7 @@ policy_engine.add_rule(Box::new(CustomAuthorizationPolicy));
 Configure quality of service:
 
 ```rust
-use hive_protocol::qos::{QosConfig, Priority, QosRule};
+use peat_protocol::qos::{QosConfig, Priority, QosRule};
 
 let qos_config = QosConfig::new()
     // Position updates are high priority
@@ -1016,7 +1016,7 @@ let qos_config = QosConfig::new()
 
 ### 8.1 Test Philosophy
 
-HIVE follows a test pyramid approach:
+PEAT follows a test pyramid approach:
 
 ```
          /\
@@ -1073,8 +1073,8 @@ Integration tests are in `tests/` directory:
 ```rust
 // tests/cell_integration.rs
 
-use hive_protocol::cell::{Cell, CellConfig};
-use hive_protocol::models::Node;
+use peat_protocol::cell::{Cell, CellConfig};
+use peat_protocol::models::Node;
 
 #[tokio::test]
 async fn test_cell_formation_integration() {
@@ -1120,7 +1120,7 @@ E2E tests validate real CRDT synchronization:
 ```rust
 // tests/sync_e2e.rs
 
-use hive_protocol::testing::{E2eHarness, TestObserver};
+use peat_protocol::testing::{E2eHarness, TestObserver};
 
 #[tokio::test]
 async fn test_state_sync_e2e() {
@@ -1274,7 +1274,7 @@ cargo tarpaulin --out Html
 
 ### 9.1 Backend Architecture
 
-HIVE abstracts the CRDT backend to support multiple implementations:
+PEAT abstracts the CRDT backend to support multiple implementations:
 
 ```rust
 /// Backend-agnostic sync trait
@@ -1301,13 +1301,13 @@ pub trait SyncBackend: Send + Sync {
 Production-ready CRDT backend using Ditto SDK:
 
 ```rust
-use hive_protocol::storage::ditto::DittoBackend;
+use peat_protocol::storage::ditto::DittoBackend;
 
 // Configure Ditto
 let ditto_config = DittoConfig::new()
     .with_app_id(env::var("DITTO_APP_ID")?)
     .with_offline_token(env::var("DITTO_OFFLINE_TOKEN")?)
-    .with_persistence_dir("/var/lib/hive/ditto");
+    .with_persistence_dir("/var/lib/peat/ditto");
 
 let backend = DittoBackend::new(ditto_config).await?;
 let sync_engine = SyncEngine::new(backend);
@@ -1328,11 +1328,11 @@ let sync_engine = SyncEngine::new(backend);
 Pure Rust implementation using Automerge + Iroh:
 
 ```rust
-use hive_protocol::storage::automerge::AutomergeBackend;
+use peat_protocol::storage::automerge::AutomergeBackend;
 
 // Configure Automerge + Iroh
 let automerge_config = AutomergeConfig::new()
-    .with_persistence_dir("/var/lib/hive/automerge");
+    .with_persistence_dir("/var/lib/peat/automerge");
 
 let backend = AutomergeBackend::new(automerge_config).await?;
 let sync_engine = SyncEngine::new(backend);
@@ -1364,7 +1364,7 @@ cargo build --release --features automerge-backend
 Runtime selection (if both compiled):
 
 ```rust
-use hive_protocol::storage::{DittoBackend, AutomergeBackend, BackendSelector};
+use peat_protocol::storage::{DittoBackend, AutomergeBackend, BackendSelector};
 
 let backend: Box<dyn SyncBackend> = match config.backend {
     BackendType::Ditto => Box::new(DittoBackend::new(ditto_config).await?),
@@ -1378,7 +1378,7 @@ let backend: Box<dyn SyncBackend> = match config.backend {
 
 ### 10.1 Architecture
 
-Mobile support via hive-ffi using UniFFI:
+Mobile support via peat-ffi using UniFFI:
 
 ```
 ┌─────────────────┐     ┌─────────────────┐
@@ -1388,13 +1388,13 @@ Mobile support via hive-ffi using UniFFI:
          │                       │
          ▼                       ▼
 ┌─────────────────────────────────────────┐
-│              hive-ffi                   │
+│              peat-ffi                   │
 │         (UniFFI bindings)               │
 └─────────────────┬───────────────────────┘
                   │
                   ▼
 ┌─────────────────────────────────────────┐
-│           hive-protocol                  │
+│           peat-protocol                  │
 │      (Automerge backend only)           │
 └─────────────────────────────────────────┘
 ```
@@ -1411,12 +1411,12 @@ rustup target add armv7-linux-androideabi
 rustup target add x86_64-linux-android
 
 # Build FFI library
-cd hive-ffi
+cd peat-ffi
 cargo build --release --target aarch64-linux-android
 
 # Generate Kotlin bindings
 cargo run --bin uniffi-bindgen generate \
-    --library target/aarch64-linux-android/release/libhive_ffi.so \
+    --library target/aarch64-linux-android/release/libpeat_ffi.so \
     --language kotlin \
     --out-dir kotlin-bindings
 ```
@@ -1424,30 +1424,30 @@ cargo run --bin uniffi-bindgen generate \
 ### 10.3 Kotlin Usage
 
 ```kotlin
-import com.hive.protocol.*
+import com.peat.protocol.*
 
-class HiveService {
-    private val hive: HiveClient
+class PeatService {
+    private val peat: PeatClient
 
     init {
-        // Initialize HIVE client
-        val config = HiveConfig(
+        // Initialize PEAT client
+        val config = PeatConfig(
             nodeId = UUID.randomUUID().toString(),
             persistenceDir = context.filesDir.absolutePath
         )
-        hive = HiveClient(config)
+        peat = PeatClient(config)
     }
 
     suspend fun start() {
-        hive.start()
+        peat.start()
     }
 
     suspend fun updatePosition(lat: Double, lon: Double) {
-        hive.updatePosition(Position(lat, lon, 0.0))
+        peat.updatePosition(Position(lat, lon, 0.0))
     }
 
     fun observePeers(): Flow<List<Peer>> {
-        return hive.peers().asFlow()
+        return peat.peers().asFlow()
     }
 }
 ```
@@ -1462,24 +1462,24 @@ cd atak-plugin
 ./gradlew assembleRelease
 
 # Install on device
-adb install -r app/build/outputs/apk/release/hive-atak-plugin.apk
+adb install -r app/build/outputs/apk/release/peat-atak-plugin.apk
 ```
 
 Plugin architecture:
-- `HiveDropDownReceiver`: UI integration
-- `HiveCotTranslator`: CoT message translation
-- `HivePeerManager`: Peer discovery and management
+- `PeatDropDownReceiver`: UI integration
+- `PeatCotTranslator`: CoT message translation
+- `PeatPeerManager`: Peer discovery and management
 
 ---
 
 ## 11. Edge AI Integration
 
-### 11.1 hive-inference Overview
+### 11.1 peat-inference Overview
 
-The `hive-inference` crate provides edge AI/ML capabilities:
+The `peat-inference` crate provides edge AI/ML capabilities:
 
 ```rust
-use hive_inference::{InferencePipeline, DetectionModel, VideoSource};
+use peat_inference::{InferencePipeline, DetectionModel, VideoSource};
 
 // Create inference pipeline
 let pipeline = InferencePipeline::new()
@@ -1500,10 +1500,10 @@ while let Some(detection) = detections.recv().await {
 
 ### 11.2 Model Distribution
 
-HIVE distributes AI models across the network:
+PEAT distributes AI models across the network:
 
 ```rust
-use hive_protocol::distribution::{ModelDistributor, ModelManifest};
+use peat_protocol::distribution::{ModelDistributor, ModelManifest};
 
 // Create model manifest
 let manifest = ModelManifest::new()
@@ -1526,7 +1526,7 @@ println!("Distributed to {}/{} nodes", status.completed, status.total);
 Support multiple inference runtimes:
 
 ```rust
-use hive_inference::runtime::{RuntimeAdapter, OnnxRuntime, TensorRtRuntime};
+use peat_inference::runtime::{RuntimeAdapter, OnnxRuntime, TensorRtRuntime};
 
 // ONNX Runtime (cross-platform)
 let onnx = OnnxRuntime::new(OnnxConfig::default())?;
@@ -1629,7 +1629,7 @@ All public APIs must have doc comments:
 ```rust
 /// Discovers peers in the local network.
 ///
-/// Uses the configured discovery strategy to find other HIVE nodes.
+/// Uses the configured discovery strategy to find other PEAT nodes.
 /// Returns a list of discovered peers within the timeout period.
 ///
 /// # Arguments
@@ -1681,7 +1681,7 @@ Key Architecture Decision Records:
 
 | ADR | Title |
 |-----|-------|
-| [001](../../adr/001-cap-protocol-poc.md) | HIVE Protocol POC |
+| [001](../../adr/001-cap-protocol-poc.md) | PEAT Protocol POC |
 | [004](../../adr/004-human-machine-cell-composition.md) | Human-Machine Cell Composition |
 | [011](../../adr/011-ditto-vs-automerge-iroh.md) | Ditto vs Automerge/Iroh |
 | [012](../../adr/012-schema-definition-protocol-extensibility.md) | Schema Definition |
@@ -1700,7 +1700,7 @@ Key Architecture Decision Records:
 
 ### 13.4 Getting Help
 
-- **GitHub Issues**: [github.com/kitplummer/hive/issues](https://github.com/kitplummer/hive/issues)
+- **GitHub Issues**: [github.com/defenseunicorns/peat/issues](https://github.com/defenseunicorns/peat/issues)
 - **Documentation**: [docs/INDEX.md](../../INDEX.md)
 - **ADRs**: [docs/adr/](../../adr/)
 
@@ -1708,4 +1708,4 @@ Key Architecture Decision Records:
 
 **Document Version**: 1.0
 **Last Updated**: 2025-12-08
-**Maintainer**: HIVE Development Team
+**Maintainer**: PEAT Development Team

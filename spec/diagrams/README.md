@@ -1,6 +1,6 @@
-# HIVE Protocol Diagrams
+# PEAT Protocol Diagrams
 
-This directory contains normative diagrams for the HIVE Protocol specification.
+This directory contains normative diagrams for the PEAT Protocol specification.
 
 ## Purpose
 

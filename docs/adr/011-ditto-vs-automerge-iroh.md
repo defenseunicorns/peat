@@ -4,7 +4,7 @@
 **Date**: 2025-11-06  
 **Authors**: Codex, Kit Plummer  
 **Supersedes**: ADR-007 (Automerge-Based Sync Engine)  
-**Relates To**: ADR-001 (HIVE Protocol POC), ADR-005 (Data Sync Abstraction), ADR-006 (Security), ADR-010 (Transport Layer)
+**Relates To**: ADR-001 (PEAT Protocol POC), ADR-005 (Data Sync Abstraction), ADR-006 (Security), ADR-010 (Transport Layer)
 
 ## Context
 
@@ -37,7 +37,7 @@ Initial analysis (ADR-007) assumed simplified Ethernet-only networking. **Real t
 
 ### Backend Architecture Design
 
-**Important Conceptual Clarification**: A "backend" in HIVE Protocol is a **complete, integrated solution** for storage, synchronization, and persistence - not individual components.
+**Important Conceptual Clarification**: A "backend" in PEAT Protocol is a **complete, integrated solution** for storage, synchronization, and persistence - not individual components.
 
 #### What is a Backend?
 
@@ -87,7 +87,7 @@ A backend is the complete stack that provides:
 
 #### Capability-Based Architecture
 
-Rather than forcing all backends into one interface, HIVE Protocol uses **optional capability traits**:
+Rather than forcing all backends into one interface, PEAT Protocol uses **optional capability traits**:
 
 ```rust
 // Required for all backends
@@ -262,7 +262,7 @@ Use Loro instead of Automerge as CRDT foundation, Iroh for networking.
 
 **Adopt Option 3: Automerge + Iroh**
 
-Build HIVE Protocol's sync and networking layers using:
+Build PEAT Protocol's sync and networking layers using:
 - **Automerge** for CRDT foundation and delta sync
 - **Iroh** for multi-path QUIC networking and peer connectivity
 - **Custom glue code** for Repository/Collection API, discovery, storage, queries
@@ -337,7 +337,7 @@ impl CapMdnsDiscovery {
         let daemon = ServiceDaemon::new()?;
         Ok(Self {
             daemon,
-            service_type: "_hive-protocol._quic.local.".to_string(),
+            service_type: "_peat-protocol._quic.local.".to_string(),
         })
     }
     
@@ -346,7 +346,7 @@ impl CapMdnsDiscovery {
             &self.service_type,
             &format!("cap-{}", node_id),
             &format!("0.0.0.0:{}", port),
-            "HIVE Protocol Node",
+            "PEAT Protocol Node",
         )?;
         self.daemon.register(service)?;
         Ok(())
@@ -1149,7 +1149,7 @@ impl Collection {
 **Usage Example:**
 ```rust
 // Create repository
-let store = AutomergeStore::open("/var/lib/hive/storage")?;
+let store = AutomergeStore::open("/var/lib/peat/storage")?;
 let repo = Repository::new(Arc::new(store));
 
 // Use collections just like Ditto
@@ -1529,7 +1529,7 @@ impl MdnsDiscovery {
         
         Ok(Self {
             daemon,
-            service_type: "_hive-protocol._quic.local.".to_string(),
+            service_type: "_peat-protocol._quic.local.".to_string(),
             discovered: Arc::new(RwLock::new(HashMap::new())),
             events,
         })
@@ -1540,7 +1540,7 @@ impl MdnsDiscovery {
             &self.service_type,
             &format!("cap-{}", endpoint_id),
             &format!("0.0.0.0:{}", port),
-            "HIVE Protocol Node",
+            "PEAT Protocol Node",
         )?;
         
         // Add EndpointId as TXT record
@@ -2491,7 +2491,7 @@ Result: 64x smaller updates for single-field changes
 
 ### Feature Parity (Week 18)
 
-- [x] All HIVE Protocol use cases supported
+- [x] All PEAT Protocol use cases supported
 - [x] Performance within 20% of Ditto on key metrics
 - [x] Security layer integrated (PKI, encryption, authorization)
 - [x] Geohash-based proximity queries
@@ -2542,7 +2542,7 @@ The identified gaps are **manageable** with well-known libraries and straightfor
 6. [QUIC Multipath Extension](https://datatracker.ietf.org/doc/draft-ietf-quic-multipath/)
 7. [Loro CRDT](https://loro.dev/)
 8. [RocksDB](https://rocksdb.org/)
-9. ADR-001: HIVE Protocol POC Architecture
+9. ADR-001: PEAT Protocol POC Architecture
 10. ADR-005: Data Synchronization Abstraction Layer
 11. ADR-006: Security, Authentication, and Authorization
 12. ADR-007: Automerge-Based Sync Engine
@@ -2585,8 +2585,8 @@ async fn main() -> Result<()> {
         .bind_addr("10.0.0.100:3478".parse()?)
         .stun_port(3478)  // For NAT detection
         .relay_port(3479) // For fallback relay
-        .tls_cert_path("/etc/hive/relay-cert.pem")
-        .tls_key_path("/etc/hive/relay-key.pem")
+        .tls_cert_path("/etc/peat/relay-cert.pem")
+        .tls_key_path("/etc/peat/relay-key.pem")
         .spawn()
         .await?;
     
@@ -2620,27 +2620,27 @@ let endpoint = Endpoint::builder()
 
 ### Milestone Updates
 
-**2025-11-19: hive-sim Backend Abstraction Complete** ✅
+**2025-11-19: peat-sim Backend Abstraction Complete** ✅
 
-Added pluggable backend support to hive-sim network simulator:
+Added pluggable backend support to peat-sim network simulator:
 
 **Changes Made**:
 - Added `--backend` CLI flag for backend selection (`ditto` or `automerge`)
-- Updated `hive-sim/src/main.rs` with backend-agnostic initialization (main.rs:1281-1349)
-- Exposed `automerge-backend` feature flag in `hive-sim/Cargo.toml`
-- Documentation updated in `hive-sim/README.md` with backend comparison table and usage guide
+- Updated `peat-sim/src/main.rs` with backend-agnostic initialization (main.rs:1281-1349)
+- Exposed `automerge-backend` feature flag in `peat-sim/Cargo.toml`
+- Documentation updated in `peat-sim/README.md` with backend comparison table and usage guide
 
 **Usage**:
 ```bash
 # Ditto backend (default - requires credentials)
-docker build -f hive-sim/Dockerfile -t hive-sim-node:latest .
-hive-sim --backend ditto --node-id node1
+docker build -f peat-sim/Dockerfile -t peat-sim-node:latest .
+peat-sim --backend ditto --node-id node1
 
 # Automerge+Iroh backend (open source - no credentials)
-docker build -f hive-sim/Dockerfile \
+docker build -f peat-sim/Dockerfile \
   --build-arg FEATURES="automerge-backend" \
-  -t hive-sim-node:automerge .
-hive-sim --backend automerge --node-id node1
+  -t peat-sim-node:automerge .
+peat-sim --backend automerge --node-id node1
 ```
 
 **Impact**:

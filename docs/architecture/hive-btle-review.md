@@ -1,4 +1,4 @@
-# hive-btle Architectural Review
+# peat-btle Architectural Review
 
 **Date**: December 2024
 **Version**: 0.1.0
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-hive-btle is a BLE mesh transport library implementing distributed state synchronization using CRDTs. This review assesses the current architecture, identifies gaps, and provides prioritized recommendations for production readiness.
+peat-btle is a BLE mesh transport library implementing distributed state synchronization using CRDTs. This review assesses the current architecture, identifies gaps, and provides prioritized recommendations for production readiness.
 
 **Key Findings**:
 - Strong core abstractions (CRDT sync, peer management, observer pattern)
@@ -29,14 +29,14 @@ hive-btle is a BLE mesh transport library implementing distributed state synchro
 ### 1.1 Current Structure
 
 ```
-hive-btle/src/
+peat-btle/src/
 ├── lib.rs              # Crate entry, public exports
 ├── config.rs           # BleConfig, profiles
 ├── error.rs            # BleError, Result alias
 ├── transport.rs        # MeshTransport trait
 │
 ├── Core Data Layer
-│   ├── document.rs         # HiveDocument wire format
+│   ├── document.rs         # PeatDocument wire format
 │   ├── document_sync.rs    # DocumentSync state management
 │   └── sync/
 │       ├── crdt.rs         # GCounter, LWW, EmergencyEvent
@@ -45,16 +45,16 @@ hive-btle/src/
 │       └── delta.rs        # Delta encoding
 │
 ├── Peer Management Layer
-│   ├── peer.rs             # HivePeer, SignalStrength
+│   ├── peer.rs             # PeatPeer, SignalStrength
 │   ├── peer_manager.rs     # PeerManager (thread-safe)
-│   ├── observer.rs         # HiveEvent, HiveObserver trait
-│   └── hive_mesh.rs        # HiveMesh facade (std only)
+│   ├── observer.rs         # PeatEvent, PeatObserver trait
+│   └── peat_mesh.rs        # PeatMesh facade (std only)
 │
 ├── BLE Service Layer
 │   ├── discovery/
 │   │   ├── advertiser.rs   # Beacon building
 │   │   ├── scanner.rs      # Device scanning
-│   │   └── beacon.rs       # HiveBeacon parsing
+│   │   └── beacon.rs       # PeatBeacon parsing
 │   └── gatt/
 │       ├── service.rs      # GATT service definition
 │       ├── characteristics.rs  # Characteristic UUIDs
@@ -90,15 +90,15 @@ hive-btle/src/
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Application Layer                         │
-│  (iOS HiveTest, M5Stack firmware, Linux daemon)             │
+│  (iOS PeatTest, M5Stack firmware, Linux daemon)             │
 ├─────────────────────────────────────────────────────────────┤
-│                    HiveMesh Facade                           │
+│                    PeatMesh Facade                           │
 │  Unified API: discovery, sync, events                       │
 ├─────────────────────────────────────────────────────────────┤
 │  PeerManager  │  DocumentSync  │  ObserverManager           │
 ├───────────────┼────────────────┼─────────────────────────────┤
-│  HivePeer     │  HiveDocument  │  HiveEvent                 │
-│               │  CRDT Layer    │  HiveObserver              │
+│  PeatPeer     │  PeatDocument  │  PeatEvent                 │
+│               │  CRDT Layer    │  PeatObserver              │
 ├─────────────────────────────────────────────────────────────┤
 │  Discovery    │  GATT Service  │  PHY/Power                 │
 │  Advertiser   │  Sync Protocol │  Radio Scheduler           │
@@ -116,10 +116,10 @@ hive-btle/src/
 
 **High-Level (Recommended)**:
 ```rust
-use hive_btle::{HiveMesh, HiveMeshConfig, HiveEvent, HiveObserver};
+use peat_btle::{PeatMesh, PeatMeshConfig, PeatEvent, PeatObserver};
 
-let config = HiveMeshConfig::new(node_id, "ALPHA-1", "DEMO");
-let mesh = HiveMesh::new(config);
+let config = PeatMeshConfig::new(node_id, "ALPHA-1", "DEMO");
+let mesh = PeatMesh::new(config);
 mesh.add_observer(Arc::new(my_observer));
 
 // Platform callbacks
@@ -135,9 +135,9 @@ if let Some(data) = mesh.tick(now_ms) {
 
 **Low-Level (Platform Builders)**:
 ```rust
-use hive_btle::{BleConfig, BleAdapter, BluetoothLETransport};
+use peat_btle::{BleConfig, BleAdapter, BluetoothLETransport};
 
-let config = BleConfig::hive_lite(node_id);
+let config = BleConfig::peat_lite(node_id);
 let adapter = platform::linux::BlueZAdapter::new()?;
 let transport = BluetoothLETransport::new(config, adapter);
 ```
@@ -146,10 +146,10 @@ let transport = BluetoothLETransport::new(config, adapter);
 
 | Category | Count | Notes |
 |----------|-------|-------|
-| Core types | 8 | NodeId, HiveDocument, HivePeer, etc. |
+| Core types | 8 | NodeId, PeatDocument, PeatPeer, etc. |
 | Configuration | 12 | BleConfig, PowerProfile, etc. |
-| Traits | 6 | BleAdapter, HiveObserver, MeshTransport |
-| Events | 11 | HiveEvent variants |
+| Traits | 6 | BleAdapter, PeatObserver, MeshTransport |
+| Events | 11 | PeatEvent variants |
 | Platform | 5 | Adapter impls (conditional) |
 | **Total public** | ~60 | Many are implementation details |
 
@@ -157,7 +157,7 @@ let transport = BluetoothLETransport::new(config, adapter);
 
 1. **Over-exposure**: Semi-internal types like `SyncProtocol`, `MeshRouter` exported
 2. **No prelude**: Common imports require 5+ use statements
-3. **Inconsistent naming**: `HiveEvent` vs `BleError` (prefix inconsistency)
+3. **Inconsistent naming**: `PeatEvent` vs `BleError` (prefix inconsistency)
 4. **Missing builder patterns**: Configuration structs lack fluent builders
 5. **Weak type safety**: Identifiers passed as `String` across boundaries
 
@@ -177,21 +177,21 @@ let transport = BluetoothLETransport::new(config, adapter);
 
 ### 3.2 Integration Gap Analysis
 
-**iOS (HiveTest app)**:
-- Maintains separate `HiveBLEManager` (CoreBluetooth wrapper)
-- Does NOT use `HiveMesh` for peer tracking
+**iOS (PeatTest app)**:
+- Maintains separate `PeatBLEManager` (CoreBluetooth wrapper)
+- Does NOT use `PeatMesh` for peer tracking
 - Manually parses device names
 - Duplicates connection state management
-- **Gap**: No clean path from CoreBluetooth callbacks → HiveMesh
+- **Gap**: No clean path from CoreBluetooth callbacks → PeatMesh
 
 **ESP32 (M5Stack)**:
-- Uses `HiveMesh` correctly
+- Uses `PeatMesh` correctly
 - Implements gossip manually (`nimble::gossip_document()`)
 - Custom NVS persistence (`DocumentStore`)
 - **Gap**: No framework gossip strategy, no persistence abstraction
 
 **Common Gaps**:
-1. No unified BLE event → HiveMesh routing
+1. No unified BLE event → PeatMesh routing
 2. No persistence abstraction (each platform reimplements)
 3. No gossip/flooding strategy in framework
 4. No connection state machine abstraction
@@ -212,7 +212,7 @@ let transport = BluetoothLETransport::new(config, adapter);
 ### 4.2 Wire Format
 
 ```
-HiveDocument (variable size):
+PeatDocument (variable size):
 ┌──────────────────────────────────────────────┐
 │ Header (8 bytes)                             │
 │   version: u32 (LE)                          │
@@ -254,7 +254,7 @@ HiveDocument (variable size):
 
 **Recommendation**: Design for 244-byte payloads with fallback fragmentation.
 
-#### HiveDocument Size Calculation
+#### PeatDocument Size Calculation
 
 ```
 Size = 8 (header)
@@ -322,7 +322,7 @@ pub const MAX_DOCUMENT_SIZE: usize = 512;
 |--------|-------|----------|
 | peer_manager.rs | 9 | Good |
 | document_sync.rs | 9 | Good |
-| hive_mesh.rs | 9 | Good |
+| peat_mesh.rs | 9 | Good |
 | sync/crdt.rs | 19 | Excellent |
 | sync/protocol.rs | 10 | Good |
 | observer.rs | 2 | Minimal |
@@ -382,14 +382,14 @@ pub const MAX_DOCUMENT_SIZE: usize = 512;
 
 ### 7.1 Leaky Abstractions
 
-**Issue**: iOS app bypasses HiveMesh entirely
+**Issue**: iOS app bypasses PeatMesh entirely
 ```swift
-// HiveViewModel.swift - duplicates peer tracking
+// PeatViewModel.swift - duplicates peer tracking
 var discoveredPeripherals: [String: CBPeripheral] = [:]
 var connectedPeripherals: [String: CBPeripheral] = [:]
 ```
 
-**Fix**: Provide clear callback → HiveMesh routing pattern
+**Fix**: Provide clear callback → PeatMesh routing pattern
 
 ### 7.2 Manual Gossip
 
@@ -448,8 +448,8 @@ fn on_ble_discovered(identifier: &str, ...) // UUID? MAC? Handle?
 3. **Add Persistence Trait** (`persistence.rs`)
    ```rust
    pub trait DocumentStore: Send + Sync {
-       fn save(&self, doc: &HiveDocument) -> Result<()>;
-       fn load(&self) -> Result<Option<HiveDocument>>;
+       fn save(&self, doc: &PeatDocument) -> Result<()>;
+       fn load(&self) -> Result<Option<PeatDocument>>;
    }
    ```
 
@@ -457,12 +457,12 @@ fn on_ble_discovered(identifier: &str, ...) // UUID? MAC? Handle?
    ```rust
    pub trait GossipStrategy: Send + Sync {
        fn should_forward(&self, result: &MergeResult) -> bool;
-       fn select_peers<'a>(&self, peers: &'a [HivePeer]) -> Vec<&'a HivePeer>;
+       fn select_peers<'a>(&self, peers: &'a [PeatPeer]) -> Vec<&'a PeatPeer>;
    }
    ```
 
-5. **Fix iOS HiveMesh Integration**
-   - Route CoreBluetooth callbacks → HiveMesh
+5. **Fix iOS PeatMesh Integration**
+   - Route CoreBluetooth callbacks → PeatMesh
    - Remove duplicate peer tracking
    - Use document-based state
 
@@ -483,8 +483,8 @@ fn on_ble_discovered(identifier: &str, ...) // UUID? MAC? Handle?
 8. **Add Prelude Module**
    ```rust
    pub mod prelude {
-       pub use crate::{HiveMesh, HiveMeshConfig, HiveEvent, HiveObserver};
-       pub use crate::{HivePeer, NodeId, Result};
+       pub use crate::{PeatMesh, PeatMeshConfig, PeatEvent, PeatObserver};
+       pub use crate::{PeatPeer, NodeId, Result};
    }
    ```
 
@@ -521,7 +521,7 @@ Week 3: Examples & Guides
 └── Add prelude module
 
 Week 4: Polish
-├── Fix iOS HiveMesh integration
+├── Fix iOS PeatMesh integration
 ├── API documentation enhancements
 └── Final review and cleanup
 ```
@@ -531,16 +531,16 @@ Week 4: Polish
 ## 10. Appendix: File Inventory
 
 ### Files to Create
-- `hive-btle/src/prelude.rs`
-- `hive-btle/src/persistence.rs`
-- `hive-btle/src/gossip.rs`
-- `hive-btle/src/platform/mock.rs`
-- `hive-btle/tests/mesh_sync.rs`
-- `hive-btle/tests/emergency_flow.rs`
-- `hive-btle/tests/peer_lifecycle.rs`
-- `hive-btle/examples/basic_mesh.rs`
-- `hive-btle/examples/emergency_demo.rs`
-- `hive-btle/examples/custom_observer.rs`
+- `peat-btle/src/prelude.rs`
+- `peat-btle/src/persistence.rs`
+- `peat-btle/src/gossip.rs`
+- `peat-btle/src/platform/mock.rs`
+- `peat-btle/tests/mesh_sync.rs`
+- `peat-btle/tests/emergency_flow.rs`
+- `peat-btle/tests/peer_lifecycle.rs`
+- `peat-btle/examples/basic_mesh.rs`
+- `peat-btle/examples/emergency_demo.rs`
+- `peat-btle/examples/custom_observer.rs`
 - `docs/testing/functional-test-plan.md`
 - `docs/platform-guides/ios.md`
 - `docs/platform-guides/android.md`
@@ -549,11 +549,11 @@ Week 4: Polish
 - `docs/platform-guides/raspberry-pi.md`
 
 ### Files to Modify
-- `hive-btle/src/lib.rs` - Add prelude, persistence, gossip exports
-- `hive-btle/src/hive_mesh.rs` - Integrate new traits
-- `hive-btle/src/platform/mod.rs` - Add mock feature
-- `hive-btle/ios/hive-apple-ffi/src/lib.rs` - Expose full API
-- `hive-btle/README.md` - Update with examples
+- `peat-btle/src/lib.rs` - Add prelude, persistence, gossip exports
+- `peat-btle/src/peat_mesh.rs` - Integrate new traits
+- `peat-btle/src/platform/mod.rs` - Add mock feature
+- `peat-btle/ios/peat-apple-ffi/src/lib.rs` - Expose full API
+- `peat-btle/README.md` - Update with examples
 
 ---
 
@@ -593,7 +593,7 @@ jobs:
     runs-on: [self-hosted, linux, ARM64, ble]
     steps:
       - uses: actions/checkout@v4
-      - name: Build hive-btle (ARM64)
+      - name: Build peat-btle (ARM64)
         run: cargo build --features linux
       - name: Run BLE integration tests
         run: cargo test --features linux,ble-hardware

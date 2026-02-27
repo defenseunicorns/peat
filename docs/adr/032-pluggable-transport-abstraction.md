@@ -51,7 +51,7 @@ How multiple transports are used together:
 ### Current Implementation Gap
 
 **What exists today:**
-- `MeshTransport` trait in `hive-protocol/src/transport/mod.rs`
+- `MeshTransport` trait in `peat-protocol/src/transport/mod.rs`
 - `IrohMeshTransport` implementing QUIC-based transport
 - `DittoMeshTransport` delegating to Ditto's transport
 - `HealthMonitor` for connection quality tracking
@@ -69,7 +69,7 @@ How multiple transports are used together:
 **ADR-030** answered: "Does Iroh support multiple NICs?"
 - Yes, Iroh automatically binds to all interfaces
 
-**ADR-032** answers: "How does HIVE manage multiple transports holistically?"
+**ADR-032** answers: "How does PEAT manage multiple transports holistically?"
 - Transport registration with unique IDs
 - PACE-style failover policies
 - Simultaneous use modes
@@ -694,7 +694,7 @@ impl BluetoothLETransport {
             },
             adapter,
             connections: RwLock::new(HashMap::new()),
-            service_uuid: Uuid::parse_str("HIVE-SERVICE-UUID").unwrap(),
+            service_uuid: Uuid::parse_str("PEAT-SERVICE-UUID").unwrap(),
         }
     }
 }
@@ -1049,7 +1049,7 @@ This integrates with the geographic beacon system (ADR-024) to provide distance 
 
 **Goal**: Android/iOS peer discovery and messaging
 
-- [ ] Create `hive-bluetooth` crate (behind feature flag)
+- [ ] Create `peat-bluetooth` crate (behind feature flag)
 - [ ] Implement `BluetoothLETransport`
 - [ ] Implement BLE advertising for peer discovery
 - [ ] Implement GATT service for data exchange
@@ -1062,7 +1062,7 @@ This integrates with the geographic beacon system (ADR-024) to provide distance 
 
 **Goal**: Long-range, low-power telemetry
 
-- [ ] Create `hive-lora` crate (behind feature flag)
+- [ ] Create `peat-lora` crate (behind feature flag)
 - [ ] Implement `LoRaTransport`
 - [ ] Handle spreading factor selection
 - [ ] Implement duty cycle management
@@ -1075,7 +1075,7 @@ This integrates with the geographic beacon system (ADR-024) to provide distance 
 
 **Goal**: High-bandwidth peer-to-peer clusters
 
-- [ ] Create `hive-wifi-direct` crate
+- [ ] Create `peat-wifi-direct` crate
 - [ ] Implement `WifiDirectTransport`
 - [ ] Handle group formation (GO negotiation)
 - [ ] Integrate with IP-based QUIC after connection

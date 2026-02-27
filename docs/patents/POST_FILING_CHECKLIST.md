@@ -34,7 +34,7 @@
 
 ### 2a. Update PATENT_STRATEGY.md
 
-Open `/Users/kit/Code/hive/docs/PATENT_STRATEGY.md` and fill in:
+Open `/Users/kit/Code/peat/docs/PATENT_STRATEGY.md` and fill in:
 
 ```markdown
 ## Filing Record
@@ -47,7 +47,7 @@ Open `/Users/kit/Code/hive/docs/PATENT_STRATEGY.md` and fill in:
 
 ### 2b. Update PATENT_PLEDGE.md
 
-Open `/Users/kit/Code/hive/docs/PATENT_PLEDGE.md` and update:
+Open `/Users/kit/Code/peat/docs/PATENT_PLEDGE.md` and update:
 
 **Line 5** - Effective Date:
 ```markdown
@@ -76,7 +76,7 @@ Create a simple notice for GitHub:
 ```markdown
 # Patent Notice
 
-HIVE Protocol includes innovations covered by pending patent applications:
+PEAT Protocol includes innovations covered by pending patent applications:
 
 - **US Provisional 63/XXX,XXX**: Hierarchical Capability Composition
 - **US Provisional 63/XXX,XXX**: Graduated Human Authority Control
@@ -105,7 +105,7 @@ Add near the top (after project description):
 ```markdown
 ## Patent Notice
 
-HIVE Protocol includes innovations covered by pending U.S. patent applications. We pledge not to assert these patents against NATO allies, academic institutions, open-source contributors, or non-commercial use. See [PATENT_PLEDGE.md](docs/PATENT_PLEDGE.md) for details.
+PEAT Protocol includes innovations covered by pending U.S. patent applications. We pledge not to assert these patents against NATO allies, academic institutions, open-source contributors, or non-commercial use. See [PATENT_PLEDGE.md](docs/PATENT_PLEDGE.md) for details.
 
 **Status**: Patent Pending
 ```
@@ -117,9 +117,9 @@ Add the same notice, emphasizing that infrastructure components are NOT patented
 ```markdown
 ## Patent Notice
 
-HIVE Protocol (which uses automerge-edge) includes patented innovations related to hierarchical capability composition and human authority control. **These infrastructure components (storage, discovery, transport) are NOT covered by patents** and remain fully open-source.
+PEAT Protocol (which uses automerge-edge) includes patented innovations related to hierarchical capability composition and human authority control. **These infrastructure components (storage, discovery, transport) are NOT covered by patents** and remain fully open-source.
 
-See [HIVE Protocol Patent Pledge](../hive-protocol/docs/PATENT_PLEDGE.md) for details.
+See [PEAT Protocol Patent Pledge](../peat-protocol/docs/PATENT_PLEDGE.md) for details.
 ```
 
 ---
@@ -137,7 +137,7 @@ If you have a company website, create page at:
 **Twitter/LinkedIn/Blog Post**:
 
 ```
-🚀 Big news: (r)evolve has filed patent applications for HIVE Protocol innovations
+🚀 Big news: (r)evolve has filed patent applications for PEAT Protocol innovations
 in autonomous system coordination!
 
 But here's what makes this different: We're pledging NOT to assert these patents
@@ -158,13 +158,13 @@ Send to:
 - Open-source community leaders
 - Investors
 
-**Subject**: HIVE Protocol Patent Pledge - Defensive Use Only
+**Subject**: PEAT Protocol Patent Pledge - Defensive Use Only
 
 **Body**:
 ```
 Hi [Name],
 
-I wanted to share an important update on HIVE Protocol's intellectual property strategy.
+I wanted to share an important update on PEAT Protocol's intellectual property strategy.
 
 We've filed provisional patent applications covering our core innovations in
 hierarchical capability composition and human authority control for autonomous systems.
@@ -177,7 +177,7 @@ a Patent Pledge guaranteeing that we will NOT assert these patents against:
 - Open-source contributors
 - Non-commercial use
 
-This means you can use, study, and build on HIVE Protocol without patent concerns.
+This means you can use, study, and build on PEAT Protocol without patent concerns.
 
 Read the full pledge: [link to PATENT_PLEDGE.md]
 
@@ -210,11 +210,11 @@ If private:
 **Blog post / Press release**:
 
 ```
-HIVE Protocol: Open Source Autonomous Coordination for Defense
+PEAT Protocol: Open Source Autonomous Coordination for Defense
 
-We're excited to announce that HIVE Protocol is now open source!
+We're excited to announce that PEAT Protocol is now open source!
 
-HIVE Protocol enables hierarchical coordination of autonomous platforms using
+PEAT Protocol enables hierarchical coordination of autonomous platforms using
 CRDTs for partition-tolerant, eventually-consistent state management.
 
 Key innovations (patent pending):
@@ -226,13 +226,13 @@ patents against NATO allies, academic researchers, or open-source contributors.
 
 This is defense technology built for the common good.
 
-Get started: https://github.com/r-evolve/hive
+Get started: https://github.com/r-evolve/peat
 Read our Patent Pledge: [link]
 ```
 
 ### 5c. Submit to Communities
 
-- [ ] Hacker News: "Show HN: HIVE Protocol - Open source autonomous coordination with defensive patents"
+- [ ] Hacker News: "Show HN: PEAT Protocol - Open source autonomous coordination with defensive patents"
 - [ ] r/rust: Announce Rust implementation
 - [ ] r/robotics: Cross-post for robotics community
 - [ ] Defense tech newsletters / blogs
@@ -297,7 +297,7 @@ Create a document to track evidence for Month 12 decision:
 - [Date] [Company] wanted to: [use case]
 
 ## Open Source Adoption
-- [Date] [Organization] forked HIVE Protocol
+- [Date] [Organization] forked PEAT Protocol
 - [Date] [University] published paper using CAP
 - [Date] GitHub stars reached: [number]
 
@@ -340,7 +340,7 @@ If budget allows:
 | **Within 1 hour** | Save filing receipts securely |
 | **Within 24 hours** | Update PATENT_STRATEGY.md and PATENT_PLEDGE.md |
 | **Within 48 hours** | Publish Patent Pledge on website, announce publicly |
-| **Within 1 week** | Open-source HIVE Protocol repository |
+| **Within 1 week** | Open-source PEAT Protocol repository |
 | **Within 2 weeks** | Optional legal review of pledge |
 | **Month 1-11** | Track evidence, monitor competitors |
 | **Month 11** | Schedule Month 12 decision meeting |

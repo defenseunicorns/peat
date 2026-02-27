@@ -1,9 +1,9 @@
-# ADR-001: HIVE Protocol Proof-of-Concept Architecture
+# ADR-001: PEAT Protocol Proof-of-Concept Architecture
 
 **Status:** Proposed  
 **Date:** 2025-10-28  
 **Decision Makers:** Research Team  
-**Technical Story:** Implement HIVE protocol to demonstrate hierarchical capability composition at scale
+**Technical Story:** Implement PEAT protocol to demonstrate hierarchical capability composition at scale
 
 ## Context and Problem Statement
 
@@ -83,7 +83,7 @@ Build a Rust library + reference application that demonstrates:
 └─────────────────────────────────────────────────────────┘
                             │
 ┌─────────────────────────────────────────────────────────┐
-│                    HIVE Protocol Library                  │
+│                    PEAT Protocol Library                  │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
 │  │   Phase 1:   │  │   Phase 2:   │  │   Phase 3:   │ │
 │  │  Discovery   │→ │    Cell     │→ │ Hierarchical │ │

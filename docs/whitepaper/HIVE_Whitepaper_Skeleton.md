@@ -1,4 +1,4 @@
-# HIVE PROTOCOL: BREAKING THE 20-PLATFORM WALL
+# PEAT PROTOCOL: BREAKING THE 20-PLATFORM WALL
 
 **Open Coordination Architecture for Human-Machine Teams at Scale**
 
@@ -26,7 +26,7 @@ Military autonomous systems programs consistently plateau at approximately 20 pl
 
 **The Solution**
 
-[2-3 sentences: HIVE Protocol, hierarchical CRDT coordination, key validation results]
+[2-3 sentences: PEAT Protocol, hierarchical CRDT coordination, key validation results]
 
 **The Imperative**
 
@@ -36,7 +36,7 @@ Military autonomous systems programs consistently plateau at approximately 20 pl
 
 - The ~20 platform ceiling is architectural, not technological
 - Military hierarchy is the coordination primitive that enables scale
-- HIVE achieves 95-99% bandwidth reduction through hierarchical aggregation
+- PEAT achieves 95-99% bandwidth reduction through hierarchical aggregation
 - Open standards are strategic necessity, not preference
 - The architecture decision window is 12-24 months
 
@@ -168,13 +168,13 @@ In the absence of open standards, proprietary solutions fill the gap.
 
 ### Key Finding: Section II
 
-> "Existing standards solve platform-level interoperability. None address hierarchical coordination at scale—they assume that layer exists. It doesn't. HIVE fills this gap."
+> "Existing standards solve platform-level interoperability. None address hierarchical coordination at scale—they assume that layer exists. It doesn't. PEAT fills this gap."
 
 ---
 
 ## III. THE HIERARCHY INSIGHT
 
-**Thesis:** Military hierarchy isn't bureaucratic overhead—it's evolved communication optimization. HIVE makes this pattern technical architecture.
+**Thesis:** Military hierarchy isn't bureaucratic overhead—it's evolved communication optimization. PEAT makes this pattern technical architecture.
 
 ---
 
@@ -258,13 +258,13 @@ Hierarchy preserves human decision authority where it matters.
 
 ### Key Finding: Section III
 
-> "Military hierarchy isn't the obstacle to autonomous coordination—it's the solution. The pattern reduces O(n²) to O(n log n) because it was evolved to solve exactly this problem. HIVE implements hierarchy as technical architecture."
+> "Military hierarchy isn't the obstacle to autonomous coordination—it's the solution. The pattern reduces O(n²) to O(n log n) because it was evolved to solve exactly this problem. PEAT implements hierarchy as technical architecture."
 
 ---
 
 ## IV. TECHNICAL ARCHITECTURE
 
-**Thesis:** HIVE achieves scalable coordination through CRDT-based eventual consistency, hierarchical aggregation, and edge-native design.
+**Thesis:** PEAT achieves scalable coordination through CRDT-based eventual consistency, hierarchical aggregation, and edge-native design.
 
 ---
 
@@ -359,7 +359,7 @@ AI participates in the hierarchy, not just at the edge.
 
 [Content to develop:]
 - Current model: AI for perception on individual platforms
-- HIVE model: AI as team member at every echelon
+- PEAT model: AI as team member at every echelon
 - Formation-level AI: optimization within commander's intent
 - Platform-level AI: perception, local decisions
 - AI capability advertisement: "Which assets can identify [target type] with >90% confidence?"
@@ -391,7 +391,7 @@ Laboratory validation confirms the architecture.
 
 ### Key Finding: Section IV
 
-> "HIVE achieves O(n log n) scaling through hierarchical CRDT-based coordination—enabling 1,000+ platform operations on networks that saturate at 50 with mesh approaches. Lab validation confirms 95-99% bandwidth reduction."
+> "PEAT achieves O(n log n) scaling through hierarchical CRDT-based coordination—enabling 1,000+ platform operations on networks that saturate at 50 with mesh approaches. Lab validation confirms 95-99% bandwidth reduction."
 
 ---
 
@@ -411,7 +411,7 @@ Infrastructure wins by enabling, not capturing.
 - TCP/IP became universal by being nobody's proprietary advantage
 - Open protocols create ecosystems; proprietary protocols create dependencies
 - The internet's architecture enabled permissionless innovation
-- HIVE positions as coordination substrate—not product, but infrastructure
+- PEAT positions as coordination substrate—not product, but infrastructure
 - Revenue from services, not protocol licensing
 
 ---
@@ -543,7 +543,7 @@ Delay has compounding consequences.
 
 ## VII. PATH FORWARD
 
-**Thesis:** HIVE is validated, integration-ready, and positioned for standardization with clear pathways for pilot programs and adoption.
+**Thesis:** PEAT is validated, integration-ready, and positioned for standardization with clear pathways for pilot programs and adoption.
 
 ---
 
@@ -551,7 +551,7 @@ Delay has compounding consequences.
 
 [Target: ~0.5 page]
 
-HIVE is ready for integration pilots.
+PEAT is ready for integration pilots.
 
 [Content to develop:]
 - TRL 4-5: Laboratory validated
@@ -572,7 +572,7 @@ Programs choose integration depth based on requirements.
 
 **Shallow Integration**
 - Protocol adapters
-- HIVE coordinates existing C2 outputs
+- PEAT coordinates existing C2 outputs
 - Minimal changes to current systems
 
 **Medium Integration**
@@ -581,9 +581,9 @@ Programs choose integration depth based on requirements.
 - Incremental adoption
 
 **Deep Integration**
-- Native HIVE implementation
+- Native PEAT implementation
 - Full capability advertisement
-- New platforms designed for HIVE
+- New platforms designed for PEAT
 
 ---
 
@@ -618,7 +618,7 @@ Multiple paths reinforce each other.
 [Target: ~0.75 page]
 
 **For Program Managers**
-- Evaluate HIVE integration for multi-platform coordination requirements
+- Evaluate PEAT integration for multi-platform coordination requirements
 - Assess current architectures against O(n²) scaling limits
 - Identify pilot opportunities for operational validation
 - Engage with consortium development
@@ -632,7 +632,7 @@ Multiple paths reinforce each other.
 **For Technical Evaluators**
 - Assess current program coordination scaling assumptions
 - Evaluate proprietary dependencies for coalition interoperability risk
-- Review HIVE technical specifications for integration feasibility
+- Review PEAT technical specifications for integration feasibility
 - Consider three-layer architecture for incremental adoption
 
 **For Strategic Decision-Makers**
@@ -645,7 +645,7 @@ Multiple paths reinforce each other.
 
 ### Key Finding: Section VII
 
-> "HIVE is validated and integration-ready. The path from current state to NATO STANAG is clear. What's required is engagement: pilot programs, consortium participation, and strategic prioritization of open coordination infrastructure."
+> "PEAT is validated and integration-ready. The path from current state to NATO STANAG is clear. What's required is engagement: pilot programs, consortium participation, and strategic prioritization of open coordination infrastructure."
 
 ---
 
@@ -657,7 +657,7 @@ The 20-platform wall is real. It is mathematical. And it will constrain every au
 
 The solution is not more technology. It is recognizing that military hierarchy—the organizational pattern that has enabled coordinated human action at scale for millennia—is the architecture that enables machine coordination at scale.
 
-HIVE Protocol implements this insight: hierarchical aggregation, capability composition, human-machine authority, built on CRDT foundations that work in the contested, bandwidth-constrained environments where these systems must operate.
+PEAT Protocol implements this insight: hierarchical aggregation, capability composition, human-machine authority, built on CRDT foundations that work in the contested, bandwidth-constrained environments where these systems must operate.
 
 The architecture decision is being made now. Every program that adopts proprietary coordination creates switching costs that compound coalition interoperability challenges. Open infrastructure enables the ecosystem; proprietary fragmentation constrains it.
 
@@ -709,7 +709,7 @@ https://revolveteam.com
 **Distribution:** Public Release
 
 **Suggested Citation:**
-Plummer, K. (2025). "HIVE Protocol: Breaking the 20-Platform Wall." (r)evolve - Revolve Team LLC.
+Plummer, K. (2025). "PEAT Protocol: Breaking the 20-Platform Wall." (r)evolve - Revolve Team LLC.
 
 ---
 

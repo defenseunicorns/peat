@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// HIVE ATAK Plugin Build Configuration
+// PEAT ATAK Plugin Build Configuration
 // Based on ATAK-CIV SDK 5.6.0 plugintemplate-compose
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -92,7 +92,7 @@ def supportedFlavors =
 
 android {
     compileSdk 36
-    namespace 'com.revolveteam.atak.hive'
+    namespace 'com.revolveteam.atak.peat'
 
     dexOptions {
         jumboMode = true
@@ -155,7 +155,7 @@ android {
     }
 
     bundle {
-        storeArchive {
+        storeArcpeat {
             enable = false
         }
     }
@@ -170,11 +170,11 @@ android {
 
     sourceSets {
         main {
-            setProperty("archivesBaseName", "ATAK-Plugin-HIVE-" + PLUGIN_VERSION + "-" + getVersionName() + "-" + ATAK_VERSION)
+            setProperty("arcpeatsBaseName", "ATAK-Plugin-PEAT-" + PLUGIN_VERSION + "-" + getVersionName() + "-" + ATAK_VERSION)
             defaultConfig.versionCode = getVersionCode()
             defaultConfig.versionName = PLUGIN_VERSION + " (" + getVersionName() + ") - [" + ATAK_VERSION + "]"
 
-            // JNI libs location for hive-ffi native libraries
+            // JNI libs location for peat-ffi native libraries
             jniLibs.srcDirs = ['libs']
         }
 
@@ -222,9 +222,9 @@ dependencies {
         exclude group: 'org.jetbrains', module: 'annotations'
     }
 
-    // HIVE BLE mesh transport (for WearTAK sync)
+    // PEAT BLE mesh transport (for WearTAK sync)
     // Use Maven dependency so composite build substitution works
-    implementation 'com.revolveteam:hive:0.0.10'
+    implementation 'com.revolveteam:peat:0.0.10'
 
     // CompileOnly dependencies - needed for compilation but provided by ATAK at runtime
     // These are excluded from packaging to avoid conflicts with ATAK's bundled versions
@@ -258,32 +258,32 @@ configurations.implementation {
    exclude group: 'com.google.guava', module: 'listenablefuture'
 }
 
-// Task to copy native libraries from hive-ffi build
-task copyHiveNativeLibs(type: Copy) {
-    description 'Copy hive-ffi native libraries to jniLibs'
+// Task to copy native libraries from peat-ffi build
+task copyPeatNativeLibs(type: Copy) {
+    description 'Copy peat-ffi native libraries to jniLibs'
 
-    def hiveFfiDir = file("${rootDir}/../target")
+    def peatFfiDir = file("${rootDir}/../target")
 
-    from("${hiveFfiDir}/aarch64-linux-android/release/libhive_ffi.so") {
+    from("${peatFfiDir}/aarch64-linux-android/release/libpeat_ffi.so") {
         into 'arm64-v8a'
     }
-    from("${hiveFfiDir}/armv7-linux-androideabi/release/libhive_ffi.so") {
+    from("${peatFfiDir}/armv7-linux-androideabi/release/libpeat_ffi.so") {
         into 'armeabi-v7a'
     }
-    from("${hiveFfiDir}/x86_64-linux-android/release/libhive_ffi.so") {
+    from("${peatFfiDir}/x86_64-linux-android/release/libpeat_ffi.so") {
         into 'x86_64'
     }
-    from("${hiveFfiDir}/i686-linux-android/release/libhive_ffi.so") {
+    from("${peatFfiDir}/i686-linux-android/release/libpeat_ffi.so") {
         into 'x86'
     }
 
     into "${projectDir}/libs"
 }
 
-// Task to copy Kotlin bindings from hive-ffi
-task copyHiveBindings(type: Copy) {
-    description 'Copy hive-ffi Kotlin bindings'
+// Task to copy Kotlin bindings from peat-ffi
+task copyPeatBindings(type: Copy) {
+    description 'Copy peat-ffi Kotlin bindings'
 
-    from file("${rootDir}/../kotlin-test/src/main/kotlin/uniffi/hive_ffi")
-    into "${projectDir}/src/main/java/uniffi/hive_ffi"
+    from file("${rootDir}/../kotlin-test/src/main/kotlin/uniffi/peat_ffi")
+    into "${projectDir}/src/main/java/uniffi/peat_ffi"
 }

@@ -1,4 +1,4 @@
-# HIVE Protocol Architecture
+# PEAT Protocol Architecture
 
 **Status**: Living Document
 **Last Updated**: 2025-01-07
@@ -6,55 +6,55 @@
 
 ## Overview
 
-HIVE (Hierarchical Intelligence for Virtual Environments) is a decentralized mesh protocol for human-machine teaming in tactical environments. It provides the foundational communication, synchronization, and coordination primitives that enable autonomous and semi-autonomous systems to form dynamic teams ("cells") and operate effectively in contested, denied, or limited communication environments.
+PEAT (Hierarchical Intelligence for Virtual Environments) is a decentralized mesh protocol for human-machine teaming in tactical environments. It provides the foundational communication, synchronization, and coordination primitives that enable autonomous and semi-autonomous systems to form dynamic teams ("cells") and operate effectively in contested, denied, or limited communication environments.
 
-### What HIVE Is
+### What PEAT Is
 
-HIVE is a **protocol specification** with a reference implementation in Rust. Think of it as:
+PEAT is a **protocol specification** with a reference implementation in Rust. Think of it as:
 
-- **TCP/IP for autonomy**: Just as TCP/IP provides reliable communication primitives, HIVE provides reliable synchronization and coordination primitives
-- **HTTP for state**: Just as HTTP provides request/response semantics, HIVE provides eventual consistency semantics via CRDTs
-- **Protobuf for tactical data**: Just as Protobuf defines wire formats, HIVE defines tactical entity schemas (tracks, capabilities, missions)
+- **TCP/IP for autonomy**: Just as TCP/IP provides reliable communication primitives, PEAT provides reliable synchronization and coordination primitives
+- **HTTP for state**: Just as HTTP provides request/response semantics, PEAT provides eventual consistency semantics via CRDTs
+- **Protobuf for tactical data**: Just as Protobuf defines wire formats, PEAT defines tactical entity schemas (tracks, capabilities, missions)
 
-### What HIVE Is Not
+### What PEAT Is Not
 
-- **Not an application**: HIVE is infrastructure that applications build on
-- **Not a replacement for tactical systems**: HIVE bridges and extends existing systems like TAK
-- **Not AI/ML**: HIVE provides the data fabric that AI systems consume and produce
+- **Not an application**: PEAT is infrastructure that applications build on
+- **Not a replacement for tactical systems**: PEAT bridges and extends existing systems like TAK
+- **Not AI/ML**: PEAT provides the data fabric that AI systems consume and produce
 
 ---
 
 ## Architecture Layers
 
-HIVE is organized into five distinct layers, each with clear responsibilities:
+PEAT is organized into five distinct layers, each with clear responsibilities:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         APPLICATION LAYER                                    │
 │  ┌─────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌────────────┐  │
-│  │ TAK Bridge  │  │ HIVE Commander  │  │ HIVE Inference  │  │  Your App  │  │
-│  │ (CoT ↔ HIVE)│  │   (Game/TUI)    │  │  (Edge ML)      │  │            │  │
+│  │ TAK Bridge  │  │ PEAT Commander  │  │ PEAT Inference  │  │  Your App  │  │
+│  │ (CoT ↔ PEAT)│  │   (Game/TUI)    │  │  (Edge ML)      │  │            │  │
 │  └─────────────┘  └─────────────────┘  └─────────────────┘  └────────────┘  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                          BINDING LAYER                                       │
 │  ┌─────────────────────────────────────────────────────────────────────────┐│
-│  │                            hive-ffi                                      ││
+│  │                            peat-ffi                                      ││
 │  │              (Kotlin/Swift via UniFFI + JNI bindings)                    ││
 │  └─────────────────────────────────────────────────────────────────────────┘│
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                         TRANSPORT LAYER                                      │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐  ┌────────────┐ │
-│  │   hive-mesh     │  │  hive-discovery │  │hive-transport│  │ hive-lite  │ │
+│  │   peat-mesh     │  │  peat-discovery │  │peat-transport│  │ peat-lite  │ │
 │  │ (Peer topology) │  │  (mDNS/Static)  │  │(HTTP/Axum)   │  │ (ESP32 UDP)│ │
 │  └─────────────────┘  └─────────────────┘  └──────────────┘  └────────────┘ │
 │  ┌─────────────────────────────────────────────────────────────────────────┐│
-│  │                      hive-btle (external)                                ││
+│  │                      peat-btle (external)                                ││
 │  │            (BLE mesh for Android/iOS/Windows/ESP32)                      ││
 │  └─────────────────────────────────────────────────────────────────────────┘│
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                         PROTOCOL LAYER                                       │
 │  ┌─────────────────────────────────────────────────────────────────────────┐│
-│  │                          hive-protocol                                   ││
+│  │                          peat-protocol                                   ││
 │  │  ┌─────────────┐  ┌─────────────┐  ┌────────────┐  ┌───────────────┐    ││
 │  │  │ DocumentStore│  │  Security   │  │Coordination│  │TransportManager│   ││
 │  │  │ (CRDT sync) │  │ (PKI+Auth)  │  │(Cell mgmt) │  │(Abstract I/O)  │   ││
@@ -67,7 +67,7 @@ HIVE is organized into five distinct layers, each with clear responsibilities:
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                          SCHEMA LAYER                                        │
 │  ┌─────────────────────────────────────────────────────────────────────────┐│
-│  │                          hive-schema                                     ││
+│  │                          peat-schema                                     ││
 │  │   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌────────────┐  ││
 │  │   │ beacon.proto │  │ mission.proto│  │security.proto│  │ cot.proto  │  ││
 │  │   │ (Tracks)     │  │ (Tasks)      │  │ (Auth)       │  │ (TAK/CoT)  │  ││
@@ -80,9 +80,9 @@ HIVE is organized into five distinct layers, each with clear responsibilities:
 
 ## Layer Descriptions
 
-### 1. Schema Layer (`hive-schema`)
+### 1. Schema Layer (`peat-schema`)
 
-**Purpose**: Define the wire format for all HIVE messages
+**Purpose**: Define the wire format for all PEAT messages
 
 **Responsibilities**:
 - Protobuf message definitions for all tactical entities
@@ -103,7 +103,7 @@ HIVE is organized into five distinct layers, each with clear responsibilities:
 
 ---
 
-### 2. Protocol Layer (`hive-protocol`)
+### 2. Protocol Layer (`peat-protocol`)
 
 **Purpose**: Core synchronization, coordination, and security primitives
 
@@ -126,7 +126,7 @@ HIVE is organized into five distinct layers, each with clear responsibilities:
 | `validation` | Schema validation, type checking | ADR-012 |
 | `hierarchy` | Hierarchical aggregation, flow control | ADR-009, ADR-027 |
 
-**Dependencies**: `hive-schema`
+**Dependencies**: `peat-schema`
 
 **Feature Flags**:
 - `ditto-backend`: Use Ditto for CRDT sync (default, requires SDK)
@@ -143,11 +143,11 @@ HIVE is organized into five distinct layers, each with clear responsibilities:
 
 | Crate | Purpose | Platforms |
 |-------|---------|-----------|
-| `hive-mesh` | Peer topology management, routing | All |
-| `hive-discovery` | mDNS/static peer discovery | Desktop, Mobile |
-| `hive-transport` | HTTP/REST API for external systems | Servers |
-| `hive-lite` | UDP-based protocol for constrained devices | ESP32, no_std |
-| `hive-btle` (external) | BLE mesh for mobile/embedded | Android, iOS, Windows, ESP32 |
+| `peat-mesh` | Peer topology management, routing | All |
+| `peat-discovery` | mDNS/static peer discovery | Desktop, Mobile |
+| `peat-transport` | HTTP/REST API for external systems | Servers |
+| `peat-lite` | UDP-based protocol for constrained devices | ESP32, no_std |
+| `peat-btle` (external) | BLE mesh for mobile/embedded | Android, iOS, Windows, ESP32 |
 
 **Transport Abstractions** (ADR-032):
 ```rust
@@ -158,11 +158,11 @@ pub trait Transport: Send + Sync {
 }
 ```
 
-**Dependencies**: `hive-protocol`, `hive-schema`
+**Dependencies**: `peat-protocol`, `peat-schema`
 
 ---
 
-### 4. Binding Layer (`hive-ffi`)
+### 4. Binding Layer (`peat-ffi`)
 
 **Purpose**: Cross-platform mobile and native bindings
 
@@ -171,7 +171,7 @@ pub trait Transport: Send + Sync {
 - UniFFI-generated Swift bindings (iOS)
 - JNI direct bindings for Android performance-critical paths
 
-**Dependencies**: `hive-protocol` (without ditto-backend for cross-compilation)
+**Dependencies**: `peat-protocol` (without ditto-backend for cross-compilation)
 
 ---
 
@@ -183,12 +183,12 @@ pub trait Transport: Send + Sync {
 
 | Crate | Purpose |
 |-------|---------|
-| `hive-tak-bridge` | Bidirectional TAK Server <-> HIVE bridge |
-| `hive-commander` | TUI/Game interface for tactical visualization |
-| `hive-inference` | Edge ML inference (YOLOv8, object tracking) |
-| `hive-sim` | Network simulation and validation |
+| `peat-tak-bridge` | Bidirectional TAK Server <-> PEAT bridge |
+| `peat-commander` | TUI/Game interface for tactical visualization |
+| `peat-inference` | Edge ML inference (YOLOv8, object tracking) |
+| `peat-sim` | Network simulation and validation |
 
-**Dependencies**: `hive-protocol`, `hive-transport`, `hive-schema`
+**Dependencies**: `peat-protocol`, `peat-transport`, `peat-schema`
 
 ---
 
@@ -202,14 +202,14 @@ pub trait Transport: Send + Sync {
               │               │              │               │
               ▼               ▼              ▼               ▼
       ┌─────────────┐ ┌─────────────┐ ┌───────────┐ ┌─────────────┐
-      │tak-bridge   │ │commander    │ │inference  │ │  hive-sim   │
+      │tak-bridge   │ │commander    │ │inference  │ │  peat-sim   │
       └─────────────┘ └─────────────┘ └───────────┘ └─────────────┘
               │               │              │               │
               └───────────────┼──────────────┼───────────────┘
                               │              │
                               ▼              ▼
                     ┌─────────────────────────────┐
-                    │         hive-ffi            │
+                    │         peat-ffi            │
                     │  (UniFFI + JNI bindings)    │
                     └─────────────────────────────┘
                               │
@@ -218,7 +218,7 @@ pub trait Transport: Send + Sync {
       │                       │                       │
       ▼                       ▼                       ▼
 ┌──────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ hive-mesh    │    │ hive-discovery  │    │ hive-transport  │
+│ peat-mesh    │    │ peat-discovery  │    │ peat-transport  │
 │              │────│                 │    │                 │
 └──────────────┘    └─────────────────┘    └─────────────────┘
       │                       │                       │
@@ -226,18 +226,18 @@ pub trait Transport: Send + Sync {
                               │
                               ▼
                     ┌─────────────────────────────┐
-                    │       hive-protocol         │
+                    │       peat-protocol         │
                     │  (Core sync + security)     │
                     └─────────────────────────────┘
                               │
                               ▼
                     ┌─────────────────────────────┐
-                    │        hive-schema          │
+                    │        peat-schema          │
                     │    (Protobuf definitions)   │
                     └─────────────────────────────┘
 
                     ┌─────────────────────────────┐
-                    │        hive-lite            │
+                    │        peat-lite            │
                     │   (Standalone, no_std)      │
                     └─────────────────────────────┘
 ```
@@ -248,7 +248,7 @@ pub trait Transport: Send + Sync {
 
 ### Cells
 
-A **cell** is a dynamic group of nodes that coordinate together. Cells are the fundamental unit of organization in HIVE:
+A **cell** is a dynamic group of nodes that coordinate together. Cells are the fundamental unit of organization in PEAT:
 
 - **Formation**: Nodes discover each other and negotiate cell membership
 - **Leadership**: Cells elect leaders based on capabilities and authority
@@ -257,7 +257,7 @@ A **cell** is a dynamic group of nodes that coordinate together. Cells are the f
 
 ### Capability Aggregation and Emergent Behavior
 
-A core principle of HIVE is that **cells exhibit emergent capabilities** greater than the sum of their individual members:
+A core principle of PEAT is that **cells exhibit emergent capabilities** greater than the sum of their individual members:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -299,7 +299,7 @@ A core principle of HIVE is that **cells exhibit emergent capabilities** greater
 
 ### Documents and CRDTs
 
-HIVE uses **Conflict-free Replicated Data Types (CRDTs)** for state synchronization:
+PEAT uses **Conflict-free Replicated Data Types (CRDTs)** for state synchronization:
 
 - **Documents**: JSON-like structures that merge automatically
 - **Collections**: Named groups of documents (e.g., "tracks", "missions")
@@ -308,7 +308,7 @@ HIVE uses **Conflict-free Replicated Data Types (CRDTs)** for state synchronizat
 
 ### Bypass Channel
 
-For latency-critical data (sensor readings, control commands), HIVE provides a **UDP bypass channel**:
+For latency-critical data (sensor readings, control commands), PEAT provides a **UDP bypass channel**:
 
 - Skips CRDT synchronization overhead
 - Configurable per-collection
@@ -330,7 +330,7 @@ For latency-critical data (sensor readings, control commands), HIVE provides a *
        │                          │                           │
        │  ┌──────────────────┐    │                           │
        │  │ 1. Position data │    │                           │
-       │  │    via hive-lite │    │                           │
+       │  │    via peat-lite │    │                           │
        │  │    UDP protocol  │    │                           │
        │  └────────┬─────────┘    │                           │
        │           │              │                           │
@@ -394,7 +394,7 @@ For IETF RFC-style specifications, see the [Protocol Specification](spec/) direc
 ### For Application Developers
 
 ```rust
-use hive_protocol::prelude::*;
+use peat_protocol::prelude::*;
 
 // Create a document store with Automerge backend
 let store = DocumentStore::new(Config::default()).await?;

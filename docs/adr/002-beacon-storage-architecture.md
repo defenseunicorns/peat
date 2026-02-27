@@ -2,12 +2,12 @@
 
 **Status**: Accepted
 **Date**: 2025-10-29
-**Decision Makers**: HIVE Protocol Team
+**Decision Makers**: PEAT Protocol Team
 **Related**: E3.1 Geographic Self-Organization
 
 ## Context
 
-The HIVE protocol's geographic discovery system requires nodes to continuously broadcast their position and status as "beacons" across a Ditto mesh network. Each node must be able to discover nearby nodes to autonomously form cells during the discovery phase.
+The PEAT protocol's geographic discovery system requires nodes to continuously broadcast their position and status as "beacons" across a Ditto mesh network. Each node must be able to discover nearby nodes to autonomously form cells during the discovery phase.
 
 Two architectural approaches were considered for beacon storage:
 
@@ -203,7 +203,7 @@ tokio::spawn(async move {
 
 - [Ditto TTL Documentation](https://docs.ditto.live/concepts/document-ttl)
 - [Ditto Query Language](https://docs.ditto.live/concepts/dql)
-- HIVE Protocol Specification: Discovery Phase (E3.1)
+- PEAT Protocol Specification: Discovery Phase (E3.1)
 - Swarm Robotics Patterns: Decentralized State Management
 
 ## Notes

@@ -30,7 +30,7 @@ Upward aggregation should be **configurable per capability type and mission cont
 ### 1. Aggregation Policy Message
 
 ```protobuf
-// New file: hive-schema/proto/aggregation.proto
+// New file: peat-schema/proto/aggregation.proto
 
 syntax = "proto3";
 
@@ -413,7 +413,7 @@ message AggregationMetadata {
 1. Create `aggregation.proto` with policy messages
 2. Add preset policies to schema
 3. Generate Rust bindings
-4. Add to hive-schema crate
+4. Add to peat-schema crate
 
 ### Phase 2: Policy-Driven Aggregation (2 weeks)
 1. Refactor `CapabilityAggregator` to accept `AggregationPolicy`
@@ -506,7 +506,7 @@ This creates **perfect symmetry** between upward and downward flows:
 
 **Proposed State**: Policy-driven aggregation with the same flexibility as downward commands
 
-**Philosophy**: **"HIVE Protocol provides mechanism, integrators provide policy"** - this principle should apply **both ways** (upward AND downward)
+**Philosophy**: **"PEAT Protocol provides mechanism, integrators provide policy"** - this principle should apply **both ways** (upward AND downward)
 
 ---
 

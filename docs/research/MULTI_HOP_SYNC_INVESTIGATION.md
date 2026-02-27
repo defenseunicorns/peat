@@ -93,7 +93,7 @@ Iroh-gossip is based on two academic papers:
 | Intermediate visibility | Likely yes | Likely yes |
 | CRDT integration | Built-in | Via iroh-docs |
 
-## Security Implications for HIVE
+## Security Implications for PEAT
 
 ### Critical Question
 **Can we trust all mesh members?**

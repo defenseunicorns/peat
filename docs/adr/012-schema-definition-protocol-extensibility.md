@@ -28,7 +28,7 @@ The feedback revealed a fundamental separation of concerns:
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │      hive-schema (Foundational Library)                │  │
+│  │      peat-schema (Foundational Library)                │  │
 │  │  • Message schemas (Protobuf/Avro/JSON Schema)        │  │
 │  │  • Ontology definitions (capabilities, cells, etc)    │  │
 │  │  • Validation rules                                   │  │
@@ -44,7 +44,7 @@ The feedback revealed a fundamental separation of concerns:
 │  └──────────────────────────────────────────────────────┘  │
 │                           ↓ uses                             │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │      hive-transport (Protocol Adapters)                │  │
+│  │      peat-transport (Protocol Adapters)                │  │
 │  │  • HTTP/WebSocket adapter                             │  │
 │  │  • gRPC adapter                                       │  │
 │  │  • ROS2 DDS adapter                                   │  │
@@ -116,7 +116,7 @@ The current ADR-005 (Data Sync Abstraction Layer) proposes abstracting sync back
 
 We will **separate schema definition, ontology, and protocol extensibility into distinct architectural layers**, creating three new foundational crates:
 
-### 1. `hive-schema` - Schema Definition Library
+### 1. `peat-schema` - Schema Definition Library
 
 **Purpose**: Define CAP message schemas and ontology in a standard, code-generatable format
 
@@ -136,7 +136,7 @@ We will **separate schema definition, ontology, and protocol extensibility into 
 
 **Structure**:
 ```
-hive-schema/
+peat-schema/
 ├── proto/
 │   ├── core.proto           # Core message types (Position, Timestamp, UUID)
 │   ├── platform.proto       # Platform state, capabilities, beacons
@@ -394,7 +394,7 @@ protoc --cpp_out=./cpp proto/*.proto
 protoc --java_out=./java proto/*.proto
 ```
 
-### 2. `hive-transport` - Protocol Adapter Abstraction
+### 2. `peat-transport` - Protocol Adapter Abstraction
 
 **Purpose**: Define standard interfaces for protocol adapters and implement concrete transports
 
@@ -402,7 +402,7 @@ protoc --java_out=./java proto/*.proto
 
 **Core Abstraction**:
 ```rust
-// hive-transport/src/lib.rs
+// peat-transport/src/lib.rs
 
 use cap_schema::platform::v1::PlatformBeacon;
 use async_trait::async_trait;
@@ -492,7 +492,7 @@ pub enum MulticastScope {
 **Transport Implementations**:
 
 ```rust
-// hive-transport/src/adapters/http_websocket.rs
+// peat-transport/src/adapters/http_websocket.rs
 
 use axum::{Router, routing::post};
 use tokio_tungstenite::WebSocketStream;
@@ -577,7 +577,7 @@ impl HttpWebSocketTransport {
 ```
 
 ```rust
-// hive-transport/src/adapters/grpc.rs
+// peat-transport/src/adapters/grpc.rs
 
 use tonic::{transport::Server, Request, Response, Status};
 
@@ -588,7 +588,7 @@ pub struct GrpcTransport {
     client_pool: Arc<RwLock<HashMap<String, PlatformServiceClient>>>,
 }
 
-// gRPC service definitions in hive-schema/proto/service.proto
+// gRPC service definitions in peat-schema/proto/service.proto
 // service PlatformService {
 //   rpc SendBeacon(PlatformBeacon) returns (SendReceipt);
 //   rpc StreamBeacons(StreamRequest) returns (stream PlatformBeacon);
@@ -654,7 +654,7 @@ impl MessageTransport for GrpcTransport {
 ```
 
 ```rust
-// hive-transport/src/adapters/ros2.rs
+// peat-transport/src/adapters/ros2.rs
 
 use rclrs::{Node, Publisher, Subscription};
 use rosidl_runtime_rs::Message as RosMessage;
@@ -762,14 +762,14 @@ impl Ros2Transport {
 }
 ```
 
-### 3. `hive-persistence` - Storage Abstraction
+### 3. `peat-persistence` - Storage Abstraction
 
 **Purpose**: Define standard interfaces for accessing the data persistence layer, allowing external systems to interact with CAP's data store
 
 **Architecture**: Trait-based abstraction with multiple backend implementations
 
 ```rust
-// hive-persistence/src/lib.rs
+// peat-persistence/src/lib.rs
 
 use cap_schema::platform::v1::PlatformBeacon;
 use cap_schema::cell::v1::CellState;
@@ -844,7 +844,7 @@ impl Query {
 
 **Storage Backends**:
 ```rust
-// hive-persistence/src/backends/
+// peat-persistence/src/backends/
 
 pub mod automerge;   // CRDT-based sync store
 pub mod ditto;       // Ditto SDK wrapper
@@ -856,7 +856,7 @@ pub mod redis;       // In-memory cache/pub-sub
 
 **External Access Interface**:
 ```rust
-// hive-persistence/src/external_api.rs
+// peat-persistence/src/external_api.rs
 
 /// External API for non-CAP systems to access CAP data
 pub struct ExternalApi {
@@ -1146,9 +1146,9 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 │  ADR-012: Schema Definition & Protocol Extensibility            │
 │  ↓ (defines WHAT messages look like)                            │
 │  │                                                               │
-│  ├─→ hive-schema (protobuf definitions)                          │
-│  ├─→ hive-transport (HTTP/gRPC/ROS2 adapters)                    │
-│  └─→ hive-persistence (storage interfaces)                       │
+│  ├─→ peat-schema (protobuf definitions)                          │
+│  ├─→ peat-transport (HTTP/gRPC/ROS2 adapters)                    │
+│  └─→ peat-persistence (storage interfaces)                       │
 │                                                                  │
 │                         ↓ used by                                │
 │                                                                  │
@@ -1157,7 +1157,7 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 │  │                                                               │
 │  ├─→ Automerge CRDT layer                                       │
 │  ├─→ Iroh networking layer (QUIC transport)                     │
-│  └─→ Implements hive-persistence traits                          │
+│  └─→ Implements peat-persistence traits                          │
 │                                                                  │
 │                         ↓ used by                                │
 │                                                                  │
@@ -1209,7 +1209,7 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 
 ### Phase 0: Schema Definition (Weeks 1-2) - **HIGHEST PRIORITY**
 
-**Goal**: Create `hive-schema` crate with core message definitions
+**Goal**: Create `peat-schema` crate with core message definitions
 
 **Tasks**:
 1. Define protobuf schemas for core messages:
@@ -1234,20 +1234,20 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
    - Migration guide from current JSON schemas
 
 **Success Criteria**:
-- [ ] `hive-schema` crate compiles and passes all tests
+- [ ] `peat-schema` crate compiles and passes all tests
 - [ ] Can generate bindings for Rust, Python, JavaScript
 - [ ] Validation catches common errors
 - [ ] Documentation complete
 
 ### Phase 1: Transport Abstraction (Weeks 3-4)
 
-**Goal**: Create `hive-transport` crate with HTTP/WebSocket adapter
+**Goal**: Create `peat-transport` crate with HTTP/WebSocket adapter
 
 **Tasks**:
 1. Define `MessageTransport` trait
 2. Implement `HttpWebSocketTransport` adapter
 3. Add message routing and pub-sub logic
-4. Integration tests with `hive-schema` messages
+4. Integration tests with `peat-schema` messages
 
 **Success Criteria**:
 - [ ] Can send/receive CAP messages over HTTP/WebSocket
@@ -1256,7 +1256,7 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 
 ### Phase 2: Persistence Abstraction (Weeks 5-6)
 
-**Goal**: Create `hive-persistence` crate with external API
+**Goal**: Create `peat-persistence` crate with external API
 
 **Tasks**:
 1. Define `DataStore` trait
@@ -1291,11 +1291,11 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 
 ### Phase 4: CAP Core Refactoring (Weeks 11-14)
 
-**Goal**: Refactor `hive-protocol` crate to use new abstractions
+**Goal**: Refactor `peat-protocol` crate to use new abstractions
 
 **Tasks**:
-1. Replace inline schemas with `hive-schema`
-2. Replace direct Ditto/Automerge calls with `hive-persistence` traits
+1. Replace inline schemas with `peat-schema`
+2. Replace direct Ditto/Automerge calls with `peat-persistence` traits
 3. Add transport selection logic
 4. Update all tests
 
@@ -1326,7 +1326,7 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 1. **Schema Clarity**: Message schemas are first-class artifacts, not buried in code
 2. **Type Safety**: Code generation prevents schema drift across languages
 3. **Extensibility**: New transports can be added without modifying core protocol
-4. **Integration**: External systems can adopt CAP messages without HIVE protocol
+4. **Integration**: External systems can adopt CAP messages without PEAT protocol
 5. **Tooling**: Standard schema enables validation, visualization, debugging tools
 6. **Multi-Language**: Python, JavaScript, Java, C++ can all use CAP messages natively
 7. **Versioning**: Protobuf supports schema evolution with backward compatibility
@@ -1422,9 +1422,9 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 ## Success Metrics
 
 1. **Schema Adoption**:
-   - [ ] All CAP messages defined in `hive-schema`
+   - [ ] All CAP messages defined in `peat-schema`
    - [ ] Code generation works for 3+ languages
-   - [ ] Zero manual serialization code in `hive-protocol`
+   - [ ] Zero manual serialization code in `peat-protocol`
 
 2. **Transport Extensibility**:
    - [ ] 3+ transport implementations (HTTP/WS, gRPC, ROS2)
@@ -1446,17 +1446,17 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
    - [ ] Validation catches 90%+ of schema errors at compile-time
    - [ ] Documentation rated "good" or better by external developers
 
-## Appendix: HIVE Protocol Schemas (v1)
+## Appendix: PEAT Protocol Schemas (v1)
 
-> **Added 2025-11-25**: These schemas define the core HIVE Protocol primitives for software distribution, capability advertisement, and event routing. They supersede the earlier example schemas above and represent the canonical protocol definitions.
+> **Added 2025-11-25**: These schemas define the core PEAT Protocol primitives for software distribution, capability advertisement, and event routing. They supersede the earlier example schemas above and represent the canonical protocol definitions.
 >
-> **Design Principle**: HIVE Protocol defines the envelope, applications define the contents. All payloads use `google.protobuf.Any` or `google.protobuf.Struct` to remain application-agnostic.
+> **Design Principle**: PEAT Protocol defines the envelope, applications define the contents. All payloads use `google.protobuf.Any` or `google.protobuf.Struct` to remain application-agnostic.
 
 ### A.1 Blob Reference (ADR-025)
 
 ```protobuf
 syntax = "proto3";
-package hive.blob.v1;
+package peat.blob.v1;
 
 // Content-addressed blob reference
 message BlobReference {
@@ -1464,7 +1464,7 @@ message BlobReference {
   string hash_algorithm = 2;    // "sha256", "blake3"
   uint64 size_bytes = 3;
 
-  // Application-defined metadata (opaque to HIVE)
+  // Application-defined metadata (opaque to PEAT)
   map<string, string> metadata = 10;
 }
 ```
@@ -1473,7 +1473,7 @@ message BlobReference {
 
 ```protobuf
 syntax = "proto3";
-package hive.capability.v1;
+package peat.capability.v1;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
@@ -1531,16 +1531,16 @@ message AggregatedCapability {
 }
 ```
 
-### A.3 HIVE Event (Products, Anomalies, Telemetry)
+### A.3 PEAT Event (Products, Anomalies, Telemetry)
 
 ```protobuf
 syntax = "proto3";
-package hive.event.v1;
+package peat.event.v1;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/any.proto";
 
-message HiveEvent {
+message PeatEvent {
   string event_id = 1;
   google.protobuf.Timestamp timestamp = 2;
   string source_node_id = 3;
@@ -1597,11 +1597,11 @@ message EventSummary {
 
 ```protobuf
 syntax = "proto3";
-package hive.deployment.v1;
+package peat.deployment.v1;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
-import "hive/blob/v1/blob.proto";
+import "peat/blob/v1/blob.proto";
 
 message DeploymentDirective {
   string directive_id = 1;
@@ -1609,7 +1609,7 @@ message DeploymentDirective {
   string issuer_node_id = 3;
   string issuer_formation_id = 4;
   DeploymentScope scope = 5;
-  hive.blob.v1.BlobReference artifact = 6;
+  peat.blob.v1.BlobReference artifact = 6;
   string artifact_type = 7;     // "onnx_model", "container", "config_package"
   google.protobuf.Struct config = 10;  // Application-defined
   DeploymentOptions options = 11;
@@ -1638,7 +1638,7 @@ message CapabilityFilter {
 }
 
 message DeploymentOptions {
-  hive.event.v1.EventPriority priority = 1;
+  peat.event.v1.EventPriority priority = 1;
   uint32 timeout_seconds = 2;
   bool replace_existing = 3;
   optional uint32 rollback_threshold_percent = 4;
@@ -1667,24 +1667,24 @@ enum DeploymentState {
 
 ### A.5 Protocol Behavior Summary
 
-| Schema | Direction | Aggregation | HIVE Responsibility |
+| Schema | Direction | Aggregation | PEAT Responsibility |
 |--------|-----------|-------------|---------------------|
 | BlobReference | N/A | N/A | Transfer bytes, verify hash |
 | CapabilityAdvertisement | ↑ Upward | Summarize at echelons | Route through hierarchy |
-| HiveEvent | ↑ Upward | Per AggregationPolicy | Apply routing policy |
+| PeatEvent | ↑ Upward | Per AggregationPolicy | Apply routing policy |
 | DeploymentDirective | ↓ Downward | Scope filtering | Route to matching nodes |
 | DeploymentStatus | ↑ Upward | Aggregate per directive | Collect status reports |
 
 ### A.6 Extension Points
 
-Applications extend HIVE by:
+Applications extend PEAT by:
 1. **Defining capability attributes** (`Capability.attributes`)
-2. **Defining event payloads** (`HiveEvent.payload`)
+2. **Defining event payloads** (`PeatEvent.payload`)
 3. **Defining artifact types** (`DeploymentDirective.artifact_type`)
 4. **Defining deployment config** (`DeploymentDirective.config`)
 5. **Defining custom filters** (`CapabilityFilter.custom_filters`)
 
-HIVE routes, aggregates, and enforces policies without understanding application semantics.
+PEAT routes, aggregates, and enforces policies without understanding application semantics.
 
 ---
 
@@ -1729,7 +1729,7 @@ HIVE routes, aggregates, and enforces policies without understanding application
    - Validate Protobuf selection
    - Confirm ROS2 integration requirements
 
-2. **Prototype `hive-schema` with core messages** (1 week)
+2. **Prototype `peat-schema` with core messages** (1 week)
    - Implement Phase 0 (Schema Definition)
    - Generate Rust, Python, JavaScript bindings
    - Validate with simple examples
@@ -1752,12 +1752,12 @@ HIVE routes, aggregates, and enforces policies without understanding application
 ### After ADR-012 Phase 0 Complete
 
 6. **Begin ADR-011 (Automerge + Iroh) implementation**
-   - Use hive-schema messages as Automerge document structure
-   - Implement hive-persistence traits
+   - Use peat-schema messages as Automerge document structure
+   - Implement peat-persistence traits
    - Integrate with Iroh networking
 
 7. **Update ADR-005 implementation plan** 
-   - Reframe as backend abstraction within hive-persistence
+   - Reframe as backend abstraction within peat-persistence
    - Not top-level protocol interface
 
 ---

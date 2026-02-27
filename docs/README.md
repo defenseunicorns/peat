@@ -1,9 +1,9 @@
-# HIVE Protocol Demo - Documentation
+# PEAT Protocol Demo - Documentation
 
 **Organization**: (r)evolve - Revolve Team LLC  
 **URL**: https://revolveteam.com
 
-This directory contains documentation for the HIVE Protocol POI Tracking Demo, coordinating five parallel development teams.
+This directory contains documentation for the PEAT Protocol POI Tracking Demo, coordinating five parallel development teams.
 
 ## Directory Structure
 
@@ -24,7 +24,7 @@ docs/
 | Team | Primary Focus | Key Deliverables |
 |------|--------------|------------------|
 | **Core** | Schema, protocol, Automerge/Iroh | CapabilityAdvertisement, TrackUpdate, MissionTask schemas |
-| **ATAK** | Android plugin, HIVE-TAK Bridge | CoT translation, TAK Server integration |
+| **ATAK** | Android plugin, PEAT-TAK Bridge | CoT translation, TAK Server integration |
 | **Experiments** | Containerlab, validation | Network simulation, metrics collection |
 | **AI** | Jetson inference, YOLOv8, MLOps | Object tracking, model hot-swap |
 | **PM** | Coordination, demo scripting | Sprint management, stakeholder comms |

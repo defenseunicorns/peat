@@ -1,6 +1,6 @@
-# HIVE Protocol Specification: Data Schema Definitions
+# PEAT Protocol Specification: Data Schema Definitions
 
-**Spec ID**: HIVE-SPEC-003
+**Spec ID**: PEAT-SPEC-003
 **Status**: Draft
 **Version**: 0.1.0
 **Date**: 2025-01-07
@@ -8,7 +8,7 @@
 
 ## Abstract
 
-This document specifies the data schemas for HIVE Protocol. It defines the Protocol Buffer message formats for tactical entities, their relationships, and mapping to external standards (CoT/TAK).
+This document specifies the data schemas for PEAT Protocol. It defines the Protocol Buffer message formats for tactical entities, their relationships, and mapping to external standards (CoT/TAK).
 
 ## Table of Contents
 
@@ -30,7 +30,7 @@ This document specifies the data schemas for HIVE Protocol. It defines the Proto
 
 ### 1.1 Purpose
 
-HIVE schemas define the structure of all data exchanged between nodes. Using Protocol Buffers ensures:
+PEAT schemas define the structure of all data exchanged between nodes. Using Protocol Buffers ensures:
 - Compact binary encoding
 - Forward/backward compatibility
 - Cross-language support
@@ -54,8 +54,8 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 ### 2.1 Package Structure
 
 ```
-hive-schema/proto/
-├── hive/
+peat-schema/proto/
+├── peat/
 │   ├── common/
 │   │   └── v1/
 │   │       └── common.proto       # Common types (Position, Timestamp)
@@ -104,7 +104,7 @@ Schema packages follow semantic versioning:
 
 ```protobuf
 syntax = "proto3";
-package hive.common.v1;
+package peat.common.v1;
 
 // Geographic position in WGS84
 message Position {
@@ -207,26 +207,26 @@ The primary entity tracking message:
 
 ```protobuf
 syntax = "proto3";
-package hive.beacon.v1;
+package peat.beacon.v1;
 
-import "hive/common/v1/common.proto";
+import "peat/common/v1/common.proto";
 
 // Track update from a node
 message Beacon {
     // Unique identifier for this track
-    hive.common.v1.UUID track_id = 1;
+    peat.common.v1.UUID track_id = 1;
 
     // Device that produced this beacon
     bytes device_id = 2;
 
     // Callsign for display
-    hive.common.v1.Callsign callsign = 3;
+    peat.common.v1.Callsign callsign = 3;
 
     // Current position
-    hive.common.v1.Position position = 4;
+    peat.common.v1.Position position = 4;
 
     // Timestamp of position fix
-    hive.common.v1.Timestamp timestamp = 5;
+    peat.common.v1.Timestamp timestamp = 5;
 
     // Entity classification
     Affiliation affiliation = 6;
@@ -280,13 +280,13 @@ For hierarchical reporting:
 // Aggregated track summary (sent upward in hierarchy)
 message TrackSummary {
     // Cell producing this summary
-    hive.common.v1.UUID cell_id = 1;
+    peat.common.v1.UUID cell_id = 1;
 
     // Time range covered
-    hive.common.v1.TimeRange time_range = 2;
+    peat.common.v1.TimeRange time_range = 2;
 
     // Bounding box containing all tracks
-    hive.common.v1.BoundingBox coverage = 3;
+    peat.common.v1.BoundingBox coverage = 3;
 
     // Count by affiliation
     map<int32, uint32> affiliation_counts = 4;
@@ -307,14 +307,14 @@ message TrackSummary {
 
 ```protobuf
 syntax = "proto3";
-package hive.mission.v1;
+package peat.mission.v1;
 
-import "hive/common/v1/common.proto";
+import "peat/common/v1/common.proto";
 
 // Mission definition
 message Mission {
     // Unique mission identifier
-    hive.common.v1.UUID mission_id = 1;
+    peat.common.v1.UUID mission_id = 1;
 
     // Human-readable name
     string name = 2;
@@ -329,13 +329,13 @@ message Mission {
     Priority priority = 5;
 
     // Time window
-    hive.common.v1.TimeRange time_window = 6;
+    peat.common.v1.TimeRange time_window = 6;
 
     // Area of operations
     AreaOfOperations aoo = 7;
 
     // Assigned cells/units
-    repeated hive.common.v1.UUID assigned_cells = 8;
+    repeated peat.common.v1.UUID assigned_cells = 8;
 
     // Objectives within this mission
     repeated Objective objectives = 9;
@@ -391,16 +391,16 @@ message AreaOfOperations {
 }
 
 message CircularArea {
-    hive.common.v1.Position center = 1;
+    peat.common.v1.Position center = 1;
     double radius_meters = 2;
 }
 
 message PolygonArea {
-    repeated hive.common.v1.Position vertices = 1;
+    repeated peat.common.v1.Position vertices = 1;
 }
 
 message RouteArea {
-    repeated hive.common.v1.Position waypoints = 1;
+    repeated peat.common.v1.Position waypoints = 1;
     double corridor_width_meters = 2;
 }
 ```
@@ -410,10 +410,10 @@ message RouteArea {
 ```protobuf
 // Individual objective within a mission
 message Objective {
-    hive.common.v1.UUID objective_id = 1;
+    peat.common.v1.UUID objective_id = 1;
     string description = 2;
     ObjectiveType type = 3;
-    hive.common.v1.Position location = 4;
+    peat.common.v1.Position location = 4;
     ObjectiveStatus status = 5;
     Priority priority = 6;
 }
@@ -445,9 +445,9 @@ enum ObjectiveStatus {
 
 ```protobuf
 syntax = "proto3";
-package hive.capability.v1;
+package peat.capability.v1;
 
-import "hive/common/v1/common.proto";
+import "peat/common/v1/common.proto";
 
 // Node capability advertisement
 message CapabilityAdvertisement {
@@ -455,7 +455,7 @@ message CapabilityAdvertisement {
     bytes device_id = 1;
 
     // Callsign
-    hive.common.v1.Callsign callsign = 2;
+    peat.common.v1.Callsign callsign = 2;
 
     // Platform type
     PlatformType platform = 3;
@@ -479,7 +479,7 @@ message CapabilityAdvertisement {
     Availability availability = 9;
 
     // Last update time
-    hive.common.v1.Timestamp timestamp = 10;
+    peat.common.v1.Timestamp timestamp = 10;
 }
 
 // Sensor capability
@@ -552,7 +552,7 @@ message CommunicationCapability {
 
 enum LinkType {
     LINK_TYPE_UNSPECIFIED = 0;
-    LINK_TYPE_MESH = 1;         // HIVE mesh
+    LINK_TYPE_MESH = 1;         // PEAT mesh
     LINK_TYPE_SATCOM = 2;
     LINK_TYPE_HF = 3;
     LINK_TYPE_VHF = 4;
@@ -596,7 +596,7 @@ enum PowerSource {
 message Availability {
     bool available = 1;
     optional string reason = 2;
-    optional hive.common.v1.Timestamp available_at = 3;
+    optional peat.common.v1.Timestamp available_at = 3;
 }
 ```
 
@@ -608,9 +608,9 @@ message Availability {
 
 ```protobuf
 syntax = "proto3";
-package hive.security.v1;
+package peat.security.v1;
 
-import "hive/common/v1/common.proto";
+import "peat/common/v1/common.proto";
 
 // Device identity information
 message DeviceIdentity {
@@ -638,7 +638,7 @@ enum DeviceType {
 // Challenge for authentication
 message Challenge {
     bytes nonce = 1;
-    hive.common.v1.Timestamp timestamp = 2;
+    peat.common.v1.Timestamp timestamp = 2;
     bytes challenger_id = 3;
 }
 
@@ -676,9 +676,9 @@ enum SecurityErrorCode {
 
 ```protobuf
 syntax = "proto3";
-package hive.ai.v1;
+package peat.ai.v1;
 
-import "hive/common/v1/common.proto";
+import "peat/common/v1/common.proto";
 
 // AI model metadata
 message ModelMetadata {
@@ -769,9 +769,9 @@ message Detection {
 
 ### 9.1 CoT Event Mapping
 
-HIVE beacons map to CoT events:
+PEAT beacons map to CoT events:
 
-| HIVE Field | CoT Field | Notes |
+| PEAT Field | CoT Field | Notes |
 |------------|-----------|-------|
 | `track_id` | `uid` | UUID format |
 | `position.latitude` | `point/@lat` | |
@@ -786,7 +786,7 @@ HIVE beacons map to CoT events:
 ### 9.2 CoT Type Mapping
 
 ```
-HIVE Affiliation + Dimension → CoT Type
+PEAT Affiliation + Dimension → CoT Type
 
 MEMBER + GROUND     → a-f-G
 MEMBER + AIR        → a-f-A
@@ -797,16 +797,16 @@ UNKNOWN + AIR       → a-u-A
 
 ### 9.3 CoT Detail Extensions
 
-HIVE-specific data is carried in CoT `<detail>` elements:
+PEAT-specific data is carried in CoT `<detail>` elements:
 
 ```xml
 <detail>
-    <__hive>
+    <__peat>
         <device_id>0x1234...</device_id>
         <cell_id>uuid</cell_id>
         <power_level>85</power_level>
         <capabilities>sensor,relay</capabilities>
-    </__hive>
+    </__peat>
 </detail>
 ```
 

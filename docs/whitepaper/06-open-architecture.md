@@ -12,7 +12,7 @@ TCP/IP became universal not because it was the best protocol, but because it was
 
 The internet's architecture enabled permissionless innovation. Anyone could build on TCP/IP without licensing negotiations, vendor lock-in, or compatibility concerns. The result: an explosion of applications, services, and value creation.
 
-HIVE positions as coordination substrate—not product, but infrastructure:
+PEAT positions as coordination substrate—not product, but infrastructure:
 - Apache 2.0 licensing: no barriers to use, modification, or distribution
 - IETF-style specifications: implementable by anyone
 - Reference implementation: working code, not just documents
@@ -59,7 +59,7 @@ Open architecture aligns with modern deployment realities.
 
 **No Per-Unit Complexity**: Proprietary protocols often involve per-device or per-deployment licensing. Open protocols deploy at any scale without incremental legal complexity.
 
-**Government and Enterprise Adoption**: Many organizations have explicit policies favoring open source for infrastructure. HIVE's Apache 2.0 license satisfies these requirements.
+**Government and Enterprise Adoption**: Many organizations have explicit policies favoring open source for infrastructure. PEAT's Apache 2.0 license satisfies these requirements.
 
 **Long-Term Viability**: Proprietary protocol owners can be acquired, pivot, or fail. Open protocols survive their originators. The infrastructure persists even if specific vendors don't.
 
@@ -67,11 +67,11 @@ Open architecture aligns with modern deployment realities.
 
 ---
 
-### 5.5 HIVE's Open Posture
+### 5.5 PEAT's Open Posture
 
-HIVE is designed for openness from the ground up:
+PEAT is designed for openness from the ground up:
 
-| Aspect | HIVE Approach |
+| Aspect | PEAT Approach |
 |--------|--------------|
 | License | Apache 2.0 (permissive, patent grant) |
 | Specifications | IETF RFC-style, version-controlled |

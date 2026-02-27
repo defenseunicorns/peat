@@ -4,7 +4,7 @@ theme: default
 paginate: true
 backgroundColor: #fff
 backgroundImage: url('https://marp.app/assets/hero-background.svg')
-header: 'HIVE Protocol - Technology Deep Dive | **COMPETITION SENSITIVE**'
+header: 'PEAT Protocol - Technology Deep Dive | **COMPETITION SENSITIVE**'
 footer: '© 2025 (r)evolve. All Rights Reserved. | **COMPETITION SENSITIVE**'
 style: |
   section {
@@ -58,7 +58,7 @@ style: |
 ---
 
 <!-- _class: lead -->
-# HIVE Protocol
+# PEAT Protocol
 ## Technology Deep Dive
 
 **Capability Aggregation Protocol**
@@ -75,7 +75,7 @@ Scalable Distributed Coordination for Autonomous Systems
 - No human oversight in distributed networks
 - Safety-critical systems need coordination guarantees
 
-**The Solution**: HIVE Protocol
+**The Solution**: PEAT Protocol
 - **95%+ bandwidth reduction** through hierarchical CRDT aggregation
 - **Validated with 12-node ContainerLab** across 3 topology modes
 - **Graduated human authority** for distributed autonomous control
@@ -341,7 +341,7 @@ CRDT eventual consistency alone doesn't provide enough control for safety-critic
 # ContainerLab Validation: Multi-Node Testing
 
 ## Test Environment
-- 12-24 containerized HIVE Protocol nodes
+- 12-24 containerized PEAT Protocol nodes
 - Ditto SDK 4.12+ for real CRDT synchronization
 - Real Docker networking (not mocked/simulated)
 - Network constraints via Linux traffic control (tc)
@@ -490,7 +490,7 @@ CRDT eventual consistency alone doesn't provide enough control for safety-critic
 
 ## Greenfield Systems (New Autonomous Platforms)
 
-**Integration Approach**: Native HIVE protocol implementation
+**Integration Approach**: Native PEAT protocol implementation
 
 | System Type | Integration Method | CAP Benefits |
 |-------------|-------------------|--------------|
@@ -498,7 +498,7 @@ CRDT eventual consistency alone doesn't provide enough control for safety-critic
 | **AI-enabled sensors** | CAP SDK integration | Real-time data sharing, distributed coordination |
 | **Next-gen robotics** | Built with CAP from day 1 | Zero translation overhead, native CRDT sync |
 
-**Example**: New quadcopter swarm designed with HIVE protocol
+**Example**: New quadcopter swarm designed with PEAT protocol
 ```rust
 let cap_node = CapNode::new(NodeCapabilities {
     role: Role::Scout,
@@ -648,7 +648,7 @@ CAP enables transformation at **every interface layer**:
 **Integration Points**:
 1. ATAK → CAP Gateway: TAK protocol translated to CAP documents
 2. DJI → CAP Bridge: DJI SDK calls wrapped in CAP client
-3. Radios: Native HIVE protocol (greenfield)
+3. Radios: Native PEAT protocol (greenfield)
 
 **Result**: Commercial drones coordinate with military units using existing C2
 
@@ -756,7 +756,7 @@ CAP enables transformation at **every interface layer**:
 
 ```
 cap/
-├── hive-protocol/          # Core protocol library (17K+ lines Rust)
+├── peat-protocol/          # Core protocol library (17K+ lines Rust)
 │   ├── src/
 │   │   ├── discovery/     # Phase 1: Bootstrap
 │   │   ├── cell/          # Phase 2: Cell Formation
@@ -766,10 +766,10 @@ cap/
 │   │   ├── storage/       # Ditto CRDT integration
 │   │   └── testing/       # E2E test harness
 │   └── tests/             # Integration & E2E tests (330+)
-├── hive-schema/            # Protocol Buffers definitions
-├── hive-persistence/       # TTL & data lifecycle management
-├── hive-transport/         # Network transport abstraction
-└── hive-sim/               # Reference simulator application
+├── peat-schema/            # Protocol Buffers definitions
+├── peat-persistence/       # TTL & data lifecycle management
+├── peat-transport/         # Network transport abstraction
+└── peat-sim/               # Reference simulator application
 ```
 
 **Code Quality**: Rust safety guarantees, 330+ tests, comprehensive documentation
@@ -847,7 +847,7 @@ cap/
 - References to validation results
 
 **Examples**:
-- ADR-001: HIVE Protocol POC (core architecture)
+- ADR-001: PEAT Protocol POC (core architecture)
 - ADR-014: Distributed Coordination Primitives (novel contribution)
 - ADR-015: Experimental Validation (scientific methodology)
 
@@ -1062,7 +1062,7 @@ cap/
 
 ---
 
-# Why HIVE Protocol Wins
+# Why PEAT Protocol Wins
 
 ## 1. Proven Technology
 - ✅ **100% sync success** under realistic network constraints
@@ -1380,6 +1380,6 @@ while let Some(event) = rx.recv().await {
 <!-- _class: lead -->
 # Thank You
 
-**HIVE Protocol: Scalable Autonomous Coordination**
+**PEAT Protocol: Scalable Autonomous Coordination**
 
 *Validated. Production-Ready. Defensible IP.*

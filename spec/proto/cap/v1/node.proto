@@ -1,10 +1,10 @@
-// HIVE Protocol - Node Model
+// PEAT Protocol - Node Model
 // Specification Version: 0.1.0
 // License: CC0 1.0 Universal (Public Domain)
 //
-// This file defines the node model for HIVE Protocol.
+// This file defines the node model for PEAT Protocol.
 // A Node represents a single platform (UAV, UGV, soldier system, sensor, etc.)
-// participating in the HIVE mesh.
+// participating in the PEAT mesh.
 
 syntax = "proto3";
 
@@ -13,7 +13,7 @@ package cap.node.v1;
 import "cap/v1/common.proto";
 import "cap/v1/capability.proto";
 
-// Phase represents the current operational phase of a node in the HIVE Protocol.
+// Phase represents the current operational phase of a node in the PEAT Protocol.
 //
 // The protocol operates in three sequential phases:
 // 1. DISCOVERY - Nodes broadcast beacons and discover peers
@@ -257,7 +257,7 @@ message NodeState {
   common.v1.Timestamp timestamp = 7;
 }
 
-// Node represents the complete state of a platform in the HIVE mesh.
+// Node represents the complete state of a platform in the PEAT mesh.
 //
 // This is the primary entity synchronized across the CRDT mesh.
 // Each physical platform MUST have exactly one Node representation.

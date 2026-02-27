@@ -12,17 +12,17 @@ Hierarchical organizations—from biological systems to human institutions—evo
 
 ### The Solution
 
-HIVE Protocol implements hierarchy as technical architecture. Using CRDTs (Conflict-free Replicated Data Types), nodes synchronize without consensus—critical for intermittent connectivity. Hierarchical aggregation reduces bandwidth by 95-99%. Cells form dynamically, elect leaders, and compose emergent capabilities greater than the sum of their parts. The protocol is domain-agnostic: the same architecture coordinates autonomous vehicles, sensor networks, robotic fleets, or disaster response teams.
+PEAT Protocol implements hierarchy as technical architecture. Using CRDTs (Conflict-free Replicated Data Types), nodes synchronize without consensus—critical for intermittent connectivity. Hierarchical aggregation reduces bandwidth by 95-99%. Cells form dynamically, elect leaders, and compose emergent capabilities greater than the sum of their parts. The protocol is domain-agnostic: the same architecture coordinates autonomous vehicles, sensor networks, robotic fleets, or disaster response teams.
 
 ### The Imperative
 
-Coordination infrastructure must be open. Proprietary protocols create vendor lock-in, limit interoperability, and slow innovation. HIVE is Apache 2.0 licensed with IETF-style specifications. The architecture decision window is now—systems being designed today will operate for decades.
+Coordination infrastructure must be open. Proprietary protocols create vendor lock-in, limit interoperability, and slow innovation. PEAT is Apache 2.0 licensed with IETF-style specifications. The architecture decision window is now—systems being designed today will operate for decades.
 
 ### Key Findings
 
 - The ~20 node ceiling is architectural, not technological
 - Hierarchy is the coordination primitive that enables scale
-- HIVE achieves 95-99% bandwidth reduction through hierarchical aggregation
+- PEAT achieves 95-99% bandwidth reduction through hierarchical aggregation
 - CRDTs enable coordination without consensus—essential for constrained networks
 - Open standards are strategic necessity, not preference
 

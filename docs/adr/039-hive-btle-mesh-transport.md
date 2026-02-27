@@ -1,16 +1,16 @@
-# ADR-039: HIVE-BTLE Mesh Transport Crate
+# ADR-039: PEAT-BTLE Mesh Transport Crate
 
 **Status**: Proposed  
 **Date**: 2025-12-13  
 **Authors**: Kit Plummer, Codex  
 **Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)  
-**Relates To**: ADR-032 (Pluggable Transport Abstraction), ADR-035 (HIVE-Lite Embedded Nodes), ADR-037 (Resource-Constrained Device Optimization), ADR-017 (P2P Mesh Management), ADR-006 (Security)
+**Relates To**: ADR-032 (Pluggable Transport Abstraction), ADR-035 (PEAT-Lite Embedded Nodes), ADR-037 (Resource-Constrained Device Optimization), ADR-017 (P2P Mesh Management), ADR-006 (Security)
 
 ---
 
 ## Executive Summary
 
-This ADR defines the architecture for `hive-btle`, a Rust crate providing Bluetooth Low Energy mesh networking for HIVE Protocol. The crate enables peer-to-peer discovery, advertisement, and connectivity across resource-constrained devices while supporting HIVE-Lite synchronization. It implements configurable Coded PHYs for throughput/range tradeoffs and targets cross-platform deployment on Linux, Android, macOS, iOS, and Windows across x86 and ARM architectures.
+This ADR defines the architecture for `peat-btle`, a Rust crate providing Bluetooth Low Energy mesh networking for PEAT Protocol. The crate enables peer-to-peer discovery, advertisement, and connectivity across resource-constrained devices while supporting PEAT-Lite synchronization. It implements configurable Coded PHYs for throughput/range tradeoffs and targets cross-platform deployment on Linux, Android, macOS, iOS, and Windows across x86 and ARM architectures.
 
 ---
 
@@ -18,9 +18,9 @@ This ADR defines the architecture for `hive-btle`, a Rust crate providing Blueto
 
 ### The BLE Mesh Opportunity
 
-Bluetooth Low Energy represents a critical transport for HIVE's tactical edge scenarios:
+Bluetooth Low Energy represents a critical transport for PEAT's tactical edge scenarios:
 
-| Scenario | BLE Advantage | HIVE Use Case |
+| Scenario | BLE Advantage | PEAT Use Case |
 |----------|---------------|---------------|
 | Wearable sync | Ultra-low power (10mW) | WearTAK on Samsung watches |
 | Sensor mesh | No infrastructure required | Environmental sensors, asset trackers |
@@ -39,10 +39,10 @@ Ditto BLE Behavior:
 ├─ Full mesh participation: All devices relay everything
 └─ Result: 3-4 hour battery life (mission failure)
 
-HIVE-BTLE Target:
+PEAT-BTLE Target:
 ├─ Batched sync windows: Radio active <5% of time
 ├─ Hierarchical discovery: Leaf nodes don't scan
-├─ HIVE Lite profile: Minimal state, single parent
+├─ PEAT Lite profile: Minimal state, single parent
 └─ Result: 18-24 hour battery life (mission capable)
 ```
 
@@ -65,7 +65,7 @@ Per ADR-032 (Pluggable Transport Abstraction), each transport type requires fund
 
 1. **Cross-Platform**: Single codebase targeting Linux, Android, macOS, iOS, Windows
 2. **Cross-Architecture**: x86_64 and ARM (aarch64, armv7, armv7-a)
-3. **HIVE-Lite Support**: Synchronize minimal CRDT state per ADR-035/037
+3. **PEAT-Lite Support**: Synchronize minimal CRDT state per ADR-035/037
 4. **Coded PHY Support**: Configure LE Coded (S=2, S=8) for range/throughput tradeoffs
 5. **Mesh Topology**: P2P discovery, advertisement, and multi-peer connectivity
 6. **Power Efficiency**: >50% battery improvement over Ditto baseline
@@ -87,7 +87,7 @@ Per ADR-032 (Pluggable Transport Abstraction), each transport type requires fund
 ### Crate Structure
 
 ```
-hive-btle/
+peat-btle/
 ├── Cargo.toml
 ├── src/
 │   ├── lib.rs              # Public API, feature gates
@@ -103,7 +103,7 @@ hive-btle/
 │   │   ├── mod.rs
 │   │   ├── advertiser.rs   # Advertisement broadcasting
 │   │   ├── scanner.rs      # Passive/active scanning
-│   │   └── beacon.rs       # HIVE beacon encoding/decoding
+│   │   └── beacon.rs       # PEAT beacon encoding/decoding
 │   │
 │   ├── mesh/               # Mesh topology management
 │   │   ├── mod.rs
@@ -113,11 +113,11 @@ hive-btle/
 │   │
 │   ├── gatt/               # GATT service definition
 │   │   ├── mod.rs
-│   │   ├── service.rs      # HIVE BLE service
+│   │   ├── service.rs      # PEAT BLE service
 │   │   ├── characteristics.rs
 │   │   └── protocol.rs     # Characteristic read/write protocol
 │   │
-│   ├── sync/               # HIVE-Lite synchronization
+│   ├── sync/               # PEAT-Lite synchronization
 │   │   ├── mod.rs
 │   │   ├── batch.rs        # Batched sync accumulator
 │   │   ├── delta.rs        # Differential sync encoding
@@ -167,12 +167,12 @@ hive-btle/
 ```rust
 // File: src/transport.rs
 
-use hive_protocol::transport::{
+use peat_protocol::transport::{
     Transport, TransportCapabilities, TransportType, 
     MessageRequirements, MeshConnection
 };
 
-/// Bluetooth LE transport implementing HIVE Transport trait
+/// Bluetooth LE transport implementing PEAT Transport trait
 pub struct BluetoothLETransport {
     config: BleConfig,
     adapter: BleAdapter,
@@ -333,10 +333,10 @@ pub enum PhyStrategy {
 
 use crate::phy::BlePhy;
 
-/// HIVE BLE beacon format (fits in BLE advertisement payload)
+/// PEAT BLE beacon format (fits in BLE advertisement payload)
 #[derive(Debug, Clone)]
-pub struct HiveBeacon {
-    /// HIVE protocol version (4 bits)
+pub struct PeatBeacon {
+    /// PEAT protocol version (4 bits)
     pub version: u8,
     /// Node capabilities flags (12 bits)
     pub capabilities: NodeCapabilities,
@@ -352,12 +352,12 @@ pub struct HiveBeacon {
     pub seq_num: u16,
 }
 
-impl HiveBeacon {
+impl PeatBeacon {
     /// Encode to BLE advertisement data (max 31 bytes legacy, 254 bytes extended)
     pub fn encode(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(16);
-        // HIVE service UUID (16 bits)
-        buf.extend_from_slice(&HIVE_SERVICE_UUID_SHORT);
+        // PEAT service UUID (16 bits)
+        buf.extend_from_slice(&PEAT_SERVICE_UUID_SHORT);
         // Packed beacon data (13 bytes)
         buf.push((self.version << 4) | ((self.capabilities.bits() >> 8) as u8 & 0x0F));
         buf.push(self.capabilities.bits() as u8);
@@ -390,7 +390,7 @@ impl DiscoveryManager {
             interval_ms: self.config.scan_interval_ms,
             window_ms: self.config.scan_window_ms,
             filter_duplicates: true,
-            filter_uuids: vec![HIVE_SERVICE_UUID],
+            filter_uuids: vec![PEAT_SERVICE_UUID],
         }).await
     }
     
@@ -402,15 +402,15 @@ impl DiscoveryManager {
             interval_ms: self.config.scan_interval_ms,
             window_ms: self.config.scan_window_ms,
             filter_duplicates: false,  // Track RSSI changes
-            filter_uuids: vec![HIVE_SERVICE_UUID],
+            filter_uuids: vec![PEAT_SERVICE_UUID],
         }).await
     }
     
     /// Start advertising our beacon
-    pub async fn start_advertising(&self, beacon: &HiveBeacon) -> Result<(), BleError> {
+    pub async fn start_advertising(&self, beacon: &PeatBeacon) -> Result<(), BleError> {
         let adv_data = AdvertisementData {
-            service_uuids: vec![HIVE_SERVICE_UUID],
-            manufacturer_data: Some((HIVE_COMPANY_ID, beacon.encode())),
+            service_uuids: vec![PEAT_SERVICE_UUID],
+            manufacturer_data: Some((PEAT_COMPANY_ID, beacon.encode())),
             connectable: true,
             tx_power_level: Some(self.config.tx_power),
         };
@@ -428,9 +428,9 @@ impl DiscoveryManager {
 ```rust
 // File: src/gatt/service.rs
 
-/// HIVE BLE GATT Service definition
+/// PEAT BLE GATT Service definition
 /// 
-/// Service UUID: 0xHIVE (custom 128-bit UUID)
+/// Service UUID: 0xPEAT (custom 128-bit UUID)
 /// 
 /// Characteristics:
 /// - Node Info (read): Node identity and capabilities
@@ -438,15 +438,15 @@ impl DiscoveryManager {
 /// - Sync Data (write/indicate): Incoming sync data
 /// - Command (write): Control commands
 /// - Status (read/notify): Connection status
-pub struct HiveGattService {
+pub struct PeatGattService {
     service_uuid: Uuid,
     characteristics: Vec<Characteristic>,
 }
 
-impl HiveGattService {
+impl PeatGattService {
     pub fn new() -> Self {
         Self {
-            service_uuid: HIVE_SERVICE_UUID,
+            service_uuid: PEAT_SERVICE_UUID,
             characteristics: vec![
                 Characteristic {
                     uuid: CHAR_NODE_INFO_UUID,
@@ -483,7 +483,7 @@ impl HiveGattService {
     }
 }
 
-/// HIVE Sync Protocol over GATT
+/// PEAT Sync Protocol over GATT
 /// 
 /// Uses chunked transfer for payloads > MTU
 pub struct GattSyncProtocol {
@@ -542,12 +542,12 @@ impl GattSyncProtocol {
 }
 ```
 
-#### 5. HIVE-Lite Sync Support
+#### 5. PEAT-Lite Sync Support
 
 ```rust
 // File: src/sync/mod.rs
 
-use hive_lite::{LiteCrdt, LwwRegister, GCounter};
+use peat_lite::{LiteCrdt, LwwRegister, GCounter};
 
 /// Batched sync accumulator for power efficiency
 /// 
@@ -628,8 +628,8 @@ impl DeltaEncoder {
     }
 }
 
-/// HIVE-Lite sync state for BLE transport
-pub struct BleHiveLiteSync {
+/// PEAT-Lite sync state for BLE transport
+pub struct BlePeatLiteSync {
     node_id: NodeId,
     parent_id: Option<NodeId>,
     batch_accumulator: BatchAccumulator,
@@ -640,7 +640,7 @@ pub struct BleHiveLiteSync {
     parent_vector_clock: VectorClock,
 }
 
-impl BleHiveLiteSync {
+impl BlePeatLiteSync {
     /// Process incoming sync message from parent
     pub async fn receive_sync(&mut self, msg: SyncMessage) -> Result<(), SyncError> {
         // Merge CRDT state
@@ -696,7 +696,7 @@ pub enum PowerProfile {
         adv_interval_ms: u32,    // 500ms
         conn_interval_ms: u32,   // 30ms
     },
-    /// Maximum battery life (HIVE Lite default)
+    /// Maximum battery life (PEAT Lite default)
     /// Radio active ~2% of time
     LowPower {
         scan_interval_ms: u32,   // 5000ms
@@ -784,7 +784,7 @@ impl RadioScheduler {
 ```rust
 // File: src/security/mod.rs
 
-use hive_security::{SecurityManager, DeviceIdentity};
+use peat_security::{SecurityManager, DeviceIdentity};
 
 /// BLE security configuration
 #[derive(Debug, Clone)]
@@ -820,7 +820,7 @@ pub enum PairingMode {
 pub struct BleSecurityManager {
     config: BleSecurityConfig,
     bond_store: Box<dyn BondStore>,
-    hive_security: Arc<dyn SecurityManager>,
+    peat_security: Arc<dyn SecurityManager>,
 }
 
 impl BleSecurityManager {
@@ -842,8 +842,8 @@ impl BleSecurityManager {
             }
         }
         
-        // Step 3: HIVE-level authentication
-        let identity = self.hive_security.authenticate_peer(peer_id).await?;
+        // Step 3: PEAT-level authentication
+        let identity = self.peat_security.authenticate_peer(peer_id).await?;
         
         Ok(identity)
     }
@@ -851,7 +851,7 @@ impl BleSecurityManager {
     /// Encrypt sync payload (application layer)
     pub fn encrypt_sync_payload(&self, payload: &[u8], recipient: &NodeId) -> Result<Vec<u8>, SecurityError> {
         if self.config.app_layer_encryption {
-            self.hive_security.encrypt(payload, recipient)
+            self.peat_security.encrypt(payload, recipient)
         } else {
             Ok(payload.to_vec())
         }
@@ -940,13 +940,13 @@ mod embedded {
 
 ```toml
 [package]
-name = "hive-btle"
+name = "peat-btle"
 version = "0.1.0"
 edition = "2021"
 authors = ["(r)evolve - Revolve Team LLC"]
 license = "Apache-2.0"
-description = "Bluetooth Low Energy mesh transport for HIVE Protocol"
-repository = "https://github.com/revolveteam/hive-protocol"
+description = "Bluetooth Low Energy mesh transport for PEAT Protocol"
+repository = "https://github.com/revolveteam/peat-protocol"
 keywords = ["ble", "bluetooth", "mesh", "sync", "crdt"]
 categories = ["network-programming", "embedded", "hardware-support"]
 
@@ -994,9 +994,9 @@ esp-idf-hal = { version = "0.43", optional = true }  # ESP32
 # Embedded
 embedded-hal = { version = "1.0", optional = true }
 
-# HIVE Protocol integration
-hive-protocol = { path = "../hive-protocol" }
-hive-lite = { path = "../hive-lite", optional = true }
+# PEAT Protocol integration
+peat-protocol = { path = "../peat-protocol" }
+peat-lite = { path = "../peat-lite", optional = true }
 
 # Metrics/tracing
 prometheus = { version = "0.13", optional = true }
@@ -1025,14 +1025,14 @@ harness = false
 | Level 3 | Yes | Yes | MITM-protected pairing |
 | Level 4 | Yes | Yes (FIPS) | LE Secure Connections |
 
-**Recommendation**: HIVE-BTLE should require Level 3+ for sync operations.
+**Recommendation**: PEAT-BTLE should require Level 3+ for sync operations.
 
 ### Application-Layer Security
 
 Per ADR-006, BLE transport security is layered:
 
 1. **BLE Pairing**: Establishes link encryption (AES-CCM)
-2. **HIVE PKI**: Verifies device identity via certificates
+2. **PEAT PKI**: Verifies device identity via certificates
 3. **Application Encryption**: ChaCha20-Poly1305 for sync payloads (optional)
 
 ### Threat Model
@@ -1041,7 +1041,7 @@ Per ADR-006, BLE transport security is layered:
 |--------|------------|
 | Eavesdropping | BLE link encryption + optional app-layer encryption |
 | MITM | Numeric comparison or passkey pairing |
-| Replay | Sequence numbers in HIVE beacon/sync messages |
+| Replay | Sequence numbers in PEAT beacon/sync messages |
 | Rogue device | PKI-based device authentication |
 | Battery drain attack | Rate limiting, connection limits |
 
@@ -1100,7 +1100,7 @@ Per ADR-006, BLE transport security is layered:
 - [ ] Parent failover works
 - [ ] Connection limits enforced
 
-### Phase 3: HIVE-Lite Sync (Weeks 6-7)
+### Phase 3: PEAT-Lite Sync (Weeks 6-7)
 
 **Deliverables:**
 1. Batch accumulator
@@ -1156,25 +1156,25 @@ Per ADR-006, BLE transport security is layered:
 
 ---
 
-## hive-ffi Integration
+## peat-ffi Integration
 
 ### Dual-Mode Operation
 
-hive-btle is designed to operate in two modes:
+peat-btle is designed to operate in two modes:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│              Full HIVE (ATAK, CLI, etc.)                │
+│              Full PEAT (ATAK, CLI, etc.)                │
 │                                                         │
 │  TransportManager (PACE policy)                         │
 │  ├── IrohTransport (QUIC/WiFi) - Primary                │
-│  ├── HiveBleTransport ────────┐  - Alternate            │
+│  ├── PeatBleTransport ────────┐  - Alternate            │
 │  └── ...                      │                         │
 └───────────────────────────────│─────────────────────────┘
                                 │ wraps
                                 ▼
 ┌─────────────────────────────────────────────────────────┐
-│                      hive-btle                          │
+│                      peat-btle                          │
 │         (Standalone OR as transport plugin)             │
 │         Same protocol - devices interoperate            │
 └─────────────────────────────────────────────────────────┘
@@ -1182,32 +1182,32 @@ hive-btle is designed to operate in two modes:
                                 │ uses directly
 ┌───────────────────────────────┴─────────────────────────┐
 │              WearTAK (Samsung Watch)                    │
-│         Can't run full HIVE - standalone hive-btle      │
+│         Can't run full PEAT - standalone peat-btle      │
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Mode 1: Standalone** - For resource-constrained devices (WearTAK on Samsung watches, ESP32 sensors) that cannot run full HIVE. The device uses hive-btle directly with its lightweight CRDT sync.
+**Mode 1: Standalone** - For resource-constrained devices (WearTAK on Samsung watches, ESP32 sensors) that cannot run full PEAT. The device uses peat-btle directly with its lightweight CRDT sync.
 
-**Mode 2: Transport Plugin** - For full HIVE nodes (ATAK, CLI, servers), hive-btle is wrapped by `HiveBleTransport` and registered with `TransportManager` alongside other transports (Iroh/QUIC, future LoRa, etc.).
+**Mode 2: Transport Plugin** - For full PEAT nodes (ATAK, CLI, servers), peat-btle is wrapped by `PeatBleTransport` and registered with `TransportManager` alongside other transports (Iroh/QUIC, future LoRa, etc.).
 
-**Interoperability**: Both modes use the same BLE protocol (GATT service, beacon format, sync protocol), so a Samsung Watch running standalone hive-btle can sync with ATAK running full HIVE with BLE as a transport.
+**Interoperability**: Both modes use the same BLE protocol (GATT service, beacon format, sync protocol), so a Samsung Watch running standalone peat-btle can sync with ATAK running full PEAT with BLE as a transport.
 
-### hive-ffi Transport Abstraction
+### peat-ffi Transport Abstraction
 
 #### Feature Flags
 
 ```toml
-# hive-ffi/Cargo.toml
+# peat-ffi/Cargo.toml
 [features]
 default = ["sync"]
-sync = ["hive-protocol/automerge-backend"]
-bluetooth = ["hive-protocol/bluetooth"]
+sync = ["peat-protocol/automerge-backend"]
+bluetooth = ["peat-protocol/bluetooth"]
 ```
 
 #### Extended NodeConfig
 
 ```rust
-// hive-ffi/src/lib.rs
+// peat-ffi/src/lib.rs
 
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct NodeConfig {
@@ -1231,18 +1231,18 @@ pub struct TransportConfigFFI {
 }
 ```
 
-#### HiveNode with TransportManager
+#### PeatNode with TransportManager
 
 ```rust
-// hive-ffi/src/lib.rs
+// peat-ffi/src/lib.rs
 
-pub struct HiveNode {
+pub struct PeatNode {
     sync_backend: Arc<AutomergeIrohBackend>,
     storage_backend: Arc<AutomergeBackend>,
     transport_manager: Arc<TransportManager>,  // Replaces: transport: Arc<IrohTransport>
     iroh_transport: Arc<IrohTransport>,
     #[cfg(feature = "bluetooth")]
-    ble_transport: Option<Arc<HiveBleTransport>>,
+    ble_transport: Option<Arc<PeatBleTransport>>,
     store: Arc<AutomergeStore>,
     storage_path: PathBuf,
     runtime: Arc<tokio::runtime::Runtime>,
@@ -1252,9 +1252,9 @@ pub struct HiveNode {
 
 #### Platform Adapters
 
-hive-btle provides platform-specific adapters that hive-ffi uses via feature flags:
+peat-btle provides platform-specific adapters that peat-ffi uses via feature flags:
 
-| Platform | hive-btle Feature | Adapter |
+| Platform | peat-btle Feature | Adapter |
 |----------|-------------------|---------|
 | Linux | `linux` | BlueZ via `bluer` crate |
 | Android | `android` | JNI to Android Bluetooth API |
@@ -1262,23 +1262,23 @@ hive-btle provides platform-specific adapters that hive-ffi uses via feature fla
 | iOS | `ios` | CoreBluetooth |
 | Windows | `windows` | WinRT Bluetooth API |
 
-hive-ffi doesn't implement its own adapters - it uses hive-btle's existing adapters:
+peat-ffi doesn't implement its own adapters - it uses peat-btle's existing adapters:
 
 ```rust
-// hive-ffi/src/lib.rs
+// peat-ffi/src/lib.rs
 
 #[cfg(all(feature = "bluetooth", target_os = "linux"))]
-use hive_btle::platform::linux::LinuxAdapter;
+use peat_btle::platform::linux::LinuxAdapter;
 
 #[cfg(all(feature = "bluetooth", target_os = "android"))]
-use hive_btle::platform::android::AndroidAdapter;
+use peat_btle::platform::android::AndroidAdapter;
 
 #[cfg(all(feature = "bluetooth", any(target_os = "macos", target_os = "ios")))]
-use hive_btle::platform::apple::AppleAdapter;
+use peat_btle::platform::apple::AppleAdapter;
 
 // Create transport with platform-appropriate adapter
 #[cfg(feature = "bluetooth")]
-fn create_ble_transport(config: &BleConfig) -> Result<HiveBleTransport<impl BleAdapter>> {
+fn create_ble_transport(config: &BleConfig) -> Result<PeatBleTransport<impl BleAdapter>> {
     #[cfg(target_os = "linux")]
     let adapter = LinuxAdapter::new()?;
 
@@ -1287,14 +1287,14 @@ fn create_ble_transport(config: &BleConfig) -> Result<HiveBleTransport<impl BleA
 
     // ... etc
 
-    Ok(HiveBleTransport::new(config, adapter))
+    Ok(PeatBleTransport::new(config, adapter))
 }
 ```
 
-For Android, hive-ffi exposes JNI functions to control the transport:
+For Android, peat-ffi exposes JNI functions to control the transport:
 
 ```kotlin
-// HiveJni.kt
+// PeatJni.kt
 external fun enableBleTransport(nodeHandle: Long, meshId: String): Boolean
 external fun disableBleTransport(nodeHandle: Long): Boolean
 external fun getBleStatus(nodeHandle: Long): BleStatus
@@ -1302,25 +1302,25 @@ external fun getBleStatus(nodeHandle: Long): BleStatus
 
 ### Translation Layer (ADR-041 Integration)
 
-Full HIVE nodes act as gateways between Automerge documents and hive-btle's lightweight CRDTs:
+Full PEAT nodes act as gateways between Automerge documents and peat-btle's lightweight CRDTs:
 
 ```rust
-// hive-protocol/src/sync/ble_translation.rs
+// peat-protocol/src/sync/ble_translation.rs
 
 pub struct BleTranslationLayer {
     node_mapping: HashMap<u32, String>,
 }
 
 impl BleTranslationLayer {
-    /// Receive HiveDocument from BLE, update Automerge
+    /// Receive PeatDocument from BLE, update Automerge
     pub fn on_ble_document(
         &mut self,
-        doc: &HiveDocument,
+        doc: &PeatDocument,
         am_doc: &mut Automerge
     ) -> Result<()> {
         let node_id = format!("{:08X}", doc.node_id());
 
-        // Map hive-btle fields to Automerge document structure
+        // Map peat-btle fields to Automerge document structure
         am_doc.put(&format!("/devices/{}/counter", node_id), doc.counter())?;
 
         if let Some(peripheral) = doc.peripheral() {
@@ -1343,9 +1343,9 @@ impl BleTranslationLayer {
         Ok(())
     }
 
-    /// Build HiveDocument from Automerge for BLE broadcast
+    /// Build PeatDocument from Automerge for BLE broadcast
     pub fn build_ble_document(&self, node_id: u32, am_doc: &Automerge) -> Vec<u8> {
-        let mut doc = HiveDocument::new(node_id);
+        let mut doc = PeatDocument::new(node_id);
         // Extract relevant fields from Automerge, populate lightweight doc
         doc.encode()
     }
@@ -1356,19 +1356,19 @@ impl BleTranslationLayer {
 
 The ATAK plugin currently runs two parallel systems:
 
-- `HiveNodeJni` → hive-ffi → IrohTransport (PLI broadcast)
-- `HiveBleManager` → hive-btle AAR → BLE mesh (WearTAK sync)
+- `PeatNodeJni` → peat-ffi → IrohTransport (PLI broadcast)
+- `PeatBleManager` → peat-btle AAR → BLE mesh (WearTAK sync)
 
 **Problem**: Data doesn't flow between them. PLI broadcasts only go over Iroh; WearTAK devices on BLE never receive them.
 
-**Solution**: Unified transport via hive-ffi:
+**Solution**: Unified transport via peat-ffi:
 
 ```kotlin
-// HivePluginLifecycle.kt - BEFORE (dual system)
-val hiveNode = HiveJni.createNode(config)
-val bleManager = HiveBleManager(context, meshId)  // Separate!
+// PeatPluginLifecycle.kt - BEFORE (dual system)
+val peatNode = PeatJni.createNode(config)
+val bleManager = PeatBleManager(context, meshId)  // Separate!
 
-// HivePluginLifecycle.kt - AFTER (unified)
+// PeatPluginLifecycle.kt - AFTER (unified)
 val config = NodeConfig(
     appId = "...",
     sharedKey = "...",
@@ -1378,18 +1378,18 @@ val config = NodeConfig(
         blePowerProfile = "balanced"
     )
 )
-val hiveNode = HiveJni.createNode(config)
-// BLE is now managed by TransportManager inside hive-ffi
+val peatNode = PeatJni.createNode(config)
+// BLE is now managed by TransportManager inside peat-ffi
 ```
 
 **Migration Steps**:
 
-1. Add `bluetooth` feature to hive-ffi, expose `TransportConfigFFI` via UniFFI
+1. Add `bluetooth` feature to peat-ffi, expose `TransportConfigFFI` via UniFFI
 2. Add JNI bindings for BLE control (`enableBleTransport`, `onBleDiscovered`, etc.)
-3. Update `HivePluginLifecycle` to use `TransportConfigFFI` with `enable_ble=true`
-4. Deprecate `HiveBleManager` (keep working during transition)
+3. Update `PeatPluginLifecycle` to use `TransportConfigFFI` with `enable_ble=true`
+4. Deprecate `PeatBleManager` (keep working during transition)
 5. Validate WearTAK sync works via unified path
-6. Remove `HiveBleManager` once stable
+6. Remove `PeatBleManager` once stable
 
 ---
 
@@ -1411,7 +1411,7 @@ Bluetooth SIG defines a mesh networking standard.
 **Pros**: Standardized, multi-vendor support
 **Cons**: Complex provisioning, no CRDT support, designed for lighting/IoT not tactical
 
-**Decision**: Implement HIVE-native mesh over GATT, not SIG Mesh.
+**Decision**: Implement PEAT-native mesh over GATT, not SIG Mesh.
 
 ### 3. ESP-NOW on ESP32
 
@@ -1431,7 +1431,7 @@ ESP-NOW is Espressif's proprietary peer-to-peer protocol.
 3. [bluer crate](https://docs.rs/bluer/) - Linux BlueZ bindings
 4. [btleplug crate](https://docs.rs/btleplug/) - Cross-platform BLE
 5. ADR-032: Pluggable Transport Abstraction
-6. ADR-035: HIVE-Lite Embedded Nodes
+6. ADR-035: PEAT-Lite Embedded Nodes
 7. ADR-037: Resource-Constrained Device Optimization
 8. ADR-006: Security, Authentication, and Authorization
 
@@ -1441,65 +1441,65 @@ ESP-NOW is Espressif's proprietary peer-to-peer protocol.
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2025-12-13 | Create dedicated hive-btle crate | BLE requires fundamentally different abstractions than IP-based transports |
-| 2025-12-13 | GATT-based sync over SIG Mesh | HIVE needs CRDT sync semantics, not broadcast mesh |
+| 2025-12-13 | Create dedicated peat-btle crate | BLE requires fundamentally different abstractions than IP-based transports |
+| 2025-12-13 | GATT-based sync over SIG Mesh | PEAT needs CRDT sync semantics, not broadcast mesh |
 | 2025-12-13 | Platform abstraction with native implementations | Each platform has different BLE APIs and capabilities |
 | 2025-12-13 | Coded PHY support as feature | Enables range/throughput tradeoffs, requires BLE 5.0 |
-| 2025-01-12 | Dual-mode operation (standalone + transport plugin) | hive-btle must work standalone for constrained devices (WearTAK) AND as transport within full HIVE |
-| 2025-01-12 | Integrate via TransportManager in hive-ffi | Unifies transport selection with PACE policy; avoids dual-system architecture in ATAK plugin |
-| 2025-01-12 | Translation layer for Automerge ↔ hive-btle | Per ADR-041, full HIVE nodes act as gateways translating between document formats |
+| 2025-01-12 | Dual-mode operation (standalone + transport plugin) | peat-btle must work standalone for constrained devices (WearTAK) AND as transport within full PEAT |
+| 2025-01-12 | Integrate via TransportManager in peat-ffi | Unifies transport selection with PACE policy; avoids dual-system architecture in ATAK plugin |
+| 2025-01-12 | Translation layer for Automerge ↔ peat-btle | Per ADR-041, full PEAT nodes act as gateways translating between document formats |
 
 ---
 
 **Next Steps:**
 1. ~~Review with stakeholders~~ (ongoing)
-2. GitHub issues created for hive-ffi integration (see below)
-3. Radicle issues for hive-btle API exposure
-4. Begin Phase 1: Add bluetooth feature flag to hive-ffi
+2. GitHub issues created for peat-ffi integration (see below)
+3. Radicle issues for peat-btle API exposure
+4. Begin Phase 1: Add bluetooth feature flag to peat-ffi
 5. Coordinate with Ascent for WearTAK integration testing
 
-**GitHub Issues (hive repo):**
-- [#554](https://github.com/kitplummer/hive/issues/554) - Add `bluetooth` feature flag to hive-ffi
-- [#555](https://github.com/kitplummer/hive/issues/555) - Refactor HiveNode to use TransportManager
-- [#556](https://github.com/kitplummer/hive/issues/556) - Add BLE transport option to NodeConfig/create_node
-- [#557](https://github.com/kitplummer/hive/issues/557) - Implement Automerge ↔ hive-btle translation layer
-- [#558](https://github.com/kitplummer/hive/issues/558) - ATAK plugin: migrate to unified transport
+**GitHub Issues (peat repo):**
+- [#554](https://github.com/defenseunicorns/peat/issues/554) - Add `bluetooth` feature flag to peat-ffi
+- [#555](https://github.com/defenseunicorns/peat/issues/555) - Refactor PeatNode to use TransportManager
+- [#556](https://github.com/defenseunicorns/peat/issues/556) - Add BLE transport option to NodeConfig/create_node
+- [#557](https://github.com/defenseunicorns/peat/issues/557) - Implement Automerge ↔ peat-btle translation layer
+- [#558](https://github.com/defenseunicorns/peat/issues/558) - ATAK plugin: migrate to unified transport
 
-**Radicle Issues (hive-btle repo):** *(create manually in Radicle)*
+**Radicle Issues (peat-btle repo):** *(create manually in Radicle)*
 
-### Issue: Ensure platform adapters are usable from external crates (hive-ffi)
+### Issue: Ensure platform adapters are usable from external crates (peat-ffi)
 
-**Summary**: hive-btle has platform adapters for Linux (BlueZ), macOS/iOS (CoreBluetooth), Android (JNI), and Windows (WinRT). Ensure these can be used by hive-ffi via feature flags without hive-ffi needing to implement its own adapters.
+**Summary**: peat-btle has platform adapters for Linux (BlueZ), macOS/iOS (CoreBluetooth), Android (JNI), and Windows (WinRT). Ensure these can be used by peat-ffi via feature flags without peat-ffi needing to implement its own adapters.
 
 **Implementation**:
-- Verify platform feature flags work correctly when hive-btle is a dependency
+- Verify platform feature flags work correctly when peat-btle is a dependency
 - Ensure `BluetoothLETransport::new()` can be called with platform-appropriate adapter
-- Export configuration types (`BleConfig`, `HiveMeshConfig`, `PowerProfile`) for external use
+- Export configuration types (`BleConfig`, `PeatMeshConfig`, `PowerProfile`) for external use
 - Ensure observer/callback pattern works across crate boundary
 - Document feature flag combinations for each target platform
 
 **Acceptance Criteria**:
-- [ ] hive-ffi can use `linux` feature → gets BlueZ adapter
-- [ ] hive-ffi can use `android` feature → gets JNI adapter
-- [ ] hive-ffi can use `macos`/`ios` feature → gets CoreBluetooth adapter
+- [ ] peat-ffi can use `linux` feature → gets BlueZ adapter
+- [ ] peat-ffi can use `android` feature → gets JNI adapter
+- [ ] peat-ffi can use `macos`/`ios` feature → gets CoreBluetooth adapter
 - [ ] Configuration types are public and documented
-- [ ] `HiveObserver` works across crate boundary
+- [ ] `PeatObserver` works across crate boundary
 - [ ] Example of external crate usage
 
 ---
 
 ### Issue: Add transport-agnostic document encoding helpers
 
-**Summary**: Ensure `HiveDocument` encoding/decoding is public and transport-agnostic for use in the translation layer.
+**Summary**: Ensure `PeatDocument` encoding/decoding is public and transport-agnostic for use in the translation layer.
 
 **Implementation**:
-- Make `HiveDocument::from_bytes()` public
-- Make `HiveDocument::to_bytes()` / `encode()` public
+- Make `PeatDocument::from_bytes()` public
+- Make `PeatDocument::to_bytes()` / `encode()` public
 - Allow external construction with arbitrary node IDs
 - Document the binary format for interoperability
 
 **Acceptance Criteria**:
-- [ ] `HiveDocument::from_bytes()` is public
-- [ ] `HiveDocument::to_bytes()` is public
+- [ ] `PeatDocument::from_bytes()` is public
+- [ ] `PeatDocument::to_bytes()` is public
 - [ ] External node ID assignment works
 - [ ] Binary format documented

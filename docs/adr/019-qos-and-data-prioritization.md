@@ -1,4 +1,4 @@
-# ADR-019: Quality of Service and Data Prioritization for HIVE Sync
+# ADR-019: Quality of Service and Data Prioritization for PEAT Sync
 
 **Status**: Proposed  
 **Date**: 2025-11-16  
@@ -9,7 +9,7 @@
 
 ### The Problem: Not All Data Is Created Equal
 
-Customer feedback has revealed a critical requirement: **HIVE must support delivering model products (contact reports, images, audio/video clips, etc.) through its hierarchical network with appropriate prioritization.**
+Customer feedback has revealed a critical requirement: **PEAT must support delivering model products (contact reports, images, audio/video clips, etc.) through its hierarchical network with appropriate prioritization.**
 
 The operational reality:
 
@@ -40,7 +40,7 @@ WITH QoS:
 
 ### The Fundamental Issue
 
-Current HIVE architecture (as inherited from Ditto/Automerge) treats all CRDT updates with approximately equal priority. This creates several operational problems:
+Current PEAT architecture (as inherited from Ditto/Automerge) treats all CRDT updates with approximately equal priority. This creates several operational problems:
 
 1. **Priority Inversion**: Critical contact reports wait behind routine telemetry
 2. **Bandwidth Starvation**: Large media files (images/video) block small critical updates
@@ -66,7 +66,7 @@ A comprehensive **Quality of Service (QoS) framework** that provides:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    HIVE QoS Framework                       │
+│                    PEAT QoS Framework                       │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  ┌─────────────────────────────────────────────────────┐   │
@@ -793,7 +793,7 @@ pub struct QoSMetrics {
 **Dashboard Example:**
 
 ```
-=== HIVE QoS Dashboard ===
+=== PEAT QoS Dashboard ===
 Bandwidth: 487 Kbps / 1000 Kbps (48.7% utilized)
 
 Priority Queues:
@@ -918,16 +918,16 @@ pub enum EnforcementMode {
 
 **STANAG 4586 (UAV C2)**: Defines message priorities for UAV control
 - Our P1-P5 aligns with 4586's "Immediate", "Priority", "Routine", "Deferred"
-- HIVE extends to multi-platform coordination beyond single UAV
+- PEAT extends to multi-platform coordination beyond single UAV
 
 **Link 16 Message Standard**: Tactical data link with priority levels
 - J-Series messages have defined precedence
-- HIVE provides similar prioritization for autonomous platforms
+- PEAT provides similar prioritization for autonomous platforms
 
 ### Commercial Standards
 
 **DiffServ (RFC 2474)**: IP packet QoS markings
-- We can map HIVE QoS classes to DSCP values for network-layer QoS
+- We can map PEAT QoS classes to DSCP values for network-layer QoS
 
 **MQTT QoS Levels**: Quality of Service for pub-sub messaging
 - MQTT has 3 levels (0, 1, 2) - we extend to 5 for finer control
@@ -1047,7 +1047,7 @@ impl AutomergeSyncCoordinator {
 
 ### Subscription Granularity
 
-**Current HIVE subscription model:**
+**Current PEAT subscription model:**
 ```rust
 // Subscribe to entire collection
 backend.subscribe("beacons", Query::All).await?;
@@ -1061,7 +1061,7 @@ ditto.store.collection("beacons")
     .subscribe();
 ```
 
-**Proposed HIVE extension:**
+**Proposed PEAT extension:**
 ```rust
 /// Enhanced query with spatial and attribute predicates
 pub enum Query {

@@ -45,7 +45,7 @@ echo ""
 
 # Deploy topology
 containerlab deploy \
-  --topo ../../../hive-sim/topologies/battalion-48node-mesh-mode4.yaml \
+  --topo ../../../peat-sim/topologies/battalion-48node-mesh-mode4.yaml \
   --reconfigure
 
 echo ""
@@ -97,7 +97,7 @@ jq -s 'map(select(.event_type=="DocumentReceived") | .latency_ms) | {count: leng
 
 echo ""
 echo "→ Destroying topology..."
-containerlab destroy --topo ../../../hive-sim/topologies/battalion-48node-mesh-mode4.yaml --cleanup
+containerlab destroy --topo ../../../peat-sim/topologies/battalion-48node-mesh-mode4.yaml --cleanup
 
 echo ""
 echo "========================================================"

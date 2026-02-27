@@ -26,20 +26,20 @@ Current Architecture Problem:
                           │ ??? Integration Point
                           ▼
                     ┌─────────────┐
-                    │ HIVE Node   │
+                    │ PEAT Node   │
                     │ (CRDT docs) │
                     └─────────────┘
 
 Questions:
-1. Where does HIVE ↔ CoT transformation happen?
+1. Where does PEAT ↔ CoT transformation happen?
 2. Who owns the transformation logic?
-3. How does a WearTAK device join a HIVE hierarchy?
-4. Can a node speak CoT natively without full HIVE stack?
+3. How does a WearTAK device join a PEAT hierarchy?
+4. Can a node speak CoT natively without full PEAT stack?
 ```
 
 ### The Deeper Issue: Format Interoperability at Scale
 
-HIVE will integrate with multiple format ecosystems:
+PEAT will integrate with multiple format ecosystems:
 
 | Format | Use Case | Characteristics |
 |--------|----------|-----------------|
@@ -53,21 +53,21 @@ HIVE will integrate with multiple format ecosystems:
 
 Each requires bidirectional transformation. If transformation remains an ad-hoc concern, we get:
 - **N×M integration matrix** - every format pair needs custom code
-- **No composability** - can't chain HIVE → CoT → Link 16
+- **No composability** - can't chain PEAT → CoT → Link 16
 - **No negotiation** - nodes can't discover compatible formats
 - **No optimization** - constrained devices can't skip unused transforms
 
 ### WearTAK Integration Requirements
 
-For Samsung watches running WearTAK to participate in HIVE hierarchies:
+For Samsung watches running WearTAK to participate in PEAT hierarchies:
 
-1. **Minimal footprint** - Watch can't run full HIVE stack
+1. **Minimal footprint** - Watch can't run full PEAT stack
 2. **CoT native** - WearTAK already speaks CoT to ATAK
-3. **Hierarchy participation** - Watch is a leaf node in HIVE hierarchy
+3. **Hierarchy participation** - Watch is a leaf node in PEAT hierarchy
 4. **Bidirectional** - Receive commands, send position/health/alerts
 5. **Battery efficient** - Transform overhead must be minimal
 
-**Key Insight**: The watch shouldn't need to understand HIVE's CRDT internals. It should speak CoT, and HIVE should accept CoT as a valid input format at the protocol level.
+**Key Insight**: The watch shouldn't need to understand PEAT's CRDT internals. It should speak CoT, and PEAT should accept CoT as a valid input format at the protocol level.
 
 ## Decision
 
@@ -77,7 +77,7 @@ We introduce **Format Adapters** as first-class protocol elements:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    HIVE Protocol Stack                          │
+│                    PEAT Protocol Stack                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌───────────────────────────────────────────────────────────┐  │
@@ -93,7 +93,7 @@ We introduce **Format Adapters** as first-class protocol elements:
 │  ┌───────────────────────────────────────────────────────────┐  │
 │  │         ★ FORMAT ADAPTER LAYER ★ (NEW)                    │  │
 │  │  • Schema-declared transformations                        │  │
-│  │  • Bidirectional HIVE ↔ External format mapping          │  │
+│  │  • Bidirectional PEAT ↔ External format mapping          │  │
 │  │  • Format capability advertisement                        │  │
 │  │  • Automatic format negotiation                           │  │
 │  └───────────────────────────────────────────────────────────┘  │
@@ -126,7 +126,7 @@ We introduce **Format Adapters** as first-class protocol elements:
 │                          │                                      │
 │                          ▼                                      │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │              Canonical HIVE Document Model                │  │
+│  │              Canonical PEAT Document Model                │  │
 │  │  • Position, Health, Capability, Command, Alert           │  │
 │  │  • Hierarchical relationships (parent, children)          │  │
 │  │  • CRDT-native (Automerge compatible)                     │  │
@@ -140,7 +140,7 @@ We introduce **Format Adapters** as first-class protocol elements:
 Transformations are **declared in schema**, not just implemented in code:
 
 ```protobuf
-// hive_format_adapters.proto
+// peat_format_adapters.proto
 
 // Format adapter capability declaration
 message FormatAdapterCapability {
@@ -153,13 +153,13 @@ message FormatAdapterCapability {
 
 enum TransformDirection {
   BIDIRECTIONAL = 0;
-  ENCODE_ONLY = 1;   // HIVE → External
-  DECODE_ONLY = 2;   // External → HIVE
+  ENCODE_ONLY = 1;   // PEAT → External
+  DECODE_ONLY = 2;   // External → PEAT
 }
 
 // Schema-level type mapping declaration
 message TypeMapping {
-  string hive_type = 1;           // "hive.Position"
+  string peat_type = 1;           // "peat.Position"
   string external_type = 2;        // "cot.event[a-f-G]"
   string transform_id = 3;         // Reference to transform implementation
   FieldMappingSet field_mappings = 4;
@@ -171,7 +171,7 @@ message FieldMappingSet {
 }
 
 message FieldMapping {
-  string hive_field = 1;           // "latitude"
+  string peat_field = 1;           // "latitude"
   string external_field = 2;       // "point/@lat"
   FieldTransform transform = 3;    // Optional field-level transform
 }
@@ -188,7 +188,7 @@ message FieldTransform {
 
 // Declare what information is lost in transformation
 message LossInfo {
-  repeated string hive_fields_not_mapped = 1;   // HIVE fields with no external equivalent
+  repeated string peat_fields_not_mapped = 1;   // PEAT fields with no external equivalent
   repeated string external_fields_ignored = 2;  // External fields we don't import
   string semantic_notes = 3;                    // Human-readable loss description
 }
@@ -202,8 +202,8 @@ pub struct CotFormatAdapter {
     /// Supported CoT protocol versions
     supported_versions: Vec<CotVersion>,
     
-    /// Type mappings (HIVE type → CoT type code)
-    type_mappings: HashMap<HiveType, CotTypeMapping>,
+    /// Type mappings (PEAT type → CoT type code)
+    type_mappings: HashMap<PeatType, CotTypeMapping>,
     
     /// Field-level transformations
     field_transforms: FieldTransformRegistry,
@@ -251,14 +251,14 @@ impl FormatAdapter for CotFormatAdapter {
         }
     }
     
-    /// Encode HIVE document to CoT event
-    fn encode(&self, doc: &HiveDocument) -> Result<EncodedMessage, TransformError> {
+    /// Encode PEAT document to CoT event
+    fn encode(&self, doc: &PeatDocument) -> Result<EncodedMessage, TransformError> {
         let cot_event = match doc.doc_type() {
-            HiveDocType::Position => self.encode_position(doc)?,
-            HiveDocType::Track => self.encode_track(doc)?,
-            HiveDocType::Alert => self.encode_alert(doc)?,
-            HiveDocType::Capability => self.encode_capability(doc)?,
-            HiveDocType::Command => self.encode_command(doc)?,
+            PeatDocType::Position => self.encode_position(doc)?,
+            PeatDocType::Track => self.encode_track(doc)?,
+            PeatDocType::Alert => self.encode_alert(doc)?,
+            PeatDocType::Capability => self.encode_capability(doc)?,
+            PeatDocType::Command => self.encode_command(doc)?,
             _ => return Err(TransformError::UnsupportedType(doc.doc_type())),
         };
         
@@ -280,16 +280,16 @@ impl FormatAdapter for CotFormatAdapter {
         })
     }
     
-    /// Decode CoT event to HIVE document
-    fn decode(&self, msg: &EncodedMessage) -> Result<HiveDocument, TransformError> {
+    /// Decode CoT event to PEAT document
+    fn decode(&self, msg: &EncodedMessage) -> Result<PeatDocument, TransformError> {
         // Parse CoT event
         let cot_event = self.parse_cot(&msg.payload, &msg.encoding)?;
         
         // Validate against CoT schema
         self.validator.validate(&cot_event)?;
         
-        // Map to HIVE document based on CoT type
-        let hive_doc = match self.classify_cot_type(&cot_event.event_type) {
+        // Map to PEAT document based on CoT type
+        let peat_doc = match self.classify_cot_type(&cot_event.event_type) {
             CotClassification::Position => self.decode_position(&cot_event)?,
             CotClassification::Track => self.decode_track(&cot_event)?,
             CotClassification::Alert => self.decode_alert(&cot_event)?,
@@ -302,7 +302,7 @@ impl FormatAdapter for CotFormatAdapter {
             }
         };
         
-        Ok(hive_doc)
+        Ok(peat_doc)
     }
     
     /// Validate external message without full decode
@@ -313,16 +313,16 @@ impl FormatAdapter for CotFormatAdapter {
 }
 ```
 
-### Type Mapping: HIVE ↔ CoT
+### Type Mapping: PEAT ↔ CoT
 
 ```rust
-/// HIVE to CoT type mapping definitions
+/// PEAT to CoT type mapping definitions
 impl CotFormatAdapter {
-    fn init_type_mappings() -> HashMap<HiveType, CotTypeMapping> {
+    fn init_type_mappings() -> HashMap<PeatType, CotTypeMapping> {
         let mut mappings = HashMap::new();
         
         // Position → CoT Event (friendly ground unit)
-        mappings.insert(HiveType::Position, CotTypeMapping {
+        mappings.insert(PeatType::Position, CotTypeMapping {
             cot_type_template: "a-{affiliation}-G-{dimension}-{function}",
             default_type: "a-f-G-U-C",  // friendly-ground-unit-combat
             field_mappings: vec![
@@ -343,7 +343,7 @@ impl CotFormatAdapter {
         });
         
         // Alert → CoT Event (emergency/alert type)
-        mappings.insert(HiveType::Alert, CotTypeMapping {
+        mappings.insert(PeatType::Alert, CotTypeMapping {
             cot_type_template: "b-{alert_class}-{severity}",
             default_type: "b-a",  // alert atom
             field_mappings: vec![
@@ -360,7 +360,7 @@ impl CotFormatAdapter {
         });
         
         // Capability → CoT Event with custom detail schema
-        mappings.insert(HiveType::Capability, CotTypeMapping {
+        mappings.insert(PeatType::Capability, CotTypeMapping {
             cot_type_template: "a-f-G-U-C",  // Unit with capability detail
             default_type: "a-f-G-U-C",
             field_mappings: vec![
@@ -368,15 +368,15 @@ impl CotFormatAdapter {
                 FieldMapping::direct("timestamp", "@time"),
             ],
             detail_mappings: vec![
-                DetailMapping::nested("capabilities", "detail/hive_capabilities", 
+                DetailMapping::nested("capabilities", "detail/peat_capabilities", 
                     encode_capability_detail),
-                DetailMapping::nested("hierarchy", "detail/hive_hierarchy",
+                DetailMapping::nested("hierarchy", "detail/peat_hierarchy",
                     encode_hierarchy_detail),
             ],
         });
         
         // Track (aggregated positions) → CoT track message
-        mappings.insert(HiveType::Track, CotTypeMapping {
+        mappings.insert(PeatType::Track, CotTypeMapping {
             cot_type_template: "a-{affiliation}-{dimension}-{function}",
             default_type: "a-u-G",  // unknown ground track
             field_mappings: vec![
@@ -400,11 +400,11 @@ impl CotFormatAdapter {
 
 ### Format Capability Advertisement
 
-Nodes advertise their format capabilities as part of HIVE discovery:
+Nodes advertise their format capabilities as part of PEAT discovery:
 
 ```protobuf
 // Extend beacon to include format capabilities
-message HiveBeacon {
+message PeatBeacon {
   string node_id = 1;
   Position position = 2;
   NodeHealth health = 3;
@@ -486,9 +486,9 @@ impl FormatNegotiator {
             .ok_or(NegotiationError::NoCommonFormat)
     }
     
-    /// Handle HIVE-native peer (no format adapter needed)
-    pub fn is_hive_native(peer_capabilities: &[FormatAdapterCapability]) -> bool {
-        peer_capabilities.iter().any(|c| c.format_id == "hive-native")
+    /// Handle PEAT-native peer (no format adapter needed)
+    pub fn is_peat_native(peer_capabilities: &[FormatAdapterCapability]) -> bool {
+        peer_capabilities.iter().any(|c| c.format_id == "peat-native")
     }
 }
 
@@ -502,7 +502,7 @@ pub struct NegotiatedFormat {
 
 ### Transform Pipeline (Chained Transformations)
 
-For multi-hop scenarios (e.g., HIVE → CoT → Link 16 gateway):
+For multi-hop scenarios (e.g., PEAT → CoT → Link 16 gateway):
 
 ```rust
 /// Transform pipeline for chained format conversion
@@ -518,19 +518,19 @@ impl TransformPipeline {
         registry: &FormatAdapterRegistry
     ) -> Result<Self, PipelineError> {
         // Find path through registered adapters
-        // All adapters convert to/from canonical HIVE format
+        // All adapters convert to/from canonical PEAT format
         
         let mut stages: Vec<Box<dyn FormatAdapter>> = vec![];
         
-        // If source isn't HIVE-native, add decode stage
-        if source_format != "hive-native" {
+        // If source isn't PEAT-native, add decode stage
+        if source_format != "peat-native" {
             let decoder = registry.get(source_format)
                 .ok_or(PipelineError::AdapterNotFound(source_format.into()))?;
             stages.push(decoder);
         }
         
-        // If dest isn't HIVE-native, add encode stage
-        if dest_format != "hive-native" {
+        // If dest isn't PEAT-native, add encode stage
+        if dest_format != "peat-native" {
             let encoder = registry.get(dest_format)
                 .ok_or(PipelineError::AdapterNotFound(dest_format.into()))?;
             stages.push(encoder);
@@ -544,14 +544,14 @@ impl TransformPipeline {
         let mut current = input.clone();
         
         for stage in &self.stages {
-            // Decode to HIVE doc
+            // Decode to PEAT doc
             let doc = stage.decode(&current)?;
             
             // If more stages, encode to next format
             if let Some(next_stage) = self.stages.get(1) {
                 current = next_stage.encode(&doc)?;
             } else {
-                // Final stage - return as HIVE doc or re-encode
+                // Final stage - return as PEAT doc or re-encode
                 return stage.encode(&doc);
             }
         }
@@ -560,27 +560,27 @@ impl TransformPipeline {
     }
 }
 
-// Example: CoT → HIVE → Link 16 (via gateway)
+// Example: CoT → PEAT → Link 16 (via gateway)
 // let pipeline = TransformPipeline::build("cot", "link16", &registry)?;
 // let link16_msg = pipeline.transform(&cot_message)?;
 ```
 
 ### WearTAK Integration Mode
 
-For WearTAK devices, HIVE Lite can operate in **CoT-Native Mode**:
+For WearTAK devices, PEAT Lite can operate in **CoT-Native Mode**:
 
 ```rust
-/// HIVE Lite operating modes for format handling
+/// PEAT Lite operating modes for format handling
 pub enum LiteFormatMode {
-    /// Full HIVE protocol with optional format adapters
-    HiveNative {
+    /// Full PEAT protocol with optional format adapters
+    PeatNative {
         adapters: Vec<FormatAdapterCapability>,
     },
     
     /// Speak external format natively, parent handles conversion
     ExternalNative {
         format: String,          // "cot", "mqtt", etc.
-        parent_converts: bool,   // Parent handles HIVE ↔ format conversion
+        parent_converts: bool,   // Parent handles PEAT ↔ format conversion
     },
     
     /// Minimal: Only send raw data, parent handles everything
@@ -607,15 +607,15 @@ pub fn weartk_config() -> LiteNodeConfig {
 }
 ```
 
-### Parent-Side CoT Bridge for HIVE Lite
+### Parent-Side CoT Bridge for PEAT Lite
 
-The ATAK phone (HIVE Edge node) handles CoT ↔ HIVE transformation for its leaf children:
+The ATAK phone (PEAT Edge node) handles CoT ↔ PEAT transformation for its leaf children:
 
 ```rust
-/// ATAK/HIVE Edge node handling WearTAK children
-pub struct AtakHiveBridge {
-    /// Local HIVE node
-    hive_node: HiveEdgeNode,
+/// ATAK/PEAT Edge node handling WearTAK children
+pub struct AtakPeatBridge {
+    /// Local PEAT node
+    peat_node: PeatEdgeNode,
     
     /// CoT format adapter
     cot_adapter: CotFormatAdapter,
@@ -627,13 +627,13 @@ pub struct AtakHiveBridge {
     tak_connection: TakServerConnection,
 }
 
-impl AtakHiveBridge {
+impl AtakPeatBridge {
     /// Handle incoming CoT from WearTAK device
     pub async fn handle_weartk_cot(&mut self, 
         child_id: &NodeId, 
         cot_bytes: &[u8]
     ) -> Result<(), BridgeError> {
-        // Decode CoT to HIVE document
+        // Decode CoT to PEAT document
         let encoded = EncodedMessage {
             format: "cot".into(),
             encoding: "protobuf".into(),
@@ -641,14 +641,14 @@ impl AtakHiveBridge {
             metadata: Default::default(),
         };
         
-        let hive_doc = self.cot_adapter.decode(&encoded)?;
+        let peat_doc = self.cot_adapter.decode(&encoded)?;
         
-        // Inject into HIVE as child's document
-        let doc_with_hierarchy = hive_doc.with_parent(self.hive_node.node_id());
-        self.hive_node.merge_child_document(child_id, doc_with_hierarchy).await?;
+        // Inject into PEAT as child's document
+        let doc_with_hierarchy = peat_doc.with_parent(self.peat_node.node_id());
+        self.peat_node.merge_child_document(child_id, doc_with_hierarchy).await?;
         
         // Optionally forward to TAK server (as CoT)
-        if self.should_forward_to_tak(&hive_doc) {
+        if self.should_forward_to_tak(&peat_doc) {
             self.tak_connection.send(cot_bytes).await?;
         }
         
@@ -658,11 +658,11 @@ impl AtakHiveBridge {
     /// Send command to WearTAK device
     pub async fn send_to_weartk(&mut self,
         child_id: &NodeId,
-        command: HiveCommand
+        command: PeatCommand
     ) -> Result<(), BridgeError> {
-        // Encode HIVE command to CoT
-        let hive_doc = command.to_document();
-        let cot_msg = self.cot_adapter.encode(&hive_doc)?;
+        // Encode PEAT command to CoT
+        let peat_doc = command.to_document();
+        let cot_msg = self.cot_adapter.encode(&peat_doc)?;
         
         // Send via BLE to watch
         let child = self.weartk_children.get_mut(child_id)
@@ -680,7 +680,7 @@ impl AtakHiveBridge {
 Constrained devices only need a subset of CoT:
 
 ```protobuf
-// Minimal CoT for HIVE Lite wearables
+// Minimal CoT for PEAT Lite wearables
 // Subset of full CoT schema
 
 message MinimalCotEvent {
@@ -737,12 +737,12 @@ message AckDetail {
 
 ### Positive
 
-1. **Native format support**: Devices can speak CoT (or other formats) without full HIVE stack
+1. **Native format support**: Devices can speak CoT (or other formats) without full PEAT stack
 2. **Negotiated interoperability**: Peers automatically discover compatible formats
 3. **Composable transforms**: Multi-hop bridging becomes straightforward
 4. **Explicit semantics**: Schema-declared mappings document what's preserved/lost
 5. **Optimized for constraints**: Lite nodes can skip transformation overhead
-6. **Ecosystem integration**: TAK, ROS2, MQTT devices join HIVE naturally
+6. **Ecosystem integration**: TAK, ROS2, MQTT devices join PEAT naturally
 
 ### Negative
 
@@ -753,7 +753,7 @@ message AckDetail {
 
 ### Risks
 
-1. **Semantic drift**: HIVE concepts may not map cleanly to all formats
+1. **Semantic drift**: PEAT concepts may not map cleanly to all formats
 2. **Performance**: Transform overhead in hot paths (mitigated by caching)
 3. **Security**: Malformed external messages could exploit transform bugs
 
@@ -766,13 +766,13 @@ message AckDetail {
 4. Basic pipeline infrastructure
 
 ### Phase 2: CoT Reference Adapter (Q1 2026)
-1. Full HIVE ↔ CoT type mappings
+1. Full PEAT ↔ CoT type mappings
 2. XML and Protobuf encoding
 3. Schema validation
 4. Integration tests with TAK
 
 ### Phase 3: WearTAK Integration (Q1 2026)
-1. CoT-native mode for HIVE Lite
+1. CoT-native mode for PEAT Lite
 2. ATAK bridge implementation
 3. Minimal CoT schema for wearables
 4. Field testing with Ascent
@@ -826,15 +826,15 @@ Examples:
 
 ## Appendix B: Transform Loss Documentation
 
-| HIVE → CoT | Lost Information | Mitigation |
+| PEAT → CoT | Lost Information | Mitigation |
 |------------|------------------|------------|
-| Capability | Rich capability taxonomy | Encode in detail/hive_capabilities extension |
+| Capability | Rich capability taxonomy | Encode in detail/peat_capabilities extension |
 | Hierarchy | Multi-parent relationships | Use CoT link elements for primary parent |
 | CRDT metadata | Vector clocks, merge history | Not needed for TAK display |
-| TTL semantics | HIVE's flexible TTL tiers | Map to CoT stale time |
+| TTL semantics | PEAT's flexible TTL tiers | Map to CoT stale time |
 
-| CoT → HIVE | Lost Information | Mitigation |
+| CoT → PEAT | Lost Information | Mitigation |
 |------------|------------------|------------|
 | Symbology detail | MIL-STD-2525 specifics | Preserve in opaque detail field |
-| Contact chains | CoT contact references | Parse and map to HIVE relationships |
+| Contact chains | CoT contact references | Parse and map to PEAT relationships |
 | Custom detail schemas | Domain-specific extensions | Preserve as opaque JSON |

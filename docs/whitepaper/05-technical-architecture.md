@@ -1,6 +1,6 @@
 ## IV. TECHNICAL ARCHITECTURE
 
-**Thesis:** HIVE achieves scalable coordination through CRDT-based eventual consistency, hierarchical aggregation, and edge-native design.
+**Thesis:** PEAT achieves scalable coordination through CRDT-based eventual consistency, hierarchical aggregation, and edge-native design.
 
 ---
 
@@ -10,7 +10,7 @@ Coordination at scale requires different foundations than traditional distribute
 
 #### CRDTs for Eventual Consistency
 
-HIVE uses Conflict-free Replicated Data Types (CRDTs), specifically Automerge documents, for all shared state. CRDTs guarantee:
+PEAT uses Conflict-free Replicated Data Types (CRDTs), specifically Automerge documents, for all shared state. CRDTs guarantee:
 
 - **Merge without coordination**: Any two replicas can merge deterministically
 - **No consensus required**: Critical for intermittent connectivity
@@ -34,11 +34,11 @@ Traditional distributed consensus (Paxos, Raft, 2PC) requires majority availabil
 | Consensus | Blocks until quorum | Always-connected only |
 | CRDTs | Proceeds locally, merges later | Partition-tolerant |
 
-HIVE assumes partitions. Nodes operate autonomously during disconnection and deterministically merge on reconnection.
+PEAT assumes partitions. Nodes operate autonomously during disconnection and deterministically merge on reconnection.
 
 #### Synchronization Protocol
 
-HIVE uses Negentropy for efficient set reconciliation:
+PEAT uses Negentropy for efficient set reconciliation:
 
 1. **Range-based comparison**: Nodes exchange fingerprints of document ranges
 2. **Bisection**: Disagreements narrow recursively to specific changes
@@ -79,43 +79,43 @@ A coordinator at level 3 sees 3 team summaries instead of 12 individual node sta
 
 Laboratory validation confirms the architecture:
 
-| Metric | Mesh Approach | HIVE Hierarchical |
+| Metric | Mesh Approach | PEAT Hierarchical |
 |--------|--------------|-------------------|
 | Bandwidth scaling | O(n²) | O(n log n) |
 | Messages (100 nodes) | 10,000/cycle | ~700/cycle |
 | Bandwidth reduction | Baseline | 93-99% |
 | Partition recovery | Conflict resolution | Automatic merge |
 
-Networks that saturate at 50 nodes with mesh coordination support 1,000+ with HIVE.
+Networks that saturate at 50 nodes with mesh coordination support 1,000+ with PEAT.
 
 ---
 
 ### 4.3 Five-Layer Architecture
 
-HIVE separates concerns for flexibility and integration.
+PEAT separates concerns for flexibility and integration.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  LAYER 5: APPLICATION                                       │
 │  Domain-specific integration: TAK/CoT, ROS2, custom apps    │
 ├─────────────────────────────────────────────────────────────┤
-│  LAYER 4: BINDING (hive-ffi, hive-lite)                     │
+│  LAYER 4: BINDING (peat-ffi, peat-lite)                     │
 │  Language bindings: C, Swift, Kotlin/Java, Python           │
 ├─────────────────────────────────────────────────────────────┤
-│  LAYER 3: TRANSPORT (hive-transport, hive-mesh)             │
+│  LAYER 3: TRANSPORT (peat-transport, peat-mesh)             │
 │  Network abstraction: QUIC/Iroh, UDP bypass, BLE mesh       │
 ├─────────────────────────────────────────────────────────────┤
-│  LAYER 2: PROTOCOL (hive-protocol)                          │
+│  LAYER 2: PROTOCOL (peat-protocol)                          │
 │  Coordination logic: cell formation, aggregation, authority │
 ├─────────────────────────────────────────────────────────────┤
-│  LAYER 1: SCHEMA (hive-schema)                              │
+│  LAYER 1: SCHEMA (peat-schema)                              │
 │  Message definitions: Protobuf, capability ontology         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-#### Layer 1: Schema (hive-schema)
+#### Layer 1: Schema (peat-schema)
 
-Protocol buffer definitions for all HIVE messages:
+Protocol buffer definitions for all PEAT messages:
 - Beacons and capability advertisements
 - Hierarchical commands and acknowledgments
 - Track and mission data
@@ -123,7 +123,7 @@ Protocol buffer definitions for all HIVE messages:
 
 Language-agnostic, extensible for domain-specific needs.
 
-#### Layer 2: Protocol (hive-protocol)
+#### Layer 2: Protocol (peat-protocol)
 
 Core coordination logic:
 - Cell formation and leader election
@@ -133,7 +133,7 @@ Core coordination logic:
 
 Pure logic, transport-independent.
 
-#### Layer 3: Transport (hive-transport, hive-mesh)
+#### Layer 3: Transport (peat-transport, peat-mesh)
 
 Network abstraction layer:
 - **Primary**: QUIC via Iroh for reliable, encrypted streams
@@ -142,19 +142,19 @@ Network abstraction layer:
 
 Multi-path capability: simultaneous use of multiple transports.
 
-#### Layer 4: Binding (hive-ffi, hive-lite)
+#### Layer 4: Binding (peat-ffi, peat-lite)
 
 Platform integration:
-- **hive-ffi**: C-compatible FFI for native library integration
-- **hive-lite**: Embedded-friendly subset for resource-constrained devices
+- **peat-ffi**: C-compatible FFI for native library integration
+- **peat-lite**: Embedded-friendly subset for resource-constrained devices
 
 Bindings for Swift (iOS), Kotlin (Android), Python, and more.
 
 #### Layer 5: Application
 
 Domain-specific integration:
-- **hive-tak-bridge**: TAK/ATAK interoperability via CoT translation
-- **hive-commander**: Reference command interface
+- **peat-tak-bridge**: TAK/ATAK interoperability via CoT translation
+- **peat-commander**: Reference command interface
 - Custom integrations per deployment
 
 ---
@@ -165,7 +165,7 @@ AI participates in the hierarchy, not just at the edge.
 
 **Traditional Model**: AI for perception on individual platforms. Each node runs inference locally; coordination is separate.
 
-**HIVE Model**: AI as team member at every level:
+**PEAT Model**: AI as team member at every level:
 
 | Level | AI Role |
 |-------|---------|
@@ -202,6 +202,6 @@ AI participates in the hierarchy, not just at the edge.
 
 ### Key Finding: Section IV
 
-> "HIVE achieves O(n log n) scaling through hierarchical CRDT-based coordination—enabling 1,000+ node operations on networks that saturate at 50 with mesh approaches. The five-layer architecture enables flexible integration from embedded devices to enterprise systems."
+> "PEAT achieves O(n log n) scaling through hierarchical CRDT-based coordination—enabling 1,000+ node operations on networks that saturate at 50 with mesh approaches. The five-layer architecture enables flexible integration from embedded devices to enterprise systems."
 
 ---

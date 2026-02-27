@@ -1,4 +1,4 @@
-# HIVE Documentation Plan
+# PEAT Documentation Plan
 
 > **Version**: 1.0
 > **Status**: Active
@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-This document outlines the comprehensive documentation strategy for HIVE (Hierarchical Intelligence for Versatile Entities), targeting two primary personas: **Operators** and **Developers**. The goal is to transform existing technical documentation into accessible, production-grade guides that enable successful adoption and contribution.
+This document outlines the comprehensive documentation strategy for PEAT (Hierarchical Intelligence for Versatile Entities), targeting two primary personas: **Operators** and **Developers**. The goal is to transform existing technical documentation into accessible, production-grade guides that enable successful adoption and contribution.
 
 ---
 
@@ -14,14 +14,14 @@ This document outlines the comprehensive documentation strategy for HIVE (Hierar
 
 ### 1.1 Operator Persona
 
-**Profile**: System administrators, DevOps engineers, and mission operators who deploy, configure, and maintain HIVE systems in production environments.
+**Profile**: System administrators, DevOps engineers, and mission operators who deploy, configure, and maintain PEAT systems in production environments.
 
 **Goals**:
-- Deploy HIVE networks quickly and reliably
+- Deploy PEAT networks quickly and reliably
 - Configure systems for specific operational requirements
 - Monitor system health and performance
 - Troubleshoot issues without deep code knowledge
-- Integrate HIVE with existing infrastructure (TAK, ATAK, C2 systems)
+- Integrate PEAT with existing infrastructure (TAK, ATAK, C2 systems)
 
 **Knowledge Level**:
 - Strong Linux/system administration skills
@@ -31,13 +31,13 @@ This document outlines the comprehensive documentation strategy for HIVE (Hierar
 
 ### 1.2 Developer Persona
 
-**Profile**: Software engineers who build applications using HIVE, contribute to the core protocol, or integrate HIVE into existing systems.
+**Profile**: Software engineers who build applications using PEAT, contribute to the core protocol, or integrate PEAT into existing systems.
 
 **Goals**:
-- Understand HIVE architecture and internals
-- Build applications using the HIVE SDK
+- Understand PEAT architecture and internals
+- Build applications using the PEAT SDK
 - Contribute features and fixes to the protocol
-- Extend HIVE with custom capabilities, policies, and integrations
+- Extend PEAT with custom capabilities, policies, and integrations
 - Run and write tests effectively
 
 **Knowledge Level**:
@@ -69,13 +69,13 @@ docs/
 │       ├── architecture.md             # Architecture deep-dive
 │       ├── getting-started.md          # Quick start for devs
 │       ├── api-reference.md            # API documentation
-│       ├── extending-hive.md           # Extension patterns
+│       ├── extending-peat.md           # Extension patterns
 │       ├── testing.md                  # Testing guide
 │       └── contributing.md             # Contribution guide
 │
 ├── tutorials/
 │   ├── quickstart-simulation.md        # First simulation in 10 minutes
-│   ├── build-first-application.md      # Build a HIVE application
+│   ├── build-first-application.md      # Build a PEAT application
 │   └── custom-capabilities.md          # Add custom capabilities
 │
 ├── reference/
@@ -114,12 +114,12 @@ docs/
 | **Getting Started** | Dev environment setup, first build, run tests | P0 |
 | **Core Concepts** | Three-phase protocol, capabilities, cells, zones | P0 |
 | **API Reference** | Public APIs with examples, trait documentation | P0 |
-| **Extending HIVE** | Custom capabilities, discovery strategies, policies | P1 |
+| **Extending PEAT** | Custom capabilities, discovery strategies, policies | P1 |
 | **Backend Abstraction** | Ditto vs Automerge, switching backends | P1 |
 | **Testing** | Unit/integration/E2E tests, test fixtures, mocking | P0 |
 | **Contributing** | Code style, PR process, review guidelines | P1 |
-| **Mobile Development** | hive-ffi, Kotlin/Swift bindings, Android build | P2 |
-| **Edge AI Integration** | hive-inference, model deployment, ONNX runtime | P2 |
+| **Mobile Development** | peat-ffi, Kotlin/Swift bindings, Android build | P2 |
+| **Edge AI Integration** | peat-inference, model deployment, ONNX runtime | P2 |
 
 ---
 
@@ -188,7 +188,7 @@ The following GitHub Issues should be created to track documentation work:
 ### Issue 1: Create Comprehensive Operator Guide
 **Labels**: documentation, operator, priority:high
 
-**Description**: Create a production-grade operator guide covering installation, configuration, deployment, monitoring, and troubleshooting for HIVE systems.
+**Description**: Create a production-grade operator guide covering installation, configuration, deployment, monitoring, and troubleshooting for PEAT systems.
 
 **Acceptance Criteria**:
 - Complete installation guide with all prerequisites
@@ -216,7 +216,7 @@ The following GitHub Issues should be created to track documentation work:
 ### Issue 3: Create Tutorial Series
 **Labels**: documentation, tutorials, priority:medium
 
-**Description**: Create hands-on tutorials for common HIVE use cases.
+**Description**: Create hands-on tutorials for common PEAT use cases.
 
 **Acceptance Criteria**:
 - Quickstart simulation tutorial (10 minutes)
@@ -321,7 +321,7 @@ How to confirm the procedure was successful.
 
 ## Overview
 
-What this section covers and its importance in the HIVE architecture.
+What this section covers and its importance in the PEAT architecture.
 
 ## Concepts
 
@@ -363,6 +363,6 @@ let result = function_name(value)?;
 
 ---
 
-**Document Owner**: HIVE Documentation Team
+**Document Owner**: PEAT Documentation Team
 **Review Cycle**: Quarterly
 **Next Review**: 2026-03-01

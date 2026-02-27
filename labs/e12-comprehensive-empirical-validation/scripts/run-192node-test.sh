@@ -4,7 +4,7 @@ set -e
 RESULTS_DIR="e12-comprehensive-results-20251110-115542"
 TEST_NAME="traditional-192node-1gbps"
 TEST_DIR="$RESULTS_DIR/$TEST_NAME"
-TOPOLOGY="../../../hive-sim/topologies/traditional-battalion-192node.yaml"
+TOPOLOGY="../../../peat-sim/topologies/traditional-battalion-192node.yaml"
 
 echo "╔════════════════════════════════════════════════════════════╗"
 echo "║  Battalion Scale Test: 192 nodes (8 platoons)            ║"

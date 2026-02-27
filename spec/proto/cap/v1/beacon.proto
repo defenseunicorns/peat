@@ -1,8 +1,8 @@
-// HIVE Protocol - Discovery Beacon
+// PEAT Protocol - Discovery Beacon
 // Specification Version: 0.1.0
 // License: CC0 1.0 Universal (Public Domain)
 //
-// This file defines the beacon model for the HIVE Protocol discovery phase.
+// This file defines the beacon model for the PEAT Protocol discovery phase.
 // Beacons are broadcast by nodes to announce their presence and capabilities.
 
 syntax = "proto3";

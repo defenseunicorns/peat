@@ -1,4 +1,4 @@
-# ADR-035: HIVE-Lite Embedded Sensor Nodes
+# ADR-035: PEAT-Lite Embedded Sensor Nodes
 
 ## Status
 
@@ -16,13 +16,13 @@ The current approach for integrating such sensors is MQTT or similar broker-base
 4. **No hierarchical filtering** - Can't aggregate/filter at intermediate tiers
 5. **Single point of compromise** - Broker is an attractive attack target
 
-HIVE's mesh architecture offers a fundamentally different model where sensors can be first-class participants in a distributed data fabric, but our current implementation requires:
+PEAT's mesh architecture offers a fundamentally different model where sensors can be first-class participants in a distributed data fabric, but our current implementation requires:
 - Full Rust `std` library support
 - Automerge CRDT engine (memory-intensive)
 - Persistent storage backends
 - Significant RAM (tens of MB minimum)
 
-This ADR proposes HIVE-Lite: a minimal, resource-constrained implementation enabling embedded devices to participate as full mesh members while respecting their hardware limitations.
+This ADR proposes PEAT-Lite: a minimal, resource-constrained implementation enabling embedded devices to participate as full mesh members while respecting their hardware limitations.
 
 ## Target Hardware Profile
 
@@ -34,7 +34,7 @@ This ADR proposes HIVE-Lite: a minimal, resource-constrained implementation enab
 - Power: Battery + USB-C
 
 **Minimum Target Specs:**
-- 256KB RAM available for HIVE-Lite
+- 256KB RAM available for PEAT-Lite
 - WiFi or BLE connectivity
 - No persistent storage required (ephemeral operation)
 
@@ -45,17 +45,17 @@ This ADR proposes HIVE-Lite: a minimal, resource-constrained implementation enab
 
 ## Decision
 
-We will create HIVE-Lite as a distinct but protocol-compatible implementation targeting embedded devices. Key design decisions:
+We will create PEAT-Lite as a distinct but protocol-compatible implementation targeting embedded devices. Key design decisions:
 
 ### 1. Tiered Node Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        HIVE Node Tiers                          │
+│                        PEAT Node Tiers                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐         │
-│  │  HIVE-Full  │    │ HIVE-Edge   │    │ HIVE-Lite   │         │
+│  │  PEAT-Full  │    │ PEAT-Edge   │    │ PEAT-Lite   │         │
 │  │             │    │             │    │             │         │
 │  │ • Full CRDT │    │ • Selective │    │ • Minimal   │         │
 │  │ • Persistent│    │   CRDTs     │    │   CRDTs     │         │
@@ -73,13 +73,13 @@ We will create HIVE-Lite as a distinct but protocol-compatible implementation ta
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**HIVE-Full**: Current implementation - servers, powerful edge devices
-**HIVE-Edge**: Intermediate tier - Raspberry Pi, phones, tablets (future)
-**HIVE-Lite**: This ADR - microcontrollers, embedded sensors
+**PEAT-Full**: Current implementation - servers, powerful edge devices
+**PEAT-Edge**: Intermediate tier - Raspberry Pi, phones, tablets (future)
+**PEAT-Lite**: This ADR - microcontrollers, embedded sensors
 
 ### 2. Ephemeral-First Design
 
-HIVE-Lite nodes operate without persistent storage:
+PEAT-Lite nodes operate without persistent storage:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -107,7 +107,7 @@ HIVE-Lite nodes operate without persistent storage:
 
 ### 3. Minimal CRDT Subset
 
-Instead of full Automerge, HIVE-Lite implements only essential CRDTs:
+Instead of full Automerge, PEAT-Lite implements only essential CRDTs:
 
 | CRDT Type | Use Case | Memory | Complexity |
 |-----------|----------|--------|------------|
@@ -120,7 +120,7 @@ Instead of full Automerge, HIVE-Lite implements only essential CRDTs:
 **Not included**: Full document CRDTs, text CRDTs, complex nested structures
 
 ```rust
-// HIVE-Lite CRDT trait (no_std compatible)
+// PEAT-Lite CRDT trait (no_std compatible)
 #![no_std]
 
 pub trait LiteCrdt: Sized {
@@ -144,11 +144,11 @@ pub struct LwwRegister<T, const MAX_SIZE: usize> {
 
 ### 4. Lightweight Gossip Protocol
 
-HIVE-Lite uses a simplified gossip protocol optimized for constrained networks:
+PEAT-Lite uses a simplified gossip protocol optimized for constrained networks:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                  HIVE-Lite Gossip Protocol                      │
+│                  PEAT-Lite Gossip Protocol                      │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  Message Types (4-bit type field):                              │
@@ -178,14 +178,14 @@ HIVE-Lite uses a simplified gossip protocol optimized for constrained networks:
 
 ### 5. Hierarchical Data Flow
 
-This is where HIVE-Lite differs fundamentally from MQTT:
+This is where PEAT-Lite differs fundamentally from MQTT:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │              Hierarchical vs Broker Architecture                │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  MQTT (Centralized):              HIVE (Mesh + Hierarchy):      │
+│  MQTT (Centralized):              PEAT (Mesh + Hierarchy):      │
 │                                                                 │
 │       ┌─────────┐                      ┌─────────┐              │
 │       │ Broker  │                      │ Squad   │              │
@@ -213,7 +213,7 @@ This is where HIVE-Lite differs fundamentally from MQTT:
 
 ### 6. First-Class Mesh Participation
 
-HIVE-Lite nodes are **not** second-class citizens requiring a bridge. They participate directly in the mesh using the same protocol as Full nodes, with capability negotiation to handle feature differences.
+PEAT-Lite nodes are **not** second-class citizens requiring a bridge. They participate directly in the mesh using the same protocol as Full nodes, with capability negotiation to handle feature differences.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -223,7 +223,7 @@ HIVE-Lite nodes are **not** second-class citizens requiring a bridge. They parti
 │  Bridge Model (REJECTED):         First-Class Model (CHOSEN):   │
 │                                                                 │
 │  ┌──────────┐                     ┌──────────┐                  │
-│  │HIVE-Full │                     │HIVE-Full │                  │
+│  │PEAT-Full │                     │PEAT-Full │                  │
 │  │          │                     │          │                  │
 │  │ ┌──────┐ │                     └────┬─────┘                  │
 │  │ │Bridge│ │                          │                        │
@@ -247,7 +247,7 @@ HIVE-Lite nodes are **not** second-class citizens requiring a bridge. They parti
 2. **Capability advertisement** - Nodes announce what they support (storage, relay, CRDTs)
 3. **Graceful degradation** - Full nodes understand Lite limitations, don't request unsupported features
 4. **Direct peering** - Lite nodes connect directly to any reachable node (Full, Edge, or Lite)
-5. **No translation layer** - Data from Lite nodes is native HIVE data, not converted
+5. **No translation layer** - Data from Lite nodes is native PEAT data, not converted
 
 **Capability Flags (announced during handshake):**
 
@@ -264,10 +264,10 @@ bitflags! {
     }
 }
 
-// HIVE-Lite typical capabilities:
+// PEAT-Lite typical capabilities:
 const LITE_CAPS: NodeCapabilities = NodeCapabilities::PRIMITIVE_CRDT;
 
-// HIVE-Full typical capabilities:
+// PEAT-Full typical capabilities:
 const FULL_CAPS: NodeCapabilities = NodeCapabilities::all();
 ```
 
@@ -287,7 +287,7 @@ const FULL_CAPS: NodeCapabilities = NodeCapabilities::all();
 ### 7. Implementation Strategy
 
 **Phase 1: Unified Protocol Specification**
-- Extend current HIVE wire protocol with capability negotiation
+- Extend current PEAT wire protocol with capability negotiation
 - Define compact binary encoding for primitive CRDTs
 - Ensure protocol works identically for all node types
 - Add feature flags for graceful capability discovery
@@ -298,8 +298,8 @@ const FULL_CAPS: NodeCapabilities = NodeCapabilities::all();
 - ESP32 HAL integration (using `esp-hal` or `esp-idf-hal`)
 - UDP transport with multicast discovery
 
-**Phase 3: HIVE-Full Compatibility**
-- Update HIVE-Full to handle capability negotiation
+**Phase 3: PEAT-Full Compatibility**
+- Update PEAT-Full to handle capability negotiation
 - Ensure Full nodes work seamlessly with Lite peers
 - Add primitive CRDT support to Full nodes (for interop)
 
@@ -310,7 +310,7 @@ const FULL_CAPS: NodeCapabilities = NodeCapabilities::all();
 
 ### 8. Memory Budget
 
-Target: 256KB RAM allocation for HIVE-Lite runtime
+Target: 256KB RAM allocation for PEAT-Lite runtime
 
 | Component | Budget | Notes |
 |-----------|--------|-------|
@@ -339,7 +339,7 @@ Target: 256KB RAM allocation for HIVE-Lite runtime
 │                 └──────────────┼───────────┘                    │
 │                                │                                │
 │  Floor 1:  [Temp-101]◄──►[Gateway]◄──►[Temp-102]               │
-│                         (HIVE-Full)                             │
+│                         (PEAT-Full)                             │
 │                              │                                  │
 │                              ▼                                  │
 │                    [Cloud/HQ Systems]                           │
@@ -366,7 +366,7 @@ A key capability is how primitive CRDTs from Lite nodes feed into Automerge docu
 │           Primitive CRDT → Automerge Document Flow              │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  HIVE-Lite Node                    HIVE-Full/Edge Node          │
+│  PEAT-Lite Node                    PEAT-Full/Edge Node          │
 │  ┌─────────────────┐               ┌─────────────────────────┐  │
 │  │ LWW-Register:   │   gossip      │ Automerge Document:     │  │
 │  │ temp = 23.5°C   │ ──────────►   │ {                       │  │
@@ -421,7 +421,7 @@ The M5Stack Core2 provides an excellent reference platform with meaningful onboa
 An M5Stack Core2 worn by a team member could provide:
 
 ```rust
-// Data published by a single HIVE-Lite node (M5Stack Core2)
+// Data published by a single PEAT-Lite node (M5Stack Core2)
 struct PersonnelSensorData {
     // Motion/Posture (from IMU)
     orientation: LwwRegister<Orientation>,  // Standing, prone, moving
@@ -503,8 +503,8 @@ A Full node correlates: "Possible casualty event - Operator-2 down, Operator-3 r
 2. **Local Intelligence** - Sensors benefit from peer data, enabling edge decisions
 3. **Bandwidth Efficiency** - Hierarchical aggregation reduces upstream traffic
 4. **Resilience** - Local mesh operates independently of upstream connectivity
-5. **Low Cost** - $15-30 sensor nodes can participate in HIVE mesh
-6. **Incremental Adoption** - Can add Lite nodes to existing HIVE deployments
+5. **Low Cost** - $15-30 sensor nodes can participate in PEAT mesh
+6. **Incremental Adoption** - Can add Lite nodes to existing PEAT deployments
 
 ### Negative
 
@@ -515,7 +515,7 @@ A Full node correlates: "Possible casualty event - Operator-2 down, Operator-3 r
 
 ### Neutral
 
-1. **Separate Codebase** - HIVE-Lite likely needs its own repo/crate (shared protocol definitions)
+1. **Separate Codebase** - PEAT-Lite likely needs its own repo/crate (shared protocol definitions)
 2. **Different Skillset** - Embedded development differs from server development
 3. **Hardware Dependency** - Testing requires physical devices or emulators
 4. **Capability Negotiation** - All nodes must implement capability discovery
@@ -533,7 +533,7 @@ Attempt to run full Automerge on ESP32 with PSRAM.
 
 ### Alternative 2: MQTT Bridge Only
 
-Keep sensors on MQTT, bridge at HIVE-Full nodes.
+Keep sensors on MQTT, bridge at PEAT-Full nodes.
 
 **Rejected because:**
 - Loses peer-to-peer benefits
@@ -547,7 +547,7 @@ Simple pub/sub without CRDT guarantees.
 **Rejected because:**
 - Loses consistency guarantees
 - Can't meaningfully merge conflicting data
-- Defeats purpose of HIVE integration
+- Defeats purpose of PEAT integration
 
 ## Appendix C: AXP192 Power Management (CRITICAL)
 
@@ -639,7 +639,7 @@ The AXP192 is not a peripheral to experiment with. Its registers directly contro
 ## Appendix A: Sensor Data Schema
 
 ```rust
-/// Standard sensor reading format for HIVE-Lite
+/// Standard sensor reading format for PEAT-Lite
 #[derive(Clone)]
 pub struct SensorReading {
     /// Sensor type identifier
@@ -666,7 +666,7 @@ pub struct SensorAlert {
 
 All node types use the **same wire protocol**. Differences are in capabilities, not protocol dialect.
 
-| Feature | HIVE-Full | HIVE-Edge | HIVE-Lite |
+| Feature | PEAT-Full | PEAT-Edge | PEAT-Lite |
 |---------|-----------|-----------|-----------|
 | **Mesh Participation** | ✓ | ✓ | ✓ |
 | **Direct Peering** | ✓ | ✓ | ✓ |

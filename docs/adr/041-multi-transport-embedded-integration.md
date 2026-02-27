@@ -4,13 +4,13 @@
 **Date**: 2024-12-22
 **Authors**: Kit Plummer, Codex
 **Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)
-**Relates To**: ADR-035 (HIVE-Lite Embedded Nodes), ADR-039 (HIVE-BTLE Mesh Transport), ADR-032 (Pluggable Transport Abstraction), ADR-007 (Automerge Sync Engine), ADR-011 (Ditto vs AutomergeIroh)
+**Relates To**: ADR-035 (PEAT-Lite Embedded Nodes), ADR-039 (PEAT-BTLE Mesh Transport), ADR-032 (Pluggable Transport Abstraction), ADR-007 (Automerge Sync Engine), ADR-011 (Ditto vs AutomergeIroh)
 
 ---
 
 ## Executive Summary
 
-This ADR defines how HIVE supports multiple simultaneous transports (AutomergeIroh, hive-btle, future transports) and how embedded devices integrate with full HIVE nodes. The key insight is that Automerge is too resource-intensive for embedded targets (ESP32, Pico), requiring a **gateway translation architecture** where full HIVE nodes translate between Automerge documents and hive-btle's lightweight CRDT format.
+This ADR defines how PEAT supports multiple simultaneous transports (AutomergeIroh, peat-btle, future transports) and how embedded devices integrate with full PEAT nodes. The key insight is that Automerge is too resource-intensive for embedded targets (ESP32, Pico), requiring a **gateway translation architecture** where full PEAT nodes translate between Automerge documents and peat-btle's lightweight CRDT format.
 
 ---
 
@@ -18,22 +18,22 @@ This ADR defines how HIVE supports multiple simultaneous transports (AutomergeIr
 
 ### The Multi-Transport Reality
 
-HIVE must operate across diverse network conditions:
+PEAT must operate across diverse network conditions:
 
 | Scenario | Transport | Bandwidth | Typical Nodes |
 |----------|-----------|-----------|---------------|
 | Full connectivity | Iroh (QUIC/UDP) | High (Mbps) | Phones, servers, laptops |
-| BLE mesh | hive-btle | Low (Kbps) | Wearables, sensors, embedded |
+| BLE mesh | peat-btle | Low (Kbps) | Wearables, sensors, embedded |
 | Degraded network | Either/both | Variable | All nodes adapt |
 | Air-gapped | BLE only | Very low | Field operations |
 
-A phone running HIVE may have both transports active simultaneously:
+A phone running PEAT may have both transports active simultaneously:
 - WiFi/cellular: Syncing with cloud/HQ via Iroh
-- BLE: Syncing with nearby embedded sensors via hive-btle
+- BLE: Syncing with nearby embedded sensors via peat-btle
 
 ### The Automerge Problem
 
-Per ADR-007 and ADR-011, HIVE's primary sync engine is AutomergeIroh - Automerge CRDTs synced via Iroh networking. However:
+Per ADR-007 and ADR-011, PEAT's primary sync engine is AutomergeIroh - Automerge CRDTs synced via Iroh networking. However:
 
 **Automerge Resource Requirements:**
 - Binary size: ~2-3MB compiled
@@ -51,11 +51,11 @@ Per ADR-007 and ADR-011, HIVE's primary sync engine is AutomergeIroh - Automerge
 
 ### Current Backend Situation
 
-HIVE currently supports two sync backends:
+PEAT currently supports two sync backends:
 1. **AutomergeIroh** - Open source, Automerge CRDTs + Iroh transport
 2. **Ditto** - Commercial, proprietary CRDTs + proprietary transport
 
-hive-btle introduces a third CRDT implementation (GCounter, LWW-Register, etc.) optimized for embedded. This creates a potential fragmentation problem.
+peat-btle introduces a third CRDT implementation (GCounter, LWW-Register, etc.) optimized for embedded. This creates a potential fragmentation problem.
 
 ---
 
@@ -63,11 +63,11 @@ hive-btle introduces a third CRDT implementation (GCounter, LWW-Register, etc.) 
 
 ### Architecture: Gateway Translation Model
 
-Full HIVE nodes act as **gateways** that translate between Automerge documents and hive-btle's lightweight format:
+Full PEAT nodes act as **gateways** that translate between Automerge documents and peat-btle's lightweight format:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
-│                        Full HIVE Node (Phone/Server)                        │
+│                        Full PEAT Node (Phone/Server)                        │
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
 │  │                         AutomergeIroh                                 │  │
 │  │              (Full Automerge documents, sync via Iroh)                │  │
@@ -75,12 +75,12 @@ Full HIVE nodes act as **gateways** that translate between Automerge documents a
 │                                    ↕                                        │
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
 │  │                      Translation Layer                                │  │
-│  │         (Maps hive-btle primitives ↔ Automerge document fields)       │  │
-│  │                      OWNED BY HIVE REPO                               │  │
+│  │         (Maps peat-btle primitives ↔ Automerge document fields)       │  │
+│  │                      OWNED BY PEAT REPO                               │  │
 │  └──────────────────────────────────────────────────────────────────────┘  │
 │                                    ↕                                        │
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │                          hive-btle                                    │  │
+│  │                          peat-btle                                    │  │
 │  │              (BLE transport + lightweight CRDTs for embedded)         │  │
 │  └──────────────────────────────────────────────────────────────────────┘  │
 └────────────────────────────────────────────────────────────────────────────┘
@@ -88,7 +88,7 @@ Full HIVE nodes act as **gateways** that translate between Automerge documents a
 ┌────────────────────────────────────────────────────────────────────────────┐
 │                      Embedded Node (ESP32/Pico)                             │
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │                          hive-btle                                    │  │
+│  │                          peat-btle                                    │  │
 │  │          (BLE transport + lightweight CRDTs, standalone)              │  │
 │  └──────────────────────────────────────────────────────────────────────┘  │
 └────────────────────────────────────────────────────────────────────────────┘
@@ -96,38 +96,38 @@ Full HIVE nodes act as **gateways** that translate between Automerge documents a
 
 ### Key Principles
 
-#### 1. Schema Ownership Lives in HIVE
+#### 1. Schema Ownership Lives in PEAT
 
-The canonical schema definition lives in the HIVE repository, not in hive-btle:
+The canonical schema definition lives in the PEAT repository, not in peat-btle:
 
 | Component | Owner | Description |
 |-----------|-------|-------------|
-| **Schema definition** | HIVE repo | Canonical field names, types, semantics |
-| **Automerge representation** | HIVE repo | Full documents for std nodes |
-| **Lightweight representation** | hive-btle | Embedded-friendly projection |
-| **Translation logic** | HIVE repo | Maps between representations |
-| **BLE transport** | hive-btle | Document-agnostic byte transport |
+| **Schema definition** | PEAT repo | Canonical field names, types, semantics |
+| **Automerge representation** | PEAT repo | Full documents for std nodes |
+| **Lightweight representation** | peat-btle | Embedded-friendly projection |
+| **Translation logic** | PEAT repo | Maps between representations |
+| **BLE transport** | peat-btle | Document-agnostic byte transport |
 
-#### 2. hive-btle is Transport + Lightweight CRDTs
+#### 2. peat-btle is Transport + Lightweight CRDTs
 
-hive-btle provides two things:
+peat-btle provides two things:
 1. **BLE Transport**: Discovery, connections, GATT, chunking - document agnostic
-2. **Lightweight CRDTs**: GCounter, LWW-Register, Peripheral - the "embedded projection" of HIVE schema
+2. **Lightweight CRDTs**: GCounter, LWW-Register, Peripheral - the "embedded projection" of PEAT schema
 
 The lightweight CRDTs exist because embedded devices can't run Automerge. They represent the **same semantic data** as the full schema, just in a format that fits in 256KB RAM.
 
-#### 3. hive-btle Can Stand Alone
+#### 3. peat-btle Can Stand Alone
 
-hive-btle must be usable independently for:
-- Pure embedded deployments (ESP32 mesh without any full HIVE nodes)
+peat-btle must be usable independently for:
+- Pure embedded deployments (ESP32 mesh without any full PEAT nodes)
 - Open source release (standalone BLE mesh library)
 - Testing and development
 
-When used standalone, the lightweight CRDTs ARE the schema. When integrated with full HIVE, they become a projection that gets translated.
+When used standalone, the lightweight CRDTs ARE the schema. When integrated with full PEAT, they become a projection that gets translated.
 
 #### 4. BLE-First Schema Design
 
-HIVE's schema should be designed with BLE constraints in mind:
+PEAT's schema should be designed with BLE constraints in mind:
 
 ```
 DESIGN PRINCIPLE: If it works well on BLE, it works everywhere.
@@ -142,15 +142,15 @@ Benefits:
 
 ### Integration Points
 
-#### Full HIVE Node Receiving from Embedded
+#### Full PEAT Node Receiving from Embedded
 
 ```rust
-// In HIVE repo (not hive-btle)
+// In PEAT repo (not peat-btle)
 impl TranslationLayer {
     /// Receive lightweight document from BLE, update Automerge
     fn on_ble_document_received(&mut self, data: &[u8]) -> Result<()> {
-        // Decode hive-btle format
-        let lite_doc = hive_btle::HiveDocument::decode(data)?;
+        // Decode peat-btle format
+        let lite_doc = peat_btle::PeatDocument::decode(data)?;
 
         // Extract fields and map to Automerge document
         let node_id = lite_doc.node_id;
@@ -187,20 +187,20 @@ impl TranslationLayer {
 }
 ```
 
-#### Full HIVE Node Sending to Embedded
+#### Full PEAT Node Sending to Embedded
 
 ```rust
-// In HIVE repo (not hive-btle)
+// In PEAT repo (not peat-btle)
 impl TranslationLayer {
     /// Build lightweight document from Automerge for BLE broadcast
     fn build_ble_document(&self) -> Vec<u8> {
-        let mut doc = hive_btle::HiveDocument::new(self.node_id);
+        let mut doc = peat_btle::PeatDocument::new(self.node_id);
 
         // Extract relevant fields from Automerge
         // Only include what embedded nodes need
         if let Some(emergency_ts) = self.automerge_doc.get("/alerts/active/emergency") {
             doc.peripheral.as_mut().unwrap().set_event(
-                hive_btle::EventType::Emergency,
+                peat_btle::EventType::Emergency,
                 emergency_ts
             );
         }
@@ -212,11 +212,11 @@ impl TranslationLayer {
 
 ### Transport Abstraction
 
-For true multi-transport support, HIVE should have a transport abstraction:
+For true multi-transport support, PEAT should have a transport abstraction:
 
 ```rust
-// In HIVE repo
-trait HiveTransport {
+// In PEAT repo
+trait PeatTransport {
     /// Send data to a peer
     async fn send(&self, peer_id: &NodeId, data: &[u8]) -> Result<()>;
 
@@ -232,11 +232,11 @@ trait HiveTransport {
 
 // Implementations
 struct IrohTransport { /* AutomergeIroh */ }
-struct BleTransport { /* hive-btle */ }
+struct BleTransport { /* peat-btle */ }
 
 // Transport manager selects best transport per peer
 struct TransportManager {
-    transports: Vec<Box<dyn HiveTransport>>,
+    transports: Vec<Box<dyn PeatTransport>>,
 }
 
 impl TransportManager {
@@ -261,7 +261,7 @@ When network conditions change:
 |----------|----------|
 | Full connectivity | Use Iroh for full Automerge sync |
 | WiFi fails, BLE available | Fall back to BLE, sync lightweight format |
-| Only BLE available | Full HIVE nodes act as BLE mesh participants |
+| Only BLE available | Full PEAT nodes act as BLE mesh participants |
 | BLE to embedded | Translate and sync lightweight format |
 
 The translation layer ensures data flows correctly regardless of which transport is active.
@@ -273,16 +273,16 @@ The translation layer ensures data flows correctly regardless of which transport
 ### Positive
 
 1. **Embedded devices can participate** - No Automerge requirement
-2. **Clean separation** - hive-btle is standalone and useful independently
-3. **Single source of truth** - Schema owned by HIVE, not duplicated
+2. **Clean separation** - peat-btle is standalone and useful independently
+3. **Single source of truth** - Schema owned by PEAT, not duplicated
 4. **Graceful degradation** - BLE works when WiFi fails
-5. **OSS-friendly** - hive-btle can be released standalone
+5. **OSS-friendly** - peat-btle can be released standalone
 
 ### Negative
 
 1. **Translation complexity** - Must maintain mapping between formats
 2. **Potential data loss** - Lightweight format is a subset of full schema
-3. **Two CRDT implementations** - Automerge + hive-btle lightweight
+3. **Two CRDT implementations** - Automerge + peat-btle lightweight
 4. **Testing surface** - Must test translation correctness
 
 ### Neutral
@@ -294,7 +294,7 @@ The translation layer ensures data flows correctly regardless of which transport
 
 ## Schema Mapping Guidelines
 
-When designing HIVE schema, consider BLE representation:
+When designing PEAT schema, consider BLE representation:
 
 | Full Schema Field | BLE Representation | Notes |
 |-------------------|-------------------|-------|
@@ -314,25 +314,25 @@ When designing HIVE schema, consider BLE representation:
 
 ### Phase 1: Document Architecture (This ADR)
 - [x] Define gateway translation model
-- [x] Clarify ownership (schema in HIVE, transport in hive-btle)
+- [x] Clarify ownership (schema in PEAT, transport in peat-btle)
 - [x] Document integration points
 
-### Phase 2: hive-btle Standalone (Current Work)
+### Phase 2: peat-btle Standalone (Current Work)
 - [x] Lightweight CRDTs (GCounter, Peripheral)
-- [x] HiveDocument wire format
+- [x] PeatDocument wire format
 - [x] PeerManager, DocumentSync
-- [ ] HiveMesh facade
+- [ ] PeatMesh facade
 - [ ] Platform bindings (UniFFI, JNI)
 
-### Phase 3: HIVE Translation Layer (Future)
+### Phase 3: PEAT Translation Layer (Future)
 - [ ] Define schema-to-lightweight mapping
-- [ ] Implement TranslationLayer in HIVE repo
+- [ ] Implement TranslationLayer in PEAT repo
 - [ ] Integrate with AutomergeIroh documents
 
 ### Phase 4: Transport Abstraction (Future)
-- [ ] Define HiveTransport trait
+- [ ] Define PeatTransport trait
 - [ ] Implement for Iroh
-- [ ] Implement for hive-btle
+- [ ] Implement for peat-btle
 - [ ] TransportManager with fallback logic
 
 ---
@@ -342,8 +342,8 @@ When designing HIVE schema, consider BLE representation:
 - ADR-007: Automerge-Based Sync Engine
 - ADR-011: Ditto vs AutomergeIroh Analysis
 - ADR-032: Pluggable Transport Abstraction
-- ADR-035: HIVE-Lite Embedded Nodes
-- ADR-039: HIVE-BTLE Mesh Transport Crate
+- ADR-035: PEAT-Lite Embedded Nodes
+- ADR-039: PEAT-BTLE Mesh Transport Crate
 - [Automerge](https://automerge.org/) - CRDT library
 - [Iroh](https://iroh.computer/) - P2P networking
 
@@ -354,6 +354,6 @@ When designing HIVE schema, consider BLE representation:
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2024-12-22 | Gateway translation model | Automerge too heavy for ESP32, need lightweight alternative |
-| 2024-12-22 | Schema ownership in HIVE | Single source of truth, hive-btle is projection |
-| 2024-12-22 | hive-btle standalone capability | OSS release, pure embedded deployments |
+| 2024-12-22 | Schema ownership in PEAT | Single source of truth, peat-btle is projection |
+| 2024-12-22 | peat-btle standalone capability | OSS release, pure embedded deployments |
 | 2024-12-22 | BLE-first schema design | If it works on BLE, it works everywhere |

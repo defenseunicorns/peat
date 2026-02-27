@@ -5,11 +5,11 @@
        functional-suite functional-ble functional-android functional-k8s
 
 # ============================================
-# HIVE Protocol Development Makefile
+# PEAT Protocol Development Makefile
 # ============================================
 
 help:
-	@echo "HIVE Protocol Development & Testing"
+	@echo "PEAT Protocol Development & Testing"
 	@echo ""
 	@echo "Development:"
 	@echo "  build        - Build all crates"
@@ -33,7 +33,7 @@ help:
 	@echo "Architecture Comparison (O(n²) vs O(n log n)):"
 	@echo "  baseline-client-server    - Traditional hub-spoke (all node counts)"
 	@echo "  baseline-mesh             - Traditional P2P mesh (all node counts)"
-	@echo "  hive-hierarchical         - HIVE hierarchical (all node counts)"
+	@echo "  peat-hierarchical         - PEAT hierarchical (all node counts)"
 	@echo "  compare-architectures     - Run all 3 architectures for comparison"
 	@echo ""
 	@echo "Bandwidth Testing:"
@@ -56,7 +56,7 @@ help:
 	@echo "  build-docker             - Build Docker image (run once before tests)"
 	@echo ""
 	@echo "Android (ATAK Plugin):"
-	@echo "  build-android            - Cross-compile hive-ffi for Android"
+	@echo "  build-android            - Cross-compile peat-ffi for Android"
 	@echo "  build-atak-plugin        - Build ATAK plugin APK (includes native libs)"
 	@echo "  deploy-atak-plugin       - Deploy APK to connected device"
 	@echo "  android                  - Build and deploy ATAK plugin"
@@ -83,7 +83,7 @@ help:
 	@echo "  functional-k8s           - Run only k8s cluster test"
 	@echo ""
 	@echo "Legacy E-Series Tests (for reference):"
-	@echo "  e11-modes                - Test HIVE modes (legacy)"
+	@echo "  e11-modes                - Test PEAT modes (legacy)"
 	@echo "  e12-comprehensive        - Full validation suite (legacy)"
 
 # ============================================
@@ -95,9 +95,9 @@ build:
 	cargo build
 
 build-docker:
-	@echo "Building Docker image for hive-sim..."
-	@cd hive-sim && docker build -f Dockerfile -t hive-sim-node:latest ..
-	@echo "✓ Docker image built: hive-sim-node:latest"
+	@echo "Building Docker image for peat-sim..."
+	@cd peat-sim && docker build -f Dockerfile -t peat-sim-node:latest ..
+	@echo "✓ Docker image built: peat-sim-node:latest"
 
 # ============================================
 # Tiered Testing (for fast development iteration)
@@ -127,16 +127,16 @@ test-unit: clean-ditto
 	@echo "Running unit tests..."
 	@if command -v cargo-nextest >/dev/null 2>&1; then \
 		if [ -f .env ]; then \
-			export $$(grep -v '^#' .env | xargs) && cargo nextest run --lib --workspace --exclude hive-ffi; \
+			export $$(grep -v '^#' .env | xargs) && cargo nextest run --lib --workspace --exclude peat-ffi; \
 		else \
-			cargo nextest run --lib --workspace --exclude hive-ffi; \
+			cargo nextest run --lib --workspace --exclude peat-ffi; \
 		fi; \
 	else \
 		echo "Note: Install cargo-nextest for 2x faster tests: cargo install cargo-nextest"; \
 		if [ -f .env ]; then \
-			export $$(grep -v '^#' .env | xargs) && cargo test --lib --workspace --exclude hive-ffi; \
+			export $$(grep -v '^#' .env | xargs) && cargo test --lib --workspace --exclude peat-ffi; \
 		else \
-			cargo test --lib --workspace --exclude hive-ffi; \
+			cargo test --lib --workspace --exclude peat-ffi; \
 		fi; \
 	fi
 
@@ -145,16 +145,16 @@ test-integration: clean-ditto
 	@echo "Running integration tests (excluding E2E)..."
 	@if command -v cargo-nextest >/dev/null 2>&1; then \
 		if [ -f .env ]; then \
-			export $$(grep -v '^#' .env | xargs) && cargo nextest run --workspace --exclude hive-ffi -E 'not test(e2e)'; \
+			export $$(grep -v '^#' .env | xargs) && cargo nextest run --workspace --exclude peat-ffi -E 'not test(e2e)'; \
 		else \
-			cargo nextest run --workspace --exclude hive-ffi -E 'not test(e2e)'; \
+			cargo nextest run --workspace --exclude peat-ffi -E 'not test(e2e)'; \
 		fi; \
 	else \
 		echo "Note: Install cargo-nextest for 2x faster tests: cargo install cargo-nextest"; \
 		if [ -f .env ]; then \
-			export $$(grep -v '^#' .env | xargs) && cargo test --workspace --exclude hive-ffi; \
+			export $$(grep -v '^#' .env | xargs) && cargo test --workspace --exclude peat-ffi; \
 		else \
-			cargo test --workspace --exclude hive-ffi; \
+			cargo test --workspace --exclude peat-ffi; \
 		fi; \
 	fi
 
@@ -167,16 +167,16 @@ test-e2e: clean-ditto
 	fi
 	@if command -v cargo-nextest >/dev/null 2>&1; then \
 		if [ -f .env ]; then \
-			export $$(grep -v '^#' .env | xargs) && cargo nextest run --workspace --exclude hive-ffi -E 'test(e2e)'; \
+			export $$(grep -v '^#' .env | xargs) && cargo nextest run --workspace --exclude peat-ffi -E 'test(e2e)'; \
 		else \
-			cargo nextest run --workspace --exclude hive-ffi -E 'test(e2e)'; \
+			cargo nextest run --workspace --exclude peat-ffi -E 'test(e2e)'; \
 		fi; \
 	else \
 		echo "Note: Install cargo-nextest for 2x faster tests: cargo install cargo-nextest"; \
 		if [ -f .env ]; then \
-			export $$(grep -v '^#' .env | xargs) && cargo test --workspace --exclude hive-ffi e2e; \
+			export $$(grep -v '^#' .env | xargs) && cargo test --workspace --exclude peat-ffi e2e; \
 		else \
-			cargo test --workspace --exclude hive-ffi e2e; \
+			cargo test --workspace --exclude peat-ffi e2e; \
 		fi; \
 	fi
 
@@ -185,22 +185,22 @@ test: clean-ditto
 	@echo "Running all tests..."
 	@if command -v cargo-nextest >/dev/null 2>&1; then \
 		if [ -f .env ]; then \
-			export $$(grep -v '^#' .env | xargs) && cargo nextest run --workspace --exclude hive-ffi; \
+			export $$(grep -v '^#' .env | xargs) && cargo nextest run --workspace --exclude peat-ffi; \
 		else \
-			cargo nextest run --workspace --exclude hive-ffi; \
+			cargo nextest run --workspace --exclude peat-ffi; \
 		fi; \
 	else \
 		if [ -f .env ]; then \
-			export $$(grep -v '^#' .env | xargs) && cargo test --workspace --exclude hive-ffi; \
+			export $$(grep -v '^#' .env | xargs) && cargo test --workspace --exclude peat-ffi; \
 		else \
-			cargo test --workspace --exclude hive-ffi; \
+			cargo test --workspace --exclude peat-ffi; \
 		fi; \
 	fi
 
 # Run baseline comparison tests only (Containerlab-based)
 test-baseline:
 	@echo "Running baseline comparison tests..."
-	@cd hive-sim && ./run-baseline-comparison.sh
+	@cd peat-sim && ./run-baseline-comparison.sh
 
 fmt:
 	@echo "Formatting code..."
@@ -216,16 +216,16 @@ check: fmt clippy test
 pre-commit: clean-ditto
 	@echo "Running pre-commit checks..."
 	@cargo fmt --all
-	@cargo clippy --all-targets --all-features --workspace --exclude hive-ffi --exclude hive-inference -- -D warnings
-	@cargo clippy --all-targets --workspace -p hive-inference -- -D warnings
+	@cargo clippy --all-targets --all-features --workspace --exclude peat-ffi --exclude peat-inference -- -D warnings
+	@cargo clippy --all-targets --workspace -p peat-inference -- -D warnings
 	@$(MAKE) test-unit
 	@echo "✅ Pre-commit checks passed!"
 
 ci: clean-ditto
 	@echo "Running CI pipeline..."
 	@cargo fmt --all -- --check
-	@cargo clippy --all-targets --all-features --workspace --exclude hive-ffi --exclude hive-inference -- -D warnings
-	@cargo clippy --all-targets --workspace -p hive-inference -- -D warnings
+	@cargo clippy --all-targets --all-features --workspace --exclude peat-ffi --exclude peat-inference -- -D warnings
+	@cargo clippy --all-targets --workspace -p peat-inference -- -D warnings
 	@$(MAKE) test-integration
 	@echo "✅ CI pipeline passed!"
 
@@ -235,18 +235,18 @@ clean: clean-ditto
 
 clean-ditto:
 	@find . -type d -name ".ditto*" -exec rm -rf {} + 2>/dev/null || true
-	@rm -rf /tmp/hive-persistence-test-* 2>/dev/null || true
+	@rm -rf /tmp/peat-persistence-test-* 2>/dev/null || true
 
 clean-labs:
 	@echo "Cleaning up all containerlab topologies..."
-	@cd hive-sim && ./cleanup-all-labs.sh
+	@cd peat-sim && ./cleanup-all-labs.sh
 
 # ============================================
 # Quick Validation
 # ============================================
 
 validate:
-	@$(MAKE) -C hive-sim validate
+	@$(MAKE) -C peat-sim validate
 
 # ============================================
 # Architecture Comparison (O(n²) vs O(n))
@@ -260,7 +260,7 @@ baseline-client-server:
 	@echo "║  Expected: O(n²) message volume at HQ                     ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@echo ""
-	@cd hive-sim && ./test-traditional-client-server-suite.sh
+	@cd peat-sim && ./test-traditional-client-server-suite.sh
 
 # Traditional P2P Mesh - Shows O(n²) connections AND messages
 baseline-mesh:
@@ -270,17 +270,17 @@ baseline-mesh:
 	@echo "║  Expected: O(n²) connections + O(n²) messages per node    ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@echo ""
-	@cd hive-sim && ./test-traditional-mesh-suite.sh
+	@cd peat-sim && ./test-traditional-mesh-suite.sh
 
-# HIVE Hierarchical - Shows O(n log n) scaling
-hive-hierarchical:
+# PEAT Hierarchical - Shows O(n log n) scaling
+peat-hierarchical:
 	@echo "╔════════════════════════════════════════════════════════════╗"
-	@echo "║  HIVE Hierarchical Protocol                               ║"
+	@echo "║  PEAT Hierarchical Protocol                               ║"
 	@echo "║  Hierarchical aggregation with differential filtering     ║"
 	@echo "║  Expected: O(n log n) message volume via aggregation      ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@echo ""
-	@cd hive-sim && ./test-hive-hierarchical-suite.sh
+	@cd peat-sim && ./test-peat-hierarchical-suite.sh
 
 # Run all three architectures for direct comparison
 compare-architectures:
@@ -291,10 +291,10 @@ compare-architectures:
 	@echo ""
 	@$(MAKE) baseline-client-server
 	@$(MAKE) baseline-mesh
-	@$(MAKE) hive-hierarchical
+	@$(MAKE) peat-hierarchical
 	@echo ""
 	@echo "✅ Architecture comparison complete"
-	@echo "📊 Compare results in hive-sim/architecture-comparison-*/"
+	@echo "📊 Compare results in peat-sim/architecture-comparison-*/"
 
 # ============================================
 # Backend Comparison
@@ -306,7 +306,7 @@ backend-comparison:
 	@echo "║  2 Backends × 4 Bandwidths = 8 test runs                  ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@echo ""
-	@cd hive-sim && ./test-backend-comparison.sh
+	@cd peat-sim && ./test-backend-comparison.sh
 
 # Quick validation: Test event-driven hierarchical (24-node only)
 validate-event-driven:
@@ -315,7 +315,7 @@ validate-event-driven:
 	@echo "║  Zero polling - measuring REAL empirical latencies        ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@echo ""
-	@cd hive-sim && ./validate-event-driven.sh
+	@cd peat-sim && ./validate-event-driven.sh
 
 backend-comparison-scaling:
 	@echo "╔════════════════════════════════════════════════════════════╗"
@@ -328,7 +328,7 @@ backend-comparison-scaling:
 	@echo "   Tests: 24/48/96 nodes × Traditional/Hierarchical"
 	@echo "   Metrics: Document sync latency (P50/P95/P99)"
 	@echo ""
-	@cd hive-sim && ./test-backend-comparison-scaling.sh
+	@cd peat-sim && ./test-backend-comparison-scaling.sh
 
 backend-comparison-hierarchical:
 	@echo "╔════════════════════════════════════════════════════════════╗"
@@ -337,7 +337,7 @@ backend-comparison-hierarchical:
 	@echo "║  2 Backends × 3 Scales × 2 Topologies × 4 BW = 48 tests   ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@echo ""
-	@cd hive-sim && ./test-backend-comparison-hierarchical.sh
+	@cd peat-sim && ./test-backend-comparison-hierarchical.sh
 
 # Traditional baseline tests - run once and reuse (NO CRDT)
 traditional-baseline:
@@ -347,7 +347,7 @@ traditional-baseline:
 	@echo "║  4 Scales × 4 BW = 16 tests (~45 mins)                    ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@echo ""
-	@cd hive-sim && ./test-traditional-baseline.sh
+	@cd peat-sim && ./test-traditional-baseline.sh
 
 # Hierarchical tests only - reuse traditional results from previous run
 hierarchical-only:
@@ -357,7 +357,7 @@ hierarchical-only:
 	@echo "║  2 Backends × 3 Scales × 4 BW = 24 tests (~60 mins)       ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@echo ""
-	@cd hive-sim && ./test-hierarchical-only.sh
+	@cd peat-sim && ./test-hierarchical-only.sh
 
 # ============================================
 # Bandwidth Testing
@@ -370,7 +370,7 @@ bandwidth-matrix:
 	@echo "║  3 Architectures × 4 Bandwidths = 12 test runs            ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@echo ""
-	@cd hive-sim && ./test-bandwidth-matrix.sh
+	@cd peat-sim && ./test-bandwidth-matrix.sh
 
 # Test specific bandwidth constraint
 bandwidth-constrained:
@@ -381,7 +381,7 @@ bandwidth-constrained:
 		exit 1; \
 	fi
 	@echo "Testing all architectures at $(BW) bandwidth..."
-	@cd hive-sim && ./test-bandwidth-constrained.sh $(BW)
+	@cd peat-sim && ./test-bandwidth-constrained.sh $(BW)
 
 # ============================================
 # Full Experimental Matrix
@@ -396,32 +396,32 @@ matrix-full:
 	@echo ""
 	@echo "⚠️  WARNING: This will take several hours"
 	@echo ""
-	@cd hive-sim && ./run-complete-matrix.sh
+	@cd peat-sim && ./run-complete-matrix.sh
 
 # Analyze matrix results
 matrix-analyze:
 	@if [ -z "$(DIR)" ]; then \
 		echo "Usage: make matrix-analyze DIR=<results-directory>"; \
-		echo "Example: make matrix-analyze DIR=hive-sim/matrix-results-20251118-120000"; \
+		echo "Example: make matrix-analyze DIR=peat-sim/matrix-results-20251118-120000"; \
 		exit 1; \
 	fi
 	@echo "Generating comparative analysis for $(DIR)..."
-	@cd hive-sim && python3 analyze-matrix-results.py $(DIR)
+	@cd peat-sim && python3 analyze-matrix-results.py $(DIR)
 
 # ============================================
 # Android Cross-Compilation
 # ============================================
 
-# Build hive-ffi native library for Android
+# Build peat-ffi native library for Android
 # Requires: cargo-ndk (cargo install cargo-ndk)
-# Outputs to: atak-plugin/app/libs/{arm64-v8a,armeabi-v7a}/libhive_ffi.so
+# Outputs to: atak-plugin/app/libs/{arm64-v8a,armeabi-v7a}/libpeat_ffi.so
 build-android:
-	@echo "Building hive-ffi for Android..."
+	@echo "Building peat-ffi for Android..."
 	@command -v cargo-ndk >/dev/null 2>&1 || { echo "Error: cargo-ndk not found. Install with: cargo install cargo-ndk"; exit 1; }
 	@export PATH="$$HOME/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin:$$PATH" && \
-		cargo ndk -t arm64-v8a -t armeabi-v7a -o atak-plugin/app/libs build --release -p hive-ffi --features bluetooth
+		cargo ndk -t arm64-v8a -t armeabi-v7a -o atak-plugin/app/libs build --release -p peat-ffi --features bluetooth
 	@echo "✓ Native libraries built:"
-	@ls -la atak-plugin/app/libs/arm64-v8a/libhive_ffi.so atak-plugin/app/libs/armeabi-v7a/libhive_ffi.so
+	@ls -la atak-plugin/app/libs/arm64-v8a/libpeat_ffi.so atak-plugin/app/libs/armeabi-v7a/libpeat_ffi.so
 
 # Build ATAK plugin with native libs
 build-atak-plugin: build-android
@@ -432,7 +432,7 @@ build-atak-plugin: build-android
 # Deploy ATAK plugin to connected device
 deploy-atak-plugin:
 	@echo "Deploying ATAK plugin..."
-	@adb install -r atak-plugin/app/build/outputs/apk/civ/debug/ATAK-Plugin-HIVE-*.apk
+	@adb install -r atak-plugin/app/build/outputs/apk/civ/debug/ATAK-Plugin-PEAT-*.apk
 	@echo "✓ Deployed to device"
 
 # Full Android build and deploy
@@ -442,8 +442,8 @@ android: build-atak-plugin deploy-atak-plugin
 # Clean Android build artifacts
 clean-android:
 	@echo "Cleaning Android build artifacts..."
-	@rm -rf atak-plugin/app/libs/arm64-v8a/libhive_ffi.so
-	@rm -rf atak-plugin/app/libs/armeabi-v7a/libhive_ffi.so
+	@rm -rf atak-plugin/app/libs/arm64-v8a/libpeat_ffi.so
+	@rm -rf atak-plugin/app/libs/armeabi-v7a/libpeat_ffi.so
 	@rm -rf atak-plugin/app/build
 	@echo "✓ Android artifacts cleaned"
 
@@ -467,15 +467,15 @@ BLE_TEST_PI_USER ?= kit
 IROH_TEST_PORT ?= 42009
 BLE_TEST_PI_IP ?= 192.168.228.13
 
-# Build Android BLE test APK (cross-compile libhive_ffi + Gradle build)
+# Build Android BLE test APK (cross-compile libpeat_ffi + Gradle build)
 build-ble-test-app: build-android
 	@echo "╔════════════════════════════════════════════════════════════╗"
 	@echo "║  Building Android BLE Test App                            ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@mkdir -p android-ble-test/app/src/main/jniLibs/arm64-v8a
-	cp atak-plugin/app/libs/arm64-v8a/libhive_ffi.so \
+	cp atak-plugin/app/libs/arm64-v8a/libpeat_ffi.so \
 		android-ble-test/app/src/main/jniLibs/arm64-v8a/
-	@echo "✓ Copied libhive_ffi.so to android-ble-test jniLibs"
+	@echo "✓ Copied libpeat_ffi.so to android-ble-test jniLibs"
 	cd android-ble-test && ./gradlew assembleDebug
 	@echo "✓ BLE test APK built:"
 	@ls -la android-ble-test/app/build/outputs/apk/debug/app-debug.apk
@@ -514,7 +514,7 @@ ble-test-logs:
 clean-ble-test: stop-dual-test-peer
 	@echo "Cleaning BLE test artifacts..."
 	@rm -rf android-ble-test/app/build
-	@rm -rf android-ble-test/app/src/main/jniLibs/arm64-v8a/libhive_ffi.so
+	@rm -rf android-ble-test/app/src/main/jniLibs/arm64-v8a/libpeat_ffi.so
 	@echo "✓ BLE test artifacts cleaned"
 
 # ============================================
@@ -534,7 +534,7 @@ build-dual-test-peer:
 	CXXFLAGS="-include cstdint" cross build --release \
 		--target aarch64-unknown-linux-gnu \
 		--example dual_test_peer \
-		-p hive-ffi --features sync,bluetooth
+		-p peat-ffi --features sync,bluetooth
 	@echo "✓ dual_test_peer built:"
 	@ls -la target/aarch64-unknown-linux-gnu/release/examples/dual_test_peer
 
@@ -632,7 +632,7 @@ dual-transport-test: deploy-dual-test-peer build-ble-test-app deploy-ble-test-ap
 	echo "╔════════════════════════════════════════════════════════════╗"; \
 	echo "║  Android Results                                          ║"; \
 	echo "╚════════════════════════════════════════════════════════════╝"; \
-	adb logcat -d -s HiveTest 2>/dev/null | grep -E "Phase|RESULT|HIVE |Run:|Build:|====| " || echo "  (no output captured)"
+	adb logcat -d -s HiveTest 2>/dev/null | grep -E "Phase|RESULT|PEAT |Run:|Build:|====| " || echo "  (no output captured)"
 	@echo ""
 	@echo "Waiting for Pi dual_test_peer to finish (up to 30s)..."
 	@for i in $$(seq 1 30); do \
@@ -669,8 +669,8 @@ dual-test-peer-logs:
 # Functional Test Suite (all hardware tests)
 # ============================================
 # Orchestrates all functional/hardware tests from one entry point.
-# Tests: rpi-rpi BLE (hive-btle), rpi-android dual-transport (hive),
-#        k8s cluster (hive-mesh)
+# Tests: rpi-rpi BLE (peat-btle), rpi-android dual-transport (hive),
+#        k8s cluster (peat-mesh)
 
 functional-suite:
 	@./scripts/functional-suite.sh
@@ -690,7 +690,7 @@ functional-k8s:
 
 e11-modes:
 	@echo "Running E11 mode testing (legacy)..."
-	@cd hive-sim && ./test-all-modes-report.sh
+	@cd peat-sim && ./test-all-modes-report.sh
 
 e12-comprehensive:
 	@echo "Running E12 comprehensive validation (legacy)..."

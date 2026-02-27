@@ -3,7 +3,7 @@ plugins {
     application
 }
 
-group = "live.ditto.hive"
+group = "live.ditto.peat"
 version = "0.1.0"
 
 repositories {
@@ -39,9 +39,9 @@ val nativeLibDir = layout.buildDirectory.dir("native")
 // Copy native library to a location JNA can find
 tasks.register<Copy>("copyNativeLib") {
     from("${rootProject.projectDir}/../target/debug")
-    include("libhive_ffi.dylib")  // macOS
-    include("libhive_ffi.so")     // Linux
-    include("hive_ffi.dll")       // Windows
+    include("libpeat_ffi.dylib")  // macOS
+    include("libpeat_ffi.so")     // Linux
+    include("peat_ffi.dll")       // Windows
     into(nativeLibDir)
 }
 

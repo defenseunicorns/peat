@@ -5,14 +5,14 @@ on:
   push:
     branches: [ main, develop ]
     paths:
-      - 'hive-ffi/**'
-      - 'hive-protocol/**'
+      - 'peat-ffi/**'
+      - 'peat-protocol/**'
       - '.github/workflows/android.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
-      - 'hive-ffi/**'
-      - 'hive-protocol/**'
+      - 'peat-ffi/**'
+      - 'peat-protocol/**'
       - '.github/workflows/android.yml'
 
 env:
@@ -85,18 +85,18 @@ jobs:
           cache-on-failure: true
           key: android-${{ matrix.target }}
 
-      - name: Build hive-ffi for Android
+      - name: Build peat-ffi for Android
         env:
           CC: ${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.cc }}
           AR: ${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
         run: |
-          cargo build -p hive-ffi --release --target ${{ matrix.target }}
+          cargo build -p peat-ffi --release --target ${{ matrix.target }}
 
       - name: Upload native library
         uses: actions/upload-artifact@v4
         with:
-          name: libhive_ffi-${{ matrix.abi }}
-          path: target/${{ matrix.target }}/release/libhive_ffi.so
+          name: libpeat_ffi-${{ matrix.abi }}
+          path: target/${{ matrix.target }}/release/libpeat_ffi.so
           if-no-files-found: error
 
   generate-bindings:
@@ -118,14 +118,14 @@ jobs:
           cache-on-failure: true
           key: bindings
 
-      - name: Build hive-ffi (host)
-        run: cargo build -p hive-ffi --release
+      - name: Build peat-ffi (host)
+        run: cargo build -p peat-ffi --release
 
       - name: Generate Kotlin bindings
         run: |
-          cargo run -p hive-ffi --release --bin uniffi-bindgen -- \
+          cargo run -p peat-ffi --release --bin uniffi-bindgen -- \
             generate \
-            --library target/release/libhive_ffi.so \
+            --library target/release/libpeat_ffi.so \
             --language kotlin \
             --out-dir bindings/kotlin
 
@@ -157,9 +157,9 @@ jobs:
           mkdir -p android/kotlin
 
           # Copy native libraries
-          cp artifacts/libhive_ffi-arm64-v8a/libhive_ffi.so android/jniLibs/arm64-v8a/
-          cp artifacts/libhive_ffi-armeabi-v7a/libhive_ffi.so android/jniLibs/armeabi-v7a/
-          cp artifacts/libhive_ffi-x86_64/libhive_ffi.so android/jniLibs/x86_64/
+          cp artifacts/libpeat_ffi-arm64-v8a/libpeat_ffi.so android/jniLibs/arm64-v8a/
+          cp artifacts/libpeat_ffi-armeabi-v7a/libpeat_ffi.so android/jniLibs/armeabi-v7a/
+          cp artifacts/libpeat_ffi-x86_64/libpeat_ffi.so android/jniLibs/x86_64/
 
           # Copy Kotlin bindings
           cp -r artifacts/kotlin-bindings/* android/kotlin/
@@ -171,6 +171,6 @@ jobs:
       - name: Upload complete Android package
         uses: actions/upload-artifact@v4
         with:
-          name: hive-android-package
+          name: peat-android-package
           path: android/
           if-no-files-found: error
